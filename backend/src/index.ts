@@ -71,11 +71,11 @@ app.get('/health', (req, res) => {
     });
 });
 
-// Routes
+// Routes - Enable one by one to find the problem
 app.use('/api/initiatives', initiativeRoutes);
-app.use('/api/kpis', kpiRoutes);
-app.use('/api/evidence', evidenceRoutes);
-app.use('/api/upload', uploadRoutes);
+// app.use('/api/kpis', kpiRoutes);
+// app.use('/api/evidence', evidenceRoutes);
+// app.use('/api/upload', uploadRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
