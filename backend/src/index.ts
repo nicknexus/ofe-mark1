@@ -23,7 +23,7 @@ app.use(helmet({
 }));
 app.use(cors({
     origin: process.env.NODE_ENV === 'production'
-        ? process.env.FRONTEND_URL
+        ? true // Allow all origins for now
         : 'http://localhost:3000',
     credentials: true
 }));
@@ -40,21 +40,21 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files from uploads directory
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+// Serve static files from uploads directory (disabled for serverless)
+// app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Environment check endpoint
 app.get('/health', (req, res) => {
-    console.log('Environment check:', {
-        SUPABASE_URL: process.env.SUPABASE_URL ? '✅ SET' : '❌ MISSING',
-        SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? '✅ SET' : '❌ MISSING',
-        SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ? '✅ SET' : '❌ MISSING'
-    });
-
+    // Simplified health check for serverless
     res.json({
         status: 'OK',
         timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development'
+        environment: process.env.NODE_ENV || 'development',
+        supabase: {
+            url: !!process.env.SUPABASE_URL,
+            anon_key: !!process.env.SUPABASE_ANON_KEY,
+            service_key: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+        }
     });
 });
 
