@@ -59,10 +59,10 @@ export default function CreateKPIModal({
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                    <h2 className="text-xl font-semibold text-gray-900">Create New KPI</h2>
+                <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
+                    <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Create New KPI</h2>
                     <button
                         onClick={onClose}
                         className="text-gray-400 hover:text-gray-600 p-1"
@@ -72,9 +72,9 @@ export default function CreateKPIModal({
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
                     <div>
-                        <label className="label">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
                             KPI Title <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -82,37 +82,37 @@ export default function CreateKPIModal({
                             name="title"
                             value={formData.title}
                             onChange={handleInputChange}
-                            className="input-field"
-                            placeholder="e.g., Number of students trained"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                            placeholder="e.g., Students Trained, Wells Built"
                             required
                         />
                     </div>
 
                     <div>
-                        <label className="label">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
                             Description <span className="text-red-500">*</span>
                         </label>
                         <textarea
                             name="description"
                             value={formData.description}
                             onChange={handleInputChange}
-                            className="input-field resize-none"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none text-sm"
                             rows={3}
-                            placeholder="What does this KPI measure and why is it important?"
+                            placeholder="Describe what this KPI measures..."
                             required
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label className="label">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Metric Type <span className="text-red-500">*</span>
                             </label>
                             <select
                                 name="metric_type"
                                 value={formData.metric_type}
                                 onChange={handleInputChange}
-                                className="input-field"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
                                 required
                             >
                                 <option value="number">Number</option>
@@ -121,7 +121,7 @@ export default function CreateKPIModal({
                         </div>
 
                         <div>
-                            <label className="label">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Unit <span className="text-red-500">*</span>
                             </label>
                             <input
@@ -129,44 +129,61 @@ export default function CreateKPIModal({
                                 name="unit_of_measurement"
                                 value={formData.unit_of_measurement}
                                 onChange={handleInputChange}
-                                className="input-field"
-                                placeholder="students, hours, USD"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                                placeholder="People, Hours, USD, etc."
                                 required
                             />
                         </div>
                     </div>
 
                     <div>
-                        <label className="label">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                             Category <span className="text-red-500">*</span>
                         </label>
-                        <select
-                            name="category"
-                            value={formData.category}
-                            onChange={handleInputChange}
-                            className="input-field"
-                            required
-                        >
-                            <option value="input">Input (Resources used)</option>
-                            <option value="output">Output (Direct results)</option>
-                            <option value="impact">Impact (Long-term outcomes)</option>
-                        </select>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            {[
+                                { value: 'input', label: 'Input', desc: 'Resources going in' },
+                                { value: 'output', label: 'Output', desc: 'Direct results' },
+                                { value: 'impact', label: 'Impact', desc: 'Long-term effects' }
+                            ].map((category) => (
+                                <label
+                                    key={category.value}
+                                    className={`relative flex flex-col p-3 border rounded-lg cursor-pointer transition-colors ${formData.category === category.value
+                                        ? 'border-primary-500 bg-primary-50'
+                                        : 'border-gray-300 hover:border-gray-400'
+                                        }`}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="category"
+                                        value={category.value}
+                                        checked={formData.category === category.value}
+                                        onChange={handleInputChange}
+                                        className="sr-only"
+                                    />
+                                    <span className="text-sm font-medium text-gray-900">
+                                        {category.label}
+                                    </span>
+                                    <span className="text-xs text-gray-500 mt-1">
+                                        {category.desc}
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex space-x-3 pt-4">
+                    <div className="flex flex-col sm:flex-row gap-3 pt-4">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="btn-secondary flex-1"
-                            disabled={loading}
+                            className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 order-2 sm:order-1"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="btn-primary flex-1"
-                            disabled={loading || !formData.title || !formData.description || !formData.unit_of_measurement}
+                            disabled={loading}
+                            className="w-full sm:flex-1 px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-lg hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2"
                         >
                             {loading ? 'Creating...' : 'Create KPI'}
                         </button>

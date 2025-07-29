@@ -129,409 +129,305 @@ export default function KPIDetailPage() {
     const proofPercentage = getEvidenceProofPercentage()
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center space-x-4">
-                <Link
-                    to={`/initiatives/${initiativeId}`}
-                    className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                    <ArrowLeft className="w-5 h-5" />
-                </Link>
-                <div className="flex-1">
-                    <h1 className="text-3xl font-bold text-gray-900">{kpi.title}</h1>
-                    <p className="text-gray-600 mt-1">{kpi.description}</p>
-                </div>
-                <div className="flex space-x-3">
-                    <button
-                        onClick={() => setIsEvidenceModalOpen(true)}
-                        className="btn-secondary flex items-center space-x-2"
-                    >
-                        <Upload className="w-4 h-4" />
-                        <span>Add Evidence</span>
-                    </button>
-                    <button
-                        onClick={() => setIsUpdateModalOpen(true)}
-                        className="btn-primary flex items-center space-x-2"
-                    >
-                        <Plus className="w-4 h-4" />
-                        <span>Add Data</span>
-                    </button>
-                </div>
-            </div>
-
-            {/* Quick Stats Bar */}
-            <div className="grid grid-cols-3 gap-4">
-                <div className="card p-4 text-center">
-                    <p className="text-2xl font-bold text-blue-600">{updates.length}</p>
-                    <p className="text-sm text-gray-600">Data Points</p>
-                </div>
-                <div className="card p-4 text-center">
-                    <p className="text-2xl font-bold text-green-600">{evidence.length}</p>
-                    <p className="text-sm text-gray-600">Evidence Items</p>
-                </div>
-                <div className="card p-4 text-center">
-                    <p className={`text-2xl font-bold ${proofPercentage >= 80 ? 'text-green-600' :
-                        proofPercentage >= 30 ? 'text-yellow-600' : 'text-red-600'
-                        }`}>
-                        {proofPercentage}%
-                    </p>
-                    <p className="text-sm text-gray-600">Proven</p>
-                </div>
-            </div>
-
-            {/* Charts Section - Wide Layout */}
-            {updates.length > 0 && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Individual Data Points Chart */}
-                    <div className="card p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                            Individual Data Points
-                        </h3>
-                        <ResponsiveContainer width="100%" height={250}>
-                            <LineChart data={updates
-                                .sort((a, b) => new Date(a.date_represented).getTime() - new Date(b.date_represented).getTime())
-                                .map(update => ({
-                                    date: new Date(update.date_represented).toLocaleDateString('en-US', {
-                                        month: 'short',
-                                        day: 'numeric'
-                                    }),
-                                    value: update.value,
-                                    label: update.label || update.note
-                                }))}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                                <XAxis
-                                    dataKey="date"
-                                    stroke="#6b7280"
-                                    fontSize={12}
-                                />
-                                <YAxis
-                                    stroke="#6b7280"
-                                    fontSize={12}
-                                />
-                                <Tooltip
-                                    contentStyle={{
-                                        backgroundColor: 'white',
-                                        border: '1px solid #e5e7eb',
-                                        borderRadius: '8px'
-                                    }}
-                                    formatter={(value, name) => [
-                                        `${value} ${kpi.unit_of_measurement || ''}`,
-                                        'Value'
-                                    ]}
-                                />
-                                <Line
-                                    type="monotone"
-                                    dataKey="value"
-                                    stroke="#16a34a"
-                                    strokeWidth={3}
-                                    dot={{ fill: '#16a34a', r: 6 }}
-                                    activeDot={{ r: 8, stroke: '#16a34a', strokeWidth: 2 }}
-                                />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
-
-                    {/* Evidence Coverage Visualization */}
-                    <div className="card p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                            Evidence Coverage
-                        </h3>
-                        <div className="flex items-center justify-center" style={{ height: '250px' }}>
-                            <div className="text-center">
-                                {/* Large Percentage Circle */}
-                                <div className={`inline-flex items-center justify-center w-32 h-32 rounded-full text-4xl font-bold mb-6 ${proofPercentage >= 80 ? 'bg-green-100 text-green-600' :
-                                        proofPercentage >= 30 ? 'bg-yellow-100 text-yellow-600' :
-                                            'bg-red-100 text-red-600'
-                                    }`}>
-                                    {proofPercentage}%
-                                </div>
-
-                                {/* Stats Grid */}
-                                <div className="grid grid-cols-2 gap-4 text-center">
-                                    <div className="p-3 bg-gray-50 rounded-lg">
-                                        <p className="text-lg font-semibold text-gray-900">{updates.length}</p>
-                                        <p className="text-xs text-gray-600">Data Points</p>
-                                    </div>
-                                    <div className="p-3 bg-gray-50 rounded-lg">
-                                        <p className="text-lg font-semibold text-gray-900">{evidence.length}</p>
-                                        <p className="text-xs text-gray-600">Evidence Items</p>
-                                    </div>
-                                    <div className="p-3 bg-green-50 rounded-lg">
-                                        <p className="text-lg font-semibold text-green-600">
-                                            {updates.filter(u => evidence.some(e =>
-                                                e.date_represented === u.date_represented ||
-                                                (e.date_range_start && e.date_range_end &&
-                                                    u.date_represented >= e.date_range_start &&
-                                                    u.date_represented <= e.date_range_end)
-                                            )).length}
-                                        </p>
-                                        <p className="text-xs text-gray-600">Proven</p>
-                                    </div>
-                                    <div className="p-3 bg-red-50 rounded-lg">
-                                        <p className="text-lg font-semibold text-red-600">
-                                            {updates.length - updates.filter(u => evidence.some(e =>
-                                                e.date_represented === u.date_represented ||
-                                                (e.date_range_start && e.date_range_end &&
-                                                    u.date_represented >= e.date_range_start &&
-                                                    u.date_represented <= e.date_range_end)
-                                            )).length}
-                                        </p>
-                                        <p className="text-xs text-gray-600">Needs Proof</p>
-                                    </div>
-                                </div>
+        <>
+            {/* Header with back navigation */}
+            <div className="space-y-4 sm:space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+                    <div className="flex items-center space-x-3 min-w-0">
+                        <Link
+                            to={`/initiatives/${initiativeId}`}
+                            className="text-gray-500 hover:text-gray-700 transition-colors p-1 -ml-1"
+                        >
+                            <ArrowLeft className="w-5 h-5" />
+                        </Link>
+                        <div className="min-w-0">
+                            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 truncate">
+                                {kpi.title}
+                            </h1>
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(kpi.category)}`}>
+                                    {kpi.category}
+                                </span>
+                                <span className="text-gray-500 text-sm">
+                                    {kpi.metric_type === 'percentage' ? '%' : kpi.unit_of_measurement}
+                                </span>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
 
-            {/* Main Content - Side by Side Layout */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                {/* Left Column - Data & Evidence (Takes more space) */}
-                <div className="xl:col-span-2 space-y-6">
-                    {/* Data Updates */}
-                    <div className="card p-6">
+                    <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 sm:flex-shrink-0">
+                        <button
+                            onClick={() => setIsEvidenceModalOpen(true)}
+                            className="btn-secondary flex items-center justify-center space-x-2 text-sm"
+                        >
+                            <Upload className="w-4 h-4" />
+                            <span className="hidden sm:inline">Add Evidence</span>
+                            <span className="sm:hidden">Evidence</span>
+                        </button>
+                        <button
+                            onClick={() => setIsUpdateModalOpen(true)}
+                            className="btn-primary flex items-center justify-center space-x-2 text-sm"
+                        >
+                            <Plus className="w-4 h-4" />
+                            <span>Add Data</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Quick Stats Bar */}
+                <div className="grid grid-cols-3 gap-3 sm:gap-4">
+                    <div className="card p-3 sm:p-4 text-center">
+                        <p className="text-lg sm:text-2xl font-bold text-blue-600">{updates.length}</p>
+                        <p className="text-xs sm:text-sm text-gray-600">Data Points</p>
+                    </div>
+                    <div className="card p-3 sm:p-4 text-center">
+                        <p className="text-lg sm:text-2xl font-bold text-green-600">{evidence.length}</p>
+                        <p className="text-xs sm:text-sm text-gray-600">Evidence Items</p>
+                    </div>
+                    <div className="card p-3 sm:p-4 text-center">
+                        <p className={`text-lg sm:text-2xl font-bold ${proofPercentage >= 80 ? 'text-green-600' :
+                            proofPercentage >= 30 ? 'text-yellow-600' : 'text-red-600'
+                            }`}>
+                            {proofPercentage}%
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-600">Proven</p>
+                    </div>
+                </div>
+
+                {/* Data and Evidence Lists - Full width on desktop */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
+                    {/* Data Updates Timeline */}
+                    <div className="card p-4 sm:p-6">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold text-gray-900">Data Updates</h3>
+                            <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+                                Data Updates ({updates.length})
+                            </h3>
                             <button
                                 onClick={() => setIsUpdateModalOpen(true)}
-                                className="btn-secondary flex items-center space-x-2"
+                                className="btn-secondary flex items-center space-x-2 text-sm"
                             >
                                 <Plus className="w-4 h-4" />
-                                <span>Add Update</span>
+                                <span className="hidden sm:inline">Add Data</span>
+                                <span className="sm:hidden">Add</span>
                             </button>
                         </div>
 
                         {updates.length === 0 ? (
                             <div className="text-center py-8">
-                                <TrendingUp className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                                <h4 className="text-lg font-medium text-gray-900 mb-2">No data updates yet</h4>
-                                <p className="text-gray-600 mb-4">Add your first data point to start tracking progress</p>
+                                <Calendar className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-4" />
+                                <p className="text-gray-600 text-sm sm:text-base">No data points yet</p>
                                 <button
                                     onClick={() => setIsUpdateModalOpen(true)}
-                                    className="btn-primary"
+                                    className="btn-primary mt-4 text-sm"
                                 >
-                                    Add First Update
+                                    Add First Data Point
                                 </button>
                             </div>
                         ) : (
-                            <div className="space-y-3">
-                                {updates.slice(0, 5).map((update) => (
-                                    <div key={update.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center space-x-4">
-                                                <div className="text-xl font-bold text-primary-600">
-                                                    {update.value}
-                                                    <span className="text-sm text-gray-500 ml-1">
-                                                        {kpi.metric_type === 'percentage' ? '%' : kpi.unit_of_measurement}
-                                                    </span>
+                            <div className="space-y-3 max-h-96 overflow-y-auto">
+                                {updates
+                                    .sort((a, b) => new Date(b.date_represented).getTime() - new Date(a.date_represented).getTime())
+                                    .map((update) => (
+                                        <div key={update.id} className="p-3 border border-gray-200 rounded-lg">
+                                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center space-x-2">
+                                                        <span className="text-lg sm:text-xl font-bold text-primary-600">
+                                                            {update.value} {kpi.unit_of_measurement}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs sm:text-sm text-gray-600">
+                                                        {formatDate(update.date_represented)}
+                                                    </p>
+                                                    {update.note && (
+                                                        <p className="text-xs sm:text-sm text-gray-500 mt-1 line-clamp-2">
+                                                            {update.note}
+                                                        </p>
+                                                    )}
                                                 </div>
-                                                {update.label && (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                        {update.label}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="flex items-center text-sm text-gray-500">
-                                                    <Calendar className="w-4 h-4 mr-1" />
-                                                    <span>{formatDate(update.date_represented)}</span>
+                                                <div className="flex items-center space-x-2 text-xs">
+                                                    {evidence.some(ev =>
+                                                        ev.date_represented === update.date_represented ||
+                                                        (ev.date_range_start && ev.date_range_end &&
+                                                            update.date_represented >= ev.date_range_start &&
+                                                            update.date_represented <= ev.date_range_end)
+                                                    ) ? (
+                                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                            ✓ Proven
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                                                            No evidence
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                {update.note && (
-                                                    <p className="text-xs text-gray-500 mt-1 italic">{update.note}</p>
-                                                )}
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-                                {updates.length > 5 && (
-                                    <div className="text-center py-2">
-                                        <p className="text-sm text-gray-500">
-                                            +{updates.length - 5} more updates
-                                        </p>
-                                    </div>
-                                )}
+                                    ))}
                             </div>
                         )}
                     </div>
 
-                    {/* Evidence Section */}
-                    <div className="card p-6">
+                    {/* Evidence List */}
+                    <div className="card p-4 sm:p-6">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold text-gray-900">Supporting Evidence</h3>
+                            <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+                                Evidence ({evidence.length})
+                            </h3>
                             <button
                                 onClick={() => setIsEvidenceModalOpen(true)}
-                                className="btn-secondary flex items-center space-x-2"
+                                className="btn-secondary flex items-center space-x-2 text-sm"
                             >
                                 <Upload className="w-4 h-4" />
-                                <span>Add Evidence</span>
+                                <span className="hidden sm:inline">Add Evidence</span>
+                                <span className="sm:hidden">Add</span>
                             </button>
                         </div>
 
                         {evidence.length === 0 ? (
                             <div className="text-center py-8">
-                                <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                                <h4 className="text-lg font-medium text-gray-900 mb-2">No evidence yet</h4>
-                                <p className="text-gray-600 mb-4">Upload files, photos, or documents to prove your impact</p>
+                                <FileText className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-4" />
+                                <p className="text-gray-600 text-sm sm:text-base">No evidence uploaded</p>
                                 <button
                                     onClick={() => setIsEvidenceModalOpen(true)}
-                                    className="btn-primary"
+                                    className="btn-primary mt-4 text-sm"
                                 >
-                                    Add First Evidence
+                                    Upload First Evidence
                                 </button>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 gap-4">
-                                {evidence.slice(0, 4).map((item) => {
-                                    const typeInfo = getEvidenceTypeInfo(item.type)
-                                    const hasFileUrl = item.file_url && item.file_url.trim() !== ''
-                                    const isExternalURL = hasFileUrl && item.file_url!.startsWith('http')
-                                    const isUploadedFile = hasFileUrl && item.file_url!.startsWith('/uploads/')
-                                    const isImage = hasFileUrl && /\.(jpg|jpeg|png|gif|webp)$/i.test(item.file_url!)
-                                    const isPDF = hasFileUrl && item.file_url!.toLowerCase().includes('.pdf')
-
-                                    return (
-                                        <div key={item.id} className="border border-gray-200 rounded-lg p-3 hover:shadow-sm transition-shadow">
-                                            <div className="flex items-start space-x-3">
-                                                <div className={`p-2 rounded-lg ${typeInfo.color.replace('text-', 'bg-').replace('-600', '-100')} ${typeInfo.color}`}>
-                                                    {typeInfo.icon === '📷' ? <Camera className="w-4 h-4" /> :
-                                                        typeInfo.icon === '📄' ? <FileText className="w-4 h-4" /> :
-                                                            typeInfo.icon === '💬' ? <MessageSquare className="w-4 h-4" /> :
-                                                                <DollarSign className="w-4 h-4" />}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="font-medium text-gray-900 line-clamp-1">{item.title}</h4>
-                                                    {item.description && (
-                                                        <p className="text-sm text-gray-600 line-clamp-2 mt-1">{item.description}</p>
-                                                    )}
-
-                                                    {/* Evidence Actions */}
-                                                    {hasFileUrl ? (
-                                                        <div className="mt-2">
-                                                            {isImage ? (
-                                                                <div className="flex items-center space-x-2">
-                                                                    <img
-                                                                        src={`http://localhost:3001${item.file_url}`}
-                                                                        alt={item.title}
-                                                                        className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-90"
-                                                                        onClick={() => window.open(`http://localhost:3001${item.file_url}`, '_blank')}
-                                                                    />
-                                                                    <button
-                                                                        onClick={() => window.open(`http://localhost:3001${item.file_url}`, '_blank')}
-                                                                        className="text-blue-600 hover:text-blue-800 text-sm"
-                                                                    >
-                                                                        View Full Size
-                                                                    </button>
-                                                                </div>
-                                                            ) : isExternalURL ? (
+                            <div className="space-y-3 max-h-96 overflow-y-auto">
+                                {evidence
+                                    .sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime())
+                                    .map((item) => {
+                                        const typeInfo = getEvidenceTypeInfo(item.type)
+                                        const IconComponent = item.type === 'visual_proof' ? Camera :
+                                            item.type === 'documentation' ? FileText :
+                                                item.type === 'testimony' ? MessageSquare : DollarSign
+                                        return (
+                                            <div key={item.id} className="p-3 border border-gray-200 rounded-lg">
+                                                <div className="flex items-start space-x-3">
+                                                    <div className={`p-2 rounded-lg ${typeInfo.color}`}>
+                                                        <IconComponent className="w-4 h-4" />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <h4 className="text-sm font-medium text-gray-900 truncate">
+                                                            {item.title}
+                                                        </h4>
+                                                        <p className="text-xs text-gray-600">
+                                                            {formatDate(item.date_represented)}
+                                                        </p>
+                                                        {item.description && (
+                                                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                                                {item.description}
+                                                            </p>
+                                                        )}
+                                                        {item.file_url && (
+                                                            <div className="mt-2">
                                                                 <a
                                                                     href={item.file_url}
                                                                     target="_blank"
                                                                     rel="noopener noreferrer"
-                                                                    className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 text-sm"
+                                                                    className="inline-flex items-center space-x-1 text-xs text-primary-600 hover:text-primary-700"
                                                                 >
                                                                     <ExternalLink className="w-3 h-3" />
-                                                                    <span>Open Link</span>
+                                                                    <span>View File</span>
                                                                 </a>
-                                                            ) : isUploadedFile ? (
-                                                                <a
-                                                                    href={`http://localhost:3001${item.file_url}`}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 text-sm"
-                                                                >
-                                                                    {isPDF ? <FileText className="w-3 h-3" /> : <Download className="w-3 h-3" />}
-                                                                    <span>{isPDF ? 'View PDF' : 'Download'}</span>
-                                                                </a>
-                                                            ) : null}
-                                                        </div>
-                                                    ) : (
-                                                        <p className="text-xs text-gray-500 mt-1">Text-based evidence</p>
-                                                    )}
-
-                                                    <div className="flex items-center justify-between mt-2">
-                                                        <div className="flex items-center text-xs text-gray-500">
-                                                            <Calendar className="w-3 h-3 mr-1" />
-                                                            <span>{formatDate(item.date_represented)}</span>
-                                                        </div>
-                                                        <span className="px-2 py-1 bg-gray-100 rounded text-xs">
-                                                            {typeInfo.label}
-                                                        </span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    )
-                                })}
-                                {evidence.length > 4 && (
-                                    <div className="text-center py-2">
-                                        <p className="text-sm text-gray-500">
-                                            +{evidence.length - 4} more evidence items
-                                        </p>
-                                    </div>
-                                )}
+                                        )
+                                    })}
                             </div>
                         )}
                     </div>
                 </div>
 
-                {/* Right Column - Analytics & Charts */}
-                <div className="space-y-6">
-                    {/* Progress Summary */}
-                    <div className="card p-4">
-                        <h3 className="font-semibold text-gray-900 mb-4">Progress Summary</h3>
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm text-gray-600">Latest Value</span>
-                                <span className="font-medium">
-                                    {updates.length > 0 ? `${updates[0].value} ${kpi.unit_of_measurement}` : 'No data'}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm text-gray-600">Evidence Coverage</span>
-                                <span className={`font-medium ${proofPercentage >= 80 ? 'text-green-600' :
-                                    proofPercentage >= 30 ? 'text-yellow-600' : 'text-red-600'
-                                    }`}>
-                                    {proofPercentage}%
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm text-gray-600">Total Data Points</span>
-                                <span className="font-medium">{updates.length}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm text-gray-600">Evidence Items</span>
-                                <span className="font-medium">{evidence.length}</span>
-                            </div>
+                {/* Charts Section - Full width at bottom on desktop */}
+                {updates.length > 0 && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                        {/* Individual Data Points Chart */}
+                        <div className="card p-4 sm:p-6">
+                            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">
+                                Individual Data Points
+                            </h3>
+                            <ResponsiveContainer width="100%" height={250}>
+                                <LineChart data={updates
+                                    .sort((a, b) => new Date(a.date_represented).getTime() - new Date(b.date_represented).getTime())
+                                    .map(update => ({
+                                        date: new Date(update.date_represented).toLocaleDateString('en-US', {
+                                            month: 'short',
+                                            day: 'numeric'
+                                        }),
+                                        value: update.value,
+                                        label: update.label || update.note
+                                    }))}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                                    <XAxis
+                                        dataKey="date"
+                                        stroke="#6b7280"
+                                        fontSize={12}
+                                    />
+                                    <YAxis
+                                        stroke="#6b7280"
+                                        fontSize={12}
+                                    />
+                                    <Tooltip
+                                        contentStyle={{
+                                            backgroundColor: 'white',
+                                            border: '1px solid #e5e7eb',
+                                            borderRadius: '8px'
+                                        }}
+                                        formatter={(value, name) => [
+                                            `${value} ${kpi.unit_of_measurement || ''}`,
+                                            'Value'
+                                        ]}
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="value"
+                                        stroke="#16a34a"
+                                        strokeWidth={3}
+                                        dot={{ fill: '#16a34a', r: 6 }}
+                                        activeDot={{ r: 8, stroke: '#16a34a', strokeWidth: 2 }}
+                                    />
+                                </LineChart>
+                            </ResponsiveContainer>
                         </div>
-                    </div>
 
-                    {/* Quick Actions */}
-                    <div className="card p-4">
-                        <h4 className="font-medium text-gray-900 mb-3">Quick Actions</h4>
-                        <div className="space-y-2">
-                            <button
-                                onClick={() => setIsUpdateModalOpen(true)}
-                                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                            >
-                                📊 Add data point
-                            </button>
-                            <button
-                                onClick={() => setIsEvidenceModalOpen(true)}
-                                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                            >
-                                📎 Upload evidence
-                            </button>
-                            <Link
-                                to={`/initiatives/${initiativeId}`}
-                                className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                            >
-                                ⬅️ Back to initiative
-                            </Link>
+                        {/* Evidence Coverage Visualization */}
+                        <div className="card p-4 sm:p-6">
+                            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">
+                                Evidence Coverage
+                            </h3>
+                            <div className="flex items-center justify-center" style={{ height: '250px' }}>
+                                <div className="text-center">
+                                    {/* Large Percentage Circle */}
+                                    <div className={`inline-flex items-center justify-center w-24 h-24 sm:w-32 sm:h-32 rounded-full text-2xl sm:text-4xl font-bold mb-4 sm:mb-6 ${proofPercentage >= 80 ? 'bg-green-100 text-green-600' :
+                                        proofPercentage >= 30 ? 'bg-yellow-100 text-yellow-600' :
+                                            'bg-red-100 text-red-600'
+                                        }`}>
+                                        {proofPercentage}%
+                                    </div>
+
+                                    {/* Stats Grid */}
+                                    <div className="grid grid-cols-2 gap-3 sm:gap-4 text-center">
+                                        <div>
+                                            <p className="text-lg sm:text-xl font-bold text-gray-900">{updates.length}</p>
+                                            <p className="text-xs text-gray-600">Updates</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-lg sm:text-xl font-bold text-gray-900">{evidence.length}</p>
+                                            <p className="text-xs text-gray-600">Evidence</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* Modals */}
@@ -553,6 +449,6 @@ export default function KPIDetailPage() {
                 initiativeId={initiativeId!}
                 preSelectedKPIId={kpi.id}
             />
-        </div>
+        </>
     )
 } 
