@@ -77,9 +77,14 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
     });
 });
 
-// 404 handler
+// Debug: catch all routes
 app.use('*', (req, res) => {
-    res.status(404).json({ error: 'Route not found' });
+    res.json({
+        error: 'Route not found',
+        path: req.originalUrl,
+        method: req.method,
+        available_routes: ['/test', '/health']
+    });
 });
 
 // For local development
