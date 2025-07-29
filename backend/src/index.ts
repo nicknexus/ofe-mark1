@@ -48,7 +48,7 @@ app.get('/', (req, res) => {
     res.json({
         message: 'OFE API is running!',
         status: 'OK',
-        available_endpoints: ['/test', '/health', '/api/initiatives', '/api/kpis'],
+        available_endpoints: ['/test', '/health', '/api/initiatives', '/api/kpis', '/api/evidence'],
         timestamp: new Date().toISOString()
     });
 });
@@ -74,7 +74,7 @@ app.get('/health', (req, res) => {
 // Routes - Enable one by one to find the problem
 app.use('/api/initiatives', initiativeRoutes);
 app.use('/api/kpis', kpiRoutes);
-// app.use('/api/evidence', evidenceRoutes);
+app.use('/api/evidence', evidenceRoutes);
 // app.use('/api/upload', uploadRoutes);
 
 // Error handling middleware
@@ -92,7 +92,7 @@ app.use('*', (req, res) => {
         error: 'Route not found',
         path: req.originalUrl,
         method: req.method,
-        available_routes: ['/test', '/health', '/api/initiatives', '/api/kpis']
+        available_routes: ['/test', '/health', '/api/initiatives', '/api/kpis', '/api/evidence']
     });
 });
 
