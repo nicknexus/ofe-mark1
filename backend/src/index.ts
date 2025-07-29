@@ -75,7 +75,7 @@ app.get('/health', (req, res) => {
 app.use('/api/initiatives', initiativeRoutes);
 app.use('/api/kpis', kpiRoutes);
 app.use('/api/evidence', evidenceRoutes);
-// app.use('/api/upload', uploadRoutes);
+// app.use('/api/upload', uploadRoutes); // Disabled: multer + local filesystem doesn't work in serverless
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
