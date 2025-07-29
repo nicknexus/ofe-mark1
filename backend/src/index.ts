@@ -44,6 +44,15 @@ app.use(express.urlencoded({ extended: true }));
 // app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Environment check endpoint
+app.get('/', (req, res) => {
+    res.json({
+        message: 'OFE API is running!',
+        status: 'OK',
+        available_endpoints: ['/test', '/health'],
+        timestamp: new Date().toISOString()
+    });
+});
+
 app.get('/test', (req, res) => {
     res.json({ message: 'Hello from serverless!' });
 });
