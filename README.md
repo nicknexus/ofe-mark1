@@ -112,4 +112,4 @@ Copy `.env.example` to `.env` and configure:
 
 ## 📝 License
 
-Private project for charity impact tracking. 
+Private project for charity impact tracking. # Deploy trigger
