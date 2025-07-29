@@ -44,6 +44,10 @@ app.use(express.urlencoded({ extended: true }));
 // app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Environment check endpoint
+app.get('/test', (req, res) => {
+    res.json({ message: 'Hello from serverless!' });
+});
+
 app.get('/health', (req, res) => {
     // Simplified health check for serverless
     res.json({
@@ -59,10 +63,10 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
-app.use('/api/initiatives', initiativeRoutes);
-app.use('/api/kpis', kpiRoutes);
-app.use('/api/evidence', evidenceRoutes);
-app.use('/api/upload', uploadRoutes);
+// app.use('/api/initiatives', initiativeRoutes);
+// app.use('/api/kpis', kpiRoutes);
+// app.use('/api/evidence', evidenceRoutes);
+// app.use('/api/upload', uploadRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
