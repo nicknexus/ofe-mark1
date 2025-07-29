@@ -16,7 +16,6 @@ import uploadRoutes from './routes/upload';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
 
 // Security middleware
 app.use(helmet({
@@ -79,7 +78,14 @@ app.use('*', (req, res) => {
     res.status(404).json({ error: 'Route not found' });
 });
 
-app.listen(PORT, () => {
-    console.log('🚀 OFE Backend server running on port', PORT);
-    console.log('📊 Health check: http://localhost:' + PORT + '/health');
-}); 
+// For local development
+if (process.env.NODE_ENV !== 'production') {
+    const PORT = process.env.PORT || 3001;
+    app.listen(PORT, () => {
+        console.log('🚀 OFE Backend server running on port', PORT);
+        console.log('📊 Health check: http://localhost:' + PORT + '/health');
+    });
+}
+
+// Export for Vercel serverless
+export default app; 
