@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import {
     Plus,
@@ -10,10 +10,12 @@ import {
     MapPin,
     ExternalLink,
     Upload,
-    HelpCircle
+    HelpCircle,
+    Edit,
+    Trash2
 } from 'lucide-react'
 import { apiService } from '../services/api'
-import { Initiative, LoadingState, CreateEvidenceForm, KPI } from '../types'
+import { Initiative, LoadingState, CreateEvidenceForm, CreateInitiativeForm, KPI } from '../types'
 import { formatDate, truncateText } from '../utils'
 import toast from 'react-hot-toast'
 import CreateInitiativeModal from '../components/CreateInitiativeModal'
@@ -28,13 +30,80 @@ export default function Dashboard() {
     const [showCreateModal, setShowCreateModal] = useState(false)
     const [showEvidenceModal, setShowEvidenceModal] = useState(false)
     const [showTutorial, setShowTutorial] = useState(false)
+    const [showEditModal, setShowEditModal] = useState(false)
+    const [deleteConfirmInitiative, setDeleteConfirmInitiative] = useState<Initiative | null>(null)
+    const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null)
+
+    // Add loading cache to prevent duplicate requests
+    const [isLoadingData, setIsLoadingData] = useState(false)
+    const hasLoadedData = useRef(false)
+    const loadingPromise = useRef<Promise<void> | null>(null)
 
     useEffect(() => {
-        loadInitiatives()
-        loadAllKPIs()
-        loadEvidenceCount()
-        checkFirstTimeUser()
+        // Only load once on mount - prevent React StrictMode double execution
+        if (!hasLoadedData.current && !isLoadingData && !loadingPromise.current) {
+            hasLoadedData.current = true
+            loadingPromise.current = loadAllData()
+        }
     }, [])
+
+    const loadAllData = async (): Promise<void> => {
+        if (isLoadingData || loadingPromise.current) {
+            console.log('Load already in progress, skipping...')
+            return loadingPromise.current || Promise.resolve()
+        }
+
+        setIsLoadingData(true)
+        setLoadingState({ isLoading: true })
+
+        try {
+            console.log('Loading dashboard data...')
+
+            // Use the new sequential loading method to respect rate limits
+            const { initiatives, kpis, evidence } = await apiService.loadDashboardData()
+
+            setInitiatives(initiatives)
+            setAllKPIs(kpis)
+            setTotalEvidence(evidence.length)
+
+            setLoadingState({ isLoading: false })
+            console.log('Dashboard data loaded successfully')
+
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to load dashboard data'
+            setLoadingState({ isLoading: false, error: message })
+            toast.error(message)
+            console.error('Dashboard loading error:', error)
+            hasLoadedData.current = false // Reset on error so retry can work
+        } finally {
+            setIsLoadingData(false)
+            loadingPromise.current = null
+            checkFirstTimeUser()
+        }
+    }
+
+    // Smart refresh function - only refresh specific data when needed
+    const refreshInitiatives = async () => {
+        try {
+            const initiatives = await apiService.getInitiatives()
+            setInitiatives(initiatives)
+        } catch (error) {
+            console.error('Failed to refresh initiatives:', error)
+        }
+    }
+
+    const refreshKPIsAndEvidence = async () => {
+        try {
+            const [kpis, evidence] = await Promise.all([
+                apiService.getKPIs(),
+                apiService.getEvidence()
+            ])
+            setAllKPIs(kpis)
+            setTotalEvidence(evidence.length)
+        } catch (error) {
+            console.error('Failed to refresh KPIs and evidence:', error)
+        }
+    }
 
     const checkFirstTimeUser = () => {
         const hasSeenTutorial = localStorage.getItem('ofe-tutorial-seen')
@@ -61,56 +130,65 @@ export default function Dashboard() {
         setShowTutorial(true)
     }
 
-    const loadInitiatives = async () => {
+    const handleCreateInitiative = async (formData: CreateInitiativeForm) => {
         try {
-            setLoadingState({ isLoading: true })
-            const data = await apiService.getInitiatives()
-            setInitiatives(data)
-            setLoadingState({ isLoading: false })
+            await apiService.createInitiative(formData)
+            toast.success('Initiative created successfully!')
+            // Only refresh initiatives, not all data
+            await refreshInitiatives()
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to load initiatives'
-            setLoadingState({ isLoading: false, error: message })
+            const message = error instanceof Error ? error.message : 'Failed to create initiative'
+            toast.error(message)
+            throw error
+        }
+    }
+
+    const handleEditInitiative = async (formData: CreateInitiativeForm) => {
+        if (!selectedInitiative?.id) return
+        try {
+            await apiService.updateInitiative(selectedInitiative.id, formData)
+            toast.success('Initiative updated successfully!')
+            // Only refresh initiatives, not all data
+            await refreshInitiatives()
+            setShowEditModal(false)
+            setSelectedInitiative(null)
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to update initiative'
+            toast.error(message)
+            throw error
+        }
+    }
+
+    const handleDeleteInitiative = async (initiative: Initiative) => {
+        if (!initiative.id) return
+        try {
+            await apiService.deleteInitiative(initiative.id)
+            toast.success('Initiative deleted successfully!')
+            // Refresh all data since deleting initiative affects KPIs and evidence too
+            hasLoadedData.current = false
+            await loadAllData()
+            setDeleteConfirmInitiative(null)
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to delete initiative'
             toast.error(message)
         }
     }
 
-    const loadAllKPIs = async () => {
-        try {
-            // Load KPIs from all initiatives
-            const data = await apiService.getKPIs()
-            setAllKPIs(data)
-        } catch (error) {
-            console.error('Failed to load KPIs:', error)
-        }
+    const openEditModal = (initiative: Initiative) => {
+        setSelectedInitiative(initiative)
+        setShowEditModal(true)
     }
 
-    const loadEvidenceCount = async () => {
-        try {
-            // Get evidence from all initiatives
-            const evidenceData = await apiService.getEvidence()
-            setTotalEvidence(evidenceData.length)
-        } catch (error) {
-            console.error('Failed to load evidence count:', error)
-        }
-    }
-
-    const handleCreateInitiative = async (data: any) => {
-        try {
-            await apiService.createInitiative(data)
-            toast.success('Initiative created successfully!')
-            setShowCreateModal(false)
-            loadInitiatives()
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Failed to create initiative')
-        }
+    const openDeleteConfirm = (initiative: Initiative) => {
+        setDeleteConfirmInitiative(initiative)
     }
 
     const handleAddEvidence = async (evidenceData: CreateEvidenceForm) => {
         try {
             await apiService.createEvidence(evidenceData)
             toast.success('Evidence added successfully!')
-            // Refresh evidence count
-            loadEvidenceCount()
+            // Only refresh evidence count, not all data
+            await refreshKPIsAndEvidence()
             setShowEvidenceModal(false)
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to add evidence'
@@ -132,10 +210,16 @@ export default function Dashboard() {
             <div className="text-center py-12">
                 <div className="text-red-600 mb-4">{loadingState.error}</div>
                 <button
-                    onClick={loadInitiatives}
+                    onClick={() => {
+                        if (!isLoadingData && !loadingPromise.current) {
+                            hasLoadedData.current = false
+                            loadingPromise.current = loadAllData()
+                        }
+                    }}
                     className="btn-primary"
+                    disabled={isLoadingData || !!loadingPromise.current}
                 >
-                    Try Again
+                    {(isLoadingData || loadingPromise.current) ? 'Loading...' : 'Try Again'}
                 </button>
             </div>
         )
@@ -271,35 +355,62 @@ export default function Dashboard() {
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                             {initiatives.map((initiative) => (
-                                <Link
+                                <div
                                     key={initiative.id}
-                                    to={`/initiatives/${initiative.id}`}
-                                    className="card p-4 sm:p-6 hover:shadow-lg transition-all duration-200 border-2 border-transparent hover:border-primary-200 group"
+                                    className="card p-4 sm:p-6 hover:shadow-lg transition-all duration-200 border-2 border-transparent hover:border-primary-200 group relative"
                                 >
-                                    <div className="flex items-start justify-between mb-3 sm:mb-4">
-                                        <h3 className="text-base sm:text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition-colors pr-2">
-                                            {initiative.title}
-                                        </h3>
-                                        <div className="text-primary-600 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                                            <ExternalLink className="w-4 h-4" />
+                                    <Link
+                                        to={`/initiatives/${initiative.id}`}
+                                        className="block"
+                                    >
+                                        <div className="flex items-start justify-between mb-3 sm:mb-4">
+                                            <h3 className="text-base sm:text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition-colors pr-2">
+                                                {initiative.title}
+                                            </h3>
                                         </div>
-                                    </div>
 
-                                    <p className="text-gray-600 text-sm mb-3 sm:mb-4 line-clamp-3">
-                                        {truncateText(initiative.description, 120)}
-                                    </p>
+                                        <p className="text-gray-600 text-sm mb-3 sm:mb-4 line-clamp-3">
+                                            {truncateText(initiative.description, 120)}
+                                        </p>
 
-                                    <div className="pt-3 sm:pt-4 border-t border-gray-100">
-                                        <div className="flex items-center justify-between text-xs sm:text-sm">
-                                            <span className="text-gray-500 truncate pr-2">
-                                                Created {formatDate(initiative.created_at || '')}
-                                            </span>
-                                            <span className="text-primary-600 font-medium group-hover:underline flex-shrink-0">
-                                                Open →
-                                            </span>
+                                        <div className="pt-3 sm:pt-4 border-t border-gray-100">
+                                            <div className="flex items-center justify-between text-xs sm:text-sm">
+                                                <span className="text-gray-500 truncate pr-2">
+                                                    Created {formatDate(initiative.created_at || '')}
+                                                </span>
+                                                <span className="text-primary-600 font-medium group-hover:underline flex-shrink-0">
+                                                    Open →
+                                                </span>
+                                            </div>
                                         </div>
+                                    </Link>
+
+                                    {/* Action Buttons */}
+                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
+                                        <button
+                                            onClick={(e) => {
+                                                e.preventDefault()
+                                                e.stopPropagation()
+                                                openEditModal(initiative)
+                                            }}
+                                            className="p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-colors"
+                                            title="Edit Initiative"
+                                        >
+                                            <Edit className="w-3 h-3 text-gray-600" />
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.preventDefault()
+                                                e.stopPropagation()
+                                                openDeleteConfirm(initiative)
+                                            }}
+                                            className="p-1.5 bg-white border border-red-200 rounded-lg shadow-sm hover:bg-red-50 hover:border-red-300 transition-colors"
+                                            title="Delete Initiative"
+                                        >
+                                            <Trash2 className="w-3 h-3 text-red-600" />
+                                        </button>
                                     </div>
-                                </Link>
+                                </div>
                             ))}
                         </div>
                     )}
@@ -315,6 +426,19 @@ export default function Dashboard() {
                 />
             )}
 
+            {/* Edit Initiative Modal */}
+            {selectedInitiative && (
+                <CreateInitiativeModal
+                    isOpen={showEditModal}
+                    onClose={() => {
+                        setShowEditModal(false)
+                        setSelectedInitiative(null)
+                    }}
+                    onSubmit={handleEditInitiative}
+                    editData={selectedInitiative}
+                />
+            )}
+
             <AddEvidenceModal
                 isOpen={showEvidenceModal}
                 onClose={() => setShowEvidenceModal(false)}
@@ -323,6 +447,43 @@ export default function Dashboard() {
                 initiativeId=""
                 preSelectedKPIId=""
             />
+
+            {/* Delete Confirmation Dialog */}
+            {deleteConfirmInitiative && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-xl max-w-md w-full p-6">
+                        <div className="flex items-center space-x-3 mb-4">
+                            <div className="p-2 bg-red-100 rounded-lg">
+                                <Trash2 className="w-5 h-5 text-red-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900">Delete Initiative</h3>
+                                <p className="text-sm text-gray-600">This action cannot be undone</p>
+                            </div>
+                        </div>
+
+                        <p className="text-gray-700 mb-6">
+                            Are you sure you want to delete "<strong>{deleteConfirmInitiative.title}</strong>"?
+                            This will also delete all associated KPIs, data points, and evidence.
+                        </p>
+
+                        <div className="flex space-x-3">
+                            <button
+                                onClick={() => setDeleteConfirmInitiative(null)}
+                                className="btn-secondary flex-1"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => handleDeleteInitiative(deleteConfirmInitiative)}
+                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                            >
+                                Delete Initiative
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {showTutorial && (
                 <FirstTimeTutorial

@@ -161,6 +161,19 @@ export interface LoadingState {
     error?: string;
 }
 
+export interface EvidenceByDate {
+    date: string;
+    dateRange?: {
+        start: string;
+        end: string;
+    };
+    totalMetricImpact: number;
+    dataPoints: KPIUpdate[];
+    evidenceItems: Evidence[];
+    completionPercentage: number;
+    isFullyProven: boolean;
+}
+
 export interface ModalState {
     isOpen: boolean;
     type?: 'create' | 'edit' | 'view';

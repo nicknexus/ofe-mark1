@@ -22,23 +22,353 @@ import {
     BarChart3
 } from 'lucide-react'
 import { apiService } from '../services/api'
-import { KPI, KPIUpdate, LoadingState, CreateKPIUpdateForm, CreateEvidenceForm, Evidence } from '../types'
-import { formatDate, getEvidenceColor, getCategoryColor, getEvidenceTypeInfo } from '../utils'
+import { KPI, KPIUpdate, LoadingState, CreateKPIUpdateForm } from '../types'
+import { formatDate, getCategoryColor, getEvidenceTypeInfo } from '../utils'
 import AddKPIUpdateModal from '../components/AddKPIUpdateModal'
-import AddEvidenceModal from '../components/AddEvidenceModal'
+import KPIEvidenceSection from '../components/KPIEvidenceSection'
+import EvidencePreviewModal from '../components/EvidencePreviewModal'
 import toast from 'react-hot-toast'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import AddEvidenceModal from '../components/AddEvidenceModal'
+
+// DataPointsList Component
+interface DataPointsListProps {
+    updates: KPIUpdate[]
+    kpi: KPI
+    onRefresh: () => void
+}
+
+interface DataPointWithEvidence extends KPIUpdate {
+    evidenceItems?: any[]
+    completionPercentage?: number
+    isFullyProven?: boolean
+}
+
+function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
+    const [expandedPoints, setExpandedPoints] = useState<string[]>([])
+    const [dataPointsWithEvidence, setDataPointsWithEvidence] = useState<DataPointWithEvidence[]>([])
+    const [loading, setLoading] = useState(false)
+    const [selectedEvidence, setSelectedEvidence] = useState<any>(null)
+    const [isEvidencePreviewOpen, setIsEvidencePreviewOpen] = useState(false)
+    const [isEditEvidenceModalOpen, setIsEditEvidenceModalOpen] = useState(false)
+    const [deleteConfirmEvidence, setDeleteConfirmEvidence] = useState<any>(null)
+
+    useEffect(() => {
+        if (updates.length > 0) {
+            fetchDataPointsWithEvidence()
+        }
+    }, [updates])
+
+    const fetchDataPointsWithEvidence = async () => {
+        try {
+            setLoading(true)
+            const evidenceByDates = await apiService.getKPIEvidenceByDates(kpi.id!)
+
+            // Map updates to include their evidence and completion data
+            const updatesWithEvidence = updates.map(update => {
+                // Find the matching date group from evidenceByDates
+                const matchingGroup = evidenceByDates.find(group => {
+                    return group.dataPoints.some((dp: any) => dp.id === update.id)
+                })
+
+                if (matchingGroup) {
+                    const matchingDataPoint = matchingGroup.dataPoints.find((dp: any) => dp.id === update.id)
+                    return {
+                        ...update,
+                        evidenceItems: matchingDataPoint?.evidenceItems || [],
+                        completionPercentage: matchingDataPoint?.completionPercentage || 0,
+                        isFullyProven: matchingDataPoint?.isFullyProven || false
+                    }
+                }
+
+                return {
+                    ...update,
+                    evidenceItems: [],
+                    completionPercentage: 0,
+                    isFullyProven: false
+                }
+            })
+
+            setDataPointsWithEvidence(updatesWithEvidence)
+        } catch (error) {
+            console.error('Error fetching data points with evidence:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const toggleExpanded = (updateId: string) => {
+        setExpandedPoints(prev =>
+            prev.includes(updateId)
+                ? prev.filter(id => id !== updateId)
+                : [...prev, updateId]
+        )
+    }
+
+    const handleEvidenceClick = (evidence: any) => {
+        setSelectedEvidence(evidence)
+        setIsEvidencePreviewOpen(true)
+    }
+
+    const handleEditEvidence = (evidence: any) => {
+        setSelectedEvidence(evidence)
+        setIsEditEvidenceModalOpen(true)
+    }
+
+    const handleDeleteEvidence = async (evidence: any) => {
+        if (!evidence.id) return
+        try {
+            await apiService.deleteEvidence(evidence.id)
+            toast.success('Evidence deleted successfully!')
+            fetchDataPointsWithEvidence()
+            onRefresh()
+            setDeleteConfirmEvidence(null)
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to delete evidence'
+            toast.error(message)
+        }
+    }
+
+    const handleUpdateEvidence = async (evidenceData: any) => {
+        if (!selectedEvidence?.id) return
+        try {
+            await apiService.updateEvidence(selectedEvidence.id, evidenceData)
+            toast.success('Evidence updated successfully!')
+            fetchDataPointsWithEvidence()
+            onRefresh()
+            setIsEditEvidenceModalOpen(false)
+            setSelectedEvidence(null)
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to update evidence'
+            toast.error(message)
+            throw error
+        }
+    }
+
+    const getStatusColor = (dataPoint: DataPointWithEvidence) => {
+        if (dataPoint.isFullyProven) return 'text-green-600'
+        if (dataPoint.completionPercentage && dataPoint.completionPercentage > 0) return 'text-yellow-600'
+        return 'text-gray-500'
+    }
+
+    const getStatusDot = (dataPoint: DataPointWithEvidence) => {
+        if (dataPoint.isFullyProven) return 'bg-green-500'
+        if (dataPoint.completionPercentage && dataPoint.completionPercentage > 0) return 'bg-yellow-500'
+        return 'bg-gray-300'
+    }
+
+    return (
+        <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+            {dataPointsWithEvidence
+                .sort((a, b) => new Date(b.date_represented).getTime() - new Date(a.date_represented).getTime())
+                .map((dataPoint) => {
+                    const isExpanded = expandedPoints.includes(dataPoint.id!)
+                    return (
+                        <div key={dataPoint.id} className="border border-gray-200 rounded-lg">
+                            {/* Main Data Point Card */}
+                            <div
+                                className="p-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                                onClick={() => toggleExpanded(dataPoint.id!)}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-3 min-w-0 flex-1">
+                                        <div className={`w-3 h-3 rounded-full flex-shrink-0 ${getStatusDot(dataPoint)}`}></div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center space-x-2 mb-1">
+                                                <span className="text-lg font-bold text-primary-600">
+                                                    {dataPoint.value} {kpi.unit_of_measurement}
+                                                </span>
+                                                {dataPoint.label && (
+                                                    <span className="text-sm text-gray-500">- {dataPoint.label}</span>
+                                                )}
+                                            </div>
+                                            <div className="text-xs text-gray-600">
+                                                {dataPoint.date_range_start && dataPoint.date_range_end ? (
+                                                    <span>Range: {formatDate(dataPoint.date_range_start)} - {formatDate(dataPoint.date_range_end)}</span>
+                                                ) : (
+                                                    <span>Date: {formatDate(dataPoint.date_represented)}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center space-x-2 flex-shrink-0">
+                                        <span className={`text-sm font-medium ${getStatusColor(dataPoint)}`}>
+                                            {dataPoint.completionPercentage || 0}%
+                                        </span>
+                                        <button className="text-gray-400 hover:text-gray-600">
+                                            <Edit className="w-4 h-4" />
+                                        </button>
+                                        <div className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                                            <Calendar className="w-4 h-4 text-gray-400" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Expanded Details */}
+                            {isExpanded && (
+                                <div className="border-t border-gray-100 p-4 bg-gray-50">
+                                    {/* Progress Bar */}
+                                    <div className="mb-4">
+                                        <div className="flex justify-between text-sm mb-1">
+                                            <span className="text-gray-700">Evidence Coverage</span>
+                                            <span className={getStatusColor(dataPoint)}>
+                                                {dataPoint.completionPercentage || 0}% Complete
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 rounded-full h-2">
+                                            <div
+                                                className={`h-2 rounded-full ${dataPoint.isFullyProven ? 'bg-green-500' :
+                                                    dataPoint.completionPercentage && dataPoint.completionPercentage > 0 ? 'bg-yellow-500' : 'bg-gray-300'
+                                                    }`}
+                                                style={{ width: `${dataPoint.completionPercentage || 0}%` }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Evidence Items */}
+                                    {dataPoint.evidenceItems && dataPoint.evidenceItems.length > 0 ? (
+                                        <div>
+                                            <h5 className="text-sm font-medium text-gray-700 mb-2">
+                                                Evidence ({dataPoint.evidenceItems.length} items)
+                                            </h5>
+                                            <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                                {dataPoint.evidenceItems.map((evidence: any) => (
+                                                    <div
+                                                        key={evidence.id}
+                                                        className="flex items-center justify-between p-2 bg-white rounded border hover:border-blue-300 cursor-pointer transition-colors"
+                                                        onClick={() => handleEvidenceClick(evidence)}
+                                                    >
+                                                        <div className="flex items-center space-x-2 min-w-0 flex-1">
+                                                            <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                                                            <div className="min-w-0 flex-1">
+                                                                <span className="text-sm font-medium text-gray-900 block truncate hover:text-blue-600">
+                                                                    {evidence.title}
+                                                                </span>
+                                                                <span className="text-xs text-gray-500 block">
+                                                                    {evidence.date_range_start && evidence.date_range_end ? (
+                                                                        <>Range: {formatDate(evidence.date_range_start)} - {formatDate(evidence.date_range_end)}</>
+                                                                    ) : (
+                                                                        <>Date: {formatDate(evidence.date_represented)}</>
+                                                                    )}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center space-x-2 flex-shrink-0">
+                                                            {evidence.file_url && (
+                                                                <div className="text-gray-400">
+                                                                    <ExternalLink className="w-3 h-3" />
+                                                                </div>
+                                                            )}
+                                                            <button
+                                                                className="text-gray-400 hover:text-gray-600"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    handleEditEvidence(evidence)
+                                                                }}
+                                                                title="Edit Evidence"
+                                                            >
+                                                                <Edit className="w-3 h-3" />
+                                                            </button>
+                                                            <button
+                                                                className="text-gray-400 hover:text-red-600"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    setDeleteConfirmEvidence(evidence)
+                                                                }}
+                                                                title="Delete Evidence"
+                                                            >
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-4">
+                                            <Calendar className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                                            <p className="text-sm text-gray-500">No evidence yet</p>
+                                            <p className="text-xs text-gray-400">Add evidence to support this data point</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )
+                })}
+
+            {/* Edit Evidence Modal */}
+            {selectedEvidence && (
+                <AddEvidenceModal
+                    isOpen={isEditEvidenceModalOpen}
+                    onClose={() => {
+                        setIsEditEvidenceModalOpen(false)
+                        setSelectedEvidence(null)
+                    }}
+                    onSubmit={handleUpdateEvidence}
+                    availableKPIs={[kpi]}
+                    initiativeId={kpi.initiative_id || ''}
+                    preSelectedKPIId={kpi.id}
+                    editData={selectedEvidence}
+                />
+            )}
+
+            {/* Delete Confirmation Dialog */}
+            {deleteConfirmEvidence && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-xl max-w-md w-full p-6">
+                        <div className="flex items-center space-x-3 mb-4">
+                            <div className="p-2 bg-red-100 rounded-lg">
+                                <Trash2 className="w-5 h-5 text-red-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900">Delete Evidence</h3>
+                                <p className="text-sm text-gray-600">This action cannot be undone</p>
+                            </div>
+                        </div>
+
+                        <p className="text-gray-700 mb-6">
+                            Are you sure you want to delete "<strong>{deleteConfirmEvidence.title}</strong>"?
+                        </p>
+
+                        <div className="flex space-x-3">
+                            <button
+                                onClick={() => setDeleteConfirmEvidence(null)}
+                                className="btn-secondary flex-1"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => handleDeleteEvidence(deleteConfirmEvidence)}
+                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                            >
+                                Delete Evidence
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Evidence Preview Modal */}
+            <EvidencePreviewModal
+                isOpen={isEvidencePreviewOpen}
+                onClose={() => setIsEvidencePreviewOpen(false)}
+                evidence={selectedEvidence}
+            />
+        </div>
+    )
+}
 
 export default function KPIDetailPage() {
     const { initiativeId, kpiId } = useParams<{ initiativeId: string; kpiId: string }>()
     const [kpi, setKPI] = useState<KPI | null>(null)
     const [updates, setUpdates] = useState<KPIUpdate[]>([])
-    const [evidence, setEvidence] = useState<Evidence[]>([])
     const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: true })
+    const [evidenceStats, setEvidenceStats] = useState<any[]>([])
 
     // Modal states
     const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
-    const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false)
 
     useEffect(() => {
         if (kpiId) {
@@ -51,20 +381,59 @@ export default function KPIDetailPage() {
 
         try {
             setLoadingState({ isLoading: true })
-            const [kpiData, updatesData, evidenceData] = await Promise.all([
+            const [kpiData, updatesData] = await Promise.all([
                 apiService.getKPI(kpiId),
-                apiService.getKPIUpdates(kpiId),
-                apiService.getEvidence(undefined, kpiId)
+                apiService.getKPIUpdates(kpiId)
             ])
 
             setKPI(kpiData)
             setUpdates(updatesData)
-            setEvidence(evidenceData)
+
+            // Load evidence stats 
+            loadEvidenceStats()
+
             setLoadingState({ isLoading: false })
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to load KPI data'
             setLoadingState({ isLoading: false, error: message })
             toast.error(message)
+        }
+    }
+
+    const loadEvidenceStats = async () => {
+        if (!kpiId || !initiativeId) return
+
+        try {
+            const evidence = await apiService.getEvidence(initiativeId, kpiId)
+
+            // Calculate evidence type statistics
+            const typeCount = evidence.reduce((acc: any, item: any) => {
+                acc[item.type] = (acc[item.type] || 0) + 1
+                return acc
+            }, {})
+
+            const totalEvidence = evidence.length
+            const stats = Object.entries(typeCount).map(([type, count]: [string, any]) => ({
+                type,
+                count,
+                percentage: totalEvidence > 0 ? Math.round((count / totalEvidence) * 100) : 0,
+                label: type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
+            }))
+
+            setEvidenceStats(stats)
+        } catch (error) {
+            console.error('Error loading evidence stats:', error)
+            setEvidenceStats([])
+        }
+    }
+
+    const getEvidenceIcon = (type: string) => {
+        switch (type) {
+            case 'visual_proof': return Camera
+            case 'documentation': return FileText
+            case 'testimony': return MessageSquare
+            case 'financials': return DollarSign
+            default: return FileText
         }
     }
 
@@ -80,31 +449,6 @@ export default function KPIDetailPage() {
             toast.error(message)
             throw error
         }
-    }
-
-    const handleAddEvidence = async (evidenceData: CreateEvidenceForm) => {
-        try {
-            await apiService.createEvidence(evidenceData)
-            toast.success('Evidence added successfully!')
-            loadKPIData() // Refresh data
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to add evidence'
-            toast.error(message)
-            throw error
-        }
-    }
-
-    const getEvidenceProofPercentage = () => {
-        if (updates.length === 0) return 0
-        const updatesWithEvidence = updates.filter(update =>
-            evidence.some(ev =>
-                ev.date_represented === update.date_represented ||
-                (ev.date_range_start && ev.date_range_end &&
-                    update.date_represented >= ev.date_range_start &&
-                    update.date_represented <= ev.date_range_end)
-            )
-        )
-        return Math.round((updatesWithEvidence.length / updates.length) * 100)
     }
 
     if (loadingState.isLoading) {
@@ -125,8 +469,6 @@ export default function KPIDetailPage() {
             </div>
         )
     }
-
-    const proofPercentage = getEvidenceProofPercentage()
 
     return (
         <>
@@ -157,14 +499,6 @@ export default function KPIDetailPage() {
 
                     <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 sm:flex-shrink-0">
                         <button
-                            onClick={() => setIsEvidenceModalOpen(true)}
-                            className="btn-secondary flex items-center justify-center space-x-2 text-sm"
-                        >
-                            <Upload className="w-4 h-4" />
-                            <span className="hidden sm:inline">Add Evidence</span>
-                            <span className="sm:hidden">Evidence</span>
-                        </button>
-                        <button
                             onClick={() => setIsUpdateModalOpen(true)}
                             className="btn-primary flex items-center justify-center space-x-2 text-sm"
                         >
@@ -174,33 +508,50 @@ export default function KPIDetailPage() {
                     </div>
                 </div>
 
-                {/* Quick Stats Bar */}
-                <div className="grid grid-cols-3 gap-3 sm:gap-4">
+                {/* Stats Cards */}
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
                     <div className="card p-3 sm:p-4 text-center">
                         <p className="text-lg sm:text-2xl font-bold text-blue-600">{updates.length}</p>
                         <p className="text-xs sm:text-sm text-gray-600">Data Points</p>
                     </div>
                     <div className="card p-3 sm:p-4 text-center">
-                        <p className="text-lg sm:text-2xl font-bold text-green-600">{evidence.length}</p>
-                        <p className="text-xs sm:text-sm text-gray-600">Evidence Items</p>
-                    </div>
-                    <div className="card p-3 sm:p-4 text-center">
-                        <p className={`text-lg sm:text-2xl font-bold ${proofPercentage >= 80 ? 'text-green-600' :
-                            proofPercentage >= 30 ? 'text-yellow-600' : 'text-red-600'
-                            }`}>
-                            {proofPercentage}%
+                        <p className="text-lg sm:text-2xl font-bold text-green-600">
+                            {updates.reduce((sum, update) => sum + update.value, 0)}
                         </p>
-                        <p className="text-xs sm:text-sm text-gray-600">Proven</p>
+                        <p className="text-xs sm:text-sm text-gray-600">Total {kpi.unit_of_measurement}</p>
                     </div>
                 </div>
 
+                {/* Evidence Type Statistics - Compact horizontal layout */}
+                {evidenceStats.length > 0 && (
+                    <div className="card p-3">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+                            <span className="text-sm font-medium text-gray-700 mr-2">Evidence Types:</span>
+                            {evidenceStats.map((stat, index) => {
+                                const IconComponent = getEvidenceIcon(stat.type)
+                                const typeInfo = getEvidenceTypeInfo(stat.type)
+                                return (
+                                    <div key={stat.type} className="flex items-center space-x-1.5">
+                                        <div className={`p-1 rounded-lg ${typeInfo.color} flex-shrink-0`}>
+                                            <IconComponent className="w-3 h-3" />
+                                        </div>
+                                        <span className="text-xs font-medium text-gray-900">{stat.label}</span>
+                                        <span className="text-xs text-gray-600">({stat.count} • {stat.percentage}%)</span>
+                                        {index < evidenceStats.length - 1 && <span className="text-gray-300">|</span>}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                )}
+
                 {/* Data and Evidence Lists - Full width on desktop */}
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
-                    {/* Data Updates Timeline */}
-                    <div className="card p-4 sm:p-6">
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
+                    {/* Data Updates Timeline - Takes 2/3 of the space */}
+                    <div className="xl:col-span-2 card p-4 sm:p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-base sm:text-lg font-semibold text-gray-900">
-                                Data Updates ({updates.length})
+                                Data Points ({updates.length})
                             </h3>
                             <button
                                 onClick={() => setIsUpdateModalOpen(true)}
@@ -224,124 +575,25 @@ export default function KPIDetailPage() {
                                 </button>
                             </div>
                         ) : (
-                            <div className="space-y-3 max-h-96 overflow-y-auto">
-                                {updates
-                                    .sort((a, b) => new Date(b.date_represented).getTime() - new Date(a.date_represented).getTime())
-                                    .map((update) => (
-                                        <div key={update.id} className="p-3 border border-gray-200 rounded-lg">
-                                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
-                                                <div className="min-w-0">
-                                                    <div className="flex items-center space-x-2">
-                                                        <span className="text-lg sm:text-xl font-bold text-primary-600">
-                                                            {update.value} {kpi.unit_of_measurement}
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-xs sm:text-sm text-gray-600">
-                                                        {formatDate(update.date_represented)}
-                                                    </p>
-                                                    {update.note && (
-                                                        <p className="text-xs sm:text-sm text-gray-500 mt-1 line-clamp-2">
-                                                            {update.note}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center space-x-2 text-xs">
-                                                    {evidence.some(ev =>
-                                                        ev.date_represented === update.date_represented ||
-                                                        (ev.date_range_start && ev.date_range_end &&
-                                                            update.date_represented >= ev.date_range_start &&
-                                                            update.date_represented <= ev.date_range_end)
-                                                    ) ? (
-                                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                            ✓ Proven
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                                                            No evidence
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                            </div>
+                            <DataPointsList
+                                updates={updates}
+                                kpi={kpi}
+                                onRefresh={() => {
+                                    loadKPIData() // This will refresh data points and evidence stats
+                                }}
+                            />
                         )}
                     </div>
 
-                    {/* Evidence List */}
-                    <div className="card p-4 sm:p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-base sm:text-lg font-semibold text-gray-900">
-                                Evidence ({evidence.length})
-                            </h3>
-                            <button
-                                onClick={() => setIsEvidenceModalOpen(true)}
-                                className="btn-secondary flex items-center space-x-2 text-sm"
-                            >
-                                <Upload className="w-4 h-4" />
-                                <span className="hidden sm:inline">Add Evidence</span>
-                                <span className="sm:hidden">Add</span>
-                            </button>
-                        </div>
-
-                        {evidence.length === 0 ? (
-                            <div className="text-center py-8">
-                                <FileText className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-4" />
-                                <p className="text-gray-600 text-sm sm:text-base">No evidence uploaded</p>
-                                <button
-                                    onClick={() => setIsEvidenceModalOpen(true)}
-                                    className="btn-primary mt-4 text-sm"
-                                >
-                                    Upload First Evidence
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="space-y-3 max-h-96 overflow-y-auto">
-                                {evidence
-                                    .sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime())
-                                    .map((item) => {
-                                        const typeInfo = getEvidenceTypeInfo(item.type)
-                                        const IconComponent = item.type === 'visual_proof' ? Camera :
-                                            item.type === 'documentation' ? FileText :
-                                                item.type === 'testimony' ? MessageSquare : DollarSign
-                                        return (
-                                            <div key={item.id} className="p-3 border border-gray-200 rounded-lg">
-                                                <div className="flex items-start space-x-3">
-                                                    <div className={`p-2 rounded-lg ${typeInfo.color}`}>
-                                                        <IconComponent className="w-4 h-4" />
-                                                    </div>
-                                                    <div className="min-w-0 flex-1">
-                                                        <h4 className="text-sm font-medium text-gray-900 truncate">
-                                                            {item.title}
-                                                        </h4>
-                                                        <p className="text-xs text-gray-600">
-                                                            {formatDate(item.date_represented)}
-                                                        </p>
-                                                        {item.description && (
-                                                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                                                                {item.description}
-                                                            </p>
-                                                        )}
-                                                        {item.file_url && (
-                                                            <div className="mt-2">
-                                                                <a
-                                                                    href={item.file_url}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="inline-flex items-center space-x-1 text-xs text-primary-600 hover:text-primary-700"
-                                                                >
-                                                                    <ExternalLink className="w-3 h-3" />
-                                                                    <span>View File</span>
-                                                                </a>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
-                            </div>
-                        )}
+                    {/* New KPI Evidence Section - Takes 1/3 of the space */}
+                    <div className="xl:col-span-1">
+                        <KPIEvidenceSection
+                            kpi={kpi}
+                            onRefresh={() => {
+                                loadKPIData() // This will refresh both data points and evidence stats
+                            }}
+                            initiativeId={initiativeId!}
+                        />
                     </div>
                 </div>
 
@@ -396,36 +648,6 @@ export default function KPIDetailPage() {
                                 </LineChart>
                             </ResponsiveContainer>
                         </div>
-
-                        {/* Evidence Coverage Visualization */}
-                        <div className="card p-4 sm:p-6">
-                            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">
-                                Evidence Coverage
-                            </h3>
-                            <div className="flex items-center justify-center" style={{ height: '250px' }}>
-                                <div className="text-center">
-                                    {/* Large Percentage Circle */}
-                                    <div className={`inline-flex items-center justify-center w-24 h-24 sm:w-32 sm:h-32 rounded-full text-2xl sm:text-4xl font-bold mb-4 sm:mb-6 ${proofPercentage >= 80 ? 'bg-green-100 text-green-600' :
-                                        proofPercentage >= 30 ? 'bg-yellow-100 text-yellow-600' :
-                                            'bg-red-100 text-red-600'
-                                        }`}>
-                                        {proofPercentage}%
-                                    </div>
-
-                                    {/* Stats Grid */}
-                                    <div className="grid grid-cols-2 gap-3 sm:gap-4 text-center">
-                                        <div>
-                                            <p className="text-lg sm:text-xl font-bold text-gray-900">{updates.length}</p>
-                                            <p className="text-xs text-gray-600">Updates</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-lg sm:text-xl font-bold text-gray-900">{evidence.length}</p>
-                                            <p className="text-xs text-gray-600">Evidence</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 )}
             </div>
@@ -439,15 +661,6 @@ export default function KPIDetailPage() {
                 kpiId={kpi.id!}
                 metricType={kpi.metric_type}
                 unitOfMeasurement={kpi.unit_of_measurement}
-            />
-
-            <AddEvidenceModal
-                isOpen={isEvidenceModalOpen}
-                onClose={() => setIsEvidenceModalOpen(false)}
-                onSubmit={handleAddEvidence}
-                availableKPIs={[kpi]}
-                initiativeId={initiativeId!}
-                preSelectedKPIId={kpi.id}
             />
         </>
     )

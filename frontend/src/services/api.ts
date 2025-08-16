@@ -15,6 +15,10 @@ import {
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 class ApiService {
+    private requestCache = new Map<string, { promise: Promise<any>, timestamp: number }>()
+    private readonly CACHE_DURATION = 30000 // 30 seconds for GET requests
+    private readonly REQUEST_DELAY = 100 // Minimum delay between requests
+
     private async getAuthHeaders() {
         const { data: { session } } = await supabase.auth.getSession()
 
@@ -28,23 +32,165 @@ class ApiService {
         }
     }
 
-    private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-        const headers = await this.getAuthHeaders()
+    private getCacheKey(endpoint: string, options: RequestInit = {}): string {
+        return `${options.method || 'GET'}:${endpoint}:${JSON.stringify(options.body || {})}`
+    }
 
-        const response = await fetch(`${API_BASE_URL}/api${endpoint}`, {
-            ...options,
-            headers: {
-                ...headers,
-                ...options.headers
+    private async sleep(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms))
+    }
+
+    private async retryWithBackoff<T>(
+        requestFn: () => Promise<T>,
+        maxRetries: number = 3,
+        baseDelay: number = 1000
+    ): Promise<T> {
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                return await requestFn()
+            } catch (error: any) {
+                const is429Error = error.message?.includes('Too Many Requests') ||
+                    error.message?.includes('429') ||
+                    (error.response && error.response.status === 429)
+
+                const isNetworkError = error.message?.includes('Network error') ||
+                    error.message?.includes('Failed to fetch')
+
+                // Only retry on 429 (rate limit) or network errors
+                if (attempt === maxRetries || (!is429Error && !isNetworkError)) {
+                    throw error
+                }
+
+                const delay = baseDelay * Math.pow(2, attempt) // Exponential backoff
+                console.log(`Rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries + 1})`)
+                await this.sleep(delay)
+            }
+        }
+        throw new Error('Max retries exceeded')
+    }
+
+    private clearCacheByPattern(pattern: string) {
+        const keysToDelete: string[] = []
+        for (const key of this.requestCache.keys()) {
+            if (key.includes(pattern)) {
+                keysToDelete.push(key)
+            }
+        }
+        keysToDelete.forEach(key => this.requestCache.delete(key))
+    }
+
+    private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+        const cacheKey = this.getCacheKey(endpoint, options)
+        const method = options.method || 'GET'
+        const now = Date.now()
+
+        // For GET requests, check cache
+        if (method === 'GET') {
+            const cached = this.requestCache.get(cacheKey)
+            if (cached && (now - cached.timestamp) < this.CACHE_DURATION) {
+                console.log(`Using cached result for: ${cacheKey}`)
+                return cached.promise
+            }
+        }
+
+        // Check if the same request is already in flight
+        const inFlight = this.requestCache.get(cacheKey)
+        if (inFlight && (now - inFlight.timestamp) < 5000) { // 5 second deduplication window
+            console.log(`Request already in flight: ${cacheKey}`)
+            return inFlight.promise
+        }
+
+        const requestPromise = this.retryWithBackoff(async () => {
+            const headers = await this.getAuthHeaders()
+
+            const response = await fetch(`${API_BASE_URL}/api${endpoint}`, {
+                ...options,
+                headers: {
+                    ...headers,
+                    ...options.headers
+                }
+            })
+
+            if (!response.ok) {
+                let errorMessage = 'API request failed'
+
+                if (response.status === 429) {
+                    errorMessage = 'Too Many Requests'
+                } else {
+                    try {
+                        const error = await response.json()
+                        errorMessage = error.error || error.message || `HTTP ${response.status}`
+                    } catch {
+                        errorMessage = `HTTP ${response.status} - ${response.statusText}`
+                    }
+                }
+
+                throw new Error(errorMessage)
+            }
+
+            // Handle empty responses (common for DELETE operations)
+            const contentType = response.headers.get('content-type')
+            const contentLength = response.headers.get('content-length')
+
+            // If response is empty or has no content, return null
+            if (contentLength === '0' || response.status === 204 || !contentType?.includes('application/json')) {
+                return null
+            }
+
+            // Try to parse JSON, but handle empty responses gracefully
+            const text = await response.text()
+            if (!text.trim()) {
+                return null
+            }
+
+            try {
+                return JSON.parse(text)
+            } catch (error) {
+                console.warn('Failed to parse response as JSON:', text)
+                return null
             }
         })
 
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({ error: 'Network error' }))
-            throw new Error(error.error || 'API request failed')
-        }
+        // Cache the promise with timestamp
+        this.requestCache.set(cacheKey, { promise: requestPromise, timestamp: now })
 
-        return response.json()
+        // For mutating operations, clear related cache entries after completion
+        requestPromise.finally(() => {
+            if (method !== 'GET') {
+                // Clear cache for related GET requests
+                if (endpoint.includes('/initiatives')) {
+                    this.clearCacheByPattern('/initiatives')
+                }
+                if (endpoint.includes('/kpis')) {
+                    this.clearCacheByPattern('/kpis')
+                    // KPI changes also affect initiative dashboards
+                    this.clearCacheByPattern('/initiatives')
+                }
+                if (endpoint.includes('/evidence')) {
+                    this.clearCacheByPattern('/evidence')
+                    // Evidence changes also affect KPIs and initiative dashboards
+                    this.clearCacheByPattern('/kpis')
+                    this.clearCacheByPattern('/initiatives')
+                }
+
+                // Remove the mutating request from cache immediately
+                setTimeout(() => {
+                    this.requestCache.delete(cacheKey)
+                }, 100)
+            }
+        })
+
+        return requestPromise
+    }
+
+    // Public method to clear cache for specific patterns (useful for components)
+    public clearCache(pattern?: string) {
+        if (pattern) {
+            this.clearCacheByPattern(pattern)
+        } else {
+            // Clear all cache
+            this.requestCache.clear()
+        }
     }
 
     // Initiatives
@@ -118,6 +264,10 @@ class ApiService {
     // KPI Updates
     async getKPIUpdates(kpiId: string): Promise<KPIUpdate[]> {
         return this.request<KPIUpdate[]>(`/kpis/${kpiId}/updates`)
+    }
+
+    async getKPIEvidenceByDates(kpiId: string): Promise<any[]> {
+        return this.request<any[]>(`/kpis/${kpiId}/evidence-by-dates`)
     }
 
     async createKPIUpdate(kpiId: string, data: CreateKPIUpdateForm): Promise<KPIUpdate> {
@@ -199,6 +349,33 @@ class ApiService {
         return this.request<void>(`/evidence/${id}`, {
             method: 'DELETE'
         })
+    }
+
+    // Batch loading method to reduce API calls - SEQUENTIAL to avoid rate limiting
+    async loadDashboardData(): Promise<{
+        initiatives: Initiative[]
+        kpis: KPI[]
+        evidence: Evidence[]
+    }> {
+        console.log('Loading dashboard data sequentially...')
+
+        // Load data sequentially with delays to respect rate limits
+        const initiatives = await this.getInitiatives()
+        console.log('Loaded initiatives:', initiatives.length)
+
+        // Small delay between requests
+        await this.sleep(300)
+
+        const kpis = await this.getKPIs()
+        console.log('Loaded KPIs:', kpis.length)
+
+        // Small delay between requests
+        await this.sleep(300)
+
+        const evidence = await this.getEvidence()
+        console.log('Loaded evidence:', evidence.length)
+
+        return { initiatives, kpis, evidence }
     }
 }
 

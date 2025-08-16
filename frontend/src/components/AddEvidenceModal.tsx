@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { X, Upload, Calendar, Link as LinkIcon, FileText, Camera, DollarSign, MessageSquare, File } from 'lucide-react'
 import { CreateEvidenceForm, KPI } from '../types'
 import { apiService } from '../services/api'
+import { formatDate } from '../utils'
 
 interface AddEvidenceModalProps {
     isOpen: boolean
@@ -10,6 +11,7 @@ interface AddEvidenceModalProps {
     availableKPIs: KPI[]
     initiativeId: string
     preSelectedKPIId?: string
+    editData?: any // Optional prop for editing existing evidence
 }
 
 export default function AddEvidenceModal({
@@ -18,22 +20,30 @@ export default function AddEvidenceModal({
     onSubmit,
     availableKPIs,
     initiativeId,
-    preSelectedKPIId
+    preSelectedKPIId,
+    editData
 }: AddEvidenceModalProps) {
     const [formData, setFormData] = useState<CreateEvidenceForm>({
-        title: '',
-        description: '',
-        type: 'visual_proof',
-        date_represented: new Date().toISOString().split('T')[0],
-        kpi_ids: preSelectedKPIId ? [preSelectedKPIId] : [],
+        title: editData?.title || '',
+        description: editData?.description || '',
+        type: editData?.type || 'visual_proof',
+        date_represented: editData?.date_represented || new Date().toISOString().split('T')[0],
+        date_range_start: editData?.date_range_start,
+        date_range_end: editData?.date_range_end,
+        file_url: editData?.file_url,
+        kpi_ids: editData ? [] : (preSelectedKPIId ? [preSelectedKPIId] : []), // Reset KPI selection for editing
         initiative_id: initiativeId
     })
-    const [isDateRange, setIsDateRange] = useState(false)
+    const [isDateRange, setIsDateRange] = useState(editData?.date_range_start && editData?.date_range_end ? true : false)
     const [loading, setLoading] = useState(false)
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [isDragOver, setIsDragOver] = useState(false)
     const [uploadProgress, setUploadProgress] = useState('')
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    // State for showing matching data points
+    const [matchingDataPoints, setMatchingDataPoints] = useState<any[]>([])
+    const [isFetchingMatches, setIsFetchingMatches] = useState(false)
 
     const evidenceTypes = [
         { value: 'visual_proof', label: 'Visual Proof', icon: Camera, description: 'Photos, videos, screenshots' },
@@ -41,6 +51,87 @@ export default function AddEvidenceModal({
         { value: 'testimony', label: 'Testimony', icon: MessageSquare, description: 'Quotes, feedback, stories' },
         { value: 'financials', label: 'Financials', icon: DollarSign, description: 'Receipts, invoices, budgets' }
     ] as const
+
+    // Debounced effect to fetch matching data points
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            if (formData.kpi_ids.length > 0) {
+                if (isDateRange && formData.date_range_start && formData.date_range_end) {
+                    fetchMatchingDataPoints()
+                } else if (!isDateRange && formData.date_represented) {
+                    fetchMatchingDataPoints()
+                } else {
+                    setMatchingDataPoints([])
+                }
+            } else {
+                setMatchingDataPoints([])
+            }
+        }, 300) // 300ms debounce
+
+        return () => clearTimeout(timeoutId)
+    }, [isDateRange, formData.date_range_start, formData.date_range_end, formData.date_represented, formData.kpi_ids])
+
+    const fetchMatchingDataPoints = async () => {
+        if (isFetchingMatches) return // Prevent concurrent calls
+
+        try {
+            setIsFetchingMatches(true)
+
+            // For each selected KPI, get their updates and filter by date overlap
+            const allDataPoints = []
+            for (const kpiId of formData.kpi_ids) {
+                const updates = await apiService.getKPIUpdates(kpiId)
+                const matchingUpdates = updates.filter(update => {
+                    const updateDate = update.date_represented
+                    const updateStart = update.date_range_start
+                    const updateEnd = update.date_range_end
+
+                    if (isDateRange) {
+                        // Evidence is a date range
+                        const evidenceStart = formData.date_range_start!
+                        const evidenceEnd = formData.date_range_end!
+
+                        // Check if evidence range overlaps with update
+                        if (updateStart && updateEnd) {
+                            // Both are ranges - check overlap
+                            return evidenceStart <= updateEnd && evidenceEnd >= updateStart
+                        } else {
+                            // Update is single date - check if it's within evidence range
+                            return updateDate >= evidenceStart && updateDate <= evidenceEnd
+                        }
+                    } else {
+                        // Evidence is a single date
+                        const evidenceDate = formData.date_represented!
+
+                        // Check if evidence date matches or overlaps with update
+                        if (updateStart && updateEnd) {
+                            // Update is a range - check if evidence date falls within it
+                            return evidenceDate >= updateStart && evidenceDate <= updateEnd
+                        } else {
+                            // Both are single dates - check for exact match
+                            return evidenceDate === updateDate
+                        }
+                    }
+                })
+
+                // Add KPI info to each update
+                const kpi = availableKPIs.find(k => k.id === kpiId)
+                const updatesWithKPI = matchingUpdates.map(update => ({
+                    ...update,
+                    kpi_title: kpi?.title,
+                    kpi_unit: kpi?.unit_of_measurement
+                }))
+
+                allDataPoints.push(...updatesWithKPI)
+            }
+
+            setMatchingDataPoints(allDataPoints)
+        } catch (error) {
+            console.error('Error fetching matching data points:', error)
+        } finally {
+            setIsFetchingMatches(false)
+        }
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -59,25 +150,41 @@ export default function AddEvidenceModal({
             }
 
             // Create evidence record with the real file URL
-            const submitData = {
+            let submitData = {
                 ...formData,
                 file_url: finalFileUrl
             }
 
-            setUploadProgress('Creating evidence record...')
+            // Handle date range logic
+            if (isDateRange) {
+                // For date ranges, ensure both range fields are included
+                if (!submitData.date_range_start || !submitData.date_range_end) {
+                    throw new Error('Both start and end dates are required for date ranges')
+                }
+                // Set date_represented to start date for consistency
+                submitData.date_represented = submitData.date_range_start
+            } else {
+                // For single dates, clear range fields
+                submitData.date_range_start = undefined
+                submitData.date_range_end = undefined
+            }
+
+            setUploadProgress(editData ? 'Updating evidence record...' : 'Creating evidence record...')
             await onSubmit(submitData)
 
-            // Reset form
-            setFormData({
-                title: '',
-                description: '',
-                type: 'visual_proof',
-                date_represented: new Date().toISOString().split('T')[0],
-                kpi_ids: preSelectedKPIId ? [preSelectedKPIId] : [],
-                initiative_id: initiativeId
-            })
-            setSelectedFile(null)
-            setIsDateRange(false)
+            // Reset form only if creating (not editing)
+            if (!editData) {
+                setFormData({
+                    title: '',
+                    description: '',
+                    type: 'visual_proof',
+                    date_represented: new Date().toISOString().split('T')[0],
+                    kpi_ids: preSelectedKPIId ? [preSelectedKPIId] : [],
+                    initiative_id: initiativeId
+                })
+                setSelectedFile(null)
+                setIsDateRange(false)
+            }
             setUploadProgress('')
             onClose()
         } catch (error) {
@@ -162,8 +269,12 @@ export default function AddEvidenceModal({
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
                     <div>
-                        <h2 className="text-xl font-semibold text-gray-900">Upload Evidence</h2>
-                        <p className="text-sm text-gray-600 mt-1">Add proof to support your impact claims</p>
+                        <h2 className="text-xl font-semibold text-gray-900">
+                            {editData ? 'Edit Evidence' : 'Upload Evidence'}
+                        </h2>
+                        <p className="text-sm text-gray-600 mt-1">
+                            {editData ? 'Update your evidence information' : 'Add proof to support your impact claims'}
+                        </p>
                     </div>
                     <button
                         onClick={onClose}
@@ -377,6 +488,39 @@ export default function AddEvidenceModal({
                             )}
                         </div>
                     </div>
+
+                    {/* Matching Data Points (shown for both single dates and date ranges) */}
+                    {matchingDataPoints.length > 0 && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h4 className="text-sm font-medium text-blue-900 mb-2">
+                                📊 Data Points {isDateRange ? 'in Selected Date Range' : 'on Selected Date'}
+                            </h4>
+                            <p className="text-xs text-blue-700 mb-3">
+                                Your evidence will help prove these data points:
+                            </p>
+                            <div className="space-y-2 max-h-32 overflow-y-auto">
+                                {matchingDataPoints.map((dataPoint, index) => (
+                                    <div key={`${dataPoint.id}-${index}`} className="flex items-center justify-between bg-white rounded px-3 py-2 text-sm">
+                                        <div>
+                                            <span className="font-medium text-gray-900">
+                                                {dataPoint.value} {dataPoint.kpi_unit}
+                                            </span>
+                                            <span className="text-gray-500 ml-2">
+                                                • {dataPoint.kpi_title}
+                                            </span>
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                            {dataPoint.date_range_start && dataPoint.date_range_end ? (
+                                                <>Range: {formatDate(dataPoint.date_range_start)} - {formatDate(dataPoint.date_range_end)}</>
+                                            ) : (
+                                                <>{formatDate(dataPoint.date_represented)}</>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* KPI Selection */}
                     <div>

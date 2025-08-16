@@ -24,6 +24,8 @@ export default function AddKPIUpdateModal({
     const [formData, setFormData] = useState<CreateKPIUpdateForm>({
         value: 0,
         date_represented: new Date().toISOString().split('T')[0],
+        date_range_start: undefined,
+        date_range_end: undefined,
         note: '',
         label: ''
     })
@@ -35,10 +37,27 @@ export default function AddKPIUpdateModal({
         setLoading(true)
 
         try {
-            await onSubmit(formData)
+            // Prepare form data based on date mode
+            const submitData = { ...formData }
+            if (isDateRange) {
+                // For date ranges, keep both range fields and set date_represented to start date
+                submitData.date_represented = formData.date_range_start || formData.date_represented
+                // Ensure both range fields are included
+                if (!submitData.date_range_start || !submitData.date_range_end) {
+                    throw new Error('Both start and end dates are required for date ranges')
+                }
+            } else {
+                // For single dates, clear range fields
+                submitData.date_range_start = undefined
+                submitData.date_range_end = undefined
+            }
+
+            await onSubmit(submitData)
             setFormData({
                 value: 0,
                 date_represented: new Date().toISOString().split('T')[0],
+                date_range_start: undefined,
+                date_range_end: undefined,
                 note: '',
                 label: ''
             })
@@ -55,6 +74,20 @@ export default function AddKPIUpdateModal({
             ...prev,
             [name]: name === 'value' ? parseFloat(value) || 0 : value
         }))
+    }
+
+    const handleValueFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+        // Clear the field if it contains 0
+        if (formData.value === 0) {
+            setFormData(prev => ({ ...prev, value: '' as any }))
+        }
+    }
+
+    const handleValueBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+        // If field is empty on blur, set it back to 0
+        if (e.target.value === '' || isNaN(parseFloat(e.target.value))) {
+            setFormData(prev => ({ ...prev, value: 0 }))
+        }
     }
 
     if (!isOpen) return null
@@ -90,6 +123,8 @@ export default function AddKPIUpdateModal({
                                 name="value"
                                 value={formData.value}
                                 onChange={handleInputChange}
+                                onFocus={handleValueFocus}
+                                onBlur={handleValueBlur}
                                 className="input-field pr-16"
                                 placeholder="Enter the value"
                                 required
@@ -107,69 +142,70 @@ export default function AddKPIUpdateModal({
 
                     {/* Date Selection */}
                     <div>
-                        <label className="label">
-                            <Calendar className="w-4 h-4 inline mr-2" />
-                            Date this data represents <span className="text-red-500">*</span>
-                        </label>
-
-                        <div className="space-y-3">
-                            <div className="flex items-center space-x-4">
-                                <label className="flex items-center">
-                                    <input
-                                        type="radio"
-                                        checked={!isDateRange}
-                                        onChange={() => setIsDateRange(false)}
-                                        className="mr-2"
-                                    />
-                                    <span className="text-sm">Single Date</span>
-                                </label>
-                                <label className="flex items-center">
-                                    <input
-                                        type="radio"
-                                        checked={isDateRange}
-                                        onChange={() => setIsDateRange(true)}
-                                        className="mr-2"
-                                    />
-                                    <span className="text-sm">Date Range</span>
-                                </label>
-                            </div>
-
-                            {!isDateRange ? (
-                                <input
-                                    type="date"
-                                    name="date_represented"
-                                    value={formData.date_represented}
-                                    onChange={handleInputChange}
-                                    className="input-field"
-                                    required
-                                />
-                            ) : (
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs text-gray-600 mb-1">From</label>
-                                        <input
-                                            type="date"
-                                            name="date_range_start"
-                                            value={formData.date_range_start || ''}
-                                            onChange={handleInputChange}
-                                            className="input-field"
-                                            required={isDateRange}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs text-gray-600 mb-1">To</label>
-                                        <input
-                                            type="date"
-                                            name="date_range_end"
-                                            value={formData.date_range_end || ''}
-                                            onChange={handleInputChange}
-                                            className="input-field"
-                                            required={isDateRange}
-                                        />
-                                    </div>
-                                </div>
-                            )}
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="label">
+                                <Calendar className="w-4 h-4 inline mr-2" />
+                                Date
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsDateRange(!isDateRange)
+                                    // Clear date fields when switching modes
+                                    if (!isDateRange) {
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            date_range_start: '',
+                                            date_range_end: ''
+                                        }))
+                                    } else {
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            date_represented: new Date().toISOString().split('T')[0]
+                                        }))
+                                    }
+                                }}
+                                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                            >
+                                {isDateRange ? 'Single Date' : 'Date Range'}
+                            </button>
                         </div>
+
+                        {!isDateRange ? (
+                            <input
+                                type="date"
+                                name="date_represented"
+                                value={formData.date_represented}
+                                onChange={handleInputChange}
+                                className="input-field"
+                                required
+                            />
+                        ) : (
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs text-gray-600 mb-1">From</label>
+                                    <input
+                                        type="date"
+                                        name="date_range_start"
+                                        value={formData.date_range_start || ''}
+                                        onChange={handleInputChange}
+                                        className="input-field"
+                                        required={isDateRange}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-gray-600 mb-1">To</label>
+                                    <input
+                                        type="date"
+                                        name="date_range_end"
+                                        value={formData.date_range_end || ''}
+                                        onChange={handleInputChange}
+                                        className="input-field"
+                                        required={isDateRange}
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Label */}

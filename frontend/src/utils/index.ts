@@ -7,16 +7,49 @@ export function cn(...inputs: ClassValue[]) {
 
 // Format date for display
 export function formatDate(date: string | Date): string {
+    let dateToFormat: Date
+
+    if (typeof date === 'string') {
+        // Handle YYYY-MM-DD format strings by parsing as local date
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            const [year, month, day] = date.split('-').map(Number)
+            dateToFormat = new Date(year, month - 1, day) // month is 0-indexed
+        } else {
+            dateToFormat = new Date(date)
+        }
+    } else {
+        dateToFormat = date
+    }
+
     return new Intl.DateTimeFormat('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
-    }).format(new Date(date))
+    }).format(dateToFormat)
 }
 
 // Format date for inputs
 export function formatDateForInput(date: string | Date): string {
-    return new Date(date).toISOString().split('T')[0]
+    let dateToFormat: Date
+
+    if (typeof date === 'string') {
+        // Handle YYYY-MM-DD format strings by parsing as local date
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            const [year, month, day] = date.split('-').map(Number)
+            dateToFormat = new Date(year, month - 1, day) // month is 0-indexed
+        } else {
+            dateToFormat = new Date(date)
+        }
+    } else {
+        dateToFormat = date
+    }
+
+    // Return in YYYY-MM-DD format for input fields
+    const year = dateToFormat.getFullYear()
+    const month = String(dateToFormat.getMonth() + 1).padStart(2, '0')
+    const day = String(dateToFormat.getDate()).padStart(2, '0')
+
+    return `${year}-${month}-${day}`
 }
 
 // Calculate evidence percentage color and status

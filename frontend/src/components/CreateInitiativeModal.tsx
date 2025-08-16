@@ -6,18 +6,20 @@ interface CreateInitiativeModalProps {
     isOpen: boolean
     onClose: () => void
     onSubmit: (data: CreateInitiativeForm) => Promise<void>
+    editData?: any // Optional prop for editing existing initiative
 }
 
 export default function CreateInitiativeModal({
     isOpen,
     onClose,
-    onSubmit
+    onSubmit,
+    editData
 }: CreateInitiativeModalProps) {
     const [formData, setFormData] = useState<CreateInitiativeForm>({
-        title: '',
-        description: '',
-        region: '',
-        location: ''
+        title: editData?.title || '',
+        description: editData?.description || '',
+        region: editData?.region || '',
+        location: editData?.location || ''
     })
     const [loading, setLoading] = useState(false)
 
@@ -27,7 +29,13 @@ export default function CreateInitiativeModal({
 
         try {
             await onSubmit(formData)
-            setFormData({ title: '', description: '', region: '', location: '' })
+            // Reset form only if creating (not editing)
+            if (!editData) {
+                setFormData({ title: '', description: '', region: '', location: '' })
+            }
+            onClose()
+        } catch (error) {
+            // Don't close modal on error, let parent handle error display
         } finally {
             setLoading(false)
         }
@@ -47,7 +55,9 @@ export default function CreateInitiativeModal({
             <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
-                    <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Create New Initiative</h2>
+                    <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
+                        {editData ? 'Edit Initiative' : 'Create New Initiative'}
+                    </h2>
                     <button
                         onClick={onClose}
                         className="text-gray-400 hover:text-gray-600 p-1"
@@ -125,7 +135,7 @@ export default function CreateInitiativeModal({
                             disabled={loading}
                             className="w-full sm:flex-1 px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-lg hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2"
                         >
-                            {loading ? 'Creating...' : 'Create Initiative'}
+                            {loading ? (editData ? 'Updating...' : 'Creating...') : (editData ? 'Update Initiative' : 'Create Initiative')}
                         </button>
                     </div>
                 </form>

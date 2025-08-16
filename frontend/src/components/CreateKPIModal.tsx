@@ -7,20 +7,22 @@ interface CreateKPIModalProps {
     onClose: () => void
     onSubmit: (data: CreateKPIForm) => Promise<void>
     initiativeId: string
+    editData?: any // Optional prop for editing existing KPI
 }
 
 export default function CreateKPIModal({
     isOpen,
     onClose,
     onSubmit,
-    initiativeId
+    initiativeId,
+    editData
 }: CreateKPIModalProps) {
     const [formData, setFormData] = useState<CreateKPIForm>({
-        title: '',
-        description: '',
-        metric_type: 'number',
-        unit_of_measurement: '',
-        category: 'output',
+        title: editData?.title || '',
+        description: editData?.description || '',
+        metric_type: editData?.metric_type || 'number',
+        unit_of_measurement: editData?.unit_of_measurement || '',
+        category: editData?.category || 'output',
         initiative_id: initiativeId
     })
     const [loading, setLoading] = useState(false)
@@ -30,18 +32,18 @@ export default function CreateKPIModal({
         setLoading(true)
 
         try {
-            await onSubmit({
-                ...formData,
-                initiative_id: initiativeId
-            })
-            setFormData({
-                title: '',
-                description: '',
-                metric_type: 'number',
-                unit_of_measurement: '',
-                category: 'output',
-                initiative_id: initiativeId
-            })
+            await onSubmit(formData)
+            // Reset form only if creating (not editing)
+            if (!editData) {
+                setFormData({
+                    title: '',
+                    description: '',
+                    metric_type: 'number',
+                    unit_of_measurement: '',
+                    category: 'output',
+                    initiative_id: initiativeId
+                })
+            }
             onClose()
         } finally {
             setLoading(false)
@@ -62,7 +64,9 @@ export default function CreateKPIModal({
             <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
-                    <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Create New KPI</h2>
+                    <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
+                        {editData ? 'Edit KPI' : 'Create New KPI'}
+                    </h2>
                     <button
                         onClick={onClose}
                         className="text-gray-400 hover:text-gray-600 p-1"
@@ -185,7 +189,7 @@ export default function CreateKPIModal({
                             disabled={loading}
                             className="w-full sm:flex-1 px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-lg hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2"
                         >
-                            {loading ? 'Creating...' : 'Create KPI'}
+                            {loading ? (editData ? 'Updating...' : 'Creating...') : (editData ? 'Update KPI' : 'Create KPI')}
                         </button>
                     </div>
                 </form>

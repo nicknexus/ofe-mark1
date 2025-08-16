@@ -12,7 +12,9 @@ import {
     Hash,
     TrendingUp,
     Upload,
-    Eye
+    Eye,
+    Edit,
+    Trash2
 } from 'lucide-react'
 import { apiService } from '../services/api'
 import { InitiativeDashboard, LoadingState, CreateKPIForm, CreateKPIUpdateForm, CreateEvidenceForm } from '../types'
@@ -27,11 +29,14 @@ export default function InitiativePage() {
     const { id } = useParams<{ id: string }>()
     const [dashboard, setDashboard] = useState<InitiativeDashboard | null>(null)
     const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: true })
+    const [isLoadingDashboard, setIsLoadingDashboard] = useState(false)
 
     // Modal states
     const [isKPIModalOpen, setIsKPIModalOpen] = useState(false)
     const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
     const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false)
+    const [isEditKPIModalOpen, setIsEditKPIModalOpen] = useState(false)
+    const [deleteConfirmKPI, setDeleteConfirmKPI] = useState<any>(null)
 
     // Selected KPI for modals
     const [selectedKPI, setSelectedKPI] = useState<any>(null)
@@ -43,9 +48,10 @@ export default function InitiativePage() {
     }, [id])
 
     const loadDashboard = async () => {
-        if (!id) return
+        if (!id || isLoadingDashboard) return
 
         try {
+            setIsLoadingDashboard(true)
             setLoadingState({ isLoading: true })
             const data = await apiService.getInitiativeDashboard(id)
             setDashboard(data)
@@ -54,6 +60,8 @@ export default function InitiativePage() {
             const message = error instanceof Error ? error.message : 'Failed to load dashboard'
             setLoadingState({ isLoading: false, error: message })
             toast.error(message)
+        } finally {
+            setIsLoadingDashboard(false)
         }
     }
 
@@ -61,11 +69,59 @@ export default function InitiativePage() {
         try {
             await apiService.createKPI(kpiData)
             toast.success('KPI created successfully!')
-            loadDashboard() // Refresh the dashboard
+
+            // Explicitly clear the dashboard cache to ensure fresh data
+            apiService.clearCache(`/initiatives/${id}/dashboard`)
+
+            // Only reload if not currently loading
+            if (!isLoadingDashboard) {
+                loadDashboard() // Refresh the dashboard
+            }
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to create KPI'
             toast.error(message)
             throw error // Re-throw to keep modal open on error
+        }
+    }
+
+    const handleEditKPI = async (kpiData: CreateKPIForm) => {
+        if (!selectedKPI) return
+        try {
+            await apiService.updateKPI(selectedKPI.id, kpiData)
+            toast.success('KPI updated successfully!')
+
+            // Explicitly clear the dashboard cache to ensure fresh data
+            apiService.clearCache(`/initiatives/${id}/dashboard`)
+
+            // Only reload if not currently loading
+            if (!isLoadingDashboard) {
+                loadDashboard() // Refresh the dashboard
+            }
+            setIsEditKPIModalOpen(false)
+            setSelectedKPI(null)
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to update KPI'
+            toast.error(message)
+            throw error
+        }
+    }
+
+    const handleDeleteKPI = async (kpi: any) => {
+        try {
+            await apiService.deleteKPI(kpi.id)
+            toast.success('KPI deleted successfully!')
+
+            // Explicitly clear the dashboard cache to ensure fresh data
+            apiService.clearCache(`/initiatives/${id}/dashboard`)
+
+            // Only reload if not currently loading
+            if (!isLoadingDashboard) {
+                loadDashboard() // Refresh the dashboard
+            }
+            setDeleteConfirmKPI(null)
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to delete KPI'
+            toast.error(message)
         }
     }
 
@@ -75,7 +131,14 @@ export default function InitiativePage() {
         try {
             await apiService.createKPIUpdate(selectedKPI.id, updateData)
             toast.success('KPI update added successfully!')
-            loadDashboard() // Refresh the dashboard
+
+            // Explicitly clear the dashboard cache to ensure fresh data
+            apiService.clearCache(`/initiatives/${id}/dashboard`)
+
+            // Only reload if not currently loading
+            if (!isLoadingDashboard) {
+                loadDashboard() // Refresh the dashboard
+            }
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to add KPI update'
             toast.error(message)
@@ -87,7 +150,14 @@ export default function InitiativePage() {
         try {
             await apiService.createEvidence(evidenceData)
             toast.success('Evidence added successfully!')
-            loadDashboard() // Refresh the dashboard
+
+            // Explicitly clear the dashboard cache to ensure fresh data
+            apiService.clearCache(`/initiatives/${id}/dashboard`)
+
+            // Only reload if not currently loading
+            if (!isLoadingDashboard) {
+                loadDashboard() // Refresh the dashboard
+            }
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to add evidence'
             toast.error(message)
@@ -107,6 +177,15 @@ export default function InitiativePage() {
         setIsEvidenceModalOpen(true)
     }
 
+    const openEditModal = (kpi: any) => {
+        setSelectedKPI(kpi)
+        setIsEditKPIModalOpen(true)
+    }
+
+    const openDeleteConfirm = (kpi: any) => {
+        setDeleteConfirmKPI(kpi)
+    }
+
     if (loadingState.isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -123,8 +202,8 @@ export default function InitiativePage() {
                     <Link to="/" className="btn-secondary">
                         Back to Dashboard
                     </Link>
-                    <button onClick={loadDashboard} className="btn-primary">
-                        Try Again
+                    <button onClick={loadDashboard} className="btn-primary" disabled={isLoadingDashboard}>
+                        {isLoadingDashboard ? 'Loading...' : 'Try Again'}
                     </button>
                 </div>
             </div>
@@ -223,7 +302,11 @@ export default function InitiativePage() {
 
                             <div className="space-y-3 sm:space-y-4">
                                 {kpis.map((kpi) => (
-                                    <div key={kpi.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 hover:shadow-sm transition-shadow">
+                                    <Link
+                                        key={kpi.id}
+                                        to={`/initiatives/${id}/kpis/${kpi.id}`}
+                                        className="block border border-gray-200 rounded-lg p-3 sm:p-4 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer"
+                                    >
                                         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between space-y-2 sm:space-y-0 mb-3">
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-3 mb-1">
@@ -252,28 +335,54 @@ export default function InitiativePage() {
                                             {/* Quick Actions */}
                                             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                                                 <button
-                                                    onClick={() => openUpdateModal(kpi)}
+                                                    onClick={(e) => {
+                                                        e.preventDefault()
+                                                        e.stopPropagation()
+                                                        openUpdateModal(kpi)
+                                                    }}
                                                     className="px-3 py-1.5 bg-primary-50 text-primary-700 rounded text-xs sm:text-sm hover:bg-primary-100 transition-colors text-center"
                                                 >
                                                     Add Data
                                                 </button>
                                                 {kpi.total_updates > 0 && (
                                                     <button
-                                                        onClick={() => openEvidenceModal(kpi)}
+                                                        onClick={(e) => {
+                                                            e.preventDefault()
+                                                            e.stopPropagation()
+                                                            openEvidenceModal(kpi)
+                                                        }}
                                                         className="px-3 py-1.5 bg-green-50 text-green-700 rounded text-xs sm:text-sm hover:bg-green-100 transition-colors text-center"
                                                     >
                                                         Add Evidence
                                                     </button>
                                                 )}
-                                                <Link
-                                                    to={`/initiatives/${id}/kpis/${kpi.id}`}
-                                                    className="px-3 py-1.5 text-gray-600 hover:text-gray-800 rounded text-xs sm:text-sm hover:bg-gray-100 transition-colors text-center"
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.preventDefault()
+                                                        e.stopPropagation()
+                                                        openEditModal(kpi)
+                                                    }}
+                                                    className="px-3 py-1.5 bg-gray-50 text-gray-700 rounded text-xs sm:text-sm hover:bg-gray-100 transition-colors text-center flex items-center justify-center space-x-1"
+                                                    title="Edit KPI"
                                                 >
-                                                    View Details
-                                                </Link>
+                                                    <Edit className="w-3 h-3" />
+                                                    <span className="hidden sm:inline">Edit</span>
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.preventDefault()
+                                                        e.stopPropagation()
+                                                        openDeleteConfirm(kpi)
+                                                    }}
+                                                    className="px-3 py-1.5 bg-red-50 text-red-700 rounded text-xs sm:text-sm hover:bg-red-100 transition-colors text-center flex items-center justify-center space-x-1"
+                                                    title="Delete KPI"
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                    <span className="hidden sm:inline">Delete</span>
+                                                </button>
                                             </div>
                                         </div>
-                                    </div>
+                                    </Link>
                                 ))}
                             </div>
                         </div>
@@ -375,6 +484,57 @@ export default function InitiativePage() {
                 initiativeId={id!}
                 preSelectedKPIId={selectedKPI?.id}
             />
+
+            {/* Edit KPI Modal */}
+            {selectedKPI && (
+                <CreateKPIModal
+                    isOpen={isEditKPIModalOpen}
+                    onClose={() => {
+                        setIsEditKPIModalOpen(false)
+                        setSelectedKPI(null)
+                    }}
+                    onSubmit={handleEditKPI}
+                    initiativeId={id!}
+                    editData={selectedKPI}
+                />
+            )}
+
+            {/* Delete Confirmation Dialog */}
+            {deleteConfirmKPI && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-xl max-w-md w-full p-6">
+                        <div className="flex items-center space-x-3 mb-4">
+                            <div className="p-2 bg-red-100 rounded-lg">
+                                <Trash2 className="w-5 h-5 text-red-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900">Delete KPI</h3>
+                                <p className="text-sm text-gray-600">This action cannot be undone</p>
+                            </div>
+                        </div>
+
+                        <p className="text-gray-700 mb-6">
+                            Are you sure you want to delete "<strong>{deleteConfirmKPI.title}</strong>"?
+                            This will also delete all associated data points and evidence links.
+                        </p>
+
+                        <div className="flex space-x-3">
+                            <button
+                                onClick={() => setDeleteConfirmKPI(null)}
+                                className="btn-secondary flex-1"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => handleDeleteKPI(deleteConfirmKPI)}
+                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                            >
+                                Delete KPI
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
