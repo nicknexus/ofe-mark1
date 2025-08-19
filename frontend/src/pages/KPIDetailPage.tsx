@@ -370,6 +370,38 @@ export default function KPIDetailPage() {
     // Modal states
     const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
 
+    // Date filter states
+    const [dateFilter, setDateFilter] = useState<{
+        startDate: string
+        endDate: string
+        isActive: boolean
+    }>({
+        startDate: '',
+        endDate: '',
+        isActive: false
+    })
+
+    // Filtered data based on date filter
+    const filteredUpdates = dateFilter.isActive
+        ? updates.filter(update => {
+            const updateDate = update.date_represented
+            const updateStart = update.date_range_start
+            const updateEnd = update.date_range_end
+
+            // Check if update overlaps with filter range
+            if (updateStart && updateEnd) {
+                // Update is a range - check overlap
+                return dateFilter.startDate <= updateEnd && dateFilter.endDate >= updateStart
+            } else {
+                // Update is single date - check if it's within filter range
+                return updateDate >= dateFilter.startDate && updateDate <= dateFilter.endDate
+            }
+        })
+        : updates
+
+    // Calculate filtered total sum
+    const filteredTotal = filteredUpdates.reduce((sum, update) => sum + update.value, 0)
+
     useEffect(() => {
         if (kpiId) {
             loadKPIData()
@@ -545,13 +577,62 @@ export default function KPIDetailPage() {
                     </div>
                 )}
 
+                {/* Date Filter */}
+                <div className="card p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+                        <h3 className="text-base sm:text-lg font-semibold text-gray-900">Filter by Date Range</h3>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <div className="flex items-center space-x-2">
+                                <label className="text-sm text-gray-600">From:</label>
+                                <input
+                                    type="date"
+                                    value={dateFilter.startDate}
+                                    onChange={(e) => setDateFilter(prev => ({
+                                        ...prev,
+                                        startDate: e.target.value,
+                                        isActive: e.target.value !== '' && prev.endDate !== ''
+                                    }))}
+                                    className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                />
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <label className="text-sm text-gray-600">To:</label>
+                                <input
+                                    type="date"
+                                    value={dateFilter.endDate}
+                                    onChange={(e) => setDateFilter(prev => ({
+                                        ...prev,
+                                        endDate: e.target.value,
+                                        isActive: prev.startDate !== '' && e.target.value !== ''
+                                    }))}
+                                    className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                />
+                            </div>
+                            <button
+                                onClick={() => setDateFilter({ startDate: '', endDate: '', isActive: false })}
+                                className="btn-secondary text-sm px-3 py-2"
+                                disabled={!dateFilter.isActive}
+                            >
+                                Clear Filter
+                            </button>
+                        </div>
+                    </div>
+                    {dateFilter.isActive && (
+                        <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                            <p className="text-sm text-blue-700">
+                                Showing data from {new Date(dateFilter.startDate).toLocaleDateString()} to {new Date(dateFilter.endDate).toLocaleDateString()}
+                            </p>
+                        </div>
+                    )}
+                </div>
+
                 {/* Data and Evidence Lists - Full width on desktop */}
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
                     {/* Data Updates Timeline - Takes 2/3 of the space */}
                     <div className="xl:col-span-2 card p-4 sm:p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-base sm:text-lg font-semibold text-gray-900">
-                                Data Points ({updates.length})
+                                Data Points ({dateFilter.isActive ? filteredUpdates.length : updates.length})
                             </h3>
                             <button
                                 onClick={() => setIsUpdateModalOpen(true)}
@@ -563,20 +644,36 @@ export default function KPIDetailPage() {
                             </button>
                         </div>
 
-                        {updates.length === 0 ? (
+                        {/* Filtered Total Sum */}
+                        {dateFilter.isActive && (
+                            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium text-green-700">Filtered Range Total:</span>
+                                    <span className="text-lg font-bold text-green-600">
+                                        {filteredTotal} {kpi.unit_of_measurement}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+
+                        {filteredUpdates.length === 0 ? (
                             <div className="text-center py-8">
                                 <Calendar className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-4" />
-                                <p className="text-gray-600 text-sm sm:text-base">No data points yet</p>
-                                <button
-                                    onClick={() => setIsUpdateModalOpen(true)}
-                                    className="btn-primary mt-4 text-sm"
-                                >
-                                    Add First Data Point
-                                </button>
+                                <p className="text-gray-600 text-sm sm:text-base">
+                                    {dateFilter.isActive ? 'No data points in selected date range' : 'No data points yet'}
+                                </p>
+                                {!dateFilter.isActive && (
+                                    <button
+                                        onClick={() => setIsUpdateModalOpen(true)}
+                                        className="btn-primary mt-4 text-sm"
+                                    >
+                                        Add First Data Point
+                                    </button>
+                                )}
                             </div>
                         ) : (
                             <DataPointsList
-                                updates={updates}
+                                updates={filteredUpdates}
                                 kpi={kpi}
                                 onRefresh={() => {
                                     loadKPIData() // This will refresh data points and evidence stats
@@ -593,6 +690,7 @@ export default function KPIDetailPage() {
                                 loadKPIData() // This will refresh both data points and evidence stats
                             }}
                             initiativeId={initiativeId!}
+                            dateFilter={dateFilter}
                         />
                     </div>
                 </div>

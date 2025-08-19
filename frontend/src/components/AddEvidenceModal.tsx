@@ -44,6 +44,7 @@ export default function AddEvidenceModal({
     // State for showing matching data points
     const [matchingDataPoints, setMatchingDataPoints] = useState<any[]>([])
     const [isFetchingMatches, setIsFetchingMatches] = useState(false)
+    const [kpiDataSummaries, setKpiDataSummaries] = useState<any[]>([])
 
     const evidenceTypes = [
         { value: 'visual_proof', label: 'Visual Proof', icon: Camera, description: 'Photos, videos, screenshots' },
@@ -78,7 +79,7 @@ export default function AddEvidenceModal({
             setIsFetchingMatches(true)
 
             // For each selected KPI, get their updates and filter by date overlap
-            const allDataPoints = []
+            const kpiSummaries = []
             for (const kpiId of formData.kpi_ids) {
                 const updates = await apiService.getKPIUpdates(kpiId)
                 const matchingUpdates = updates.filter(update => {
@@ -114,17 +115,32 @@ export default function AddEvidenceModal({
                     }
                 })
 
-                // Add KPI info to each update
-                const kpi = availableKPIs.find(k => k.id === kpiId)
-                const updatesWithKPI = matchingUpdates.map(update => ({
-                    ...update,
-                    kpi_title: kpi?.title,
-                    kpi_unit: kpi?.unit_of_measurement
-                }))
+                if (matchingUpdates.length > 0) {
+                    // Find KPI info
+                    const kpi = availableKPIs.find(k => k.id === kpiId)
+                    if (kpi) {
+                        // Calculate total for this KPI
+                        const total = matchingUpdates.reduce((sum, update) => sum + update.value, 0)
 
-                allDataPoints.push(...updatesWithKPI)
+                        // Add KPI info to each update
+                        const updatesWithKPI = matchingUpdates.map(update => ({
+                            ...update,
+                            kpi_title: kpi.title,
+                            kpi_unit: kpi.unit_of_measurement
+                        }))
+
+                        kpiSummaries.push({
+                            kpi,
+                            total,
+                            updates: updatesWithKPI
+                        })
+                    }
+                }
             }
 
+            setKpiDataSummaries(kpiSummaries)
+            // Keep the old format for backward compatibility if needed
+            const allDataPoints = kpiSummaries.flatMap(summary => summary.updates)
             setMatchingDataPoints(allDataPoints)
         } catch (error) {
             console.error('Error fetching matching data points:', error)
@@ -319,6 +335,144 @@ export default function AddEvidenceModal({
                         </div>
                     </div>
 
+                    {/* KPI Selection */}
+                    <div>
+                        <label className="label mb-3">
+                            Link to KPIs <span className="text-red-500">*</span>
+                        </label>
+                        <p className="text-sm text-gray-600 mb-3">
+                            Select which KPIs this evidence supports
+                        </p>
+                        {availableKPIs.length === 0 ? (
+                            <p className="text-sm text-gray-500 italic">No KPIs available. Create KPIs first.</p>
+                        ) : (
+                            <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                                {availableKPIs.map((kpi) => (
+                                    <label
+                                        key={kpi.id}
+                                        className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.kpi_ids.includes(kpi.id!)}
+                                            onChange={() => handleKPISelection(kpi.id!)}
+                                            className="mr-3"
+                                        />
+                                        <div className="flex-1">
+                                            <div className="font-medium text-gray-900">{kpi.title}</div>
+                                            <div className="text-sm text-gray-500">{kpi.description}</div>
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Date Selection */}
+                    <div>
+                        <label className="label">
+                            <Calendar className="w-4 h-4 inline mr-2" />
+                            Date this evidence represents <span className="text-red-500">*</span>
+                        </label>
+
+                        <div className="space-y-3">
+                            <div className="flex items-center space-x-4">
+                                <label className="flex items-center">
+                                    <input
+                                        type="radio"
+                                        checked={!isDateRange}
+                                        onChange={() => setIsDateRange(false)}
+                                        className="mr-2"
+                                    />
+                                    <span className="text-sm">Single Date</span>
+                                </label>
+                                <label className="flex items-center">
+                                    <input
+                                        type="radio"
+                                        checked={isDateRange}
+                                        onChange={() => setIsDateRange(true)}
+                                        className="mr-2"
+                                    />
+                                    <span className="text-sm">Date Range</span>
+                                </label>
+                            </div>
+
+                            {!isDateRange ? (
+                                <input
+                                    type="date"
+                                    name="date_represented"
+                                    value={formData.date_represented}
+                                    onChange={handleInputChange}
+                                    className="input-field"
+                                    required
+                                />
+                            ) : (
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs text-gray-600 mb-1">From</label>
+                                        <input
+                                            type="date"
+                                            name="date_range_start"
+                                            value={formData.date_range_start || ''}
+                                            onChange={handleInputChange}
+                                            className="input-field"
+                                            required={isDateRange}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-gray-600 mb-1">To</label>
+                                        <input
+                                            type="date"
+                                            name="date_range_end"
+                                            value={formData.date_range_end || ''}
+                                            onChange={handleInputChange}
+                                            className="input-field"
+                                            required={isDateRange}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Matching Data Points (shown right after date selection) */}
+                    {kpiDataSummaries.length > 0 && (
+                        <div className="space-y-3">
+                            <h4 className="text-sm font-medium text-blue-900">
+                                📊 Data Points {isDateRange ? 'in Selected Date Range' : 'on Selected Date'}
+                            </h4>
+                            <p className="text-xs text-blue-700 mb-3">
+                                Your evidence will help prove these data points:
+                            </p>
+                            {kpiDataSummaries.map((kpiSummary: any) => (
+                                <div key={kpiSummary.kpi.id} className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <h5 className="text-sm font-medium text-blue-900 mb-2">
+                                        📈 {kpiSummary.kpi.title}
+                                    </h5>
+                                    <p className="text-sm font-semibold text-blue-800 mb-3">
+                                        Total: {kpiSummary.total} {kpiSummary.kpi.unit_of_measurement}
+                                    </p>
+                                    <div className="space-y-1 max-h-24 overflow-y-auto">
+                                        {kpiSummary.updates.map((dataPoint: any, index: number) => (
+                                            <div key={`${dataPoint.id}-${index}`} className="flex items-center justify-between bg-white rounded px-3 py-2 text-sm">
+                                                <span className="font-medium text-gray-900">
+                                                    {dataPoint.value} {dataPoint.kpi_unit}
+                                                </span>
+                                                <span className="text-xs text-gray-500">
+                                                    {dataPoint.date_range_start && dataPoint.date_range_end ? (
+                                                        <>Range: {formatDate(dataPoint.date_range_start)} - {formatDate(dataPoint.date_range_end)}</>
+                                                    ) : (
+                                                        <>{formatDate(dataPoint.date_represented)}</>
+                                                    )}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                     {/* Title and Description */}
                     <div className="grid grid-cols-1 gap-4">
                         <div>
@@ -420,139 +574,6 @@ export default function AddEvidenceModal({
                                 placeholder="Or paste a link to online evidence (https://...)"
                             />
                         </div>
-                    </div>
-
-                    {/* Date Selection */}
-                    <div>
-                        <label className="label">
-                            <Calendar className="w-4 h-4 inline mr-2" />
-                            Date this evidence represents <span className="text-red-500">*</span>
-                        </label>
-
-                        <div className="space-y-3">
-                            <div className="flex items-center space-x-4">
-                                <label className="flex items-center">
-                                    <input
-                                        type="radio"
-                                        checked={!isDateRange}
-                                        onChange={() => setIsDateRange(false)}
-                                        className="mr-2"
-                                    />
-                                    <span className="text-sm">Single Date</span>
-                                </label>
-                                <label className="flex items-center">
-                                    <input
-                                        type="radio"
-                                        checked={isDateRange}
-                                        onChange={() => setIsDateRange(true)}
-                                        className="mr-2"
-                                    />
-                                    <span className="text-sm">Date Range</span>
-                                </label>
-                            </div>
-
-                            {!isDateRange ? (
-                                <input
-                                    type="date"
-                                    name="date_represented"
-                                    value={formData.date_represented}
-                                    onChange={handleInputChange}
-                                    className="input-field"
-                                    required
-                                />
-                            ) : (
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs text-gray-600 mb-1">From</label>
-                                        <input
-                                            type="date"
-                                            name="date_range_start"
-                                            value={formData.date_range_start || ''}
-                                            onChange={handleInputChange}
-                                            className="input-field"
-                                            required={isDateRange}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs text-gray-600 mb-1">To</label>
-                                        <input
-                                            type="date"
-                                            name="date_range_end"
-                                            value={formData.date_range_end || ''}
-                                            onChange={handleInputChange}
-                                            className="input-field"
-                                            required={isDateRange}
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Matching Data Points (shown for both single dates and date ranges) */}
-                    {matchingDataPoints.length > 0 && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                            <h4 className="text-sm font-medium text-blue-900 mb-2">
-                                📊 Data Points {isDateRange ? 'in Selected Date Range' : 'on Selected Date'}
-                            </h4>
-                            <p className="text-xs text-blue-700 mb-3">
-                                Your evidence will help prove these data points:
-                            </p>
-                            <div className="space-y-2 max-h-32 overflow-y-auto">
-                                {matchingDataPoints.map((dataPoint, index) => (
-                                    <div key={`${dataPoint.id}-${index}`} className="flex items-center justify-between bg-white rounded px-3 py-2 text-sm">
-                                        <div>
-                                            <span className="font-medium text-gray-900">
-                                                {dataPoint.value} {dataPoint.kpi_unit}
-                                            </span>
-                                            <span className="text-gray-500 ml-2">
-                                                • {dataPoint.kpi_title}
-                                            </span>
-                                        </div>
-                                        <div className="text-xs text-gray-500">
-                                            {dataPoint.date_range_start && dataPoint.date_range_end ? (
-                                                <>Range: {formatDate(dataPoint.date_range_start)} - {formatDate(dataPoint.date_range_end)}</>
-                                            ) : (
-                                                <>{formatDate(dataPoint.date_represented)}</>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* KPI Selection */}
-                    <div>
-                        <label className="label mb-3">
-                            Link to KPIs <span className="text-red-500">*</span>
-                        </label>
-                        <p className="text-sm text-gray-600 mb-3">
-                            Select which KPIs this evidence supports
-                        </p>
-                        {availableKPIs.length === 0 ? (
-                            <p className="text-sm text-gray-500 italic">No KPIs available. Create KPIs first.</p>
-                        ) : (
-                            <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
-                                {availableKPIs.map((kpi) => (
-                                    <label
-                                        key={kpi.id}
-                                        className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={formData.kpi_ids.includes(kpi.id!)}
-                                            onChange={() => handleKPISelection(kpi.id!)}
-                                            className="mr-3"
-                                        />
-                                        <div className="flex-1">
-                                            <div className="font-medium text-gray-900">{kpi.title}</div>
-                                            <div className="text-sm text-gray-500">{kpi.description}</div>
-                                        </div>
-                                    </label>
-                                ))}
-                            </div>
-                        )}
                     </div>
 
                     {/* Actions */}

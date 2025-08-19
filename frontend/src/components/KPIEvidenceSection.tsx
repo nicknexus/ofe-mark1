@@ -20,9 +20,14 @@ interface KPIEvidenceSectionProps {
     kpi: KPI
     onRefresh: () => void
     initiativeId: string
+    dateFilter?: {
+        startDate: string
+        endDate: string
+        isActive: boolean
+    }
 }
 
-export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId }: KPIEvidenceSectionProps) {
+export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateFilter }: KPIEvidenceSectionProps) {
     const [evidence, setEvidence] = useState<Evidence[]>([])
     const [loading, setLoading] = useState(true)
     const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false)
@@ -30,6 +35,24 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId }: KPI
     const [isEvidencePreviewOpen, setIsEvidencePreviewOpen] = useState(false)
     const [isEditEvidenceModalOpen, setIsEditEvidenceModalOpen] = useState(false)
     const [deleteConfirmEvidence, setDeleteConfirmEvidence] = useState<Evidence | null>(null)
+
+    // Filter evidence based on date filter
+    const filteredEvidence = dateFilter?.isActive
+        ? evidence.filter(evidenceItem => {
+            const evidenceDate = evidenceItem.date_represented
+            const evidenceStart = evidenceItem.date_range_start
+            const evidenceEnd = evidenceItem.date_range_end
+
+            // Check if evidence overlaps with filter range
+            if (evidenceStart && evidenceEnd) {
+                // Evidence is a range - check overlap
+                return dateFilter.startDate <= evidenceEnd && dateFilter.endDate >= evidenceStart
+            } else {
+                // Evidence is single date - check if it's within filter range
+                return evidenceDate >= dateFilter.startDate && evidenceDate <= dateFilter.endDate
+            }
+        })
+        : evidence
 
     useEffect(() => {
         if (kpi.id) {
@@ -127,34 +150,45 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId }: KPI
     return (
         <div className="card p-4">
             {/* Header */}
-            <div className="flex items-center justify-between mb-3">
-                <h3 className="text-base font-semibold text-gray-900">
-                    Evidence ({evidence.length})
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+                    Evidence ({dateFilter?.isActive ? filteredEvidence.length : evidence.length})
                 </h3>
                 <button
                     onClick={() => setIsEvidenceModalOpen(true)}
-                    className="btn-primary flex items-center space-x-1 text-xs px-2 py-1"
+                    className="btn-secondary flex items-center space-x-2 text-sm"
                 >
-                    <Upload className="w-3 h-3" />
-                    <span>Add</span>
+                    <Upload className="w-4 h-4" />
+                    <span className="hidden sm:inline">Add Evidence</span>
+                    <span className="sm:hidden">Add</span>
                 </button>
             </div>
 
-            {/* Evidence List */}
-            {evidence.length === 0 ? (
-                <div className="text-center py-6 text-gray-500">
-                    <Upload className="w-8 h-8 mx-auto text-gray-300 mb-3" />
-                    <p className="text-sm">No evidence uploaded yet</p>
-                    <button
-                        onClick={() => setIsEvidenceModalOpen(true)}
-                        className="mt-2 text-xs text-primary-600 hover:text-primary-700"
-                    >
-                        Add the first evidence
-                    </button>
+            {loading ? (
+                <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500"></div>
+                </div>
+            ) : filteredEvidence.length === 0 ? (
+                <div className="text-center py-8">
+                    <Upload className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600 text-sm sm:text-base">
+                        {dateFilter?.isActive
+                            ? 'No evidence in selected date range'
+                            : 'No evidence yet'
+                        }
+                    </p>
+                    {!dateFilter?.isActive && (
+                        <button
+                            onClick={() => setIsEvidenceModalOpen(true)}
+                            className="btn-primary mt-4 text-sm"
+                        >
+                            Add First Evidence
+                        </button>
+                    )}
                 </div>
             ) : (
                 <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
-                    {evidence
+                    {filteredEvidence
                         .sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime())
                         .map(evidenceItem => {
                             const IconComponent = getEvidenceIcon(evidenceItem.type)
