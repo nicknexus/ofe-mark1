@@ -27,6 +27,7 @@ export default function Dashboard() {
     const [allKPIs, setAllKPIs] = useState<KPI[]>([])
     const [totalEvidence, setTotalEvidence] = useState<number>(0)
     const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: true })
+    const [isLoadingStats, setIsLoadingStats] = useState(true)
     const [showCreateModal, setShowCreateModal] = useState(false)
     const [showEvidenceModal, setShowEvidenceModal] = useState(false)
     const [showTutorial, setShowTutorial] = useState(false)
@@ -36,13 +37,11 @@ export default function Dashboard() {
 
     // Add loading cache to prevent duplicate requests
     const [isLoadingData, setIsLoadingData] = useState(false)
-    const hasLoadedData = useRef(false)
     const loadingPromise = useRef<Promise<void> | null>(null)
 
     useEffect(() => {
-        // Only load once on mount - prevent React StrictMode double execution
-        if (!hasLoadedData.current && !isLoadingData && !loadingPromise.current) {
-            hasLoadedData.current = true
+        // Only load if not already loading and no promise in progress
+        if (!isLoadingData && !loadingPromise.current) {
             loadingPromise.current = loadAllData()
         }
     }, [])
@@ -53,20 +52,32 @@ export default function Dashboard() {
             return loadingPromise.current || Promise.resolve()
         }
 
+        // Check if all data is already cached - if so, load from cache without API calls
+        const hasCachedData = apiService.isDataCached('/initiatives') &&
+            apiService.isDataCached('/kpis') &&
+            apiService.isDataCached('/evidence')
+
+        if (hasCachedData) {
+            console.log('All dashboard data is cached, loading from cache...')
+        } else {
+            console.log('Loading dashboard data...')
+        }
+
         setIsLoadingData(true)
         setLoadingState({ isLoading: true })
 
         try {
-            console.log('Loading dashboard data...')
-
-            // Use the new sequential loading method to respect rate limits
-            const { initiatives, kpis, evidence } = await apiService.loadDashboardData()
-
+            // Load initiatives first for immediate display
+            const initiatives = await apiService.loadInitiativesOnly()
             setInitiatives(initiatives)
+            setLoadingState({ isLoading: false }) // Show initiatives immediately
+
+            // Load KPIs and evidence in background
+            const { kpis, evidence } = await apiService.loadKPIsAndEvidence()
             setAllKPIs(kpis)
             setTotalEvidence(evidence.length)
+            setIsLoadingStats(false)
 
-            setLoadingState({ isLoading: false })
             console.log('Dashboard data loaded successfully')
 
         } catch (error) {
@@ -74,7 +85,6 @@ export default function Dashboard() {
             setLoadingState({ isLoading: false, error: message })
             toast.error(message)
             console.error('Dashboard loading error:', error)
-            hasLoadedData.current = false // Reset on error so retry can work
         } finally {
             setIsLoadingData(false)
             loadingPromise.current = null
@@ -94,14 +104,17 @@ export default function Dashboard() {
 
     const refreshKPIsAndEvidence = async () => {
         try {
+            setIsLoadingStats(true)
             const [kpis, evidence] = await Promise.all([
                 apiService.getKPIs(),
                 apiService.getEvidence()
             ])
             setAllKPIs(kpis)
             setTotalEvidence(evidence.length)
+            setIsLoadingStats(false)
         } catch (error) {
             console.error('Failed to refresh KPIs and evidence:', error)
+            setIsLoadingStats(false)
         }
     }
 
@@ -165,7 +178,7 @@ export default function Dashboard() {
             await apiService.deleteInitiative(initiative.id)
             toast.success('Initiative deleted successfully!')
             // Refresh all data since deleting initiative affects KPIs and evidence too
-            hasLoadedData.current = false
+            setIsLoadingStats(true)
             await loadAllData()
             setDeleteConfirmInitiative(null)
         } catch (error) {
@@ -212,7 +225,6 @@ export default function Dashboard() {
                 <button
                     onClick={() => {
                         if (!isLoadingData && !loadingPromise.current) {
-                            hasLoadedData.current = false
                             loadingPromise.current = loadAllData()
                         }
                     }}
@@ -238,7 +250,7 @@ export default function Dashboard() {
                     </div>
                     <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
                         {/* Only show evidence upload if user has KPIs */}
-                        {allKPIs.length > 0 && (
+                        {!isLoadingStats && allKPIs.length > 0 && (
                             <button
                                 onClick={() => setShowEvidenceModal(true)}
                                 className="btn-secondary flex items-center justify-center space-x-2 text-sm"
@@ -290,7 +302,11 @@ export default function Dashboard() {
                             </div>
                             <div className="ml-3 sm:ml-4">
                                 <p className="text-xs sm:text-sm font-medium text-gray-600">Total KPIs</p>
-                                <p className="text-xl sm:text-2xl font-bold text-gray-900">{allKPIs.length}</p>
+                                {isLoadingStats ? (
+                                    <div className="animate-pulse bg-gray-200 h-6 w-8 rounded"></div>
+                                ) : (
+                                    <p className="text-xl sm:text-2xl font-bold text-gray-900">{allKPIs.length}</p>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -302,14 +318,18 @@ export default function Dashboard() {
                             </div>
                             <div className="ml-3 sm:ml-4">
                                 <p className="text-xs sm:text-sm font-medium text-gray-600">Evidence Items</p>
-                                <p className="text-xl sm:text-2xl font-bold text-gray-900">{totalEvidence}</p>
+                                {isLoadingStats ? (
+                                    <div className="animate-pulse bg-gray-200 h-6 w-8 rounded"></div>
+                                ) : (
+                                    <p className="text-xl sm:text-2xl font-bold text-gray-900">{totalEvidence}</p>
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
 
                 {/* Help Text for Evidence */}
-                {allKPIs.length === 0 && initiatives.length > 0 && (
+                {!isLoadingStats && allKPIs.length === 0 && initiatives.length > 0 && (
                     <div className="card p-3 sm:p-4 bg-blue-50 border-blue-200">
                         <div className="flex items-start sm:items-center">
                             <div className="p-2 bg-blue-100 rounded-lg mr-3 flex-shrink-0">

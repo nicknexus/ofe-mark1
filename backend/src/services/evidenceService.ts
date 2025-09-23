@@ -3,8 +3,8 @@ import { Evidence } from '../types'
 
 export class EvidenceService {
     static async create(evidence: Evidence, userId: string): Promise<Evidence> {
-        // Extract kpi_ids before inserting into evidence table
-        const { kpi_ids, ...evidenceData } = evidence;
+        // Extract linkage fields before inserting into evidence table
+        const { kpi_ids, kpi_update_ids, ...evidenceData } = evidence;
 
         const { data, error } = await supabase
             .from('evidence')
@@ -14,7 +14,7 @@ export class EvidenceService {
 
         if (error) throw new Error(`Failed to create evidence: ${error.message}`);
 
-        // Link to KPIs if provided
+        // Legacy: Link to KPIs if provided
         if (kpi_ids && kpi_ids.length > 0) {
             const kpiLinks = kpi_ids.map(kpiId => ({
                 evidence_id: data.id,
@@ -26,6 +26,21 @@ export class EvidenceService {
                 .insert(kpiLinks);
 
             if (linkError) throw new Error(`Failed to link evidence to KPIs: ${linkError.message}`);
+        }
+
+        // New: Link to specific KPI updates (data points) if provided
+        if (kpi_update_ids && kpi_update_ids.length > 0) {
+            const updateLinks = kpi_update_ids.map(updateId => ({
+                evidence_id: data.id,
+                kpi_update_id: updateId,
+                user_id: userId
+            }));
+
+            const { error: linkError2 } = await supabase
+                .from('evidence_kpi_updates')
+                .insert(updateLinks);
+
+            if (linkError2) throw new Error(`Failed to link evidence to data points: ${linkError2.message}`);
         }
 
         return data;
@@ -66,11 +81,13 @@ export class EvidenceService {
     }
 
     static async getById(id: string): Promise<Evidence | null> {
+        // Include linked data points for new model
         const { data, error } = await supabase
             .from('evidence')
             .select(`
                 *,
                 evidence_kpis(kpi_id),
+                evidence_kpi_updates(kpi_update_id),
                 initiatives(title)
             `)
             .eq('id', id)
@@ -84,8 +101,8 @@ export class EvidenceService {
     }
 
     static async update(id: string, evidence: Partial<Evidence>, userId: string): Promise<Evidence> {
-        // Extract kpi_ids for separate handling
-        const { kpi_ids, ...evidenceData } = evidence;
+        // Extract linkage fields for separate handling
+        const { kpi_ids, kpi_update_ids, ...evidenceData } = evidence;
 
         const { data, error } = await supabase
             .from('evidence')
@@ -97,7 +114,7 @@ export class EvidenceService {
 
         if (error) throw new Error(`Failed to update evidence: ${error.message}`);
 
-        // Update KPI links if provided
+        // Update legacy KPI links if provided
         if (kpi_ids !== undefined) {
             // Delete existing links
             await supabase
@@ -120,17 +137,47 @@ export class EvidenceService {
             }
         }
 
+        // Update data point links if provided
+        if (kpi_update_ids !== undefined) {
+            // Delete existing links
+            await supabase
+                .from('evidence_kpi_updates')
+                .delete()
+                .eq('evidence_id', id);
+
+            if (kpi_update_ids.length > 0) {
+                const updateLinks = kpi_update_ids.map(updateId => ({
+                    evidence_id: id,
+                    kpi_update_id: updateId,
+                    user_id: userId
+                }));
+
+                const { error: linkError2 } = await supabase
+                    .from('evidence_kpi_updates')
+                    .insert(updateLinks);
+
+                if (linkError2) throw new Error(`Failed to update evidence data point links: ${linkError2.message}`);
+            }
+        }
+
         return data;
     }
 
     static async delete(id: string, userId: string): Promise<void> {
-        // Delete KPI links first
+        // Delete links first (both legacy and new)
         const { error: linkError } = await supabase
             .from('evidence_kpis')
             .delete()
             .eq('evidence_id', id);
 
         if (linkError) throw new Error(`Failed to delete evidence KPI links: ${linkError.message}`);
+
+        const { error: linkError2 } = await supabase
+            .from('evidence_kpi_updates')
+            .delete()
+            .eq('evidence_id', id);
+
+        if (linkError2) throw new Error(`Failed to delete evidence data point links: ${linkError2.message}`);
 
         // Delete evidence
         const { error } = await supabase

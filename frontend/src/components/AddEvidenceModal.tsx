@@ -45,6 +45,7 @@ export default function AddEvidenceModal({
     const [matchingDataPoints, setMatchingDataPoints] = useState<any[]>([])
     const [isFetchingMatches, setIsFetchingMatches] = useState(false)
     const [kpiDataSummaries, setKpiDataSummaries] = useState<any[]>([])
+    const [selectedUpdateIds, setSelectedUpdateIds] = useState<string[]>([])
 
     const evidenceTypes = [
         { value: 'visual_proof', label: 'Visual Proof', icon: Camera, description: 'Photos, videos, screenshots' },
@@ -142,6 +143,10 @@ export default function AddEvidenceModal({
             // Keep the old format for backward compatibility if needed
             const allDataPoints = kpiSummaries.flatMap(summary => summary.updates)
             setMatchingDataPoints(allDataPoints)
+            // Auto-select all shown data points when there is a preselected KPI
+            if (!editData) {
+                setSelectedUpdateIds(allDataPoints.map((dp: any) => dp.id))
+            }
         } catch (error) {
             console.error('Error fetching matching data points:', error)
         } finally {
@@ -166,7 +171,7 @@ export default function AddEvidenceModal({
             }
 
             // Create evidence record with the real file URL
-            let submitData = {
+            let submitData: any = {
                 ...formData,
                 file_url: finalFileUrl
             }
@@ -184,6 +189,9 @@ export default function AddEvidenceModal({
                 submitData.date_range_start = undefined
                 submitData.date_range_end = undefined
             }
+
+            // Include selected data points for precise linking
+            submitData.kpi_update_ids = selectedUpdateIds
 
             setUploadProgress(editData ? 'Updating evidence record...' : 'Creating evidence record...')
             await onSubmit(submitData)
@@ -444,6 +452,25 @@ export default function AddEvidenceModal({
                             <p className="text-xs text-blue-700 mb-3">
                                 Your evidence will help prove these data points:
                             </p>
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs text-gray-600">Selected {selectedUpdateIds.length} data point(s)</span>
+                                <div className="space-x-2">
+                                    <button
+                                        type="button"
+                                        className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
+                                        onClick={() => setSelectedUpdateIds(kpiDataSummaries.flatMap((s: any) => s.updates.map((u: any) => u.id)))}
+                                    >
+                                        Select All
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
+                                        onClick={() => setSelectedUpdateIds([])}
+                                    >
+                                        Clear
+                                    </button>
+                                </div>
+                            </div>
                             {kpiDataSummaries.map((kpiSummary: any) => (
                                 <div key={kpiSummary.kpi.id} className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <h5 className="text-sm font-medium text-blue-900 mb-2">
@@ -452,21 +479,32 @@ export default function AddEvidenceModal({
                                     <p className="text-sm font-semibold text-blue-800 mb-3">
                                         Total: {kpiSummary.total} {kpiSummary.kpi.unit_of_measurement}
                                     </p>
-                                    <div className="space-y-1 max-h-24 overflow-y-auto">
-                                        {kpiSummary.updates.map((dataPoint: any, index: number) => (
-                                            <div key={`${dataPoint.id}-${index}`} className="flex items-center justify-between bg-white rounded px-3 py-2 text-sm">
-                                                <span className="font-medium text-gray-900">
-                                                    {dataPoint.value} {dataPoint.kpi_unit}
-                                                </span>
-                                                <span className="text-xs text-gray-500">
-                                                    {dataPoint.date_range_start && dataPoint.date_range_end ? (
-                                                        <>Range: {formatDate(dataPoint.date_range_start)} - {formatDate(dataPoint.date_range_end)}</>
-                                                    ) : (
-                                                        <>{formatDate(dataPoint.date_represented)}</>
-                                                    )}
-                                                </span>
-                                            </div>
-                                        ))}
+                                    <div className="space-y-1 max-h-36 overflow-y-auto">
+                                        {kpiSummary.updates.map((dataPoint: any, index: number) => {
+                                            const checked = selectedUpdateIds.includes(dataPoint.id)
+                                            return (
+                                                <label key={`${dataPoint.id}-${index}`} className="flex items-center justify-between bg-white rounded px-3 py-2 text-sm cursor-pointer hover:bg-gray-50">
+                                                    <div className="flex items-center space-x-3">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={checked}
+                                                            onChange={() => setSelectedUpdateIds(prev => checked ? prev.filter(id => id !== dataPoint.id) : [...prev, dataPoint.id])}
+                                                            className="h-4 w-4"
+                                                        />
+                                                        <span className="font-medium text-gray-900">
+                                                            {dataPoint.value} {dataPoint.kpi_unit}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-xs text-gray-500">
+                                                        {dataPoint.date_range_start && dataPoint.date_range_end ? (
+                                                            <>Range: {formatDate(dataPoint.date_range_start)} - {formatDate(dataPoint.date_range_end)}</>
+                                                        ) : (
+                                                            <>{formatDate(dataPoint.date_represented)}</>
+                                                        )}
+                                                    </span>
+                                                </label>
+                                            )
+                                        })}
                                     </div>
                                 </div>
                             ))}
@@ -596,7 +634,7 @@ export default function AddEvidenceModal({
                                 <button
                                     type="submit"
                                     className="btn-primary flex-1"
-                                    disabled={loading || !formData.title || formData.kpi_ids.length === 0}
+                                    disabled={loading || !formData.title}
                                 >
                                     {loading ? 'Processing...' : 'Add Evidence'}
                                 </button>

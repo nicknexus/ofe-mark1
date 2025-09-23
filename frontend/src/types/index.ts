@@ -55,6 +55,17 @@ export interface KPIUpdate {
     user_id?: string;
 }
 
+export interface BeneficiaryGroup {
+    id?: string;
+    initiative_id: string;
+    name: string;
+    description?: string;
+    criteria?: Record<string, any> | null;
+    created_at?: string;
+    updated_at?: string;
+    user_id?: string;
+}
+
 export interface Evidence {
     id?: string;
     title: string;
@@ -69,7 +80,10 @@ export interface Evidence {
         lat: number;
         lng: number;
     }[];
-    kpi_ids: string[];
+    // Legacy linkage (kept for backward compatibility in UI/API)
+    kpi_ids?: string[];
+    // New precise linkage to specific KPI updates (data points)
+    kpi_update_ids?: string[];
     initiative_id?: string;
     created_at?: string;
     updated_at?: string;
@@ -141,6 +155,8 @@ export interface CreateKPIUpdateForm {
     date_range_end?: string;
     note?: string;
     label?: string;
+    // New: link data point to beneficiary groups at creation time
+    beneficiary_group_ids?: string[];
 }
 
 export interface CreateEvidenceForm {
@@ -151,7 +167,10 @@ export interface CreateEvidenceForm {
     date_represented: string;
     date_range_start?: string;
     date_range_end?: string;
-    kpi_ids: string[];
+    // Legacy: link evidence to KPIs (kept for backward compatibility)
+    kpi_ids?: string[];
+    // New: link evidence to specific KPI updates (data points)
+    kpi_update_ids?: string[];
     initiative_id?: string;
 }
 

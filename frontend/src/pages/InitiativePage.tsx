@@ -23,6 +23,7 @@ import CreateKPIModal from '../components/CreateKPIModal'
 import AddKPIUpdateModal from '../components/AddKPIUpdateModal'
 import AddEvidenceModal from '../components/AddEvidenceModal'
 import InitiativeCharts from '../components/InitiativeCharts'
+import BeneficiaryManager from '../components/BeneficiaryManager'
 import toast from 'react-hot-toast'
 
 export default function InitiativePage() {
@@ -270,7 +271,7 @@ export default function InitiativePage() {
                 /* Main Layout - Stack on mobile, side-by-side on desktop */
                 <div className="space-y-6 lg:grid lg:grid-cols-3 lg:gap-6 lg:space-y-0">
                     {/* Main Content - KPIs */}
-                    <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+                    <div className="lg:col-span-2 space-y-4 sm:space-y-6 flex flex-col">
                         {/* Quick Stats Bar */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                             <div className="card p-3 sm:p-4 text-center">
@@ -288,7 +289,7 @@ export default function InitiativePage() {
                         </div>
 
                         {/* KPIs List - Front and Center */}
-                        <div className="card p-4 sm:p-6">
+                        <div className="card p-4 sm:p-6 flex flex-col h-[600px]">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 space-y-2 sm:space-y-0">
                                 <h3 className="text-base sm:text-lg font-semibold text-gray-900">Your KPIs</h3>
                                 <button
@@ -300,12 +301,12 @@ export default function InitiativePage() {
                                 </button>
                             </div>
 
-                            <div className="space-y-3 sm:space-y-4">
+                            <div className="flex-1 overflow-y-auto space-y-4 sm:space-y-5 pr-2">
                                 {kpis.map((kpi) => (
                                     <Link
                                         key={kpi.id}
                                         to={`/initiatives/${id}/kpis/${kpi.id}`}
-                                        className="block border border-gray-200 rounded-lg p-3 sm:p-4 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer"
+                                        className="block border border-gray-200 rounded-lg p-4 sm:p-5 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer"
                                     >
                                         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between space-y-2 sm:space-y-0 mb-3">
                                             <div className="flex-1 min-w-0">
@@ -390,6 +391,12 @@ export default function InitiativePage() {
 
                     {/* Right Column - Analytics & Progress */}
                     <div className="space-y-4 sm:space-y-6">
+                        {/* Beneficiary Groups */}
+                        <BeneficiaryManager
+                            initiativeId={id!}
+                            onRefresh={loadDashboard}
+                        />
+
                         {/* Progress Checklist */}
                         <div className="card p-3 sm:p-4">
                             <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-3 sm:mb-4">Your Progress</h3>

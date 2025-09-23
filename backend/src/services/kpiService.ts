@@ -146,13 +146,32 @@ export class KPIService {
 
     // KPI Updates
     static async addUpdate(update: KPIUpdate, userId: string): Promise<KPIUpdate> {
+        // Support optional beneficiary_group_ids on creation
+        const { beneficiary_group_ids, ...insertData } = (update as any)
+
         const { data, error } = await supabase
             .from('kpi_updates')
-            .insert([{ ...update, user_id: userId }])
+            .insert([{ ...insertData, user_id: userId }])
             .select()
             .single();
 
         if (error) throw new Error(`Failed to add KPI update: ${error.message}`);
+
+        // Link to beneficiary groups if provided
+        if (Array.isArray(beneficiary_group_ids) && beneficiary_group_ids.length > 0) {
+            const links = beneficiary_group_ids.map((groupId: string) => ({
+                kpi_update_id: data.id,
+                beneficiary_group_id: groupId,
+                user_id: userId
+            }))
+
+            const { error: linkError } = await supabase
+                .from('kpi_update_beneficiary_groups')
+                .insert(links)
+
+            if (linkError) throw new Error(`Failed to link data point to beneficiary groups: ${linkError.message}`)
+        }
+
         return data;
     }
 
@@ -169,15 +188,39 @@ export class KPIService {
     }
 
     static async updateKPIUpdate(id: string, updates: Partial<KPIUpdate>, userId: string): Promise<KPIUpdate> {
+        const { beneficiary_group_ids, ...updateData } = (updates as any)
+
         const { data, error } = await supabase
             .from('kpi_updates')
-            .update(updates)
+            .update(updateData)
             .eq('id', id)
             .eq('user_id', userId)
             .select()
             .single();
 
         if (error) throw new Error(`Failed to update KPI update: ${error.message}`);
+
+        // Replace beneficiary links if provided
+        if (beneficiary_group_ids !== undefined) {
+            await supabase
+                .from('kpi_update_beneficiary_groups')
+                .delete()
+                .eq('kpi_update_id', id)
+
+            if (Array.isArray(beneficiary_group_ids) && beneficiary_group_ids.length > 0) {
+                const links = beneficiary_group_ids.map((groupId: string) => ({
+                    kpi_update_id: id,
+                    beneficiary_group_id: groupId,
+                    user_id: userId
+                }))
+
+                const { error: linkError } = await supabase
+                    .from('kpi_update_beneficiary_groups')
+                    .insert(links)
+
+                if (linkError) throw new Error(`Failed to update beneficiary links for data point: ${linkError.message}`)
+            }
+        }
         return data;
     }
 
@@ -203,7 +246,7 @@ export class KPIService {
 
         if (updatesError) throw new Error(`Failed to fetch KPI updates: ${updatesError.message}`);
 
-        // Get evidence linked to this KPI
+        // Get evidence linked to this KPI (legacy) and the more precise links to updates
         const { data: evidenceData, error: evidenceError } = await supabase
             .from('evidence_kpis')
             .select(`
@@ -217,44 +260,33 @@ export class KPIService {
 
         if (evidenceError) throw new Error(`Failed to fetch evidence: ${evidenceError.message}`);
 
-        const evidence = evidenceData?.map(item => item.evidence).filter(Boolean) || [];
+        const rawEvidence = (evidenceData || []).map((item: any) => item.evidence).filter(Boolean)
+        // Some PostgREST joins can yield arrays; normalize to a flat array of evidence objects
+        const evidence: any[] = []
+        for (const ev of rawEvidence) {
+            if (Array.isArray(ev)) evidence.push(...ev)
+            else evidence.push(ev)
+        }
+
+        // Additionally fetch precise evidence-to-update links to attribute evidence per data point
+        const { data: evidenceUpdateLinks } = await supabase
+            .from('evidence_kpi_updates')
+            .select('evidence_id, kpi_update_id');
 
         // Calculate completion percentage for each individual data point
         const updatesWithCompletion = (updates || []).map(update => {
-            // Find evidence that covers this specific update
-            const relevantEvidence = evidence.filter((evidenceItem: any) => {
-                const evidenceDate = evidenceItem.date_represented;
-                const evidenceRange = evidenceItem.date_range_start && evidenceItem.date_range_end ? {
-                    start: evidenceItem.date_range_start,
-                    end: evidenceItem.date_range_end
-                } : null;
+            // First, collect explicitly linked evidence via evidence_kpi_updates
+            const explicitEvidenceIds = new Set(
+                (evidenceUpdateLinks || [])
+                    .filter((l: any) => l.kpi_update_id === update.id)
+                    .map((l: any) => l.evidence_id)
+            )
 
-                const updateDate = update.date_represented;
-                const updateRange = update.date_range_start && update.date_range_end ? {
-                    start: update.date_range_start,
-                    end: update.date_range_end
-                } : null;
+            const explicitEvidence = evidence.filter((e: any) => explicitEvidenceIds.has(e.id))
 
-                // Check if evidence covers this update
-                // Case 1: Exact date match
-                if (evidenceDate === updateDate) {
-                    return true;
-                }
-                // Case 2: Evidence range covers update date
-                if (evidenceRange && !updateRange) {
-                    return evidenceRange.start <= updateDate && evidenceRange.end >= updateDate;
-                }
-                // Case 3: Evidence date within update range
-                if (updateRange && !evidenceRange) {
-                    return updateRange.start <= evidenceDate && updateRange.end >= evidenceDate;
-                }
-                // Case 4: Both are ranges - check overlap
-                if (evidenceRange && updateRange) {
-                    return evidenceRange.start <= updateRange.end && evidenceRange.end >= updateRange.start;
-                }
-
-                return false;
-            });
+            // Only use explicitly linked evidence - no more implicit date matching
+            // This ensures evidence only counts toward data points it's actually linked to
+            const relevantEvidence = explicitEvidence
 
             // Calculate completion percentage for this data point
             let completionPercentage = 0;

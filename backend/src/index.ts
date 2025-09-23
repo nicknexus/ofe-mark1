@@ -10,6 +10,7 @@ import path from 'path';
 import initiativeRoutes from './routes/initiatives';
 import kpiRoutes from './routes/kpis';
 import evidenceRoutes from './routes/evidence';
+import beneficiaryRoutes from './routes/beneficiaries';
 import uploadRoutes from './routes/upload';
 
 // Load environment variables
@@ -21,10 +22,11 @@ const app = express();
 app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" } // Allow serving uploaded files
 }));
+const devOrigins = ['http://localhost:3000', 'http://localhost:5173']
 app.use(cors({
     origin: process.env.NODE_ENV === 'production'
-        ? true // Allow all origins for now
-        : 'http://localhost:3000',
+        ? true // Allow all origins for now (adjust in production as needed)
+        : devOrigins,
     credentials: true
 }));
 
@@ -75,6 +77,7 @@ app.get('/health', (req, res) => {
 app.use('/api/initiatives', initiativeRoutes);
 app.use('/api/kpis', kpiRoutes);
 app.use('/api/evidence', evidenceRoutes);
+app.use('/api/beneficiaries', beneficiaryRoutes);
 // app.use('/api/upload', uploadRoutes); // Disabled: multer + local filesystem doesn't work in serverless
 
 // Error handling middleware

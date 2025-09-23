@@ -55,6 +55,17 @@ export interface KPIUpdate {
     user_id?: string;
 }
 
+export interface BeneficiaryGroup {
+    id?: string;
+    initiative_id: string;
+    name: string;
+    description?: string;
+    criteria?: Record<string, any> | null;
+    created_at?: string;
+    updated_at?: string;
+    user_id?: string;
+}
+
 export interface Evidence {
     id?: string;
     title: string;
@@ -69,7 +80,10 @@ export interface Evidence {
         lat: number;
         lng: number;
     }[];
-    kpi_ids: string[];
+    // Legacy KPI-level evidence link (kept for existing flows)
+    kpi_ids?: string[];
+    // New precise linkage to specific KPI updates
+    kpi_update_ids?: string[];
     initiative_id?: string;
     created_at?: string;
     updated_at?: string;

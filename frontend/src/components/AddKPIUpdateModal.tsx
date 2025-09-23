@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
-import { X, Calendar, Hash, MapPin, FileText } from 'lucide-react'
-import { CreateKPIUpdateForm } from '../types'
+import React, { useState, useEffect } from 'react'
+import { X, Calendar, Hash, MapPin, FileText, Users } from 'lucide-react'
+import { CreateKPIUpdateForm, BeneficiaryGroup } from '../types'
+import { apiService } from '../services/api'
 
 interface AddKPIUpdateModalProps {
     isOpen: boolean
@@ -31,6 +32,17 @@ export default function AddKPIUpdateModal({
     })
     const [isDateRange, setIsDateRange] = useState(false)
     const [loading, setLoading] = useState(false)
+    const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
+    const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
+
+    useEffect(() => {
+        if (isOpen) {
+            apiService
+                .getBeneficiaryGroups()
+                .then((groups) => setBeneficiaryGroups(groups || []))
+                .catch(() => setBeneficiaryGroups([]))
+        }
+    }, [isOpen])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -52,7 +64,7 @@ export default function AddKPIUpdateModal({
                 submitData.date_range_end = undefined
             }
 
-            await onSubmit(submitData)
+            await onSubmit({ ...submitData, beneficiary_group_ids: selectedGroupIds })
             setFormData({
                 value: 0,
                 date_represented: new Date().toISOString().split('T')[0],
@@ -62,6 +74,7 @@ export default function AddKPIUpdateModal({
                 label: ''
             })
             setIsDateRange(false)
+            setSelectedGroupIds([])
             onClose()
         } finally {
             setLoading(false)
@@ -235,6 +248,36 @@ export default function AddKPIUpdateModal({
                             rows={3}
                             placeholder="Any additional context or explanation for this update..."
                         />
+                    </div>
+
+                    {/* Beneficiary Groups */}
+                    <div>
+                        <label className="label">
+                            <Users className="w-4 h-4 inline mr-2" />
+                            Beneficiary Groups (optional)
+                        </label>
+                        {beneficiaryGroups.length === 0 ? (
+                            <p className="text-xs text-gray-500">No groups yet. You can add them later.</p>
+                        ) : (
+                            <div className="space-y-1 max-h-28 overflow-y-auto border border-gray-200 rounded-lg p-2">
+                                {beneficiaryGroups.map(group => {
+                                    const checked = selectedGroupIds.includes(group.id!)
+                                    return (
+                                        <label key={group.id} className="flex items-center justify-between px-2 py-1 rounded hover:bg-gray-50 cursor-pointer">
+                                            <div className="flex items-center space-x-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={checked}
+                                                    onChange={() => setSelectedGroupIds(prev => checked ? prev.filter(id => id !== group.id) : [...prev, group.id!])}
+                                                />
+                                                <span className="text-sm text-gray-800">{group.name}</span>
+                                            </div>
+                                            {group.description && <span className="text-xs text-gray-500 truncate max-w-[180px]">{group.description}</span>}
+                                        </label>
+                                    )
+                                })}
+                            </div>
+                        )}
                     </div>
 
                     {/* Actions */}

@@ -19,7 +19,8 @@ import {
     ExternalLink,
     MessageSquare,
     DollarSign,
-    BarChart3
+    BarChart3,
+    Users
 } from 'lucide-react'
 import { apiService } from '../services/api'
 import { KPI, KPIUpdate, LoadingState, CreateKPIUpdateForm } from '../types'
@@ -30,6 +31,7 @@ import EvidencePreviewModal from '../components/EvidencePreviewModal'
 import toast from 'react-hot-toast'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import AddEvidenceModal from '../components/AddEvidenceModal'
+import EditDataPointBeneficiariesModal from '../components/EditDataPointBeneficiariesModal'
 
 // DataPointsList Component
 interface DataPointsListProps {
@@ -52,6 +54,8 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
     const [isEvidencePreviewOpen, setIsEvidencePreviewOpen] = useState(false)
     const [isEditEvidenceModalOpen, setIsEditEvidenceModalOpen] = useState(false)
     const [deleteConfirmEvidence, setDeleteConfirmEvidence] = useState<any>(null)
+    const [editingDataPoint, setEditingDataPoint] = useState<any>(null)
+    const [dataPointBeneficiaries, setDataPointBeneficiaries] = useState<Record<string, any[]>>({})
 
     useEffect(() => {
         if (updates.length > 0) {
@@ -90,6 +94,26 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
             })
 
             setDataPointsWithEvidence(updatesWithEvidence)
+
+            // Load beneficiaries for all data points in parallel (PERFORMANCE OPTIMIZATION)
+            const beneficiaryPromises = updates.map(update =>
+                apiService.getBeneficiaryGroupsForUpdate(update.id!).catch(error => {
+                    console.error('Error loading beneficiaries for update:', update.id, error)
+                    return []
+                })
+            )
+
+            const beneficiaryResults = await Promise.allSettled(beneficiaryPromises)
+            const beneficiaryData = beneficiaryResults.map((result, index) => ({
+                updateId: updates[index].id,
+                beneficiaries: result.status === 'fulfilled' ? (result.value || []) : []
+            }))
+            const beneficiaryMap: Record<string, any[]> = {}
+            beneficiaryData.forEach(result => {
+                beneficiaryMap[result.updateId!] = result.beneficiaries
+            })
+            setDataPointBeneficiaries(beneficiaryMap)
+
         } catch (error) {
             console.error('Error fetching data points with evidence:', error)
         } finally {
@@ -195,8 +219,16 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
                                         <span className={`text-sm font-medium ${getStatusColor(dataPoint)}`}>
                                             {dataPoint.completionPercentage || 0}%
                                         </span>
-                                        <button className="text-gray-400 hover:text-gray-600">
-                                            <Edit className="w-4 h-4" />
+                                        <button
+                                            className="text-gray-400 hover:text-blue-600"
+                                            onClick={(e) => {
+                                                e.preventDefault()
+                                                e.stopPropagation()
+                                                setEditingDataPoint({ ...dataPoint, kpi })
+                                            }}
+                                            title="Edit Beneficiaries"
+                                        >
+                                            <Users className="w-4 h-4" />
                                         </button>
                                         <div className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
                                             <Calendar className="w-4 h-4 text-gray-400" />
@@ -208,6 +240,37 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
                             {/* Expanded Details */}
                             {isExpanded && (
                                 <div className="border-t border-gray-100 p-4 bg-gray-50">
+                                    {/* Beneficiaries */}
+                                    <div className="mb-4">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm font-medium text-gray-700">Beneficiary Groups</span>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.preventDefault()
+                                                    e.stopPropagation()
+                                                    setEditingDataPoint({ ...dataPoint, kpi })
+                                                }}
+                                                className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
+                                            >
+                                                Edit
+                                            </button>
+                                        </div>
+                                        {dataPointBeneficiaries[dataPoint.id!]?.length > 0 ? (
+                                            <div className="flex flex-wrap gap-1">
+                                                {dataPointBeneficiaries[dataPoint.id!].map((beneficiary: any) => (
+                                                    <span
+                                                        key={beneficiary.id}
+                                                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800"
+                                                    >
+                                                        {beneficiary.name}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-gray-500">No beneficiary groups linked</p>
+                                        )}
+                                    </div>
+
                                     {/* Progress Bar */}
                                     <div className="mb-4">
                                         <div className="flex justify-between text-sm mb-1">
@@ -355,6 +418,17 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
                 isOpen={isEvidencePreviewOpen}
                 onClose={() => setIsEvidencePreviewOpen(false)}
                 evidence={selectedEvidence}
+            />
+
+            {/* Edit Data Point Beneficiaries Modal */}
+            <EditDataPointBeneficiariesModal
+                isOpen={!!editingDataPoint}
+                onClose={() => setEditingDataPoint(null)}
+                dataPoint={editingDataPoint}
+                onRefresh={() => {
+                    fetchDataPointsWithEvidence()
+                    onRefresh()
+                }}
             />
         </div>
     )

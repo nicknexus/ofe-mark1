@@ -16,7 +16,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 class ApiService {
     private requestCache = new Map<string, { promise: Promise<any>, timestamp: number }>()
-    private readonly CACHE_DURATION = 30000 // 30 seconds for GET requests
+    private readonly CACHE_DURATION = 60000 // 1 minute for GET requests (better performance)
     private readonly REQUEST_DELAY = 100 // Minimum delay between requests
 
     private async getAuthHeaders() {
@@ -77,6 +77,15 @@ class ApiService {
             }
         }
         keysToDelete.forEach(key => this.requestCache.delete(key))
+    }
+
+    // Check if data is cached for an endpoint
+    isDataCached(endpoint: string, options: RequestInit = {}): boolean {
+        const cacheKey = this.getCacheKey(endpoint, options)
+        const cached = this.requestCache.get(cacheKey)
+        const now = Date.now()
+
+        return !!(cached && (now - cached.timestamp) < this.CACHE_DURATION)
     }
 
     private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -351,29 +360,91 @@ class ApiService {
         })
     }
 
-    // Batch loading method to reduce API calls - SEQUENTIAL to avoid rate limiting
+    // Beneficiary Groups
+    async getBeneficiaryGroups(initiativeId?: string) {
+        const params = new URLSearchParams()
+        if (initiativeId) params.append('initiative_id', initiativeId)
+        const qs = params.toString()
+        return this.request(`/beneficiaries${qs ? `?${qs}` : ''}`)
+    }
+
+    async createBeneficiaryGroup(payload: any) {
+        return this.request('/beneficiaries', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        })
+    }
+
+    async updateBeneficiaryGroup(id: string, payload: any) {
+        return this.request(`/beneficiaries/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload)
+        })
+    }
+
+    async deleteBeneficiaryGroup(id: string) {
+        return this.request(`/beneficiaries/${id}`, {
+            method: 'DELETE'
+        })
+    }
+
+    async replaceKPIUpdateBeneficiaries(kpiUpdateId: string, groupIds: string[]) {
+        return this.request('/beneficiaries/link-kpi-update', {
+            method: 'POST',
+            body: JSON.stringify({ kpi_update_id: kpiUpdateId, beneficiary_group_ids: groupIds })
+        })
+    }
+
+    async getBeneficiaryGroupsForUpdate(updateId: string) {
+        return this.request(`/beneficiaries/for-kpi-update/${updateId}`)
+    }
+
+    async getKPIUpdatesForBeneficiaryGroup(groupId: string) {
+        return this.request(`/beneficiaries/${groupId}/kpi-updates`)
+    }
+
+    async getBulkDataPointCounts(groupIds: string[]) {
+        return this.request('/beneficiaries/bulk-data-point-counts', {
+            method: 'POST',
+            body: JSON.stringify({ group_ids: groupIds })
+        })
+    }
+
+    // Load initiatives first for immediate display
+    async loadInitiativesOnly(): Promise<Initiative[]> {
+        console.log('Loading initiatives...')
+        const initiatives = await this.getInitiatives()
+        console.log('Loaded initiatives:', initiatives.length)
+        return initiatives
+    }
+
+    // Load KPIs and evidence in parallel for background updates
+    async loadKPIsAndEvidence(): Promise<{
+        kpis: KPI[]
+        evidence: Evidence[]
+    }> {
+        console.log('Loading KPIs and evidence in parallel...')
+
+        // Load both in parallel since they're independent
+        const [kpis, evidence] = await Promise.all([
+            this.getKPIs(),
+            this.getEvidence()
+        ])
+
+        console.log('Loaded KPIs:', kpis.length, 'Evidence:', evidence.length)
+        return { kpis, evidence }
+    }
+
+    // Legacy method for backward compatibility - now just calls the new methods
     async loadDashboardData(): Promise<{
         initiatives: Initiative[]
         kpis: KPI[]
         evidence: Evidence[]
     }> {
-        console.log('Loading dashboard data sequentially...')
+        console.log('Loading dashboard data...')
 
-        // Load data sequentially with delays to respect rate limits
-        const initiatives = await this.getInitiatives()
-        console.log('Loaded initiatives:', initiatives.length)
-
-        // Small delay between requests
-        await this.sleep(300)
-
-        const kpis = await this.getKPIs()
-        console.log('Loaded KPIs:', kpis.length)
-
-        // Small delay between requests
-        await this.sleep(300)
-
-        const evidence = await this.getEvidence()
-        console.log('Loaded evidence:', evidence.length)
+        const initiatives = await this.loadInitiativesOnly()
+        const { kpis, evidence } = await this.loadKPIsAndEvidence()
 
         return { initiatives, kpis, evidence }
     }
