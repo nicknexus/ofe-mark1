@@ -106,11 +106,11 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
             const beneficiaryResults = await Promise.allSettled(beneficiaryPromises)
             const beneficiaryData = beneficiaryResults.map((result, index) => ({
                 updateId: updates[index].id,
-                beneficiaries: result.status === 'fulfilled' ? (result.value || []) : []
+                beneficiaries: result.status === 'fulfilled' ? (result.value as any[] || []) : []
             }))
             const beneficiaryMap: Record<string, any[]> = {}
             beneficiaryData.forEach(result => {
-                beneficiaryMap[result.updateId!] = result.beneficiaries
+                beneficiaryMap[result.updateId!] = result.beneficiaries as any[]
             })
             setDataPointBeneficiaries(beneficiaryMap)
 

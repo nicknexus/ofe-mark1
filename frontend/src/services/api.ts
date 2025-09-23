@@ -5,6 +5,7 @@ import {
     KPIWithEvidence,
     KPIUpdate,
     Evidence,
+    BeneficiaryGroup,
     InitiativeDashboard,
     CreateInitiativeForm,
     CreateKPIForm,
@@ -361,11 +362,11 @@ class ApiService {
     }
 
     // Beneficiary Groups
-    async getBeneficiaryGroups(initiativeId?: string) {
+    async getBeneficiaryGroups(initiativeId?: string): Promise<BeneficiaryGroup[]> {
         const params = new URLSearchParams()
         if (initiativeId) params.append('initiative_id', initiativeId)
         const qs = params.toString()
-        return this.request(`/beneficiaries${qs ? `?${qs}` : ''}`)
+        return this.request<BeneficiaryGroup[]>(`/beneficiaries${qs ? `?${qs}` : ''}`)
     }
 
     async createBeneficiaryGroup(payload: any) {
