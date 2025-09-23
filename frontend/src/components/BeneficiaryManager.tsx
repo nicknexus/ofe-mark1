@@ -138,7 +138,7 @@ export default function BeneficiaryManager({ initiativeId, onRefresh }: Benefici
                 const groupIds = groups.map(g => g.id!).filter(Boolean)
                 try {
                     const counts = await apiService.getBulkDataPointCounts(groupIds)
-                    setDataPointCounts(counts || {})
+                    setDataPointCounts(counts as Record<string, number> || {})
                 } catch (error) {
                     console.error('Error loading data point counts:', error)
                     // Don't show error to user, just log it - counts will show as 0
@@ -206,7 +206,7 @@ export default function BeneficiaryManager({ initiativeId, onRefresh }: Benefici
             if (!groupDataPoints[groupId]) {
                 try {
                     const dataPoints = await apiService.getKPIUpdatesForBeneficiaryGroup(groupId)
-                    setGroupDataPoints(prev => ({ ...prev, [groupId]: dataPoints || [] }))
+                    setGroupDataPoints(prev => ({ ...prev, [groupId]: (dataPoints as any[]) || [] }))
                 } catch (error) {
                     console.error('Error loading data points for group:', error)
                 }

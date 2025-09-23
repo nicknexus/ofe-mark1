@@ -57,7 +57,7 @@ export default function AddEvidenceModal({
     // Debounced effect to fetch matching data points
     useEffect(() => {
         const timeoutId = setTimeout(() => {
-            if (formData.kpi_ids.length > 0) {
+            if (formData.kpi_ids && formData.kpi_ids.length > 0) {
                 if (isDateRange && formData.date_range_start && formData.date_range_end) {
                     fetchMatchingDataPoints()
                 } else if (!isDateRange && formData.date_represented) {
@@ -81,7 +81,7 @@ export default function AddEvidenceModal({
 
             // For each selected KPI, get their updates and filter by date overlap
             const kpiSummaries = []
-            for (const kpiId of formData.kpi_ids) {
+            for (const kpiId of formData.kpi_ids || []) {
                 const updates = await apiService.getKPIUpdates(kpiId)
                 const matchingUpdates = updates.filter(update => {
                     const updateDate = update.date_represented
@@ -230,9 +230,9 @@ export default function AddEvidenceModal({
     const handleKPISelection = (kpiId: string) => {
         setFormData(prev => ({
             ...prev,
-            kpi_ids: prev.kpi_ids.includes(kpiId)
-                ? prev.kpi_ids.filter(id => id !== kpiId)
-                : [...prev.kpi_ids, kpiId]
+            kpi_ids: (prev.kpi_ids || []).includes(kpiId)
+                ? (prev.kpi_ids || []).filter(id => id !== kpiId)
+                : [...(prev.kpi_ids || []), kpiId]
         }))
     }
 
@@ -362,7 +362,7 @@ export default function AddEvidenceModal({
                                     >
                                         <input
                                             type="checkbox"
-                                            checked={formData.kpi_ids.includes(kpi.id!)}
+                                            checked={formData.kpi_ids?.includes(kpi.id!) || false}
                                             onChange={() => handleKPISelection(kpi.id!)}
                                             className="mr-3"
                                         />

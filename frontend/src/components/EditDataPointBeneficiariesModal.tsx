@@ -37,7 +37,7 @@ export default function EditDataPointBeneficiariesModal({
                 apiService.getBeneficiaryGroupsForUpdate(dataPoint.id)
             ])
             setAllGroups(groups || [])
-            setLinkedGroupIds((linkedGroups || []).map((g: any) => g.id))
+            setLinkedGroupIds(((linkedGroups as any[]) || []).map((g: any) => g.id))
         } catch (error) {
             console.error('Error loading data:', error)
             toast.error('Failed to load beneficiary groups')
