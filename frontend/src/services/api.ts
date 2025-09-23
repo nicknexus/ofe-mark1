@@ -182,6 +182,11 @@ class ApiService {
                     this.clearCacheByPattern('/kpis')
                     this.clearCacheByPattern('/initiatives')
                 }
+                if (endpoint.includes('/beneficiaries')) {
+                    this.clearCacheByPattern('/beneficiaries')
+                    // Beneficiary changes may affect KPI data point counts
+                    this.clearCacheByPattern('/kpis')
+                }
 
                 // Remove the mutating request from cache immediately
                 setTimeout(() => {
