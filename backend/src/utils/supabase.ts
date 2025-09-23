@@ -1,8 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
-// Load .env - in serverless, env vars are set directly by platform
-dotenv.config();
+// Load .env from project root (one level up from backend)
+// In serverless environments, this will be a no-op as env vars are injected directly
+dotenv.config({ path: process.env.NODE_ENV === 'production' ? undefined : '../.env' });
 
 console.log('Environment check:', {
     SUPABASE_URL: process.env.SUPABASE_URL ? '✅ SET' : '❌ MISSING',
