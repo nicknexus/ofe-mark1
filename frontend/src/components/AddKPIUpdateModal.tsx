@@ -160,28 +160,45 @@ export default function AddKPIUpdateModal({
                                 <Calendar className="w-4 h-4 inline mr-2" />
                                 Date
                             </label>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setIsDateRange(!isDateRange)
-                                    // Clear date fields when switching modes
-                                    if (!isDateRange) {
-                                        setFormData(prev => ({
-                                            ...prev,
-                                            date_range_start: '',
-                                            date_range_end: ''
-                                        }))
-                                    } else {
-                                        setFormData(prev => ({
-                                            ...prev,
-                                            date_represented: new Date().toISOString().split('T')[0]
-                                        }))
-                                    }
-                                }}
-                                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
-                            >
-                                {isDateRange ? 'Single Date' : 'Date Range'}
-                            </button>
+                            <div className="flex bg-gray-100 rounded-lg p-1">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (isDateRange) {
+                                            setIsDateRange(false)
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                date_represented: new Date().toISOString().split('T')[0]
+                                            }))
+                                        }
+                                    }}
+                                    className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${!isDateRange
+                                        ? 'bg-white text-gray-900 shadow-sm font-medium'
+                                        : 'text-gray-600 hover:text-gray-900'
+                                        }`}
+                                >
+                                    Single Date
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (!isDateRange) {
+                                            setIsDateRange(true)
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                date_range_start: '',
+                                                date_range_end: ''
+                                            }))
+                                        }
+                                    }}
+                                    className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${isDateRange
+                                        ? 'bg-white text-gray-900 shadow-sm font-medium'
+                                        : 'text-gray-600 hover:text-gray-900'
+                                        }`}
+                                >
+                                    Date Range
+                                </button>
+                            </div>
                         </div>
 
                         {!isDateRange ? (

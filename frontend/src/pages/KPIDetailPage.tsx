@@ -43,7 +43,7 @@ interface DataPointsListProps {
 interface DataPointWithEvidence extends KPIUpdate {
     evidenceItems?: any[]
     completionPercentage?: number
-    isFullyProven?: boolean
+    isFullySupported?: boolean
 }
 
 function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
@@ -81,7 +81,7 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
                         ...update,
                         evidenceItems: matchingDataPoint?.evidenceItems || [],
                         completionPercentage: matchingDataPoint?.completionPercentage || 0,
-                        isFullyProven: matchingDataPoint?.isFullyProven || false
+                        isFullySupported: matchingDataPoint?.isFullySupported || false
                     }
                 }
 
@@ -89,7 +89,7 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
                     ...update,
                     evidenceItems: [],
                     completionPercentage: 0,
-                    isFullyProven: false
+                    isFullySupported: false
                 }
             })
 
@@ -170,13 +170,13 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
     }
 
     const getStatusColor = (dataPoint: DataPointWithEvidence) => {
-        if (dataPoint.isFullyProven) return 'text-green-600'
+        if (dataPoint.isFullySupported) return 'text-green-600'
         if (dataPoint.completionPercentage && dataPoint.completionPercentage > 0) return 'text-yellow-600'
         return 'text-gray-500'
     }
 
     const getStatusDot = (dataPoint: DataPointWithEvidence) => {
-        if (dataPoint.isFullyProven) return 'bg-green-500'
+        if (dataPoint.isFullySupported) return 'bg-green-500'
         if (dataPoint.completionPercentage && dataPoint.completionPercentage > 0) return 'bg-yellow-500'
         return 'bg-gray-300'
     }
@@ -281,7 +281,7 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
                                         </div>
                                         <div className="w-full bg-gray-200 rounded-full h-2">
                                             <div
-                                                className={`h-2 rounded-full ${dataPoint.isFullyProven ? 'bg-green-500' :
+                                                className={`h-2 rounded-full ${dataPoint.isFullySupported ? 'bg-green-500' :
                                                     dataPoint.completionPercentage && dataPoint.completionPercentage > 0 ? 'bg-yellow-500' : 'bg-gray-300'
                                                     }`}
                                                 style={{ width: `${dataPoint.completionPercentage || 0}%` }}
@@ -418,6 +418,11 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
                 isOpen={isEvidencePreviewOpen}
                 onClose={() => setIsEvidencePreviewOpen(false)}
                 evidence={selectedEvidence}
+                onEdit={(evidence) => {
+                    setSelectedEvidence(evidence)
+                    setIsEvidencePreviewOpen(false)
+                    setIsEditEvidenceModalOpen(true)
+                }}
             />
 
             {/* Edit Data Point Beneficiaries Modal */}

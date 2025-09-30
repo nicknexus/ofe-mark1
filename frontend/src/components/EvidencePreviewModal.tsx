@@ -1,5 +1,5 @@
 import React from 'react'
-import { X, Calendar, FileText, Camera, MessageSquare, DollarSign, ExternalLink, Download } from 'lucide-react'
+import { X, Calendar, FileText, Camera, MessageSquare, DollarSign, ExternalLink, Download, Edit } from 'lucide-react'
 import { Evidence } from '../types'
 import { formatDate, getEvidenceTypeInfo } from '../utils'
 
@@ -7,9 +7,10 @@ interface EvidencePreviewModalProps {
     isOpen: boolean
     onClose: () => void
     evidence: Evidence | null
+    onEdit?: (evidence: Evidence) => void
 }
 
-export default function EvidencePreviewModal({ isOpen, onClose, evidence }: EvidencePreviewModalProps) {
+export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit }: EvidencePreviewModalProps) {
     if (!isOpen || !evidence) return null
 
     const getEvidenceIcon = (type: string) => {
@@ -49,12 +50,23 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence }: Evid
                             <p className="text-sm text-gray-600 capitalize">{evidence.type.replace('_', ' ')}</p>
                         </div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 p-1"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center space-x-2">
+                        {onEdit && (
+                            <button
+                                onClick={() => onEdit(evidence)}
+                                className="flex items-center space-x-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm"
+                            >
+                                <Edit className="w-4 h-4" />
+                                <span>Edit</span>
+                            </button>
+                        )}
+                        <button
+                            onClick={onClose}
+                            className="text-gray-400 hover:text-gray-600 p-1"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex flex-col lg:flex-row max-h-[calc(90vh-80px)]">

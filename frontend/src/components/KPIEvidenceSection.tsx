@@ -273,6 +273,11 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateF
                     evidence={selectedEvidence}
                     isOpen={isEvidencePreviewOpen}
                     onClose={() => setIsEvidencePreviewOpen(false)}
+                    onEdit={(evidence) => {
+                        setSelectedEvidence(evidence)
+                        setIsEvidencePreviewOpen(false)
+                        setIsEditEvidenceModalOpen(true)
+                    }}
                 />
             )}
 

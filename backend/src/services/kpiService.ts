@@ -34,9 +34,9 @@ export class KPIService {
             .from('kpis')
             .select(`
         *,
-        kpi_updates(id, date_represented, created_at),
+        kpi_updates(id, value, date_represented, created_at),
         evidence_kpis(
-            evidence(id, date_represented, date_range_start, date_range_end)
+            evidence(id, type, date_represented, date_range_start, date_range_end)
         )
       `)
             .eq('user_id', userId);
@@ -66,11 +66,30 @@ export class KPIService {
                 const evidenceItems = kpi.evidence_kpis?.map((ek: any) => ek.evidence).filter(Boolean) || [];
                 const updates = kpi.kpi_updates || [];
 
+                // Calculate total value from all updates
+                const total_value = updates.reduce((sum: number, update: any) => sum + (update.value || 0), 0);
+
+                // Calculate evidence type breakdown
+                const evidenceTypeStats = evidenceItems.reduce((acc: any, item: any) => {
+                    acc[item.type] = (acc[item.type] || 0) + 1;
+                    return acc;
+                }, {});
+
+                const totalEvidence = evidenceItems.length;
+                const evidenceTypes = Object.entries(evidenceTypeStats).map(([type, count]: [string, any]) => ({
+                    type,
+                    count,
+                    percentage: totalEvidence > 0 ? Math.round((count / totalEvidence) * 100) : 0,
+                    label: type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
+                }));
+
                 return {
                     ...kpi,
                     evidence_count: evidenceItems.length,
                     total_updates: updates.length,
+                    total_value: total_value,
                     evidence_percentage: evidencePercentage,
+                    evidence_types: evidenceTypes,
                     latest_update: updates.length > 0 ? updates[0] : null
                 };
             } catch (error) {
@@ -93,11 +112,30 @@ export class KPIService {
                     ? Math.round((updatesWithEvidence.length / updates.length) * 100)
                     : 0;
 
+                // Calculate total value from all updates
+                const total_value = updates.reduce((sum: number, update: any) => sum + (update.value || 0), 0);
+
+                // Calculate evidence type breakdown (fallback)
+                const evidenceTypeStats = evidenceItems.reduce((acc: any, item: any) => {
+                    acc[item.type] = (acc[item.type] || 0) + 1;
+                    return acc;
+                }, {});
+
+                const totalEvidence = evidenceItems.length;
+                const evidenceTypes = Object.entries(evidenceTypeStats).map(([type, count]: [string, any]) => ({
+                    type,
+                    count,
+                    percentage: totalEvidence > 0 ? Math.round((count / totalEvidence) * 100) : 0,
+                    label: type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
+                }));
+
                 return {
                     ...kpi,
                     evidence_count: evidenceItems.length,
                     total_updates: updates.length,
+                    total_value: total_value,
                     evidence_percentage: evidencePercentage,
+                    evidence_types: evidenceTypes,
                     latest_update: updates.length > 0 ? updates[0] : null
                 };
             }

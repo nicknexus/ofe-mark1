@@ -61,15 +61,15 @@ export function getEvidenceColor(percentage: number): string {
 
 // Get evidence status text
 export function getEvidenceStatus(percentage: number): string {
-    if (percentage >= 80) return 'Fully Proven'
-    if (percentage >= 30) return 'Some Proof'
+    if (percentage >= 80) return 'Fully Supported'
+    if (percentage >= 30) return 'Some Supporting Evidence'
     return 'Needs Evidence'
 }
 
 // Get evidence status with emoji
 export function getEvidenceStatusEmoji(percentage: number): string {
-    if (percentage >= 80) return '🟢 Fully Proven'
-    if (percentage >= 30) return '🟡 Some Proof'
+    if (percentage >= 80) return '🟢 Fully Supported'
+    if (percentage >= 30) return '🟡 Some Supporting Evidence'
     return '🔴 Needs Evidence'
 }
 
@@ -91,7 +91,7 @@ export function getCategoryColor(category: 'input' | 'output' | 'impact'): strin
 export function getEvidenceTypeInfo(type: 'visual_proof' | 'documentation' | 'testimony' | 'financials') {
     switch (type) {
         case 'visual_proof':
-            return { icon: '📷', color: 'bg-pink-100 text-pink-800', label: 'Visual Proof' }
+            return { icon: '📷', color: 'bg-pink-100 text-pink-800', label: 'Visual Support' }
         case 'documentation':
             return { icon: '📄', color: 'bg-blue-100 text-blue-800', label: 'Documentation' }
         case 'testimony':

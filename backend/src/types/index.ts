@@ -102,6 +102,13 @@ export interface KPIWithEvidence extends KPI {
     evidence_percentage: number;
     latest_update?: KPIUpdate;
     total_updates: number;
+    total_value: number;
+    evidence_types: Array<{
+        type: string;
+        count: number;
+        percentage: number;
+        label: string;
+    }>;
 }
 
 export interface EvidenceType {

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { X, Upload, Calendar, Link as LinkIcon, FileText, Camera, DollarSign, MessageSquare, File } from 'lucide-react'
-import { CreateEvidenceForm, KPI } from '../types'
+import { CreateEvidenceForm, KPI, KPIWithEvidence } from '../types'
 import { apiService } from '../services/api'
 import { formatDate } from '../utils'
 
@@ -8,7 +8,7 @@ interface AddEvidenceModalProps {
     isOpen: boolean
     onClose: () => void
     onSubmit: (data: CreateEvidenceForm) => Promise<void>
-    availableKPIs: KPI[]
+    availableKPIs: (KPI | KPIWithEvidence)[]
     initiativeId: string
     preSelectedKPIId?: string
     editData?: any // Optional prop for editing existing evidence
@@ -31,7 +31,7 @@ export default function AddEvidenceModal({
         date_range_start: editData?.date_range_start,
         date_range_end: editData?.date_range_end,
         file_url: editData?.file_url,
-        kpi_ids: editData ? [] : (preSelectedKPIId ? [preSelectedKPIId] : []), // Reset KPI selection for editing
+        kpi_ids: editData?.kpi_ids || (preSelectedKPIId ? [preSelectedKPIId] : []),
         initiative_id: initiativeId
     })
     const [isDateRange, setIsDateRange] = useState(editData?.date_range_start && editData?.date_range_end ? true : false)
@@ -48,11 +48,29 @@ export default function AddEvidenceModal({
     const [selectedUpdateIds, setSelectedUpdateIds] = useState<string[]>([])
 
     const evidenceTypes = [
-        { value: 'visual_proof', label: 'Visual Proof', icon: Camera, description: 'Photos, videos, screenshots' },
+        { value: 'visual_proof', label: 'Visual Support', icon: Camera, description: 'Photos, videos, screenshots' },
         { value: 'documentation', label: 'Documentation', icon: FileText, description: 'Reports, forms, certificates' },
         { value: 'testimony', label: 'Testimony', icon: MessageSquare, description: 'Quotes, feedback, stories' },
         { value: 'financials', label: 'Financials', icon: DollarSign, description: 'Receipts, invoices, budgets' }
     ] as const
+
+    // Update form data when editData changes
+    useEffect(() => {
+        if (editData) {
+            setFormData({
+                title: editData.title || '',
+                description: editData.description || '',
+                type: editData.type || 'visual_proof',
+                date_represented: editData.date_represented || new Date().toISOString().split('T')[0],
+                date_range_start: editData.date_range_start,
+                date_range_end: editData.date_range_end,
+                file_url: editData.file_url,
+                kpi_ids: editData.kpi_ids || [],
+                initiative_id: initiativeId
+            })
+            setIsDateRange(editData.date_range_start && editData.date_range_end ? true : false)
+        }
+    }, [editData, initiativeId])
 
     // Debounced effect to fetch matching data points
     useEffect(() => {
@@ -297,7 +315,7 @@ export default function AddEvidenceModal({
                             {editData ? 'Edit Evidence' : 'Upload Evidence'}
                         </h2>
                         <p className="text-sm text-gray-600 mt-1">
-                            {editData ? 'Update your evidence information' : 'Add proof to support your impact claims'}
+                            {editData ? 'Update your evidence information' : 'Add supporting evidence for your impact claims'}
                         </p>
                     </div>
                     <button
@@ -367,7 +385,14 @@ export default function AddEvidenceModal({
                                             className="mr-3"
                                         />
                                         <div className="flex-1">
-                                            <div className="font-medium text-gray-900">{kpi.title}</div>
+                                            <div className="flex items-center space-x-2">
+                                                <div className="font-medium text-gray-900">{kpi.title}</div>
+                                                {'total_updates' in kpi && kpi.total_updates > 0 && (
+                                                    <span className="inline-flex items-center justify-center w-4 h-4 bg-blue-500 text-white text-xs font-bold rounded-full flex-shrink-0">
+                                                        {kpi.total_updates > 99 ? '99+' : kpi.total_updates}
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div className="text-sm text-gray-500">{kpi.description}</div>
                                         </div>
                                     </label>
@@ -384,25 +409,27 @@ export default function AddEvidenceModal({
                         </label>
 
                         <div className="space-y-3">
-                            <div className="flex items-center space-x-4">
-                                <label className="flex items-center">
-                                    <input
-                                        type="radio"
-                                        checked={!isDateRange}
-                                        onChange={() => setIsDateRange(false)}
-                                        className="mr-2"
-                                    />
-                                    <span className="text-sm">Single Date</span>
-                                </label>
-                                <label className="flex items-center">
-                                    <input
-                                        type="radio"
-                                        checked={isDateRange}
-                                        onChange={() => setIsDateRange(true)}
-                                        className="mr-2"
-                                    />
-                                    <span className="text-sm">Date Range</span>
-                                </label>
+                            <div className="flex bg-gray-100 rounded-lg p-1 w-fit">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsDateRange(false)}
+                                    className={`px-3 py-1 text-sm rounded-md transition-all duration-200 ${!isDateRange
+                                        ? 'bg-white text-gray-900 shadow-sm font-medium'
+                                        : 'text-gray-600 hover:text-gray-900'
+                                        }`}
+                                >
+                                    Single Date
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsDateRange(true)}
+                                    className={`px-3 py-1 text-sm rounded-md transition-all duration-200 ${isDateRange
+                                        ? 'bg-white text-gray-900 shadow-sm font-medium'
+                                        : 'text-gray-600 hover:text-gray-900'
+                                        }`}
+                                >
+                                    Date Range
+                                </button>
                             </div>
 
                             {!isDateRange ? (
@@ -552,7 +579,7 @@ export default function AddEvidenceModal({
                         <div
                             className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${isDragOver
                                 ? 'border-primary-500 bg-primary-50'
-                                : selectedFile
+                                : selectedFile || formData.file_url
                                     ? 'border-green-300 bg-green-50'
                                     : 'border-gray-300 hover:border-gray-400'
                                 }`}
@@ -578,6 +605,17 @@ export default function AddEvidenceModal({
                                     >
                                         Remove file
                                     </button>
+                                </div>
+                            ) : formData.file_url ? (
+                                <div className="space-y-2">
+                                    <File className="w-8 h-8 text-blue-600 mx-auto" />
+                                    <p className="text-sm font-medium text-blue-800">Current file attached</p>
+                                    <p className="text-xs text-blue-600">
+                                        {formData.file_url.split('/').pop() || 'Existing file'}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        Click to replace with a new file
+                                    </p>
                                 </div>
                             ) : (
                                 <div className="space-y-2">
