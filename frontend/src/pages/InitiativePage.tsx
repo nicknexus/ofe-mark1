@@ -244,7 +244,9 @@ export default function InitiativePage() {
     }
 
     const openKPIDetails = (kpi: any) => {
-        navigate(`/initiatives/${id}/kpis/${kpi.id}`)
+        if (id && kpi.id) {
+            navigate(`/initiatives/${id}/kpis/${kpi.id}`)
+        }
     }
 
     if (loadingState.isLoading) {
@@ -455,19 +457,21 @@ export default function InitiativePage() {
                             ) : (
                                 <div className="space-y-4">
                                     {filteredKpis.map((kpi) => (
-                                        <ExpandableKPICard
-                                            key={kpi.id}
-                                            kpi={kpi}
-                                            kpiTotal={kpiTotals[kpi.id] || 0}
-                                            isExpanded={expandedKPIs.has(kpi.id)}
-                                            onToggleExpand={() => toggleKPIExpansion(kpi.id)}
-                                            onAddUpdate={() => openUpdateModal(kpi)}
-                                            onAddEvidence={() => openEvidenceModal(kpi)}
-                                            onEdit={() => openEditModal(kpi)}
-                                            onDelete={() => openDeleteConfirm(kpi)}
-                                            onViewDetails={() => openKPIDetails(kpi)}
-                                            kpiUpdates={allKPIUpdates.filter(update => update.kpi_id === kpi.id)}
-                                        />
+                                        kpi.id && (
+                                            <ExpandableKPICard
+                                                key={kpi.id}
+                                                kpi={kpi}
+                                                kpiTotal={kpiTotals[kpi.id] || 0}
+                                                isExpanded={expandedKPIs.has(kpi.id)}
+                                                onToggleExpand={() => toggleKPIExpansion(kpi.id)}
+                                                onAddUpdate={() => openUpdateModal(kpi)}
+                                                onAddEvidence={() => openEvidenceModal(kpi)}
+                                                onEdit={() => openEditModal(kpi)}
+                                                onDelete={() => openDeleteConfirm(kpi)}
+                                                onViewDetails={() => openKPIDetails(kpi)}
+                                                kpiUpdates={allKPIUpdates.filter(update => update.kpi_id === kpi.id)}
+                                            />
+                                        )
                                     ))}
                                 </div>
                             )}
