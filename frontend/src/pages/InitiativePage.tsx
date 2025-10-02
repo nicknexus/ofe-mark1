@@ -463,7 +463,7 @@ export default function InitiativePage() {
                                                 kpi={kpi}
                                                 kpiTotal={kpiTotals[kpi.id] || 0}
                                                 isExpanded={expandedKPIs.has(kpi.id)}
-                                                onToggleExpand={() => toggleKPIExpansion(kpi.id)}
+                                                onToggleExpand={() => kpi.id && toggleKPIExpansion(kpi.id)}
                                                 onAddUpdate={() => openUpdateModal(kpi)}
                                                 onAddEvidence={() => openEvidenceModal(kpi)}
                                                 onEdit={() => openEditModal(kpi)}
