@@ -15,11 +15,10 @@ import {
     Trash2
 } from 'lucide-react'
 import { apiService } from '../services/api'
-import { Initiative, LoadingState, CreateEvidenceForm, CreateInitiativeForm, KPI } from '../types'
+import { Initiative, LoadingState, CreateInitiativeForm, KPI } from '../types'
 import { formatDate, truncateText } from '../utils'
 import toast from 'react-hot-toast'
 import CreateInitiativeModal from '../components/CreateInitiativeModal'
-import AddEvidenceModal from '../components/AddEvidenceModal'
 import FirstTimeTutorial from '../components/FirstTimeTutorial'
 
 export default function Dashboard() {
@@ -29,7 +28,6 @@ export default function Dashboard() {
     const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: true })
     const [isLoadingStats, setIsLoadingStats] = useState(true)
     const [showCreateModal, setShowCreateModal] = useState(false)
-    const [showEvidenceModal, setShowEvidenceModal] = useState(false)
     const [showTutorial, setShowTutorial] = useState(false)
     const [showEditModal, setShowEditModal] = useState(false)
     const [deleteConfirmInitiative, setDeleteConfirmInitiative] = useState<Initiative | null>(null)
@@ -196,19 +194,6 @@ export default function Dashboard() {
         setDeleteConfirmInitiative(initiative)
     }
 
-    const handleAddEvidence = async (evidenceData: CreateEvidenceForm) => {
-        try {
-            await apiService.createEvidence(evidenceData)
-            toast.success('Evidence added successfully!')
-            // Only refresh evidence count, not all data
-            await refreshKPIsAndEvidence()
-            setShowEvidenceModal(false)
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to add evidence'
-            toast.error(message)
-            throw error
-        }
-    }
 
     if (loadingState.isLoading) {
         return (
@@ -249,17 +234,6 @@ export default function Dashboard() {
                         </p>
                     </div>
                     <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-                        {/* Only show evidence upload if user has KPIs */}
-                        {!isLoadingStats && allKPIs.length > 0 && (
-                            <button
-                                onClick={() => setShowEvidenceModal(true)}
-                                className="btn-secondary flex items-center justify-center space-x-2 text-sm"
-                            >
-                                <Upload className="w-4 h-4" />
-                                <span className="hidden sm:inline">Upload Evidence</span>
-                                <span className="sm:hidden">Evidence</span>
-                            </button>
-                        )}
                         <div className="flex space-x-2 sm:space-x-3">
                             <button
                                 onClick={showTutorialAgain}
@@ -459,14 +433,6 @@ export default function Dashboard() {
                 />
             )}
 
-            <AddEvidenceModal
-                isOpen={showEvidenceModal}
-                onClose={() => setShowEvidenceModal(false)}
-                onSubmit={handleAddEvidence}
-                availableKPIs={allKPIs}
-                initiativeId=""
-                preSelectedKPIId=""
-            />
 
             {/* Delete Confirmation Dialog */}
             {deleteConfirmInitiative && (
