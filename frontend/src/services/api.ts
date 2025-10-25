@@ -420,8 +420,8 @@ class ApiService {
     async loadInitiativesOnly(): Promise<Initiative[]> {
         console.log('Loading initiatives...')
         const initiatives = await this.getInitiatives()
-        console.log('Loaded initiatives:', initiatives.length)
-        return initiatives
+        console.log('Loaded initiatives:', initiatives?.length || 0)
+        return initiatives || []
     }
 
     // Load KPIs and evidence in parallel for background updates
@@ -437,8 +437,11 @@ class ApiService {
             this.getEvidence()
         ])
 
-        console.log('Loaded KPIs:', kpis.length, 'Evidence:', evidence.length)
-        return { kpis, evidence }
+        console.log('Loaded KPIs:', kpis?.length || 0, 'Evidence:', evidence?.length || 0)
+        return {
+            kpis: kpis || [],
+            evidence: evidence || []
+        }
     }
 
     // Legacy method for backward compatibility - now just calls the new methods

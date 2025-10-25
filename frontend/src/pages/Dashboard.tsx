@@ -17,6 +17,7 @@ import {
 import { apiService } from '../services/api'
 import { Initiative, LoadingState, CreateInitiativeForm, KPI } from '../types'
 import { formatDate, truncateText } from '../utils'
+import { Labels } from '../ui/labels'
 import toast from 'react-hot-toast'
 import CreateInitiativeModal from '../components/CreateInitiativeModal'
 import FirstTimeTutorial from '../components/FirstTimeTutorial'
@@ -275,7 +276,7 @@ export default function Dashboard() {
                                 <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
                             </div>
                             <div className="ml-3 sm:ml-4">
-                                <p className="text-xs sm:text-sm font-medium text-gray-600">Total KPIs</p>
+                                <p className="text-xs sm:text-sm font-medium text-gray-600">Total {Labels.kpiPlural}</p>
                                 {isLoadingStats ? (
                                     <div className="animate-pulse bg-gray-200 h-6 w-8 rounded"></div>
                                 ) : (
@@ -311,10 +312,10 @@ export default function Dashboard() {
                             </div>
                             <div className="min-w-0">
                                 <p className="text-sm font-medium text-blue-800">
-                                    Create KPIs first to start uploading evidence
+                                    Create {Labels.kpiPlural} first to start uploading evidence
                                 </p>
                                 <p className="text-xs text-blue-600 mt-1">
-                                    Evidence needs to be linked to specific KPIs to track your impact proof
+                                    Evidence needs to be linked to specific {Labels.kpiPlural.toLowerCase()} to track your impact proof
                                 </p>
                             </div>
                         </div>

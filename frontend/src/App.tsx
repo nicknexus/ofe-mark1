@@ -12,6 +12,14 @@ import InitiativePage from './pages/InitiativePage'
 import KPIDetailPage from './pages/KPIDetailPage'
 import Layout from './components/Layout'
 
+// New pages
+import HomeDashboard from './pages/Home/HomePage'
+import LocationsPage from './pages/Locations/LocationsPage'
+import LocationDetailPage from './pages/Locations/LocationDetailPage'
+import BeneficiariesPage from './pages/Beneficiaries/BeneficiariesPage'
+import InitiativeHomePage from './pages/Initiative/InitiativeHomePage'
+import InitiativeMetricsPage from './pages/Initiative/InitiativeMetricsPage'
+
 function App() {
     const [user, setUser] = useState<User | null>(null)
     const [loading, setLoading] = useState(true)
@@ -83,8 +91,15 @@ function App() {
             <Layout user={user}>
                 <Routes>
                     <Route path="/" element={<Dashboard />} />
-                    <Route path="/initiatives/:id" element={<InitiativePage />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/initiatives/:id" element={<InitiativeHomePage />} />
+                    <Route path="/initiatives/:id/kpis" element={<InitiativeMetricsPage />} />
                     <Route path="/initiatives/:initiativeId/kpis/:kpiId" element={<KPIDetailPage />} />
+                    <Route path="/initiatives/:id/locations" element={<LocationsPage />} />
+                    <Route path="/initiatives/:id/beneficiaries" element={<BeneficiariesPage />} />
+                    <Route path="/locations" element={<LocationsPage />} />
+                    <Route path="/locations/:id" element={<LocationDetailPage />} />
+                    <Route path="/beneficiaries" element={<BeneficiariesPage />} />
                 </Routes>
             </Layout>
             <Toaster position="top-right" />
