@@ -155,7 +155,7 @@ export default function DataPointPreviewModal({
                                                             <FileText className="w-3 h-3" />
                                                         </div>
                                                         <span className="text-sm font-medium text-gray-900 truncate">{evidence.title}</span>
-                                                        <span className={`px-2 py-0.5 rounded text-xs ${typeInfo.bgColor} ${typeInfo.textColor}`}>
+                                                        <span className={`px-2 py-0.5 rounded text-xs ${typeInfo.color}`}>
                                                             {evidence.type.replace('_', ' ')}
                                                         </span>
                                                     </div>
