@@ -299,7 +299,7 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateF
 
             {/* Delete Confirmation Dialog */}
             {deleteConfirmEvidence && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
                     <div className="bg-white rounded-xl max-w-md w-full p-6">
                         <div className="flex items-center space-x-3 mb-4">
                             <div className="p-2 bg-red-100 rounded-lg">

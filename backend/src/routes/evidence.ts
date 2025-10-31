@@ -30,6 +30,29 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     }
 });
 
+// Get evidence statistics - MUST come before /:id route
+router.get('/stats/by-type', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const { initiative_id } = req.query;
+        const stats = await EvidenceService.getEvidenceStats(initiative_id as string);
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+        return;
+    }
+});
+
+// Get evidence linked to a specific data point (KPI update) - MUST come before /:id route
+router.get('/for-kpi-update/:updateId', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const evidence = await EvidenceService.getEvidenceForUpdate(req.params.updateId, req.user!.id);
+        res.json(evidence);
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+        return;
+    }
+});
+
 // Get evidence by ID
 router.get('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
@@ -39,6 +62,17 @@ router.get('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
             return;
         }
         res.json(evidence);
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+        return;
+    }
+});
+
+// Get data points linked to a specific evidence
+router.get('/:id/data-points', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const dataPoints = await EvidenceService.getDataPointsForEvidence(req.params.id, req.user!.id);
+        res.json(dataPoints);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
         return;
@@ -61,18 +95,6 @@ router.delete('/:id', authenticateUser, async (req: AuthenticatedRequest, res) =
     try {
         await EvidenceService.delete(req.params.id, req.user!.id);
         res.status(204).send();
-    } catch (error) {
-        res.status(500).json({ error: (error as Error).message });
-        return;
-    }
-});
-
-// Get evidence statistics
-router.get('/stats/by-type', authenticateUser, async (req: AuthenticatedRequest, res) => {
-    try {
-        const { initiative_id } = req.query;
-        const stats = await EvidenceService.getEvidenceStats(initiative_id as string);
-        res.json(stats);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
         return;

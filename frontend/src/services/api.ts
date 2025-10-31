@@ -210,7 +210,8 @@ class ApiService {
 
     // Initiatives
     async getInitiatives(): Promise<Initiative[]> {
-        return this.request<Initiative[]>('/initiatives')
+        const result = await this.request<Initiative[]>('/initiatives')
+        return result || []
     }
 
     async getInitiative(id: string): Promise<Initiative> {
@@ -244,7 +245,8 @@ class ApiService {
     // KPIs
     async getKPIs(initiativeId?: string): Promise<KPI[]> {
         const params = initiativeId ? `?initiative_id=${initiativeId}` : ''
-        return this.request<KPI[]>(`/kpis${params}`)
+        const result = await this.request<KPI[]>(`/kpis${params}`)
+        return result || []
     }
 
     async getKPI(id: string): Promise<KPI> {
@@ -253,7 +255,8 @@ class ApiService {
 
     async getKPIsWithEvidence(initiativeId?: string): Promise<KPIWithEvidence[]> {
         const params = initiativeId ? `?initiative_id=${initiativeId}` : ''
-        return this.request<KPIWithEvidence[]>(`/kpis/with-evidence${params}`)
+        const result = await this.request<KPIWithEvidence[]>(`/kpis/with-evidence${params}`)
+        return result || []
     }
 
     async createKPI(data: CreateKPIForm): Promise<KPI> {
@@ -278,11 +281,13 @@ class ApiService {
 
     // KPI Updates
     async getKPIUpdates(kpiId: string): Promise<KPIUpdate[]> {
-        return this.request<KPIUpdate[]>(`/kpis/${kpiId}/updates`)
+        const result = await this.request<KPIUpdate[]>(`/kpis/${kpiId}/updates`)
+        return result || []
     }
 
     async getKPIEvidenceByDates(kpiId: string): Promise<any[]> {
-        return this.request<any[]>(`/kpis/${kpiId}/evidence-by-dates`)
+        const result = await this.request<any[]>(`/kpis/${kpiId}/evidence-by-dates`)
+        return result || []
     }
 
     async createKPIUpdate(kpiId: string, data: CreateKPIUpdateForm): Promise<KPIUpdate> {
@@ -312,7 +317,8 @@ class ApiService {
         if (kpiId) params.append('kpi_id', kpiId)
 
         const queryString = params.toString()
-        return this.request<Evidence[]>(`/evidence${queryString ? `?${queryString}` : ''}`)
+        const result = await this.request<Evidence[]>(`/evidence${queryString ? `?${queryString}` : ''}`)
+        return result || []
     }
 
     async getEvidenceItem(id: string): Promise<Evidence> {
@@ -366,12 +372,21 @@ class ApiService {
         })
     }
 
+    async getEvidenceForDataPoint(updateId: string): Promise<Evidence[]> {
+        return this.request<Evidence[]>(`/evidence/for-kpi-update/${updateId}`)
+    }
+
+    async getDataPointsForEvidence(evidenceId: string): Promise<any[]> {
+        return this.request<any[]>(`/evidence/${evidenceId}/data-points`)
+    }
+
     // Beneficiary Groups
     async getBeneficiaryGroups(initiativeId?: string): Promise<BeneficiaryGroup[]> {
         const params = new URLSearchParams()
         if (initiativeId) params.append('initiative_id', initiativeId)
         const qs = params.toString()
-        return this.request<BeneficiaryGroup[]>(`/beneficiaries${qs ? `?${qs}` : ''}`)
+        const result = await this.request<BeneficiaryGroup[]>(`/beneficiaries${qs ? `?${qs}` : ''}`)
+        return result || []
     }
 
     async createBeneficiaryGroup(payload: any) {

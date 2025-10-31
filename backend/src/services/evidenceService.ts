@@ -211,4 +211,56 @@ export class EvidenceService {
 
         return stats;
     }
+
+    static async getEvidenceForUpdate(updateId: string, userId: string): Promise<Evidence[]> {
+        const { data, error } = await supabase
+            .from('evidence_kpi_updates')
+            .select(`
+                evidence(
+                    id, title, description, type, file_url, file_type,
+                    date_represented, date_range_start, date_range_end,
+                    created_at, updated_at, user_id
+                )
+            `)
+            .eq('kpi_update_id', updateId);
+
+        if (error) throw new Error(`Failed to fetch evidence for update: ${error.message}`);
+
+        // Extract and filter evidence items
+        const evidence = (data || [])
+            .map((item: any) => item.evidence)
+            .filter(Boolean)
+            .filter((e: any) => e.user_id === userId);
+
+        return evidence;
+    }
+
+    static async getDataPointsForEvidence(evidenceId: string, userId: string): Promise<any[]> {
+        // First get all evidence_kpi_updates for this evidence
+        const { data, error } = await supabase
+            .from('evidence_kpi_updates')
+            .select(`
+                kpi_update_id,
+                kpi_updates(
+                    id, value, date_represented, date_range_start, date_range_end,
+                    label, note, created_at, user_id,
+                    kpis(id, title, unit_of_measurement)
+                )
+            `)
+            .eq('evidence_id', evidenceId);
+
+        if (error) throw new Error(`Failed to fetch data points for evidence: ${error.message}`);
+
+        // Extract and filter data points by user_id
+        const dataPoints = (data || [])
+            .map((item: any) => item.kpi_updates)
+            .filter(Boolean)
+            .filter((dp: any) => dp.user_id === userId)
+            .map((dp: any) => ({
+                ...dp,
+                kpi: dp.kpis
+            }));
+
+        return dataPoints;
+    }
 } 

@@ -1,7 +1,8 @@
-import React from 'react'
-import { X, Calendar, FileText, Camera, MessageSquare, DollarSign, ExternalLink, Download, Edit } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { X, Calendar, FileText, Camera, MessageSquare, DollarSign, ExternalLink, Download, Edit, BarChart3 } from 'lucide-react'
 import { Evidence } from '../types'
 import { formatDate, getEvidenceTypeInfo } from '../utils'
+import { apiService } from '../services/api'
 
 interface EvidencePreviewModalProps {
     isOpen: boolean
@@ -11,6 +12,29 @@ interface EvidencePreviewModalProps {
 }
 
 export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit }: EvidencePreviewModalProps) {
+    const [linkedDataPoints, setLinkedDataPoints] = useState<any[]>([])
+    const [loadingDataPoints, setLoadingDataPoints] = useState(false)
+
+    useEffect(() => {
+        if (isOpen && evidence?.id) {
+            loadLinkedDataPoints()
+        }
+    }, [isOpen, evidence?.id])
+
+    const loadLinkedDataPoints = async () => {
+        if (!evidence?.id) return
+        try {
+            setLoadingDataPoints(true)
+            const dataPoints = await apiService.getDataPointsForEvidence(evidence.id)
+            setLinkedDataPoints(dataPoints || [])
+        } catch (error) {
+            console.error('Failed to load linked data points:', error)
+            setLinkedDataPoints([])
+        } finally {
+            setLoadingDataPoints(false)
+        }
+    }
+
     if (!isOpen || !evidence) return null
 
     const getEvidenceIcon = (type: string) => {
@@ -37,7 +61,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
     const isPDF = evidence.file_url && evidence.file_url.includes('.pdf')
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[70]">
             <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -173,6 +197,55 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                         <p>Uploaded: {formatDate(evidence.created_at.split('T')[0])}</p>
                                     )}
                                 </div>
+                            </div>
+
+                            {/* Linked Data Points */}
+                            <div>
+                                <div className="flex items-center space-x-2 mb-3">
+                                    <BarChart3 className="w-4 h-4 text-gray-600" />
+                                    <h3 className="text-sm font-medium text-gray-700">Supporting Data Points</h3>
+                                    <span className="text-xs text-gray-500">({linkedDataPoints.length})</span>
+                                </div>
+                                {loadingDataPoints ? (
+                                    <div className="text-center py-4">
+                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600 mx-auto"></div>
+                                    </div>
+                                ) : linkedDataPoints.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {linkedDataPoints.map((dataPoint) => {
+                                            const hasDateRange = dataPoint.date_range_start && dataPoint.date_range_end
+                                            const displayDate = hasDateRange
+                                                ? `${formatDate(dataPoint.date_range_start)} - ${formatDate(dataPoint.date_range_end)}`
+                                                : formatDate(dataPoint.date_represented)
+
+                                            return (
+                                                <div key={dataPoint.id} className="bg-white rounded-lg p-3 border border-gray-200 hover:border-green-300 transition-colors">
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-sm font-semibold text-blue-600">
+                                                                {dataPoint.value?.toLocaleString()} {dataPoint.kpi?.unit_of_measurement || ''}
+                                                            </span>
+                                                            {dataPoint.kpi && (
+                                                                <span className="text-xs text-gray-500 truncate max-w-[120px]">
+                                                                    {dataPoint.kpi.title}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex items-center space-x-1 text-xs text-gray-500">
+                                                            <Calendar className="w-3 h-3" />
+                                                            <span>{displayDate}</span>
+                                                        </div>
+                                                        {dataPoint.label && (
+                                                            <p className="text-xs text-gray-600 mt-1 line-clamp-1">{dataPoint.label}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-gray-500 text-center py-4">No data points linked to this evidence</p>
+                                )}
                             </div>
                         </div>
                     </div>
