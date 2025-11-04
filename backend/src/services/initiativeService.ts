@@ -33,11 +33,15 @@ export class InitiativeService {
 
         // Generate slug from title
         let baseSlug = this.generateSlug(initiative.title);
+        // Ensure slug is not empty
+        if (!baseSlug || baseSlug.trim() === '') {
+            baseSlug = 'initiative';
+        }
         let slug = baseSlug;
         let attempt = 0;
         let conflict = true;
 
-        // Check if slug already exists (for any initiative in this org)
+        // Check if slug already exists globally (handle unique constraint)
         while (conflict && attempt < 100) {
             const { data: check } = await supabase
                 .from('initiatives')
@@ -49,8 +53,18 @@ export class InitiativeService {
                 conflict = false;
             } else {
                 attempt++;
-                slug = `${baseSlug}-${attempt}`;
+                // Use UUID suffix for better uniqueness instead of just incrementing
+                if (attempt === 1) {
+                    slug = `${baseSlug}-${Date.now().toString().slice(-6)}`;
+                } else {
+                    slug = `${baseSlug}-${Date.now().toString().slice(-6)}-${attempt}`;
+                }
             }
+        }
+
+        if (attempt >= 100) {
+            // Fallback: use UUID suffix if we can't find a unique slug
+            slug = `${baseSlug}-${Date.now().toString()}`;
         }
 
         const { data, error } = await supabase
@@ -65,7 +79,27 @@ export class InitiativeService {
             .select()
             .single();
 
-        if (error) throw new Error(`Failed to create initiative: ${error.message}`);
+        if (error) {
+            // If it's a duplicate slug error, try one more time with UUID suffix
+            if (error.message.includes('duplicate key') && error.message.includes('slug')) {
+                const fallbackSlug = `${baseSlug}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+                const { data: retryData, error: retryError } = await supabase
+                    .from('initiatives')
+                    .insert([{ 
+                        ...initiative, 
+                        user_id: userId, 
+                        organization_id: organizationId,
+                        slug: fallbackSlug,
+                        is_public: initiative.is_public || false
+                    }])
+                    .select()
+                    .single();
+                
+                if (retryError) throw new Error(`Failed to create initiative: ${retryError.message}`);
+                return retryData;
+            }
+            throw new Error(`Failed to create initiative: ${error.message}`);
+        }
         return data;
     }
 
