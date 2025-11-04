@@ -73,8 +73,8 @@ export default function AddEvidenceModal({
                     let kpiIds: string[] = []
                     if (fullEvidence.kpi_ids && Array.isArray(fullEvidence.kpi_ids)) {
                         kpiIds = fullEvidence.kpi_ids
-                    } else if (fullEvidence.evidence_kpis && Array.isArray(fullEvidence.evidence_kpis)) {
-                        kpiIds = fullEvidence.evidence_kpis.map((link: any) => link.kpi_id).filter(Boolean)
+                    } else if ((fullEvidence as any).evidence_kpis && Array.isArray((fullEvidence as any).evidence_kpis)) {
+                        kpiIds = (fullEvidence as any).evidence_kpis.map((link: any) => link.kpi_id).filter(Boolean)
                     } else {
                         kpiIds = editData.kpi_ids || []
                     }

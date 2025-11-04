@@ -73,7 +73,7 @@ export default function DataPointPreviewModal({
         try {
             setLoadingBeneficiaries(true)
             const groups = await apiService.getBeneficiaryGroupsForUpdate(dataPoint.id)
-            setBeneficiaryGroups(groups || [])
+            setBeneficiaryGroups(Array.isArray(groups) ? groups : [])
         } catch (error) {
             console.error('Failed to load beneficiary groups:', error)
             setBeneficiaryGroups([])

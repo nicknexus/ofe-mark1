@@ -78,8 +78,9 @@ export default function AddKPIUpdateModal({
                 if (editData.id) {
                     apiService
                         .getBeneficiaryGroupsForUpdate(editData.id)
-                        .then((groups: any[]) => {
-                            setSelectedGroupIds(groups.map((g: any) => g.id))
+                        .then((groups: any) => {
+                            const groupArray = Array.isArray(groups) ? groups : []
+                            setSelectedGroupIds(groupArray.map((g: any) => g.id))
                         })
                         .catch(() => setSelectedGroupIds([]))
                 }
