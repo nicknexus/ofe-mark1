@@ -9,8 +9,8 @@ interface BeneficiariesTabProps {
 
 export default function BeneficiariesTab({ initiativeId, onRefresh }: BeneficiariesTabProps) {
     return (
-        <div className="min-h-screen bg-gray-50">
-            <div className="p-8">
+        <div className="h-[calc(100vh-64px)] bg-gray-50 overflow-hidden">
+            <div className="h-full p-8 overflow-y-auto">
                 <div className="max-w-4xl mx-auto">
                     {/* Header */}
                     <div className="mb-8">

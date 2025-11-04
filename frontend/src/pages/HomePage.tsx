@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
     Target,
@@ -13,14 +13,23 @@ import {
     ArrowRight,
     Play,
     Star,
-    Globe
+    Globe,
+    Search,
+    Loader2
 } from 'lucide-react'
+import { Organization } from '../types'
 
 interface HomePageProps {
     onGetStarted: () => void
 }
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+
 export default function HomePage({ onGetStarted }: HomePageProps) {
+    const [searchQuery, setSearchQuery] = useState('')
+    const [searchResults, setSearchResults] = useState<Organization[]>([])
+    const [isSearching, setIsSearching] = useState(false)
+    const [showResults, setShowResults] = useState(false)
     const features = [
         {
             name: 'Impact Tracking',
@@ -54,6 +63,32 @@ export default function HomePage({ onGetStarted }: HomePageProps) {
         },
     ];
 
+    // Search organizations
+    useEffect(() => {
+        if (searchQuery.trim().length >= 2) {
+            setIsSearching(true)
+            const timeoutId = setTimeout(async () => {
+                try {
+                    const response = await fetch(`${API_URL}/api/organizations/public/search?q=${encodeURIComponent(searchQuery)}`)
+                    if (response.ok) {
+                        const data = await response.json()
+                        setSearchResults(data)
+                        setShowResults(true)
+                    }
+                } catch (error) {
+                    console.error('Search error:', error)
+                } finally {
+                    setIsSearching(false)
+                }
+            }, 300)
+
+            return () => clearTimeout(timeoutId)
+        } else {
+            setSearchResults([])
+            setShowResults(false)
+        }
+    }, [searchQuery])
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100">
             {/* Navigation */}
@@ -65,6 +100,51 @@ export default function HomePage({ onGetStarted }: HomePageProps) {
                                 <Target className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                             </div>
                             <span className="text-lg sm:text-xl font-bold text-gray-900">OFE</span>
+                        </div>
+                        <div className="flex items-center space-x-4 flex-1 max-w-md mx-4">
+                            {/* Search Bar */}
+                            <div className="relative w-full">
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search organizations..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        onFocus={() => searchQuery.length >= 2 && setShowResults(true)}
+                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                                    />
+                                    {isSearching && (
+                                        <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />
+                                    )}
+                                </div>
+                                {/* Search Results Dropdown */}
+                                {showResults && searchResults.length > 0 && (
+                                    <div className="absolute z-50 w-full mt-2 bg-white rounded-lg shadow-lg border border-gray-200 max-h-96 overflow-y-auto">
+                                        {searchResults.map((org) => (
+                                            <Link
+                                                key={org.id}
+                                                to={`/org/${org.slug}`}
+                                                onClick={() => {
+                                                    setShowResults(false)
+                                                    setSearchQuery('')
+                                                }}
+                                                className="block px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
+                                            >
+                                                <div className="font-semibold text-gray-900">{org.name}</div>
+                                                {org.description && (
+                                                    <div className="text-sm text-gray-600 mt-1 line-clamp-2">{org.description}</div>
+                                                )}
+                                            </Link>
+                                        ))}
+                                    </div>
+                                )}
+                                {showResults && searchQuery.length >= 2 && !isSearching && searchResults.length === 0 && (
+                                    <div className="absolute z-50 w-full mt-2 bg-white rounded-lg shadow-lg border border-gray-200 p-4 text-center text-gray-500 text-sm">
+                                        No organizations found
+                                    </div>
+                                )}
+                            </div>
                         </div>
                         <div className="flex items-center space-x-4">
                             <button

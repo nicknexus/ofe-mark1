@@ -10,6 +10,7 @@ import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
 import InitiativePage from './pages/InitiativePage'
 import KPIDetailPage from './pages/KPIDetailPage'
+import PublicOrganizationPage from './pages/PublicOrganizationPage'
 import Layout from './components/Layout'
 
 function App() {
@@ -67,26 +68,28 @@ function App() {
         )
     }
 
-    // Show homepage when not authenticated
-    if (!user) {
-        return (
-            <>
-                <HomePage onGetStarted={handleGetStarted} />
-                <Toaster position="top-right" />
-            </>
-        )
-    }
-
-    // Show main app when authenticated
+    // Main routing - public routes available to all, authenticated routes wrapped in Layout
     return (
         <Router>
-            <Layout user={user}>
-                <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/initiatives/:id" element={<InitiativePage />} />
-                    <Route path="/initiatives/:initiativeId/kpis/:kpiId" element={<KPIDetailPage />} />
-                </Routes>
-            </Layout>
+            <Routes>
+                {/* Public routes - accessible without auth */}
+                <Route path="/org/:slug" element={<PublicOrganizationPage />} />
+                
+                {/* Authenticated routes */}
+                {user ? (
+                    <Route path="/*" element={
+                        <Layout user={user}>
+                            <Routes>
+                                <Route index element={<Dashboard />} />
+                                <Route path="initiatives/:id" element={<InitiativePage />} />
+                                <Route path="initiatives/:initiativeId/kpis/:kpiId" element={<KPIDetailPage />} />
+                            </Routes>
+                        </Layout>
+                    } />
+                ) : (
+                    <Route path="/*" element={<HomePage onGetStarted={handleGetStarted} />} />
+                )}
+            </Routes>
             <Toaster position="top-right" />
         </Router>
     )

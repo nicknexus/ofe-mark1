@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { X, Calendar, Hash, MapPin, FileText, Users } from 'lucide-react'
-import { CreateKPIUpdateForm, BeneficiaryGroup } from '../types'
+import { CreateKPIUpdateForm, BeneficiaryGroup, Location } from '../types'
 import { apiService } from '../services/api'
 
 interface AddKPIUpdateModalProps {
@@ -11,6 +11,7 @@ interface AddKPIUpdateModalProps {
     kpiId: string
     metricType: 'number' | 'percentage'
     unitOfMeasurement: string
+    initiativeId?: string
 }
 
 export default function AddKPIUpdateModal({
@@ -20,7 +21,8 @@ export default function AddKPIUpdateModal({
     kpiTitle,
     kpiId,
     metricType,
-    unitOfMeasurement
+    unitOfMeasurement,
+    initiativeId
 }: AddKPIUpdateModalProps) {
     const [formData, setFormData] = useState<CreateKPIUpdateForm>({
         value: 0,
@@ -34,6 +36,8 @@ export default function AddKPIUpdateModal({
     const [loading, setLoading] = useState(false)
     const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
     const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
+    const [locations, setLocations] = useState<Location[]>([])
+    const [selectedLocationId, setSelectedLocationId] = useState<string>('')
 
     useEffect(() => {
         if (isOpen) {
@@ -41,8 +45,15 @@ export default function AddKPIUpdateModal({
                 .getBeneficiaryGroups()
                 .then((groups) => setBeneficiaryGroups(groups || []))
                 .catch(() => setBeneficiaryGroups([]))
+
+            if (initiativeId) {
+                apiService
+                    .getLocations(initiativeId)
+                    .then((locs) => setLocations(locs || []))
+                    .catch(() => setLocations([]))
+            }
         }
-    }, [isOpen])
+    }, [isOpen, initiativeId])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -64,7 +75,11 @@ export default function AddKPIUpdateModal({
                 submitData.date_range_end = undefined
             }
 
-            await onSubmit({ ...submitData, beneficiary_group_ids: selectedGroupIds })
+            await onSubmit({
+                ...submitData,
+                beneficiary_group_ids: selectedGroupIds,
+                location_id: selectedLocationId || undefined
+            })
             setFormData({
                 value: 0,
                 date_represented: new Date().toISOString().split('T')[0],
@@ -75,6 +90,7 @@ export default function AddKPIUpdateModal({
             })
             setIsDateRange(false)
             setSelectedGroupIds([])
+            setSelectedLocationId('')
             onClose()
         } finally {
             setLoading(false)
@@ -265,6 +281,32 @@ export default function AddKPIUpdateModal({
                             rows={3}
                             placeholder="Any additional context or explanation for this update..."
                         />
+                    </div>
+
+                    {/* Location */}
+                    <div>
+                        <label className="label">
+                            <MapPin className="w-4 h-4 inline mr-2" />
+                            Location (optional)
+                        </label>
+                        {locations.length === 0 ? (
+                            <p className="text-xs text-gray-500">
+                                No locations yet. Add locations in the Locations tab.
+                            </p>
+                        ) : (
+                            <select
+                                value={selectedLocationId}
+                                onChange={(e) => setSelectedLocationId(e.target.value)}
+                                className="input-field"
+                            >
+                                <option value="">Select a location...</option>
+                                {locations.map((location) => (
+                                    <option key={location.id} value={location.id}>
+                                        {location.name}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
                     </div>
 
                     {/* Beneficiary Groups */}

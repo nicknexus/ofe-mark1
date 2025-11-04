@@ -11,7 +11,10 @@ import initiativeRoutes from './routes/initiatives';
 import kpiRoutes from './routes/kpis';
 import evidenceRoutes from './routes/evidence';
 import beneficiaryRoutes from './routes/beneficiaries';
+import locationRoutes from './routes/locations';
 import uploadRoutes from './routes/upload';
+import organizationRoutes from './routes/organizations';
+import authRoutes from './routes/auth';
 
 // Load environment variables
 dotenv.config();
@@ -50,7 +53,7 @@ app.get('/', (req, res) => {
     res.json({
         message: 'OFE API is running!',
         status: 'OK',
-        available_endpoints: ['/test', '/health', '/api/initiatives', '/api/kpis', '/api/evidence'],
+        available_endpoints: ['/test', '/health', '/api/initiatives', '/api/kpis', '/api/evidence', '/api/locations'],
         timestamp: new Date().toISOString()
     });
 });
@@ -74,10 +77,13 @@ app.get('/health', (req, res) => {
 });
 
 // Routes - Enable one by one to find the problem
+app.use('/api/auth', authRoutes);
+app.use('/api/organizations', organizationRoutes);
 app.use('/api/initiatives', initiativeRoutes);
 app.use('/api/kpis', kpiRoutes);
 app.use('/api/evidence', evidenceRoutes);
 app.use('/api/beneficiaries', beneficiaryRoutes);
+app.use('/api/locations', locationRoutes);
 // app.use('/api/upload', uploadRoutes); // Disabled: multer + local filesystem doesn't work in serverless
 
 // Error handling middleware
@@ -95,7 +101,7 @@ app.use('*', (req, res) => {
         error: 'Route not found',
         path: req.originalUrl,
         method: req.method,
-        available_routes: ['/test', '/health', '/api/initiatives', '/api/kpis', '/api/evidence']
+        available_routes: ['/test', '/health', '/api/organizations', '/api/initiatives', '/api/kpis', '/api/evidence', '/api/locations']
     });
 });
 

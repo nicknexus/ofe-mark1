@@ -1,9 +1,23 @@
+export interface Organization {
+    id?: string;
+    name: string;
+    slug?: string;
+    description?: string;
+    is_public?: boolean;
+    owner_id?: string; // Single owner user (cascades delete when user is deleted)
+    created_at?: string;
+    updated_at?: string;
+    role?: 'owner' | 'admin' | 'member'; // User's role in organization (when fetched via user_organizations)
+}
+
 export interface Initiative {
     id?: string;
     title: string;
     description: string;
     region?: string;
     location?: string;
+    slug?: string;
+    is_public?: boolean;
     coordinates?: {
         lat: number;
         lng: number;
@@ -37,6 +51,18 @@ export interface KPI {
     user_id?: string;
 }
 
+export interface Location {
+    id?: string;
+    initiative_id: string;
+    name: string;
+    description?: string;
+    latitude: number;
+    longitude: number;
+    created_at?: string;
+    updated_at?: string;
+    user_id?: string;
+}
+
 export interface KPIUpdate {
     id?: string;
     kpi_id: string;
@@ -46,6 +72,7 @@ export interface KPIUpdate {
     date_range_end?: string;
     note?: string;
     label?: string;
+    location_id?: string;
     coordinates?: {
         lat: number;
         lng: number;
@@ -76,6 +103,7 @@ export interface Evidence {
     date_represented: string;
     date_range_start?: string;
     date_range_end?: string;
+    location_id?: string;
     coordinates?: {
         lat: number;
         lng: number;

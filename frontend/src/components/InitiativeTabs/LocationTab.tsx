@@ -1,43 +1,306 @@
-import React from 'react'
-import { MapPin, Globe, Navigation } from 'lucide-react'
+import React, { useState, useEffect, useRef } from 'react'
+import { MapPin, Plus, Edit, Trash2, AlertCircle } from 'lucide-react'
+import { useParams } from 'react-router-dom'
+import { Location } from '../../types'
+import { apiService } from '../../services/api'
+import LocationMap from '../LocationMap'
+import LocationModal from '../LocationModal'
+import toast from 'react-hot-toast'
 
 export default function LocationTab() {
+    const { id: initiativeId } = useParams<{ id: string }>()
+    const [locations, setLocations] = useState<Location[]>([])
+    const [loading, setLoading] = useState(true)
+    const [isModalOpen, setIsModalOpen] = useState(false)
+    const [selectedLocation, setSelectedLocation] = useState<Location | null>(null)
+    const [mapClickCoordinates, setMapClickCoordinates] = useState<[number, number] | null>(null)
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+    const locationCardRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+    useEffect(() => {
+        if (initiativeId) {
+            loadLocations()
+        }
+    }, [initiativeId])
+
+    // Auto-scroll to selected location in sidebar
+    useEffect(() => {
+        if (selectedLocation?.id) {
+            const cardRef = locationCardRefs.current[selectedLocation.id]
+            if (cardRef) {
+                cardRef.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }
+        }
+    }, [selectedLocation])
+
+    const loadLocations = async () => {
+        if (!initiativeId) return
+        try {
+            setLoading(true)
+            const data = await apiService.getLocations(initiativeId)
+            setLocations(data)
+        } catch (error) {
+            toast.error('Failed to load locations')
+            console.error(error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleCreateLocation = async (locationData: Partial<Location>) => {
+        try {
+            await apiService.createLocation(locationData)
+            toast.success('Location created successfully!')
+            await loadLocations()
+            setIsModalOpen(false)
+            setSelectedLocation(null)
+            setMapClickCoordinates(null)
+        } catch (error) {
+            throw error
+        }
+    }
+
+    const handleUpdateLocation = async (locationData: Partial<Location>) => {
+        if (!selectedLocation?.id) return
+        try {
+            await apiService.updateLocation(selectedLocation.id, locationData)
+            toast.success('Location updated successfully!')
+            await loadLocations()
+            setIsModalOpen(false)
+            setSelectedLocation(null)
+        } catch (error) {
+            throw error
+        }
+    }
+
+    const handleDeleteLocation = async (id: string) => {
+        try {
+            await apiService.deleteLocation(id)
+            toast.success('Location deleted successfully!')
+            await loadLocations()
+            setDeleteConfirmId(null)
+        } catch (error) {
+            toast.error('Failed to delete location')
+            console.error(error)
+        }
+    }
+
+    const handleMapClick = (coordinates: [number, number]) => {
+        setMapClickCoordinates(coordinates)
+        setSelectedLocation(null)
+        setIsModalOpen(true)
+    }
+
+    const handleLocationClick = (location: Location) => {
+        // Just select the location to highlight it - don't open editor
+        setSelectedLocation(location)
+        setMapClickCoordinates(null)
+    }
+
+    const handleAddClick = () => {
+        setSelectedLocation(null)
+        setMapClickCoordinates(null)
+        setIsModalOpen(true)
+    }
+
+    const handleEditClick = (location: Location, e: React.MouseEvent) => {
+        e.stopPropagation()
+        setSelectedLocation(location)
+        setMapClickCoordinates(null)
+        setIsModalOpen(true)
+    }
+
+    const handleListItemClick = (location: Location) => {
+        setSelectedLocation(location)
+        setMapClickCoordinates(null)
+        setIsModalOpen(true)
+    }
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+            </div>
+        )
+    }
+
+    if (!initiativeId) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">Invalid initiative ID</p>
+                </div>
+            </div>
+        )
+    }
+
     return (
-        <div className="min-h-screen bg-gray-50">
-            <div className="p-8">
-                <div className="max-w-4xl mx-auto">
-                    {/* Header */}
-                    <div className="mb-8">
-                        <div className="flex items-center space-x-3 mb-4">
-                            <div className="p-3 bg-green-100 rounded-lg">
-                                <MapPin className="w-6 h-6 text-green-600" />
+        <div className="h-[calc(100vh-64px)] bg-gradient-to-br from-slate-50 via-white to-blue-50/30 overflow-hidden">
+            <div className="h-full flex flex-col">
+                {/* Header */}
+                <div className="bg-white border-b border-gray-200 p-3 flex-shrink-0">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                            <div className="p-2 bg-green-100 rounded-lg">
+                                <MapPin className="w-5 h-5 text-green-600" />
                             </div>
                             <div>
-                                <h1 className="text-2xl font-bold text-gray-900">Location & Geography</h1>
-                                <p className="text-gray-600">Geographic data and location-based insights</p>
+                                <h1 className="text-xl font-bold text-gray-900">Locations</h1>
+                                <p className="text-sm text-gray-600">Manage geographic locations for your initiative</p>
                             </div>
                         </div>
+                        <button
+                            onClick={handleAddClick}
+                            className="inline-flex items-center space-x-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+                        >
+                            <Plus className="w-4 h-4" />
+                            <span>Add Location</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Main Content */}
+                <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-2 p-2 overflow-hidden min-h-0">
+                    {/* Map - 2/3 width */}
+                    <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm p-2 overflow-hidden flex flex-col min-h-0 h-full">
+                        <LocationMap
+                            locations={locations}
+                            onLocationClick={handleLocationClick}
+                            onMapClick={handleMapClick}
+                            selectedLocationId={selectedLocation?.id || null}
+                        />
                     </div>
 
-                    {/* Coming Soon Content */}
-                    <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-                        <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                            <Globe className="w-8 h-8 text-green-600" />
+                    {/* Location List - 1/3 width */}
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-2 overflow-hidden flex flex-col min-h-0 h-full">
+                        <div className="mb-2 flex-shrink-0">
+                            <h2 className="text-base font-semibold text-gray-900 mb-0.5">
+                                All Locations ({locations.length})
+                            </h2>
+                            <p className="text-xs text-gray-500">Click a location to edit • Map clicks show details</p>
                         </div>
-                        <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                            Geographic Features Coming Soon
-                        </h3>
-                        <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                            This section will contain maps, location data, and geographic insights for your initiative.
-                        </p>
-                        <div className="flex flex-wrap gap-2 justify-center">
-                            <span className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm">🗺️ Interactive Maps</span>
-                            <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm">📍 Location Tracking</span>
-                            <span className="px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-sm">🌍 Geographic Insights</span>
+
+                        <div className="flex-1 overflow-y-auto space-y-1.5 min-h-0">
+                            {locations.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <MapPin className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                                    <p className="text-gray-500 text-sm mb-3">No locations yet</p>
+                                    <button
+                                        onClick={handleAddClick}
+                                        className="text-sm text-green-600 hover:text-green-700 font-medium"
+                                    >
+                                        Add your first location
+                                    </button>
+                                </div>
+                            ) : (
+                                locations.map((location) => (
+                                    <div
+                                        key={location.id}
+                                        ref={(el) => {
+                                            if (location.id) {
+                                                locationCardRefs.current[location.id] = el
+                                            }
+                                        }}
+                                        onClick={() => handleListItemClick(location)}
+                                        className={`p-3 rounded-lg border cursor-pointer transition-all ${selectedLocation?.id === location.id
+                                            ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
+                                            : 'border-gray-200 hover:border-gray-300 bg-gray-50'
+                                            }`}
+                                    >
+                                        <div className="flex items-start justify-between mb-1.5">
+                                            <h3 className="font-semibold text-gray-900 text-sm">{location.name}</h3>
+                                            <div className="flex items-center space-x-1">
+                                                <button
+                                                    onClick={(e) => handleEditClick(location, e)}
+                                                    className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                                                >
+                                                    <Edit className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        setDeleteConfirmId(location.id!)
+                                                    }}
+                                                    className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {location.description && (
+                                            <p className="text-xs text-gray-600 mb-1.5 line-clamp-2">
+                                                {location.description}
+                                            </p>
+                                        )}
+                                        <div className="text-xs text-gray-500">
+                                            {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Location Modal */}
+            <LocationModal
+                isOpen={isModalOpen}
+                onClose={() => {
+                    setIsModalOpen(false)
+                    setSelectedLocation(null)
+                    setMapClickCoordinates(null)
+                }}
+                onSubmit={selectedLocation ? handleUpdateLocation : handleCreateLocation}
+                initialLocation={selectedLocation}
+                initiativeId={initiativeId}
+                initialCoordinates={mapClickCoordinates}
+            />
+
+            {/* Delete Confirmation */}
+            {deleteConfirmId && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+                    <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl">
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-red-100 to-pink-100 rounded-2xl flex items-center justify-center">
+                                <Trash2 className="w-8 h-8 text-red-600" />
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">Delete Location</h3>
+                            <p className="text-gray-500">This action cannot be undone</p>
+                        </div>
+
+                        <div className="bg-gradient-to-r from-red-50/50 to-pink-50/50 border border-red-100/60 rounded-xl p-4 mb-6">
+                            <p className="text-gray-700 text-center">
+                                Are you sure you want to delete{' '}
+                                <strong className="text-gray-900">
+                                    "{locations.find((l) => l.id === deleteConfirmId)?.name}"
+                                </strong>
+                                ?
+                            </p>
+                            <p className="text-sm text-gray-600 text-center mt-2">
+                                Data points linked to this location will remain but won't be associated with a
+                                location anymore.
+                            </p>
+                        </div>
+
+                        <div className="flex space-x-3">
+                            <button
+                                onClick={() => setDeleteConfirmId(null)}
+                                className="flex-1 px-6 py-3 bg-gray-100/80 hover:bg-gray-200/80 text-gray-700 hover:text-gray-900 rounded-xl font-semibold transition-all duration-200 hover:scale-[1.02]"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => handleDeleteLocation(deleteConfirmId)}
+                                className="flex-1 px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl font-semibold shadow-lg shadow-red-600/25 hover:shadow-xl hover:shadow-red-600/30 transition-all duration-200 hover:scale-[1.02]"
+                            >
+                                Delete Location
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

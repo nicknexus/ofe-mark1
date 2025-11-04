@@ -251,14 +251,20 @@ export default function InitiativePage() {
         })
     }
 
-    const openKPIDetails = (kpi: any) => {
-        if (id && kpi.id) {
-            navigate(`/initiatives/${id}/kpis/${kpi.id}`)
-        }
-    }
-
     const handleTabChange = (tab: string) => {
         setActiveTab(tab)
+    }
+
+    const handleMetricCardClick = (kpiId: string) => {
+        setActiveTab('metrics')
+        // Expand the clicked KPI
+        setExpandedKPIs(prev => {
+            const newSet = new Set(prev)
+            if (!newSet.has(kpiId)) {
+                newSet.add(kpiId)
+            }
+            return newSet
+        })
     }
 
     const renderHomeContent = () => {
@@ -267,7 +273,7 @@ export default function InitiativePage() {
         const { initiative, kpis, stats } = dashboard
 
         return (
-            <div className="h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+            <div className="h-full bg-gradient-to-br from-slate-50 via-white to-blue-50/30 overflow-hidden">
                 {kpis.length === 0 ? (
                     /* Empty State - Compact for Laptop */
                     <div className="flex items-center justify-center h-full p-4">
@@ -311,23 +317,17 @@ export default function InitiativePage() {
                     </div>
                 ) : (
                     /* Analytics Dashboard - Flush to Top */
-                    <div className="h-full relative">
+                    <div className="h-full overflow-hidden">
                         <MetricsDashboard
                             kpis={kpis}
                             kpiTotals={kpiTotals}
                             stats={stats}
                             kpiUpdates={allKPIUpdates}
+                            initiativeId={id}
+                            onNavigateToLocations={() => setActiveTab('location')}
+                            onMetricCardClick={handleMetricCardClick}
+                            onAddKPI={() => setIsKPIModalOpen(true)}
                         />
-                        {/* Floating View Metrics Button */}
-                        <div className="absolute top-4 right-4">
-                            <button
-                                onClick={() => setActiveTab('metrics')}
-                                className="inline-flex items-center space-x-2 px-4 py-2 bg-white/90 hover:bg-white border border-gray-200/60 hover:border-gray-300/60 rounded-lg text-sm font-medium text-gray-700 hover:text-gray-900 transition-all duration-200 hover:shadow-sm hover:scale-[1.02] backdrop-blur-sm"
-                            >
-                                <BarChart3 className="w-4 h-4" />
-                                <span>View Metrics</span>
-                            </button>
-                        </div>
                     </div>
                 )}
             </div>
@@ -357,7 +357,6 @@ export default function InitiativePage() {
                         onAddEvidence={openEvidenceModal}
                         onEditKPI={openEditModal}
                         onDeleteKPI={openDeleteConfirm}
-                        onViewKPIDetails={openKPIDetails}
                         onToggleKPIExpansion={toggleKPIExpansion}
                         initiativeId={id}
                     />
@@ -400,13 +399,14 @@ export default function InitiativePage() {
     }
 
     return (
-        <div className="bg-gray-50">
+        <div className="relative">
             {/* Fixed Sidebar */}
             <InitiativeSidebar
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
                 initiativeTitle={dashboard.initiative.title}
                 initiativeId={id!}
+                initiativeSlug={dashboard.initiative.slug}
             />
 
             {/* Main Content with left margin for sidebar */}
@@ -434,6 +434,7 @@ export default function InitiativePage() {
                     kpiId={selectedKPI.id}
                     metricType={selectedKPI.metric_type}
                     unitOfMeasurement={selectedKPI.unit_of_measurement}
+                    initiativeId={id!}
                 />
             )}
 

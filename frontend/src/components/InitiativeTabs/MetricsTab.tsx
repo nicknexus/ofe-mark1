@@ -16,7 +16,6 @@ interface MetricsTabProps {
     onAddEvidence: (kpi?: any) => void
     onEditKPI: (kpi: any) => void
     onDeleteKPI: (kpi: any) => void
-    onViewKPIDetails: (kpi: any) => void
     onToggleKPIExpansion: (kpiId: string) => void
     initiativeId?: string
 }
@@ -34,7 +33,6 @@ export default function MetricsTab({
     onAddEvidence,
     onEditKPI,
     onDeleteKPI,
-    onViewKPIDetails,
     onToggleKPIExpansion,
     initiativeId
 }: MetricsTabProps) {
@@ -48,8 +46,8 @@ export default function MetricsTab({
         : kpis.filter(kpi => kpi.category === categoryFilter)
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
-            <div className="w-full px-2 sm:px-4 py-4 space-y-6">
+        <div className="h-[calc(100vh-64px)] bg-gradient-to-br from-slate-50 via-white to-blue-50/30 overflow-hidden">
+            <div className="h-full w-full px-2 sm:px-4 py-4 space-y-6 overflow-y-auto">
                 {kpis.length === 0 ? (
                     /* Empty State */
                     <div className="flex items-center justify-center min-h-[60vh]">
@@ -161,7 +159,7 @@ export default function MetricsTab({
                                     </p>
                                 </div>
                             ) : (
-                                <div className="space-y-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                                     {filteredKpis.map((kpi) => (
                                         kpi.id && (
                                             <ExpandableKPICard
@@ -174,7 +172,6 @@ export default function MetricsTab({
                                                 onAddEvidence={() => onAddEvidence(kpi)}
                                                 onEdit={() => onEditKPI(kpi)}
                                                 onDelete={() => onDeleteKPI(kpi)}
-                                                onViewDetails={() => onViewKPIDetails(kpi)}
                                                 kpiUpdates={allKPIUpdates.filter(update => update.kpi_id === kpi.id)}
                                                 initiativeId={initiativeId || initiative.id}
                                             />

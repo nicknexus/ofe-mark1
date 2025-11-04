@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
-import { X } from 'lucide-react'
-import { CreateKPIForm } from '../types'
+import React, { useState, useEffect } from 'react'
+import { X, MapPin } from 'lucide-react'
+import { CreateKPIForm, Location } from '../types'
+import { apiService } from '../services/api'
 
 interface CreateKPIModalProps {
     isOpen: boolean
@@ -23,16 +24,27 @@ export default function CreateKPIModal({
         metric_type: editData?.metric_type || 'number',
         unit_of_measurement: editData?.unit_of_measurement || '',
         category: editData?.category || 'output',
-        initiative_id: initiativeId
+        initiative_id: initiativeId,
+        location_ids: editData?.location_ids || []
     })
     const [loading, setLoading] = useState(false)
+    const [locations, setLocations] = useState<Location[]>([])
+    const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>(editData?.location_ids || [])
+
+    useEffect(() => {
+        if (isOpen && initiativeId) {
+            apiService.getLocations(initiativeId)
+                .then((locs) => setLocations(locs || []))
+                .catch(() => setLocations([]))
+        }
+    }, [isOpen, initiativeId])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
 
         try {
-            await onSubmit(formData)
+            await onSubmit({ ...formData, location_ids: selectedLocationIds })
             // Reset form only if creating (not editing)
             if (!editData) {
                 setFormData({
@@ -41,8 +53,10 @@ export default function CreateKPIModal({
                     metric_type: 'number',
                     unit_of_measurement: '',
                     category: 'output',
-                    initiative_id: initiativeId
+                    initiative_id: initiativeId,
+                    location_ids: []
                 })
+                setSelectedLocationIds([])
             }
             onClose()
         } finally {
@@ -174,6 +188,42 @@ export default function CreateKPIModal({
                                 </label>
                             ))}
                         </div>
+                    </div>
+
+                    {/* Locations */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <MapPin className="w-4 h-4 inline mr-2" />
+                            Locations (optional)
+                        </label>
+                        {locations.length === 0 ? (
+                            <p className="text-xs text-gray-500">
+                                No locations yet. Add locations in the Locations tab.
+                            </p>
+                        ) : (
+                            <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-300 rounded-lg p-2">
+                                {locations.map((location) => (
+                                    <label
+                                        key={location.id}
+                                        className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedLocationIds.includes(location.id!)}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setSelectedLocationIds([...selectedLocationIds, location.id!])
+                                                } else {
+                                                    setSelectedLocationIds(selectedLocationIds.filter(id => id !== location.id))
+                                                }
+                                            }}
+                                            className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                                        />
+                                        <span className="text-sm text-gray-700">{location.name}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3 pt-4">

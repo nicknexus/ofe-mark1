@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { X, Upload, Calendar, Link as LinkIcon, FileText, Camera, DollarSign, MessageSquare, File } from 'lucide-react'
-import { CreateEvidenceForm, KPI, KPIWithEvidence } from '../types'
+import { X, Upload, Calendar, Link as LinkIcon, FileText, Camera, DollarSign, MessageSquare, File, MapPin } from 'lucide-react'
+import { CreateEvidenceForm, KPI, KPIWithEvidence, Location } from '../types'
 import { apiService } from '../services/api'
 import { formatDate } from '../utils'
 
@@ -46,6 +46,8 @@ export default function AddEvidenceModal({
     const [isFetchingMatches, setIsFetchingMatches] = useState(false)
     const [kpiDataSummaries, setKpiDataSummaries] = useState<any[]>([])
     const [selectedUpdateIds, setSelectedUpdateIds] = useState<string[]>([])
+    const [locations, setLocations] = useState<Location[]>([])
+    const [selectedLocationId, setSelectedLocationId] = useState<string>('')
 
     const evidenceTypes = [
         { value: 'visual_proof', label: 'Visual Support', icon: Camera, description: 'Photos, videos, screenshots' },
@@ -69,8 +71,19 @@ export default function AddEvidenceModal({
                 initiative_id: initiativeId
             })
             setIsDateRange(editData.date_range_start && editData.date_range_end ? true : false)
+            setSelectedLocationId(editData.location_id || '')
         }
     }, [editData, initiativeId])
+
+    // Load locations when modal opens
+    useEffect(() => {
+        if (isOpen && initiativeId) {
+            apiService
+                .getLocations(initiativeId)
+                .then((locs) => setLocations(locs || []))
+                .catch(() => setLocations([]))
+        }
+    }, [isOpen, initiativeId])
 
     // Debounced effect to fetch matching data points
     useEffect(() => {
@@ -210,6 +223,7 @@ export default function AddEvidenceModal({
 
             // Include selected data points for precise linking
             submitData.kpi_update_ids = selectedUpdateIds
+            submitData.location_id = selectedLocationId || undefined
 
             setUploadProgress(editData ? 'Updating evidence record...' : 'Creating evidence record...')
             await onSubmit(submitData)
@@ -537,6 +551,32 @@ export default function AddEvidenceModal({
                             ))}
                         </div>
                     )}
+
+                    {/* Location */}
+                    <div>
+                        <label className="label">
+                            <MapPin className="w-4 h-4 inline mr-2" />
+                            Location (optional)
+                        </label>
+                        {locations.length === 0 ? (
+                            <p className="text-xs text-gray-500">
+                                No locations yet. Add locations in the Locations tab.
+                            </p>
+                        ) : (
+                            <select
+                                value={selectedLocationId}
+                                onChange={(e) => setSelectedLocationId(e.target.value)}
+                                className="input-field"
+                            >
+                                <option value="">Select a location...</option>
+                                {locations.map((location) => (
+                                    <option key={location.id} value={location.id}>
+                                        {location.name}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                    </div>
 
                     {/* Title and Description */}
                     <div className="grid grid-cols-1 gap-4">

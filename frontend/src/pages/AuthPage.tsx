@@ -19,17 +19,20 @@ export default function AuthPage() {
 
         try {
             if (isSignUp) {
-                await AuthService.signUp(formData.email, formData.password)
-
-                // Update profile with additional info
-                if (formData.name || formData.organization) {
-                    await AuthService.updateProfile({
-                        name: formData.name,
-                        organization: formData.organization
-                    })
+                if (!formData.organization || formData.organization.trim() === '') {
+                    toast.error('Organization name is required')
+                    setLoading(false)
+                    return
                 }
 
-                toast.success('Account created! Please check your email to verify.')
+                await AuthService.signUp(
+                    formData.email, 
+                    formData.password,
+                    formData.name,
+                    formData.organization
+                )
+
+                toast.success('Account created successfully!')
             } else {
                 await AuthService.signIn(formData.email, formData.password)
                 toast.success('Welcome back!')
@@ -139,7 +142,7 @@ export default function AuthPage() {
                         {isSignUp && (
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Organization (Optional)
+                                    Organization Name <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
@@ -148,7 +151,11 @@ export default function AuthPage() {
                                     onChange={handleInputChange}
                                     className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
                                     placeholder="Your organization name"
+                                    required
                                 />
+                                <p className="mt-1 text-xs text-gray-500">
+                                    This will be your organization's public page name
+                                </p>
                             </div>
                         )}
 

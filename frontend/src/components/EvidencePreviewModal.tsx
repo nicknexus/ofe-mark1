@@ -203,7 +203,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                             <div>
                                 <div className="flex items-center space-x-2 mb-3">
                                     <BarChart3 className="w-4 h-4 text-gray-600" />
-                                    <h3 className="text-sm font-medium text-gray-700">Supporting Data Points</h3>
+                                    <h3 className="text-sm font-medium text-gray-700">Supporting Impact Claims</h3>
                                     <span className="text-xs text-gray-500">({linkedDataPoints.length})</span>
                                 </div>
                                 {loadingDataPoints ? (
@@ -244,7 +244,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                         })}
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-gray-500 text-center py-4">No data points linked to this evidence</p>
+                                    <p className="text-sm text-gray-500 text-center py-4">No impact claims linked to this evidence</p>
                                 )}
                             </div>
                         </div>

@@ -12,12 +12,11 @@ import {
     TrendingUp,
     Calendar,
     Target,
-    ExternalLink,
     X,
     Eye
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
-import { getCategoryColor } from '../utils'
+import { getCategoryColor, parseLocalDate, isSameDay, compareDates } from '../utils'
 import EvidencePreviewModal from './EvidencePreviewModal'
 import DataPointPreviewModal from './DataPointPreviewModal'
 import AddKPIUpdateModal from './AddKPIUpdateModal'
@@ -34,7 +33,6 @@ interface ExpandableKPICardProps {
     onAddEvidence: () => void
     onEdit: () => void
     onDelete: () => void
-    onViewDetails: () => void // Add function to navigate to KPI details page
     kpiUpdates?: any[] // Add KPI updates data for this specific KPI
     initiativeId?: string // Initiative ID for fetching evidence
 }
@@ -48,7 +46,6 @@ export default function ExpandableKPICard({
     onAddEvidence,
     onEdit,
     onDelete,
-    onViewDetails,
     kpiUpdates = [],
     initiativeId
 }: ExpandableKPICardProps) {
@@ -191,11 +188,12 @@ export default function ExpandableKPICard({
     }
 
     // Get effective date for an update - use end date for ranges, otherwise use date_represented
+    // Parse as local date to avoid timezone shifts
     const getEffectiveDate = (update: any): Date => {
         if (update.date_range_end) {
-            return new Date(update.date_range_end)
+            return parseLocalDate(update.date_range_end)
         }
-        return new Date(update.date_represented)
+        return parseLocalDate(update.date_represented)
     }
 
     // Generate cumulative data for this specific KPI
@@ -245,12 +243,20 @@ export default function ExpandableKPICard({
 
         // Create a full time series from startDate to now
         const endDate = new Date()
+        endDate.setHours(0, 0, 0, 0) // Normalize to midnight local time
+
+        // Normalize startDate to midnight
+        startDate.setHours(0, 0, 0, 0)
+
         const timeDiff = endDate.getTime() - startDate.getTime()
         const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24))
 
         // Create daily data points for the entire period
         for (let i = 0; i <= daysDiff; i++) {
-            const currentDate = new Date(startDate.getTime() + (i * 24 * 60 * 60 * 1000))
+            const currentDate = new Date(startDate)
+            currentDate.setDate(startDate.getDate() + i)
+            currentDate.setHours(0, 0, 0, 0) // Normalize to midnight local time
+
             const dateString = currentDate.toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric'
@@ -259,12 +265,17 @@ export default function ExpandableKPICard({
             // Find if there's an update on this date (using effective date)
             const updateOnThisDate = filteredUpdates.find(update => {
                 const updateDate = getEffectiveDate(update)
-                return updateDate.toDateString() === currentDate.toDateString()
+                updateDate.setHours(0, 0, 0, 0)
+                return isSameDay(updateDate, currentDate)
             })
 
             // Calculate cumulative value up to this point (using effective date)
             const cumulative = filteredUpdates
-                .filter(update => getEffectiveDate(update) <= currentDate)
+                .filter(update => {
+                    const updateDate = getEffectiveDate(update)
+                    updateDate.setHours(0, 0, 0, 0)
+                    return compareDates(updateDate, currentDate) <= 0
+                })
                 .reduce((sum, update) => sum + (update.value || 0), 0)
 
             data.push({
@@ -280,86 +291,147 @@ export default function ExpandableKPICard({
 
     const chartData = generateChartData()
 
+    // Calculate dynamic max value with headroom for the graph
+    const calculateMaxWithHeadroom = () => {
+        if (!chartData || chartData.length === 0) return 0
+
+        // Find the maximum cumulative value
+        let maxValue = 0
+        chartData.forEach((dataPoint) => {
+            if (dataPoint.cumulative && typeof dataPoint.cumulative === 'number' && isFinite(dataPoint.cumulative)) {
+                maxValue = Math.max(maxValue, dataPoint.cumulative)
+            }
+        })
+
+        if (maxValue === 0) return 0
+
+        // Add dynamic headroom: more percentage for smaller values, less for larger values
+        let headroomPercentage = 0.15 // Default 15%
+        if (maxValue < 100) {
+            headroomPercentage = 0.20 // 20% for small values
+        } else if (maxValue < 1000) {
+            headroomPercentage = 0.15 // 15% for medium values
+        } else if (maxValue < 10000) {
+            headroomPercentage = 0.12 // 12% for larger values
+        } else {
+            headroomPercentage = 0.10 // 10% for very large values
+        }
+
+        return maxValue * (1 + headroomPercentage)
+    }
+
+    const maxDomainValue = calculateMaxWithHeadroom()
+    const actualMaxValue = Math.max(...chartData.map(d =>
+        typeof d.cumulative === 'number' && isFinite(d.cumulative) ? d.cumulative : 0
+    ).filter(v => v > 0), 0)
+
+    // Generate ticks that include the actual max value
+    const generateYTicks = () => {
+        if (maxDomainValue === 0) return []
+        const ticks: number[] = []
+        const numTicks = 5
+        const step = maxDomainValue / numTicks
+
+        for (let i = 0; i <= numTicks; i++) {
+            ticks.push(Math.round(i * step))
+        }
+
+        // Ensure the actual max value is included if it's not already close to a tick
+        if (actualMaxValue > 0 && !ticks.some(t => Math.abs(t - actualMaxValue) < step * 0.1)) {
+            ticks.push(actualMaxValue)
+            ticks.sort((a, b) => a - b)
+        }
+
+        return ticks
+    }
+
+    const yTicks = generateYTicks()
+
     return (
-        <div className="bg-white/90 backdrop-blur-xl border border-gray-200/60 hover:border-blue-300/60 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300">
-            {/* Collapsed View - Horizontal Layout */}
+        <div className={`bg-white/90 backdrop-blur-xl border-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 ${(kpi.evidence_percentage || 0) >= 80
+            ? 'border-green-300/60 hover:border-green-400/60'
+            : (kpi.evidence_percentage || 0) >= 30
+                ? 'border-yellow-300/60 hover:border-yellow-400/60'
+                : 'border-red-300/60 hover:border-red-400/60'
+            }`}>
+            {/* Collapsed View - Compact Vertical Layout */}
             <div
-                className="p-4 cursor-pointer"
+                className="p-3 cursor-pointer h-full flex flex-col"
                 onClick={onToggleExpand}
             >
-                <div className="flex items-center justify-between">
-                    {/* Left: KPI Info */}
-                    <div className="flex items-center space-x-4 flex-1 min-w-0">
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center space-x-3 mb-1">
-                                <h3 className="text-lg font-bold text-gray-900 truncate">{kpi.title}</h3>
-                                <span className={`px-2 py-1 rounded-lg text-xs font-semibold ${getCategoryColor(kpi.category)}`}>
-                                    {kpi.category}
-                                </span>
-                            </div>
-                            <p className="text-sm text-gray-600 truncate">{kpi.description}</p>
+                {/* Header: Category & Status */}
+                <div className="flex items-center justify-between gap-1.5 mb-2">
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${getCategoryColor(kpi.category)}`}>
+                        {kpi.category}
+                    </span>
+                    {/* Evidence Status Badge - Compact */}
+                    <div className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${(kpi.evidence_percentage || 0) >= 80
+                        ? 'bg-green-100 text-green-700'
+                        : (kpi.evidence_percentage || 0) >= 30
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                        {(kpi.evidence_percentage || 0) >= 80 ? '✓' :
+                            (kpi.evidence_percentage || 0) >= 30 ? '⚠' :
+                                '⚠'}
+                    </div>
+                </div>
 
-                            {/* Progress Bar */}
-                            <div className="mt-2">
-                                <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                                    <span>Supported</span>
-                                    <span>
-                                        {kpi.evidence_percentage || 0}%
-                                    </span>
-                                </div>
-                                <div className="w-full bg-gray-200 rounded-full h-1.5">
-                                    <div
-                                        className={`h-1.5 rounded-full transition-all duration-300 ${(kpi.evidence_percentage || 0) >= 100
-                                            ? 'bg-green-500'
-                                            : 'bg-yellow-500'
-                                            }`}
-                                        style={{
-                                            width: `${Math.min(kpi.evidence_percentage || 0, 100)}%`
-                                        }}
-                                    ></div>
-                                </div>
-                            </div>
+                {/* Title - Single line */}
+                <h3 className="text-sm font-bold text-gray-900 mb-1.5 line-clamp-2 leading-tight">{kpi.title}</h3>
+
+                {/* Value Display */}
+                {kpi.total_updates > 0 && kpiTotal !== undefined ? (
+                    <div className="mb-2">
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-xl font-bold text-gray-900">
+                                {kpiTotal.toLocaleString()}
+                            </span>
+                            <span className="text-[10px] font-medium text-gray-500">
+                                {kpi.metric_type === 'percentage' ? '%' : kpi.unit_of_measurement}
+                            </span>
+                        </div>
+                        <div className="text-[10px] text-gray-500 mt-0.5">
+                            {kpi.total_updates} claim{(kpi.total_updates !== 1) ? 's' : ''}
                         </div>
                     </div>
-
-                    {/* Center: Value Display */}
-                    <div className="flex items-center space-x-6 px-6">
-                        {kpi.total_updates > 0 && kpiTotal !== undefined ? (
-                            <div className="text-center">
-                                <div className="flex items-baseline space-x-1">
-                                    <span className="text-1xl font-bold text-green-600">
-                                        {kpiTotal.toLocaleString()}
-                                    </span>
-                                    <span className="text-sm font-medium text-gray-500">
-                                        {kpi.metric_type === 'percentage' ? '%' : kpi.unit_of_measurement}
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-center space-x-1 mt-1">
-                                    <TrendingUp className="w-3 h-3 text-green-500" />
-                                    <span className="text-xs text-green-600 font-medium">{kpi.total_updates} updates</span>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="text-center">
-                                <div className="w-2 h-2 bg-gray-300 rounded-full mx-auto mb-1"></div>
-                                <span className="text-sm text-gray-500 font-medium">No data yet</span>
-                            </div>
-                        )}
+                ) : (
+                    <div className="mb-2">
+                        <div className="text-xs text-gray-400 font-medium">No claims yet</div>
                     </div>
+                )}
 
-                    {/* Right: Expand Button */}
-                    <div className="flex items-center space-x-2">
-                        <div className="text-xs text-gray-500">
-                            {kpi.evidence_count} evidence
-                        </div>
-                        <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                            {isExpanded ? (
-                                <ChevronUp className="w-5 h-5 text-gray-400" />
-                            ) : (
-                                <ChevronDown className="w-5 h-5 text-gray-400" />
-                            )}
-                        </button>
+                {/* Evidence Coverage Bar - Compact */}
+                <div className="mt-auto">
+                    <div className="flex items-center justify-between text-[10px] mb-1">
+                        <span className="font-semibold text-gray-600">Coverage</span>
+                        <span className={`font-bold ${(kpi.evidence_percentage || 0) >= 80
+                            ? 'text-green-600'
+                            : (kpi.evidence_percentage || 0) >= 30
+                                ? 'text-yellow-600'
+                                : 'text-red-600'
+                            }`}>
+                            {kpi.evidence_percentage || 0}%
+                        </span>
                     </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                        <div
+                            className={`h-full rounded-full transition-all duration-500 ${(kpi.evidence_percentage || 0) >= 80
+                                ? 'bg-gradient-to-r from-green-500 to-green-600'
+                                : (kpi.evidence_percentage || 0) >= 30
+                                    ? 'bg-gradient-to-r from-yellow-500 to-yellow-600'
+                                    : 'bg-gradient-to-r from-red-500 to-red-600'
+                                }`}
+                            style={{
+                                width: `${Math.min(kpi.evidence_percentage || 0, 100)}%`
+                            }}
+                        ></div>
+                    </div>
+                    {(kpi.evidence_percentage || 0) < 80 && (
+                        <p className="text-[10px] text-gray-500 mt-1">
+                            {kpi.evidence_count || 0} evidence
+                        </p>
+                    )}
                 </div>
             </div>
 
@@ -393,7 +465,7 @@ export default function ExpandableKPICard({
                                     className="flex items-center space-x-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm font-medium transition-colors"
                                 >
                                     <Plus className="w-4 h-4" />
-                                    <span>Add Data</span>
+                                    <span>Add Impact Claim</span>
                                 </button>
                                 {kpi.total_updates > 0 && (
                                     <button
@@ -426,16 +498,6 @@ export default function ExpandableKPICard({
                                 >
                                     <Trash2 className="w-4 h-4" />
                                 </button>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        onViewDetails()
-                                    }}
-                                    className="flex items-center space-x-2 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-sm font-medium transition-colors"
-                                >
-                                    <ExternalLink className="w-4 h-4" />
-                                    <span>Full Details</span>
-                                </button>
                             </div>
                         </div>
                     </div>
@@ -451,7 +513,7 @@ export default function ExpandableKPICard({
                                         <BarChart3 className="w-5 h-5 text-blue-600" />
                                     </div>
                                     <div>
-                                        <p className="text-sm text-gray-600">Data Points</p>
+                                        <p className="text-sm text-gray-600">Impact Claims</p>
                                         <p className="text-xl font-bold text-blue-600">{kpi.total_updates}</p>
                                     </div>
                                 </div>
@@ -541,32 +603,62 @@ export default function ExpandableKPICard({
                                                 <XAxis
                                                     dataKey="date"
                                                     stroke="#6b7280"
-                                                    fontSize={12}
+                                                    fontSize={11}
+                                                    tick={{ fill: '#6b7280' }}
+                                                    angle={-45}
+                                                    textAnchor="end"
+                                                    height={60}
                                                 />
                                                 <YAxis
                                                     stroke="#6b7280"
-                                                    fontSize={12}
-                                                    domain={[0, 'dataMax + (dataMax * 0.1)']}
+                                                    fontSize={11}
+                                                    tick={{ fill: '#6b7280' }}
+                                                    domain={maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax']}
+                                                    ticks={yTicks.length > 0 ? yTicks : undefined}
+                                                    tickFormatter={(value) => {
+                                                        if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
+                                                        if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
+                                                        return value.toString()
+                                                    }}
                                                 />
                                                 <Tooltip
                                                     contentStyle={{
                                                         backgroundColor: 'white',
                                                         border: '1px solid #e5e7eb',
-                                                        borderRadius: '8px'
+                                                        borderRadius: '8px',
+                                                        padding: '10px 12px',
+                                                        fontSize: '12px',
+                                                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
                                                     }}
-                                                    formatter={(value, name) => [
-                                                        `${value} ${kpi.unit_of_measurement || ''}`,
-                                                        'Cumulative Total'
-                                                    ]}
-                                                    labelFormatter={(label) => `Date: ${label}`}
+                                                    formatter={(value: any, name: string) => {
+                                                        const unit = kpi.unit_of_measurement || ''
+                                                        const formattedValue = typeof value === 'number'
+                                                            ? value.toLocaleString() + (unit ? ` ${unit}` : '')
+                                                            : value
+                                                        return [formattedValue, 'Cumulative Total']
+                                                    }}
+                                                    labelFormatter={(label) => {
+                                                        // Find the actual date from chartData
+                                                        const dataPoint = chartData.find(d => d.date === label)
+                                                        if (dataPoint?.fullDate) {
+                                                            return new Date(dataPoint.fullDate).toLocaleDateString('en-US', {
+                                                                month: 'short',
+                                                                day: 'numeric',
+                                                                year: 'numeric'
+                                                            })
+                                                        }
+                                                        return `Date: ${label}`
+                                                    }}
+                                                    cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '5 5' }}
                                                 />
                                                 <Line
-                                                    type="monotone"
+                                                    type="basis"
                                                     dataKey="cumulative"
                                                     stroke="#16a34a"
-                                                    strokeWidth={3}
+                                                    strokeWidth={3.5}
                                                     dot={false}
-                                                    activeDot={{ r: 6, stroke: '#16a34a', strokeWidth: 2 }}
+                                                    activeDot={{ r: 6, fill: '#16a34a', stroke: 'white', strokeWidth: 2 }}
+                                                    strokeLinecap="round"
                                                 />
                                             </LineChart>
                                         </ResponsiveContainer>
@@ -587,7 +679,7 @@ export default function ExpandableKPICard({
                                 {/* Data Points Section */}
                                 <div className="bg-gradient-to-br from-blue-50/30 to-indigo-50/20 border border-blue-100/60 rounded-xl p-4">
                                     <div className="flex items-center justify-between mb-4">
-                                        <h5 className="text-lg font-semibold text-gray-900">Data Points</h5>
+                                        <h5 className="text-lg font-semibold text-gray-900">Impact Claims</h5>
                                         <div className="flex items-center space-x-2">
                                             <div className="flex items-center space-x-2 text-sm text-gray-500">
                                                 <BarChart3 className="w-4 h-4" />
@@ -639,7 +731,7 @@ export default function ExpandableKPICard({
                                         ) : (
                                             <div className="text-center py-8 text-gray-500">
                                                 <BarChart3 className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                                                <p className="text-sm">No data points yet</p>
+                                                <p className="text-sm">No impact claims yet</p>
                                             </div>
                                         )}
                                     </div>

@@ -6,11 +6,13 @@ import {
     KPIUpdate,
     Evidence,
     BeneficiaryGroup,
+    Location,
     InitiativeDashboard,
     CreateInitiativeForm,
     CreateKPIForm,
     CreateKPIUpdateForm,
-    CreateEvidenceForm
+    CreateEvidenceForm,
+    Organization
 } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
@@ -33,8 +35,12 @@ class ApiService {
         }
     }
 
-    private getCacheKey(endpoint: string, options: RequestInit = {}): string {
-        return `${options.method || 'GET'}:${endpoint}:${JSON.stringify(options.body || {})}`
+    private async getCacheKey(endpoint: string, options: RequestInit = {}): Promise<string> {
+        // Get user ID to include in cache key so different users don't share cache
+        const { data: { session } } = await supabase.auth.getSession()
+        const userId = session?.user?.id || 'anonymous'
+
+        return `${userId}:${options.method || 'GET'}:${endpoint}:${JSON.stringify(options.body || {})}`
     }
 
     private async sleep(ms: number): Promise<void> {
@@ -81,8 +87,8 @@ class ApiService {
     }
 
     // Check if data is cached for an endpoint
-    isDataCached(endpoint: string, options: RequestInit = {}): boolean {
-        const cacheKey = this.getCacheKey(endpoint, options)
+    async isDataCached(endpoint: string, options: RequestInit = {}): Promise<boolean> {
+        const cacheKey = await this.getCacheKey(endpoint, options)
         const cached = this.requestCache.get(cacheKey)
         const now = Date.now()
 
@@ -90,7 +96,7 @@ class ApiService {
     }
 
     private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-        const cacheKey = this.getCacheKey(endpoint, options)
+        const cacheKey = await this.getCacheKey(endpoint, options)
         const method = options.method || 'GET'
         const now = Date.now()
 
@@ -186,6 +192,9 @@ class ApiService {
                     this.clearCacheByPattern('/beneficiaries')
                     // Beneficiary changes may affect KPI data point counts
                     this.clearCacheByPattern('/kpis')
+                }
+                if (endpoint.includes('/locations')) {
+                    this.clearCacheByPattern('/locations')
                 }
 
                 // Remove the mutating request from cache immediately
@@ -429,6 +438,62 @@ class ApiService {
             method: 'POST',
             body: JSON.stringify({ group_ids: groupIds })
         })
+    }
+
+    // Organizations
+    async getOrganizations(): Promise<Organization[]> {
+        const result = await this.request<Organization[]>('/organizations')
+        return result || []
+    }
+
+    async getOrganization(id: string): Promise<Organization> {
+        return this.request<Organization>(`/organizations/${id}`)
+    }
+
+    async updateOrganization(id: string, data: Partial<Organization>): Promise<Organization> {
+        return this.request<Organization>(`/organizations/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        })
+    }
+
+    // Locations
+    async getLocations(initiativeId?: string): Promise<Location[]> {
+        const params = initiativeId ? `?initiative_id=${initiativeId}` : ''
+        const result = await this.request<Location[]>(`/locations${params}`)
+        return result || []
+    }
+
+    async getLocation(id: string): Promise<Location> {
+        return this.request<Location>(`/locations/${id}`)
+    }
+
+    async createLocation(data: Partial<Location>): Promise<Location> {
+        return this.request<Location>('/locations', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        })
+    }
+
+    async updateLocation(id: string, data: Partial<Location>): Promise<Location> {
+        return this.request<Location>(`/locations/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        })
+    }
+
+    async deleteLocation(id: string): Promise<void> {
+        return this.request<void>(`/locations/${id}`, {
+            method: 'DELETE'
+        })
+    }
+
+    async getLocationKPIUpdates(locationId: string): Promise<KPIUpdate[]> {
+        return this.request<KPIUpdate[]>(`/locations/${locationId}/kpi-updates`)
+    }
+
+    async getLocationEvidence(locationId: string): Promise<Evidence[]> {
+        return this.request<Evidence[]>(`/locations/${locationId}/evidence`)
     }
 
     // Load initiatives first for immediate display

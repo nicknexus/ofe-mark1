@@ -14,13 +14,15 @@ interface InitiativeSidebarProps {
     onTabChange: (tab: string) => void
     initiativeTitle: string
     initiativeId: string
+    initiativeSlug?: string
 }
 
 export default function InitiativeSidebar({
     activeTab,
     onTabChange,
     initiativeTitle,
-    initiativeId
+    initiativeId,
+    initiativeSlug
 }: InitiativeSidebarProps) {
     const tabs = [
         {
@@ -50,7 +52,7 @@ export default function InitiativeSidebar({
     ]
 
     return (
-        <div className="fixed left-0 top-0 w-56 h-full bg-white border-r border-gray-200 flex flex-col z-30">
+        <div className="fixed left-0 top-16 w-56 h-[calc(100vh-64px)] bg-white border-r border-gray-200 flex flex-col z-30">
             {/* Header */}
             <div className="p-4 border-b border-gray-200">
                 <div className="flex items-center space-x-2 mb-3">
@@ -105,7 +107,11 @@ export default function InitiativeSidebar({
             {/* Footer */}
             <div className="p-3 border-t border-gray-200">
                 <div className="text-xs text-gray-500 text-center">
-                    Initiative ID: {initiativeId}
+                    {initiativeSlug ? (
+                        <span className="font-mono">{initiativeSlug}</span>
+                    ) : (
+                        <span>ID: {initiativeId.slice(0, 8)}...</span>
+                    )}
                 </div>
             </div>
         </div>

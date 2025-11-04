@@ -115,6 +115,47 @@ export function generateId(): string {
 }
 
 // Debounce function
+// Parse a date string as a local date (not UTC) to avoid timezone shifts
+// This ensures dates like "2024-11-01" are treated as Nov 1st in the user's timezone
+export function parseLocalDate(dateString: string | Date): Date {
+    if (dateString instanceof Date) {
+        return dateString
+    }
+
+    // If it's a date string like "2024-11-01", parse it as local date
+    // Split and create Date object directly to avoid UTC interpretation
+    const parts = dateString.split('T')[0].split('-')
+    if (parts.length === 3) {
+        const year = parseInt(parts[0], 10)
+        const month = parseInt(parts[1], 10) - 1 // Month is 0-indexed
+        const day = parseInt(parts[2], 10)
+        return new Date(year, month, day)
+    }
+
+    // Fallback to standard Date parsing
+    return new Date(dateString)
+}
+
+// Get date-only string (YYYY-MM-DD) from a Date object, normalized to local timezone
+export function getLocalDateString(date: Date): string {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+}
+
+// Compare two dates by their date-only values (ignoring time)
+export function compareDates(date1: Date, date2: Date): number {
+    const d1 = new Date(date1.getFullYear(), date1.getMonth(), date1.getDate())
+    const d2 = new Date(date2.getFullYear(), date2.getMonth(), date2.getDate())
+    return d1.getTime() - d2.getTime()
+}
+
+// Check if two dates are on the same day
+export function isSameDay(date1: Date, date2: Date): boolean {
+    return compareDates(date1, date2) === 0
+}
+
 export function debounce<T extends (...args: any[]) => any>(
     func: T,
     wait: number

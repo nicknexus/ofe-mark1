@@ -22,7 +22,7 @@ import {
     Clock
 } from 'lucide-react'
 import { apiService } from '../services/api'
-import { Initiative, LoadingState, CreateInitiativeForm, KPI } from '../types'
+import { Initiative, LoadingState, CreateInitiativeForm, KPI, Organization } from '../types'
 import { formatDate, truncateText } from '../utils'
 import toast from 'react-hot-toast'
 import CreateInitiativeModal from '../components/CreateInitiativeModal'
@@ -32,6 +32,7 @@ export default function Dashboard() {
     const [initiatives, setInitiatives] = useState<Initiative[]>([])
     const [allKPIs, setAllKPIs] = useState<KPI[]>([])
     const [totalEvidence, setTotalEvidence] = useState<number>(0)
+    const [organization, setOrganization] = useState<Organization | null>(null)
     const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: true })
     const [isLoadingStats, setIsLoadingStats] = useState(true)
     const [showCreateModal, setShowCreateModal] = useState(false)
@@ -58,9 +59,12 @@ export default function Dashboard() {
         }
 
         // Check if all data is already cached - if so, load from cache without API calls
-        const hasCachedData = apiService.isDataCached('/initiatives') &&
-            apiService.isDataCached('/kpis') &&
+        const [initiativesCached, kpisCached, evidenceCached] = await Promise.all([
+            apiService.isDataCached('/initiatives'),
+            apiService.isDataCached('/kpis'),
             apiService.isDataCached('/evidence')
+        ])
+        const hasCachedData = initiativesCached && kpisCached && evidenceCached
 
         if (hasCachedData) {
             console.log('All dashboard data is cached, loading from cache...')
@@ -72,9 +76,16 @@ export default function Dashboard() {
         setLoadingState({ isLoading: true })
 
         try {
-            // Load initiatives first for immediate display
-            const initiatives = await apiService.loadInitiativesOnly()
+            // Load organization and initiatives in parallel for immediate display
+            const [orgs, initiatives] = await Promise.all([
+                apiService.getOrganizations(),
+                apiService.loadInitiativesOnly()
+            ])
+            
             setInitiatives(initiatives)
+            if (orgs && orgs.length > 0) {
+                setOrganization(orgs[0]) // User has one organization
+            }
             setLoadingState({ isLoading: false }) // Show initiatives immediately
 
             // Load KPIs and evidence in background
@@ -231,230 +242,159 @@ export default function Dashboard() {
 
     return (
         <>
-            <div className="min-h-screen bg-gray-50">
-                <div className="space-y-8">
-                    {/* Clean Header */}
-                    <div className="bg-white border-b border-gray-200">
-                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                            <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0 py-8">
-                                <div className="space-y-1">
-                                    <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-                                    <p className="text-gray-600">
-                                        Track and showcase your organization's impact
-                                    </p>
-                                </div>
-                                <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
-                                    <button
-                                        onClick={showTutorialAgain}
-                                        className="btn-secondary flex items-center justify-center space-x-2 px-4 py-2 rounded-lg"
-                                        title="Show tutorial again"
-                                    >
-                                        <HelpCircle className="w-4 h-4" />
-                                        <span>Tutorial</span>
-                                    </button>
-                                    <button
-                                        onClick={() => setShowCreateModal(true)}
-                                        className="btn-primary flex items-center space-x-2 px-4 py-2 rounded-lg"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                        <span>{initiatives.length === 0 ? 'Get Started' : 'New Initiative'}</span>
-                                    </button>
-                                </div>
+            <div className="min-h-screen bg-white">
+                {/* Header with Organization Name */}
+                <div className="bg-white border-b border-gray-200">
+                    <div className="px-4 sm:px-6 lg:px-8 py-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                            <div className="space-y-1">
+                                {organization && (
+                                    <h1 className="text-2xl font-semibold text-gray-900">
+                                        {organization.name}
+                                    </h1>
+                                )}
+                                <h2 className="text-lg font-normal text-gray-600">
+                                    Dashboard
+                                </h2>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={showTutorialAgain}
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 transition-colors"
+                                    title="Show tutorial again"
+                                >
+                                    <HelpCircle className="w-4 h-4 inline mr-1.5" />
+                                    Tutorial
+                                </button>
+                                <button
+                                    onClick={() => setShowCreateModal(true)}
+                                    className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors flex items-center gap-1.5"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    {initiatives.length === 0 ? 'Get Started' : 'New Initiative'}
+                                </button>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    {/* Simple Stats Grid */}
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                {/* Small Banner for KPIs */}
+                {!isLoadingStats && allKPIs.length === 0 && initiatives.length > 0 && (
+                    <div className="px-4 sm:px-6 lg:px-8 pt-6">
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <BarChart3 className="w-4 h-4 text-blue-600" />
+                                <p className="text-sm text-blue-800">
+                                    Create your first KPI to start tracking impact
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Initiatives Section - Front and Center */}
+                <div className="px-4 sm:px-6 lg:px-8 py-8">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-6">Your Initiatives</h2>
+
+                    {initiatives.length === 0 ? (
+                        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+                            <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                                <Target className="w-6 h-6 text-primary-600" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                                Welcome to OFE
+                            </h3>
+                            <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                                Let's start by creating your first initiative. Think of it as a project or program you want to track.
+                            </p>
+                            <button
+                                onClick={() => setShowCreateModal(true)}
+                                className="px-6 py-2.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
+                            >
+                                Create Your First Initiative
+                            </button>
+                            <p className="text-xs text-gray-500 mt-4">
+                                Example: "Youth Training Program 2025" or "Clean Water Project"
+                            </p>
+                        </div>
+                    ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <div className="bg-white rounded-lg border border-gray-200 p-6">
-                                <div className="flex items-center">
-                                    <div className="p-2 bg-primary-100 rounded-lg">
-                                        <Target className="w-5 h-5 text-primary-600" />
-                                    </div>
-                                    <div className="ml-4">
-                                        <p className="text-sm font-medium text-gray-600">Active Initiatives</p>
-                                        <p className="text-2xl font-bold text-gray-900">{initiatives.length}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="bg-white rounded-lg border border-gray-200 p-6">
-                                <div className="flex items-center">
-                                    <div className="p-2 bg-blue-100 rounded-lg">
-                                        <BarChart3 className="w-5 h-5 text-blue-600" />
-                                    </div>
-                                    <div className="ml-4">
-                                        <p className="text-sm font-medium text-gray-600">Total KPIs</p>
-                                        {isLoadingStats ? (
-                                            <div className="animate-pulse bg-gray-200 h-6 w-8 rounded"></div>
-                                        ) : (
-                                            <p className="text-2xl font-bold text-gray-900">{allKPIs.length}</p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="bg-white rounded-lg border border-gray-200 p-6">
-                                <div className="flex items-center">
-                                    <div className="p-2 bg-green-100 rounded-lg">
-                                        <FileText className="w-5 h-5 text-green-600" />
-                                    </div>
-                                    <div className="ml-4">
-                                        <p className="text-sm font-medium text-gray-600">Evidence Items</p>
-                                        {isLoadingStats ? (
-                                            <div className="animate-pulse bg-gray-200 h-6 w-8 rounded"></div>
-                                        ) : (
-                                            <p className="text-2xl font-bold text-gray-900">{totalEvidence}</p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="bg-white rounded-lg border border-gray-200 p-6">
-                                <div className="flex items-center">
-                                    <div className="p-2 bg-purple-100 rounded-lg">
-                                        <Users className="w-5 h-5 text-purple-600" />
-                                    </div>
-                                    <div className="ml-4">
-                                        <p className="text-sm font-medium text-gray-600">Beneficiaries</p>
-                                        <p className="text-2xl font-bold text-gray-900">0</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Help Text for Evidence */}
-                    {!isLoadingStats && allKPIs.length === 0 && initiatives.length > 0 && (
-                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                <div className="flex items-start">
-                                    <div className="p-2 bg-blue-100 rounded-lg mr-3 flex-shrink-0">
-                                        <Target className="w-5 h-5 text-blue-600" />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-medium text-blue-800">
-                                            Create KPIs first to start uploading evidence
-                                        </p>
-                                        <p className="text-xs text-blue-600 mt-1">
-                                            Evidence needs to be linked to specific KPIs to track your impact proof
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Initiatives Section */}
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                        <div className="space-y-6">
-                            <div>
-                                <h2 className="text-xl font-semibold text-gray-900">Your Initiatives</h2>
-                                <p className="text-gray-600 mt-1">Manage and track your impact projects</p>
-                            </div>
-
-                            {initiatives.length === 0 ? (
-                                <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                                    <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                                        <Target className="w-6 h-6 text-primary-600" />
-                                    </div>
-                                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                        Welcome to OFE!
-                                    </h3>
-                                    <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                                        Let's start by creating your first initiative. Think of it as a project or program you want to track.
-                                    </p>
-                                    <button
-                                        onClick={() => setShowCreateModal(true)}
-                                        className="btn-primary text-base px-6 py-3"
+                            {initiatives.map((initiative) => (
+                                <div
+                                    key={initiative.id}
+                                    className="group bg-white rounded-lg border border-gray-200 hover:border-primary-300 hover:shadow-md transition-all duration-200 relative"
+                                >
+                                    <Link
+                                        to={`/initiatives/${initiative.id}`}
+                                        className="block p-6"
                                     >
-                                        Create Your First Initiative
-                                    </button>
-                                    <p className="text-sm text-gray-500 mt-4">
-                                        💡 Example: "Youth Training Program 2025" or "Clean Water Project"
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {initiatives.map((initiative) => (
-                                        <div
-                                            key={initiative.id}
-                                            className="group bg-white rounded-lg border border-gray-200 hover:border-primary-300 hover:shadow-md transition-all duration-200 relative"
-                                        >
-                                            <Link
-                                                to={`/initiatives/${initiative.id}`}
-                                                className="block p-6"
-                                            >
-                                                <div className="flex items-start justify-between mb-4">
-                                                    <div className="flex items-center space-x-3">
-                                                        <div className="p-2 bg-primary-100 rounded-lg">
-                                                            <Target className="w-5 h-5 text-primary-600" />
-                                                        </div>
-                                                        <div>
-                                                            <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
-                                                                {initiative.title}
-                                                            </h3>
-                                                            <div className="flex items-center text-sm text-gray-500 mt-1">
-                                                                <Calendar className="w-4 h-4 mr-1" />
-                                                                <span>Created {formatDate(initiative.created_at || '')}</span>
-                                                            </div>
-                                                        </div>
+                                        <div className="flex items-start justify-between mb-4">
+                                            <div className="flex items-center space-x-3">
+                                                <div className="p-2 bg-primary-100 rounded-lg">
+                                                    <Target className="w-5 h-5 text-primary-600" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition-colors mb-1">
+                                                        {initiative.title}
+                                                    </h3>
+                                                    <div className="flex items-center text-xs text-gray-500">
+                                                        <Calendar className="w-3 h-3 mr-1" />
+                                                        <span>Created {formatDate(initiative.created_at || '')}</span>
                                                     </div>
                                                 </div>
-
-                                                <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                                                    {truncateText(initiative.description, 120)}
-                                                </p>
-
-                                                <div className="flex items-center justify-between text-sm">
-                                                    <div className="flex items-center space-x-4">
-                                                        <div className="flex items-center text-blue-600">
-                                                            <BarChart3 className="w-4 h-4 mr-1" />
-                                                            <span>0 KPIs</span>
-                                                        </div>
-                                                        <div className="flex items-center text-green-600">
-                                                            <FileText className="w-4 h-4 mr-1" />
-                                                            <span>0 Evidence</span>
-                                                        </div>
-                                                    </div>
-                                                    <span className="text-primary-600 font-medium group-hover:underline">
-                                                        View Details →
-                                                    </span>
-                                                </div>
-                                            </Link>
-
-                                            {/* Action Buttons */}
-                                            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.preventDefault()
-                                                        e.stopPropagation()
-                                                        openEditModal(initiative)
-                                                    }}
-                                                    className="p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-colors"
-                                                    title="Edit Initiative"
-                                                >
-                                                    <Edit className="w-3 h-3 text-gray-600" />
-                                                </button>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.preventDefault()
-                                                        e.stopPropagation()
-                                                        openDeleteConfirm(initiative)
-                                                    }}
-                                                    className="p-1.5 bg-white border border-red-200 rounded-lg shadow-sm hover:bg-red-50 hover:border-red-300 transition-colors"
-                                                    title="Delete Initiative"
-                                                >
-                                                    <Trash2 className="w-3 h-3 text-red-600" />
-                                                </button>
                                             </div>
                                         </div>
-                                    ))}
+
+                                        <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+                                            {truncateText(initiative.description, 120)}
+                                        </p>
+
+                                        <div className="flex items-center justify-between text-sm pt-4 border-t border-gray-100">
+                                            <div className="flex items-center space-x-4">
+                                                <div className="flex items-center text-blue-600">
+                                                    <BarChart3 className="w-4 h-4 mr-1" />
+                                                    <span>0 KPIs</span>
+                                                </div>
+                                                <div className="flex items-center text-green-600">
+                                                    <FileText className="w-4 h-4 mr-1" />
+                                                    <span>0 Evidence</span>
+                                                </div>
+                                            </div>
+                                            <span className="text-primary-600 font-medium group-hover:underline">
+                                                View →
+                                            </span>
+                                        </div>
+                                    </Link>
+
+                                    {/* Action Buttons */}
+                                    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
+                                        <button
+                                            onClick={(e) => {
+                                                e.preventDefault()
+                                                e.stopPropagation()
+                                                openEditModal(initiative)
+                                            }}
+                                            className="p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-colors"
+                                            title="Edit Initiative"
+                                        >
+                                            <Edit className="w-3 h-3 text-gray-600" />
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.preventDefault()
+                                                e.stopPropagation()
+                                                openDeleteConfirm(initiative)
+                                            }}
+                                            className="p-1.5 bg-white border border-red-200 rounded-lg shadow-sm hover:bg-red-50 hover:border-red-300 transition-colors"
+                                            title="Delete Initiative"
+                                        >
+                                            <Trash2 className="w-3 h-3 text-red-600" />
+                                        </button>
+                                    </div>
                                 </div>
-                            )}
+                            ))}
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
 
@@ -483,33 +423,33 @@ export default function Dashboard() {
 
             {/* Delete Confirmation Dialog */}
             {deleteConfirmInitiative && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-xl max-w-md w-full p-6">
-                        <div className="flex items-center space-x-3 mb-4">
-                            <div className="p-2 bg-red-100 rounded-lg">
-                                <Trash2 className="w-5 h-5 text-red-600" />
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-xl max-w-md w-full p-6 border border-gray-100 shadow-xl">
+                        <div className="flex items-start space-x-4 mb-6">
+                            <div className="p-2 bg-gray-50 rounded-lg">
+                                <Trash2 className="w-5 h-5 text-gray-600" />
                             </div>
-                            <div>
-                                <h3 className="text-lg font-semibold text-gray-900">Delete Initiative</h3>
-                                <p className="text-sm text-gray-600">This action cannot be undone</p>
+                            <div className="flex-1">
+                                <h3 className="text-lg font-normal text-gray-900 mb-1">Delete Initiative</h3>
+                                <p className="text-sm text-gray-500">This action cannot be undone</p>
                             </div>
                         </div>
 
-                        <p className="text-gray-700 mb-6">
-                            Are you sure you want to delete "<strong>{deleteConfirmInitiative.title}</strong>"?
-                            This will also delete all associated KPIs, data points, and evidence.
+                        <p className="text-gray-700 mb-6 text-sm leading-relaxed">
+                            Are you sure you want to delete "<strong className="font-medium">{deleteConfirmInitiative.title}</strong>"?
+                            This will also delete all associated KPIs, impact claims, and evidence.
                         </p>
 
                         <div className="flex space-x-3">
                             <button
                                 onClick={() => setDeleteConfirmInitiative(null)}
-                                className="btn-secondary flex-1"
+                                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={() => handleDeleteInitiative(deleteConfirmInitiative)}
-                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-lg transition-colors"
                             >
                                 Delete Initiative
                             </button>
