@@ -406,7 +406,7 @@ export default function InitiativePage() {
                 onTabChange={handleTabChange}
                 initiativeTitle={dashboard.initiative.title}
                 initiativeId={id!}
-                initiativeSlug={dashboard.initiative.slug || undefined}
+                initiativeSlug={dashboard.initiative.slug}
             />
 
             {/* Main Content with left margin for sidebar */}

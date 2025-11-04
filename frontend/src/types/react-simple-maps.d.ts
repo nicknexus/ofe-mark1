@@ -30,7 +30,16 @@ declare module 'react-simple-maps' {
         children?: (props: { geographies: any[] }) => React.ReactNode
     }
     
-    export const ComposableMap: React.FC<{ projectionConfig?: any; width?: number; height?: number; children?: React.ReactNode }>
+    export interface ComposableMapProps {
+        projectionConfig?: any
+        width?: number
+        height?: number
+        style?: React.CSSProperties
+        onClick?: (event: any) => void
+        children?: React.ReactNode
+    }
+    
+    export const ComposableMap: React.FC<ComposableMapProps>
     export const Geographies: React.FC<GeographiesProps>
     export const Geography: React.FC<GeographyProps>
     export const Marker: React.FC<MarkerProps>

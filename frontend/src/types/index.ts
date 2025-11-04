@@ -16,6 +16,7 @@ export interface Initiative {
     description: string;
     region?: string;
     location?: string;
+    slug?: string;
     coordinates?: {
         lat: number;
         lng: number;
