@@ -134,8 +134,8 @@ export default function LocationMap({
             >
                 <ZoomableGroup zoom={position.zoom} center={position.coordinates} onMoveEnd={handleMoveEnd}>
                     <Geographies geography={geoUrl}>
-                        {({ geographies }) =>
-                            geographies.map((geo) => (
+                        {({ geographies }: { geographies: any[] }) =>
+                            geographies.map((geo: any) => (
                                 <Geography
                                     key={geo.rsmKey}
                                     geography={geo}
