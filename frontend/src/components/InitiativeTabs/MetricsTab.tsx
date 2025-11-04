@@ -18,6 +18,7 @@ interface MetricsTabProps {
     onDeleteKPI: (kpi: any) => void
     onToggleKPIExpansion: (kpiId: string) => void
     initiativeId?: string
+    onRefresh?: () => void
 }
 
 export default function MetricsTab({
@@ -34,7 +35,8 @@ export default function MetricsTab({
     onEditKPI,
     onDeleteKPI,
     onToggleKPIExpansion,
-    initiativeId
+    initiativeId,
+    onRefresh
 }: MetricsTabProps) {
     if (!dashboard) return null
 
@@ -174,6 +176,7 @@ export default function MetricsTab({
                                                 onDelete={() => onDeleteKPI(kpi)}
                                                 kpiUpdates={allKPIUpdates.filter(update => update.kpi_id === kpi.id)}
                                                 initiativeId={initiativeId || initiative.id}
+                                                onRefresh={onRefresh}
                                             />
                                         )
                                     ))}

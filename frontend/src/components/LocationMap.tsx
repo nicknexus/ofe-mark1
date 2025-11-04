@@ -12,6 +12,7 @@ interface LocationMapProps {
     onLocationClick?: (location: Location) => void
     onMapClick?: (coordinates: [number, number]) => void
     selectedLocationId?: string | null
+    refreshKey?: number // Key to trigger refresh when updates/evidence change
 }
 
 export default function LocationMap({
@@ -19,6 +20,7 @@ export default function LocationMap({
     onLocationClick,
     onMapClick,
     selectedLocationId,
+    refreshKey,
 }: LocationMapProps) {
     const [position, setPosition] = useState({ coordinates: [0, 0] as [number, number], zoom: 1 })
     const [hoveredLocationId, setHoveredLocationId] = useState<string | null>(null)
@@ -32,7 +34,7 @@ export default function LocationMap({
     const popupRef = useRef<HTMLDivElement>(null)
     const mapContainerRef = useRef<HTMLDivElement>(null)
 
-    // Fetch data when popup opens
+    // Fetch data when popup opens or refreshKey changes
     useEffect(() => {
         if (popupLocation?.id) {
             setLoadingData(true)
@@ -56,7 +58,7 @@ export default function LocationMap({
             setKpiUpdates([])
             setEvidence([])
         }
-    }, [popupLocation?.id])
+    }, [popupLocation?.id, refreshKey])
 
     // Close popup when clicking outside
     useEffect(() => {
@@ -413,6 +415,7 @@ export default function LocationMap({
                 }}
                 location={detailsLocation}
                 onLocationClick={onLocationClick}
+                refreshKey={refreshKey}
             />
 
             {/* Zoom Controls */}

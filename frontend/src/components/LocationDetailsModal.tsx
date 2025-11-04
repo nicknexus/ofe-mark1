@@ -8,6 +8,7 @@ interface LocationDetailsModalProps {
     onClose: () => void
     location: Location | null
     onLocationClick?: (location: Location) => void
+    refreshKey?: number // Key to trigger refresh when updates/evidence change
 }
 
 export default function LocationDetailsModal({
@@ -15,6 +16,7 @@ export default function LocationDetailsModal({
     onClose,
     location,
     onLocationClick,
+    refreshKey,
 }: LocationDetailsModalProps) {
     const [kpiUpdates, setKpiUpdates] = useState<KPIUpdate[]>([])
     const [evidence, setEvidence] = useState<Evidence[]>([])
@@ -43,7 +45,7 @@ export default function LocationDetailsModal({
             setKpiUpdates([])
             setEvidence([])
         }
-    }, [isOpen, location?.id])
+    }, [isOpen, location?.id, refreshKey])
 
     if (!isOpen || !location) return null
 

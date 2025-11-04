@@ -180,7 +180,6 @@ export interface CreateKPIForm {
     category: 'input' | 'output' | 'impact';
     initiative_id?: string;
     umbrella_kpi_id?: string;
-    location_ids?: string[]; // Array of location IDs to associate with this KPI
 }
 
 export interface CreateKPIUpdateForm {

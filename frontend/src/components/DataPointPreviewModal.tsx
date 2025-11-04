@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { X, Calendar, BarChart3, Edit, Trash2, MessageSquare, FileText, Eye } from 'lucide-react'
+import { X, Calendar, BarChart3, Edit, Trash2, MessageSquare, FileText, Eye, MapPin, Users } from 'lucide-react'
 import { formatDate, getEvidenceTypeInfo } from '../utils'
 import { apiService } from '../services/api'
-import { Evidence } from '../types'
+import { Evidence, Location, BeneficiaryGroup } from '../types'
 
 interface DataPointPreviewModalProps {
     isOpen: boolean
@@ -23,12 +23,22 @@ export default function DataPointPreviewModal({
 }: DataPointPreviewModalProps) {
     const [linkedEvidence, setLinkedEvidence] = useState<Evidence[]>([])
     const [loadingEvidence, setLoadingEvidence] = useState(false)
+    const [location, setLocation] = useState<Location | null>(null)
+    const [loadingLocation, setLoadingLocation] = useState(false)
+    const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
+    const [loadingBeneficiaries, setLoadingBeneficiaries] = useState(false)
 
     useEffect(() => {
         if (isOpen && dataPoint?.id) {
             loadLinkedEvidence()
+            if (dataPoint.location_id) {
+                loadLocation()
+            } else {
+                setLocation(null)
+            }
+            loadBeneficiaryGroups()
         }
-    }, [isOpen, dataPoint?.id])
+    }, [isOpen, dataPoint?.id, dataPoint?.location_id])
 
     const loadLinkedEvidence = async () => {
         if (!dataPoint?.id) return
@@ -41,6 +51,34 @@ export default function DataPointPreviewModal({
             setLinkedEvidence([])
         } finally {
             setLoadingEvidence(false)
+        }
+    }
+
+    const loadLocation = async () => {
+        if (!dataPoint?.location_id) return
+        try {
+            setLoadingLocation(true)
+            const loc = await apiService.getLocation(dataPoint.location_id)
+            setLocation(loc)
+        } catch (error) {
+            console.error('Failed to load location:', error)
+            setLocation(null)
+        } finally {
+            setLoadingLocation(false)
+        }
+    }
+
+    const loadBeneficiaryGroups = async () => {
+        if (!dataPoint?.id) return
+        try {
+            setLoadingBeneficiaries(true)
+            const groups = await apiService.getBeneficiaryGroupsForUpdate(dataPoint.id)
+            setBeneficiaryGroups(groups || [])
+        } catch (error) {
+            console.error('Failed to load beneficiary groups:', error)
+            setBeneficiaryGroups([])
+        } finally {
+            setLoadingBeneficiaries(false)
         }
     }
 
@@ -128,6 +166,62 @@ export default function DataPointPreviewModal({
                                 <h3 className="text-sm font-semibold text-gray-900">Note</h3>
                             </div>
                             <p className="text-gray-700 whitespace-pre-wrap">{dataPoint.note}</p>
+                        </div>
+                    )}
+
+                    {/* Location */}
+                    {dataPoint.location_id && (
+                        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                            <div className="flex items-center space-x-2 mb-2">
+                                <MapPin className="w-4 h-4 text-gray-600" />
+                                <h3 className="text-sm font-semibold text-gray-900">Location</h3>
+                            </div>
+                            {loadingLocation ? (
+                                <div className="text-center py-2">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mx-auto"></div>
+                                </div>
+                            ) : location ? (
+                                <div className="space-y-1">
+                                    <p className="text-gray-700 font-medium">{location.name}</p>
+                                    {location.description && (
+                                        <p className="text-sm text-gray-600">{location.description}</p>
+                                    )}
+                                    {location.latitude && location.longitude && (
+                                        <p className="text-xs text-gray-500">
+                                            Coordinates: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+                                        </p>
+                                    )}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-gray-500">Location not found</p>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Beneficiary Groups */}
+                    {beneficiaryGroups.length > 0 && (
+                        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                            <div className="flex items-center space-x-2 mb-3">
+                                <Users className="w-4 h-4 text-gray-600" />
+                                <h3 className="text-sm font-semibold text-gray-900">Beneficiary Groups</h3>
+                                <span className="text-xs text-gray-500">({beneficiaryGroups.length})</span>
+                            </div>
+                            {loadingBeneficiaries ? (
+                                <div className="text-center py-2">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mx-auto"></div>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {beneficiaryGroups.map((group) => (
+                                        <div key={group.id} className="bg-white rounded-lg p-3 border border-gray-200">
+                                            <p className="text-sm font-medium text-gray-900">{group.name}</p>
+                                            {group.description && (
+                                                <p className="text-xs text-gray-600 mt-1">{group.description}</p>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 

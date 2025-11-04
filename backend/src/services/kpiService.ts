@@ -3,31 +3,13 @@ import { KPI, KPIUpdate, KPIWithEvidence } from '../types';
 
 export class KPIService {
     static async create(kpi: KPI, userId: string): Promise<KPI> {
-        // Support optional location_ids on creation
-        const { location_ids, ...insertData } = (kpi as any)
-
         const { data, error } = await supabase
             .from('kpis')
-            .insert([{ ...insertData, user_id: userId }])
+            .insert([{ ...kpi, user_id: userId }])
             .select()
             .single();
 
         if (error) throw new Error(`Failed to create KPI: ${error.message}`);
-
-        // Link to locations if provided
-        if (Array.isArray(location_ids) && location_ids.length > 0 && data.id) {
-            const links = location_ids.map((locationId: string) => ({
-                kpi_id: data.id,
-                location_id: locationId
-            }))
-
-            const { error: linkError } = await supabase
-                .from('kpi_locations')
-                .insert(links)
-
-            if (linkError) throw new Error(`Failed to link KPI to locations: ${linkError.message}`)
-        }
-
         return data;
     }
 
@@ -41,50 +23,10 @@ export class KPIService {
             query = query.eq('initiative_id', initiativeId);
         }
 
-        const { data: kpisData, error } = await query.order('created_at', { ascending: false });
+        const { data, error } = await query.order('created_at', { ascending: false });
 
         if (error) throw new Error(`Failed to fetch KPIs: ${error.message}`);
-        
-        // If no KPIs, return empty array
-        if (!kpisData || kpisData.length === 0) {
-            return []
-        }
-
-        // Fetch location associations separately to avoid PostgREST relationship issues
-        const kpiIds = kpisData.map(k => k.id)
-        const { data: locationLinks } = await supabase
-            .from('kpi_locations')
-            .select('kpi_id, location_id, locations(id, name, latitude, longitude)')
-            .in('kpi_id', kpiIds)
-
-        // Group location links by KPI ID
-        const locationsByKPI: Record<string, any[]> = {}
-        if (locationLinks) {
-            locationLinks.forEach((link: any) => {
-                if (!locationsByKPI[link.kpi_id]) {
-                    locationsByKPI[link.kpi_id] = []
-                }
-                if (link.locations) {
-                    locationsByKPI[link.kpi_id].push({
-                        location_id: link.location_id,
-                        ...link.locations
-                    })
-                }
-            })
-        }
-
-        // Transform the data to include location_ids and locations
-        return kpisData.map((kpi: any) => {
-            const links = locationsByKPI[kpi.id] || []
-            const locationIds = links.map((l: any) => l.location_id)
-            const locations = links.map((l: any) => ({ id: l.id, name: l.name, latitude: l.latitude, longitude: l.longitude }))
-            
-            return {
-                ...kpi,
-                location_ids: locationIds,
-                locations: locations
-            }
-        })
+        return data || [];
     }
 
     static async getWithEvidence(userId: string, initiativeId?: string): Promise<KPIWithEvidence[]> {
@@ -106,41 +48,9 @@ export class KPIService {
         const { data, error } = await query.order('created_at', { ascending: false });
 
         if (error) throw new Error(`Failed to fetch KPIs with evidence: ${error.message}`);
-        
-        // Fetch location associations separately
-        const kpiIds = (data || []).map((k: any) => k.id)
-        let locationLinks: any[] = []
-        if (kpiIds.length > 0) {
-            const { data: links } = await supabase
-                .from('kpi_locations')
-                .select('kpi_id, location_id, locations(id, name, latitude, longitude)')
-                .in('kpi_id', kpiIds)
-            locationLinks = links || []
-        }
-
-        // Group location links by KPI ID
-        const locationsByKPI: Record<string, any[]> = {}
-        if (locationLinks) {
-            locationLinks.forEach((link: any) => {
-                if (!locationsByKPI[link.kpi_id]) {
-                    locationsByKPI[link.kpi_id] = []
-                }
-                if (link.locations) {
-                    locationsByKPI[link.kpi_id].push({
-                        location_id: link.location_id,
-                        ...link.locations
-                    })
-                }
-            })
-        }
 
         // Use the same per-data-point completion logic from getEvidenceByDates
         const kpisWithEvidence = await Promise.all((data || []).map(async (kpi: any) => {
-            // Extract location data from separate query
-            const links = locationsByKPI[kpi.id] || []
-            const locationIds = links.map((l: any) => l.location_id)
-            const locations = links.map((l: any) => ({ id: l.id, name: l.name, latitude: l.latitude, longitude: l.longitude }))
-            
             try {
                 // Get detailed evidence data for this KPI using our improved method
                 const evidenceByDates = await this.getEvidenceByDates(kpi.id, userId);
@@ -180,9 +90,7 @@ export class KPIService {
                     total_value: total_value,
                     evidence_percentage: evidencePercentage,
                     evidence_types: evidenceTypes,
-                    latest_update: updates.length > 0 ? updates[0] : null,
-                    location_ids: locationIds,
-                    locations: locations
+                    latest_update: updates.length > 0 ? updates[0] : null
                 };
             } catch (error) {
                 // Fallback to simple calculation if getEvidenceByDates fails
@@ -228,9 +136,7 @@ export class KPIService {
                     total_value: total_value,
                     evidence_percentage: evidencePercentage,
                     evidence_types: evidenceTypes,
-                    latest_update: updates.length > 0 ? updates[0] : null,
-                    location_ids: locationIds,
-                    locations: locations
+                    latest_update: updates.length > 0 ? updates[0] : null
                 };
             }
         }));
@@ -250,62 +156,19 @@ export class KPIService {
             if (error.code === 'PGRST116') return null;
             throw new Error(`Failed to fetch KPI: ${error.message}`);
         }
-        
-        if (!data) return null
-        
-        // Fetch location associations separately
-        const { data: locationLinks } = await supabase
-            .from('kpi_locations')
-            .select('location_id, locations(id, name, latitude, longitude)')
-            .eq('kpi_id', id)
-
-        // Transform location data
-        const links = locationLinks || []
-        const locationIds = links.map((l: any) => l.location_id)
-        const locations = links.map((l: any) => l.locations).filter(Boolean)
-        
-        return {
-            ...data,
-            location_ids: locationIds,
-            locations: locations
-        }
+        return data;
     }
 
     static async update(id: string, updates: Partial<KPI>, userId: string): Promise<KPI> {
-        // Support optional location_ids on update
-        const { location_ids, ...updateData } = (updates as any)
-
         const { data, error } = await supabase
             .from('kpis')
-            .update(updateData)
+            .update(updates)
             .eq('id', id)
             .eq('user_id', userId)
             .select()
             .single();
 
         if (error) throw new Error(`Failed to update KPI: ${error.message}`);
-
-        // Replace location links if provided
-        if (location_ids !== undefined) {
-            await supabase
-                .from('kpi_locations')
-                .delete()
-                .eq('kpi_id', id)
-
-            if (Array.isArray(location_ids) && location_ids.length > 0) {
-                const links = location_ids.map((locationId: string) => ({
-                    kpi_id: id,
-                    location_id: locationId
-                }))
-
-                const { error: linkError } = await supabase
-                    .from('kpi_locations')
-                    .insert(links)
-
-                if (linkError) throw new Error(`Failed to update location links for KPI: ${linkError.message}`)
-            }
-        }
-
         return data;
     }
 

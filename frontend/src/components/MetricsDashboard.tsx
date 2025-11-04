@@ -36,6 +36,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     const [visibleKPIs, setVisibleKPIs] = useState<Set<string>>(new Set())
     const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false)
     const [locations, setLocations] = useState<Location[]>([])
+    const [mapRefreshKey, setMapRefreshKey] = useState(0) // Key to trigger map refresh
 
     // Master filter state
     const [selectedDate, setSelectedDate] = useState<string>('')
@@ -61,6 +62,16 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
         }
     }, [initiativeId])
 
+    // Refresh map when kpiUpdates change (indicating updates/evidence were modified)
+    const updateIdsHash = React.useMemo(() => {
+        return kpiUpdates.map((u: any) => u.id).sort().join(',')
+    }, [kpiUpdates])
+
+    useEffect(() => {
+        // Increment refresh key when updates change
+        setMapRefreshKey(prev => prev + 1)
+    }, [updateIdsHash]) // Trigger refresh when update IDs change
+
     // Initialize visible KPIs with all KPIs when component mounts or kpis change
     useEffect(() => {
         const filteredKPIs = getFilteredKPIs()
@@ -82,13 +93,12 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     }
 
     const toggleAllKPIs = () => {
-        const filteredKPIs = getFilteredKPIs()
-        if (visibleKPIs.size === filteredKPIs.length) {
+        if (visibleKPIs.size === kpis.length) {
             // If all are visible, hide all
             setVisibleKPIs(new Set())
         } else {
             // Show all
-            setVisibleKPIs(new Set(filteredKPIs.map(kpi => kpi.id)))
+            setVisibleKPIs(new Set(kpis.map(kpi => kpi.id)))
         }
     }
 
@@ -169,15 +179,9 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
 
     // Filter KPIs by selected locations
     const getFilteredKPIs = () => {
-        if (selectedLocations.length === 0) {
-            return kpis
-        }
-
-        // Only show KPIs that are associated with at least one selected location
-        return kpis.filter(kpi => {
-            const kpiLocationIds = kpi.location_ids || []
-            return kpiLocationIds.some((locId: string) => selectedLocations.includes(locId))
-        })
+        // Always return all KPIs - we don't filter KPIs by location
+        // Only impact claims are filtered by location
+        return kpis
     }
 
     // Initialize visible KPIs with all KPIs when component mounts or kpis change
@@ -207,7 +211,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
         const filteredUpdates = getFilteredUpdates()
         const filteredKPIs = getFilteredKPIs()
 
-        if (!filteredKPIs || filteredKPIs.length === 0 || filteredUpdates.length === 0) {
+        if (!filteredKPIs || filteredKPIs.length === 0) {
             return []
         }
 
@@ -702,10 +706,10 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                                     onClick={toggleAllKPIs}
                                                     className="w-full text-left px-2 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 rounded mb-1"
                                                 >
-                                                    {visibleKPIs.size === filteredKPIs.length ? 'Deselect All' : 'Select All'}
+                                                    {visibleKPIs.size === kpis.length ? 'Deselect All' : 'Select All'}
                                                 </button>
                                                 <div className="border-t border-gray-200 my-1"></div>
-                                                {filteredKPIs.map((kpi, index) => (
+                                                {kpis.map((kpi, index) => (
                                                     <label
                                                         key={kpi.id}
                                                         className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
@@ -786,7 +790,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
                                         }}
                                         formatter={(value: any, name: string) => {
-                                            const kpi = filteredKPIs.find(k => k.id === name)
+                                            const kpi = kpis.find(k => k.id === name)
                                             const kpiName = kpi ? kpi.title : name
                                             const unit = kpi?.unit_of_measurement || ''
                                             const formattedValue = typeof value === 'number'
@@ -811,15 +815,15 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                     <Legend
                                         wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
                                         formatter={(value) => {
-                                            const kpi = filteredKPIs.find(k => k.id === value)
+                                            const kpi = kpis.find(k => k.id === value)
                                             return kpi ? kpi.title : value
                                         }}
                                         iconType="line"
                                     />
-                                    {filteredKPIs
+                                    {kpis
                                         .filter(kpi => visibleKPIs.has(kpi.id))
                                         .map((kpi) => {
-                                            const originalIndex = filteredKPIs.findIndex(k => k.id === kpi.id)
+                                            const originalIndex = kpis.findIndex(k => k.id === kpi.id)
                                             return (
                                                 <Line
                                                     key={kpi.id}
@@ -869,6 +873,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                     onNavigateToLocations()
                                 }
                             }}
+                            refreshKey={mapRefreshKey}
                         />
                     </div>
                 </div>

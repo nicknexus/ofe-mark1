@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { X, Calendar, Hash, MapPin, FileText, Users } from 'lucide-react'
+import { X, Calendar, Hash, MapPin, FileText, Users, Plus } from 'lucide-react'
 import { CreateKPIUpdateForm, BeneficiaryGroup, Location } from '../types'
 import { apiService } from '../services/api'
+import LocationModal from './LocationModal'
+import toast from 'react-hot-toast'
 
 interface AddKPIUpdateModalProps {
     isOpen: boolean
@@ -12,6 +14,7 @@ interface AddKPIUpdateModalProps {
     metricType: 'number' | 'percentage'
     unitOfMeasurement: string
     initiativeId?: string
+    editData?: any // Optional prop for editing existing KPI update
 }
 
 export default function AddKPIUpdateModal({
@@ -22,7 +25,8 @@ export default function AddKPIUpdateModal({
     kpiId,
     metricType,
     unitOfMeasurement,
-    initiativeId
+    initiativeId,
+    editData
 }: AddKPIUpdateModalProps) {
     const [formData, setFormData] = useState<CreateKPIUpdateForm>({
         value: 0,
@@ -38,22 +42,63 @@ export default function AddKPIUpdateModal({
     const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
     const [locations, setLocations] = useState<Location[]>([])
     const [selectedLocationId, setSelectedLocationId] = useState<string>('')
+    const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
 
+    // Load data when modal opens
     useEffect(() => {
         if (isOpen) {
+            // Load beneficiary groups
             apiService
-                .getBeneficiaryGroups()
+                .getBeneficiaryGroups(initiativeId)
                 .then((groups) => setBeneficiaryGroups(groups || []))
                 .catch(() => setBeneficiaryGroups([]))
 
+            // Load locations
             if (initiativeId) {
                 apiService
                     .getLocations(initiativeId)
                     .then((locs) => setLocations(locs || []))
                     .catch(() => setLocations([]))
             }
+
+            // If editing, load existing data
+            if (editData) {
+                setFormData({
+                    value: editData.value || 0,
+                    date_represented: editData.date_represented || new Date().toISOString().split('T')[0],
+                    date_range_start: editData.date_range_start,
+                    date_range_end: editData.date_range_end,
+                    note: editData.note || '',
+                    label: editData.label || ''
+                })
+                setIsDateRange(!!(editData.date_range_start && editData.date_range_end))
+                setSelectedLocationId(editData.location_id || '')
+
+                // Load beneficiary groups for this update
+                if (editData.id) {
+                    apiService
+                        .getBeneficiaryGroupsForUpdate(editData.id)
+                        .then((groups: any[]) => {
+                            setSelectedGroupIds(groups.map((g: any) => g.id))
+                        })
+                        .catch(() => setSelectedGroupIds([]))
+                }
+            } else {
+                // Reset form for new update
+                setFormData({
+                    value: 0,
+                    date_represented: new Date().toISOString().split('T')[0],
+                    date_range_start: undefined,
+                    date_range_end: undefined,
+                    note: '',
+                    label: ''
+                })
+                setIsDateRange(false)
+                setSelectedGroupIds([])
+                setSelectedLocationId('')
+            }
         }
-    }, [isOpen, initiativeId])
+    }, [isOpen, initiativeId, editData])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -80,17 +125,20 @@ export default function AddKPIUpdateModal({
                 beneficiary_group_ids: selectedGroupIds,
                 location_id: selectedLocationId || undefined
             })
-            setFormData({
-                value: 0,
-                date_represented: new Date().toISOString().split('T')[0],
-                date_range_start: undefined,
-                date_range_end: undefined,
-                note: '',
-                label: ''
-            })
-            setIsDateRange(false)
-            setSelectedGroupIds([])
-            setSelectedLocationId('')
+            // Only reset if creating new (not editing)
+            if (!editData) {
+                setFormData({
+                    value: 0,
+                    date_represented: new Date().toISOString().split('T')[0],
+                    date_range_start: undefined,
+                    date_range_end: undefined,
+                    note: '',
+                    label: ''
+                })
+                setIsDateRange(false)
+                setSelectedGroupIds([])
+                setSelectedLocationId('')
+            }
             onClose()
         } finally {
             setLoading(false)
@@ -127,7 +175,9 @@ export default function AddKPIUpdateModal({
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
                     <div>
-                        <h2 className="text-xl font-semibold text-gray-900">Add Data Update</h2>
+                        <h2 className="text-xl font-semibold text-gray-900">
+                            {editData ? 'Edit Data Update' : 'Add Data Update'}
+                        </h2>
                         <p className="text-sm text-gray-600 mt-1">{kpiTitle}</p>
                     </div>
                     <button
@@ -289,15 +339,11 @@ export default function AddKPIUpdateModal({
                             <MapPin className="w-4 h-4 inline mr-2" />
                             Location (optional)
                         </label>
-                        {locations.length === 0 ? (
-                            <p className="text-xs text-gray-500">
-                                No locations yet. Add locations in the Locations tab.
-                            </p>
-                        ) : (
+                        <div className="flex gap-2">
                             <select
                                 value={selectedLocationId}
                                 onChange={(e) => setSelectedLocationId(e.target.value)}
-                                className="input-field"
+                                className="input-field flex-1"
                             >
                                 <option value="">Select a location...</option>
                                 {locations.map((location) => (
@@ -306,7 +352,17 @@ export default function AddKPIUpdateModal({
                                     </option>
                                 ))}
                             </select>
-                        )}
+                            {initiativeId && (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsLocationModalOpen(true)}
+                                    className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700 flex items-center gap-1"
+                                    title="Add new location"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {/* Beneficiary Groups */}
@@ -354,10 +410,32 @@ export default function AddKPIUpdateModal({
                             className="btn-primary flex-1"
                             disabled={loading || formData.value === 0}
                         >
-                            {loading ? 'Adding...' : 'Add Update'}
+                            {loading ? (editData ? 'Updating...' : 'Adding...') : (editData ? 'Update' : 'Add Update')}
                         </button>
                     </div>
                 </form>
+
+                {/* Location Creation Modal */}
+                {initiativeId && (
+                    <LocationModal
+                        isOpen={isLocationModalOpen}
+                        onClose={() => setIsLocationModalOpen(false)}
+                        onSubmit={async (locationData) => {
+                            try {
+                                const newLocation = await apiService.createLocation(locationData)
+                                setLocations([...locations, newLocation])
+                                setSelectedLocationId(newLocation.id!)
+                                setIsLocationModalOpen(false)
+                                toast.success('Location created successfully!')
+                            } catch (error) {
+                                const message = error instanceof Error ? error.message : 'Failed to create location'
+                                toast.error(message)
+                                throw error
+                            }
+                        }}
+                        initiativeId={initiativeId}
+                    />
+                )}
             </div>
         </div>
     )

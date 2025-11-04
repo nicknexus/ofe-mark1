@@ -13,7 +13,8 @@ import {
     Calendar,
     Target,
     X,
-    Eye
+    Eye,
+    MapPin
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
 import { getCategoryColor, parseLocalDate, isSameDay, compareDates } from '../utils'
@@ -35,6 +36,7 @@ interface ExpandableKPICardProps {
     onDelete: () => void
     kpiUpdates?: any[] // Add KPI updates data for this specific KPI
     initiativeId?: string // Initiative ID for fetching evidence
+    onRefresh?: () => void // Optional callback to refresh data after updates
 }
 
 export default function ExpandableKPICard({
@@ -47,7 +49,8 @@ export default function ExpandableKPICard({
     onEdit,
     onDelete,
     kpiUpdates = [],
-    initiativeId
+    initiativeId,
+    onRefresh
 }: ExpandableKPICardProps) {
 
     // Lock body scroll when expanded
@@ -79,6 +82,7 @@ export default function ExpandableKPICard({
     const [editingDataPoint, setEditingDataPoint] = useState<any>(null)
     const [evidence, setEvidence] = useState<any[]>([])
     const [loadingEvidence, setLoadingEvidence] = useState(false)
+    const [updateLocations, setUpdateLocations] = useState<Record<string, any>>({})
 
     const handleDataPointClick = (update: any) => {
         setSelectedDataPoint(update)
@@ -97,8 +101,9 @@ export default function ExpandableKPICard({
     useEffect(() => {
         if (isExpanded && kpi.id && initiativeId) {
             loadEvidence()
+            loadUpdateLocations()
         }
-    }, [isExpanded, kpi.id, initiativeId])
+    }, [isExpanded, kpi.id, initiativeId, kpiUpdates])
 
     const loadEvidence = async () => {
         if (!kpi.id || !initiativeId) return
@@ -111,6 +116,38 @@ export default function ExpandableKPICard({
             setEvidence([])
         } finally {
             setLoadingEvidence(false)
+        }
+    }
+
+    const loadUpdateLocations = async () => {
+        if (!kpiUpdates || kpiUpdates.length === 0) return
+
+        // Get unique location IDs from updates
+        const locationIds = [...new Set(kpiUpdates
+            .filter((update: any) => update.location_id)
+            .map((update: any) => update.location_id)
+        )]
+
+        if (locationIds.length === 0) {
+            setUpdateLocations({})
+            return
+        }
+
+        try {
+            const locationPromises = locationIds.map((id: string) =>
+                apiService.getLocation(id).catch(() => null)
+            )
+            const locations = await Promise.all(locationPromises)
+            const locationMap: Record<string, any> = {}
+            locationIds.forEach((id: string, index: number) => {
+                if (locations[index]) {
+                    locationMap[id] = locations[index]
+                }
+            })
+            setUpdateLocations(locationMap)
+        } catch (error) {
+            console.error('Error loading update locations:', error)
+            setUpdateLocations({})
         }
     }
 
@@ -130,7 +167,19 @@ export default function ExpandableKPICard({
         try {
             await apiService.deleteKPIUpdate(dataPoint.id)
             toast.success('Data point deleted successfully!')
-            // TODO: Refresh data - this would need to be passed down as a prop
+
+            // Clear cache and refresh data
+            if (initiativeId) {
+                apiService.clearCache(`/initiatives/${initiativeId}/dashboard`)
+            }
+            apiService.clearCache(`/kpis/${kpi.id}/updates`)
+            onRefresh?.()
+
+            // Reload evidence if expanded
+            if (isExpanded && kpi.id && initiativeId) {
+                loadEvidence()
+            }
+
             setDeleteConfirmDataPoint(null)
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to delete data point'
@@ -143,7 +192,19 @@ export default function ExpandableKPICard({
         try {
             await apiService.updateKPIUpdate(editingDataPoint.id, updateData)
             toast.success('Data point updated successfully!')
-            // TODO: Refresh data - this would need to be passed down as a prop
+
+            // Clear cache and refresh data
+            if (initiativeId) {
+                apiService.clearCache(`/initiatives/${initiativeId}/dashboard`)
+            }
+            apiService.clearCache(`/kpis/${kpi.id}/updates`)
+            onRefresh?.()
+
+            // Reload evidence if expanded
+            if (isExpanded && kpi.id && initiativeId) {
+                loadEvidence()
+            }
+
             setIsEditDataPointModalOpen(false)
             setEditingDataPoint(null)
         } catch (error) {
@@ -164,7 +225,18 @@ export default function ExpandableKPICard({
         try {
             await apiService.deleteEvidence(evidence.id)
             toast.success('Evidence deleted successfully!')
-            // TODO: Refresh data - this would need to be passed down as a prop
+
+            // Clear cache and refresh data
+            if (initiativeId) {
+                apiService.clearCache(`/initiatives/${initiativeId}/dashboard`)
+            }
+            onRefresh?.()
+
+            // Reload evidence if expanded
+            if (isExpanded && kpi.id && initiativeId) {
+                loadEvidence()
+            }
+
             setDeleteConfirmEvidence(null)
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to delete evidence'
@@ -177,7 +249,18 @@ export default function ExpandableKPICard({
         try {
             await apiService.updateEvidence(selectedEvidence.id, evidenceData)
             toast.success('Evidence updated successfully!')
-            // TODO: Refresh data - this would need to be passed down as a prop
+
+            // Clear cache and refresh data
+            if (initiativeId) {
+                apiService.clearCache(`/initiatives/${initiativeId}/dashboard`)
+            }
+            onRefresh?.()
+
+            // Reload evidence if expanded
+            if (isExpanded && kpi.id && initiativeId) {
+                loadEvidence()
+            }
+
             setIsEditEvidenceModalOpen(false)
             setSelectedEvidence(null)
         } catch (error) {
@@ -705,6 +788,8 @@ export default function ExpandableKPICard({
                                                     ? `${new Date(update.date_range_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(update.date_range_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
                                                     : new Date(update.date_represented).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
+                                                const updateLocation = update.location_id ? updateLocations[update.location_id] : null
+
                                                 return (
                                                     <div
                                                         key={update.id || index}
@@ -722,6 +807,12 @@ export default function ExpandableKPICard({
                                                                     <Calendar className="w-3 h-3 text-gray-400" />
                                                                     <span className="text-xs text-gray-500">{displayDate}</span>
                                                                 </div>
+                                                                {updateLocation && (
+                                                                    <div className="flex items-center space-x-1 mt-0.5">
+                                                                        <MapPin className="w-3 h-3 text-gray-400" />
+                                                                        <span className="text-xs text-gray-500">{updateLocation.name}</span>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                             <Eye className="w-3.5 h-3.5 text-gray-400" />
                                                         </div>
@@ -859,6 +950,8 @@ export default function ExpandableKPICard({
                     kpiId={kpi.id}
                     metricType={kpi.metric_type || 'number'}
                     unitOfMeasurement={kpi.unit_of_measurement || ''}
+                    initiativeId={initiativeId}
+                    editData={editingDataPoint}
                 />,
                 document.body
             )}

@@ -359,6 +359,7 @@ export default function InitiativePage() {
                         onDeleteKPI={openDeleteConfirm}
                         onToggleKPIExpansion={toggleKPIExpansion}
                         initiativeId={id}
+                        onRefresh={loadDashboard}
                     />
                 )
             case 'location':

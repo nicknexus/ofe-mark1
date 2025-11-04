@@ -243,7 +243,7 @@ export class EvidenceService {
                 kpi_update_id,
                 kpi_updates(
                     id, value, date_represented, date_range_start, date_range_end,
-                    label, note, created_at, user_id,
+                    label, note, created_at, user_id, location_id,
                     kpis(id, title, unit_of_measurement)
                 )
             `)

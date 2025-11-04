@@ -23,7 +23,26 @@ class ApiService {
     private readonly REQUEST_DELAY = 100 // Minimum delay between requests
 
     private async getAuthHeaders() {
-        const { data: { session } } = await supabase.auth.getSession()
+        // Try to get session immediately (fast path for cached sessions)
+        let { data: { session } } = await supabase.auth.getSession()
+
+        // If no session, wait a bit and retry (session might be restoring from localStorage)
+        if (!session) {
+            await this.sleep(100)
+            const retryResult = await supabase.auth.getSession()
+            session = retryResult.data.session
+        }
+
+        // If still no session, try getUser() which waits for session restoration
+        if (!session) {
+            const { data: { user }, error } = await supabase.auth.getUser()
+            if (error || !user) {
+                throw new Error('No authenticated session')
+            }
+            // getUser() doesn't return session directly, so get it again
+            const finalResult = await supabase.auth.getSession()
+            session = finalResult.data.session
+        }
 
         if (!session) {
             throw new Error('No authenticated session')
@@ -60,10 +79,22 @@ class ApiService {
                     error.message?.includes('429') ||
                     (error.response && error.response.status === 429)
 
-                const isNetworkError = error.message?.includes('Network error') ||
-                    error.message?.includes('Failed to fetch')
+                // Connection refused (server not running) - don't retry
+                const isConnectionRefused = error.message?.includes('Failed to fetch') &&
+                    (error.name === 'TypeError' || error.constructor?.name === 'TypeError')
 
-                // Only retry on 429 (rate limit) or network errors
+                // If connection refused, throw immediately with helpful message
+                if (isConnectionRefused && attempt === 0) {
+                    throw new Error('Backend server is not running. Please start the server at http://localhost:3001')
+                }
+
+                const isNetworkError = !isConnectionRefused && (
+                    error.message?.includes('Network error') ||
+                    error.message?.includes('Failed to fetch')
+                )
+
+                // Only retry on 429 (rate limit) or transient network errors
+                // Don't retry on connection refused (server not running)
                 if (attempt === maxRetries || (!is429Error && !isNetworkError)) {
                     throw error
                 }

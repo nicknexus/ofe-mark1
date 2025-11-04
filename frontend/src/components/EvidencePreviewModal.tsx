@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { X, Calendar, FileText, Camera, MessageSquare, DollarSign, ExternalLink, Download, Edit, BarChart3 } from 'lucide-react'
-import { Evidence } from '../types'
+import { X, Calendar, FileText, Camera, MessageSquare, DollarSign, ExternalLink, Download, Edit, BarChart3, MapPin } from 'lucide-react'
+import { Evidence, Location } from '../types'
 import { formatDate, getEvidenceTypeInfo } from '../utils'
 import { apiService } from '../services/api'
 
@@ -14,12 +14,20 @@ interface EvidencePreviewModalProps {
 export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit }: EvidencePreviewModalProps) {
     const [linkedDataPoints, setLinkedDataPoints] = useState<any[]>([])
     const [loadingDataPoints, setLoadingDataPoints] = useState(false)
+    const [location, setLocation] = useState<Location | null>(null)
+    const [loadingLocation, setLoadingLocation] = useState(false)
+    const [dataPointLocations, setDataPointLocations] = useState<Record<string, Location>>({})
 
     useEffect(() => {
         if (isOpen && evidence?.id) {
             loadLinkedDataPoints()
+            if (evidence.location_id) {
+                loadLocation()
+            } else {
+                setLocation(null)
+            }
         }
-    }, [isOpen, evidence?.id])
+    }, [isOpen, evidence?.id, evidence?.location_id])
 
     const loadLinkedDataPoints = async () => {
         if (!evidence?.id) return
@@ -27,11 +35,47 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
             setLoadingDataPoints(true)
             const dataPoints = await apiService.getDataPointsForEvidence(evidence.id)
             setLinkedDataPoints(dataPoints || [])
+            
+            // Load locations for data points that have location_id
+            const locationIds = dataPoints
+                .filter((dp: any) => dp.location_id)
+                .map((dp: any) => dp.location_id)
+            
+            if (locationIds.length > 0) {
+                const locationPromises = locationIds.map((id: string) =>
+                    apiService.getLocation(id).catch(() => null)
+                )
+                const locations = await Promise.all(locationPromises)
+                const locationMap: Record<string, Location> = {}
+                locationIds.forEach((id: string, index: number) => {
+                    if (locations[index]) {
+                        locationMap[id] = locations[index]
+                    }
+                })
+                setDataPointLocations(locationMap)
+            } else {
+                setDataPointLocations({})
+            }
         } catch (error) {
             console.error('Failed to load linked data points:', error)
             setLinkedDataPoints([])
+            setDataPointLocations({})
         } finally {
             setLoadingDataPoints(false)
+        }
+    }
+
+    const loadLocation = async () => {
+        if (!evidence?.location_id) return
+        try {
+            setLoadingLocation(true)
+            const loc = await apiService.getLocation(evidence.location_id)
+            setLocation(loc)
+        } catch (error) {
+            console.error('Failed to load location:', error)
+            setLocation(null)
+        } finally {
+            setLoadingLocation(false)
         }
     }
 
@@ -157,6 +201,35 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                 </div>
                             </div>
 
+                            {/* Location */}
+                            {evidence.location_id && (
+                                <div>
+                                    <h3 className="text-sm font-medium text-gray-700 mb-2">Location</h3>
+                                    {loadingLocation ? (
+                                        <div className="text-center py-2">
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mx-auto"></div>
+                                        </div>
+                                    ) : location ? (
+                                        <div className="flex items-start space-x-2 text-sm text-gray-600">
+                                            <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                                            <div className="space-y-1">
+                                                <p className="font-medium text-gray-700">{location.name}</p>
+                                                {location.description && (
+                                                    <p className="text-xs text-gray-500">{location.description}</p>
+                                                )}
+                                                {location.latitude && location.longitude && (
+                                                    <p className="text-xs text-gray-500">
+                                                        {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-gray-500">Location not found</p>
+                                    )}
+                                </div>
+                            )}
+
                             {/* File Information */}
                             {evidence.file_url && (
                                 <div>
@@ -217,6 +290,8 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                             const displayDate = hasDateRange
                                                 ? `${formatDate(dataPoint.date_range_start)} - ${formatDate(dataPoint.date_range_end)}`
                                                 : formatDate(dataPoint.date_represented)
+                                            
+                                            const dataPointLocation = dataPoint.location_id ? dataPointLocations[dataPoint.location_id] : null
 
                                             return (
                                                 <div key={dataPoint.id} className="bg-white rounded-lg p-3 border border-gray-200 hover:border-green-300 transition-colors">
@@ -235,6 +310,12 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                                             <Calendar className="w-3 h-3" />
                                                             <span>{displayDate}</span>
                                                         </div>
+                                                        {dataPointLocation && (
+                                                            <div className="flex items-center space-x-1 text-xs text-gray-500 mt-1">
+                                                                <MapPin className="w-3 h-3" />
+                                                                <span>{dataPointLocation.name}</span>
+                                                            </div>
+                                                        )}
                                                         {dataPoint.label && (
                                                             <p className="text-xs text-gray-600 mt-1 line-clamp-1">{dataPoint.label}</p>
                                                         )}

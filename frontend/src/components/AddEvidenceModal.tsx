@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { X, Upload, Calendar, Link as LinkIcon, FileText, Camera, DollarSign, MessageSquare, File, MapPin } from 'lucide-react'
+import { X, Upload, Calendar, Link as LinkIcon, FileText, Camera, DollarSign, MessageSquare, File, MapPin, Plus } from 'lucide-react'
 import { CreateEvidenceForm, KPI, KPIWithEvidence, Location } from '../types'
 import { apiService } from '../services/api'
 import { formatDate } from '../utils'
+import LocationModal from './LocationModal'
+import toast from 'react-hot-toast'
 
 interface AddEvidenceModalProps {
     isOpen: boolean
@@ -48,6 +50,10 @@ export default function AddEvidenceModal({
     const [selectedUpdateIds, setSelectedUpdateIds] = useState<string[]>([])
     const [locations, setLocations] = useState<Location[]>([])
     const [selectedLocationId, setSelectedLocationId] = useState<string>('')
+    const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
+    const [hasChangedDataPoints, setHasChangedDataPoints] = useState(false)
+    const [hasChangedKPIs, setHasChangedKPIs] = useState(false)
+    const [initialKpiIds, setInitialKpiIds] = useState<string[]>([])
 
     const evidenceTypes = [
         { value: 'visual_proof', label: 'Visual Support', icon: Camera, description: 'Photos, videos, screenshots' },
@@ -59,21 +65,75 @@ export default function AddEvidenceModal({
     // Update form data when editData changes
     useEffect(() => {
         if (editData) {
-            setFormData({
-                title: editData.title || '',
-                description: editData.description || '',
-                type: editData.type || 'visual_proof',
-                date_represented: editData.date_represented || new Date().toISOString().split('T')[0],
-                date_range_start: editData.date_range_start,
-                date_range_end: editData.date_range_end,
-                file_url: editData.file_url,
-                kpi_ids: editData.kpi_ids || [],
-                initiative_id: initiativeId
-            })
-            setIsDateRange(editData.date_range_start && editData.date_range_end ? true : false)
-            setSelectedLocationId(editData.location_id || '')
+            // Load full evidence details to ensure we have kpi_ids
+            const loadEvidenceData = async () => {
+                try {
+                    const fullEvidence = await apiService.getEvidenceItem(editData.id)
+                    // Transform evidence_kpis array into kpi_ids array
+                    let kpiIds: string[] = []
+                    if (fullEvidence.kpi_ids && Array.isArray(fullEvidence.kpi_ids)) {
+                        kpiIds = fullEvidence.kpi_ids
+                    } else if (fullEvidence.evidence_kpis && Array.isArray(fullEvidence.evidence_kpis)) {
+                        kpiIds = fullEvidence.evidence_kpis.map((link: any) => link.kpi_id).filter(Boolean)
+                    } else {
+                        kpiIds = editData.kpi_ids || []
+                    }
+
+                    setFormData({
+                        title: fullEvidence.title || editData.title || '',
+                        description: fullEvidence.description || editData.description || '',
+                        type: fullEvidence.type || editData.type || 'visual_proof',
+                        date_represented: fullEvidence.date_represented || editData.date_represented || new Date().toISOString().split('T')[0],
+                        date_range_start: fullEvidence.date_range_start || editData.date_range_start,
+                        date_range_end: fullEvidence.date_range_end || editData.date_range_end,
+                        file_url: fullEvidence.file_url || editData.file_url,
+                        kpi_ids: kpiIds,
+                        initiative_id: initiativeId
+                    })
+                    setIsDateRange((fullEvidence.date_range_start && fullEvidence.date_range_end) || (editData.date_range_start && editData.date_range_end) ? true : false)
+                    setSelectedLocationId(fullEvidence.location_id || editData.location_id || '')
+
+                    // Store initial KPI IDs to track changes
+                    setInitialKpiIds(kpiIds)
+                    setHasChangedKPIs(false)
+
+                    // Load existing linked data points when editing
+                    const dataPoints = await apiService.getDataPointsForEvidence(editData.id)
+                    setSelectedUpdateIds(dataPoints.map((dp: any) => dp.id))
+                    setHasChangedDataPoints(false)
+                } catch (error) {
+                    console.error('Error loading evidence data:', error)
+                    // Fallback to editData if API call fails
+                    const kpiIds = editData.kpi_ids || []
+                    setFormData({
+                        title: editData.title || '',
+                        description: editData.description || '',
+                        type: editData.type || 'visual_proof',
+                        date_represented: editData.date_represented || new Date().toISOString().split('T')[0],
+                        date_range_start: editData.date_range_start,
+                        date_range_end: editData.date_range_end,
+                        file_url: editData.file_url,
+                        kpi_ids: kpiIds,
+                        initiative_id: initiativeId
+                    })
+                    setIsDateRange(editData.date_range_start && editData.date_range_end ? true : false)
+                    setSelectedLocationId(editData.location_id || '')
+                    setInitialKpiIds(kpiIds)
+                    setHasChangedKPIs(false)
+                    setSelectedUpdateIds([])
+                    setHasChangedDataPoints(false)
+                }
+            }
+
+            loadEvidenceData()
+        } else {
+            // Reset for new evidence
+            setSelectedUpdateIds([])
+            setHasChangedDataPoints(false)
+            setInitialKpiIds([])
+            setHasChangedKPIs(false)
         }
-    }, [editData, initiativeId])
+    }, [editData?.id, initiativeId])
 
     // Load locations when modal opens
     useEffect(() => {
@@ -222,7 +282,16 @@ export default function AddEvidenceModal({
             }
 
             // Include selected data points for precise linking
-            submitData.kpi_update_ids = selectedUpdateIds
+            // Only include kpi_update_ids if it's a new evidence or if editing and user has changed selection
+            if (!editData || hasChangedDataPoints) {
+                submitData.kpi_update_ids = selectedUpdateIds
+            }
+
+            // Only include kpi_ids if it's a new evidence or if editing and user has changed KPI selection
+            if (!editData || hasChangedKPIs) {
+                submitData.kpi_ids = formData.kpi_ids
+            }
+
             submitData.location_id = selectedLocationId || undefined
 
             setUploadProgress(editData ? 'Updating evidence record...' : 'Creating evidence record...')
@@ -260,12 +329,24 @@ export default function AddEvidenceModal({
     }
 
     const handleKPISelection = (kpiId: string) => {
-        setFormData(prev => ({
-            ...prev,
-            kpi_ids: (prev.kpi_ids || []).includes(kpiId)
+        setFormData(prev => {
+            const newKpiIds = (prev.kpi_ids || []).includes(kpiId)
                 ? (prev.kpi_ids || []).filter(id => id !== kpiId)
                 : [...(prev.kpi_ids || []), kpiId]
-        }))
+
+            // Check if KPI selection has changed from initial state
+            if (editData) {
+                const sortedNew = [...newKpiIds].sort()
+                const sortedInitial = [...initialKpiIds].sort()
+                const hasChanged = JSON.stringify(sortedNew) !== JSON.stringify(sortedInitial)
+                setHasChangedKPIs(hasChanged)
+            }
+
+            return {
+                ...prev,
+                kpi_ids: newKpiIds
+            }
+        })
     }
 
     const handleFileSelect = (file: File) => {
@@ -499,14 +580,20 @@ export default function AddEvidenceModal({
                                     <button
                                         type="button"
                                         className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
-                                        onClick={() => setSelectedUpdateIds(kpiDataSummaries.flatMap((s: any) => s.updates.map((u: any) => u.id)))}
+                                        onClick={() => {
+                                            setSelectedUpdateIds(kpiDataSummaries.flatMap((s: any) => s.updates.map((u: any) => u.id)))
+                                            if (editData) setHasChangedDataPoints(true)
+                                        }}
                                     >
                                         Select All
                                     </button>
                                     <button
                                         type="button"
                                         className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
-                                        onClick={() => setSelectedUpdateIds([])}
+                                        onClick={() => {
+                                            setSelectedUpdateIds([])
+                                            if (editData) setHasChangedDataPoints(true)
+                                        }}
                                     >
                                         Clear
                                     </button>
@@ -529,7 +616,10 @@ export default function AddEvidenceModal({
                                                         <input
                                                             type="checkbox"
                                                             checked={checked}
-                                                            onChange={() => setSelectedUpdateIds(prev => checked ? prev.filter(id => id !== dataPoint.id) : [...prev, dataPoint.id])}
+                                                            onChange={() => {
+                                                                setSelectedUpdateIds(prev => checked ? prev.filter(id => id !== dataPoint.id) : [...prev, dataPoint.id])
+                                                                if (editData) setHasChangedDataPoints(true)
+                                                            }}
                                                             className="h-4 w-4"
                                                         />
                                                         <span className="font-medium text-gray-900">
@@ -558,15 +648,11 @@ export default function AddEvidenceModal({
                             <MapPin className="w-4 h-4 inline mr-2" />
                             Location (optional)
                         </label>
-                        {locations.length === 0 ? (
-                            <p className="text-xs text-gray-500">
-                                No locations yet. Add locations in the Locations tab.
-                            </p>
-                        ) : (
+                        <div className="flex gap-2">
                             <select
                                 value={selectedLocationId}
                                 onChange={(e) => setSelectedLocationId(e.target.value)}
-                                className="input-field"
+                                className="input-field flex-1"
                             >
                                 <option value="">Select a location...</option>
                                 {locations.map((location) => (
@@ -575,7 +661,15 @@ export default function AddEvidenceModal({
                                     </option>
                                 ))}
                             </select>
-                        )}
+                            <button
+                                type="button"
+                                onClick={() => setIsLocationModalOpen(true)}
+                                className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700 flex items-center gap-1"
+                                title="Add new location"
+                            >
+                                <Plus className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Title and Description */}
@@ -714,12 +808,32 @@ export default function AddEvidenceModal({
                                     className="btn-primary flex-1"
                                     disabled={loading || !formData.title}
                                 >
-                                    {loading ? 'Processing...' : 'Add Evidence'}
+                                    {loading ? 'Processing...' : (editData ? 'Update Evidence' : 'Add Evidence')}
                                 </button>
                             </>
                         )}
                     </div>
                 </form>
+
+                {/* Location Creation Modal */}
+                <LocationModal
+                    isOpen={isLocationModalOpen}
+                    onClose={() => setIsLocationModalOpen(false)}
+                    onSubmit={async (locationData) => {
+                        try {
+                            const newLocation = await apiService.createLocation(locationData)
+                            setLocations([...locations, newLocation])
+                            setSelectedLocationId(newLocation.id!)
+                            setIsLocationModalOpen(false)
+                            toast.success('Location created successfully!')
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : 'Failed to create location'
+                            toast.error(message)
+                            throw error
+                        }
+                    }}
+                    initiativeId={initiativeId}
+                />
             </div>
         </div>
     )
