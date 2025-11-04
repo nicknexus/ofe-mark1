@@ -192,10 +192,10 @@ export default function LocationModal({
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
-            <div className="bg-white rounded-xl max-w-md w-full shadow-xl">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60] animate-fade-in">
+            <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl transform transition-all duration-200 ease-out animate-slide-up-fast">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
                     <div className="flex items-center space-x-3">
                         <div className="p-2 bg-green-100 rounded-lg">
                             <MapPin className="w-5 h-5 text-green-600" />
@@ -211,7 +211,7 @@ export default function LocationModal({
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 p-1 transition-colors"
+                        className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors duration-150"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -237,7 +237,7 @@ export default function LocationModal({
                                 value={searchQuery}
                                 onChange={(e) => handleSearchChange(e.target.value)}
                                 onFocus={() => setShowResults(true)}
-                                className="input-field pl-10"
+                                className="input-field pl-10 transition-all duration-150 hover:border-gray-400"
                                 placeholder="e.g., Central Park, New York or 123 Main St, London"
                             />
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -280,7 +280,7 @@ export default function LocationModal({
                             type="text"
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            className="input-field"
+                            className="input-field transition-all duration-150 hover:border-gray-400"
                             placeholder="e.g., Main Office, School Campus A"
                             required
                         />
@@ -313,7 +313,7 @@ export default function LocationModal({
                                     step="any"
                                     value={formData.latitude}
                                     onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
-                                    className="input-field"
+                                    className="input-field transition-all duration-150 hover:border-gray-400"
                                     placeholder="e.g., 40.7128"
                                     required
                                     min="-90"
@@ -329,7 +329,7 @@ export default function LocationModal({
                                     step="any"
                                     value={formData.longitude}
                                     onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
-                                    className="input-field"
+                                    className="input-field transition-all duration-150 hover:border-gray-400"
                                     placeholder="e.g., -74.0060"
                                     required
                                     min="-180"
@@ -344,14 +344,14 @@ export default function LocationModal({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="btn-secondary flex-1"
+                            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-all duration-150 hover:shadow-md disabled:opacity-50"
                             disabled={loading}
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="btn-primary flex-1 flex items-center justify-center space-x-2"
+                            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-primary-600 to-primary-700 border border-transparent rounded-lg hover:from-primary-700 hover:to-primary-800 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 hover:shadow-lg transform hover:scale-[1.02] flex items-center justify-center space-x-2"
                             disabled={loading}
                         >
                             <Save className="w-4 h-4" />
