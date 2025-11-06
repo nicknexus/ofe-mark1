@@ -75,9 +75,59 @@ export default function DateRangePicker({
     const handleToggle = (e: React.MouseEvent<HTMLButtonElement>) => {
         if (!isOpen && buttonRef.current) {
             const rect = buttonRef.current.getBoundingClientRect()
+            // Height accounts for: header (~40px) + day labels (~30px) + 6 rows (~192px) + preview (~40px) + buttons (~50px) + padding (~32px) = ~384px
+            const dropdownHeight = 384 // Accommodate 6-row months
+            const dropdownWidth = 280 // Approximate width of the calendar dropdown
+            const padding = 8 // Padding from viewport edges
+            
+            // Calculate available space below and above
+            const spaceBelow = window.innerHeight - rect.bottom - padding
+            const spaceAbove = rect.top - padding
+            
+            // Determine if we should show above or below
+            // Prefer position where we have more space, but ensure we have at least dropdownHeight
+            const showAbove = spaceBelow < dropdownHeight && spaceAbove >= dropdownHeight
+            
+            // Calculate vertical position
+            let top: number
+            if (showAbove) {
+                top = rect.top - dropdownHeight - 4
+            } else {
+                top = rect.bottom + 4
+            }
+            
+            // Ensure it doesn't go above viewport
+            top = Math.max(padding, top)
+            
+            // If we don't have enough space, adjust to fit
+            const availableSpace = showAbove ? spaceAbove : spaceBelow
+            if (availableSpace < dropdownHeight) {
+                // If showing below but not enough space, try showing above
+                if (!showAbove && spaceAbove >= dropdownHeight) {
+                    top = rect.top - dropdownHeight - 4
+                } else if (showAbove && spaceBelow >= dropdownHeight) {
+                    top = rect.bottom + 4
+                } else {
+                    // Not enough space in either direction - use available space
+                    top = showAbove ? padding : window.innerHeight - Math.min(dropdownHeight, availableSpace) - padding
+                }
+            }
+            
+            // Ensure it doesn't overflow viewport
+            top = Math.max(padding, Math.min(top, window.innerHeight - Math.min(dropdownHeight, availableSpace) - padding))
+            
+            // Calculate horizontal position (prevent overflow)
+            let left = rect.left
+            // If dropdown would overflow right edge, align to right
+            if (left + dropdownWidth > window.innerWidth - padding) {
+                left = window.innerWidth - dropdownWidth - padding
+            }
+            // Ensure it doesn't go below left edge
+            left = Math.max(padding, left)
+            
             setDropdownPosition({
-                top: rect.bottom + 4,
-                left: rect.left
+                top,
+                left
             })
             // Reset to current month when opening
             setCurrentMonth(new Date())
@@ -244,15 +294,17 @@ export default function DateRangePicker({
                     />
                     {/* Calendar dropdown */}
                     <div 
-                        className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] p-4 min-w-[280px]"
+                        className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] min-w-[280px] flex flex-col"
                         style={{
                             top: `${dropdownPosition.top}px`,
-                            left: `${dropdownPosition.left}px`
+                            left: `${dropdownPosition.left}px`,
+                            height: '384px',
+                            maxHeight: `${Math.min(384, window.innerHeight - Math.max(dropdownPosition.top, 8) - 8)}px`
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                    {/* Header */}
-                    <div className="flex items-center justify-between mb-4">
+                    {/* Header - Fixed */}
+                    <div className="flex items-center justify-between p-4 pb-2 flex-shrink-0">
                         <button
                             type="button"
                             onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
@@ -275,8 +327,8 @@ export default function DateRangePicker({
                         </button>
                     </div>
 
-                    {/* Day labels */}
-                    <div className="grid grid-cols-7 gap-1 mb-2">
+                    {/* Day labels - Fixed */}
+                    <div className="grid grid-cols-7 gap-1 px-4 pb-2 flex-shrink-0">
                         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
                             <div key={day} className="text-center text-xs font-medium text-gray-500 py-1">
                                 {day}
@@ -284,69 +336,74 @@ export default function DateRangePicker({
                         ))}
                     </div>
 
-                    {/* Calendar grid */}
-                    <div className="grid grid-cols-7 gap-1">
-                        {days.map((day, idx) => {
-                            const isCurrentMonth = isSameMonth(day, currentMonth)
-                            const isToday = isSameDay(day, today)
-                            const isSelected = isDateSelected(day)
-                            const isInRange = isDateInRange(day)
-                            const isDisabled = isAfter(day, maxDateObj)
-                            const isStart = previewStartDate && isSameDay(day, previewStartDate)
-                            const isEnd = previewEndDate && isSameDay(day, previewEndDate)
+                    {/* Calendar grid - Flexible height with scroll fallback */}
+                    <div className="px-4 flex-1 min-h-0 overflow-y-auto">
+                        <div className="grid grid-cols-7 gap-1 pb-2">
+                            {days.map((day, idx) => {
+                                const isCurrentMonth = isSameMonth(day, currentMonth)
+                                const isToday = isSameDay(day, today)
+                                const isSelected = isDateSelected(day)
+                                const isInRange = isDateInRange(day)
+                                const isDisabled = isAfter(day, maxDateObj)
+                                const isStart = previewStartDate && isSameDay(day, previewStartDate)
+                                const isEnd = previewEndDate && isSameDay(day, previewEndDate)
 
-                            return (
-                                <button
-                                    key={idx}
-                                    type="button"
-                                    onClick={() => handleDateClick(day)}
-                                    disabled={isDisabled}
-                                    className={`
-                                        relative h-8 w-8 text-xs rounded transition-colors
-                                        ${!isCurrentMonth ? 'text-gray-300' : ''}
-                                        ${isDisabled ? 'cursor-not-allowed opacity-30' : 'hover:bg-gray-100 cursor-pointer'}
-                                        ${isInRange ? 'bg-blue-50' : ''}
-                                        ${isSelected ? 'bg-blue-600 text-white font-semibold' : ''}
-                                        ${isToday && !isSelected ? 'ring-2 ring-blue-400' : ''}
-                                        ${isStart && isEnd ? 'rounded-full' : ''}
-                                        ${isStart && !isEnd ? 'rounded-l-full' : ''}
-                                        ${isEnd && !isStart ? 'rounded-r-full' : ''}
-                                    `}
-                                >
-                                    {format(day, 'd')}
-                                </button>
-                            )
-                        })}
+                                return (
+                                    <button
+                                        key={idx}
+                                        type="button"
+                                        onClick={() => handleDateClick(day)}
+                                        disabled={isDisabled}
+                                        className={`
+                                            relative h-8 w-8 text-xs rounded transition-colors
+                                            ${!isCurrentMonth ? 'text-gray-300' : ''}
+                                            ${isDisabled ? 'cursor-not-allowed opacity-30' : 'hover:bg-gray-100 cursor-pointer'}
+                                            ${isInRange ? 'bg-blue-50' : ''}
+                                            ${isSelected ? 'bg-blue-600 text-white font-semibold' : ''}
+                                            ${isToday && !isSelected ? 'ring-2 ring-blue-400' : ''}
+                                            ${isStart && isEnd ? 'rounded-full' : ''}
+                                            ${isStart && !isEnd ? 'rounded-l-full' : ''}
+                                            ${isEnd && !isStart ? 'rounded-r-full' : ''}
+                                        `}
+                                    >
+                                        {format(day, 'd')}
+                                    </button>
+                                )
+                            })}
+                        </div>
                     </div>
 
-                    {/* Preview text */}
-                    {previewStartDate && (
-                        <div className="mt-3 p-2 bg-blue-50 rounded text-xs text-blue-700 text-center">
-                            {getPreviewText()}
-                        </div>
-                    )}
+                    {/* Preview text and buttons - Fixed at bottom */}
+                    <div className="p-4 pt-2 flex-shrink-0 border-t border-gray-100">
+                        {/* Preview text */}
+                        {previewStartDate && (
+                            <div className="mb-3 p-2 bg-blue-50 rounded text-xs text-blue-700 text-center">
+                                {getPreviewText()}
+                            </div>
+                        )}
 
-                    {/* Apply button */}
-                    <div className="mt-4 flex gap-2">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setIsOpen(false)
-                                setTempStartDate(appliedStartDate)
-                                setTempEndDate(appliedEndDate)
-                            }}
-                            className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleApply}
-                            disabled={!previewStartDate}
-                            className="flex-1 px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Apply
-                        </button>
+                        {/* Apply button */}
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsOpen(false)
+                                    setTempStartDate(appliedStartDate)
+                                    setTempEndDate(appliedEndDate)
+                                }}
+                                className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleApply}
+                                disabled={!previewStartDate}
+                                className="flex-1 px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Apply
+                            </button>
+                        </div>
                     </div>
                 </div>
                 </>,

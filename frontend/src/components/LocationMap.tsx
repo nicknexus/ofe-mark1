@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap, Tooltip } from 'react-leaflet'
 import { createPortal } from 'react-dom'
 import L from 'leaflet'
 import { MapPin, X, Info, BarChart3, FileText, Loader2 } from 'lucide-react'
@@ -265,7 +265,11 @@ function LocationMarker({
                 mouseover: onMarkerMouseEnter,
                 mouseout: onMarkerMouseLeave,
             }}
-        />
+        >
+            <Tooltip permanent={false} direction="top" offset={[0, -10]}>
+                {location.name}
+            </Tooltip>
+        </Marker>
     )
 }
 
@@ -439,7 +443,7 @@ export default function LocationMap({
             ref={mapContainerRef}
             className="relative w-full h-full rounded-lg overflow-hidden border-2 border-gray-300/60 bg-gradient-to-br from-blue-50 via-indigo-50/30 to-cyan-50 shadow-inner"
         >
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-100/20 via-white/40 to-green-100/20 pointer-events-none z-[400]" />
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-100/20 via-white/40 to-green-100/20 pointer-events-none z-[1]" />
             
             <MapContainer
                 center={center}
@@ -765,7 +769,7 @@ export default function LocationMap({
             />
 
             {/* Zoom Controls */}
-            <div className="absolute bottom-4 right-4 flex flex-col space-y-2 z-[700]">
+            <div className="absolute bottom-4 right-4 flex flex-col space-y-2 z-[50]">
                 <button
                     onClick={handleZoomIn}
                     className="w-10 h-10 bg-white border border-gray-200 rounded-lg shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors text-gray-700 font-bold text-lg pointer-events-auto"
@@ -782,7 +786,7 @@ export default function LocationMap({
 
             {/* Empty State */}
             {locations.length === 0 && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-blue-50/90 via-white/90 to-green-50/90 backdrop-blur-sm z-[800]">
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-blue-50/90 via-white/90 to-green-50/90 z-0 pointer-events-none">
                     <div className="text-center p-8">
                         <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                             <MapPin className="w-8 h-8 text-green-600" />

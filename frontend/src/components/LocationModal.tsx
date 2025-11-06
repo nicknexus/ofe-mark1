@@ -51,6 +51,18 @@ export default function LocationModal({
     const [showResults, setShowResults] = useState(false)
     const searchRef = useRef<HTMLDivElement>(null)
 
+    // Add/remove body class to dim map when modal is open
+    useEffect(() => {
+        if (isOpen) {
+            document.body.classList.add('location-modal-open')
+        } else {
+            document.body.classList.remove('location-modal-open')
+        }
+        return () => {
+            document.body.classList.remove('location-modal-open')
+        }
+    }, [isOpen])
+
     // Debounced search function
     const debouncedSearch = useRef(
         debounce(async (query: string) => {
@@ -192,7 +204,7 @@ export default function LocationModal({
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60] animate-fade-in">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[200] animate-fade-in">
             <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl transform transition-all duration-200 ease-out animate-slide-up-fast">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">

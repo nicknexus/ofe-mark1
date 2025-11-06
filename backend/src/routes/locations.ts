@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { LocationService } from '../services/locationService';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
+import { supabase } from '../utils/supabase';
 
 const router = Router();
 
@@ -74,6 +75,30 @@ router.get('/:id/evidence', authenticateUser, async (req: AuthenticatedRequest, 
     try {
         const evidence = await LocationService.getEvidenceByLocation(req.params.id, req.user!.id);
         res.json(evidence);
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// Update display order for multiple locations
+router.post('/update-order', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const { order } = req.body; // Array of { id: string, display_order: number }
+        if (!Array.isArray(order)) {
+            res.status(400).json({ error: 'Order must be an array' });
+            return;
+        }
+        
+        const updates = order.map((item: { id: string; display_order: number }) => 
+            supabase
+                .from('locations')
+                .update({ display_order: item.display_order })
+                .eq('id', item.id)
+                .eq('user_id', req.user!.id)
+        );
+        
+        await Promise.all(updates);
+        res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
     }

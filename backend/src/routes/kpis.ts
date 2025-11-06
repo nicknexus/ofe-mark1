@@ -123,4 +123,29 @@ router.get('/:id/evidence-by-dates', authenticateUser, async (req: Authenticated
     }
 });
 
+// Update display order for multiple KPIs
+router.post('/update-order', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const { order } = req.body; // Array of { id: string, display_order: number }
+        if (!Array.isArray(order)) {
+            res.status(400).json({ error: 'Order must be an array' });
+            return;
+        }
+        
+        const { supabase } = require('../utils/supabase');
+        const updates = order.map((item: { id: string; display_order: number }) => 
+            supabase
+                .from('kpis')
+                .update({ display_order: item.display_order })
+                .eq('id', item.id)
+                .eq('user_id', req.user!.id)
+        );
+        
+        await Promise.all(updates);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
 export default router; 

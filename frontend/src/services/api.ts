@@ -321,6 +321,13 @@ class ApiService {
         })
     }
 
+    async updateKPIOrder(order: Array<{ id: string; display_order: number }>): Promise<void> {
+        return this.request<void>('/kpis/update-order', {
+            method: 'POST',
+            body: JSON.stringify({ order })
+        })
+    }
+
     // KPI Updates
     async getKPIUpdates(kpiId: string): Promise<KPIUpdate[]> {
         const result = await this.request<KPIUpdate[]>(`/kpis/${kpiId}/updates`)
@@ -451,6 +458,13 @@ class ApiService {
         })
     }
 
+    async updateBeneficiaryGroupOrder(order: Array<{ id: string; display_order: number }>): Promise<void> {
+        return this.request<void>('/beneficiaries/update-order', {
+            method: 'POST',
+            body: JSON.stringify({ order })
+        })
+    }
+
     async replaceKPIUpdateBeneficiaries(kpiUpdateId: string, groupIds: string[]) {
         return this.request('/beneficiaries/link-kpi-update', {
             method: 'POST',
@@ -518,6 +532,13 @@ class ApiService {
     async deleteLocation(id: string): Promise<void> {
         return this.request<void>(`/locations/${id}`, {
             method: 'DELETE'
+        })
+    }
+
+    async updateLocationOrder(order: Array<{ id: string; display_order: number }>): Promise<void> {
+        return this.request<void>('/locations/update-order', {
+            method: 'POST',
+            body: JSON.stringify({ order })
         })
     }
 

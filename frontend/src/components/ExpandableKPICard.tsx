@@ -734,6 +734,39 @@ export default function ExpandableKPICard({
                             </div>
                         </div>
 
+                        {/* Evidence Type Icons Row - Below Stats Cards */}
+                        <div className="flex items-center justify-between gap-2 h-10 bg-gray-50/50 border border-gray-200 rounded-lg px-3 py-1">
+                            {(['visual_proof', 'documentation', 'testimony', 'financials'] as const).map((type) => {
+                                const IconComponent = getEvidenceIcon(type)
+                                const typeInfo = getEvidenceTypeInfo(type)
+                                const percentage = evidenceTypePercentages[type].percentage
+
+                                // Extract color classes from typeInfo
+                                const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' :
+                                    typeInfo.color.includes('blue') ? 'text-blue-600' :
+                                        typeInfo.color.includes('orange') ? 'text-orange-600' :
+                                            typeInfo.color.includes('green') ? 'text-green-600' :
+                                                'text-gray-600'
+
+                                return (
+                                    <div
+                                        key={type}
+                                        className="flex items-center gap-1.5 flex-1 min-w-0"
+                                    >
+                                        <IconComponent className={`w-3.5 h-3.5 ${colorClasses} flex-shrink-0`} />
+                                        <div className="flex flex-col items-start min-w-0 flex-1 overflow-hidden">
+                                            <span className="text-[9px] font-medium text-gray-700 truncate w-full leading-tight">
+                                                {typeInfo.label}
+                                            </span>
+                                            <span className="text-[8px] font-bold text-gray-600 leading-tight whitespace-nowrap">
+                                                {percentage}%
+                                            </span>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+
                         {/* Chart and Data Sections - 3/5 chart + 2/5 data/evidence */}
                         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
                             {/* Chart Section - 3/5 width */}

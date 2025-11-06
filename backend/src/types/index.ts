@@ -46,6 +46,7 @@ export interface KPI {
     category: 'input' | 'output' | 'impact';
     initiative_id?: string;
     umbrella_kpi_id?: string;
+    display_order?: number;
     created_at?: string;
     updated_at?: string;
     user_id?: string;
@@ -58,6 +59,7 @@ export interface Location {
     description?: string;
     latitude: number;
     longitude: number;
+    display_order?: number;
     created_at?: string;
     updated_at?: string;
     user_id?: string;
@@ -92,6 +94,7 @@ export interface BeneficiaryGroup {
     age_range_start?: number | null; // Optional minimum age
     age_range_end?: number | null; // Optional maximum age
     total_number?: number | null; // Total number of beneficiaries in the group
+    display_order?: number;
     created_at?: string;
     updated_at?: string;
     user_id?: string;

@@ -3,9 +3,25 @@ import { KPI, KPIUpdate, KPIWithEvidence } from '../types';
 
 export class KPIService {
     static async create(kpi: KPI, userId: string): Promise<KPI> {
+        // Get max display_order for this initiative to set the new item at the end
+        let maxOrder = 0
+        if (kpi.initiative_id) {
+            const { data: existingKPIs } = await supabase
+                .from('kpis')
+                .select('display_order')
+                .eq('initiative_id', kpi.initiative_id)
+                .eq('user_id', userId)
+                .order('display_order', { ascending: false })
+                .limit(1)
+            
+            if (existingKPIs && existingKPIs.length > 0) {
+                maxOrder = (existingKPIs[0].display_order ?? 0) + 1
+            }
+        }
+        
         const { data, error } = await supabase
             .from('kpis')
-            .insert([{ ...kpi, user_id: userId }])
+            .insert([{ ...kpi, user_id: userId, display_order: maxOrder }])
             .select()
             .single();
 
@@ -23,7 +39,7 @@ export class KPIService {
             query = query.eq('initiative_id', initiativeId);
         }
 
-        const { data, error } = await query.order('created_at', { ascending: false });
+        const { data, error } = await query.order('display_order', { ascending: true }).order('created_at', { ascending: false });
 
         if (error) throw new Error(`Failed to fetch KPIs: ${error.message}`);
         return data || [];
@@ -45,7 +61,7 @@ export class KPIService {
             query = query.eq('initiative_id', initiativeId);
         }
 
-        const { data, error } = await query.order('created_at', { ascending: false });
+        const { data, error } = await query.order('display_order', { ascending: true }).order('created_at', { ascending: false });
 
         if (error) throw new Error(`Failed to fetch KPIs with evidence: ${error.message}`);
 

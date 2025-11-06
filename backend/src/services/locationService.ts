@@ -3,9 +3,25 @@ import { Location } from '../types';
 
 export class LocationService {
     static async create(location: Location, userId: string): Promise<Location> {
+        // Get max display_order for this initiative to set the new item at the end
+        let maxOrder = 0
+        if (location.initiative_id) {
+            const { data: existingLocations } = await supabase
+                .from('locations')
+                .select('display_order')
+                .eq('initiative_id', location.initiative_id)
+                .eq('user_id', userId)
+                .order('display_order', { ascending: false })
+                .limit(1)
+            
+            if (existingLocations && existingLocations.length > 0) {
+                maxOrder = (existingLocations[0].display_order ?? 0) + 1
+            }
+        }
+        
         const { data, error } = await supabase
             .from('locations')
-            .insert([{ ...location, user_id: userId }])
+            .insert([{ ...location, user_id: userId, display_order: maxOrder }])
             .select()
             .single();
 
@@ -23,7 +39,7 @@ export class LocationService {
             query = query.eq('initiative_id', initiativeId);
         }
 
-        const { data, error } = await query.order('created_at', { ascending: false });
+        const { data, error } = await query.order('display_order', { ascending: true }).order('created_at', { ascending: false });
 
         if (error) throw new Error(`Failed to fetch locations: ${error.message}`);
         return data || [];

@@ -182,6 +182,17 @@
     border: none !important;
 }
 
+/* Dim Leaflet map when modal backdrop is present */
+.fixed.inset-0[class*="bg-black"] ~ * .leaflet-container,
+.fixed.inset-0[class*="bg-black"] ~ * .leaflet-pane,
+body:has(.fixed.inset-0[class*="bg-black"]) .leaflet-container,
+body:has(.fixed.inset-0[class*="bg-black"]) .leaflet-pane,
+body.location-modal-open .leaflet-container,
+body.location-modal-open .leaflet-pane {
+    filter: brightness(0.75) !important;
+    transition: filter 0.2s ease-in-out;
+}
+
 /* Hover effects */
 .hover-lift {
     transition: transform 0.2s ease-in-out;

@@ -7,6 +7,7 @@ export class BeneficiaryService {
             .from('beneficiary_groups')
             .select('*')
             .eq('user_id', userId)
+            .order('display_order', { ascending: true })
             .order('created_at', { ascending: false })
 
         if (initiativeId) query = query.eq('initiative_id', initiativeId)
@@ -21,9 +22,25 @@ export class BeneficiaryService {
             throw new Error('Location is required for beneficiary groups')
         }
         
+        // Get max display_order for this initiative to set the new item at the end
+        let maxOrder = 0
+        if (group.initiative_id) {
+            const { data: existingGroups } = await supabase
+                .from('beneficiary_groups')
+                .select('display_order')
+                .eq('initiative_id', group.initiative_id)
+                .eq('user_id', userId)
+                .order('display_order', { ascending: false })
+                .limit(1)
+            
+            if (existingGroups && existingGroups.length > 0) {
+                maxOrder = (existingGroups[0].display_order ?? 0) + 1
+            }
+        }
+        
         const { data, error } = await supabase
             .from('beneficiary_groups')
-            .insert([{ ...group, user_id: userId }])
+            .insert([{ ...group, user_id: userId, display_order: maxOrder }])
             .select()
             .single()
 

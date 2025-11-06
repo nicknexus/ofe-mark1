@@ -1,21 +1,184 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { MapPin, Plus, Edit, Trash2, AlertCircle } from 'lucide-react'
+import { MapPin, Plus, Edit, Trash2, AlertCircle, GripVertical } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { Location } from '../../types'
 import { apiService } from '../../services/api'
 import LocationMap from '../LocationMap'
 import LocationModal from '../LocationModal'
 import toast from 'react-hot-toast'
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent,
+} from '@dnd-kit/core'
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    useSortable,
+    verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+
+// Sortable Location Card Component
+function SortableLocationCard({ 
+    location, 
+    selectedLocationId, 
+    onListItemClick, 
+    onEditClick, 
+    onDeleteClick,
+    locationCardRefs 
+}: {
+    location: Location
+    selectedLocationId: string | null
+    onListItemClick: (location: Location) => void
+    onEditClick: (location: Location, e: React.MouseEvent) => void
+    onDeleteClick: (e: React.MouseEvent) => void
+    locationCardRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>
+}) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: location.id! })
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    }
+
+    return (
+        <div
+            ref={(el) => {
+                setNodeRef(el)
+                if (location.id) {
+                    locationCardRefs.current[location.id] = el
+                }
+            }}
+            style={style}
+            onClick={() => onListItemClick(location)}
+            className={`p-3 rounded-lg border cursor-pointer transition-all relative group ${
+                selectedLocationId === location.id
+                    ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
+                    : 'border-gray-200 hover:border-gray-300 bg-gray-50'
+            }`}
+        >
+            {/* Drag Handle - Top Right Corner */}
+            <div
+                {...attributes}
+                {...listeners}
+                className="absolute top-1 right-1 cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{ opacity: isDragging ? 1 : undefined }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <GripVertical className="w-3 h-3 text-gray-400" />
+            </div>
+            <div className="flex items-start justify-between mb-1.5">
+                <h3 className="font-semibold text-gray-900 text-sm pr-8">{location.name}</h3>
+                <div className="flex items-center space-x-1">
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            onEditClick(location, e)
+                        }}
+                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                    >
+                        <Edit className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            onDeleteClick(e)
+                        }}
+                        className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+            </div>
+            {location.description && (
+                <p className="text-xs text-gray-600 mb-1.5 line-clamp-2">
+                    {location.description}
+                </p>
+            )}
+            <div className="text-xs text-gray-500">
+                {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+            </div>
+        </div>
+    )
+}
 
 export default function LocationTab() {
     const { id: initiativeId } = useParams<{ id: string }>()
     const [locations, setLocations] = useState<Location[]>([])
+    const [orderedLocations, setOrderedLocations] = useState<Location[]>([])
     const [loading, setLoading] = useState(true)
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [selectedLocation, setSelectedLocation] = useState<Location | null>(null)
     const [mapClickCoordinates, setMapClickCoordinates] = useState<[number, number] | null>(null)
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
     const locationCardRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+    // Initialize ordered locations from state, sorted by display_order
+    useEffect(() => {
+        const sorted = [...locations].sort((a, b) => {
+            const orderA = a.display_order ?? 0
+            const orderB = b.display_order ?? 0
+            return orderA - orderB
+        })
+        setOrderedLocations(sorted)
+    }, [locations])
+
+    // Drag and drop sensors
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    )
+
+    // Handle drag end
+    const handleDragEnd = async (event: DragEndEvent) => {
+        const { active, over } = event
+
+        if (!over || active.id === over.id) return
+
+        const oldIndex = orderedLocations.findIndex((loc) => loc.id === active.id)
+        const newIndex = orderedLocations.findIndex((loc) => loc.id === over.id)
+
+        if (oldIndex === -1 || newIndex === -1) return
+
+        const newOrderedLocations = arrayMove(orderedLocations, oldIndex, newIndex)
+        setOrderedLocations(newOrderedLocations)
+
+        // Update display_order in backend
+        if (initiativeId) {
+            try {
+                const order = newOrderedLocations.map((loc, index) => ({
+                    id: loc.id!,
+                    display_order: index,
+                }))
+                await apiService.updateLocationOrder(order)
+            } catch (error) {
+                console.error('Failed to update location order:', error)
+                toast.error('Failed to save order')
+                // Revert on error
+                setOrderedLocations(orderedLocations)
+            }
+        }
+    }
 
     useEffect(() => {
         if (initiativeId) {
@@ -165,7 +328,7 @@ export default function LocationTab() {
                     {/* Map - 2/3 width */}
                     <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm p-2 overflow-hidden flex flex-col min-h-0 h-full">
                         <LocationMap
-                            locations={locations}
+                            locations={orderedLocations}
                             onLocationClick={handleLocationClick}
                             onMapClick={handleMapClick}
                             selectedLocationId={selectedLocation?.id || null}
@@ -176,13 +339,13 @@ export default function LocationTab() {
                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-2 overflow-hidden flex flex-col min-h-0 h-full">
                         <div className="mb-2 flex-shrink-0">
                             <h2 className="text-base font-semibold text-gray-900 mb-0.5">
-                                All Locations ({locations.length})
+                                All Locations ({orderedLocations.length})
                             </h2>
                             <p className="text-xs text-gray-500">Click a location to edit • Map clicks show details</p>
                         </div>
 
                         <div className="flex-1 overflow-y-auto space-y-1.5 min-h-0">
-                            {locations.length === 0 ? (
+                            {orderedLocations.length === 0 ? (
                                 <div className="text-center py-8">
                                     <MapPin className="w-10 h-10 text-gray-300 mx-auto mb-3" />
                                     <p className="text-gray-500 text-sm mb-3">No locations yet</p>
@@ -194,50 +357,31 @@ export default function LocationTab() {
                                     </button>
                                 </div>
                             ) : (
-                                locations.map((location) => (
-                                    <div
-                                        key={location.id}
-                                        ref={(el) => {
-                                            if (location.id) {
-                                                locationCardRefs.current[location.id] = el
-                                            }
-                                        }}
-                                        onClick={() => handleListItemClick(location)}
-                                        className={`p-3 rounded-lg border cursor-pointer transition-all ${selectedLocation?.id === location.id
-                                            ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
-                                            : 'border-gray-200 hover:border-gray-300 bg-gray-50'
-                                            }`}
+                                <DndContext
+                                    sensors={sensors}
+                                    collisionDetection={closestCenter}
+                                    onDragEnd={handleDragEnd}
+                                >
+                                    <SortableContext
+                                        items={orderedLocations.map(loc => loc.id!)}
+                                        strategy={verticalListSortingStrategy}
                                     >
-                                        <div className="flex items-start justify-between mb-1.5">
-                                            <h3 className="font-semibold text-gray-900 text-sm">{location.name}</h3>
-                                            <div className="flex items-center space-x-1">
-                                                <button
-                                                    onClick={(e) => handleEditClick(location, e)}
-                                                    className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                                                >
-                                                    <Edit className="w-3.5 h-3.5" />
-                                                </button>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        setDeleteConfirmId(location.id!)
-                                                    }}
-                                                    className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                        {location.description && (
-                                            <p className="text-xs text-gray-600 mb-1.5 line-clamp-2">
-                                                {location.description}
-                                            </p>
-                                        )}
-                                        <div className="text-xs text-gray-500">
-                                            {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
-                                        </div>
-                                    </div>
-                                ))
+                                        {orderedLocations.map((location) => (
+                                            <SortableLocationCard
+                                                key={location.id}
+                                                location={location}
+                                                selectedLocationId={selectedLocation?.id || null}
+                                                onListItemClick={handleListItemClick}
+                                                onEditClick={handleEditClick}
+                                                onDeleteClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setDeleteConfirmId(location.id!)
+                                                }}
+                                                locationCardRefs={locationCardRefs}
+                                            />
+                                        ))}
+                                    </SortableContext>
+                                </DndContext>
                             )}
                         </div>
                     </div>
