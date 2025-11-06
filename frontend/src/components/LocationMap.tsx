@@ -438,8 +438,8 @@ export default function LocationMap({
                 style={{ width: '100%', height: '100%' }}
                 className="relative z-0"
                 zoomControl={false}
-                whenCreated={(map) => {
-                    mapInstanceRef.current = map
+                whenReady={(map) => {
+                    mapInstanceRef.current = map.target as L.Map
                 }}
             >
                 <TileLayer
@@ -672,6 +672,9 @@ export default function LocationMap({
                     return null
                 }
 
+                // TypeScript now knows nearestLocation is not null here
+                const location = nearestLocation
+
                 return (
                     <div
                         ref={mapClickPopupRef}
@@ -702,7 +705,7 @@ export default function LocationMap({
                                         <MapPin className="w-4 h-4 text-green-600" />
                                     </div>
                                     <div>
-                                        <h3 className="font-semibold text-gray-900 text-sm">{nearestLocation.name}</h3>
+                                        <h3 className="font-semibold text-gray-900 text-sm">{location.name}</h3>
                                     </div>
                                 </div>
                                 <button
@@ -726,8 +729,8 @@ export default function LocationMap({
                                 </button>
                                 <button
                                     onClick={() => {
-                                        if (nearestLocation?.id && onApplyLocationFilter) {
-                                            onApplyLocationFilter(nearestLocation.id)
+                                        if (location.id && onApplyLocationFilter) {
+                                            onApplyLocationFilter(location.id)
                                             setMapClickPopup(null)
                                         }
                                     }}
