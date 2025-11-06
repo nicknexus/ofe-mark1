@@ -859,7 +859,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                             return (
                                                 <Line
                                                     key={kpi.id}
-                                                    type="basis"
+                                                    type="monotone"
                                                     dataKey={kpi.id}
                                                     stroke={getKPIColor(kpi.category, originalIndex)}
                                                     strokeWidth={3.5}
@@ -918,6 +918,12 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 // Navigate to locations tab when clicking map
                                 if (onNavigateToLocations) {
                                     onNavigateToLocations()
+                                }
+                            }}
+                            onApplyLocationFilter={(locationId) => {
+                                // Apply location filter when clicking map
+                                if (!selectedLocations.includes(locationId)) {
+                                    setSelectedLocations([locationId])
                                 }
                             }}
                             refreshKey={mapRefreshKey}

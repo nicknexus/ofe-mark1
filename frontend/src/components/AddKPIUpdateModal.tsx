@@ -253,30 +253,30 @@ export default function AddKPIUpdateModal({
                     {/* Date Selection */}
                     <div>
                         <label className="label mb-2">
-                            <Calendar className="w-4 h-4 inline mr-2" />
+                                <Calendar className="w-4 h-4 inline mr-2" />
                             Date <span className="text-red-500">*</span>
-                        </label>
+                            </label>
                         <DateRangePicker
                             value={datePickerValue}
                             onChange={(value) => {
                                 setDatePickerValue(value)
                                 // Update formData for compatibility
                                 if (value.singleDate) {
-                                    setFormData(prev => ({
-                                        ...prev,
+                                            setFormData(prev => ({
+                                                ...prev,
                                         date_represented: value.singleDate!,
                                         date_range_start: undefined,
                                         date_range_end: undefined
                                     }))
                                 } else if (value.startDate && value.endDate) {
-                                    setFormData(prev => ({
-                                        ...prev,
+                                            setFormData(prev => ({
+                                                ...prev,
                                         date_range_start: value.startDate!,
                                         date_range_end: value.endDate!,
                                         date_represented: value.startDate!
-                                    }))
-                                }
-                            }}
+                                            }))
+                                        }
+                                    }}
                             maxDate={getLocalDateString(new Date())}
                             placeholder="Select date or range"
                         />

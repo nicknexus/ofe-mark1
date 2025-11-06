@@ -840,7 +840,7 @@ export default function ExpandableKPICard({
                                                     cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '5 5' }}
                                                 />
                                                 <Line
-                                                    type="basis"
+                                                    type="monotone"
                                                     dataKey="cumulative"
                                                     stroke="#16a34a"
                                                     strokeWidth={3.5}
