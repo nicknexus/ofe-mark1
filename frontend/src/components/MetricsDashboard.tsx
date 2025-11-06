@@ -185,6 +185,8 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                 return updateDate === datePickerValue.singleDate
             })
         } else if (datePickerValue.startDate && datePickerValue.endDate) {
+            const filterStartDate = datePickerValue.startDate
+            const filterEndDate = datePickerValue.endDate
             filtered = filtered.filter(update => {
                 const updateDate = update.date_represented ? getLocalDateString(parseLocalDate(update.date_represented)) : ''
                 const updateStart = update.date_range_start ? getLocalDateString(parseLocalDate(update.date_range_start)) : ''
@@ -192,10 +194,10 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
 
                 // If update is a date range, check if it overlaps with filter range
                 if (updateStart && updateEnd) {
-                    return updateStart <= datePickerValue.endDate && updateEnd >= datePickerValue.startDate
+                    return updateStart <= filterEndDate && updateEnd >= filterStartDate
                 }
                 // If update is a single date, check if it's within the range
-                return updateDate >= datePickerValue.startDate && updateDate <= datePickerValue.endDate
+                return updateDate >= filterStartDate && updateDate <= filterEndDate
             })
         }
 
@@ -540,8 +542,6 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                     left: rect.left
                                 })
                                 setShowLocationPicker(!showLocationPicker)
-                                setShowDatePicker(false)
-                                setShowDateRangePicker(false)
                             }}
                             className="flex items-center space-x-1 px-2 py-1 bg-green-50 hover:bg-green-100 text-green-700 rounded text-xs font-medium transition-colors border border-green-200"
                         >
