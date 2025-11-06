@@ -65,3 +65,4 @@ CREATE POLICY "Users can update their own organizations" ON organizations
         )
     );
 
+

@@ -26,3 +26,4 @@ AFTER DELETE ON user_organizations
 FOR EACH ROW
 EXECUTE FUNCTION cleanup_orphaned_organizations();
 
+

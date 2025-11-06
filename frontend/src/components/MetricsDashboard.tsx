@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { TrendingUp, Target, BarChart3, Calendar, FileText, Filter, ChevronDown, X, MapPin, ExternalLink, Plus } from 'lucide-react'
+import { TrendingUp, Target, BarChart3, Calendar, FileText, Filter, ChevronDown, X, MapPin, ExternalLink, Plus, Users } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import {
     LineChart,
@@ -12,9 +12,10 @@ import {
     Legend
 } from 'recharts'
 import LocationMap from './LocationMap'
+import DateRangePicker from './DateRangePicker'
 import { apiService } from '../services/api'
-import { Location } from '../types'
-import { getCategoryColor, parseLocalDate, isSameDay, compareDates } from '../utils'
+import { Location, BeneficiaryGroup } from '../types'
+import { getCategoryColor, parseLocalDate, isSameDay, compareDates, getLocalDateString, formatDate } from '../utils'
 
 interface MetricsDashboardProps {
     kpis: any[]
@@ -37,21 +38,23 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false)
     const [locations, setLocations] = useState<Location[]>([])
     const [mapRefreshKey, setMapRefreshKey] = useState(0) // Key to trigger map refresh
+    const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
+    const [updateBeneficiaryGroupsCache, setUpdateBeneficiaryGroupsCache] = useState<Record<string, string[]>>({})
 
     // Master filter state
-    const [selectedDate, setSelectedDate] = useState<string>('')
-    const [dateRangeStart, setDateRangeStart] = useState<string>('')
-    const [dateRangeEnd, setDateRangeEnd] = useState<string>('')
+    const [datePickerValue, setDatePickerValue] = useState<{
+        singleDate?: string
+        startDate?: string
+        endDate?: string
+    }>({})
     const [selectedLocations, setSelectedLocations] = useState<string[]>([])
-    const [showDatePicker, setShowDatePicker] = useState(false)
-    const [showDateRangePicker, setShowDateRangePicker] = useState(false)
+    const [selectedBeneficiaryGroups, setSelectedBeneficiaryGroups] = useState<string[]>([])
     const [showLocationPicker, setShowLocationPicker] = useState(false)
+    const [showBeneficiaryPicker, setShowBeneficiaryPicker] = useState(false)
     const locationButtonRef = React.useRef<HTMLButtonElement>(null)
-    const dateButtonRef = React.useRef<HTMLButtonElement>(null)
-    const dateRangeButtonRef = React.useRef<HTMLButtonElement>(null)
+    const beneficiaryButtonRef = React.useRef<HTMLButtonElement>(null)
     const [locationDropdownPosition, setLocationDropdownPosition] = useState({ top: 0, left: 0 })
-    const [dateDropdownPosition, setDateDropdownPosition] = useState({ top: 0, left: 0 })
-    const [dateRangeDropdownPosition, setDateRangeDropdownPosition] = useState({ top: 0, left: 0 })
+    const [beneficiaryDropdownPosition, setBeneficiaryDropdownPosition] = useState({ top: 0, left: 0 })
 
     // Load locations
     useEffect(() => {
@@ -61,6 +64,38 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                 .catch(() => setLocations([]))
         }
     }, [initiativeId])
+
+    // Load beneficiary groups
+    useEffect(() => {
+        if (initiativeId) {
+            apiService.getBeneficiaryGroups(initiativeId)
+                .then((groups) => setBeneficiaryGroups(groups || []))
+                .catch(() => setBeneficiaryGroups([]))
+        }
+    }, [initiativeId])
+
+    // Load beneficiary groups for updates (cache them)
+    useEffect(() => {
+        if (kpiUpdates.length === 0) return
+
+        const loadBeneficiaryGroupsForUpdates = async () => {
+            const cache: Record<string, string[]> = {}
+            const promises = kpiUpdates.map(async (update) => {
+                if (!update.id) return
+                try {
+                    const groups = await apiService.getBeneficiaryGroupsForUpdate(update.id)
+                    const groupIds = Array.isArray(groups) ? groups.map((g: any) => g.id).filter(Boolean) : []
+                    cache[update.id] = groupIds
+                } catch (error) {
+                    cache[update.id] = []
+                }
+            })
+            await Promise.all(promises)
+            setUpdateBeneficiaryGroupsCache(cache)
+        }
+
+        loadBeneficiaryGroupsForUpdates()
+    }, [kpiUpdates])
 
     // Refresh map when kpiUpdates change (indicating updates/evidence were modified)
     const updateIdsHash = React.useMemo(() => {
@@ -143,27 +178,24 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
 
         let filtered = [...kpiUpdates]
 
-        // Filter by single date
-        if (selectedDate) {
+        // Filter by single date or date range
+        if (datePickerValue.singleDate) {
             filtered = filtered.filter(update => {
-                const updateDate = update.date_represented ? new Date(update.date_represented).toISOString().split('T')[0] : ''
-                return updateDate === selectedDate
+                const updateDate = update.date_represented ? getLocalDateString(parseLocalDate(update.date_represented)) : ''
+                return updateDate === datePickerValue.singleDate
             })
-        }
-
-        // Filter by date range
-        if (dateRangeStart && dateRangeEnd) {
+        } else if (datePickerValue.startDate && datePickerValue.endDate) {
             filtered = filtered.filter(update => {
-                const updateDate = update.date_represented ? new Date(update.date_represented).toISOString().split('T')[0] : ''
-                const updateStart = update.date_range_start ? new Date(update.date_range_start).toISOString().split('T')[0] : ''
-                const updateEnd = update.date_range_end ? new Date(update.date_range_end).toISOString().split('T')[0] : ''
+                const updateDate = update.date_represented ? getLocalDateString(parseLocalDate(update.date_represented)) : ''
+                const updateStart = update.date_range_start ? getLocalDateString(parseLocalDate(update.date_range_start)) : ''
+                const updateEnd = update.date_range_end ? getLocalDateString(parseLocalDate(update.date_range_end)) : ''
 
                 // If update is a date range, check if it overlaps with filter range
                 if (updateStart && updateEnd) {
-                    return updateStart <= dateRangeEnd && updateEnd >= dateRangeStart
+                    return updateStart <= datePickerValue.endDate && updateEnd >= datePickerValue.startDate
                 }
                 // If update is a single date, check if it's within the range
-                return updateDate >= dateRangeStart && updateDate <= dateRangeEnd
+                return updateDate >= datePickerValue.startDate && updateDate <= datePickerValue.endDate
             })
         }
 
@@ -171,6 +203,16 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
         if (selectedLocations.length > 0) {
             filtered = filtered.filter(update => {
                 return update.location_id && selectedLocations.includes(update.location_id)
+            })
+        }
+
+        // Filter by beneficiary group(s) - impact claims must be linked to selected beneficiary groups
+        if (selectedBeneficiaryGroups.length > 0) {
+            filtered = filtered.filter(update => {
+                if (!update.id) return false
+                const updateGroupIds = updateBeneficiaryGroupsCache[update.id] || []
+                // Check if update is linked to any of the selected beneficiary groups
+                return updateGroupIds.some(groupId => selectedBeneficiaryGroups.includes(groupId))
             })
         }
 
@@ -240,17 +282,17 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
         let endDate: Date
 
         // If a single date is selected, only show that date
-        if (selectedDate) {
-            startDate = parseLocalDate(selectedDate)
+        if (datePickerValue.singleDate) {
+            startDate = parseLocalDate(datePickerValue.singleDate)
             startDate.setHours(0, 0, 0, 0)
-            endDate = parseLocalDate(selectedDate)
+            endDate = parseLocalDate(datePickerValue.singleDate)
             endDate.setHours(23, 59, 59, 999)
         }
         // If a date range is selected, use that range
-        else if (dateRangeStart && dateRangeEnd) {
-            startDate = parseLocalDate(dateRangeStart)
+        else if (datePickerValue.startDate && datePickerValue.endDate) {
+            startDate = parseLocalDate(datePickerValue.startDate)
             startDate.setHours(0, 0, 0, 0)
-            endDate = parseLocalDate(dateRangeEnd)
+            endDate = parseLocalDate(datePickerValue.endDate)
             endDate.setHours(23, 59, 59, 999)
         }
         // Otherwise, use time frame
@@ -297,18 +339,19 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
         }> = []
 
         // Calculate time range
-        // Normalize dates to ensure accurate day calculation
-        startDate.setHours(0, 0, 0, 0)
-        const endDateNormalized = new Date(endDate)
-        endDateNormalized.setHours(0, 0, 0, 0)
+        // Normalize dates to ensure accurate day calculation - use date-only values
+        const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate())
+        startDateOnly.setHours(0, 0, 0, 0)
+        const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate())
+        endDateOnly.setHours(0, 0, 0, 0)
 
-        const timeDiff = endDateNormalized.getTime() - startDate.getTime()
+        const timeDiff = endDateOnly.getTime() - startDateOnly.getTime()
         const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24))
 
         // Create daily data points for the entire period
         for (let i = 0; i <= daysDiff; i++) {
-            const currentDate = new Date(startDate)
-            currentDate.setDate(startDate.getDate() + i)
+            const currentDate = new Date(startDateOnly)
+            currentDate.setDate(startDateOnly.getDate() + i)
             currentDate.setHours(0, 0, 0, 0) // Normalize to midnight local time
 
             // Don't create dates beyond today
@@ -318,10 +361,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                 break
             }
 
-            const dateString = currentDate.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric'
-            })
+            const dateString = formatDate(currentDate).split(',')[0] // Get just the date part without year
 
             const dataPoint: any = {
                 date: dateString,
@@ -351,6 +391,18 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     const filteredTotals = getFilteredTotals()
     const filteredUpdates = getFilteredUpdates()
     const filteredKPIs = getFilteredKPIs()
+
+    // Calculate x-axis interval to always show approximately 30 labels (1 month's worth)
+    // For 1 month view, show every single day
+    const getXAxisInterval = () => {
+        // If viewing 1 month without custom date range, show all labels (every day)
+        if (timeFrame === '1month' && !datePickerValue.singleDate && !datePickerValue.startDate) return 0
+        
+        const dataPointCount = chartData.length
+        if (dataPointCount <= 30) return 0 // Show all labels if we have 30 or fewer data points
+        // Calculate interval to show ~30 labels: interval = floor((count - 1) / 30)
+        return Math.floor((dataPointCount - 1) / 30)
+    }
 
     // Get top 6 KPIs for metric cards (from filtered KPIs)
     const displayKPIs = filteredKPIs.slice(0, 6)
@@ -469,112 +521,13 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     <span className="text-xs font-semibold text-gray-700">Filters:</span>
 
                     {/* Date Filter */}
-                    <div className="relative">
-                        <button
-                            ref={dateButtonRef}
-                            onClick={(e) => {
-                                const rect = e.currentTarget.getBoundingClientRect()
-                                setDateDropdownPosition({
-                                    top: rect.bottom + 4,
-                                    left: rect.left
-                                })
-                                setShowDatePicker(!showDatePicker)
-                                setShowDateRangePicker(false)
-                                setShowLocationPicker(false)
-                            }}
-                            className="flex items-center space-x-1 px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded text-xs font-medium transition-colors border border-blue-200"
-                        >
-                            <Calendar className="w-3 h-3" />
-                            <span>Date</span>
-                            {selectedDate && <X className="w-2.5 h-2.5 ml-1" onClick={(e) => { e.stopPropagation(); setSelectedDate(''); setDateRangeStart(''); setDateRangeEnd('') }} />}
-                        </button>
-                        {showDatePicker && createPortal(
-                            <>
-                                <div className="fixed inset-0 z-[9998]" onClick={() => setShowDatePicker(false)} />
-                                <div
-                                    className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] p-2"
-                                    style={{
-                                        top: `${dateDropdownPosition.top}px`,
-                                        left: `${dateDropdownPosition.left}px`
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <input
-                                        type="date"
-                                        value={selectedDate}
-                                        onChange={(e) => {
-                                            setSelectedDate(e.target.value)
-                                            setDateRangeStart('')
-                                            setDateRangeEnd('')
-                                        }}
-                                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-                            </>,
-                            document.body
-                        )}
-                    </div>
-
-                    {/* Date Range Filter */}
-                    <div className="relative">
-                        <button
-                            ref={dateRangeButtonRef}
-                            onClick={(e) => {
-                                const rect = e.currentTarget.getBoundingClientRect()
-                                setDateRangeDropdownPosition({
-                                    top: rect.bottom + 4,
-                                    left: rect.left
-                                })
-                                setShowDateRangePicker(!showDateRangePicker)
-                                setShowDatePicker(false)
-                                setShowLocationPicker(false)
-                            }}
-                            className="flex items-center space-x-1 px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded text-xs font-medium transition-colors border border-purple-200"
-                        >
-                            <Calendar className="w-3 h-3" />
-                            <span>Range</span>
-                            {(dateRangeStart || dateRangeEnd) && <X className="w-2.5 h-2.5 ml-1" onClick={(e) => { e.stopPropagation(); setDateRangeStart(''); setDateRangeEnd('') }} />}
-                        </button>
-                        {showDateRangePicker && createPortal(
-                            <>
-                                <div className="fixed inset-0 z-[9998]" onClick={() => setShowDateRangePicker(false)} />
-                                <div
-                                    className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] p-2 space-y-2 min-w-[180px]"
-                                    style={{
-                                        top: `${dateRangeDropdownPosition.top}px`,
-                                        left: `${dateRangeDropdownPosition.left}px`
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <div>
-                                        <label className="text-xs text-gray-600 mb-1 block">Start</label>
-                                        <input
-                                            type="date"
-                                            value={dateRangeStart}
-                                            onChange={(e) => {
-                                                setDateRangeStart(e.target.value)
-                                                setSelectedDate('')
-                                            }}
-                                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs text-gray-600 mb-1 block">End</label>
-                                        <input
-                                            type="date"
-                                            value={dateRangeEnd}
-                                            onChange={(e) => {
-                                                setDateRangeEnd(e.target.value)
-                                                setSelectedDate('')
-                                            }}
-                                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                        />
-                                    </div>
-                                </div>
-                            </>,
-                            document.body
-                        )}
-                    </div>
+                    <DateRangePicker
+                        value={datePickerValue}
+                        onChange={setDatePickerValue}
+                        maxDate={getLocalDateString(new Date())}
+                        placeholder="Filter by date"
+                        className="w-auto"
+                    />
 
                     {/* Location Filter */}
                     <div className="relative">
@@ -659,14 +612,95 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                         )}
                     </div>
 
+                    {/* Beneficiary Groups Filter */}
+                    <div className="relative">
+                        <button
+                            ref={beneficiaryButtonRef}
+                            onClick={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect()
+                                setBeneficiaryDropdownPosition({
+                                    top: rect.bottom + 4,
+                                    left: rect.left
+                                })
+                                setShowBeneficiaryPicker(!showBeneficiaryPicker)
+                                setShowLocationPicker(false)
+                            }}
+                            className="flex items-center space-x-1 px-2 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded text-xs font-medium transition-colors border border-orange-200"
+                        >
+                            <Users className="w-3 h-3" />
+                            <span>Beneficiaries</span>
+                            {selectedBeneficiaryGroups.length > 0 && (
+                                <span className="ml-1 bg-orange-600 text-white text-[10px] px-1 rounded-full">
+                                    {selectedBeneficiaryGroups.length}
+                                </span>
+                            )}
+                        </button>
+                        {showBeneficiaryPicker && createPortal(
+                            <>
+                                <div className="fixed inset-0 z-[9998]" onClick={() => setShowBeneficiaryPicker(false)} />
+                                <div
+                                    className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] p-2 min-w-[200px] max-h-64 overflow-y-auto"
+                                    style={{
+                                        top: `${beneficiaryDropdownPosition.top}px`,
+                                        left: `${beneficiaryDropdownPosition.left}px`
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    {beneficiaryGroups.length === 0 ? (
+                                        <p className="text-xs text-gray-500">No beneficiary groups available</p>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-xs font-semibold text-gray-700">Select Beneficiaries</span>
+                                                {selectedBeneficiaryGroups.length > 0 && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            setSelectedBeneficiaryGroups([])
+                                                        }}
+                                                        className="text-xs text-blue-600 hover:text-blue-800"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {beneficiaryGroups.map((group) => (
+                                                <label
+                                                    key={group.id}
+                                                    className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedBeneficiaryGroups.includes(group.id!)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setSelectedBeneficiaryGroups([...selectedBeneficiaryGroups, group.id!])
+                                                            } else {
+                                                                setSelectedBeneficiaryGroups(selectedBeneficiaryGroups.filter(id => id !== group.id))
+                                                            }
+                                                        }}
+                                                        className="w-3 h-3 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                                                    />
+                                                    <span className="text-xs text-gray-700 truncate flex-1">
+                                                        {group.name}
+                                                    </span>
+                                                </label>
+                                            ))}
+                                        </>
+                                    )}
+                                </div>
+                            </>,
+                            document.body
+                        )}
+                    </div>
+
                     {/* Clear All Filters */}
-                    {(selectedDate || dateRangeStart || dateRangeEnd || selectedLocations.length > 0) && (
+                    {(datePickerValue.singleDate || datePickerValue.startDate || datePickerValue.endDate || selectedLocations.length > 0 || selectedBeneficiaryGroups.length > 0) && (
                         <button
                             onClick={() => {
-                                setSelectedDate('')
-                                setDateRangeStart('')
-                                setDateRangeEnd('')
+                                setDatePickerValue({})
                                 setSelectedLocations([])
+                                setSelectedBeneficiaryGroups([])
                             }}
                             className="flex items-center space-x-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs font-medium transition-colors"
                         >
@@ -767,6 +801,8 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                         angle={-45}
                                         textAnchor="end"
                                         height={60}
+                                        interval={getXAxisInterval()}
+                                        tickMargin={8}
                                     />
                                     <YAxis
                                         stroke="#6b7280"
@@ -802,11 +838,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                             // Find the actual date from chartData
                                             const dataPoint = chartData.find(d => d.date === label)
                                             if (dataPoint?.fullDate) {
-                                                return new Date(dataPoint.fullDate).toLocaleDateString('en-US', {
-                                                    month: 'short',
-                                                    day: 'numeric',
-                                                    year: 'numeric'
-                                                })
+                                                return formatDate(dataPoint.fullDate)
                                             }
                                             return `Date: ${label}`
                                         }}
@@ -866,7 +898,22 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     </div>
                     <div className="flex-1 min-h-0">
                         <LocationMap
-                            locations={locations.filter(loc => selectedLocations.length === 0 || selectedLocations.includes(loc.id!))}
+                            locations={locations.filter(loc => {
+                                // If beneficiary groups are selected, only show locations that have those groups
+                                if (selectedBeneficiaryGroups.length > 0) {
+                                    const locationIdsFromBeneficiaries = beneficiaryGroups
+                                        .filter(bg => selectedBeneficiaryGroups.includes(bg.id!))
+                                        .map(bg => bg.location_id)
+                                        .filter(Boolean)
+                                    return locationIdsFromBeneficiaries.includes(loc.id!)
+                                }
+                                // If locations are selected, only show selected locations
+                                if (selectedLocations.length > 0) {
+                                    return selectedLocations.includes(loc.id!)
+                                }
+                                // Otherwise show all locations
+                                return true
+                            })}
                             onMapClick={() => {
                                 // Navigate to locations tab when clicking map
                                 if (onNavigateToLocations) {

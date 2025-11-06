@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { X, Calendar, BarChart3, Edit, Trash2, MessageSquare, FileText, Eye, MapPin, Users } from 'lucide-react'
-import { formatDate, getEvidenceTypeInfo } from '../utils'
+import { formatDate, getEvidenceTypeInfo, parseLocalDate } from '../utils'
 import { apiService } from '../services/api'
 import { Evidence, Location, BeneficiaryGroup } from '../types'
 
@@ -145,7 +145,7 @@ export default function DataPointPreviewModal({
                         </div>
                         {hasDateRange && (
                             <div className="mt-2 text-xs text-gray-500">
-                                Period: {Math.ceil((new Date(dataPoint.date_range_end).getTime() - new Date(dataPoint.date_range_start).getTime()) / (1000 * 60 * 60 * 24))} days
+                                Period: {Math.ceil((parseLocalDate(dataPoint.date_range_end).getTime() - parseLocalDate(dataPoint.date_range_start).getTime()) / (1000 * 60 * 60 * 24)) + 1} days
                             </div>
                         )}
                     </div>

@@ -253,6 +253,10 @@ export default function InitiativePage() {
 
     const handleTabChange = (tab: string) => {
         setActiveTab(tab)
+        // Clear expanded KPIs when switching to metrics tab to show main metrics page
+        if (tab === 'metrics') {
+            setExpandedKPIs(new Set())
+        }
     }
 
     const handleMetricCardClick = (kpiId: string) => {
@@ -301,7 +305,7 @@ export default function InitiativePage() {
                                     <span>Add First Metric</span>
                                 </button>
                                 <button
-                                    onClick={() => setActiveTab('metrics')}
+                                    onClick={() => handleTabChange('metrics')}
                                     className="inline-flex items-center space-x-2 px-6 py-3 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-xl text-base font-medium transition-colors duration-200"
                                 >
                                     <BarChart3 className="w-4 h-4" />

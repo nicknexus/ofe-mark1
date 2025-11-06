@@ -14,6 +14,7 @@ import {
     ResponsiveContainer,
     ReferenceLine
 } from 'recharts'
+import { parseLocalDate, formatDate } from '../utils'
 
 interface KPIChartsProps {
     kpi: any
@@ -33,10 +34,7 @@ export default function KPICharts({ kpi, updates, evidence, proofPercentage }: K
         )
 
         return {
-            date: new Date(update.date_represented).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric'
-            }),
+            date: formatDate(update.date_represented).split(',')[0], // Get just the date part without year for chart
             fullDate: update.date_represented,
             value: update.value,
             hasEvidence: hasEvidence ? 100 : 0,
@@ -49,7 +47,7 @@ export default function KPICharts({ kpi, updates, evidence, proofPercentage }: K
             note: update.note || update.label,
             target: kpi.target_value || null
         }
-    }).sort((a, b) => new Date(a.fullDate).getTime() - new Date(b.fullDate).getTime())
+    }).sort((a, b) => parseLocalDate(a.fullDate).getTime() - parseLocalDate(b.fullDate).getTime())
 
     // Cumulative progress data
     const cumulativeData = timelineData.map((item, index) => {

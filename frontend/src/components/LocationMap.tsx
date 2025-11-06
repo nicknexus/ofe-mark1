@@ -3,6 +3,7 @@ import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 're
 import { MapPin, X, Info, BarChart3, FileText, Loader2 } from 'lucide-react'
 import { Location, KPIUpdate, Evidence } from '../types'
 import { apiService } from '../services/api'
+import { formatDate } from '../utils'
 import LocationDetailsModal from './LocationDetailsModal'
 
 const geoUrl = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'
@@ -336,7 +337,7 @@ export default function LocationMap({
                                                 {update.value} {update.kpis?.unit_of_measurement || ''}
                                             </div>
                                             <div className="text-gray-400 mt-1">
-                                                {new Date(update.date_represented).toLocaleDateString()}
+                                                {formatDate(update.date_represented)}
                                             </div>
                                         </div>
                                     ))}
@@ -375,7 +376,7 @@ export default function LocationMap({
                                                 {ev.type?.replace('_', ' ')}
                                             </div>
                                             <div className="text-gray-400 mt-1">
-                                                {new Date(ev.date_represented).toLocaleDateString()}
+                                                {formatDate(ev.date_represented)}
                                             </div>
                                         </div>
                                     ))}

@@ -34,3 +34,4 @@ WHERE NOT EXISTS (
     AND uo.user_id = o.owner_id
 );
 
+

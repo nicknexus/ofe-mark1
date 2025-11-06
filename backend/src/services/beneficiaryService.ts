@@ -17,6 +17,10 @@ export class BeneficiaryService {
     }
 
     static async create(group: BeneficiaryGroup, userId: string): Promise<BeneficiaryGroup> {
+        if (!group.location_id) {
+            throw new Error('Location is required for beneficiary groups')
+        }
+        
         const { data, error } = await supabase
             .from('beneficiary_groups')
             .insert([{ ...group, user_id: userId }])

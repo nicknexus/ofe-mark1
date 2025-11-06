@@ -3,6 +3,8 @@ import { X, Calendar, Hash, MapPin, FileText, Users, Plus } from 'lucide-react'
 import { CreateKPIUpdateForm, BeneficiaryGroup, Location } from '../types'
 import { apiService } from '../services/api'
 import LocationModal from './LocationModal'
+import DateRangePicker from './DateRangePicker'
+import { getLocalDateString } from '../utils'
 import toast from 'react-hot-toast'
 
 interface AddKPIUpdateModalProps {
@@ -30,13 +32,17 @@ export default function AddKPIUpdateModal({
 }: AddKPIUpdateModalProps) {
     const [formData, setFormData] = useState<CreateKPIUpdateForm>({
         value: 0,
-        date_represented: new Date().toISOString().split('T')[0],
+        date_represented: getLocalDateString(new Date()),
         date_range_start: undefined,
         date_range_end: undefined,
         note: '',
         label: ''
     })
-    const [isDateRange, setIsDateRange] = useState(false)
+    const [datePickerValue, setDatePickerValue] = useState<{
+        singleDate?: string
+        startDate?: string
+        endDate?: string
+    }>({})
     const [loading, setLoading] = useState(false)
     const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
     const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
@@ -63,15 +69,21 @@ export default function AddKPIUpdateModal({
 
             // If editing, load existing data
             if (editData) {
+                const initialDateValue = editData.date_range_start && editData.date_range_end
+                    ? { startDate: editData.date_range_start, endDate: editData.date_range_end }
+                    : editData.date_represented
+                        ? { singleDate: editData.date_represented }
+                        : {}
+                
                 setFormData({
                     value: editData.value || 0,
-                    date_represented: editData.date_represented || new Date().toISOString().split('T')[0],
+                    date_represented: editData.date_represented || getLocalDateString(new Date()),
                     date_range_start: editData.date_range_start,
                     date_range_end: editData.date_range_end,
                     note: editData.note || '',
                     label: editData.label || ''
                 })
-                setIsDateRange(!!(editData.date_range_start && editData.date_range_end))
+                setDatePickerValue(initialDateValue)
                 setSelectedLocationId(editData.location_id || '')
 
                 // Load beneficiary groups for this update
@@ -88,13 +100,13 @@ export default function AddKPIUpdateModal({
                 // Reset form for new update
                 setFormData({
                     value: 0,
-                    date_represented: new Date().toISOString().split('T')[0],
+                    date_represented: getLocalDateString(new Date()),
                     date_range_start: undefined,
                     date_range_end: undefined,
                     note: '',
                     label: ''
                 })
-                setIsDateRange(false)
+                setDatePickerValue({})
                 setSelectedGroupIds([])
                 setSelectedLocationId('')
             }
@@ -106,19 +118,33 @@ export default function AddKPIUpdateModal({
         setLoading(true)
 
         try {
-            // Prepare form data based on date mode
+            // Validate dates aren't in the future
+            const today = getLocalDateString(new Date())
+            
+            // Prepare form data based on date picker value
             const submitData = { ...formData }
-            if (isDateRange) {
-                // For date ranges, keep both range fields and set date_represented to start date
-                submitData.date_represented = formData.date_range_start || formData.date_represented
-                // Ensure both range fields are included
-                if (!submitData.date_range_start || !submitData.date_range_end) {
-                    throw new Error('Both start and end dates are required for date ranges')
+            
+            if (datePickerValue.singleDate) {
+                // Single date selected
+                if (datePickerValue.singleDate > today) {
+                    throw new Error('Date cannot be in the future')
                 }
-            } else {
-                // For single dates, clear range fields
+                submitData.date_represented = datePickerValue.singleDate
                 submitData.date_range_start = undefined
                 submitData.date_range_end = undefined
+            } else if (datePickerValue.startDate && datePickerValue.endDate) {
+                // Date range selected
+                if (datePickerValue.startDate > today) {
+                    throw new Error('Start date cannot be in the future')
+                }
+                if (datePickerValue.endDate > today) {
+                    throw new Error('End date cannot be in the future')
+                }
+                submitData.date_range_start = datePickerValue.startDate
+                submitData.date_range_end = datePickerValue.endDate
+                submitData.date_represented = datePickerValue.startDate
+            } else {
+                throw new Error('Please select a date')
             }
 
             await onSubmit({
@@ -130,17 +156,20 @@ export default function AddKPIUpdateModal({
             if (!editData) {
                 setFormData({
                     value: 0,
-                    date_represented: new Date().toISOString().split('T')[0],
+                    date_represented: getLocalDateString(new Date()),
                     date_range_start: undefined,
                     date_range_end: undefined,
                     note: '',
                     label: ''
                 })
-                setIsDateRange(false)
+                setDatePickerValue({})
                 setSelectedGroupIds([])
                 setSelectedLocationId('')
             }
             onClose()
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to save update'
+            toast.error(message)
         } finally {
             setLoading(false)
         }
@@ -223,87 +252,34 @@ export default function AddKPIUpdateModal({
 
                     {/* Date Selection */}
                     <div>
-                        <div className="flex items-center justify-between mb-2">
-                            <label className="label">
-                                <Calendar className="w-4 h-4 inline mr-2" />
-                                Date
-                            </label>
-                            <div className="flex bg-gray-100 rounded-lg p-1">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        if (isDateRange) {
-                                            setIsDateRange(false)
-                                            setFormData(prev => ({
-                                                ...prev,
-                                                date_represented: new Date().toISOString().split('T')[0]
-                                            }))
-                                        }
-                                    }}
-                                    className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${!isDateRange
-                                        ? 'bg-white text-gray-900 shadow-sm font-medium'
-                                        : 'text-gray-600 hover:text-gray-900'
-                                        }`}
-                                >
-                                    Single Date
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        if (!isDateRange) {
-                                            setIsDateRange(true)
-                                            setFormData(prev => ({
-                                                ...prev,
-                                                date_range_start: '',
-                                                date_range_end: ''
-                                            }))
-                                        }
-                                    }}
-                                    className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${isDateRange
-                                        ? 'bg-white text-gray-900 shadow-sm font-medium'
-                                        : 'text-gray-600 hover:text-gray-900'
-                                        }`}
-                                >
-                                    Date Range
-                                </button>
-                            </div>
-                        </div>
-
-                        {!isDateRange ? (
-                            <input
-                                type="date"
-                                name="date_represented"
-                                value={formData.date_represented}
-                                onChange={handleInputChange}
-                                className="input-field transition-all duration-150 hover:border-gray-400"
-                                required
-                            />
-                        ) : (
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-xs text-gray-600 mb-1">From</label>
-                                    <input
-                                        type="date"
-                                        name="date_range_start"
-                                        value={formData.date_range_start || ''}
-                                        onChange={handleInputChange}
-                                        className="input-field transition-all duration-150 hover:border-gray-400"
-                                        required={isDateRange}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs text-gray-600 mb-1">To</label>
-                                    <input
-                                        type="date"
-                                        name="date_range_end"
-                                        value={formData.date_range_end || ''}
-                                        onChange={handleInputChange}
-                                        className="input-field transition-all duration-150 hover:border-gray-400"
-                                        required={isDateRange}
-                                    />
-                                </div>
-                            </div>
-                        )}
+                        <label className="label mb-2">
+                            <Calendar className="w-4 h-4 inline mr-2" />
+                            Date <span className="text-red-500">*</span>
+                        </label>
+                        <DateRangePicker
+                            value={datePickerValue}
+                            onChange={(value) => {
+                                setDatePickerValue(value)
+                                // Update formData for compatibility
+                                if (value.singleDate) {
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        date_represented: value.singleDate!,
+                                        date_range_start: undefined,
+                                        date_range_end: undefined
+                                    }))
+                                } else if (value.startDate && value.endDate) {
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        date_range_start: value.startDate!,
+                                        date_range_end: value.endDate!,
+                                        date_represented: value.startDate!
+                                    }))
+                                }
+                            }}
+                            maxDate={getLocalDateString(new Date())}
+                            placeholder="Select date or range"
+                        />
                     </div>
 
                     {/* Label */}

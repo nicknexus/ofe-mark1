@@ -2,8 +2,9 @@ import React, { useState, useRef, useEffect } from 'react'
 import { X, Upload, Calendar, Link as LinkIcon, FileText, Camera, DollarSign, MessageSquare, File, MapPin, Plus } from 'lucide-react'
 import { CreateEvidenceForm, KPI, KPIWithEvidence, Location } from '../types'
 import { apiService } from '../services/api'
-import { formatDate } from '../utils'
+import { formatDate, getLocalDateString } from '../utils'
 import LocationModal from './LocationModal'
+import DateRangePicker from './DateRangePicker'
 import toast from 'react-hot-toast'
 
 interface AddEvidenceModalProps {
@@ -29,14 +30,18 @@ export default function AddEvidenceModal({
         title: editData?.title || '',
         description: editData?.description || '',
         type: editData?.type || 'visual_proof',
-        date_represented: editData?.date_represented || new Date().toISOString().split('T')[0],
+        date_represented: editData?.date_represented || getLocalDateString(new Date()),
         date_range_start: editData?.date_range_start,
         date_range_end: editData?.date_range_end,
         file_url: editData?.file_url,
         kpi_ids: editData?.kpi_ids || (preSelectedKPIId ? [preSelectedKPIId] : []),
         initiative_id: initiativeId
     })
-    const [isDateRange, setIsDateRange] = useState(editData?.date_range_start && editData?.date_range_end ? true : false)
+    const [datePickerValue, setDatePickerValue] = useState<{
+        singleDate?: string
+        startDate?: string
+        endDate?: string
+    }>({})
     const [loading, setLoading] = useState(false)
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [isDragOver, setIsDragOver] = useState(false)
@@ -83,14 +88,19 @@ export default function AddEvidenceModal({
                         title: fullEvidence.title || editData.title || '',
                         description: fullEvidence.description || editData.description || '',
                         type: fullEvidence.type || editData.type || 'visual_proof',
-                        date_represented: fullEvidence.date_represented || editData.date_represented || new Date().toISOString().split('T')[0],
+                        date_represented: fullEvidence.date_represented || editData.date_represented || getLocalDateString(new Date()),
                         date_range_start: fullEvidence.date_range_start || editData.date_range_start,
                         date_range_end: fullEvidence.date_range_end || editData.date_range_end,
                         file_url: fullEvidence.file_url || editData.file_url,
                         kpi_ids: kpiIds,
                         initiative_id: initiativeId
                     })
-                    setIsDateRange((fullEvidence.date_range_start && fullEvidence.date_range_end) || (editData.date_range_start && editData.date_range_end) ? true : false)
+                    const initialDateValue = (fullEvidence.date_range_start && fullEvidence.date_range_end)
+                        ? { startDate: fullEvidence.date_range_start, endDate: fullEvidence.date_range_end }
+                        : (fullEvidence.date_represented || editData.date_represented)
+                            ? { singleDate: fullEvidence.date_represented || editData.date_represented }
+                            : {}
+                    setDatePickerValue(initialDateValue)
                     setSelectedLocationId(fullEvidence.location_id || editData.location_id || '')
 
                     // Store initial KPI IDs to track changes
@@ -109,14 +119,19 @@ export default function AddEvidenceModal({
                         title: editData.title || '',
                         description: editData.description || '',
                         type: editData.type || 'visual_proof',
-                        date_represented: editData.date_represented || new Date().toISOString().split('T')[0],
+                        date_represented: editData.date_represented || getLocalDateString(new Date()),
                         date_range_start: editData.date_range_start,
                         date_range_end: editData.date_range_end,
                         file_url: editData.file_url,
                         kpi_ids: kpiIds,
                         initiative_id: initiativeId
                     })
-                    setIsDateRange(editData.date_range_start && editData.date_range_end ? true : false)
+                    const initialDateValue = (editData.date_range_start && editData.date_range_end)
+                        ? { startDate: editData.date_range_start, endDate: editData.date_range_end }
+                        : editData.date_represented
+                            ? { singleDate: editData.date_represented }
+                            : {}
+                    setDatePickerValue(initialDateValue)
                     setSelectedLocationId(editData.location_id || '')
                     setInitialKpiIds(kpiIds)
                     setHasChangedKPIs(false)
@@ -132,6 +147,7 @@ export default function AddEvidenceModal({
             setHasChangedDataPoints(false)
             setInitialKpiIds([])
             setHasChangedKPIs(false)
+            setDatePickerValue({})
         }
     }, [editData?.id, initiativeId])
 
@@ -149,9 +165,9 @@ export default function AddEvidenceModal({
     useEffect(() => {
         const timeoutId = setTimeout(() => {
             if (formData.kpi_ids && formData.kpi_ids.length > 0) {
-                if (isDateRange && formData.date_range_start && formData.date_range_end) {
+                if (datePickerValue.startDate && datePickerValue.endDate) {
                     fetchMatchingDataPoints()
-                } else if (!isDateRange && formData.date_represented) {
+                } else if (datePickerValue.singleDate) {
                     fetchMatchingDataPoints()
                 } else {
                     setMatchingDataPoints([])
@@ -162,7 +178,7 @@ export default function AddEvidenceModal({
         }, 300) // 300ms debounce
 
         return () => clearTimeout(timeoutId)
-    }, [isDateRange, formData.date_range_start, formData.date_range_end, formData.date_represented, formData.kpi_ids])
+    }, [datePickerValue, formData.kpi_ids])
 
     const fetchMatchingDataPoints = async () => {
         if (isFetchingMatches) return // Prevent concurrent calls
@@ -179,10 +195,10 @@ export default function AddEvidenceModal({
                     const updateStart = update.date_range_start
                     const updateEnd = update.date_range_end
 
-                    if (isDateRange) {
+                    if (datePickerValue.startDate && datePickerValue.endDate) {
                         // Evidence is a date range
-                        const evidenceStart = formData.date_range_start!
-                        const evidenceEnd = formData.date_range_end!
+                        const evidenceStart = datePickerValue.startDate
+                        const evidenceEnd = datePickerValue.endDate
 
                         // Check if evidence range overlaps with update
                         if (updateStart && updateEnd) {
@@ -192,9 +208,9 @@ export default function AddEvidenceModal({
                             // Update is single date - check if it's within evidence range
                             return updateDate >= evidenceStart && updateDate <= evidenceEnd
                         }
-                    } else {
+                    } else if (datePickerValue.singleDate) {
                         // Evidence is a single date
-                        const evidenceDate = formData.date_represented!
+                        const evidenceDate = datePickerValue.singleDate
 
                         // Check if evidence date matches or overlaps with update
                         if (updateStart && updateEnd) {
@@ -205,6 +221,7 @@ export default function AddEvidenceModal({
                             return evidenceDate === updateDate
                         }
                     }
+                    return false
                 })
 
                 if (matchingUpdates.length > 0) {
@@ -268,17 +285,18 @@ export default function AddEvidenceModal({
             }
 
             // Handle date range logic
-            if (isDateRange) {
-                // For date ranges, ensure both range fields are included
-                if (!submitData.date_range_start || !submitData.date_range_end) {
-                    throw new Error('Both start and end dates are required for date ranges')
-                }
-                // Set date_represented to start date for consistency
-                submitData.date_represented = submitData.date_range_start
-            } else {
-                // For single dates, clear range fields
+            if (datePickerValue.singleDate) {
+                // Single date selected
+                submitData.date_represented = datePickerValue.singleDate
                 submitData.date_range_start = undefined
                 submitData.date_range_end = undefined
+            } else if (datePickerValue.startDate && datePickerValue.endDate) {
+                // Date range selected
+                submitData.date_range_start = datePickerValue.startDate
+                submitData.date_range_end = datePickerValue.endDate
+                submitData.date_represented = datePickerValue.startDate
+            } else {
+                throw new Error('Please select a date')
             }
 
             // Include selected data points for precise linking
@@ -303,12 +321,12 @@ export default function AddEvidenceModal({
                     title: '',
                     description: '',
                     type: 'visual_proof',
-                    date_represented: new Date().toISOString().split('T')[0],
+                    date_represented: getLocalDateString(new Date()),
                     kpi_ids: preSelectedKPIId ? [preSelectedKPIId] : [],
                     initiative_id: initiativeId
                 })
                 setSelectedFile(null)
-                setIsDateRange(false)
+                setDatePickerValue({})
             }
             setUploadProgress('')
             onClose()
@@ -499,78 +517,41 @@ export default function AddEvidenceModal({
 
                     {/* Date Selection */}
                     <div>
-                        <label className="label">
+                        <label className="label mb-2">
                             <Calendar className="w-4 h-4 inline mr-2" />
                             Date this evidence represents <span className="text-red-500">*</span>
                         </label>
-
-                        <div className="space-y-3">
-                            <div className="flex bg-gray-100 rounded-lg p-1 w-fit">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsDateRange(false)}
-                                    className={`px-3 py-1 text-sm rounded-md transition-all duration-200 ${!isDateRange
-                                        ? 'bg-white text-gray-900 shadow-sm font-medium'
-                                        : 'text-gray-600 hover:text-gray-900'
-                                        }`}
-                                >
-                                    Single Date
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsDateRange(true)}
-                                    className={`px-3 py-1 text-sm rounded-md transition-all duration-200 ${isDateRange
-                                        ? 'bg-white text-gray-900 shadow-sm font-medium'
-                                        : 'text-gray-600 hover:text-gray-900'
-                                        }`}
-                                >
-                                    Date Range
-                                </button>
-                            </div>
-
-                            {!isDateRange ? (
-                                <input
-                                    type="date"
-                                    name="date_represented"
-                                    value={formData.date_represented}
-                                    onChange={handleInputChange}
-                                    className="input-field"
-                                    required
-                                />
-                            ) : (
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs text-gray-600 mb-1">From</label>
-                                        <input
-                                            type="date"
-                                            name="date_range_start"
-                                            value={formData.date_range_start || ''}
-                                            onChange={handleInputChange}
-                                            className="input-field"
-                                            required={isDateRange}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs text-gray-600 mb-1">To</label>
-                                        <input
-                                            type="date"
-                                            name="date_range_end"
-                                            value={formData.date_range_end || ''}
-                                            onChange={handleInputChange}
-                                            className="input-field"
-                                            required={isDateRange}
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        <DateRangePicker
+                            value={datePickerValue}
+                            onChange={(value) => {
+                                setDatePickerValue(value)
+                                // Update formData for compatibility
+                                if (value.singleDate) {
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        date_represented: value.singleDate!,
+                                        date_range_start: undefined,
+                                        date_range_end: undefined
+                                    }))
+                                } else if (value.startDate && value.endDate) {
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        date_range_start: value.startDate!,
+                                        date_range_end: value.endDate!,
+                                        date_represented: value.startDate!
+                                    }))
+                                }
+                            }}
+                            maxDate={getLocalDateString(new Date())}
+                            placeholder="Select date or range"
+                        />
                     </div>
 
                     {/* Matching Data Points (shown right after date selection) */}
                     {kpiDataSummaries.length > 0 && (
                         <div className="space-y-3">
                             <h4 className="text-sm font-medium text-blue-900">
-                                📊 Data Points {isDateRange ? 'in Selected Date Range' : 'on Selected Date'}
+                                📊 Data Points {datePickerValue.startDate && datePickerValue.endDate ? 'in Selected Date Range' : 'on Selected Date'}
                             </h4>
                             <p className="text-xs text-blue-700 mb-3">
                                 Your evidence will help prove these data points:

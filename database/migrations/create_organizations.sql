@@ -88,3 +88,4 @@ COMMENT ON TABLE organizations IS 'Organizations that users belong to and initia
 COMMENT ON COLUMN organizations.slug IS 'URL-friendly identifier for public pages (e.g., charity-name)';
 COMMENT ON COLUMN organizations.is_public IS 'Whether this organization is published and accessible via public URL';
 
+

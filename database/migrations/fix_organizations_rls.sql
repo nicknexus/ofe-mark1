@@ -28,3 +28,4 @@ CREATE POLICY "Organizations are viewable by everyone if public" ON organization
         auth.role() = 'service_role'
     );
 
+

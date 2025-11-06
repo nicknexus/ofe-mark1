@@ -14,10 +14,13 @@ import {
     Target,
     X,
     Eye,
-    MapPin
+    MapPin,
+    Camera,
+    MessageSquare,
+    DollarSign
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
-import { getCategoryColor, parseLocalDate, isSameDay, compareDates } from '../utils'
+import { getCategoryColor, parseLocalDate, isSameDay, compareDates, formatDate, getEvidenceTypeInfo } from '../utils'
 import EvidencePreviewModal from './EvidencePreviewModal'
 import DataPointPreviewModal from './DataPointPreviewModal'
 import AddKPIUpdateModal from './AddKPIUpdateModal'
@@ -97,13 +100,19 @@ export default function ExpandableKPICard({
         )
     }
 
-    // Load evidence when expanded
+    // Load evidence for all cards (needed for evidence type percentages in collapsed view)
     useEffect(() => {
-        if (isExpanded && kpi.id && initiativeId) {
+        if (kpi.id && initiativeId) {
             loadEvidence()
+        }
+    }, [kpi.id, initiativeId])
+
+    // Load update locations when expanded
+    useEffect(() => {
+        if (isExpanded && kpiUpdates && kpiUpdates.length > 0) {
             loadUpdateLocations()
         }
-    }, [isExpanded, kpi.id, initiativeId, kpiUpdates])
+    }, [isExpanded, kpiUpdates])
 
     const loadEvidence = async () => {
         if (!kpi.id || !initiativeId) return
@@ -340,10 +349,14 @@ export default function ExpandableKPICard({
             currentDate.setDate(startDate.getDate() + i)
             currentDate.setHours(0, 0, 0, 0) // Normalize to midnight local time
 
-            const dateString = currentDate.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric'
-            })
+            // Don't create dates beyond today
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+            if (compareDates(currentDate, today) > 0) {
+                break
+            }
+
+            const dateString = formatDate(currentDate).split(',')[0] // Get just the date part without year
 
             // Find if there's an update on this date (using effective date)
             const updateOnThisDate = filteredUpdates.find(update => {
@@ -373,6 +386,18 @@ export default function ExpandableKPICard({
     }
 
     const chartData = generateChartData()
+
+    // Calculate x-axis interval to always show approximately 30 labels (1 month's worth)
+    // For 1 month view, show every single day
+    const getXAxisInterval = () => {
+        // If viewing 1 month, show all labels (every day)
+        if (timeFrame === '1month') return 0
+
+        const dataPointCount = chartData.length
+        if (dataPointCount <= 30) return 0 // Show all labels if we have 30 or fewer data points
+        // Calculate interval to show ~30 labels: interval = floor((count - 1) / 30)
+        return Math.floor((dataPointCount - 1) / 30)
+    }
 
     // Calculate dynamic max value with headroom for the graph
     const calculateMaxWithHeadroom = () => {
@@ -430,64 +455,151 @@ export default function ExpandableKPICard({
 
     const yTicks = generateYTicks()
 
+    // Calculate evidence type percentages
+    const calculateEvidenceTypePercentages = () => {
+        if (!evidence || evidence.length === 0) {
+            return {
+                visual_proof: { count: 0, percentage: 0 },
+                documentation: { count: 0, percentage: 0 },
+                testimony: { count: 0, percentage: 0 },
+                financials: { count: 0, percentage: 0 }
+            }
+        }
+
+        const typeCounts = {
+            visual_proof: 0,
+            documentation: 0,
+            testimony: 0,
+            financials: 0
+        }
+
+        evidence.forEach((ev: any) => {
+            if (ev.type && typeCounts.hasOwnProperty(ev.type)) {
+                typeCounts[ev.type as keyof typeof typeCounts]++
+            }
+        })
+
+        const total = evidence.length
+        return {
+            visual_proof: { count: typeCounts.visual_proof, percentage: total > 0 ? Math.round((typeCounts.visual_proof / total) * 100) : 0 },
+            documentation: { count: typeCounts.documentation, percentage: total > 0 ? Math.round((typeCounts.documentation / total) * 100) : 0 },
+            testimony: { count: typeCounts.testimony, percentage: total > 0 ? Math.round((typeCounts.testimony / total) * 100) : 0 },
+            financials: { count: typeCounts.financials, percentage: total > 0 ? Math.round((typeCounts.financials / total) * 100) : 0 }
+        }
+    }
+
+    const evidenceTypePercentages = calculateEvidenceTypePercentages()
+
+    // Get evidence type icon component
+    const getEvidenceIcon = (type: 'visual_proof' | 'documentation' | 'testimony' | 'financials') => {
+        switch (type) {
+            case 'visual_proof': return Camera
+            case 'documentation': return FileText
+            case 'testimony': return MessageSquare
+            case 'financials': return DollarSign
+            default: return FileText
+        }
+    }
+
     return (
-        <div className={`bg-white/90 backdrop-blur-xl border-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 ${(kpi.evidence_percentage || 0) >= 80
+        <div className={`bg-white/90 backdrop-blur-xl border-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden ${(kpi.evidence_percentage || 0) >= 80
             ? 'border-green-300/60 hover:border-green-400/60'
             : (kpi.evidence_percentage || 0) >= 30
                 ? 'border-yellow-300/60 hover:border-yellow-400/60'
                 : 'border-red-300/60 hover:border-red-400/60'
             }`}>
-            {/* Collapsed View - Compact Vertical Layout */}
+            {/* Collapsed View - New Layout */}
             <div
-                className="p-3 cursor-pointer h-full flex flex-col"
+                className="cursor-pointer h-full flex flex-col"
                 onClick={onToggleExpand}
             >
-                {/* Header: Category & Status */}
-                <div className="flex items-center justify-between gap-1.5 mb-2">
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${getCategoryColor(kpi.category)}`}>
-                        {kpi.category}
-                    </span>
-                    {/* Evidence Status Badge - Compact */}
-                    <div className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${(kpi.evidence_percentage || 0) >= 80
-                        ? 'bg-green-100 text-green-700'
-                        : (kpi.evidence_percentage || 0) >= 30
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-red-100 text-red-700'
-                        }`}>
-                        {(kpi.evidence_percentage || 0) >= 80 ? '✓' :
-                            (kpi.evidence_percentage || 0) >= 30 ? '⚠' :
-                                '⚠'}
+                {/* Main Content Section */}
+                <div className="flex flex-1 min-h-0">
+                    {/* Left Section - ~70% width */}
+                    <div className="w-[70%] bg-gradient-to-br from-blue-50/50 to-indigo-50/30 p-2.5 flex flex-col">
+                        {/* Category Badge */}
+                        <div className="mb-2">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${getCategoryColor(kpi.category)}`}>
+                                {kpi.category}
+                            </span>
+                        </div>
+
+                        {/* Title */}
+                        <h3 className="text-xl font-bold text-gray-900 mb-3 line-clamp-2 leading-tight">{kpi.title}</h3>
+
+                        {/* Metric Number */}
+                        {kpiTotal !== undefined ? (
+                            <div className="flex-1 flex flex-col justify-center">
+                                <span className="text-5xl font-extrabold text-gray-900 tracking-tight leading-none">
+                                    {kpiTotal.toLocaleString()}
+                                </span>
+                                <span className="text-sm font-medium text-gray-600 mt-1">
+                                    {kpi.metric_type === 'percentage' ? '%' : kpi.unit_of_measurement}
+                                </span>
+                            </div>
+                        ) : (
+                            <div className="flex-1 flex items-center">
+                                <div className="text-sm text-gray-400 font-medium">No data yet</div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Right Section - ~30% width */}
+                    <div className="w-[30%] bg-gradient-to-br from-purple-50/50 to-pink-50/30 p-3 flex flex-col border-l border-gray-200/50">
+                        {/* Impact Claims */}
+                        <div className="mb-2">
+                            <div className="text-[9px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">
+                                Impact Claims
+                            </div>
+                            <div className="text-2xl font-extrabold text-purple-700">
+                                {kpi.total_updates || 0}
+                            </div>
+                        </div>
+
+                        {/* Evidence Claims */}
+                        <div className="mb-3">
+                            <div className="text-[9px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">
+                                Evidence Claims
+                            </div>
+                            <div className="text-2xl font-extrabold text-pink-700">
+                                {kpi.evidence_count || 0}
+                            </div>
+                        </div>
+
+                        {/* Evidence Type Grid - 2x2 */}
+                        <div className="grid grid-cols-2 gap-1.5 mt-auto">
+                            {(['visual_proof', 'documentation', 'testimony', 'financials'] as const).map((type) => {
+                                const IconComponent = getEvidenceIcon(type)
+                                const typeInfo = getEvidenceTypeInfo(type)
+                                const percentage = evidenceTypePercentages[type].percentage
+
+                                // Extract color classes from typeInfo
+                                const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' :
+                                    typeInfo.color.includes('blue') ? 'text-blue-600' :
+                                        typeInfo.color.includes('orange') ? 'text-orange-600' :
+                                            typeInfo.color.includes('green') ? 'text-green-600' :
+                                                'text-gray-600'
+
+                                return (
+                                    <div
+                                        key={type}
+                                        className={`p-1.5 rounded bg-white/60 border border-gray-200/50 flex flex-col items-center justify-center ${percentage > 0 ? 'hover:bg-white/80' : 'opacity-50'}`}
+                                    >
+                                        <IconComponent className={`w-3 h-3 ${colorClasses}`} />
+                                        <div className="text-[8px] font-bold text-gray-700 mt-0.5">
+                                            {percentage}%
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
                     </div>
                 </div>
 
-                {/* Title - Single line */}
-                <h3 className="text-sm font-bold text-gray-900 mb-1.5 line-clamp-2 leading-tight">{kpi.title}</h3>
-
-                {/* Value Display */}
-                {kpi.total_updates > 0 && kpiTotal !== undefined ? (
-                    <div className="mb-2">
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-xl font-bold text-gray-900">
-                                {kpiTotal.toLocaleString()}
-                            </span>
-                            <span className="text-[10px] font-medium text-gray-500">
-                                {kpi.metric_type === 'percentage' ? '%' : kpi.unit_of_measurement}
-                            </span>
-                        </div>
-                        <div className="text-[10px] text-gray-500 mt-0.5">
-                            {kpi.total_updates} claim{(kpi.total_updates !== 1) ? 's' : ''}
-                        </div>
-                    </div>
-                ) : (
-                    <div className="mb-2">
-                        <div className="text-xs text-gray-400 font-medium">No claims yet</div>
-                    </div>
-                )}
-
-                {/* Evidence Coverage Bar - Compact */}
-                <div className="mt-auto">
+                {/* Progress Bar Section - Full width at bottom */}
+                <div className="px-3 py-2 bg-gradient-to-r from-gray-50 to-gray-100/50 border-t border-gray-200/50">
                     <div className="flex items-center justify-between text-[10px] mb-1">
-                        <span className="font-semibold text-gray-600">Coverage</span>
+                        <span className="font-semibold text-gray-600">Evidence Coverage</span>
                         <span className={`font-bold ${(kpi.evidence_percentage || 0) >= 80
                             ? 'text-green-600'
                             : (kpi.evidence_percentage || 0) >= 30
@@ -497,7 +609,7 @@ export default function ExpandableKPICard({
                             {kpi.evidence_percentage || 0}%
                         </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                    <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                         <div
                             className={`h-full rounded-full transition-all duration-500 ${(kpi.evidence_percentage || 0) >= 80
                                 ? 'bg-gradient-to-r from-green-500 to-green-600'
@@ -510,11 +622,6 @@ export default function ExpandableKPICard({
                             }}
                         ></div>
                     </div>
-                    {(kpi.evidence_percentage || 0) < 80 && (
-                        <p className="text-[10px] text-gray-500 mt-1">
-                            {kpi.evidence_count || 0} evidence
-                        </p>
-                    )}
                 </div>
             </div>
 
@@ -691,6 +798,8 @@ export default function ExpandableKPICard({
                                                     angle={-45}
                                                     textAnchor="end"
                                                     height={60}
+                                                    interval={getXAxisInterval()}
+                                                    tickMargin={8}
                                                 />
                                                 <YAxis
                                                     stroke="#6b7280"
@@ -724,11 +833,7 @@ export default function ExpandableKPICard({
                                                         // Find the actual date from chartData
                                                         const dataPoint = chartData.find(d => d.date === label)
                                                         if (dataPoint?.fullDate) {
-                                                            return new Date(dataPoint.fullDate).toLocaleDateString('en-US', {
-                                                                month: 'short',
-                                                                day: 'numeric',
-                                                                year: 'numeric'
-                                                            })
+                                                            return formatDate(dataPoint.fullDate)
                                                         }
                                                         return `Date: ${label}`
                                                     }}
@@ -785,8 +890,8 @@ export default function ExpandableKPICard({
                                             kpiUpdates.map((update, index) => {
                                                 const hasDateRange = update.date_range_start && update.date_range_end
                                                 const displayDate = hasDateRange
-                                                    ? `${new Date(update.date_range_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(update.date_range_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-                                                    : new Date(update.date_represented).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                                    ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}`
+                                                    : formatDate(update.date_represented)
 
                                                 const updateLocation = update.location_id ? updateLocations[update.location_id] : null
 

@@ -210,14 +210,16 @@ class ApiService {
                 }
                 if (endpoint.includes('/kpis')) {
                     this.clearCacheByPattern('/kpis')
-                    // KPI changes also affect initiative dashboards
+                    // KPI changes also affect initiative dashboards and locations (via evidence)
                     this.clearCacheByPattern('/initiatives')
+                    this.clearCacheByPattern('/locations')
                 }
                 if (endpoint.includes('/evidence')) {
                     this.clearCacheByPattern('/evidence')
-                    // Evidence changes also affect KPIs and initiative dashboards
+                    // Evidence changes also affect KPIs, initiative dashboards, and locations
                     this.clearCacheByPattern('/kpis')
                     this.clearCacheByPattern('/initiatives')
+                    this.clearCacheByPattern('/locations')
                 }
                 if (endpoint.includes('/beneficiaries')) {
                     this.clearCacheByPattern('/beneficiaries')
