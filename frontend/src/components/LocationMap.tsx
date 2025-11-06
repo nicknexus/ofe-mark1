@@ -43,6 +43,15 @@ function MapClickHandler({ onMapClick, onMapClickPosition }: { onMapClick?: (coo
     return null
 }
 
+// Component to store map instance in ref
+function MapInstanceSetter({ mapRef }: { mapRef: React.MutableRefObject<L.Map | null> }) {
+    const map = useMap()
+    useEffect(() => {
+        mapRef.current = map
+    }, [map, mapRef])
+    return null
+}
+
 // Component to update map view when position changes
 function MapViewUpdater({ center, zoom }: { center: [number, number]; zoom: number }) {
     const map = useMap()
@@ -438,10 +447,8 @@ export default function LocationMap({
                 style={{ width: '100%', height: '100%' }}
                 className="relative z-0"
                 zoomControl={false}
-                whenReady={(map) => {
-                    mapInstanceRef.current = map.target as L.Map
-                }}
             >
+                <MapInstanceSetter mapRef={mapInstanceRef} />
                 <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -649,7 +656,7 @@ export default function LocationMap({
             )}
 
             {/* Map Click Popup - For applying location filter */}
-            {mapClickPopup && onApplyLocationFilter && createPortal((() => {
+            {mapClickPopup && onApplyLocationFilter && (() => {
                 // Find nearest location to clicked coordinates
                 const [lng, lat] = mapClickPopup.coordinates
                 let nearestLocation: Location | null = null
@@ -672,10 +679,7 @@ export default function LocationMap({
                     return null
                 }
 
-                // TypeScript now knows nearestLocation is not null here
-                const location = nearestLocation
-
-                return (
+                return createPortal(
                     <div
                         ref={mapClickPopupRef}
                         className="fixed z-[9999] bg-white rounded-xl shadow-2xl border border-gray-200 min-w-[280px] max-w-[320px] animate-fade-in-up overflow-hidden flex flex-col"
@@ -705,7 +709,7 @@ export default function LocationMap({
                                         <MapPin className="w-4 h-4 text-green-600" />
                                     </div>
                                     <div>
-                                        <h3 className="font-semibold text-gray-900 text-sm">{location.name}</h3>
+                                        <h3 className="font-semibold text-gray-900 text-sm">{nearestLocation.name}</h3>
                                     </div>
                                 </div>
                                 <button
@@ -729,8 +733,8 @@ export default function LocationMap({
                                 </button>
                                 <button
                                     onClick={() => {
-                                        if (location.id && onApplyLocationFilter) {
-                                            onApplyLocationFilter(location.id)
+                                        if (nearestLocation.id && onApplyLocationFilter) {
+                                            onApplyLocationFilter(nearestLocation.id)
                                             setMapClickPopup(null)
                                         }
                                     }}
@@ -740,11 +744,10 @@ export default function LocationMap({
                                 </button>
                             </div>
                         </div>
-                    </div>
+                    </div>,
+                    document.body
                 )
-            })(),
-            document.body
-            )}
+            })()}
 
             {/* Location Details Modal */}
             <LocationDetailsModal
