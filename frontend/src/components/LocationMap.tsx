@@ -679,6 +679,9 @@ export default function LocationMap({
                     return null
                 }
 
+                // TypeScript now knows nearestLocation is not null here, but we need to assert it
+                const location: Location = nearestLocation as Location
+
                 return createPortal(
                     <div
                         ref={mapClickPopupRef}
@@ -709,7 +712,7 @@ export default function LocationMap({
                                         <MapPin className="w-4 h-4 text-green-600" />
                                     </div>
                                     <div>
-                                        <h3 className="font-semibold text-gray-900 text-sm">{nearestLocation.name}</h3>
+                                        <h3 className="font-semibold text-gray-900 text-sm">{location.name}</h3>
                                     </div>
                                 </div>
                                 <button
@@ -733,8 +736,8 @@ export default function LocationMap({
                                 </button>
                                 <button
                                     onClick={() => {
-                                        if (nearestLocation.id && onApplyLocationFilter) {
-                                            onApplyLocationFilter(nearestLocation.id)
+                                        if (location.id && onApplyLocationFilter) {
+                                            onApplyLocationFilter(location.id)
                                             setMapClickPopup(null)
                                         }
                                     }}
