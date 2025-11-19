@@ -103,10 +103,12 @@ interface MetricsDashboardProps {
     onNavigateToLocations?: () => void
     onMetricCardClick?: (kpiId: string) => void
     onAddKPI?: () => void
+    onStoryClick?: (storyId: string) => void
 }
 
-export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = [], initiativeId, onNavigateToLocations, onMetricCardClick, onAddKPI }: MetricsDashboardProps) {
-    const [timeFrame, setTimeFrame] = useState<'1month' | '6months' | '1year' | '5years'>('1month')
+export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = [], initiativeId, onNavigateToLocations, onMetricCardClick, onAddKPI, onStoryClick }: MetricsDashboardProps) {
+    const [timeFrame, setTimeFrame] = useState<'all' | '1month' | '6months' | '1year' | '5years'>('all')
+    const [isCumulative, setIsCumulative] = useState(true)
     const [visibleKPIs, setVisibleKPIs] = useState<Set<string>>(new Set())
     const [orderedKPIs, setOrderedKPIs] = useState<any[]>([])
     
@@ -162,7 +164,6 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
             }
         }
     }
-    const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false)
     const [locations, setLocations] = useState<Location[]>([])
     const [mapRefreshKey, setMapRefreshKey] = useState(0) // Key to trigger map refresh
     const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
@@ -178,10 +179,13 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     const [selectedBeneficiaryGroups, setSelectedBeneficiaryGroups] = useState<string[]>([])
     const [showLocationPicker, setShowLocationPicker] = useState(false)
     const [showBeneficiaryPicker, setShowBeneficiaryPicker] = useState(false)
+    const [showMetricsPicker, setShowMetricsPicker] = useState(false)
     const locationButtonRef = React.useRef<HTMLButtonElement>(null)
     const beneficiaryButtonRef = React.useRef<HTMLButtonElement>(null)
+    const metricsButtonRef = React.useRef<HTMLButtonElement>(null)
     const [locationDropdownPosition, setLocationDropdownPosition] = useState({ top: 0, left: 0 })
     const [beneficiaryDropdownPosition, setBeneficiaryDropdownPosition] = useState({ top: 0, left: 0 })
+    const [metricsDropdownPosition, setMetricsDropdownPosition] = useState({ top: 0, left: 0 })
 
     // Load locations
     useEffect(() => {
@@ -429,23 +433,48 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
             const now = new Date()
             now.setHours(0, 0, 0, 0) // Normalize to midnight local time
 
-            switch (timeFrame) {
-                case '1month':
+            if (timeFrame === 'all') {
+                // Find the oldest update date across visible KPIs only
+                // Filter updates to only include those from visible KPIs
+                const visibleKPIUpdates = filteredUpdates.filter(update => {
+                    const kpiId = update.kpi_id
+                    return visibleKPIs.has(kpiId) && filteredKPIIds.has(kpiId)
+                })
+                
+                if (visibleKPIUpdates.length > 0) {
+                    const oldestUpdate = visibleKPIUpdates.reduce((oldest, update) => {
+                        const updateDate = getEffectiveDate(update)
+                        const oldestDate = getEffectiveDate(oldest)
+                        return updateDate < oldestDate ? update : oldest
+                    })
+                    startDate = getEffectiveDate(oldestUpdate)
+                    startDate.setHours(0, 0, 0, 0)
+                    // Subtract 1 day to show the graph starting at 0 before the first impact claim
+                    startDate.setDate(startDate.getDate() - 1)
+                } else {
+                    // Fallback to 1 month if no updates from visible KPIs
                     startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
-                    break
-                case '6months':
-                    startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate())
-                    break
-                case '1year':
-                    startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
-                    break
-                case '5years':
-                    startDate = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate())
-                    break
-                default:
-                    startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
+                    startDate.setHours(0, 0, 0, 0)
+                }
+            } else {
+                switch (timeFrame) {
+                    case '1month':
+                        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
+                        break
+                    case '6months':
+                        startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate())
+                        break
+                    case '1year':
+                        startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
+                        break
+                    case '5years':
+                        startDate = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate())
+                        break
+                    default:
+                        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
+                }
+                startDate.setHours(0, 0, 0, 0) // Normalize to midnight local time
             }
-            startDate.setHours(0, 0, 0, 0) // Normalize to midnight local time
             endDate = new Date(now)
             endDate.setHours(23, 59, 59, 999) // End of today
         }
@@ -467,6 +496,62 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
             [kpiId: string]: any; // Dynamic keys for each KPI
         }> = []
 
+        // Non-cumulative mode: group by month (only when timeFrame is 'all')
+        if (!isCumulative && timeFrame === 'all') {
+            // Start from the month before the first impact claim
+            const firstMonthStart = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
+            firstMonthStart.setMonth(firstMonthStart.getMonth() - 1)
+            
+            const now = new Date()
+            const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+            
+            // Group updates by month for each visible KPI only
+            const monthlyTotals: Record<string, Record<string, number>> = {} // [monthKey][kpiId] = total
+            
+            Object.keys(filteredUpdatesByKPI).forEach(kpiId => {
+                // Only process visible KPIs
+                if (!visibleKPIs.has(kpiId)) return
+                
+                filteredUpdatesByKPI[kpiId].forEach(update => {
+                    const updateDate = getEffectiveDate(update)
+                    const monthKey = `${updateDate.getFullYear()}-${String(updateDate.getMonth() + 1).padStart(2, '0')}`
+                    
+                    if (!monthlyTotals[monthKey]) {
+                        monthlyTotals[monthKey] = {}
+                    }
+                    if (!monthlyTotals[monthKey][kpiId]) {
+                        monthlyTotals[monthKey][kpiId] = 0
+                    }
+                    monthlyTotals[monthKey][kpiId] += (update.value || 0)
+                })
+            })
+            
+            // Generate monthly data points
+            let currentMonthDate = new Date(firstMonthStart)
+            while (currentMonthDate <= currentMonth) {
+                const monthKey = `${currentMonthDate.getFullYear()}-${String(currentMonthDate.getMonth() + 1).padStart(2, '0')}`
+                const monthName = currentMonthDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                
+                const dataPoint: any = {
+                    date: monthName,
+                    fullDate: new Date(currentMonthDate)
+                }
+                
+                // Set value for each visible KPI (0 if no updates for that month)
+                Array.from(visibleKPIs).forEach(kpiId => {
+                    dataPoint[kpiId] = monthlyTotals[monthKey]?.[kpiId] || 0
+                })
+                
+                data.push(dataPoint)
+                
+                // Move to next month
+                currentMonthDate.setMonth(currentMonthDate.getMonth() + 1)
+            }
+            
+            return data
+        }
+
+        // Cumulative mode: daily data points
         // Calculate time range
         // Normalize dates to ensure accurate day calculation - use date-only values
         const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate())
@@ -524,6 +609,9 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     // Calculate x-axis interval to always show approximately 30 labels (1 month's worth)
     // For 1 month view, show every single day
     const getXAxisInterval = () => {
+        // Non-cumulative mode: show every month (interval 0)
+        if (!isCumulative && timeFrame === 'all') return 0
+        
         // If viewing 1 month without custom date range, show all labels (every day)
         if (timeFrame === '1month' && !datePickerValue.singleDate && !datePickerValue.startDate) return 0
         
@@ -609,56 +697,104 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
 
     return (
         <div className="h-full flex flex-col overflow-hidden px-3 pt-2 pb-2 space-y-1.5">
-            {/* Top Metric Cards - 6 across max */}
-            <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-            >
-                <SortableContext
-                    items={displayKPIs.map(kpi => kpi.id!)}
-                    strategy={horizontalListSortingStrategy}
-                >
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 flex-shrink-0">
-                        {displayKPIs.map((kpi, index) => {
-                            const metricColor = getKPIColor(kpi.category, index)
-                            return (
-                                <SortableMetricCard
-                                    key={kpi.id}
-                                    kpi={kpi}
-                                    metricColor={metricColor}
-                                    filteredTotal={filteredTotals[kpi.id] || 0}
-                                    onMetricCardClick={onMetricCardClick}
-                                />
-                            )
-                        })}
-                        {/* Plus box to add new metric - only show if fewer than 6 KPIs */}
-                        {kpis.length < 6 && onAddKPI && (
-                            <button
-                                onClick={onAddKPI}
-                                className="bg-white/80 backdrop-blur-sm border-2 border-dashed border-gray-300/60 rounded-lg p-2 hover:shadow-md hover:border-blue-400 hover:bg-blue-50/50 cursor-pointer transition-all flex flex-col items-center justify-center min-h-[80px]"
-                            >
-                                <Plus className="w-5 h-5 text-gray-400 mb-1" />
-                                <span className="text-xs text-gray-500 font-medium">Add Metric</span>
-                            </button>
-                        )}
-                    </div>
-                </SortableContext>
-            </DndContext>
-
             {/* Master Filter Bar */}
             <div className="bg-white/80 backdrop-blur-sm border border-gray-200/60 rounded-lg p-1.5 flex items-center justify-between flex-wrap gap-1.5 flex-shrink-0">
                 <div className="flex items-center space-x-2 flex-wrap">
                     <span className="text-xs font-semibold text-gray-700">Filters:</span>
 
                     {/* Date Filter */}
-                    <DateRangePicker
-                        value={datePickerValue}
-                        onChange={setDatePickerValue}
-                        maxDate={getLocalDateString(new Date())}
-                        placeholder="Filter by date"
-                        className="w-auto"
-                    />
+                    <div className="relative">
+                        <DateRangePicker
+                            value={datePickerValue}
+                            onChange={setDatePickerValue}
+                            maxDate={getLocalDateString(new Date())}
+                            placeholder="Filter by date"
+                            className="w-auto"
+                        />
+                    </div>
+
+                    {/* Metrics Filter */}
+                    <div className="relative">
+                        <button
+                            ref={metricsButtonRef}
+                            onClick={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect()
+                                setMetricsDropdownPosition({
+                                    top: rect.bottom + 4,
+                                    left: rect.left
+                                })
+                                setShowMetricsPicker(!showMetricsPicker)
+                                setShowLocationPicker(false)
+                                setShowBeneficiaryPicker(false)
+                            }}
+                            className="flex items-center space-x-1 px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded text-xs font-medium transition-colors border border-blue-200"
+                        >
+                            <Filter className="w-3 h-3" />
+                            <span>Metrics</span>
+                            {visibleKPIs.size > 0 && visibleKPIs.size < kpis.length && (
+                                <span className="ml-1 bg-blue-600 text-white text-[10px] px-1 rounded-full">
+                                    {visibleKPIs.size}
+                                </span>
+                            )}
+                            <ChevronDown className={`w-3 h-3 transition-transform ${showMetricsPicker ? 'rotate-180' : ''}`} />
+                        </button>
+                        {showMetricsPicker && createPortal(
+                            <>
+                                <div className="fixed inset-0 z-[9998]" onClick={() => setShowMetricsPicker(false)} />
+                                <div
+                                    className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] p-2 min-w-[200px] max-h-64 overflow-y-auto"
+                                    style={{
+                                        top: `${metricsDropdownPosition.top}px`,
+                                        left: `${metricsDropdownPosition.left}px`
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    {kpis.length === 0 ? (
+                                        <p className="text-xs text-gray-500">No metrics available</p>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-xs font-semibold text-gray-700">Select Metrics</span>
+                                                {visibleKPIs.size > 0 && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            toggleAllKPIs()
+                                                        }}
+                                                        className="text-xs text-blue-600 hover:text-blue-800"
+                                                    >
+                                                        {visibleKPIs.size === kpis.length ? 'Deselect All' : 'Select All'}
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {kpis.map((kpi, index) => (
+                                                <label
+                                                    key={kpi.id}
+                                                    className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={visibleKPIs.has(kpi.id)}
+                                                        onChange={() => toggleKPI(kpi.id)}
+                                                        className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                        style={{ accentColor: getKPIColor(kpi.category, index) }}
+                                                    />
+                                                    <div
+                                                        className="w-2 h-2 rounded-full flex-shrink-0"
+                                                        style={{ backgroundColor: getKPIColor(kpi.category, index) }}
+                                                    />
+                                                    <span className="text-xs text-gray-700 truncate flex-1">
+                                                        {kpi.title}
+                                                    </span>
+                                                </label>
+                                            ))}
+                                        </>
+                                    )}
+                                </div>
+                            </>,
+                            document.body
+                        )}
+                    </div>
 
                     {/* Location Filter */}
                     <div className="relative">
@@ -671,6 +807,8 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                     left: rect.left
                                 })
                                 setShowLocationPicker(!showLocationPicker)
+                                setShowMetricsPicker(false)
+                                setShowBeneficiaryPicker(false)
                             }}
                             className="flex items-center space-x-1 px-2 py-1 bg-green-50 hover:bg-green-100 text-green-700 rounded text-xs font-medium transition-colors border border-green-200"
                         >
@@ -681,6 +819,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                     {selectedLocations.length}
                                 </span>
                             )}
+                            <ChevronDown className={`w-3 h-3 transition-transform ${showLocationPicker ? 'rotate-180' : ''}`} />
                         </button>
                         {showLocationPicker && createPortal(
                             <>
@@ -753,6 +892,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 })
                                 setShowBeneficiaryPicker(!showBeneficiaryPicker)
                                 setShowLocationPicker(false)
+                                setShowMetricsPicker(false)
                             }}
                             className="flex items-center space-x-1 px-2 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded text-xs font-medium transition-colors border border-orange-200"
                         >
@@ -763,6 +903,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                     {selectedBeneficiaryGroups.length}
                                 </span>
                             )}
+                            <ChevronDown className={`w-3 h-3 transition-transform ${showBeneficiaryPicker ? 'rotate-180' : ''}`} />
                         </button>
                         {showBeneficiaryPicker && createPortal(
                             <>
@@ -831,7 +972,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setSelectedLocations([])
                                 setSelectedBeneficiaryGroups([])
                             }}
-                            className="flex items-center space-x-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs font-medium transition-colors"
+                            className="flex items-center space-x-1 px-2 py-1 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded text-xs font-medium transition-colors border border-gray-200"
                         >
                             <X className="w-3 h-3" />
                             <span>Clear</span>
@@ -839,6 +980,43 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     )}
                 </div>
             </div>
+
+            {/* Top Metric Cards - 6 across max */}
+            <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+            >
+                <SortableContext
+                    items={displayKPIs.map(kpi => kpi.id!)}
+                    strategy={horizontalListSortingStrategy}
+                >
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 flex-shrink-0">
+                        {displayKPIs.map((kpi, index) => {
+                            const metricColor = getKPIColor(kpi.category, index)
+                            return (
+                                <SortableMetricCard
+                                    key={kpi.id}
+                                    kpi={kpi}
+                                    metricColor={metricColor}
+                                    filteredTotal={filteredTotals[kpi.id] || 0}
+                                    onMetricCardClick={onMetricCardClick}
+                                />
+                            )
+                        })}
+                        {/* Plus box to add new metric - only show if fewer than 6 KPIs */}
+                        {kpis.length < 6 && onAddKPI && (
+                            <button
+                                onClick={onAddKPI}
+                                className="bg-white/80 backdrop-blur-sm border-2 border-dashed border-gray-300/60 rounded-lg p-2 hover:shadow-md hover:border-blue-400 hover:bg-blue-50/50 cursor-pointer transition-all flex flex-col items-center justify-center min-h-[80px]"
+                            >
+                                <Plus className="w-5 h-5 text-gray-400 mb-1" />
+                                <span className="text-xs text-gray-500 font-medium">Add Metric</span>
+                            </button>
+                        )}
+                    </div>
+                </SortableContext>
+            </DndContext>
 
             {/* Graph and Map Row */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-1.5 h-[25vh] lg:h-[50vh] overflow-hidden">
@@ -849,68 +1027,47 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             <h3 className="text-sm font-semibold text-gray-900">Metrics Over Time</h3>
                         </div>
                         <div className="flex items-center space-x-1">
-                            {/* Filter Dropdown */}
-                            <div className="relative">
-                                <button
-                                    onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-                                    className="flex items-center space-x-1 px-2 py-1 bg-white/80 hover:bg-white rounded border border-gray-200 text-xs font-medium text-gray-700 transition-colors"
-                                >
-                                    <Filter className="w-3 h-3" />
-                                    <span className="text-xs">Metrics</span>
-                                    <ChevronDown className={`w-3 h-3 transition-transform ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
-                                </button>
-
-                                {isFilterDropdownOpen && (
-                                    <>
-                                        <div className="fixed inset-0 z-10" onClick={() => setIsFilterDropdownOpen(false)} />
-                                        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-[100] min-w-[180px] max-h-48 overflow-y-auto">
-                                            <div className="p-2">
-                                                <button
-                                                    onClick={toggleAllKPIs}
-                                                    className="w-full text-left px-2 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 rounded mb-1"
-                                                >
-                                                    {visibleKPIs.size === kpis.length ? 'Deselect All' : 'Select All'}
-                                                </button>
-                                                <div className="border-t border-gray-200 my-1"></div>
-                                                {kpis.map((kpi, index) => (
-                                                    <label
-                                                        key={kpi.id}
-                                                        className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={visibleKPIs.has(kpi.id)}
-                                                            onChange={() => toggleKPI(kpi.id)}
-                                                            className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                                            style={{ accentColor: getKPIColor(kpi.category, index) }}
-                                                        />
-                                                        <div
-                                                            className="w-2 h-2 rounded-full flex-shrink-0"
-                                                            style={{ backgroundColor: getKPIColor(kpi.category, index) }}
-                                                        />
-                                                        <span className="text-xs text-gray-700 truncate flex-1">
-                                                            {kpi.title}
-                                                        </span>
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-
+                            {/* Cumulative/Non-cumulative Toggle */}
+                            {timeFrame === 'all' && (
+                                <div className="flex items-center space-x-0.5 bg-white/80 rounded p-0.5 mr-1">
+                                    <button
+                                        onClick={() => setIsCumulative(true)}
+                                        className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${isCumulative
+                                            ? 'bg-blue-600 text-white'
+                                            : 'text-gray-600 hover:bg-gray-100'
+                                            }`}
+                                    >
+                                        Cumulative
+                                    </button>
+                                    <button
+                                        onClick={() => setIsCumulative(false)}
+                                        className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${!isCumulative
+                                            ? 'bg-blue-600 text-white'
+                                            : 'text-gray-600 hover:bg-gray-100'
+                                            }`}
+                                    >
+                                        Monthly
+                                    </button>
+                                </div>
+                            )}
                             {/* Time Frame Filters */}
                             <div className="flex items-center space-x-0.5 bg-white/80 rounded p-0.5">
-                                {(['1month', '6months', '1year', '5years'] as const).map((tf) => (
+                                {(['all', '1month', '6months', '1year', '5years'] as const).map((tf) => (
                                     <button
                                         key={tf}
-                                        onClick={() => setTimeFrame(tf)}
+                                        onClick={() => {
+                                            setTimeFrame(tf)
+                                            // Reset to cumulative mode when switching away from 'all'
+                                            if (tf !== 'all') {
+                                                setIsCumulative(true)
+                                            }
+                                        }}
                                         className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${timeFrame === tf
                                             ? 'bg-blue-600 text-white'
                                             : 'text-gray-600 hover:bg-gray-100'
                                             }`}
                                     >
-                                        {tf === '1month' ? '1M' : tf === '6months' ? '6M' : tf === '1year' ? '1Y' : '5Y'}
+                                        {tf === 'all' ? 'All' : tf === '1month' ? '1M' : tf === '6months' ? '6M' : tf === '1year' ? '1Y' : '5Y'}
                                     </button>
                                 ))}
                             </div>
@@ -1056,6 +1213,9 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 }
                             }}
                             refreshKey={mapRefreshKey}
+                            initiativeId={initiativeId}
+                            onMetricClick={onMetricCardClick}
+                            onStoryClick={onStoryClick}
                         />
                     </div>
                 </div>

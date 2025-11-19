@@ -125,6 +125,23 @@ export interface Evidence {
     user_id?: string;
 }
 
+export interface Story {
+    id?: string;
+    initiative_id: string;
+    title: string;
+    description?: string;
+    media_url?: string; // Optional - can be null/empty
+    media_type: 'photo' | 'video' | 'recording';
+    date_represented: string; // Mandatory date
+    location_id?: string;
+    location?: Location; // Populated when fetching
+    beneficiary_group_ids?: string[]; // Array of linked beneficiary group IDs
+    beneficiary_groups?: BeneficiaryGroup[]; // Populated when fetching
+    created_at?: string;
+    updated_at?: string;
+    user_id?: string;
+}
+
 export interface DashboardStats {
     total_kpis: number;
     evidence_coverage_percentage: number;

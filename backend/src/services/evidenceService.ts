@@ -1,5 +1,6 @@
 import { supabase } from '../utils/supabase'
 import { Evidence } from '../types'
+import { deleteFromSupabase } from '../utils/fileUpload'
 
 export class EvidenceService {
     static async create(evidence: Evidence, userId: string): Promise<Evidence> {
@@ -56,6 +57,7 @@ export class EvidenceService {
                 .select(`
                     *,
                     evidence_kpis!inner(kpi_id),
+                    evidence_kpi_updates(kpi_update_id),
                     initiatives(title)
                 `)
                 .eq('evidence_kpis.kpi_id', kpiId);
@@ -66,6 +68,7 @@ export class EvidenceService {
                 .select(`
                     *,
                     evidence_kpis(kpi_id),
+                    evidence_kpi_updates(kpi_update_id),
                     initiatives(title)
                 `);
         }
@@ -77,7 +80,17 @@ export class EvidenceService {
         const { data, error } = await query.order('created_at', { ascending: false });
 
         if (error) throw new Error(`Failed to fetch evidence: ${error.message}`);
-        return data || [];
+        
+        // Transform the data to include kpi_update_ids as a flat array
+        const transformedData = (data || []).map((item: any) => {
+            const kpi_update_ids = item.evidence_kpi_updates?.map((link: any) => link.kpi_update_id).filter(Boolean) || [];
+            return {
+                ...item,
+                kpi_update_ids
+            };
+        });
+        
+        return transformedData;
     }
 
     static async getById(id: string): Promise<Evidence | null> {
@@ -104,6 +117,14 @@ export class EvidenceService {
         // Extract linkage fields for separate handling
         const { kpi_ids, kpi_update_ids, ...evidenceData } = evidence;
 
+        // Get existing evidence to check if file_url is changing
+        const { data: existingEvidence } = await supabase
+            .from('evidence')
+            .select('file_url')
+            .eq('id', id)
+            .eq('user_id', userId)
+            .single();
+
         const { data, error } = await supabase
             .from('evidence')
             .update({ ...evidenceData, updated_at: new Date().toISOString() })
@@ -113,6 +134,12 @@ export class EvidenceService {
             .single();
 
         if (error) throw new Error(`Failed to update evidence: ${error.message}`);
+
+        // Delete old file if file_url changed and old file exists
+        if (evidenceData.file_url && existingEvidence?.file_url && 
+            evidenceData.file_url !== existingEvidence.file_url) {
+            await deleteFromSupabase(existingEvidence.file_url);
+        }
 
         // Update legacy KPI links if provided
         if (kpi_ids !== undefined) {
@@ -164,6 +191,21 @@ export class EvidenceService {
     }
 
     static async delete(id: string, userId: string): Promise<void> {
+        // Get evidence record first to delete associated file
+        const { data: evidence, error: fetchError } = await supabase
+            .from('evidence')
+            .select('file_url')
+            .eq('id', id)
+            .eq('user_id', userId)
+            .single();
+
+        if (fetchError) {
+            if (fetchError.code === 'PGRST116') {
+                throw new Error('Evidence not found');
+            }
+            throw new Error(`Failed to fetch evidence: ${fetchError.message}`);
+        }
+
         // Delete links first (both legacy and new)
         const { error: linkError } = await supabase
             .from('evidence_kpis')
@@ -179,7 +221,7 @@ export class EvidenceService {
 
         if (linkError2) throw new Error(`Failed to delete evidence data point links: ${linkError2.message}`);
 
-        // Delete evidence
+        // Delete evidence record
         const { error } = await supabase
             .from('evidence')
             .delete()
@@ -187,6 +229,12 @@ export class EvidenceService {
             .eq('user_id', userId);
 
         if (error) throw new Error(`Failed to delete evidence: ${error.message}`);
+
+        // Delete file from Supabase Storage if it exists
+        if (evidence?.file_url) {
+            await deleteFromSupabase(evidence.file_url);
+        }
+
         return;
     }
 

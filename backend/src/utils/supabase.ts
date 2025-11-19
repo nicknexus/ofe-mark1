@@ -8,7 +8,8 @@ dotenv.config({ path: process.env.NODE_ENV === 'production' ? undefined : '../.e
 console.log('Environment check:', {
     SUPABASE_URL: process.env.SUPABASE_URL ? '✅ SET' : '❌ MISSING',
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? '✅ SET' : '❌ MISSING',
-    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ? '✅ SET' : '❌ MISSING'
+    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ? '✅ SET' : '❌ MISSING',
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY ? '✅ SET' : '❌ MISSING'
 });
 
 const supabaseUrl = process.env.SUPABASE_URL;

@@ -12,6 +12,8 @@ import {
     CreateKPIForm,
     CreateKPIUpdateForm,
     CreateEvidenceForm,
+    CreateStoryForm,
+    Story,
     Organization
 } from '../types'
 
@@ -76,7 +78,9 @@ class ApiService {
                 return await requestFn()
             } catch (error: any) {
                 const is429Error = error.message?.includes('Too Many Requests') ||
+                    error.message?.includes('Rate Limit Exceeded') ||
                     error.message?.includes('429') ||
+                    error.status === 429 ||
                     (error.response && error.response.status === 429)
 
                 // Connection refused (server not running) - don't retry
@@ -160,19 +164,37 @@ class ApiService {
 
             if (!response.ok) {
                 let errorMessage = 'API request failed'
+                const contentType = response.headers.get('content-type')
 
-                if (response.status === 429) {
-                    errorMessage = 'Too Many Requests'
-                } else {
+                // Read response as text first to avoid consuming the body
+                const responseText = await response.text()
+
+                // Try to parse as JSON if content-type indicates JSON
+                if (contentType?.includes('application/json') && responseText.trim()) {
                     try {
-                        const error = await response.json()
-                        errorMessage = error.error || error.message || `HTTP ${response.status}`
-                    } catch {
-                        errorMessage = `HTTP ${response.status} - ${response.statusText}`
+                        const error = JSON.parse(responseText)
+                        errorMessage = error.message || error.error || `HTTP ${response.status}`
+                        
+                        // Preserve error code for specific handling
+                        const errorWithCode = new Error(errorMessage) as any
+                        errorWithCode.code = error.code
+                        errorWithCode.status = response.status
+                        throw errorWithCode
+                    } catch (parseError: any) {
+                        // If JSON parsing fails, fall through to status-based handling
                     }
                 }
 
-                throw new Error(errorMessage)
+                // Handle specific status codes
+                if (response.status === 429) {
+                    throw new Error('Rate Limit Exceeded')
+                } else if (response.status === 402) {
+                    throw new Error('OpenAI Quota Exceeded')
+                } else {
+                    // Use response text if available, otherwise use status text
+                    const message = responseText.trim() || response.statusText
+                    throw new Error(`HTTP ${response.status} - ${message}`)
+                }
             }
 
             // Handle empty responses (common for DELETE operations)
@@ -550,6 +572,59 @@ class ApiService {
         return this.request<Evidence[]>(`/locations/${locationId}/evidence`)
     }
 
+    // Stories
+    async getStories(initiativeId: string, filters?: {
+        locationIds?: string[];
+        beneficiaryGroupIds?: string[];
+        startDate?: string;
+        endDate?: string;
+        search?: string;
+    }): Promise<Story[]> {
+        const params = new URLSearchParams()
+        params.append('initiative_id', initiativeId)
+        if (filters?.locationIds?.length) {
+            filters.locationIds.forEach(id => params.append('location_id', id))
+        }
+        if (filters?.beneficiaryGroupIds?.length) {
+            filters.beneficiaryGroupIds.forEach(id => params.append('beneficiary_group_id', id))
+        }
+        if (filters?.startDate) {
+            params.append('start_date', filters.startDate)
+        }
+        if (filters?.endDate) {
+            params.append('end_date', filters.endDate)
+        }
+        if (filters?.search) {
+            params.append('search', filters.search)
+        }
+        const result = await this.request<Story[]>(`/stories?${params.toString()}`)
+        return result || []
+    }
+
+    async getStory(id: string): Promise<Story> {
+        return this.request<Story>(`/stories/${id}`)
+    }
+
+    async createStory(story: CreateStoryForm): Promise<Story> {
+        return this.request<Story>('/stories', {
+            method: 'POST',
+            body: JSON.stringify(story)
+        })
+    }
+
+    async updateStory(id: string, data: Partial<CreateStoryForm>): Promise<Story> {
+        return this.request<Story>(`/stories/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        })
+    }
+
+    async deleteStory(id: string): Promise<void> {
+        return this.request<void>(`/stories/${id}`, {
+            method: 'DELETE'
+        })
+    }
+
     // Load initiatives first for immediate display
     async loadInitiativesOnly(): Promise<Initiative[]> {
         console.log('Loading initiatives...')
@@ -587,6 +662,79 @@ class ApiService {
         const { kpis, evidence } = await this.loadKPIsAndEvidence()
 
         return { initiatives, kpis, evidence }
+    }
+
+    // Reports
+    async getReportData(filters: {
+        initiativeId: string
+        dateStart?: string
+        dateEnd?: string
+        kpiIds?: string[]
+        locationIds?: string[]
+        beneficiaryGroupIds?: string[]
+    }): Promise<{
+        metrics: Array<{
+            id: string
+            kpi_id: string
+            kpi_title: string
+            kpi_description: string
+            value: number
+            unit_of_measurement: string
+            date_represented: string
+            location_id?: string
+            location_name?: string
+        }>
+        totals: Array<{
+            kpi_id: string
+            kpi_title: string
+            kpi_description: string
+            unit_of_measurement: string
+            total_value: number
+            count: number
+        }>
+        locations: Array<{
+            id: string
+            name: string
+            description?: string
+            latitude: number
+            longitude: number
+        }>
+        stories: Array<{
+            id: string
+            title: string
+            description?: string
+            date_represented: string
+            location_id?: string
+            location_name?: string
+        }>
+        mapPoints: Array<{
+            lat: number
+            lng: number
+            name: string
+            type: 'location' | 'story'
+        }>
+    }> {
+        return this.request('/reports/report-data', {
+            method: 'POST',
+            body: JSON.stringify(filters)
+        })
+    }
+
+    async generateReport(data: {
+        initiativeId: string
+        initiativeTitle: string
+        dateRange: { start: string; end: string }
+        totals: any[]
+        rawMetrics: any[]
+        selectedStory: any
+        locations: any[]
+        beneficiaryGroups: any[]
+        deepLink?: string
+    }): Promise<{ reportText: string }> {
+        return this.request<{ reportText: string }>('/reports/generate-report', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        })
     }
 }
 

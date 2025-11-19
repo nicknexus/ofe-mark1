@@ -2,10 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap, Tooltip } from 'react-leaflet'
 import { createPortal } from 'react-dom'
 import L from 'leaflet'
-import { MapPin, X, Info, BarChart3, FileText, Loader2 } from 'lucide-react'
-import { Location, KPIUpdate, Evidence } from '../types'
-import { apiService } from '../services/api'
-import { formatDate } from '../utils'
+import { MapPin, X } from 'lucide-react'
+import { Location } from '../types'
 import LocationDetailsModal from './LocationDetailsModal'
 
 // Fix Leaflet default icon issue with webpack/vite
@@ -23,6 +21,10 @@ interface LocationMapProps {
     selectedLocationId?: string | null
     refreshKey?: number // Key to trigger refresh when updates/evidence change
     onApplyLocationFilter?: (locationId: string) => void // Callback to apply location filter
+    initiativeId?: string // Initiative ID for fetching stories
+    onEditClick?: (location: Location) => void // Callback for edit button
+    onMetricClick?: (kpiId: string) => void // Callback for metric card click
+    onStoryClick?: (storyId: string) => void // Callback for story card click
 }
 
 // Component to handle map click events
@@ -280,125 +282,45 @@ export default function LocationMap({
     selectedLocationId,
     refreshKey,
     onApplyLocationFilter,
+    initiativeId,
+    onEditClick,
+    onMetricClick,
+    onStoryClick,
 }: LocationMapProps) {
     const [center, setCenter] = useState<[number, number]>([20, 0]) // [lat, lng]
     const [zoom, setZoom] = useState(2)
     const [hoveredLocationId, setHoveredLocationId] = useState<string | null>(null)
-    const [popupLocation, setPopupLocation] = useState<Location | null>(null)
-    const [popupPosition, setPopupPosition] = useState<{ x: number; y: number } | null>(null)
     const [detailsLocation, setDetailsLocation] = useState<Location | null>(null)
-    const [kpiUpdates, setKpiUpdates] = useState<KPIUpdate[]>([])
-    const [evidence, setEvidence] = useState<Evidence[]>([])
-    const [loadingData, setLoadingData] = useState(false)
     const [detailsModalOpen, setDetailsModalOpen] = useState(false)
     const [mapClickPopup, setMapClickPopup] = useState<{ coordinates: [number, number]; position: { x: number; y: number } } | null>(null)
-    const popupRef = useRef<HTMLDivElement>(null)
     const mapClickPopupRef = useRef<HTMLDivElement>(null)
     const mapContainerRef = useRef<HTMLDivElement>(null)
     const mapInstanceRef = useRef<L.Map | null>(null)
 
-    // Fetch data when popup opens or refreshKey changes
-    useEffect(() => {
-        if (popupLocation?.id) {
-            setLoadingData(true)
-            Promise.all([
-                apiService.getLocationKPIUpdates(popupLocation.id),
-                apiService.getLocationEvidence(popupLocation.id),
-            ])
-                .then(([updates, ev]) => {
-                    setKpiUpdates(updates || [])
-                    setEvidence(ev || [])
-                })
-                .catch((error) => {
-                    console.error('Failed to fetch location data:', error)
-                    setKpiUpdates([])
-                    setEvidence([])
-                })
-                .finally(() => {
-                    setLoadingData(false)
-                })
-        } else {
-            setKpiUpdates([])
-            setEvidence([])
-        }
-    }, [popupLocation?.id, refreshKey])
-
     // Close popup when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
-                setPopupLocation(null)
-                setPopupPosition(null)
-            }
             if (mapClickPopupRef.current && !mapClickPopupRef.current.contains(event.target as Node)) {
                 setMapClickPopup(null)
             }
         }
 
-        if (popupLocation || mapClickPopup) {
+        if (mapClickPopup) {
             document.addEventListener('mousedown', handleClickOutside)
         }
 
         return () => {
             document.removeEventListener('mousedown', handleClickOutside)
         }
-    }, [popupLocation, mapClickPopup])
-
-    // Update popup position when marker is clicked
-    const updatePopupPosition = (location: Location, event: L.LeafletMouseEvent) => {
-        const map = mapInstanceRef.current
-        let positionSet = false
-        
-        if (map && mapContainerRef.current) {
-            // Use map instance to convert lat/lng to container point
-            try {
-                const markerLatLng = event.latlng
-                const point = map.latLngToContainerPoint(markerLatLng)
-                const containerRect = mapContainerRef.current.getBoundingClientRect()
-                // Convert to viewport coordinates
-                setPopupPosition({
-                    x: containerRect.left + point.x,
-                    y: containerRect.top + point.y - 10, // Position above marker
-                })
-                positionSet = true
-            } catch (e) {
-                console.error('Error calculating popup position:', e)
-            }
-        }
-        
-        if (!positionSet) {
-            // Fallback: use original event coordinates (already in viewport coordinates)
-            const originalEvent = (event as any).originalEvent as MouseEvent
-            if (originalEvent) {
-                setPopupPosition({
-                    x: originalEvent.clientX,
-                    y: originalEvent.clientY - 10,
-                })
-                positionSet = true
-            }
-        }
-        
-        if (!positionSet && mapContainerRef.current) {
-            // Last resort: use center of map container in viewport coordinates
-            const rect = mapContainerRef.current.getBoundingClientRect()
-            setPopupPosition({
-                x: rect.left + rect.width / 2,
-                y: rect.top + rect.height / 2 - 150,
-            })
-        }
-    }
+    }, [mapClickPopup])
 
     const handleMarkerClick = (location: Location, event: L.LeafletMouseEvent) => {
         // Close map click popup if open
         setMapClickPopup(null)
         
-        if (popupLocation?.id === location.id) {
-            setPopupLocation(null)
-            setPopupPosition(null)
-        } else {
-            setPopupLocation(location)
-            updatePopupPosition(location, event)
-        }
+        // Open details modal directly
+        setDetailsLocation(location)
+        setDetailsModalOpen(true)
         onLocationClick?.(location)
     }
 
@@ -463,7 +385,7 @@ export default function LocationMap({
                 {locations.map((location) => {
                     const isHovered = hoveredLocationId === location.id
                     const isSelected = selectedLocationId === location.id
-                    const isPopupOpen = popupLocation?.id === location.id
+                    const isPopupOpen = detailsLocation?.id === location.id && detailsModalOpen
 
                     return (
                         <LocationMarker
@@ -480,184 +402,6 @@ export default function LocationMap({
                 })}
             </MapContainer>
 
-            {/* Click Popup */}
-            {popupLocation && popupPosition && createPortal(
-                <div
-                    ref={popupRef}
-                    className="fixed z-[9999] bg-white rounded-xl shadow-2xl border border-gray-200 min-w-[320px] max-w-[400px] max-h-[600px] animate-fade-in-up overflow-hidden flex flex-col"
-                    style={{
-                        left: `${Math.max(10, Math.min(popupPosition.x, window.innerWidth - 410))}px`,
-                        top: `${Math.max(10, popupPosition.y - 300)}px`,
-                        transform: popupPosition.y - 300 < 10 ? 'translateY(0)' : 'translateX(-50%)',
-                        pointerEvents: 'auto',
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {/* Popup Arrow */}
-                    {popupPosition.y - 300 >= 10 && (
-                        <div
-                            className="absolute w-4 h-4 bg-white border-r border-b border-gray-200 transform rotate-45"
-                            style={{
-                                bottom: '-8px',
-                                left: '50%',
-                                transform: 'translateX(-50%) rotate(45deg)',
-                            }}
-                        />
-                    )}
-
-                    {/* Popup Content */}
-                    <div className="p-4 flex-1 overflow-y-auto">
-                        {/* Header */}
-                        <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center space-x-2">
-                                <div className="p-2 bg-green-100 rounded-lg">
-                                    <MapPin className="w-4 h-4 text-green-600" />
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-gray-900 text-sm">{popupLocation.name}</h3>
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => {
-                                    setPopupLocation(null)
-                                    setPopupPosition(null)
-                                }}
-                                className="text-gray-400 hover:text-gray-600 p-1 transition-colors"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-
-                        {popupLocation.description && (
-                            <p className="text-sm text-gray-600 mb-3 line-clamp-2">{popupLocation.description}</p>
-                        )}
-
-                        <div className="space-y-2 pt-3 border-t border-gray-100 mb-4">
-                            <div className="flex items-center space-x-2 text-xs text-gray-500">
-                                <Info className="w-3.5 h-3.5 flex-shrink-0" />
-                                <span className="break-all">
-                                    {popupLocation.latitude.toFixed(6)}, {popupLocation.longitude.toFixed(6)}
-                                </span>
-                            </div>
-                            {popupLocation.created_at && (
-                                <div className="text-xs text-gray-400">
-                                    Created {new Date(popupLocation.created_at).toLocaleDateString()}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Metrics Section - Grouped by KPI with totals */}
-                        <div className="mb-4">
-                            <div className="flex items-center space-x-2 mb-2">
-                                <BarChart3 className="w-4 h-4 text-blue-600" />
-                                <h4 className="text-sm font-semibold text-gray-900">
-                                    Metrics
-                                </h4>
-                            </div>
-                            {loadingData ? (
-                                <div className="flex items-center justify-center py-4">
-                                    <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-                                </div>
-                            ) : kpiUpdates.length === 0 ? (
-                                <p className="text-xs text-gray-400 py-2">No metrics linked</p>
-                            ) : (() => {
-                                // Group updates by KPI and calculate totals
-                                const metricsMap = new Map<string, { kpi: any; updates: any[]; total: number }>()
-                                kpiUpdates.forEach((update: any) => {
-                                    const kpiId = update.kpi_id || 'unknown'
-                                    if (!metricsMap.has(kpiId)) {
-                                        metricsMap.set(kpiId, {
-                                            kpi: update.kpis,
-                                            updates: [],
-                                            total: 0,
-                                        })
-                                    }
-                                    const metric = metricsMap.get(kpiId)!
-                                    metric.updates.push(update)
-                                    metric.total += update.value || 0
-                                })
-                                const metrics = Array.from(metricsMap.values())
-
-                                return (
-                                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                                        {metrics.map((metric, index) => (
-                                            <div
-                                                key={metric.kpi?.id || index}
-                                                className="bg-blue-50 border border-blue-100 rounded-lg p-2.5"
-                                            >
-                                                <div className="font-semibold text-gray-900 text-sm mb-1">
-                                                    {metric.kpi?.title || 'Unknown Metric'}
-                                                </div>
-                                                <div className="text-base font-bold text-blue-700">
-                                                    {metric.total.toLocaleString()} {metric.kpi?.unit_of_measurement || ''}
-                                                </div>
-                                                <div className="text-xs text-gray-500 mt-1">
-                                                    {metric.updates.length} {metric.updates.length === 1 ? 'impact claim' : 'impact claims'}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )
-                            })()}
-                        </div>
-
-                        {/* Evidence Section */}
-                        <div className="mb-4">
-                            <div className="flex items-center space-x-2 mb-2">
-                                <FileText className="w-4 h-4 text-purple-600" />
-                                <h4 className="text-sm font-semibold text-gray-900">
-                                    Evidence ({evidence.length})
-                                </h4>
-                            </div>
-                            {loadingData ? (
-                                <div className="flex items-center justify-center py-4">
-                                    <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-                                </div>
-                            ) : evidence.length === 0 ? (
-                                <p className="text-xs text-gray-400 py-2">No evidence linked</p>
-                            ) : (
-                                <div className="space-y-2 max-h-32 overflow-y-auto">
-                                    {evidence.slice(0, 5).map((ev) => (
-                                        <div
-                                            key={ev.id}
-                                            className="bg-purple-50 border border-purple-100 rounded-lg p-2 text-xs"
-                                        >
-                                            <div className="font-medium text-gray-900">{ev.title}</div>
-                                            <div className="text-gray-600 mt-1 capitalize">
-                                                {ev.type?.replace('_', ' ')}
-                                            </div>
-                                            <div className="text-gray-400 mt-1">
-                                                {formatDate(ev.date_represented)}
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {evidence.length > 5 && (
-                                        <p className="text-xs text-gray-400 text-center">
-                                            +{evidence.length - 5} more
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* See Details Button */}
-                        <div className="mt-4 pt-4 border-t border-gray-100">
-                            <button
-                                onClick={() => {
-                                    setDetailsLocation(popupLocation)
-                                    setPopupLocation(null)
-                                    setPopupPosition(null)
-                                    setDetailsModalOpen(true)
-                                }}
-                                className="w-full px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium transition-colors"
-                            >
-                                See Details
-                            </button>
-                        </div>
-                    </div>
-                </div>,
-                document.body
-            )}
 
             {/* Map Click Popup - For applying location filter */}
             {mapClickPopup && onApplyLocationFilter && (() => {
@@ -765,7 +509,11 @@ export default function LocationMap({
                 }}
                 location={detailsLocation}
                 onLocationClick={onLocationClick}
+                onEditClick={onEditClick}
+                onMetricClick={onMetricClick}
+                onStoryClick={onStoryClick}
                 refreshKey={refreshKey}
+                initiativeId={initiativeId}
             />
 
             {/* Zoom Controls */}
@@ -784,17 +532,14 @@ export default function LocationMap({
                 </button>
             </div>
 
-            {/* Empty State */}
+            {/* No Location Banner */}
             {locations.length === 0 && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-blue-50/90 via-white/90 to-green-50/90 z-0 pointer-events-none">
-                    <div className="text-center p-8">
-                        <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-                            <MapPin className="w-8 h-8 text-green-600" />
+                <div className="absolute top-4 left-4 z-[100] pointer-events-none">
+                    <div className="bg-white/95 backdrop-blur-sm border border-gray-300 rounded-lg px-3 py-2 shadow-lg">
+                        <div className="flex items-center space-x-2">
+                            <MapPin className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm font-medium text-gray-700">No location added</span>
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-700 mb-2">No Locations Yet</h3>
-                        <p className="text-sm text-gray-500 mb-4">
-                            Click on the map to add your first location
-                        </p>
                     </div>
                 </div>
             )}

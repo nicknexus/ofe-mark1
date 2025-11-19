@@ -135,8 +135,8 @@ export default function DateRangePicker({
         setIsOpen(!isOpen)
     }
 
-    const today = new Date()
-    const maxDateObj = maxDate ? new Date(maxDate) : today
+    const today = startOfDay(new Date())
+    const maxDateObj = maxDate ? startOfDay(parseLocalDate(maxDate)) : today
 
     const handleDateClick = (date: Date) => {
         // Don't allow future dates

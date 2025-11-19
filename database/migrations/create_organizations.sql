@@ -89,3 +89,7 @@ COMMENT ON COLUMN organizations.slug IS 'URL-friendly identifier for public page
 COMMENT ON COLUMN organizations.is_public IS 'Whether this organization is published and accessible via public URL';
 
 
+
+
+
+

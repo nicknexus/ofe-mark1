@@ -18,3 +18,7 @@ FROM pg_policies
 WHERE tablename = 'organizations' AND cmd = 'INSERT';
 
 
+
+
+
+

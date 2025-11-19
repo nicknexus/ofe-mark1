@@ -6,7 +6,9 @@ import {
     MapPin,
     Users,
     ArrowLeft,
-    Target
+    Target,
+    BookOpen,
+    Sparkles
 } from 'lucide-react'
 
 interface InitiativeSidebarProps {
@@ -48,6 +50,18 @@ export default function InitiativeSidebar({
             label: 'Beneficiaries',
             icon: Users,
             description: 'People Management'
+        },
+        {
+            id: 'stories',
+            label: 'Stories',
+            icon: BookOpen,
+            description: 'Impact Stories'
+        },
+        {
+            id: 'report',
+            label: 'AI Report',
+            icon: Sparkles,
+            description: 'Generate Impact Report'
         }
     ]
 

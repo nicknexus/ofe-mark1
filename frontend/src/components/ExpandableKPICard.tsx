@@ -20,7 +20,8 @@ import {
     DollarSign
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
-import { getCategoryColor, parseLocalDate, isSameDay, compareDates, formatDate, getEvidenceTypeInfo } from '../utils'
+import { getCategoryColor, parseLocalDate, isSameDay, compareDates, formatDate, getEvidenceTypeInfo, getLocalDateString } from '../utils'
+import DateRangePicker from './DateRangePicker'
 import EvidencePreviewModal from './EvidencePreviewModal'
 import DataPointPreviewModal from './DataPointPreviewModal'
 import AddKPIUpdateModal from './AddKPIUpdateModal'
@@ -71,7 +72,13 @@ export default function ExpandableKPICard({
     }, [isExpanded])
 
     // Time frame filter state
-    const [timeFrame, setTimeFrame] = useState<'1month' | '6months' | '1year' | '5years'>('1month')
+    const [timeFrame, setTimeFrame] = useState<'all' | '1month' | '6months' | '1year' | '5years'>('all')
+    const [isCumulative, setIsCumulative] = useState(true)
+    const [datePickerValue, setDatePickerValue] = useState<{
+        singleDate?: string
+        startDate?: string
+        endDate?: string
+    }>({})
     const [expandedDataPoints, setExpandedDataPoints] = useState<string[]>([])
     const [expandedEvidence, setExpandedEvidence] = useState<string[]>([])
     const [selectedEvidence, setSelectedEvidence] = useState<any>(null)
@@ -299,31 +306,78 @@ export default function ExpandableKPICard({
             getEffectiveDate(a).getTime() - getEffectiveDate(b).getTime()
         )
 
-        // Calculate date range based on time frame
+        // Calculate date range based on date picker, time frame, or all time
         const now = new Date()
         let startDate: Date
+        let endDate: Date
 
-        switch (timeFrame) {
-            case '1month':
-                startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
-                break
-            case '6months':
-                startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate())
-                break
-            case '1year':
-                startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
-                break
-            case '5years':
-                startDate = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate())
-                break
-            default:
-                startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
+        // If a single date is selected, only show that date
+        if (datePickerValue.singleDate) {
+            startDate = parseLocalDate(datePickerValue.singleDate)
+            startDate.setHours(0, 0, 0, 0)
+            endDate = parseLocalDate(datePickerValue.singleDate)
+            endDate.setHours(23, 59, 59, 999)
+        }
+        // If a date range is selected, use that range
+        else if (datePickerValue.startDate && datePickerValue.endDate) {
+            startDate = parseLocalDate(datePickerValue.startDate)
+            startDate.setHours(0, 0, 0, 0)
+            endDate = parseLocalDate(datePickerValue.endDate)
+            endDate.setHours(23, 59, 59, 999)
+        }
+        // Otherwise, use time frame
+        else {
+            if (timeFrame === 'all') {
+                // Find the oldest update date for this KPI
+                if (sortedUpdates.length > 0) {
+                    startDate = getEffectiveDate(sortedUpdates[0])
+                    startDate.setHours(0, 0, 0, 0)
+                    // Subtract 1 day to show the graph starting at 0 before the first impact claim
+                    startDate.setDate(startDate.getDate() - 1)
+                } else {
+                    // Fallback to 1 month if no updates
+                    startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
+                    startDate.setHours(0, 0, 0, 0)
+                }
+            } else {
+                switch (timeFrame) {
+                    case '1month':
+                        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
+                        break
+                    case '6months':
+                        startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate())
+                        break
+                    case '1year':
+                        startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
+                        break
+                    case '5years':
+                        startDate = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate())
+                        break
+                    default:
+                        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
+                }
+                startDate.setHours(0, 0, 0, 0)
+            }
+            endDate = new Date(now)
+            endDate.setHours(23, 59, 59, 999) // End of today
         }
 
-        // Filter updates within the time frame (using effective date)
-        const filteredUpdates = sortedUpdates.filter(update =>
-            getEffectiveDate(update) >= startDate
-        )
+        // Filter updates within the date range (using effective date)
+        const filteredUpdates = sortedUpdates.filter(update => {
+            const updateDate = getEffectiveDate(update)
+            updateDate.setHours(0, 0, 0, 0)
+            const updateStart = update.date_range_start ? parseLocalDate(update.date_range_start) : null
+            const updateEnd = update.date_range_end ? parseLocalDate(update.date_range_end) : null
+            
+            // If update is a date range, check if it overlaps with filter range
+            if (updateStart && updateEnd) {
+                updateStart.setHours(0, 0, 0, 0)
+                updateEnd.setHours(23, 59, 59, 999)
+                return updateStart <= endDate && updateEnd >= startDate
+            }
+            // If update is a single date, check if it's within the range
+            return compareDates(updateDate, startDate) >= 0 && compareDates(updateDate, endDate) <= 0
+        })
 
         // Generate time series data with proper spacing
         const data: Array<{
@@ -333,14 +387,55 @@ export default function ExpandableKPICard({
             fullDate: Date;
         }> = []
 
-        // Create a full time series from startDate to now
-        const endDate = new Date()
-        endDate.setHours(0, 0, 0, 0) // Normalize to midnight local time
+        // Non-cumulative mode: group by month (only when timeFrame is 'all' and no date picker)
+        if (!isCumulative && timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate) {
+            // Start from the month before the first impact claim
+            const firstMonthStart = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
+            firstMonthStart.setMonth(firstMonthStart.getMonth() - 1)
+            
+            const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+            
+            // Group updates by month
+            const monthlyTotals: Record<string, number> = {}
+            
+            filteredUpdates.forEach(update => {
+                const updateDate = getEffectiveDate(update)
+                const monthKey = `${updateDate.getFullYear()}-${String(updateDate.getMonth() + 1).padStart(2, '0')}`
+                
+                if (!monthlyTotals[monthKey]) {
+                    monthlyTotals[monthKey] = 0
+                }
+                monthlyTotals[monthKey] += (update.value || 0)
+            })
+            
+            // Generate monthly data points
+            let currentMonthDate = new Date(firstMonthStart)
+            while (currentMonthDate <= currentMonth) {
+                const monthKey = `${currentMonthDate.getFullYear()}-${String(currentMonthDate.getMonth() + 1).padStart(2, '0')}`
+                const monthName = currentMonthDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                const monthlyTotal = monthlyTotals[monthKey] || 0
+                
+                data.push({
+                    date: monthName,
+                    cumulative: monthlyTotal,
+                    value: monthlyTotal,
+                    fullDate: new Date(currentMonthDate)
+                })
+                
+                // Move to next month
+                currentMonthDate.setMonth(currentMonthDate.getMonth() + 1)
+            }
+            
+            return data
+        }
 
+        // Cumulative mode: daily data points
         // Normalize startDate to midnight
         startDate.setHours(0, 0, 0, 0)
+        const endDateNormalized = new Date(endDate)
+        endDateNormalized.setHours(0, 0, 0, 0)
 
-        const timeDiff = endDate.getTime() - startDate.getTime()
+        const timeDiff = endDateNormalized.getTime() - startDate.getTime()
         const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24))
 
         // Create daily data points for the entire period
@@ -349,10 +444,8 @@ export default function ExpandableKPICard({
             currentDate.setDate(startDate.getDate() + i)
             currentDate.setHours(0, 0, 0, 0) // Normalize to midnight local time
 
-            // Don't create dates beyond today
-            const today = new Date()
-            today.setHours(0, 0, 0, 0)
-            if (compareDates(currentDate, today) > 0) {
+            // Don't create dates beyond endDate
+            if (compareDates(currentDate, endDateNormalized) > 0) {
                 break
             }
 
@@ -390,6 +483,9 @@ export default function ExpandableKPICard({
     // Calculate x-axis interval to always show approximately 30 labels (1 month's worth)
     // For 1 month view, show every single day
     const getXAxisInterval = () => {
+        // Non-cumulative mode: show every month (interval 0)
+        if (!isCumulative && timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate) return 0
+        
         // If viewing 1 month, show all labels (every day)
         if (timeFrame === '1month') return 0
 
@@ -455,9 +551,12 @@ export default function ExpandableKPICard({
 
     const yTicks = generateYTicks()
 
-    // Calculate evidence type percentages
+    // Calculate evidence type percentages based on data point coverage
     const calculateEvidenceTypePercentages = () => {
-        if (!evidence || evidence.length === 0) {
+        // Total data points (claims) for this KPI
+        const totalDataPoints = kpiUpdates?.length || 0
+        
+        if (!evidence || evidence.length === 0 || totalDataPoints === 0) {
             return {
                 visual_proof: { count: 0, percentage: 0 },
                 documentation: { count: 0, percentage: 0 },
@@ -466,25 +565,60 @@ export default function ExpandableKPICard({
             }
         }
 
-        const typeCounts = {
-            visual_proof: 0,
-            documentation: 0,
-            testimony: 0,
-            financials: 0
+        // For each evidence type, track which unique data points it covers
+        const dataPointsCoveredByType: Record<string, Set<string>> = {
+            visual_proof: new Set(),
+            documentation: new Set(),
+            testimony: new Set(),
+            financials: new Set()
         }
 
+        // Go through each evidence item and track which data points it covers
         evidence.forEach((ev: any) => {
-            if (ev.type && typeCounts.hasOwnProperty(ev.type)) {
-                typeCounts[ev.type as keyof typeof typeCounts]++
+            if (!ev.type || !dataPointsCoveredByType.hasOwnProperty(ev.type)) return
+            
+            // Get data points covered by this evidence
+            // Check if evidence has kpi_update_ids (new precise linking)
+            if (ev.kpi_update_ids && Array.isArray(ev.kpi_update_ids)) {
+                ev.kpi_update_ids.forEach((updateId: string) => {
+                    dataPointsCoveredByType[ev.type as keyof typeof dataPointsCoveredByType].add(updateId)
+                })
+            } else if (ev.evidence_kpi_updates && Array.isArray(ev.evidence_kpi_updates)) {
+                // Alternative: check if evidence has nested evidence_kpi_updates
+                ev.evidence_kpi_updates.forEach((link: any) => {
+                    if (link.kpi_update_id) {
+                        dataPointsCoveredByType[ev.type as keyof typeof dataPointsCoveredByType].add(link.kpi_update_id)
+                    }
+                })
+            } else if (kpi.id && ev.kpi_ids?.includes(kpi.id)) {
+                // Legacy: if evidence is linked to the KPI (not specific updates), 
+                // it covers all data points for this KPI
+                kpiUpdates.forEach((update: any) => {
+                    if (update.id) {
+                        dataPointsCoveredByType[ev.type as keyof typeof dataPointsCoveredByType].add(update.id)
+                    }
+                })
             }
         })
 
-        const total = evidence.length
+        // Calculate percentage for each type: (unique data points covered / total data points) * 100
         return {
-            visual_proof: { count: typeCounts.visual_proof, percentage: total > 0 ? Math.round((typeCounts.visual_proof / total) * 100) : 0 },
-            documentation: { count: typeCounts.documentation, percentage: total > 0 ? Math.round((typeCounts.documentation / total) * 100) : 0 },
-            testimony: { count: typeCounts.testimony, percentage: total > 0 ? Math.round((typeCounts.testimony / total) * 100) : 0 },
-            financials: { count: typeCounts.financials, percentage: total > 0 ? Math.round((typeCounts.financials / total) * 100) : 0 }
+            visual_proof: { 
+                count: dataPointsCoveredByType.visual_proof.size, 
+                percentage: totalDataPoints > 0 ? Math.round((dataPointsCoveredByType.visual_proof.size / totalDataPoints) * 100) : 0 
+            },
+            documentation: { 
+                count: dataPointsCoveredByType.documentation.size, 
+                percentage: totalDataPoints > 0 ? Math.round((dataPointsCoveredByType.documentation.size / totalDataPoints) * 100) : 0 
+            },
+            testimony: { 
+                count: dataPointsCoveredByType.testimony.size, 
+                percentage: totalDataPoints > 0 ? Math.round((dataPointsCoveredByType.testimony.size / totalDataPoints) * 100) : 0 
+            },
+            financials: { 
+                count: dataPointsCoveredByType.financials.size, 
+                percentage: totalDataPoints > 0 ? Math.round((dataPointsCoveredByType.financials.size / totalDataPoints) * 100) : 0 
+            }
         }
     }
 
@@ -773,14 +907,67 @@ export default function ExpandableKPICard({
                             <div className="lg:col-span-3 bg-gradient-to-br from-blue-50/30 to-indigo-50/20 border border-blue-100/60 rounded-xl p-4 flex flex-col">
                                 <div className="flex items-center justify-between mb-4">
                                     <div>
-                                        <h5 className="text-lg font-semibold text-gray-900">Cumulative Progress</h5>
-                                        <p className="text-sm text-gray-500">Running total over time</p>
+                                        <h5 className="text-lg font-semibold text-gray-900">{isCumulative ? 'Cumulative Progress' : 'Monthly Progress'}</h5>
+                                        <p className="text-sm text-gray-500">{isCumulative ? 'Running total over time' : 'Monthly totals over time'}</p>
                                     </div>
-                                    <div className="flex items-center space-x-2">
+                                    <div className="flex items-center space-x-2 flex-wrap">
+                                        {/* Date Filter */}
+                                        <div className="relative">
+                                            <DateRangePicker
+                                                value={datePickerValue}
+                                                onChange={setDatePickerValue}
+                                                maxDate={getLocalDateString(new Date())}
+                                                placeholder="Filter by date"
+                                                className="w-auto"
+                                            />
+                                        </div>
+                                        
+                                        {/* Cumulative/Non-cumulative Toggle */}
+                                        {timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
+                                            <div className="flex items-center space-x-0.5 bg-gray-100 rounded-lg p-0.5">
+                                                <button
+                                                    onClick={() => setIsCumulative(true)}
+                                                    className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${isCumulative
+                                                        ? 'bg-white text-gray-900 shadow-sm'
+                                                        : 'text-gray-600 hover:text-gray-900'
+                                                        }`}
+                                                >
+                                                    Cumulative
+                                                </button>
+                                                <button
+                                                    onClick={() => setIsCumulative(false)}
+                                                    className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${!isCumulative
+                                                        ? 'bg-white text-gray-900 shadow-sm'
+                                                        : 'text-gray-600 hover:text-gray-900'
+                                                        }`}
+                                                >
+                                                    Monthly
+                                                </button>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Time Frame Filters */}
                                         <div className="flex bg-gray-100 rounded-lg p-0.5">
                                             <button
-                                                onClick={() => setTimeFrame('1month')}
-                                                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '1month'
+                                                onClick={() => {
+                                                    setTimeFrame('all')
+                                                    setDatePickerValue({})
+                                                    setIsCumulative(true)
+                                                }}
+                                                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate
+                                                    ? 'bg-white text-gray-900 shadow-sm'
+                                                    : 'text-gray-600 hover:text-gray-900'
+                                                    }`}
+                                            >
+                                                All
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setTimeFrame('1month')
+                                                    setDatePickerValue({})
+                                                    setIsCumulative(true)
+                                                }}
+                                                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '1month' && !datePickerValue.singleDate && !datePickerValue.startDate
                                                     ? 'bg-white text-gray-900 shadow-sm'
                                                     : 'text-gray-600 hover:text-gray-900'
                                                     }`}
@@ -788,8 +975,12 @@ export default function ExpandableKPICard({
                                                 1M
                                             </button>
                                             <button
-                                                onClick={() => setTimeFrame('6months')}
-                                                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '6months'
+                                                onClick={() => {
+                                                    setTimeFrame('6months')
+                                                    setDatePickerValue({})
+                                                    setIsCumulative(true)
+                                                }}
+                                                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '6months' && !datePickerValue.singleDate && !datePickerValue.startDate
                                                     ? 'bg-white text-gray-900 shadow-sm'
                                                     : 'text-gray-600 hover:text-gray-900'
                                                     }`}
@@ -797,8 +988,12 @@ export default function ExpandableKPICard({
                                                 6M
                                             </button>
                                             <button
-                                                onClick={() => setTimeFrame('1year')}
-                                                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '1year'
+                                                onClick={() => {
+                                                    setTimeFrame('1year')
+                                                    setDatePickerValue({})
+                                                    setIsCumulative(true)
+                                                }}
+                                                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '1year' && !datePickerValue.singleDate && !datePickerValue.startDate
                                                     ? 'bg-white text-gray-900 shadow-sm'
                                                     : 'text-gray-600 hover:text-gray-900'
                                                     }`}
@@ -806,8 +1001,12 @@ export default function ExpandableKPICard({
                                                 1Y
                                             </button>
                                             <button
-                                                onClick={() => setTimeFrame('5years')}
-                                                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '5years'
+                                                onClick={() => {
+                                                    setTimeFrame('5years')
+                                                    setDatePickerValue({})
+                                                    setIsCumulative(true)
+                                                }}
+                                                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '5years' && !datePickerValue.singleDate && !datePickerValue.startDate
                                                     ? 'bg-white text-gray-900 shadow-sm'
                                                     : 'text-gray-600 hover:text-gray-900'
                                                     }`}
@@ -1039,7 +1238,7 @@ export default function ExpandableKPICard({
             {selectedDataPoint && createPortal(
                 <DataPointPreviewModal
                     dataPoint={selectedDataPoint}
-                    kpi={kpi}
+                    kpi={selectedDataPoint.kpi || kpi}
                     isOpen={isDataPointPreviewOpen}
                     onClose={() => {
                         setIsDataPointPreviewOpen(false)
@@ -1056,6 +1255,11 @@ export default function ExpandableKPICard({
                         setIsDataPointPreviewOpen(false)
                         setSelectedDataPoint(null)
                     }}
+                    onEvidenceClick={(evidence) => {
+                        setSelectedEvidence(evidence)
+                        setIsDataPointPreviewOpen(false)
+                        setIsEvidencePreviewOpen(true)
+                    }}
                 />,
                 document.body
             )}
@@ -1070,6 +1274,15 @@ export default function ExpandableKPICard({
                         setSelectedEvidence(evidence)
                         setIsEvidencePreviewOpen(false)
                         setIsEditEvidenceModalOpen(true)
+                    }}
+                    onDelete={(evidence) => {
+                        setDeleteConfirmEvidence(evidence)
+                        setIsEvidencePreviewOpen(false)
+                    }}
+                    onDataPointClick={(dataPoint, kpiData) => {
+                        setSelectedDataPoint(dataPoint)
+                        setIsEvidencePreviewOpen(false)
+                        setIsDataPointPreviewOpen(true)
                     }}
                 />,
                 document.body

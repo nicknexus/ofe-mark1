@@ -34,6 +34,8 @@ import HomeTab from '../components/InitiativeTabs/HomeTab'
 import MetricsTab from '../components/InitiativeTabs/MetricsTab'
 import LocationTab from '../components/InitiativeTabs/LocationTab'
 import BeneficiariesTab from '../components/InitiativeTabs/BeneficiariesTab'
+import StoriesTab from '../components/InitiativeTabs/StoriesTab'
+import ReportTab from '../components/InitiativeTabs/ReportTab'
 import toast from 'react-hot-toast'
 
 export default function InitiativePage() {
@@ -49,6 +51,7 @@ export default function InitiativePage() {
 
     // Sidebar navigation state
     const [activeTab, setActiveTab] = useState('home')
+    const [initialStoryId, setInitialStoryId] = useState<string | undefined>(undefined)
 
     // Modal states
     const [isKPIModalOpen, setIsKPIModalOpen] = useState(false)
@@ -331,6 +334,10 @@ export default function InitiativePage() {
                             onNavigateToLocations={() => setActiveTab('location')}
                             onMetricCardClick={handleMetricCardClick}
                             onAddKPI={() => setIsKPIModalOpen(true)}
+                            onStoryClick={(storyId) => {
+                                setInitialStoryId(storyId)
+                                setActiveTab('stories')
+                            }}
                         />
                     </div>
                 )}
@@ -367,9 +374,19 @@ export default function InitiativePage() {
                     />
                 )
             case 'location':
-                return <LocationTab />
+                return <LocationTab 
+                    onStoryClick={(storyId) => {
+                        setInitialStoryId(storyId)
+                        setActiveTab('stories')
+                    }}
+                    onMetricClick={handleMetricCardClick}
+                />
             case 'beneficiaries':
                 return <BeneficiariesTab initiativeId={id!} onRefresh={loadDashboard} />
+            case 'stories':
+                return <StoriesTab initiativeId={id!} onRefresh={loadDashboard} initialStoryId={initialStoryId} />
+            case 'report':
+                return <ReportTab initiativeId={id!} dashboard={dashboard} />
             default:
                 return (
                     <HomeTab>

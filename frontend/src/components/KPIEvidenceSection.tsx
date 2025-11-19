@@ -278,6 +278,10 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateF
                         setIsEvidencePreviewOpen(false)
                         setIsEditEvidenceModalOpen(true)
                     }}
+                    onDelete={(evidence) => {
+                        setDeleteConfirmEvidence(evidence)
+                        setIsEvidencePreviewOpen(false)
+                    }}
                 />
             )}
 

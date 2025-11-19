@@ -5,6 +5,7 @@ import { Location } from '../../types'
 import { apiService } from '../../services/api'
 import LocationMap from '../LocationMap'
 import LocationModal from '../LocationModal'
+import LocationDetailsModal from '../LocationDetailsModal'
 import toast from 'react-hot-toast'
 import {
     DndContext,
@@ -116,13 +117,20 @@ function SortableLocationCard({
     )
 }
 
-export default function LocationTab() {
+interface LocationTabProps {
+    onStoryClick?: (storyId: string) => void
+    onMetricClick?: (kpiId: string) => void
+}
+
+export default function LocationTab({ onStoryClick, onMetricClick }: LocationTabProps) {
     const { id: initiativeId } = useParams<{ id: string }>()
     const [locations, setLocations] = useState<Location[]>([])
     const [orderedLocations, setOrderedLocations] = useState<Location[]>([])
     const [loading, setLoading] = useState(true)
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
     const [selectedLocation, setSelectedLocation] = useState<Location | null>(null)
+    const [detailsLocation, setDetailsLocation] = useState<Location | null>(null)
     const [mapClickCoordinates, setMapClickCoordinates] = useState<[number, number] | null>(null)
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
     const locationCardRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -270,13 +278,15 @@ export default function LocationTab() {
         e.stopPropagation()
         setSelectedLocation(location)
         setMapClickCoordinates(null)
+        setIsDetailsModalOpen(false)
         setIsModalOpen(true)
     }
 
     const handleListItemClick = (location: Location) => {
+        setDetailsLocation(location)
         setSelectedLocation(location)
         setMapClickCoordinates(null)
-        setIsModalOpen(true)
+        setIsDetailsModalOpen(true)
     }
 
     if (loading) {
@@ -332,6 +342,15 @@ export default function LocationTab() {
                             onLocationClick={handleLocationClick}
                             onMapClick={handleMapClick}
                             selectedLocationId={selectedLocation?.id || null}
+                            initiativeId={initiativeId}
+                            onEditClick={(location) => {
+                                setSelectedLocation(location)
+                                setMapClickCoordinates(null)
+                                setIsDetailsModalOpen(false)
+                                setIsModalOpen(true)
+                            }}
+                            onStoryClick={onStoryClick}
+                            onMetricClick={onMetricClick}
                         />
                     </div>
 
@@ -341,7 +360,7 @@ export default function LocationTab() {
                             <h2 className="text-base font-semibold text-gray-900 mb-0.5">
                                 All Locations ({orderedLocations.length})
                             </h2>
-                            <p className="text-xs text-gray-500">Click a location to edit • Map clicks show details</p>
+                            <p className="text-xs text-gray-500">Click a location to view details • Edit button opens editor</p>
                         </div>
 
                         <div className="flex-1 overflow-y-auto space-y-1.5 min-h-0">
@@ -387,6 +406,25 @@ export default function LocationTab() {
                     </div>
                 </div>
             </div>
+
+            {/* Location Details Modal */}
+            <LocationDetailsModal
+                isOpen={isDetailsModalOpen}
+                onClose={() => {
+                    setIsDetailsModalOpen(false)
+                    setDetailsLocation(null)
+                }}
+                location={detailsLocation}
+                onEditClick={(location) => {
+                    setSelectedLocation(location)
+                    setMapClickCoordinates(null)
+                    setIsDetailsModalOpen(false)
+                    setIsModalOpen(true)
+                }}
+                onStoryClick={onStoryClick}
+                onMetricClick={onMetricClick}
+                initiativeId={initiativeId}
+            />
 
             {/* Location Modal */}
             <LocationModal

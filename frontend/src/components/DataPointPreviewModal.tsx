@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { X, Calendar, BarChart3, Edit, Trash2, MessageSquare, FileText, Eye, MapPin, Users } from 'lucide-react'
+import { X, Calendar, BarChart3, Edit, Trash2, MessageSquare, FileText, Eye, MapPin, Users, Camera, DollarSign } from 'lucide-react'
 import { formatDate, getEvidenceTypeInfo, parseLocalDate } from '../utils'
 import { apiService } from '../services/api'
 import { Evidence, Location, BeneficiaryGroup } from '../types'
@@ -11,6 +11,7 @@ interface DataPointPreviewModalProps {
     kpi: any | null
     onEdit?: (dataPoint: any) => void
     onDelete?: (dataPoint: any) => void
+    onEvidenceClick?: (evidence: Evidence) => void
 }
 
 export default function DataPointPreviewModal({
@@ -19,7 +20,8 @@ export default function DataPointPreviewModal({
     dataPoint,
     kpi,
     onEdit,
-    onDelete
+    onDelete,
+    onEvidenceClick
 }: DataPointPreviewModalProps) {
     const [linkedEvidence, setLinkedEvidence] = useState<Evidence[]>([])
     const [loadingEvidence, setLoadingEvidence] = useState(false)
@@ -226,7 +228,7 @@ export default function DataPointPreviewModal({
                     )}
 
                     {/* Linked Evidence */}
-                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div>
                         <div className="flex items-center space-x-2 mb-3">
                             <FileText className="w-5 h-5 text-gray-600" />
                             <h3 className="text-sm font-semibold text-gray-900">Linked Evidence</h3>
@@ -237,31 +239,146 @@ export default function DataPointPreviewModal({
                                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
                             </div>
                         ) : linkedEvidence.length > 0 ? (
-                            <div className="space-y-2">
-                                {linkedEvidence.map((evidence) => {
-                                    const typeInfo = getEvidenceTypeInfo(evidence.type)
-                                    return (
-                                        <div key={evidence.id} className="bg-white rounded-lg p-3 border border-gray-200 hover:border-blue-300 transition-colors">
-                                            <div className="flex items-start justify-between">
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex items-center space-x-2 mb-1">
-                                                        <div className={`p-1.5 rounded ${typeInfo.color}`}>
-                                                            <FileText className="w-3 h-3" />
+                            (() => {
+                                // Group evidence by type
+                                const groupedByType: Record<string, Evidence[]> = {}
+                                
+                                linkedEvidence.forEach((evidence) => {
+                                    const type = evidence.type || 'other'
+                                    if (!groupedByType[type]) {
+                                        groupedByType[type] = []
+                                    }
+                                    groupedByType[type].push(evidence)
+                                })
+                                
+                                // Get icon component for evidence type
+                                const getEvidenceIcon = (type: string) => {
+                                    switch (type) {
+                                        case 'visual_proof': return Camera
+                                        case 'documentation': return FileText
+                                        case 'testimony': return MessageSquare
+                                        case 'financials': return DollarSign
+                                        default: return FileText
+                                    }
+                                }
+                                
+                                // Get color scheme for evidence type
+                                const getTypeColors = (type: string) => {
+                                    switch (type) {
+                                        case 'visual_proof':
+                                            return {
+                                                headerBg: 'bg-gradient-to-r from-pink-100/80 to-rose-100/60',
+                                                headerBorder: 'border-pink-200/60',
+                                                headerIcon: 'text-pink-700',
+                                                headerText: 'text-gray-900',
+                                                cardBg: 'bg-gradient-to-br from-pink-50/50 to-rose-50/30',
+                                                cardBorder: 'border-pink-100/60',
+                                                itemBorder: 'border-pink-100/40',
+                                                dotColor: 'bg-pink-400'
+                                            }
+                                        case 'documentation':
+                                            return {
+                                                headerBg: 'bg-gradient-to-r from-blue-100/80 to-indigo-100/60',
+                                                headerBorder: 'border-blue-200/60',
+                                                headerIcon: 'text-blue-700',
+                                                headerText: 'text-gray-900',
+                                                cardBg: 'bg-gradient-to-br from-blue-50/50 to-indigo-50/30',
+                                                cardBorder: 'border-blue-100/60',
+                                                itemBorder: 'border-blue-100/40',
+                                                dotColor: 'bg-blue-400'
+                                            }
+                                        case 'testimony':
+                                            return {
+                                                headerBg: 'bg-gradient-to-r from-orange-100/80 to-amber-100/60',
+                                                headerBorder: 'border-orange-200/60',
+                                                headerIcon: 'text-orange-700',
+                                                headerText: 'text-gray-900',
+                                                cardBg: 'bg-gradient-to-br from-orange-50/50 to-amber-50/30',
+                                                cardBorder: 'border-orange-100/60',
+                                                itemBorder: 'border-orange-100/40',
+                                                dotColor: 'bg-orange-400'
+                                            }
+                                        case 'financials':
+                                            return {
+                                                headerBg: 'bg-gradient-to-r from-green-100/80 to-emerald-100/60',
+                                                headerBorder: 'border-green-200/60',
+                                                headerIcon: 'text-green-700',
+                                                headerText: 'text-gray-900',
+                                                cardBg: 'bg-gradient-to-br from-green-50/50 to-emerald-50/30',
+                                                cardBorder: 'border-green-100/60',
+                                                itemBorder: 'border-green-100/40',
+                                                dotColor: 'bg-green-400'
+                                            }
+                                        default:
+                                            return {
+                                                headerBg: 'bg-gradient-to-r from-gray-100/80 to-slate-100/60',
+                                                headerBorder: 'border-gray-200/60',
+                                                headerIcon: 'text-gray-700',
+                                                headerText: 'text-gray-900',
+                                                cardBg: 'bg-gradient-to-br from-gray-50/50 to-slate-50/30',
+                                                cardBorder: 'border-gray-100/60',
+                                                itemBorder: 'border-gray-100/40',
+                                                dotColor: 'bg-gray-400'
+                                            }
+                                    }
+                                }
+                                
+                                return (
+                                    <div className="space-y-2.5">
+                                        {Object.entries(groupedByType).map(([type, evidenceList]) => {
+                                            const typeInfo = getEvidenceTypeInfo(type as any)
+                                            const IconComponent = getEvidenceIcon(type)
+                                            const colors = getTypeColors(type)
+                                            
+                                            return (
+                                                <div key={type} className={`rounded-lg border ${colors.cardBorder} overflow-hidden ${colors.cardBg}`}>
+                                                    {/* Evidence Type Card Header */}
+                                                    <div className={`px-3 py-2.5 border-b-2 ${colors.headerBorder} shadow-sm ${colors.headerBg}`}>
+                                                        <div className="flex items-center space-x-2 min-w-0">
+                                                            <IconComponent className={`w-4 h-4 ${colors.headerIcon} flex-shrink-0`} />
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className={`text-sm font-bold ${colors.headerText} truncate`}>
+                                                                    {typeInfo.label}
+                                                                </div>
+                                                                <div className="text-xs text-gray-600 mt-0.5">
+                                                                    {evidenceList.length} {evidenceList.length === 1 ? 'item' : 'items'}
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        <span className="text-sm font-medium text-gray-900 truncate">{evidence.title}</span>
-                                                        <span className={`px-2 py-0.5 rounded text-xs ${typeInfo.color}`}>
-                                                            {evidence.type.replace('_', ' ')}
-                                                        </span>
                                                     </div>
-                                                    {evidence.description && (
-                                                        <p className="text-xs text-gray-600 mt-1 line-clamp-2">{evidence.description}</p>
-                                                    )}
+                                                    
+                                                    {/* Evidence Items List */}
+                                                    <div className={`px-3 py-1.5 space-y-1 ${evidenceList.length > 3 ? 'max-h-[150px] overflow-y-auto' : ''}`}>
+                                                        {evidenceList.map((evidence, idx) => (
+                                                            <div 
+                                                                key={evidence.id}
+                                                                onClick={() => onEvidenceClick?.(evidence)}
+                                                                className={`flex items-center justify-between py-1.5 px-2 rounded-md transition-all ${
+                                                                    onEvidenceClick ? 'hover:bg-white/80 cursor-pointer hover:shadow-sm' : ''
+                                                                } ${idx < evidenceList.length - 1 ? `border-b ${colors.itemBorder}` : ''}`}
+                                                            >
+                                                                <div className="flex items-center space-x-2 min-w-0 flex-1">
+                                                                    <div className={`w-1.5 h-1.5 rounded-full ${colors.dotColor} flex-shrink-0`}></div>
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <div className="text-xs font-medium text-gray-900 truncate">
+                                                                            {evidence.title}
+                                                                        </div>
+                                                                        {evidence.description && (
+                                                                            <div className="text-[10px] text-gray-500 mt-0.5 line-clamp-1">
+                                                                                {evidence.description}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
+                                            )
+                                        })}
+                                    </div>
+                                )
+                            })()
                         ) : (
                             <p className="text-sm text-gray-500 text-center py-4">No evidence linked to this data point</p>
                         )}

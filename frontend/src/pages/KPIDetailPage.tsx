@@ -423,6 +423,10 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
                     setIsEvidencePreviewOpen(false)
                     setIsEditEvidenceModalOpen(true)
                 }}
+                onDelete={(evidence) => {
+                    setDeleteConfirmEvidence(evidence)
+                    setIsEvidencePreviewOpen(false)
+                }}
             />
 
             {/* Edit Data Point Beneficiaries Modal */}
@@ -515,21 +519,59 @@ export default function KPIDetailPage() {
         if (!kpiId || !initiativeId) return
 
         try {
-            const evidence = await apiService.getEvidence(initiativeId, kpiId)
+            const [evidence, updates] = await Promise.all([
+                apiService.getEvidence(initiativeId, kpiId),
+                apiService.getKPIUpdates(kpiId)
+            ])
 
-            // Calculate evidence type statistics
-            const typeCount = evidence.reduce((acc: any, item: any) => {
-                acc[item.type] = (acc[item.type] || 0) + 1
-                return acc
-            }, {})
+            // Total data points (claims) for this KPI
+            const totalDataPoints = updates?.length || 0
 
-            const totalEvidence = evidence.length
-            const stats = Object.entries(typeCount).map(([type, count]: [string, any]) => ({
+            if (!evidence || evidence.length === 0 || totalDataPoints === 0) {
+                setEvidenceStats([])
+                return
+            }
+
+            // For each evidence type, track which unique data points it covers
+            const dataPointsCoveredByType: Record<string, Set<string>> = {
+                visual_proof: new Set(),
+                documentation: new Set(),
+                testimony: new Set(),
+                financials: new Set()
+            }
+
+            // Go through each evidence item and track which data points it covers
+            evidence.forEach((ev: any) => {
+                if (!ev.type || !dataPointsCoveredByType.hasOwnProperty(ev.type)) return
+                
+                // Get data points covered by this evidence
+                if (ev.kpi_update_ids && Array.isArray(ev.kpi_update_ids)) {
+                    ev.kpi_update_ids.forEach((updateId: string) => {
+                        dataPointsCoveredByType[ev.type as keyof typeof dataPointsCoveredByType].add(updateId)
+                    })
+                } else if (ev.evidence_kpi_updates && Array.isArray(ev.evidence_kpi_updates)) {
+                    ev.evidence_kpi_updates.forEach((link: any) => {
+                        if (link.kpi_update_id) {
+                            dataPointsCoveredByType[ev.type as keyof typeof dataPointsCoveredByType].add(link.kpi_update_id)
+                        }
+                    })
+                } else if (ev.kpi_ids?.includes(kpiId)) {
+                    // Legacy: if evidence is linked to the KPI, it covers all data points
+                    updates.forEach((update: any) => {
+                        if (update.id) {
+                            dataPointsCoveredByType[ev.type as keyof typeof dataPointsCoveredByType].add(update.id)
+                        }
+                    })
+                }
+            })
+
+            // Calculate stats for each type
+            const stats = Object.entries(dataPointsCoveredByType).map(([type, coveredSet]) => ({
                 type,
-                count,
-                percentage: totalEvidence > 0 ? Math.round((count / totalEvidence) * 100) : 0,
-                label: type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
-            }))
+                count: coveredSet.size,
+                percentage: totalDataPoints > 0 ? Math.round((coveredSet.size / totalDataPoints) * 100) : 0,
+                label: type.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+            })).filter(stat => stat.count > 0) // Only show types that have coverage
 
             setEvidenceStats(stats)
         } catch (error) {
