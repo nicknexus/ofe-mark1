@@ -573,6 +573,9 @@ export default function ExpandableKPICard({
             financials: new Set()
         }
 
+        // Create a Set of valid update IDs for this KPI only
+        const validUpdateIds = new Set(kpiUpdates.map((update: any) => update.id).filter(Boolean))
+
         // Go through each evidence item and track which data points it covers
         evidence.forEach((ev: any) => {
             if (!ev.type || !dataPointsCoveredByType.hasOwnProperty(ev.type)) return
@@ -581,12 +584,16 @@ export default function ExpandableKPICard({
             // Check if evidence has kpi_update_ids (new precise linking)
             if (ev.kpi_update_ids && Array.isArray(ev.kpi_update_ids)) {
                 ev.kpi_update_ids.forEach((updateId: string) => {
-                    dataPointsCoveredByType[ev.type as keyof typeof dataPointsCoveredByType].add(updateId)
+                    // Only count updates that belong to THIS KPI
+                    if (validUpdateIds.has(updateId)) {
+                        dataPointsCoveredByType[ev.type as keyof typeof dataPointsCoveredByType].add(updateId)
+                    }
                 })
             } else if (ev.evidence_kpi_updates && Array.isArray(ev.evidence_kpi_updates)) {
                 // Alternative: check if evidence has nested evidence_kpi_updates
                 ev.evidence_kpi_updates.forEach((link: any) => {
-                    if (link.kpi_update_id) {
+                    if (link.kpi_update_id && validUpdateIds.has(link.kpi_update_id)) {
+                        // Only count updates that belong to THIS KPI
                         dataPointsCoveredByType[ev.type as keyof typeof dataPointsCoveredByType].add(link.kpi_update_id)
                     }
                 })
