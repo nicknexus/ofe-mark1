@@ -163,7 +163,7 @@ export default function AddStoryModal({
         try {
             const submitData = {
                 ...formData,
-                media_url: formData.media_url?.trim() || null, // Convert empty string to null
+                media_url: formData.media_url?.trim() || undefined, // Convert empty string to undefined
                 beneficiary_group_ids: selectedBeneficiaryGroupIds
             }
 
