@@ -51,15 +51,15 @@ router.post('/generate-report', authenticateUser, async (req: AuthenticatedReque
             deepLink
         } = req.body;
 
-        // Validate required fields
-        if (!initiativeId || !initiativeTitle || !selectedStory) {
+        // Validate required fields (selectedStory is now optional)
+        if (!initiativeId || !initiativeTitle) {
             console.error('Missing required fields:', {
                 initiativeId: !!initiativeId,
                 initiativeTitle: !!initiativeTitle,
                 dateRange: !!dateRangeInput,
                 selectedStory: !!selectedStory
             });
-            res.status(400).json({ error: 'Missing required fields: initiativeId, initiativeTitle, and selectedStory are required' });
+            res.status(400).json({ error: 'Missing required fields: initiativeId and initiativeTitle are required' });
             return;
         }
 
@@ -106,16 +106,20 @@ Make the report engaging but factual.`;
             ).join('\n')
             : 'No beneficiary groups specified';
 
+        const storyText = selectedStory
+            ? `**Selected Story:**
+Title: ${selectedStory.title}
+Description: ${selectedStory.description || 'No description provided'}
+Location: ${selectedStory.location_name || 'Not specified'}
+Date: ${selectedStory.date_represented}`
+            : '**Selected Story:** None selected - create a report focused on metrics and impact data without a specific story narrative.';
+
         const userPrompt = `Create a detailed initiative impact report using the following inputs.
 
 **Initiative:** ${initiativeTitle}
 **Date Range:** ${dateRangeText}
 
-**Selected Story:**
-Title: ${selectedStory.title}
-Description: ${selectedStory.description || 'No description provided'}
-Location: ${selectedStory.location_name || 'Not specified'}
-Date: ${selectedStory.date_represented}
+${storyText}
 
 **Metrics Summary (Totals):**
 ${totalsText}
@@ -143,7 +147,7 @@ Please structure the report with the following sections. Use EXACT section heade
 8. **## Footer** - End with: "Nexus Impacts | Know Your Mark On The World"
 
 IMPORTANT: 
-- DO NOT include a Story Section - the actual story will be inserted separately
+${selectedStory ? '- DO NOT include a Story Section - the actual story will be inserted separately' : '- Since no story was selected, focus the report on metrics, impact data, and achievements without a narrative story section'}
 - Use EXACTLY the section headers shown above (e.g., "## Visual Metrics Description", "## Location Information")
 - Sections 4, 5, 6, and 7 must be EXACTLY ONE SENTENCE each
 - The Overview Summary must be exactly ONE paragraph (4-5 sentences)

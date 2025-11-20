@@ -6,6 +6,7 @@ import DateRangePicker from '../DateRangePicker'
 import toast from 'react-hot-toast'
 import L from 'leaflet'
 import html2canvas from 'html2canvas'
+import { buildImpactPDF } from '../../pdf/pdfGenerator'
 
 interface ReportTabProps {
     initiativeId: string
@@ -159,7 +160,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
     }
 
     const handleGenerateReport = async () => {
-        if (!reportData || !selectedStory || !dashboard) return
+        if (!reportData || !dashboard) return
 
         try {
             setLoadingReport(true)
@@ -198,7 +199,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                     },
                     totals: reportData.totals,
                     rawMetrics: reportData.metrics,
-                    selectedStory,
+                    selectedStory: selectedStory || undefined,
                     locations: reportData.locations,
                     beneficiaryGroups: beneficiaryGroups.filter(bg =>
                         selectedBeneficiaryGroupIds.length === 0 || selectedBeneficiaryGroupIds.includes(bg.id!)
@@ -240,6 +241,39 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                     console.error('Failed to load image:', error)
                     throw error
                 }
+            }
+
+            // Parse report text and extract sections
+            const reportText = result.reportText
+            let overviewSummary = ''
+            let beneficiaryText = ''
+
+            // Extract Overview Summary and limit to 2 sentences
+            const overviewMatch = reportText.match(/##?\s*Overview Summary[\s\S]*?(?=##?\s*|$)/i)
+            if (overviewMatch) {
+                const fullSummary = overviewMatch[0]
+                    .replace(/##?\s*Overview Summary\s*/i, '')
+                    .split('\n')
+                    .map(l => l.trim())
+                    .filter(l => l && !l.startsWith('##'))
+                    .join(' ')
+                    .trim()
+
+                // Extract first 2 sentences
+                const sentences = fullSummary.match(/[^.!?]+[.!?]+/g) || []
+                overviewSummary = sentences.slice(0, 2).join(' ').trim()
+            }
+
+            // Extract Beneficiary Breakdown
+            const beneficiaryMatch = reportText.match(/##?\s*Beneficiary Breakdown[\s\S]*?(?=##?\s*|$)/i)
+            if (beneficiaryMatch) {
+                beneficiaryText = beneficiaryMatch[0]
+                    .replace(/##?\s*Beneficiary Breakdown\s*/i, '')
+                    .split('\n')
+                    .map(l => l.trim())
+                    .filter(l => l && !l.startsWith('##'))
+                    .join(' ')
+                    .trim()
             }
 
             // Helper function to export Leaflet map as image using html2canvas
@@ -363,361 +397,33 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                 })
             }
 
-            // Create PDF blob
-            const { jsPDF } = await import('jspdf')
-            const doc = new jsPDF({
-                orientation: 'portrait',
-                unit: 'mm',
-                format: 'a4'
-            })
-
-            const pageWidth = doc.internal.pageSize.getWidth()
-            const pageHeight = doc.internal.pageSize.getHeight()
-            const margin = 20
-            const contentWidth = pageWidth - (margin * 2)
-
-            // Fixed heights for portrait layout
-            const headerHeight = 30
-            const storyImageHeight = 60
-            const storySummaryHeight = 30
-            const metricsHeight = 60
-            const columnGap = 10
-            const mapTitleHeight = 8
-            const mapHeight = 60
-
-            // Calculated fixed Y positions
-            const headerY = 0
-            const contentStartY = headerHeight + 5
-            const colBlockHeight = Math.max(
-                storyImageHeight + storySummaryHeight,
-                metricsHeight + 30 // summary section
-            )
-
-            const topBlockY = contentStartY
-            const mapTitleY = topBlockY + colBlockHeight + 10
-            const mapY = mapTitleY + mapTitleHeight
-            const footerY = pageHeight - 10
-
-            // Green header background
-            doc.setFillColor(34, 197, 94) // Green #22C55E
-            doc.rect(0, 0, pageWidth, headerHeight, 'F')
-
-            // Set page background color (dark blue)
-            doc.setFillColor(74, 81, 99) // #4a5163
-            doc.rect(0, headerHeight, pageWidth, pageHeight - headerHeight, 'F')
-
-            // Set text color to white
-            doc.setTextColor(255, 255, 255)
-
-            // Format date
-            const formatDate = (dateStr: string) => {
-                if (!dateStr) return ''
-                try {
-                    const date = new Date(dateStr)
-                    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-                } catch {
-                    return dateStr
-                }
-            }
-
-            // Title Header - Green header background
-            doc.setFontSize(20)
-            doc.setFont('helvetica', 'bold')
-            doc.setTextColor(255, 255, 255)
-            doc.text(dashboard.initiative.title, margin, 12)
-
-            doc.setFontSize(11)
-            doc.setFont('helvetica', 'normal')
-            doc.setTextColor(255, 255, 255)
-            const dateRangeText = dateStart && dateEnd
-                ? `${formatDate(dateStart)} - ${formatDate(dateEnd)}`
-                : dateStart || dateEnd || 'Date range not specified'
-            doc.text(dateRangeText, margin, 22)
-
-            // Parse report text and extract sections
-            const reportText = result.reportText
-            let overviewSummary = ''
-            let locationInfo = ''
-            let mapSectionText = ''
-
-            // Extract Overview Summary and limit to 2 sentences
-            const overviewMatch = reportText.match(/##?\s*Overview Summary[\s\S]*?(?=##?\s*|$)/i)
-            if (overviewMatch) {
-                const fullSummary = overviewMatch[0]
-                    .replace(/##?\s*Overview Summary\s*/i, '')
-                    .split('\n')
-                    .map(l => l.trim())
-                    .filter(l => l && !l.startsWith('##'))
-                    .join(' ')
-                    .trim()
-
-                // Extract first 2 sentences
-                const sentences = fullSummary.match(/[^.!?]+[.!?]+/g) || []
-                overviewSummary = sentences.slice(0, 2).join(' ').trim()
-            }
-
-            const locationInfoMatch = reportText.match(/##?\s*Location Information[\s\S]*?(?=##?\s*|$)/i)
-            if (locationInfoMatch) {
-                locationInfo = locationInfoMatch[0]
-                    .replace(/##?\s*Location Information\s*/i, '')
-                    .split('\n')
-                    .map(l => l.trim())
-                    .filter(l => l && !l.startsWith('##'))
-                    .join(' ')
-                    .trim()
-            }
-
-            const mapSectionMatch = reportText.match(/##?\s*Map Section Text[\s\S]*?(?=##?\s*|$)/i)
-            if (mapSectionMatch) {
-                mapSectionText = mapSectionMatch[0]
-                    .replace(/##?\s*Map Section Text\s*/i, '')
-                    .split('\n')
-                    .map(l => l.trim())
-                    .filter(l => l && !l.startsWith('##'))
-                    .join(' ')
-                    .trim()
-            }
-
-            // Dashboard layout: Two columns split down the middle
-            const leftColumnWidth = (contentWidth - columnGap) / 2
-            const rightColumnWidth = (contentWidth - columnGap) / 2
-            const leftX = margin
-            const rightX = leftX + leftColumnWidth + columnGap
-
-            // LEFT COLUMN: Story photo + Story description in a box
-            if (selectedStory) {
-                const storyBoxHeight = storyImageHeight + storySummaryHeight + 8
-                const storyBoxPadding = 3
-
-                // Draw story box background
-                doc.setFillColor(60, 70, 90)
-                doc.setDrawColor(100, 100, 100)
-                doc.setLineWidth(0.5)
-                doc.roundedRect(leftX, topBlockY, leftColumnWidth, storyBoxHeight, 3, 3, 'FD')
-
-                const storyContentX = leftX + storyBoxPadding
-                const storyContentWidth = leftColumnWidth - (storyBoxPadding * 2)
-
-                // Story photo
-                if (selectedStory.media_url && selectedStory.media_type === 'photo') {
-                    const photoWidth = storyContentWidth
-                    const photoY = topBlockY + storyBoxPadding
-
-                    try {
-                        console.log('Loading story photo...')
-                        const base64 = await loadImageAsBase64(selectedStory.media_url)
-                        console.log('Adding image to PDF...')
-                        // Determine format from base64 string
-                        const format = base64.startsWith('data:image/png') ? 'PNG' : 'JPEG'
-                        doc.addImage(base64, format, storyContentX, photoY, photoWidth, storyImageHeight)
-                        console.log('Image added to PDF successfully')
-                    } catch (error) {
-                        // Fallback to placeholder if image fails to load
-                        console.error('Failed to load story image:', error)
-                        toast.error('Could not load story photo. Using placeholder.')
-                        doc.setFillColor(50, 60, 80)
-                        doc.setDrawColor(150, 150, 150)
-                        doc.setLineWidth(1)
-                        doc.rect(storyContentX, photoY, photoWidth, storyImageHeight, 'FD')
-
-                        doc.setFontSize(8)
-                        doc.setFont('helvetica', 'italic')
-                        doc.setTextColor(200, 200, 200)
-                        doc.text('[Photo]', storyContentX + photoWidth / 2, photoY + storyImageHeight / 2, { align: 'center' })
-                    }
-                }
-
-                // Story description
-                if (selectedStory.description) {
-                    const storySummaryY = topBlockY + storyImageHeight + storyBoxPadding + 4
-                    doc.setFontSize(9)
-                    doc.setFont('helvetica', 'normal')
-                    doc.setTextColor(255, 255, 255)
-                    const descLines = doc.splitTextToSize(selectedStory.description, storyContentWidth)
-                    const maxLines = Math.floor(storySummaryHeight / 5)
-                    let currentY = storySummaryY
-                    descLines.slice(0, maxLines).forEach((line: string) => {
-                        doc.text(line, storyContentX, currentY)
-                        currentY += 5
-                    })
-                }
-            }
-
-            // RIGHT COLUMN: Metrics boxes
-            if (reportData.totals.length > 0) {
-                // Metrics title
-                doc.setFontSize(12)
-                doc.setFont('helvetica', 'bold')
-                doc.setTextColor(255, 255, 255)
-                doc.text('Metrics', rightX, topBlockY)
-
-                const boxHeight = 18
-                const boxSpacing = 6
-                const boxesPerRow = 2
-                const boxWidth = (rightColumnWidth - boxSpacing) / boxesPerRow
-                let currentBoxX = rightX
-                let currentBoxY = topBlockY + 8
-                let boxesInCurrentRow = 0
-
-                // Calculate how many rows fit in metricsHeight
-                const maxRows = Math.floor((metricsHeight - 8) / (boxHeight + boxSpacing))
-                const maxBoxes = maxRows * boxesPerRow
-
-                reportData.totals.slice(0, maxBoxes).forEach((total) => {
-                    // Draw metric box
-                    doc.setFillColor(60, 70, 90)
-                    doc.setDrawColor(106, 114, 133)
-                    doc.setLineWidth(0.5)
-                    doc.roundedRect(currentBoxX, currentBoxY, boxWidth, boxHeight, 2, 2, 'FD')
-
-                    // Metric title - wrap if too long
-                    doc.setFontSize(7)
-                    doc.setFont('helvetica', 'bold')
-                    doc.setTextColor(255, 255, 255)
-                    const titleLines = doc.splitTextToSize(total.kpi_title, boxWidth - 6)
-                    // Allow up to 2 lines for title
-                    const titleY = currentBoxY + 6
-                    titleLines.slice(0, 2).forEach((line: string, index: number) => {
-                        doc.text(line, currentBoxX + 3, titleY + (index * 4))
-                    })
-
-                    // Metric value - Green (position based on title lines)
-                    const valueY = currentBoxY + (titleLines.length > 1 ? 12 : 14)
-                    doc.setFontSize(10)
-                    doc.setFont('helvetica', 'bold')
-                    doc.setTextColor(34, 197, 94) // Green
-                    const valueText = `${total.total_value} ${total.unit_of_measurement}`
-                    doc.text(valueText, currentBoxX + 3, valueY)
-
-                    boxesInCurrentRow++
-                    if (boxesInCurrentRow >= boxesPerRow) {
-                        currentBoxY += boxHeight + boxSpacing
-                        currentBoxX = rightX
-                        boxesInCurrentRow = 0
-                    } else {
-                        currentBoxX += boxWidth + boxSpacing
-                    }
-                })
-            }
-
-            // Summary text
-            if (overviewSummary) {
-                const overviewY = topBlockY + metricsHeight + 4
-                // Summary title
-                doc.setFontSize(12)
-                doc.setFont('helvetica', 'bold')
-                doc.setTextColor(255, 255, 255)
-                doc.text('Summary', rightX, overviewY)
-
-                // Summary text
-                const summaryTextY = overviewY + 8
-                doc.setFontSize(9)
-                doc.setFont('helvetica', 'normal')
-                doc.setTextColor(255, 255, 255)
-                const summaryLines = doc.splitTextToSize(overviewSummary, rightColumnWidth)
-                const maxLines = Math.floor(30 / 5) // 30mm height
-                let currentY = summaryTextY
-                summaryLines.slice(0, maxLines).forEach((line: string) => {
-                    doc.text(line, rightX, currentY)
-                    currentY += 5
-                })
-            }
-
-            // Map Section - Clean, professional layout
+            // Generate map image if locations exist
+            let mapImage: string | null = null
             if (reportData.locations.length > 0) {
-                // Map Title - Professional typography
-                doc.setFontSize(12)
-                doc.setFont('helvetica', 'bold')
-                doc.setTextColor(255, 255, 255)
-                doc.text('Geographic Distribution', margin, mapTitleY)
-
-                // Map - Full width, centered, with border radius
                 try {
                     console.log('Rendering map...')
-                    const mapImage = await renderMapImage(reportData.locations)
-                    console.log('Adding map to PDF...')
-
-                    // Create a rounded rectangle mask effect by drawing rounded rect background
-                    // Note: jsPDF doesn't support rounded corners on images directly,
-                    // so we'll draw a rounded rect and clip, or use a workaround
-                    const radius = 5
-
-                    // Draw rounded rectangle background
-                    doc.setFillColor(60, 70, 90)
-                    doc.setDrawColor(100, 100, 100)
-                    doc.setLineWidth(0.5)
-                    doc.roundedRect(margin, mapY, contentWidth, mapHeight, radius, radius, 'FD')
-
-                    // Add image (will be clipped by the rounded rect if we use save/restore)
-                    // For now, just add the image - the rounded rect gives the border effect
-                    doc.addImage(mapImage, 'PNG', margin, mapY, contentWidth, mapHeight)
-                    console.log('Map added to PDF successfully')
-
-                    // Location List - Clean format, 2 columns
-                    const locationsListY = mapY + mapHeight + 8
-                    doc.setFontSize(9)
-                    doc.setFont('helvetica', 'normal')
-                    doc.setTextColor(255, 255, 255)
-
-                    const locationsPerColumn = Math.ceil(reportData.locations.length / 2)
-                    const columnWidth = contentWidth / 2
-
-                    reportData.locations.forEach((loc, index) => {
-                        const column = index < locationsPerColumn ? 0 : 1
-                        const row = index < locationsPerColumn ? index : index - locationsPerColumn
-                        const locX = margin + (column * columnWidth)
-                        const locY = locationsListY + (row * 5)
-                        const locText = `• ${loc.name} (${loc.latitude.toFixed(3)}, ${loc.longitude.toFixed(3)})`
-                        doc.text(locText, locX, locY)
-                    })
+                    mapImage = await renderMapImage(reportData.locations)
+                    console.log('Map rendered successfully')
                 } catch (error) {
                     console.error('Failed to render map image:', error)
-                    toast.error('Could not render map. Using placeholder.')
-                    // Fallback: draw simple placeholder
-                    doc.setFillColor(60, 80, 100)
-                    doc.setDrawColor(200, 200, 200)
-                    doc.setLineWidth(1)
-                    doc.rect(margin, mapY, contentWidth, mapHeight, 'FD')
-
-                    doc.setFontSize(10)
-                    doc.setFont('helvetica', 'italic')
-                    doc.setTextColor(200, 200, 200)
-                    doc.text('Map unavailable', margin + contentWidth / 2, mapY + mapHeight / 2, { align: 'center' })
+                    toast.error('Could not render map. Report will be generated without map.')
                 }
             }
 
-            // Footer - Subtle, centered, professional
-            let footerYPosition = footerY
-            if (reportData.locations.length > 0) {
-                // Calculate where location list ends (accounting for 2 columns)
-                const locationsListY = mapY + mapHeight + 8
-                const locationsPerColumn = Math.ceil(reportData.locations.length / 2)
-                const locationsListEndY = locationsListY + (locationsPerColumn * 5)
-                // Footer should be at least 5mm below location list
-                footerYPosition = Math.min(locationsListEndY + 5, pageHeight - 10)
-            }
+            // Build PDF using modular generator
+            const pdfBlob = await buildImpactPDF({
+                dashboard,
+                overviewSummary: overviewSummary || 'No overview available',
+                totals: reportData.totals,
+                beneficiaryText: beneficiaryText || 'No beneficiary information available',
+                selectedStory: selectedStory || undefined,
+                mapImage: mapImage || undefined,
+                locations: reportData.locations,
+                dateStart,
+                dateEnd,
+                loadImageAsBase64
+            })
 
-            const totalPages = doc.getNumberOfPages()
-            for (let i = 1; i <= totalPages; i++) {
-                doc.setPage(i)
-                doc.setFontSize(7) // Smaller, subtle
-                doc.setTextColor(180, 180, 180) // Lighter gray
-                doc.text(
-                    'Nexus Impacts | Know Your Mark On The World',
-                    pageWidth / 2,
-                    footerYPosition,
-                    { align: 'center' }
-                )
-                doc.text(
-                    `Page ${i} of ${totalPages}`,
-                    pageWidth - margin,
-                    footerYPosition,
-                    { align: 'right' }
-                )
-            }
-
-            // Convert to blob
-            const pdfBlob = doc.output('blob')
             setPdfBlob(pdfBlob)
 
         } catch (error: any) {
@@ -1044,37 +750,33 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                         )}
 
                         {/* Story Selection and Generate Button */}
-                        {reportData.stories.length > 0 && (
-                            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                                <h2 className="text-lg font-semibold text-gray-900 mb-4">Generate Report</h2>
-                                {!selectedStory ? (
-                                    <p className="text-sm text-gray-500 mb-4">Please select a story above to anchor the report narrative.</p>
+                        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                            <h2 className="text-lg font-semibold text-gray-900 mb-4">Generate Report</h2>
+                            {reportData.stories.length > 0 && !selectedStory ? (
+                                <p className="text-sm text-gray-500 mb-4">Optional: Select a story above to anchor the report narrative, or generate without a story.</p>
+                            ) : selectedStory ? (
+                                <p className="text-sm text-gray-600 mb-4">
+                                    Selected story: <strong>{selectedStory.title}</strong>
+                                </p>
+                            ) : null}
+                            <button
+                                onClick={handleGenerateReport}
+                                disabled={loadingReport}
+                                className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                            >
+                                {loadingReport ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        <span>Generating...</span>
+                                    </>
                                 ) : (
-                                    <div className="mb-4">
-                                        <p className="text-sm text-gray-600 mb-4">
-                                            Selected story: <strong>{selectedStory.title}</strong>
-                                        </p>
-                                        <button
-                                            onClick={handleGenerateReport}
-                                            disabled={loadingReport}
-                                            className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-                                        >
-                                            {loadingReport ? (
-                                                <>
-                                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                                    <span>Generating...</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Sparkles className="w-4 h-4" />
-                                                    <span>Generate AI Report</span>
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
+                                    <>
+                                        <Sparkles className="w-4 h-4" />
+                                        <span>Generate AI Report</span>
+                                    </>
                                 )}
-                            </div>
-                        )}
+                            </button>
+                        </div>
 
                         {/* Report Preview */}
                         {reportText && pdfBlob && (

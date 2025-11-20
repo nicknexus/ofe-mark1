@@ -93,3 +93,4 @@ COMMENT ON COLUMN organizations.is_public IS 'Whether this organization is publi
 
 
 
+

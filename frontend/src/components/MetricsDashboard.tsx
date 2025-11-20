@@ -72,7 +72,7 @@ function SortableMetricCard({ kpi, metricColor, filteredTotal, onMetricCardClick
             >
                 <GripVertical className="w-3 h-3 text-gray-400" />
             </div>
-            <div 
+            <div
                 onClick={() => onMetricCardClick?.(kpi.id)}
             >
                 <div className="flex items-center justify-between mb-1">
@@ -111,7 +111,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     const [isCumulative, setIsCumulative] = useState(true)
     const [visibleKPIs, setVisibleKPIs] = useState<Set<string>>(new Set())
     const [orderedKPIs, setOrderedKPIs] = useState<any[]>([])
-    
+
     // Initialize ordered KPIs from props, sorted by display_order
     useEffect(() => {
         const sorted = [...kpis].sort((a, b) => {
@@ -121,7 +121,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
         })
         setOrderedKPIs(sorted)
     }, [kpis])
-    
+
     // Drag and drop sensors
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -133,21 +133,21 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
             coordinateGetter: sortableKeyboardCoordinates,
         })
     )
-    
+
     // Handle drag end
     const handleDragEnd = async (event: DragEndEvent) => {
         const { active, over } = event
-        
+
         if (!over || active.id === over.id) return
-        
+
         const oldIndex = orderedKPIs.findIndex((kpi) => kpi.id === active.id)
         const newIndex = orderedKPIs.findIndex((kpi) => kpi.id === over.id)
-        
+
         if (oldIndex === -1 || newIndex === -1) return
-        
+
         const newOrderedKPIs = arrayMove(orderedKPIs, oldIndex, newIndex)
         setOrderedKPIs(newOrderedKPIs)
-        
+
         // Update display_order in backend
         if (initiativeId) {
             try {
@@ -440,7 +440,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     const kpiId = update.kpi_id
                     return visibleKPIs.has(kpiId) && filteredKPIIds.has(kpiId)
                 })
-                
+
                 if (visibleKPIUpdates.length > 0) {
                     const oldestUpdate = visibleKPIUpdates.reduce((oldest, update) => {
                         const updateDate = getEffectiveDate(update)
@@ -496,26 +496,26 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
             [kpiId: string]: any; // Dynamic keys for each KPI
         }> = []
 
-        // Non-cumulative mode: group by month (only when timeFrame is 'all')
-        if (!isCumulative && timeFrame === 'all') {
-            // Start from the month before the first impact claim
+        // Non-cumulative mode: group by month (persist even when date filters are applied)
+        if (!isCumulative) {
+            // Start from the month before the first impact claim (or filtered start date)
             const firstMonthStart = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
             firstMonthStart.setMonth(firstMonthStart.getMonth() - 1)
-            
-            const now = new Date()
-            const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-            
+
+            // Use endDate for the last month to show (respects date filters if applied)
+            const lastMonthDate = new Date(endDate.getFullYear(), endDate.getMonth(), 1)
+
             // Group updates by month for each visible KPI only
             const monthlyTotals: Record<string, Record<string, number>> = {} // [monthKey][kpiId] = total
-            
+
             Object.keys(filteredUpdatesByKPI).forEach(kpiId => {
                 // Only process visible KPIs
                 if (!visibleKPIs.has(kpiId)) return
-                
+
                 filteredUpdatesByKPI[kpiId].forEach(update => {
                     const updateDate = getEffectiveDate(update)
                     const monthKey = `${updateDate.getFullYear()}-${String(updateDate.getMonth() + 1).padStart(2, '0')}`
-                    
+
                     if (!monthlyTotals[monthKey]) {
                         monthlyTotals[monthKey] = {}
                     }
@@ -525,29 +525,29 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     monthlyTotals[monthKey][kpiId] += (update.value || 0)
                 })
             })
-            
+
             // Generate monthly data points
             let currentMonthDate = new Date(firstMonthStart)
-            while (currentMonthDate <= currentMonth) {
+            while (currentMonthDate <= lastMonthDate) {
                 const monthKey = `${currentMonthDate.getFullYear()}-${String(currentMonthDate.getMonth() + 1).padStart(2, '0')}`
                 const monthName = currentMonthDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-                
+
                 const dataPoint: any = {
                     date: monthName,
                     fullDate: new Date(currentMonthDate)
                 }
-                
+
                 // Set value for each visible KPI (0 if no updates for that month)
                 Array.from(visibleKPIs).forEach(kpiId => {
                     dataPoint[kpiId] = monthlyTotals[monthKey]?.[kpiId] || 0
                 })
-                
+
                 data.push(dataPoint)
-                
+
                 // Move to next month
                 currentMonthDate.setMonth(currentMonthDate.getMonth() + 1)
             }
-            
+
             return data
         }
 
@@ -611,10 +611,10 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     const getXAxisInterval = () => {
         // Non-cumulative mode: show every month (interval 0)
         if (!isCumulative && timeFrame === 'all') return 0
-        
+
         // If viewing 1 month without custom date range, show all labels (every day)
         if (timeFrame === '1month' && !datePickerValue.singleDate && !datePickerValue.startDate) return 0
-        
+
         const dataPointCount = chartData.length
         if (dataPointCount <= 30) return 0 // Show all labels if we have 30 or fewer data points
         // Calculate interval to show ~30 labels: interval = floor((count - 1) / 30)
@@ -1027,29 +1027,27 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             <h3 className="text-sm font-semibold text-gray-900">Metrics Over Time</h3>
                         </div>
                         <div className="flex items-center space-x-1">
-                            {/* Cumulative/Non-cumulative Toggle */}
-                            {timeFrame === 'all' && (
-                                <div className="flex items-center space-x-0.5 bg-white/80 rounded p-0.5 mr-1">
-                                    <button
-                                        onClick={() => setIsCumulative(true)}
-                                        className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${isCumulative
-                                            ? 'bg-blue-600 text-white'
-                                            : 'text-gray-600 hover:bg-gray-100'
-                                            }`}
-                                    >
-                                        Cumulative
-                                    </button>
-                                    <button
-                                        onClick={() => setIsCumulative(false)}
-                                        className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${!isCumulative
-                                            ? 'bg-blue-600 text-white'
-                                            : 'text-gray-600 hover:bg-gray-100'
-                                            }`}
-                                    >
-                                        Monthly
-                                    </button>
-                                </div>
-                            )}
+                            {/* Cumulative/Non-cumulative Toggle - Always visible to persist month-to-month view */}
+                            <div className="flex items-center space-x-0.5 bg-white/80 rounded p-0.5 mr-1">
+                                <button
+                                    onClick={() => setIsCumulative(true)}
+                                    className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${isCumulative
+                                        ? 'bg-blue-600 text-white'
+                                        : 'text-gray-600 hover:bg-gray-100'
+                                        }`}
+                                >
+                                    Cumulative
+                                </button>
+                                <button
+                                    onClick={() => setIsCumulative(false)}
+                                    className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${!isCumulative
+                                        ? 'bg-blue-600 text-white'
+                                        : 'text-gray-600 hover:bg-gray-100'
+                                        }`}
+                                >
+                                    Monthly
+                                </button>
+                            </div>
                             {/* Time Frame Filters */}
                             <div className="flex items-center space-x-0.5 bg-white/80 rounded p-0.5">
                                 {(['all', '1month', '6months', '1year', '5years'] as const).map((tf) => (
@@ -1057,10 +1055,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                         key={tf}
                                         onClick={() => {
                                             setTimeFrame(tf)
-                                            // Reset to cumulative mode when switching away from 'all'
-                                            if (tf !== 'all') {
-                                                setIsCumulative(true)
-                                            }
+                                            // Preserve monthly view state when switching time frames
                                         }}
                                         className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${timeFrame === tf
                                             ? 'bg-blue-600 text-white'
