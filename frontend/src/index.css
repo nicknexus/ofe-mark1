@@ -91,6 +91,24 @@
     }
 }
 
+/* Ultra crisp fonts for report dashboard */
+#report-dashboard * {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+/* Fix grey boxes in PDF - remove html2canvas grey fallback backgrounds */
+#report-dashboard,
+#report-dashboard * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+/* Whitelist card components to prevent grey boxes */
+#report-dashboard .card-content {
+    background: transparent !important;
+}
+
 /* Custom animations */
 @keyframes fadeInUp {
     from {

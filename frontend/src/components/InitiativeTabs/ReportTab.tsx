@@ -6,7 +6,8 @@ import DateRangePicker from '../DateRangePicker'
 import toast from 'react-hot-toast'
 import L from 'leaflet'
 import html2canvas from 'html2canvas'
-import { buildImpactPDF } from '../../pdf/pdfGenerator'
+import ReportDashboard from '../ReportDashboard'
+import { convertReportToPDF } from '../../utils/reportToPDF'
 
 interface ReportTabProps {
     initiativeId: string
@@ -76,7 +77,12 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
     const [reportData, setReportData] = useState<ReportData | null>(null)
     const [selectedStory, setSelectedStory] = useState<ReportData['stories'][0] | null>(null)
     const [reportText, setReportText] = useState<string | null>(null)
-    const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
+    const [reportDashboardData, setReportDashboardData] = useState<{
+        overviewSummary: string
+        beneficiaryText: string
+        mapImage: string | null
+        hasBeneficiaryGroups: boolean
+    } | null>(null)
     const [loadingMessage, setLoadingMessage] = useState('')
 
     // Loading states
@@ -209,39 +215,9 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                 clearInterval(messageInterval)
             }
 
-            setLoadingMessage('Generating PDF preview...')
+            setLoadingMessage('Preparing report...')
 
             setReportText(result.reportText)
-
-            // Generate PDF blob for preview
-            await new Promise(resolve => setTimeout(resolve, 500)) // Small delay for UX
-
-            // Helper function to load image as base64 using fetch + blob (bypasses CORS)
-            const loadImageAsBase64 = async (url: string): Promise<string> => {
-                try {
-                    console.log('Fetching image from URL:', url)
-                    const res = await fetch(url)
-                    if (!res.ok) {
-                        throw new Error(`HTTP error! status: ${res.status}`)
-                    }
-                    const blob = await res.blob()
-                    console.log('Image fetched as blob, size:', blob.size)
-
-                    return new Promise((resolve, reject) => {
-                        const reader = new FileReader()
-                        reader.onloadend = () => {
-                            const result = reader.result as string
-                            console.log('Image converted to base64, length:', result.length)
-                            resolve(result)
-                        }
-                        reader.onerror = () => reject(new Error('FileReader error'))
-                        reader.readAsDataURL(blob)
-                    })
-                } catch (error) {
-                    console.error('Failed to load image:', error)
-                    throw error
-                }
-            }
 
             // Parse report text and extract sections
             const reportText = result.reportText
@@ -283,8 +259,8 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                         useCORS: true,
                         allowTaint: true,
                         backgroundColor: '#f0f0f0',
-                        width: 600,
-                        height: 300,
+                        width: 400,
+                        height: 400,
                         scale: 1
                     })
                         .then((canvas: HTMLCanvasElement) => {
@@ -307,11 +283,11 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                         return
                     }
 
-                    // Create hidden div for map
+                    // Create hidden div for map - square shape
                     const mapDiv = document.createElement('div')
                     mapDiv.id = 'pdf-map-temp'
-                    mapDiv.style.width = '600px'
-                    mapDiv.style.height = '300px'
+                    mapDiv.style.width = '400px'
+                    mapDiv.style.height = '400px'
                     mapDiv.style.position = 'absolute'
                     mapDiv.style.top = '-9999px'
                     mapDiv.style.left = '-9999px'
@@ -325,7 +301,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                             const map = L.map('pdf-map-temp', {
                                 renderer: L.canvas(),
                                 center: [locations[0].latitude, locations[0].longitude],
-                                zoom: locations.length > 1 ? 2 : 3,
+                                zoom: locations.length > 1 ? 0 : 1, // Even more zoomed out
                                 zoomControl: false,
                                 attributionControl: false,
                                 maxBoundsViscosity: 1.0,
@@ -346,25 +322,36 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                 maxZoom: 18
                             }).addTo(map)
 
-                            // Add modern markers - green pins without names
+                            // Add modern markers - green pins with modern styling
                             locations.forEach(loc => {
-                                // Modern pin style - larger, with shadow effect
+                                // Modern pin style - using dashboard green color
                                 L.circleMarker([loc.latitude, loc.longitude], {
-                                    radius: 10,
+                                    radius: 12,
                                     color: '#ffffff',
-                                    fillColor: '#22C55E', // Green color
+                                    fillColor: '#97b599', // Dashboard green color
                                     fillOpacity: 1,
-                                    weight: 2.5,
+                                    weight: 3,
                                     className: 'modern-pin'
                                 })
                                     .bindPopup(loc.name)
                                     .addTo(map)
+
+                                // Add outer glow effect for modern look
+                                L.circleMarker([loc.latitude, loc.longitude], {
+                                    radius: 18,
+                                    color: 'transparent',
+                                    fillColor: '#97b599',
+                                    fillOpacity: 0.2,
+                                    weight: 0,
+                                    className: 'modern-pin-glow'
+                                })
+                                    .addTo(map)
                             })
 
-                            // Fit bounds if multiple locations
+                            // Fit bounds if multiple locations - more padding for zoomed out view
                             if (locations.length > 1) {
                                 const bounds = L.latLngBounds(locations.map(loc => [loc.latitude, loc.longitude]))
-                                map.fitBounds(bounds, { padding: [20, 20] })
+                                map.fitBounds(bounds, { padding: [60, 60] })
                             }
 
                             // Wait for map to be ready, then export using html2canvas
@@ -410,27 +397,19 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                 }
             }
 
-            // Build PDF using modular generator
-            const pdfBlob = await buildImpactPDF({
-                dashboard,
+            // Store dashboard data for rendering
+            setReportDashboardData({
                 overviewSummary: overviewSummary || 'No overview available',
-                totals: reportData.totals,
                 beneficiaryText: beneficiaryText || 'No beneficiary information available',
-                selectedStory: selectedStory || undefined,
-                mapImage: mapImage || undefined,
-                locations: reportData.locations,
-                dateStart,
-                dateEnd,
-                loadImageAsBase64
+                mapImage,
+                hasBeneficiaryGroups: selectedBeneficiaryGroupIds.length > 0
             })
-
-            setPdfBlob(pdfBlob)
 
         } catch (error: any) {
             console.error('Error generating report:', error)
 
-            // Clear PDF state on error
-            setPdfBlob(null)
+            // Clear report state on error
+            setReportDashboardData(null)
             setReportText(null)
 
             // Handle specific error types
@@ -778,43 +757,54 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                             </button>
                         </div>
 
-                        {/* Report Preview */}
-                        {reportText && pdfBlob && (
+                        {/* Report Dashboard */}
+                        {reportText && reportDashboardData && reportData && (
                             <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
                                 <div className="flex items-center justify-between mb-4">
-                                    <h2 className="text-lg font-semibold text-gray-900">Report Preview</h2>
+                                    <h2 className="text-lg font-semibold text-gray-900">Report Dashboard</h2>
                                     <button
-                                        onClick={() => {
-                                            if (!pdfBlob) return
-
+                                        onClick={async () => {
                                             try {
+                                                toast.loading('Generating PDF...', { id: 'pdf-download' })
+                                                const filename = `${dashboard?.initiative.title.replace(/[^a-z0-9]/gi, '_')}_Report_${new Date().toISOString().split('T')[0]}.pdf`
+                                                const pdfBlob = await convertReportToPDF('report-dashboard', filename)
+
                                                 const url = URL.createObjectURL(pdfBlob)
                                                 const link = document.createElement('a')
                                                 link.href = url
-                                                link.download = `${dashboard?.initiative.title.replace(/[^a-z0-9]/gi, '_')}_Report_${new Date().toISOString().split('T')[0]}.pdf`
+                                                link.download = filename
                                                 document.body.appendChild(link)
                                                 link.click()
                                                 document.body.removeChild(link)
                                                 URL.revokeObjectURL(url)
 
-                                                toast.success('PDF downloaded successfully!')
+                                                toast.success('PDF downloaded successfully!', { id: 'pdf-download' })
                                             } catch (error) {
                                                 console.error('Error downloading PDF:', error)
-                                                toast.error('Failed to download PDF')
+                                                toast.error('Failed to download PDF', { id: 'pdf-download' })
                                             }
                                         }}
                                         className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center space-x-2"
                                     >
                                         <Download className="w-4 h-4" />
-                                        <span>Download PDF</span>
+                                        <span>Download as PDF</span>
                                     </button>
                                 </div>
-                                <div className="border border-gray-200 rounded-lg overflow-hidden" style={{ height: '800px' }}>
-                                    <iframe
-                                        src={URL.createObjectURL(pdfBlob)}
-                                        className="w-full h-full"
-                                        title="PDF Preview"
-                                    />
+                                <div className="border border-gray-200 rounded-lg overflow-auto bg-gray-50" style={{ maxHeight: '900px' }}>
+                                    {dashboard && (
+                                        <ReportDashboard
+                                            dashboard={dashboard}
+                                            overviewSummary={reportDashboardData.overviewSummary}
+                                            totals={reportData.totals}
+                                            beneficiaryText={reportDashboardData.beneficiaryText}
+                                            hasBeneficiaryGroups={reportDashboardData.hasBeneficiaryGroups}
+                                            selectedStory={selectedStory || undefined}
+                                            locations={reportData.locations}
+                                            dateStart={dateRange.startDate || dateRange.singleDate}
+                                            dateEnd={dateRange.endDate || dateRange.singleDate}
+                                            mapImage={reportDashboardData.mapImage}
+                                        />
+                                    )}
                                 </div>
                             </div>
                         )}

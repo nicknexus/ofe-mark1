@@ -78,30 +78,30 @@ Use specific numbers and data points from the metrics provided.
 Make the report engaging but factual.`;
 
         // Build user prompt with all data
-        const dateRangeText = dateRange.start && dateRange.end 
+        const dateRangeText = dateRange.start && dateRange.end
             ? `${dateRange.start} to ${dateRange.end}`
             : dateRange.start || dateRange.end || 'Not specified';
-        
+
         const totalsText = totals && totals.length > 0
-            ? totals.map((t: any) => 
+            ? totals.map((t: any) =>
                 `- ${t.kpi_title}: ${t.total_value} ${t.unit_of_measurement}${t.kpi_description ? ` (${t.kpi_description})` : ''}`
             ).join('\n')
             : 'No metrics available';
 
         const metricsText = rawMetrics && rawMetrics.length > 0
-            ? rawMetrics.slice(0, 20).map((m: any) => 
+            ? rawMetrics.slice(0, 20).map((m: any) =>
                 `- ${m.kpi_title}: ${m.value} ${m.unit_of_measurement} on ${m.date_represented}${m.location_name ? ` at ${m.location_name}` : ''}`
             ).join('\n')
             : 'No individual metrics available';
 
         const locationsText = locations && locations.length > 0
-            ? locations.map((l: any) => 
+            ? locations.map((l: any) =>
                 `- ${l.name}${l.description ? `: ${l.description}` : ''}`
             ).join('\n')
             : 'No locations specified';
 
         const beneficiaryGroupsText = beneficiaryGroups && beneficiaryGroups.length > 0
-            ? beneficiaryGroups.map((bg: any) => 
+            ? beneficiaryGroups.map((bg: any) =>
                 `- ${bg.name}${bg.description ? `: ${bg.description}` : ''}`
             ).join('\n')
             : 'No beneficiary groups specified';
@@ -193,8 +193,8 @@ ${selectedStory ? '- DO NOT include a Story Section - the actual story will be i
 
         // Handle specific OpenAI errors
         if (error?.code === 'insufficient_quota' || error?.type === 'insufficient_quota') {
-            res.status(402).json({ 
-                error: 'OpenAI Quota Exceeded', 
+            res.status(402).json({
+                error: 'OpenAI Quota Exceeded',
                 message: 'Your OpenAI API quota has been exceeded. Please check your OpenAI account billing and add credits.',
                 code: 'insufficient_quota'
             });
@@ -202,16 +202,16 @@ ${selectedStory ? '- DO NOT include a Story Section - the actual story will be i
         }
 
         if (error?.status === 429) {
-            res.status(429).json({ 
-                error: 'Rate Limit Exceeded', 
+            res.status(429).json({
+                error: 'Rate Limit Exceeded',
                 message: 'OpenAI API rate limit exceeded. Please try again in a moment.',
                 code: 'rate_limit'
             });
             return;
         }
 
-        res.status(500).json({ 
-            error: 'Failed to generate report', 
+        res.status(500).json({
+            error: 'Failed to generate report',
             message: error instanceof Error ? error.message : 'Unknown error',
             details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : String(error)) : undefined
         });
