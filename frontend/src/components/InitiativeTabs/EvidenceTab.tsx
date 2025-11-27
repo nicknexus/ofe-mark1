@@ -184,6 +184,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
     }
 
     const handleDeleteEvidence = async (evidence: Evidence) => {
+        if (!evidence.id) return
         if (!confirm('Are you sure you want to delete this evidence?')) return
         try {
             await apiService.deleteEvidence(evidence.id)
