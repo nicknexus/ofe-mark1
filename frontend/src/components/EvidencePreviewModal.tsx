@@ -336,7 +336,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                 </div>
                             </div>
 
-                            {/* Linked Data Points */}
+                            {/* Linked Impact Claims */}
                             <div>
                                 <div className="flex items-center space-x-2 mb-3">
                                     <BarChart3 className="w-4 h-4 text-gray-600" />
@@ -349,7 +349,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                     </div>
                                 ) : linkedDataPoints.length > 0 ? (
                                     (() => {
-                                        // Group data points by KPI
+                                        // Group impact claims by metric
                                         const groupedByKPI: Record<string, { kpi: any, dataPoints: any[] }> = {}
                                         
                                         linkedDataPoints.forEach((dataPoint) => {
@@ -399,6 +399,33 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                                                         ? `${formatDate(dataPoint.date_range_start)} - ${formatDate(dataPoint.date_range_end)}`
                                                                         : formatDate(dataPoint.date_represented)
                                                                     
+                                                                    // Calculate date coverage: how many days in the claim range the evidence covers
+                                                                    let dateCoverageText = ''
+                                                                    if (hasDateRange && evidence) {
+                                                                        const claimStart = new Date(dataPoint.date_range_start)
+                                                                        const claimEnd = new Date(dataPoint.date_range_end)
+                                                                        const claimDays = Math.ceil((claimEnd.getTime() - claimStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+                                                                        
+                                                                        // Calculate how many days the evidence covers
+                                                                        let coveredDays = 0
+                                                                        if (evidence.date_range_start && evidence.date_range_end) {
+                                                                            const evidenceStart = new Date(evidence.date_range_start)
+                                                                            const evidenceEnd = new Date(evidence.date_range_end)
+                                                                            const overlapStart = new Date(Math.max(claimStart.getTime(), evidenceStart.getTime()))
+                                                                            const overlapEnd = new Date(Math.min(claimEnd.getTime(), evidenceEnd.getTime()))
+                                                                            if (overlapEnd >= overlapStart) {
+                                                                                coveredDays = Math.ceil((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+                                                                            }
+                                                                        } else if (evidence.date_represented) {
+                                                                            const evidenceDate = new Date(evidence.date_represented)
+                                                                            if (evidenceDate >= claimStart && evidenceDate <= claimEnd) {
+                                                                                coveredDays = 1
+                                                                            }
+                                                                        }
+                                                                        
+                                                                        dateCoverageText = `Evidence covers ${coveredDays} of ${claimDays} days`
+                                                                    }
+                                                                    
                                                                     const dataPointLocation = dataPoint.location_id ? dataPointLocations[dataPoint.location_id] : null
 
                                                                     return (
@@ -425,6 +452,11 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                                                                         <div className="flex items-center space-x-1 text-[10px] text-gray-500 mt-0.5">
                                                                                             <MapPin className="w-2.5 h-2.5" />
                                                                                             <span className="truncate">{dataPointLocation.name}</span>
+                                                                                        </div>
+                                                                                    )}
+                                                                                    {dateCoverageText && (
+                                                                                        <div className="text-[10px] text-blue-600 font-medium mt-0.5">
+                                                                                            {dateCoverageText}
                                                                                         </div>
                                                                                     )}
                                                                                 </div>

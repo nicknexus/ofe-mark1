@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { X, Edit, Trash2, MapPin, Calendar, Users, Image, Video, Mic } from 'lucide-react'
+import { X, Edit, Trash2, MapPin, Calendar, Users, Image, Video, Mic, FileText } from 'lucide-react'
 import { Story } from '../types'
 import { formatDate } from '../utils'
 
@@ -43,8 +43,18 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
                 <div className="overflow-y-auto max-h-[calc(90vh-140px)]">
                     <div className="p-6 space-y-6">
                         {/* Media Section */}
-                        {story.media_url && story.media_url.trim() ? (
-                            <div className="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                        {story.media_type === 'text' ? (
+                            <div className="relative w-full bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-8 border-2 border-blue-200">
+                                <div className="text-center">
+                                    <div className="w-20 h-20 bg-blue-300 rounded-full mx-auto mb-4 flex items-center justify-center">
+                                        <FileText className="w-10 h-10 text-blue-600" />
+                                    </div>
+                                    <p className="text-lg font-medium text-blue-700">Text Story</p>
+                                    <p className="text-sm text-blue-600 mt-1">This story contains text content only</p>
+                                </div>
+                            </div>
+                        ) : story.media_url && story.media_url.trim() ? (
+                            <div className="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-lg">
                                 {story.media_type === 'photo' && !imageError ? (
                                     <img
                                         src={story.media_url}
@@ -170,6 +180,7 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
         </div>
     )
 }
+
 
 
 

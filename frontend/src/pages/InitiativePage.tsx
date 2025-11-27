@@ -32,9 +32,11 @@ import ExpandableKPICard from '../components/ExpandableKPICard'
 import InitiativeSidebar from '../components/InitiativeSidebar'
 import HomeTab from '../components/InitiativeTabs/HomeTab'
 import MetricsTab from '../components/InitiativeTabs/MetricsTab'
+import EvidenceTab from '../components/InitiativeTabs/EvidenceTab'
 import LocationTab from '../components/InitiativeTabs/LocationTab'
 import BeneficiariesTab from '../components/InitiativeTabs/BeneficiariesTab'
 import StoriesTab from '../components/InitiativeTabs/StoriesTab'
+import DonorTab from '../components/InitiativeTabs/DonorTab'
 import ReportTab from '../components/InitiativeTabs/ReportTab'
 import toast from 'react-hot-toast'
 
@@ -123,18 +125,32 @@ export default function InitiativePage() {
 
     const handleCreateKPI = async (kpiData: CreateKPIForm) => {
         try {
-            await apiService.createKPI(kpiData)
-            toast.success('KPI created successfully!')
+            const newKPI = await apiService.createKPI(kpiData)
+            toast.success('Metric created successfully!')
 
             // Explicitly clear the dashboard cache to ensure fresh data
             apiService.clearCache(`/initiatives/${id}/dashboard`)
 
             // Only reload if not currently loading
             if (!isLoadingDashboard) {
-                loadDashboard() // Refresh the dashboard
+                await loadDashboard() // Refresh the dashboard
+            }
+
+            // Auto-open the metric popup after creation
+            if (newKPI?.id) {
+                // Switch to metrics tab if not already there
+                if (activeTab !== 'metrics') {
+                    setActiveTab('metrics')
+                }
+                // Expand the newly created metric
+                setExpandedKPIs(prev => {
+                    const newSet = new Set(prev)
+                    newSet.add(newKPI.id)
+                    return newSet
+                })
             }
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to create KPI'
+            const message = error instanceof Error ? error.message : 'Failed to create metric'
             toast.error(message)
             throw error // Re-throw to keep modal open on error
         }
@@ -144,7 +160,7 @@ export default function InitiativePage() {
         if (!selectedKPI) return
         try {
             await apiService.updateKPI(selectedKPI.id, kpiData)
-            toast.success('KPI updated successfully!')
+            toast.success('Metric updated successfully!')
 
             // Explicitly clear the dashboard cache to ensure fresh data
             apiService.clearCache(`/initiatives/${id}/dashboard`)
@@ -156,7 +172,7 @@ export default function InitiativePage() {
             setIsEditKPIModalOpen(false)
             setSelectedKPI(null)
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to update KPI'
+            const message = error instanceof Error ? error.message : 'Failed to update metric'
             toast.error(message)
             throw error
         }
@@ -165,7 +181,7 @@ export default function InitiativePage() {
     const handleDeleteKPI = async (kpi: any) => {
         try {
             await apiService.deleteKPI(kpi.id)
-            toast.success('KPI deleted successfully!')
+            toast.success('Metric deleted successfully!')
 
             // Explicitly clear the dashboard cache to ensure fresh data
             apiService.clearCache(`/initiatives/${id}/dashboard`)
@@ -176,7 +192,7 @@ export default function InitiativePage() {
             }
             setDeleteConfirmKPI(null)
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to delete KPI'
+            const message = error instanceof Error ? error.message : 'Failed to delete metric'
             toast.error(message)
         }
     }
@@ -186,7 +202,7 @@ export default function InitiativePage() {
 
         try {
             await apiService.createKPIUpdate(selectedKPI.id, updateData)
-            toast.success('KPI update added successfully!')
+            toast.success('Impact claim added successfully!')
 
             // Explicitly clear the dashboard cache to ensure fresh data
             apiService.clearCache(`/initiatives/${id}/dashboard`)
@@ -196,7 +212,7 @@ export default function InitiativePage() {
                 loadDashboard() // Refresh the dashboard
             }
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to add KPI update'
+            const message = error instanceof Error ? error.message : 'Failed to add impact claim'
             toast.error(message)
             throw error
         }
@@ -373,6 +389,8 @@ export default function InitiativePage() {
                         onRefresh={loadDashboard}
                     />
                 )
+            case 'evidence':
+                return <EvidenceTab initiativeId={id!} onRefresh={loadDashboard} />
             case 'location':
                 return <LocationTab 
                     onStoryClick={(storyId) => {
@@ -385,6 +403,8 @@ export default function InitiativePage() {
                 return <BeneficiariesTab initiativeId={id!} onRefresh={loadDashboard} />
             case 'stories':
                 return <StoriesTab initiativeId={id!} onRefresh={loadDashboard} initialStoryId={initialStoryId} />
+            case 'donors':
+                return <DonorTab initiativeId={id!} dashboard={dashboard} onRefresh={loadDashboard} />
             case 'report':
                 return <ReportTab initiativeId={id!} dashboard={dashboard} />
             default:
@@ -503,7 +523,7 @@ export default function InitiativePage() {
                                 Are you sure you want to delete <strong className="text-gray-900">"{deleteConfirmKPI.title}"</strong>?
                             </p>
                             <p className="text-sm text-gray-600 text-center mt-2">
-                                This will also delete all associated data points and evidence links.
+                                This will also delete all associated impact claims and evidence links.
                             </p>
                         </div>
 
@@ -518,7 +538,7 @@ export default function InitiativePage() {
                                 onClick={() => handleDeleteKPI(deleteConfirmKPI)}
                                 className="flex-1 px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl font-semibold shadow-lg shadow-red-600/25 hover:shadow-xl hover:shadow-red-600/30 transition-all duration-200 hover:scale-[1.02]"
                             >
-                                Delete KPI
+                                Delete Metric
                             </button>
                         </div>
                     </div>

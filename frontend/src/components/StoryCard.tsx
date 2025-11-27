@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { MapPin, Calendar, Users, Image, Video, Mic } from 'lucide-react'
+import { MapPin, Calendar, Users, Image, Video, Mic, FileText } from 'lucide-react'
 import { Story } from '../types'
 import { formatDate } from '../utils'
 
@@ -22,7 +22,16 @@ export default function StoryCard({ story, onView }: StoryCardProps) {
             >
                 {/* MEDIA: square like Instagram grid */}
                 <div className="relative aspect-square bg-gradient-to-br from-green-50 to-green-100 overflow-hidden">
-                    {story.media_url && story.media_url.trim() ? (
+                    {story.media_type === 'text' ? (
+                        <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-100">
+                            <div className="text-center p-3">
+                                <div className="w-12 h-12 bg-blue-300 rounded-full mx-auto mb-2 flex items-center justify-center">
+                                    <FileText className="w-6 h-6 text-blue-600" />
+                                </div>
+                                <p className="text-sm font-medium text-blue-700">Text Story</p>
+                            </div>
+                        </div>
+                    ) : story.media_url && story.media_url.trim() ? (
                         story.media_type === 'photo' && !imageError ? (
                             <img
                                 src={story.media_url}

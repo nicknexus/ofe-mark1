@@ -373,6 +373,16 @@ export default function AddKPIUpdateModal({
                         )}
                     </div>
 
+                    {/* Disclaimer */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                        <h4 className="text-sm font-semibold text-blue-900 mb-2">📋 About Impact Claims</h4>
+                        <p className="text-xs text-blue-800 leading-relaxed">
+                            An impact claim represents a specific measurement of your work. You can set a date range (e.g., 3 days) 
+                            to represent work that spans multiple days. Evidence you upload may cover only part of this range, 
+                            and the system will show how many days your evidence covers (e.g., "Evidence covers 1 of 3 days").
+                        </p>
+                    </div>
+
                     {/* Actions */}
                     <div className="flex space-x-3 pt-4">
                         <button
@@ -388,7 +398,7 @@ export default function AddKPIUpdateModal({
                             className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-primary-600 to-primary-700 border border-transparent rounded-lg hover:from-primary-700 hover:to-primary-800 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 hover:shadow-lg transform hover:scale-[1.02]"
                             disabled={loading || formData.value === 0}
                         >
-                            {loading ? (editData ? 'Updating...' : 'Adding...') : (editData ? 'Update' : 'Add Update')}
+                            {loading ? (editData ? 'Updating...' : 'Adding...') : (editData ? 'Update Impact Claim' : 'Add Impact Claim')}
                         </button>
                     </div>
                 </form>

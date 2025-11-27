@@ -17,6 +17,8 @@ import uploadRoutes from './routes/upload';
 import organizationRoutes from './routes/organizations';
 import authRoutes from './routes/auth';
 import reportRoutes from './routes/reports';
+import donorRoutes from './routes/donors';
+import donorCreditRoutes from './routes/donorCredits';
 import { processStorageCleanupQueue } from './services/storageCleanupService';
 import { authenticateUser, AuthenticatedRequest } from './middleware/auth';
 
@@ -111,6 +113,10 @@ app.use('/api/locations', locationRoutes);
 app.use('/api/stories', storyRoutes);
 app.use('/api/upload', uploadRoutes); // Now using Supabase Storage
 app.use('/api/reports', reportRoutes);
+app.use('/api/donors', donorRoutes);
+app.use('/api/donor-credits', donorCreditRoutes);
+app.use('/api/donors', donorRoutes);
+app.use('/api/donor-credits', donorCreditRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

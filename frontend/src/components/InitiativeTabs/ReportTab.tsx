@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { FileText, Calendar, BarChart3, MapPin, Users, Sparkles, Download, Loader2 } from 'lucide-react'
+import { FileText, Calendar, BarChart3, MapPin, Users, Sparkles, Download, Loader2, Heart } from 'lucide-react'
 import { apiService } from '../../services/api'
-import { KPI, Location, BeneficiaryGroup, Story, InitiativeDashboard } from '../../types'
+import { KPI, Location, BeneficiaryGroup, Story, InitiativeDashboard, Donor } from '../../types'
 import DateRangePicker from '../DateRangePicker'
 import toast from 'react-hot-toast'
 import L from 'leaflet'
@@ -69,11 +69,13 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
     const [selectedKPIIds, setSelectedKPIIds] = useState<string[]>([])
     const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([])
     const [selectedBeneficiaryGroupIds, setSelectedBeneficiaryGroupIds] = useState<string[]>([])
+    const [selectedDonorId, setSelectedDonorId] = useState<string | null>(null)
 
     // Data state
     const [kpis, setKPIs] = useState<KPI[]>([])
     const [locations, setLocations] = useState<Location[]>([])
     const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
+    const [donors, setDonors] = useState<Donor[]>([])
     const [reportData, setReportData] = useState<ReportData | null>(null)
     const [selectedStory, setSelectedStory] = useState<ReportData['stories'][0] | null>(null)
     const [reportText, setReportText] = useState<string | null>(null)
@@ -94,11 +96,13 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
     const [showKPIPicker, setShowKPIPicker] = useState(false)
     const [showLocationPicker, setShowLocationPicker] = useState(false)
     const [showBeneficiaryPicker, setShowBeneficiaryPicker] = useState(false)
+    const [showDonorPicker, setShowDonorPicker] = useState(false)
 
     // Refs for click outside detection
     const kpiPickerRef = useRef<HTMLDivElement>(null)
     const locationPickerRef = useRef<HTMLDivElement>(null)
     const beneficiaryPickerRef = useRef<HTMLDivElement>(null)
+    const donorPickerRef = useRef<HTMLDivElement>(null)
 
     // Load filter options
     useEffect(() => {
@@ -106,11 +110,13 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
             Promise.all([
                 apiService.getKPIs(initiativeId),
                 apiService.getLocations(initiativeId),
-                apiService.getBeneficiaryGroups(initiativeId)
-            ]).then(([kpisData, locationsData, groupsData]) => {
+                apiService.getBeneficiaryGroups(initiativeId),
+                apiService.getDonors(initiativeId)
+            ]).then(([kpisData, locationsData, groupsData, donorsData]) => {
                 setKPIs(kpisData || [])
                 setLocations(locationsData || [])
                 setBeneficiaryGroups(groupsData || [])
+                setDonors(donorsData || [])
             }).catch(() => {
                 toast.error('Failed to load filter options')
             })
@@ -128,6 +134,9 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
             }
             if (beneficiaryPickerRef.current && !beneficiaryPickerRef.current.contains(event.target as Node)) {
                 setShowBeneficiaryPicker(false)
+            }
+            if (donorPickerRef.current && !donorPickerRef.current.contains(event.target as Node)) {
+                setShowDonorPicker(false)
             }
         }
 
@@ -151,7 +160,8 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                 dateEnd,
                 kpiIds: selectedKPIIds.length > 0 ? selectedKPIIds : undefined,
                 locationIds: selectedLocationIds.length > 0 ? selectedLocationIds : undefined,
-                beneficiaryGroupIds: selectedBeneficiaryGroupIds.length > 0 ? selectedBeneficiaryGroupIds : undefined
+                beneficiaryGroupIds: selectedBeneficiaryGroupIds.length > 0 ? selectedBeneficiaryGroupIds : undefined,
+                donorId: selectedDonorId || undefined
             })
 
             setReportData(data)
@@ -194,6 +204,8 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                 }
             }, 800)
 
+            const selectedDonor = selectedDonorId ? donors.find(d => d.id === selectedDonorId) : null
+
             let result
             try {
                 result = await apiService.generateReport({
@@ -209,7 +221,8 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                     locations: reportData.locations,
                     beneficiaryGroups: beneficiaryGroups.filter(bg =>
                         selectedBeneficiaryGroupIds.length === 0 || selectedBeneficiaryGroupIds.includes(bg.id!)
-                    )
+                    ),
+                    donor: selectedDonor || undefined
                 })
             } finally {
                 clearInterval(messageInterval)
@@ -622,6 +635,52 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                                 />
                                                 <span className="text-sm">{group.name}</span>
                                             </label>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Donor Select */}
+                        <div className="relative" ref={donorPickerRef}>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <Heart className="w-4 h-4 inline mr-1" />
+                                Donor (Optional)
+                            </label>
+                            <button
+                                onClick={() => setShowDonorPicker(!showDonorPicker)}
+                                className="w-full px-4 py-2 text-left bg-white border border-gray-300 rounded-lg hover:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            >
+                                {selectedDonorId
+                                    ? donors.find(d => d.id === selectedDonorId)?.name || 'Select donor...'
+                                    : 'Select donor...'}
+                            </button>
+                            {showDonorPicker && (
+                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                    <button
+                                        onClick={() => {
+                                            setSelectedDonorId(null)
+                                            setShowDonorPicker(false)
+                                        }}
+                                        className="w-full px-4 py-2 text-left hover:bg-gray-50 text-sm"
+                                    >
+                                        <span className={selectedDonorId === null ? 'font-semibold' : ''}>All Donors</span>
+                                    </button>
+                                    {donors.length === 0 ? (
+                                        <div className="p-4 text-sm text-gray-500">No donors available</div>
+                                    ) : (
+                                        donors.map(donor => (
+                                            <button
+                                                key={donor.id}
+                                                onClick={() => {
+                                                    setSelectedDonorId(donor.id || null)
+                                                    setShowDonorPicker(false)
+                                                }}
+                                                className={`w-full px-4 py-2 text-left hover:bg-gray-50 text-sm ${selectedDonorId === donor.id ? 'font-semibold bg-gray-50' : ''
+                                                    }`}
+                                            >
+                                                {donor.name}
+                                            </button>
                                         ))
                                     )}
                                 </div>

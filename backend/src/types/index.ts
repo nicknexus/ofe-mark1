@@ -131,7 +131,7 @@ export interface Story {
     title: string;
     description?: string;
     media_url?: string; // Optional - can be null/empty
-    media_type: 'photo' | 'video' | 'recording';
+    media_type: 'photo' | 'video' | 'recording' | 'text';
     date_represented: string; // Mandatory date
     location_id?: string;
     location?: Location; // Populated when fetching
@@ -147,6 +147,37 @@ export interface DashboardStats {
     evidence_coverage_percentage: number;
     most_active_initiative?: string;
     recent_updates: number;
+}
+
+export interface Donor {
+    id?: string;
+    initiative_id: string;
+    name: string;
+    email: string;
+    organization?: string;
+    notes?: string;
+    created_at?: string;
+    updated_at?: string;
+    user_id?: string;
+}
+
+export interface DonorCredit {
+    id?: string;
+    donor_id: string;
+    kpi_id: string;
+    kpi_update_id?: string;
+    credited_value: number;
+    credited_percentage?: number;
+    date_range_start?: string;
+    date_range_end?: string;
+    notes?: string;
+    created_at?: string;
+    updated_at?: string;
+    user_id?: string;
+    // Populated when fetching
+    donor?: Donor;
+    kpi?: any;
+    kpi_update?: any;
 }
 
 export interface KPIWithEvidence extends KPI {

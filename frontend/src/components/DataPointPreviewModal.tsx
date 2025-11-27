@@ -101,7 +101,7 @@ export default function DataPointPreviewModal({
                             <BarChart3 className="w-5 h-5 text-blue-600" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-semibold text-gray-900">Data Point Details</h2>
+                            <h2 className="text-xl font-semibold text-gray-900">Impact Claim Details</h2>
                             <p className="text-sm text-gray-600">{kpi.title}</p>
                         </div>
                     </div>
@@ -380,7 +380,7 @@ export default function DataPointPreviewModal({
                                 )
                             })()
                         ) : (
-                            <p className="text-sm text-gray-500 text-center py-4">No evidence linked to this data point</p>
+                            <p className="text-sm text-gray-500 text-center py-4">No evidence linked to this impact claim</p>
                         )}
                     </div>
 

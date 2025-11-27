@@ -633,6 +633,70 @@ class ApiService {
         return initiatives
     }
 
+    // Donors
+    async getDonors(initiativeId: string): Promise<Donor[]> {
+        return this.request<Donor[]>(`/donors?initiative_id=${initiativeId}`)
+    }
+
+    async getDonor(id: string): Promise<Donor> {
+        return this.request<Donor>(`/donors/${id}`)
+    }
+
+    async createDonor(donor: Partial<Donor>): Promise<Donor> {
+        return this.request<Donor>('/donors', {
+            method: 'POST',
+            body: JSON.stringify(donor)
+        })
+    }
+
+    async updateDonor(id: string, data: Partial<Donor>): Promise<Donor> {
+        return this.request<Donor>(`/donors/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        })
+    }
+
+    async deleteDonor(id: string): Promise<void> {
+        return this.request<void>(`/donors/${id}`, {
+            method: 'DELETE'
+        })
+    }
+
+    async getDonorCredits(donorId: string): Promise<DonorCredit[]> {
+        return this.request<DonorCredit[]>(`/donors/${donorId}/credits`)
+    }
+
+    // Donor Credits
+    async getCreditsForMetric(kpiId: string): Promise<DonorCredit[]> {
+        return this.request<DonorCredit[]>(`/donor-credits/by-metric/${kpiId}`)
+    }
+
+    async getTotalCreditedForMetric(kpiId: string, kpiUpdateId?: string): Promise<number> {
+        const params = kpiUpdateId ? `?kpi_update_id=${kpiUpdateId}` : ''
+        const result = await this.request<{ total: number }>(`/donor-credits/total/${kpiId}${params}`)
+        return result.total
+    }
+
+    async createDonorCredit(credit: Partial<DonorCredit>): Promise<DonorCredit> {
+        return this.request<DonorCredit>('/donor-credits', {
+            method: 'POST',
+            body: JSON.stringify(credit)
+        })
+    }
+
+    async updateDonorCredit(id: string, data: Partial<DonorCredit>): Promise<DonorCredit> {
+        return this.request<DonorCredit>(`/donor-credits/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        })
+    }
+
+    async deleteDonorCredit(id: string): Promise<void> {
+        return this.request<void>(`/donor-credits/${id}`, {
+            method: 'DELETE'
+        })
+    }
+
     // Load KPIs and evidence in parallel for background updates
     async loadKPIsAndEvidence(): Promise<{
         kpis: KPI[]
@@ -672,6 +736,7 @@ class ApiService {
         kpiIds?: string[]
         locationIds?: string[]
         beneficiaryGroupIds?: string[]
+        donorId?: string
     }): Promise<{
         metrics: Array<{
             id: string
@@ -729,6 +794,7 @@ class ApiService {
         selectedStory: any
         locations: any[]
         beneficiaryGroups: any[]
+        donor?: Donor
         deepLink?: string
     }): Promise<{ reportText: string }> {
         return this.request<{ reportText: string }>('/reports/generate-report', {

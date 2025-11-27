@@ -8,6 +8,7 @@ export interface ReportDataFilters {
     kpiIds?: string[];
     locationIds?: string[];
     beneficiaryGroupIds?: string[];
+    donorId?: string;
 }
 
 export interface ReportDataResponse {
@@ -57,7 +58,7 @@ export interface ReportDataResponse {
 
 export class ReportService {
     static async getReportData(filters: ReportDataFilters): Promise<ReportDataResponse> {
-        const { initiativeId, userId, dateStart, dateEnd, kpiIds, locationIds, beneficiaryGroupIds } = filters;
+        const { initiativeId, userId, dateStart, dateEnd, kpiIds, locationIds, beneficiaryGroupIds, donorId } = filters;
 
         // Build query for metrics_with_context view
         let metricsQuery = supabase
@@ -103,7 +104,56 @@ export class ReportService {
                 uniqueMetrics.set(metric.id, metric);
             }
         });
-        const metrics = Array.from(uniqueMetrics.values());
+        let metrics = Array.from(uniqueMetrics.values());
+
+        // Filter by donor credits if donorId is provided
+        if (donorId) {
+            // Get all credits for this donor
+            const { data: donorCredits, error: creditsError } = await supabase
+                .from('donor_credits')
+                .select('kpi_id, kpi_update_id, credited_value')
+                .eq('donor_id', donorId)
+                .eq('user_id', userId);
+
+            if (creditsError) {
+                throw new Error(`Failed to fetch donor credits: ${creditsError.message}`);
+            }
+
+            if (donorCredits && donorCredits.length > 0) {
+                // Create a map of credits by kpi_id and kpi_update_id
+                const creditsMap = new Map<string, Map<string, number>>();
+                donorCredits.forEach((credit: any) => {
+                    const kpiId = credit.kpi_id;
+                    const updateId = credit.kpi_update_id || 'metric-level';
+                    if (!creditsMap.has(kpiId)) {
+                        creditsMap.set(kpiId, new Map());
+                    }
+                    creditsMap.get(kpiId)!.set(updateId, parseFloat(credit.credited_value || 0));
+                });
+
+                // Filter metrics to only include those with credits, and adjust values
+                const filteredMetrics: any[] = [];
+                metrics.forEach((metric: any) => {
+                    const kpiCredits = creditsMap.get(metric.kpi_id);
+                    if (kpiCredits) {
+                        // Check if this specific update has a credit, or if there's a metric-level credit
+                        const updateCredit = kpiCredits.get(metric.id) || kpiCredits.get('metric-level');
+                        if (updateCredit !== undefined) {
+                            // Use the credited value instead of the full value
+                            filteredMetrics.push({
+                                ...metric,
+                                value: updateCredit.toString(),
+                                original_value: metric.value // Keep original for reference
+                            });
+                        }
+                    }
+                });
+                metrics = filteredMetrics;
+            } else {
+                // No credits for this donor, return empty metrics
+                metrics = [];
+            }
+        }
 
         // Calculate totals grouped by KPI
         const totalsMap = new Map<string, { kpi_id: string; kpi_title: string; kpi_description: string; unit_of_measurement: string; total_value: number; count: number }>();

@@ -110,7 +110,7 @@ function SortableBeneficiaryGroupCard({
                         {/* Data Points */}
                         <div>
                             <div className="text-[8px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">
-                                Data Points
+                                Impact Claims
                             </div>
                             <div className="text-lg font-extrabold text-orange-700">
                                 {dataPointCount}
@@ -179,7 +179,7 @@ function SortableBeneficiaryGroupCard({
                 <div className="border-t border-gray-200 bg-gray-50 p-3">
                     {dataPoints.length === 0 ? (
                         <p className="text-xs text-gray-500 text-center py-2">
-                            No data points linked yet
+                            No impact claims linked yet
                         </p>
                     ) : (
                         <div className="space-y-2 max-h-64 overflow-y-auto">

@@ -31,7 +31,7 @@ export default function HomePage({ onGetStarted }: HomePageProps) {
     const features = [
         {
             name: 'Impact Tracking',
-            description: 'Monitor Inputs, Outputs, and Impact KPIs with effortless clarity.',
+            description: 'Monitor Inputs, Outputs, and Impact Metrics with effortless clarity.',
             icon: BarChart3
         },
         {
@@ -185,7 +185,7 @@ export default function HomePage({ onGetStarted }: HomePageProps) {
                         <div className="rounded-2xl border border-emerald-100 bg-white/80 backdrop-blur-sm p-6 shadow-xl shadow-emerald-500/10">
                             <div className="grid grid-cols-3 gap-4">
                                 <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-green-50 p-4 border border-emerald-100">
-                                    <p className="text-emerald-600 text-xs font-medium">Active KPIs</p>
+                                    <p className="text-emerald-600 text-xs font-medium">Active Metrics</p>
                                     <p className="text-2xl font-semibold mt-2 text-emerald-700">12</p>
                                 </div>
 
@@ -245,7 +245,7 @@ export default function HomePage({ onGetStarted }: HomePageProps) {
 
                                 <p className="text-gray-700 text-sm leading-relaxed mb-6">
                                     "Simple, structured, and clear. OFE helped us transform
-                                    our reporting with clean evidence and transparent KPIs."
+                                    our reporting with clean evidence and transparent Metrics."
                                 </p>
 
                                 <p className="font-medium text-sm text-emerald-700">Program Director</p>

@@ -107,7 +107,7 @@ export default function EditDataPointBeneficiariesModal({
                     ) : (
                         <div className="space-y-3">
                             <p className="text-sm text-gray-700 mb-4">
-                                Select which beneficiary groups this data point serves:
+                                Select which beneficiary groups this impact claim serves:
                             </p>
 
                             <div className="space-y-2 max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-3">

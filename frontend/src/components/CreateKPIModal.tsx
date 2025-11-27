@@ -66,7 +66,7 @@ export default function CreateKPIModal({
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
                     <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
-                        {editData ? 'Edit KPI' : 'Create New KPI'}
+                        {editData ? 'Edit Metric' : 'Create New Metric'}
                     </h2>
                     <button
                         onClick={onClose}
@@ -80,7 +80,7 @@ export default function CreateKPIModal({
                 <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                            KPI Title <span className="text-red-500">*</span>
+                            Metric Title <span className="text-red-500">*</span>
                         </label>
                         <input
                             type="text"
@@ -103,7 +103,7 @@ export default function CreateKPIModal({
                             onChange={handleInputChange}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none text-sm"
                             rows={3}
-                            placeholder="Describe what this KPI measures..."
+                            placeholder="Describe what this metric measures..."
                             required
                         />
                     </div>
@@ -190,7 +190,7 @@ export default function CreateKPIModal({
                             disabled={loading}
                             className="w-full sm:flex-1 px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-primary-600 to-primary-700 border border-transparent rounded-lg hover:from-primary-700 hover:to-primary-800 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2 transition-all duration-150 hover:shadow-lg transform hover:scale-[1.02]"
                         >
-                            {loading ? (editData ? 'Updating...' : 'Creating...') : (editData ? 'Update KPI' : 'Create KPI')}
+                            {loading ? (editData ? 'Updating...' : 'Creating...') : (editData ? 'Update Metric' : 'Create Metric')}
                         </button>
                     </div>
                 </form>

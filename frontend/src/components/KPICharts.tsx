@@ -157,7 +157,7 @@ export default function KPICharts({ kpi, updates, evidence, proofPercentage }: K
                 {/* Individual Updates */}
                 <div className="card p-6">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                        Individual Data Points
+                        Individual Impact Claims
                     </h3>
                     <ResponsiveContainer width="100%" height={250}>
                         <LineChart data={timelineData}>
@@ -216,7 +216,7 @@ export default function KPICharts({ kpi, updates, evidence, proofPercentage }: K
                         <div className="grid grid-cols-2 gap-4 text-center">
                             <div className="p-3 bg-gray-50 rounded-lg">
                                 <p className="text-lg font-semibold text-gray-900">{updates.length}</p>
-                                <p className="text-xs text-gray-600">Data Points</p>
+                                <p className="text-xs text-gray-600">Impact Claims</p>
                             </div>
                             <div className="p-3 bg-gray-50 rounded-lg">
                                 <p className="text-lg font-semibold text-gray-900">{evidence.length}</p>

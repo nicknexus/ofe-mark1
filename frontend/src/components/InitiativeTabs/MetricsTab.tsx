@@ -51,35 +51,16 @@ export default function MetricsTab({
         <div className="h-[calc(100vh-64px)] bg-gradient-to-br from-slate-50 via-white to-blue-50/30 overflow-hidden">
             <div className="h-full w-full px-2 sm:px-4 py-4 space-y-6 overflow-y-auto">
                 {kpis.length === 0 ? (
-                    /* Empty State */
+                    /* Empty State - Only show Add Metric button */
                     <div className="flex items-center justify-center min-h-[60vh]">
                         <div className="text-center max-w-lg mx-auto">
-                            <div className="relative mb-8">
-                                <div className="w-24 h-24 mx-auto bg-gradient-to-br from-blue-100 to-indigo-100 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-100/50">
-                                    <BarChart3 className="w-12 h-12 text-blue-600" />
-                                </div>
-                                <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full flex items-center justify-center">
-                                    <Plus className="w-4 h-4 text-white" />
-                                </div>
-                            </div>
-                            <h3 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-4">
-                                Create Your First Metric
-                            </h3>
-                            <p className="text-gray-500 text-lg mb-8 leading-relaxed">
-                                Metrics are the specific measurements you want to track, like "Students Trained" or "Wells Built"
-                            </p>
                             <button
                                 onClick={onAddKPI}
                                 className="inline-flex items-center space-x-3 px-8 py-4 bg-green-100 hover:bg-green-200 text-green-700 rounded-2xl text-lg font-medium transition-colors duration-200"
                             >
                                 <Plus className="w-5 h-5" />
-                                <span>Add First Metric</span>
+                                <span>Add Metric</span>
                             </button>
-                            <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-100/60">
-                                <p className="text-sm text-blue-700 font-medium">
-                                    💡 Example: "Number of people trained" or "Clean water access provided"
-                                </p>
-                            </div>
                         </div>
                     </div>
                 ) : (

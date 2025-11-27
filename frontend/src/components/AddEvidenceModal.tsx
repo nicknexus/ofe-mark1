@@ -48,7 +48,7 @@ export default function AddEvidenceModal({
     const [uploadProgress, setUploadProgress] = useState('')
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    // State for showing matching data points
+    // State for showing matching impact claims
     const [matchingDataPoints, setMatchingDataPoints] = useState<any[]>([])
     const [isFetchingMatches, setIsFetchingMatches] = useState(false)
     const [kpiDataSummaries, setKpiDataSummaries] = useState<any[]>([])
@@ -59,6 +59,7 @@ export default function AddEvidenceModal({
     const [hasChangedDataPoints, setHasChangedDataPoints] = useState(false)
     const [hasChangedKPIs, setHasChangedKPIs] = useState(false)
     const [initialKpiIds, setInitialKpiIds] = useState<string[]>([])
+    const [isInitialFetch, setIsInitialFetch] = useState(true)
 
     const evidenceTypes = [
         { value: 'visual_proof', label: 'Visual Support', icon: Camera, description: 'Photos, videos, screenshots' },
@@ -67,13 +68,26 @@ export default function AddEvidenceModal({
         { value: 'financials', label: 'Financials', icon: DollarSign, description: 'Receipts, invoices, budgets' }
     ] as const
 
-    // Update form data when editData changes
+    // Ensure pre-selected KPI is checked when modal opens
     useEffect(() => {
-        if (editData) {
+        if (isOpen && preSelectedKPIId && !editData) {
+            // Ensure pre-selected KPI is in the formData
+            if (!formData.kpi_ids?.includes(preSelectedKPIId)) {
+                setFormData(prev => ({
+                    ...prev,
+                    kpi_ids: [...(prev.kpi_ids || []), preSelectedKPIId]
+                }))
+            }
+        }
+    }, [isOpen, preSelectedKPIId, editData])
+
+    // Update form data when editData changes or modal opens
+    useEffect(() => {
+        if (editData && isOpen) {
             // Load full evidence details to ensure we have kpi_ids
             const loadEvidenceData = async () => {
                 try {
-                    const fullEvidence = await apiService.getEvidenceItem(editData.id)
+                    const fullEvidence = await apiService.getEvidenceItem(editData.id!)
                     // Transform evidence_kpis array into kpi_ids array
                     let kpiIds: string[] = []
                     if (fullEvidence.kpi_ids && Array.isArray(fullEvidence.kpi_ids)) {
@@ -107,7 +121,7 @@ export default function AddEvidenceModal({
                     setInitialKpiIds(kpiIds)
                     setHasChangedKPIs(false)
 
-                    // Load existing linked data points when editing
+                    // Load existing linked impact claims when editing
                     const dataPoints = await apiService.getDataPointsForEvidence(editData.id)
                     setSelectedUpdateIds(dataPoints.map((dp: any) => dp.id))
                     setHasChangedDataPoints(false)
@@ -148,8 +162,9 @@ export default function AddEvidenceModal({
             setInitialKpiIds([])
             setHasChangedKPIs(false)
             setDatePickerValue({})
+            setIsInitialFetch(true) // Reset to initial fetch state for new evidence
         }
-    }, [editData?.id, initiativeId])
+    }, [editData?.id, initiativeId, isOpen])
 
     // Load locations when modal opens
     useEffect(() => {
@@ -161,14 +176,14 @@ export default function AddEvidenceModal({
         }
     }, [isOpen, initiativeId])
 
-    // Debounced effect to fetch matching data points
+    // Debounced effect to fetch matching impact claims
     useEffect(() => {
         const timeoutId = setTimeout(() => {
             if (formData.kpi_ids && formData.kpi_ids.length > 0) {
                 if (datePickerValue.startDate && datePickerValue.endDate) {
-                    fetchMatchingDataPoints()
+                    fetchMatchingImpactClaims()
                 } else if (datePickerValue.singleDate) {
-                    fetchMatchingDataPoints()
+                    fetchMatchingImpactClaims()
                 } else {
                     setMatchingDataPoints([])
                 }
@@ -180,7 +195,7 @@ export default function AddEvidenceModal({
         return () => clearTimeout(timeoutId)
     }, [datePickerValue, formData.kpi_ids])
 
-    const fetchMatchingDataPoints = async () => {
+    const fetchMatchingImpactClaims = async () => {
         if (isFetchingMatches) return // Prevent concurrent calls
 
         try {
@@ -251,12 +266,20 @@ export default function AddEvidenceModal({
             // Keep the old format for backward compatibility if needed
             const allDataPoints = kpiSummaries.flatMap(summary => summary.updates)
             setMatchingDataPoints(allDataPoints)
-            // Auto-select all shown data points when there is a preselected KPI
-            if (!editData) {
+            // Auto-select all shown impact claims only on initial fetch (not when date range changes)
+            if (!editData && isInitialFetch) {
                 setSelectedUpdateIds(allDataPoints.map((dp: any) => dp.id))
+                setIsInitialFetch(false)
+            } else {
+                // When date range changes, preserve existing selections and filter out claims that no longer match
+                setSelectedUpdateIds(prev => {
+                    const newMatchingIds = new Set(allDataPoints.map((dp: any) => dp.id))
+                    // Keep only the IDs that are still in the matching set
+                    return prev.filter(id => newMatchingIds.has(id))
+                })
             }
         } catch (error) {
-            console.error('Error fetching matching data points:', error)
+            console.error('Error fetching matching impact claims:', error)
         } finally {
             setIsFetchingMatches(false)
         }
@@ -299,7 +322,7 @@ export default function AddEvidenceModal({
                 throw new Error('Please select a date')
             }
 
-            // Include selected data points for precise linking
+            // Include selected impact claims for precise linking
             // Only include kpi_update_ids if it's a new evidence or if editing and user has changed selection
             if (!editData || hasChangedDataPoints) {
                 submitData.kpi_update_ids = selectedUpdateIds
@@ -478,29 +501,46 @@ export default function AddEvidenceModal({
                     {/* KPI Selection */}
                     <div>
                         <label className="label mb-3">
-                            Link to KPIs <span className="text-red-500">*</span>
+                            Link to Metrics <span className="text-red-500">*</span>
                         </label>
                         <p className="text-sm text-gray-600 mb-3">
-                            Select which KPIs this evidence supports
+                            Select which metrics this evidence supports
                         </p>
                         {availableKPIs.length === 0 ? (
-                            <p className="text-sm text-gray-500 italic">No KPIs available. Create KPIs first.</p>
+                            <p className="text-sm text-gray-500 italic">No metrics available. Create metrics first.</p>
                         ) : (
-                            <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
-                                {availableKPIs.map((kpi) => (
+                            <div className={`space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3 ${preSelectedKPIId && availableKPIs.length === 1 ? 'bg-gray-50' : ''}`}>
+                                {/* Sort metrics: pre-selected first, then others */}
+                                {[...availableKPIs].sort((a, b) => {
+                                    const aIsPreSelected = preSelectedKPIId === a.id
+                                    const bIsPreSelected = preSelectedKPIId === b.id
+                                    if (aIsPreSelected && !bIsPreSelected) return -1
+                                    if (!aIsPreSelected && bIsPreSelected) return 1
+                                    return 0
+                                }).map((kpi) => {
+                                    const isPreSelected = preSelectedKPIId === kpi.id
+                                    const isChecked = formData.kpi_ids?.includes(kpi.id!) || false
+                                    const isDisabled = isPreSelected && availableKPIs.length === 1
+                                    return (
                                     <label
                                         key={kpi.id}
-                                        className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer"
+                                            className={`flex items-center p-2 rounded ${isDisabled ? 'cursor-not-allowed opacity-60' : 'hover:bg-gray-50 cursor-pointer'}`}
                                     >
                                         <input
                                             type="checkbox"
-                                            checked={formData.kpi_ids?.includes(kpi.id!) || false}
-                                            onChange={() => handleKPISelection(kpi.id!)}
+                                                checked={isChecked || isPreSelected}
+                                                onChange={() => !isDisabled && handleKPISelection(kpi.id!)}
+                                                disabled={isDisabled}
                                             className="mr-3"
                                         />
                                         <div className="flex-1">
                                             <div className="flex items-center space-x-2">
                                                 <div className="font-medium text-gray-900">{kpi.title}</div>
+                                                    {isPreSelected && (
+                                                        <span className="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                                                            Pre-selected
+                                                        </span>
+                                                    )}
                                                 {'total_updates' in kpi && kpi.total_updates > 0 && (
                                                     <span className="inline-flex items-center justify-center w-4 h-4 bg-blue-500 text-white text-xs font-bold rounded-full flex-shrink-0">
                                                         {kpi.total_updates > 99 ? '99+' : kpi.total_updates}
@@ -510,7 +550,8 @@ export default function AddEvidenceModal({
                                             <div className="text-sm text-gray-500">{kpi.description}</div>
                                         </div>
                                     </label>
-                                ))}
+                                    )
+                                })}
                             </div>
                         )}
                     </div>
@@ -551,13 +592,13 @@ export default function AddEvidenceModal({
                     {kpiDataSummaries.length > 0 && (
                         <div className="space-y-3">
                             <h4 className="text-sm font-medium text-blue-900">
-                                📊 Data Points {datePickerValue.startDate && datePickerValue.endDate ? 'in Selected Date Range' : 'on Selected Date'}
+                                📊 Impact Claims {datePickerValue.startDate && datePickerValue.endDate ? 'in Selected Date Range' : 'on Selected Date'}
                             </h4>
                             <p className="text-xs text-blue-700 mb-3">
-                                Your evidence will help prove these data points:
+                                Your evidence will help prove these impact claims:
                             </p>
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs text-gray-600">Selected {selectedUpdateIds.length} data point(s)</span>
+                                <span className="text-xs text-gray-600">Selected {selectedUpdateIds.length} impact claim(s)</span>
                                 <div className="space-x-2">
                                     <button
                                         type="button"
@@ -581,7 +622,82 @@ export default function AddEvidenceModal({
                                     </button>
                                 </div>
                             </div>
-                            {kpiDataSummaries.map((kpiSummary: any) => (
+                            {kpiDataSummaries.map((kpiSummary: any) => {
+                                // Calculate coverage for each impact claim
+                                const updatesWithCoverage = kpiSummary.updates.map((dataPoint: any) => {
+                                    let coveragePercentage = 100
+                                    let coverageText = ''
+                                    let canAutoAdjust = false
+                                    let autoAdjustDates = null
+
+                                    if (dataPoint.date_range_start && dataPoint.date_range_end) {
+                                        // Impact claim has a date range
+                                        const claimStart = new Date(dataPoint.date_range_start)
+                                        const claimEnd = new Date(dataPoint.date_range_end)
+                                        const claimDays = Math.ceil((claimEnd.getTime() - claimStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+
+                                        if (datePickerValue.startDate && datePickerValue.endDate) {
+                                            // Evidence has a date range
+                                            const evidenceStart = new Date(datePickerValue.startDate)
+                                            const evidenceEnd = new Date(datePickerValue.endDate)
+                                            const overlapStart = new Date(Math.max(claimStart.getTime(), evidenceStart.getTime()))
+                                            const overlapEnd = new Date(Math.min(claimEnd.getTime(), evidenceEnd.getTime()))
+                                            
+                                            if (overlapEnd >= overlapStart) {
+                                                const coveredDays = Math.ceil((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+                                                coveragePercentage = Math.round((coveredDays / claimDays) * 100)
+                                                coverageText = `${coveragePercentage}%`
+                                                
+                                                // Can auto-adjust if coverage is less than 100%
+                                                if (coveragePercentage < 100) {
+                                                    canAutoAdjust = true
+                                                    autoAdjustDates = {
+                                                        startDate: dataPoint.date_range_start,
+                                                        endDate: dataPoint.date_range_end
+                                                    }
+                                                }
+                                            } else {
+                                                coveragePercentage = 0
+                                                coverageText = '0%'
+                                                canAutoAdjust = true
+                                                autoAdjustDates = {
+                                                    startDate: dataPoint.date_range_start,
+                                                    endDate: dataPoint.date_range_end
+                                                }
+                                            }
+                                        } else if (datePickerValue.singleDate) {
+                                            // Evidence is a single date
+                                            const evidenceDate = new Date(datePickerValue.singleDate)
+                                            if (evidenceDate >= claimStart && evidenceDate <= claimEnd) {
+                                                coveragePercentage = Math.round((1 / claimDays) * 100)
+                                                coverageText = `${coveragePercentage}%`
+                                                canAutoAdjust = true
+                                                autoAdjustDates = {
+                                                    startDate: dataPoint.date_range_start,
+                                                    endDate: dataPoint.date_range_end
+                                                }
+                                            } else {
+                                                coveragePercentage = 0
+                                                coverageText = '0%'
+                                                canAutoAdjust = true
+                                                autoAdjustDates = {
+                                                    startDate: dataPoint.date_range_start,
+                                                    endDate: dataPoint.date_range_end
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    return {
+                                        ...dataPoint,
+                                        coveragePercentage,
+                                        coverageText,
+                                        canAutoAdjust,
+                                        autoAdjustDates
+                                    }
+                                })
+
+                                return (
                                 <div key={kpiSummary.kpi.id} className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <h5 className="text-sm font-medium text-blue-900 mb-2">
                                         📈 {kpiSummary.kpi.title}
@@ -589,12 +705,16 @@ export default function AddEvidenceModal({
                                     <p className="text-sm font-semibold text-blue-800 mb-3">
                                         Total: {kpiSummary.total} {kpiSummary.kpi.unit_of_measurement}
                                     </p>
-                                    <div className="space-y-1 max-h-36 overflow-y-auto">
-                                        {kpiSummary.updates.map((dataPoint: any, index: number) => {
+                                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                                        {updatesWithCoverage.map((dataPoint: any, index: number) => {
                                             const checked = selectedUpdateIds.includes(dataPoint.id)
+                                            const hasPartialCoverage = dataPoint.coveragePercentage > 0 && dataPoint.coveragePercentage < 100
+                                            const hasNoCoverage = dataPoint.coveragePercentage === 0
+                                            
                                             return (
-                                                <label key={`${dataPoint.id}-${index}`} className="flex items-center justify-between bg-white rounded px-3 py-2 text-sm cursor-pointer hover:bg-gray-50">
-                                                    <div className="flex items-center space-x-3">
+                                                <div key={`${dataPoint.id}-${index}`} className={`bg-white rounded-lg border ${hasPartialCoverage ? 'border-blue-200' : hasNoCoverage ? 'border-red-300 border-2' : 'border-gray-200'}`}>
+                                                    <label className="flex items-start justify-between px-3 py-2 cursor-pointer hover:bg-gray-50">
+                                                        <div className="flex items-start space-x-3 flex-1">
                                                         <input
                                                             type="checkbox"
                                                             checked={checked}
@@ -602,25 +722,112 @@ export default function AddEvidenceModal({
                                                                 setSelectedUpdateIds(prev => checked ? prev.filter(id => id !== dataPoint.id) : [...prev, dataPoint.id])
                                                                 if (editData) setHasChangedDataPoints(true)
                                                             }}
-                                                            className="h-4 w-4"
+                                                                className="h-4 w-4 mt-0.5"
                                                         />
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center space-x-2 mb-1">
                                                         <span className="font-medium text-gray-900">
                                                             {dataPoint.value} {dataPoint.kpi_unit}
                                                         </span>
+                                                                    {dataPoint.coverageText && (
+                                                                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                                                                            dataPoint.coveragePercentage === 100 ? 'bg-green-100 text-green-700' :
+                                                                            dataPoint.coveragePercentage > 0 ? 'bg-blue-100 text-blue-600' :
+                                                                            'bg-red-100 text-red-700'
+                                                                        }`}>
+                                                                            {dataPoint.coverageText}
+                                                                        </span>
+                                                                    )}
                                                     </div>
-                                                    <span className="text-xs text-gray-500">
+                                                                <div className="text-xs text-gray-500">
                                                         {dataPoint.date_range_start && dataPoint.date_range_end ? (
                                                             <>Range: {formatDate(dataPoint.date_range_start)} - {formatDate(dataPoint.date_range_end)}</>
                                                         ) : (
                                                             <>{formatDate(dataPoint.date_represented)}</>
                                                         )}
-                                                    </span>
+                                                                </div>
+                                                                {hasPartialCoverage && (
+                                                                    <div className="mt-1.5 flex items-center justify-between gap-2">
+                                                                        <p className="text-xs text-blue-700 flex-1">
+                                                                            Only {dataPoint.coveragePercentage}% coverage
+                                                                        </p>
+                                                                        {dataPoint.canAutoAdjust && dataPoint.autoAdjustDates && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation()
+                                                                                    // Preserve current selection before changing date range
+                                                                                    const currentSelection = [...selectedUpdateIds]
+                                                                                    
+                                                                                    setDatePickerValue({
+                                                                                        startDate: dataPoint.autoAdjustDates.startDate,
+                                                                                        endDate: dataPoint.autoAdjustDates.endDate
+                                                                                    })
+                                                                                    setFormData(prev => ({
+                                                                                        ...prev,
+                                                                                        date_range_start: dataPoint.autoAdjustDates.startDate,
+                                                                                        date_range_end: dataPoint.autoAdjustDates.endDate,
+                                                                                        date_represented: dataPoint.autoAdjustDates.startDate
+                                                                                    }))
+                                                                                    
+                                                                                    // Mark that we're not on initial fetch anymore
+                                                                                    setIsInitialFetch(false)
+                                                                                    
+                                                                                    // The useEffect will handle fetching new matches and preserving selection
+                                                                                }}
+                                                                                className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs font-medium transition-colors whitespace-nowrap"
+                                                                            >
+                                                                                Match 100%
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                                {hasNoCoverage && (
+                                                                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs">
+                                                                        <p className="text-red-800 font-medium mb-2">
+                                                                            This evidence date range doesn't overlap with this impact claim.
+                                                                        </p>
+                                                                        {dataPoint.canAutoAdjust && dataPoint.autoAdjustDates && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation()
+                                                                                    // Preserve current selection before changing date range
+                                                                                    const currentSelection = [...selectedUpdateIds]
+                                                                                    
+                                                                                    setDatePickerValue({
+                                                                                        startDate: dataPoint.autoAdjustDates.startDate,
+                                                                                        endDate: dataPoint.autoAdjustDates.endDate
+                                                                                    })
+                                                                                    setFormData(prev => ({
+                                                                                        ...prev,
+                                                                                        date_range_start: dataPoint.autoAdjustDates.startDate,
+                                                                                        date_range_end: dataPoint.autoAdjustDates.endDate,
+                                                                                        date_represented: dataPoint.autoAdjustDates.startDate
+                                                                                    }))
+                                                                                    
+                                                                                    // Mark that we're not on initial fetch anymore
+                                                                                    setIsInitialFetch(false)
+                                                                                    
+                                                                                    // The useEffect will handle fetching new matches and preserving selection
+                                                                                }}
+                                                                                className="w-full px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
+                                                                            >
+                                                                                Auto-adjust date range to match claim
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
                                                 </label>
+                                                </div>
                                             )
                                         })}
                                     </div>
                                 </div>
-                            ))}
+                                )
+                            })}
                         </div>
                     )}
 
@@ -768,6 +975,16 @@ export default function AddEvidenceModal({
                         </div>
                     </div>
 
+                    {/* Disclaimer */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                        <h4 className="text-sm font-semibold text-blue-900 mb-2">📋 About Evidence</h4>
+                        <p className="text-xs text-blue-800 leading-relaxed">
+                            Evidence validates your impact claims. If your evidence covers only part of an impact claim's date range, 
+                            the system will show partial coverage (e.g., "Evidence covers 2 of 5 days"). This helps track how well 
+                            your evidence supports each claim.
+                        </p>
+                    </div>
+
                     {/* Actions */}
                     <div className="flex space-x-3 pt-4">
                         {uploadProgress && (
@@ -788,7 +1005,7 @@ export default function AddEvidenceModal({
                                 <button
                                     type="submit"
                                     className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-primary-600 to-primary-700 border border-transparent rounded-lg hover:from-primary-700 hover:to-primary-800 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 hover:shadow-lg transform hover:scale-[1.02]"
-                                    disabled={loading || !formData.title}
+                                    disabled={loading || !formData.title || (!selectedFile && !formData.file_url)}
                                 >
                                     {loading ? 'Processing...' : (editData ? 'Update Evidence' : 'Add Evidence')}
                                 </button>

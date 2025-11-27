@@ -352,7 +352,7 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
                                         <div className="text-center py-4">
                                             <Calendar className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                                             <p className="text-sm text-gray-500">No evidence yet</p>
-                                            <p className="text-xs text-gray-400">Add evidence to support this data point</p>
+                                            <p className="text-xs text-gray-400">Add evidence to support this impact claim</p>
                                         </div>
                                     )}
                                 </div>
@@ -665,7 +665,7 @@ export default function KPIDetailPage() {
                 <div className="grid grid-cols-2 gap-3 sm:gap-4">
                     <div className="card p-3 sm:p-4 text-center">
                         <p className="text-lg sm:text-2xl font-bold text-blue-600">{updates.length}</p>
-                        <p className="text-xs sm:text-sm text-gray-600">Data Points</p>
+                        <p className="text-xs sm:text-sm text-gray-600">Impact Claims</p>
                     </div>
                     <div className="card p-3 sm:p-4 text-center">
                         <p className="text-lg sm:text-2xl font-bold text-green-600">
@@ -753,14 +753,14 @@ export default function KPIDetailPage() {
                     <div className="xl:col-span-2 card p-4 sm:p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-base sm:text-lg font-semibold text-gray-900">
-                                Data Points ({dateFilter.isActive ? filteredUpdates.length : updates.length})
+                                Impact Claims ({dateFilter.isActive ? filteredUpdates.length : updates.length})
                             </h3>
                             <button
                                 onClick={() => setIsUpdateModalOpen(true)}
                                 className="btn-secondary flex items-center space-x-2 text-sm"
                             >
                                 <Plus className="w-4 h-4" />
-                                <span className="hidden sm:inline">Add Data</span>
+                                <span className="hidden sm:inline">Add Impact Claim</span>
                                 <span className="sm:hidden">Add</span>
                             </button>
                         </div>
@@ -781,14 +781,14 @@ export default function KPIDetailPage() {
                             <div className="text-center py-8">
                                 <Calendar className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-4" />
                                 <p className="text-gray-600 text-sm sm:text-base">
-                                    {dateFilter.isActive ? 'No data points in selected date range' : 'No data points yet'}
+                                    {dateFilter.isActive ? 'No impact claims in selected date range' : 'No impact claims yet'}
                                 </p>
                                 {!dateFilter.isActive && (
                                     <button
                                         onClick={() => setIsUpdateModalOpen(true)}
                                         className="btn-primary mt-4 text-sm"
                                     >
-                                        Add First Data Point
+                                        Add First Impact Claim
                                     </button>
                                 )}
                             </div>
@@ -822,7 +822,7 @@ export default function KPIDetailPage() {
                         {/* Individual Data Points Chart */}
                         <div className="card p-4 sm:p-6">
                             <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">
-                                Individual Data Points
+                                Individual Impact Claims
                             </h3>
                             <ResponsiveContainer width="100%" height={250}>
                                 <LineChart data={updates

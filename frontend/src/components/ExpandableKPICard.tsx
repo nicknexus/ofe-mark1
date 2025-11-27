@@ -17,7 +17,8 @@ import {
     MapPin,
     Camera,
     MessageSquare,
-    DollarSign
+    DollarSign,
+    Heart
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
 import { getCategoryColor, parseLocalDate, isSameDay, compareDates, formatDate, getEvidenceTypeInfo, getLocalDateString } from '../utils'
@@ -26,6 +27,7 @@ import EvidencePreviewModal from './EvidencePreviewModal'
 import DataPointPreviewModal from './DataPointPreviewModal'
 import AddKPIUpdateModal from './AddKPIUpdateModal'
 import AddEvidenceModal from './AddEvidenceModal'
+import MetricCreditingModal from './MetricCreditingModal'
 import { apiService } from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -93,6 +95,7 @@ export default function ExpandableKPICard({
     const [evidence, setEvidence] = useState<any[]>([])
     const [loadingEvidence, setLoadingEvidence] = useState(false)
     const [updateLocations, setUpdateLocations] = useState<Record<string, any>>({})
+    const [isCreditingModalOpen, setIsCreditingModalOpen] = useState(false)
 
     const handleDataPointClick = (update: any) => {
         setSelectedDataPoint(update)
@@ -182,7 +185,7 @@ export default function ExpandableKPICard({
         if (!dataPoint.id) return
         try {
             await apiService.deleteKPIUpdate(dataPoint.id)
-            toast.success('Data point deleted successfully!')
+            toast.success('Impact claim deleted successfully!')
 
             // Clear cache and refresh data
             if (initiativeId) {
@@ -198,7 +201,7 @@ export default function ExpandableKPICard({
 
             setDeleteConfirmDataPoint(null)
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to delete data point'
+            const message = error instanceof Error ? error.message : 'Failed to delete impact claim'
             toast.error(message)
         }
     }
@@ -207,7 +210,7 @@ export default function ExpandableKPICard({
         if (!editingDataPoint?.id) return
         try {
             await apiService.updateKPIUpdate(editingDataPoint.id, updateData)
-            toast.success('Data point updated successfully!')
+            toast.success('Impact claim updated successfully!')
 
             // Clear cache and refresh data
             if (initiativeId) {
@@ -224,7 +227,7 @@ export default function ExpandableKPICard({
             setIsEditDataPointModalOpen(false)
             setEditingDataPoint(null)
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to update data point'
+            const message = error instanceof Error ? error.message : 'Failed to update impact claim'
             toast.error(message)
             throw error
         }
@@ -813,6 +816,16 @@ export default function ExpandableKPICard({
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation()
+                                        setIsCreditingModalOpen(true)
+                                    }}
+                                    className="flex items-center space-x-2 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-sm font-medium transition-colors"
+                                >
+                                    <Heart className="w-4 h-4" />
+                                    <span>Credit to Donor</span>
+                                </button>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation()
                                         onEdit()
                                     }}
                                     className="flex items-center space-x-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg text-sm font-medium transition-colors"
@@ -835,9 +848,56 @@ export default function ExpandableKPICard({
 
                     {/* Content */}
                     <div className="p-4 space-y-4">
+                        {/* Check if metric is completely fresh (no claims AND no evidence) */}
+                        {kpiUpdates.length === 0 && !loadingEvidence && evidence.length === 0 ? (
+                            /* Fresh Metric - Show only Add buttons */
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-12">
+                                {/* Add Impact Claim */}
+                                <div className="bg-gradient-to-br from-blue-500/20 via-blue-600/15 to-blue-700/20 border-3 border-blue-500 rounded-2xl p-10 shadow-xl shadow-blue-500/10">
+                                    <div className="text-center">
+                                        <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+                                            <BarChart3 className="w-12 h-12 text-white" />
+                                        </div>
+                                        <h5 className="text-2xl font-bold text-blue-900 mb-3">Impact Claims</h5>
+                                        <p className="text-base text-blue-800 mb-8 font-medium">You haven't added any of this type, add it here!</p>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                onAddUpdate()
+                                            }}
+                                            className="inline-flex items-center space-x-3 px-10 py-5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl font-semibold text-lg transition-all duration-200 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transform hover:scale-105"
+                                        >
+                                            <Plus className="w-6 h-6" />
+                                            <span>Add Impact Claim</span>
+                                        </button>
+                                    </div>
+                                </div>
 
-                        {/* Stats Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                {/* Add Evidence */}
+                                <div className="bg-gradient-to-br from-green-500/20 via-green-600/15 to-green-700/20 border-3 border-green-500 rounded-2xl p-10 shadow-xl shadow-green-500/10">
+                                    <div className="text-center">
+                                        <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/30">
+                                            <FileText className="w-12 h-12 text-white" />
+                                        </div>
+                                        <h5 className="text-2xl font-bold text-green-900 mb-3">Evidence</h5>
+                                        <p className="text-base text-green-800 mb-8 font-medium">You haven't added any of this type, add it here!</p>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                onAddEvidence()
+                                            }}
+                                            className="inline-flex items-center space-x-3 px-10 py-5 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl font-semibold text-lg transition-all duration-200 shadow-lg shadow-green-500/30 hover:shadow-xl hover:shadow-green-500/40 transform hover:scale-105"
+                                        >
+                                            <Plus className="w-6 h-5" />
+                                            <span>Add Evidence</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Stats Grid */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3">
                                 <div className="flex items-center space-x-3">
                                     <div className="p-2 bg-blue-100 rounded-lg">
@@ -1101,13 +1161,14 @@ export default function ExpandableKPICard({
                                 </div>
                             </div>
 
-                            {/* Data Points and Evidence Sections - 2/5 width */}
+                            {/* Impact Claims and Evidence Sections - 2/5 width */}
                             <div className="lg:col-span-2 space-y-4">
-                                {/* Data Points Section */}
-                                <div className="bg-gradient-to-br from-blue-50/30 to-indigo-50/20 border border-blue-100/60 rounded-xl p-4">
+                                {/* Impact Claims Section */}
+                                {kpiUpdates && kpiUpdates.length > 0 ? (
+                                    <div className="bg-gradient-to-br from-blue-50/30 to-indigo-50/20 border border-blue-100/60 rounded-xl p-4">
                                     <div className="flex items-center justify-between mb-4">
                                         <h5 className="text-lg font-semibold text-gray-900">Impact Claims</h5>
-                                        <div className="flex items-center space-x-2">
+                                        <div className="flex items-center space-x-3">
                                             <div className="flex items-center space-x-2 text-sm text-gray-500">
                                                 <BarChart3 className="w-4 h-4" />
                                                 <span>{kpi.total_updates || 0} total</span>
@@ -1117,16 +1178,15 @@ export default function ExpandableKPICard({
                                                     e.stopPropagation()
                                                     onAddUpdate()
                                                 }}
-                                                className="flex items-center space-x-1 px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs font-medium transition-colors"
+                                                className="flex items-center space-x-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-semibold text-sm transition-all duration-200 shadow-lg shadow-blue-600/20 hover:shadow-xl hover:shadow-blue-600/30 transform hover:scale-105"
                                             >
-                                                <Plus className="w-3 h-3" />
-                                                <span>Add</span>
+                                                <Plus className="w-5 h-5" />
+                                                <span>Add Impact Claim</span>
                                             </button>
                                         </div>
                                     </div>
-                                    <div className="max-h-64 overflow-y-auto space-y-1.5">
-                                        {kpiUpdates && kpiUpdates.length > 0 ? (
-                                            kpiUpdates.map((update, index) => {
+                                        <div className="max-h-64 overflow-y-auto space-y-1.5">
+                                            {kpiUpdates.map((update, index) => {
                                                 const hasDateRange = update.date_range_start && update.date_range_end
                                                 const displayDate = hasDateRange
                                                     ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}`
@@ -1162,21 +1222,35 @@ export default function ExpandableKPICard({
                                                         </div>
                                                     </div>
                                                 )
-                                            })
-                                        ) : (
-                                            <div className="text-center py-8 text-gray-500">
-                                                <BarChart3 className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                                                <p className="text-sm">No impact claims yet</p>
-                                            </div>
-                                        )}
+                                            })}
+                                        </div>
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="bg-gradient-to-br from-blue-600/10 to-blue-700/10 border-2 border-blue-600 rounded-xl p-6">
+                                        <div className="text-center">
+                                            <BarChart3 className="w-12 h-12 mx-auto mb-3 text-blue-600" />
+                                            <h5 className="text-lg font-semibold text-blue-900 mb-2">Impact Claims</h5>
+                                            <p className="text-sm text-blue-800 mb-4">You haven't added any of this type, add it here!</p>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    onAddUpdate()
+                                                }}
+                                                className="inline-flex items-center space-x-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors duration-200"
+                                            >
+                                                <Plus className="w-5 h-5" />
+                                                <span>Add Impact Claim</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Evidence Section */}
-                                <div className="bg-gradient-to-br from-green-50/30 to-emerald-50/20 border border-green-100/60 rounded-xl p-4">
+                                {!loadingEvidence && evidence.length > 0 ? (
+                                    <div className="bg-gradient-to-br from-green-50/30 to-emerald-50/20 border border-green-100/60 rounded-xl p-4">
                                     <div className="flex items-center justify-between mb-4">
                                         <h5 className="text-lg font-semibold text-gray-900">Evidence</h5>
-                                        <div className="flex items-center space-x-2">
+                                        <div className="flex items-center space-x-3">
                                             <div className="flex items-center space-x-2 text-sm text-gray-500">
                                                 <FileText className="w-4 h-4" />
                                                 <span>{kpi.evidence_count || 0} items</span>
@@ -1186,21 +1260,15 @@ export default function ExpandableKPICard({
                                                     e.stopPropagation()
                                                     onAddEvidence()
                                                 }}
-                                                className="flex items-center space-x-1 px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded text-xs font-medium transition-colors"
+                                                className="flex items-center space-x-2 px-5 py-2.5 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-semibold text-sm transition-all duration-200 shadow-lg shadow-green-600/20 hover:shadow-xl hover:shadow-green-600/30 transform hover:scale-105"
                                             >
-                                                <Plus className="w-3 h-3" />
-                                                <span>Add</span>
+                                                <Plus className="w-5 h-5" />
+                                                <span>Add Evidence</span>
                                             </button>
                                         </div>
                                     </div>
-                                    <div className="max-h-64 overflow-y-auto space-y-1.5">
-                                        {loadingEvidence ? (
-                                            <div className="text-center py-8 text-gray-500">
-                                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600 mx-auto mb-2"></div>
-                                                <p className="text-sm">Loading evidence...</p>
-                                            </div>
-                                        ) : evidence.length > 0 ? (
-                                            evidence.map((evidenceItem) => {
+                                        <div className="max-h-64 overflow-y-auto space-y-1.5">
+                                            {evidence.map((evidenceItem) => {
                                                 return (
                                                     <div
                                                         key={evidenceItem.id}
@@ -1225,17 +1293,39 @@ export default function ExpandableKPICard({
                                                         </div>
                                                     </div>
                                                 )
-                                            })
-                                        ) : (
-                                            <div className="text-center py-8 text-gray-500">
-                                                <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                                                <p className="text-sm">No evidence uploaded yet</p>
-                                            </div>
-                                        )}
+                                            })}
+                                        </div>
                                     </div>
-                                </div>
+                                ) : loadingEvidence ? (
+                                    <div className="bg-gradient-to-br from-green-50/30 to-emerald-50/20 border border-green-100/60 rounded-xl p-4">
+                                        <div className="text-center py-8 text-gray-500">
+                                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600 mx-auto mb-2"></div>
+                                            <p className="text-sm">Loading evidence...</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="bg-gradient-to-br from-green-600/10 to-green-700/10 border-2 border-green-600 rounded-xl p-6">
+                                        <div className="text-center">
+                                            <FileText className="w-12 h-12 mx-auto mb-3 text-green-600" />
+                                            <h5 className="text-lg font-semibold text-green-900 mb-2">Evidence</h5>
+                                            <p className="text-sm text-green-800 mb-4">You haven't added any of this type, add it here!</p>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    onAddEvidence()
+                                                }}
+                                                className="inline-flex items-center space-x-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors duration-200"
+                                            >
+                                                <Plus className="w-5 h-5" />
+                                                <span>Add Evidence</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
+                        </>
+                        )}
                     </div>
                 </div>,
                 document.body
@@ -1339,16 +1429,16 @@ export default function ExpandableKPICard({
                             <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-red-100 to-pink-100 rounded-2xl flex items-center justify-center">
                                 <Trash2 className="w-8 h-8 text-red-600" />
                             </div>
-                            <h3 className="text-2xl font-bold text-gray-900 mb-2">Delete Data Point</h3>
+                            <h3 className="text-2xl font-bold text-gray-900 mb-2">Delete Impact Claim</h3>
                             <p className="text-gray-500">This action cannot be undone</p>
                         </div>
 
                         <div className="bg-gradient-to-r from-red-50/50 to-pink-50/50 border border-red-100/60 rounded-2xl p-4 mb-6">
                             <p className="text-gray-700 text-center">
-                                Are you sure you want to delete this data point?
+                                Are you sure you want to delete this impact claim?
                             </p>
                             <p className="text-sm text-gray-600 text-center mt-2">
-                                This will permanently remove the data point and its associated information.
+                                This will permanently remove the impact claim and its associated information.
                             </p>
                         </div>
 
@@ -1363,7 +1453,7 @@ export default function ExpandableKPICard({
                                 onClick={() => handleDeleteDataPoint(deleteConfirmDataPoint)}
                                 className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold transition-all duration-200 hover:scale-[1.02]"
                             >
-                                Delete Data Point
+                                Delete Impact Claim
                             </button>
                         </div>
                     </div>
@@ -1409,6 +1499,20 @@ export default function ExpandableKPICard({
                     </div>
                 </div>,
                 document.body
+            )}
+
+            {/* Credit to Donor Modal */}
+            {isCreditingModalOpen && initiativeId && (
+                <MetricCreditingModal
+                    isOpen={isCreditingModalOpen}
+                    onClose={() => setIsCreditingModalOpen(false)}
+                    onSave={async () => {
+                        onRefresh?.()
+                    }}
+                    kpi={kpi}
+                    kpiUpdates={kpiUpdates}
+                    initiativeId={initiativeId}
+                />
             )}
         </div>
     )

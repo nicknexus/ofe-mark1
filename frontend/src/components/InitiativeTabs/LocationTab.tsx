@@ -461,7 +461,7 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
                                 ?
                             </p>
                             <p className="text-sm text-gray-600 text-center mt-2">
-                                Data points linked to this location will remain but won't be associated with a
+                                Impact claims linked to this location will remain but won't be associated with a
                                 location anymore.
                             </p>
                         </div>

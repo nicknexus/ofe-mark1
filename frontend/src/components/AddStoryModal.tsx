@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { X, Upload, Calendar, MapPin, Users, Camera, Video, Mic, Image } from 'lucide-react'
+import { X, Upload, Calendar, MapPin, Users, Camera, Video, Mic, Image, FileText, Plus } from 'lucide-react'
 import { CreateStoryForm, Story, Location, BeneficiaryGroup } from '../types'
 import { apiService } from '../services/api'
 import { getLocalDateString } from '../utils'
 import DateRangePicker from './DateRangePicker'
+import LocationModal from './LocationModal'
 import toast from 'react-hot-toast'
 
 interface AddStoryModalProps {
@@ -44,11 +45,13 @@ export default function AddStoryModal({
     const [locations, setLocations] = useState<Location[]>([])
     const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
     const [selectedBeneficiaryGroupIds, setSelectedBeneficiaryGroupIds] = useState<string[]>([])
+    const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
 
     const mediaTypes = [
         { value: 'photo', label: 'Photo', icon: Camera },
         { value: 'video', label: 'Video', icon: Video },
-        { value: 'recording', label: 'Recording', icon: Mic }
+        { value: 'recording', label: 'Recording', icon: Mic },
+        { value: 'text', label: 'Text', icon: FileText }
     ] as const
 
     // Load locations and beneficiary groups
@@ -158,6 +161,10 @@ export default function AddStoryModal({
             toast.error('Please select a date')
             return
         }
+        if (!formData.location_id) {
+            toast.error('Please select a location')
+            return
+        }
 
         setLoading(true)
         try {
@@ -239,7 +246,7 @@ export default function AddStoryModal({
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Media Type *
                         </label>
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             {mediaTypes.map((type) => {
                                 const Icon = type.icon
                                 const isSelected = formData.media_type === type.value
@@ -247,7 +254,14 @@ export default function AddStoryModal({
                                     <button
                                         key={type.value}
                                         type="button"
-                                        onClick={() => setFormData(prev => ({ ...prev, media_type: type.value }))}
+                                        onClick={() => {
+                                            setFormData(prev => ({ ...prev, media_type: type.value }))
+                                            // Clear media_url when switching to text type
+                                            if (type.value === 'text') {
+                                                setFormData(prev => ({ ...prev, media_url: '' }))
+                                                setSelectedFile(null)
+                                            }
+                                        }}
                                         className={`p-4 border-2 rounded-lg transition-colors ${
                                             isSelected
                                                 ? 'border-blue-500 bg-blue-50'
@@ -264,79 +278,96 @@ export default function AddStoryModal({
                         </div>
                     </div>
 
-                    {/* File Upload */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            {formData.media_type === 'photo' ? 'Photo' : formData.media_type === 'video' ? 'Video' : 'Recording'} (Optional)
-                        </label>
-                        <div
-                            onDragOver={handleDragOver}
-                            onDragLeave={handleDragLeave}
-                            onDrop={handleDrop}
-                            className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
-                                isDragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
-                            }`}
-                        >
-                            {formData.media_url ? (
-                                <div className="space-y-2">
-                                    {formData.media_type === 'photo' ? (
-                                        <img src={formData.media_url} alt="Preview" className="w-full max-h-32 mx-auto rounded-lg object-cover" style={{ aspectRatio: '3/4', maxHeight: '150px' }} />
-                                    ) : formData.media_type === 'video' ? (
-                                        <video src={formData.media_url} className="w-full max-h-32 mx-auto rounded-lg object-cover" controls style={{ aspectRatio: '3/4', maxHeight: '150px' }} />
-                                    ) : (
-                                        <div className="w-full bg-gray-100 rounded-lg flex items-center justify-center" style={{ aspectRatio: '3/4', maxHeight: '150px' }}>
-                                            <Mic className="w-6 h-6 text-gray-400" />
-                                        </div>
-                                    )}
-                                    <p className="text-xs text-gray-600">{uploadProgress || 'File uploaded'}</p>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setFormData(prev => ({ ...prev, media_url: '' }))
-                                            setSelectedFile(null)
-                                            setUploadProgress('')
-                                        }}
-                                        className="text-xs text-red-600 hover:text-red-700"
-                                    >
-                                        Remove
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="bg-gradient-to-br from-green-100 to-green-200 rounded-lg flex items-center justify-center" style={{ aspectRatio: '3/4', maxHeight: '150px', minHeight: '120px' }}>
-                                    <div className="text-center p-4">
-                                        <div className="w-8 h-8 bg-green-300 rounded-full mx-auto mb-2 flex items-center justify-center">
-                                            {formData.media_type === 'photo' ? (
-                                                <Image className="w-4 h-4 text-green-600" />
-                                            ) : formData.media_type === 'video' ? (
-                                                <Video className="w-4 h-4 text-green-600" />
-                                            ) : (
-                                                <Mic className="w-4 h-4 text-green-600" />
-                                            )}
-                                        </div>
-                                        <p className="text-xs font-medium text-green-700 mb-1">No Media</p>
-                                        <Upload className="w-6 h-6 text-green-600 mx-auto mb-2" />
-                                        <p className="text-xs text-green-600 mb-2">
-                                            Drag and drop or click to browse
-                                        </p>
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            onChange={handleFileInputChange}
-                                            accept={formData.media_type === 'photo' ? 'image/*' : formData.media_type === 'video' ? 'video/*' : 'audio/*'}
-                                            className="hidden"
-                                        />
+                    {/* File Upload - Only show if not text type */}
+                    {formData.media_type !== 'text' && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                {formData.media_type === 'photo' ? 'Photo' : formData.media_type === 'video' ? 'Video' : 'Recording'} (Optional)
+                            </label>
+                            <div
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
+                                className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
+                                    isDragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                                }`}
+                            >
+                                {formData.media_url ? (
+                                    <div className="space-y-3">
+                                        {formData.media_type === 'photo' ? (
+                                            <div className="relative w-full max-w-md mx-auto">
+                                                <img 
+                                                    src={formData.media_url} 
+                                                    alt="Preview" 
+                                                    className="w-full h-auto rounded-lg object-cover shadow-lg border-2 border-gray-200" 
+                                                    style={{ maxHeight: '400px' }}
+                                                />
+                                            </div>
+                                        ) : formData.media_type === 'video' ? (
+                                            <video 
+                                                src={formData.media_url} 
+                                                className="w-full max-w-md mx-auto rounded-lg object-cover shadow-lg border-2 border-gray-200" 
+                                                controls 
+                                                style={{ maxHeight: '400px' }}
+                                            />
+                                        ) : (
+                                            <div className="w-full max-w-md mx-auto bg-gray-100 rounded-lg flex items-center justify-center p-8" style={{ minHeight: '200px' }}>
+                                                <div className="text-center">
+                                                    <Mic className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                                                    <p className="text-sm text-gray-600">Audio Recording</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <p className="text-xs text-gray-600">{uploadProgress || 'File uploaded'}</p>
                                         <button
                                             type="button"
-                                            onClick={() => fileInputRef.current?.click()}
-                                            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium transition-colors"
+                                            onClick={() => {
+                                                setFormData(prev => ({ ...prev, media_url: '' }))
+                                                setSelectedFile(null)
+                                                setUploadProgress('')
+                                            }}
+                                            className="text-xs text-red-600 hover:text-red-700 font-medium"
                                         >
-                                            Browse Files
+                                            Remove
                                         </button>
                                     </div>
-                                </div>
-                            )}
+                                ) : (
+                                    <div className="bg-gradient-to-br from-green-100 to-green-200 rounded-lg flex items-center justify-center" style={{ aspectRatio: '3/4', maxHeight: '150px', minHeight: '120px' }}>
+                                        <div className="text-center p-4">
+                                            <div className="w-8 h-8 bg-green-300 rounded-full mx-auto mb-2 flex items-center justify-center">
+                                                {formData.media_type === 'photo' ? (
+                                                    <Image className="w-4 h-4 text-green-600" />
+                                                ) : formData.media_type === 'video' ? (
+                                                    <Video className="w-4 h-4 text-green-600" />
+                                                ) : (
+                                                    <Mic className="w-4 h-4 text-green-600" />
+                                                )}
+                                            </div>
+                                            <p className="text-xs font-medium text-green-700 mb-1">No Media</p>
+                                            <Upload className="w-6 h-6 text-green-600 mx-auto mb-2" />
+                                            <p className="text-xs text-green-600 mb-2">
+                                                Drag and drop or click to browse
+                                            </p>
+                                            <input
+                                                ref={fileInputRef}
+                                                type="file"
+                                                onChange={handleFileInputChange}
+                                                accept={formData.media_type === 'photo' ? 'image/*' : formData.media_type === 'video' ? 'video/*' : 'audio/*'}
+                                                className="hidden"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => fileInputRef.current?.click()}
+                                                className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium transition-colors"
+                                            >
+                                                Browse Files
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Date */}
                     <div>
@@ -353,20 +384,34 @@ export default function AddStoryModal({
                     {/* Location */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Location (Optional)
+                            Location <span className="text-red-500">*</span>
                         </label>
-                        <select
-                            value={formData.location_id || ''}
-                            onChange={(e) => setFormData(prev => ({ ...prev, location_id: e.target.value || undefined }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                            <option value="">No location</option>
-                            {locations.map((location) => (
-                                <option key={location.id} value={location.id}>
-                                    {location.name}
-                                </option>
-                            ))}
-                        </select>
+                        <div className="flex gap-2">
+                            <select
+                                value={formData.location_id || ''}
+                                onChange={(e) => setFormData(prev => ({ ...prev, location_id: e.target.value }))}
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                required
+                            >
+                                <option value="">Select a location...</option>
+                                {locations.map((location) => (
+                                    <option key={location.id} value={location.id}>
+                                        {location.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                type="button"
+                                onClick={() => setIsLocationModalOpen(true)}
+                                className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700 flex items-center gap-1"
+                                title="Add new location"
+                            >
+                                <Plus className="w-4 h-4" />
+                            </button>
+                        </div>
+                        {locations.length === 0 && (
+                            <p className="text-xs text-gray-500 mt-1">No locations yet. Click the + button to create one.</p>
+                        )}
                     </div>
 
                     {/* Beneficiary Groups */}
@@ -422,6 +467,26 @@ export default function AddStoryModal({
                         </button>
                     </div>
                 </form>
+
+                {/* Location Creation Modal */}
+                <LocationModal
+                    isOpen={isLocationModalOpen}
+                    onClose={() => setIsLocationModalOpen(false)}
+                    onSubmit={async (locationData) => {
+                        try {
+                            const newLocation = await apiService.createLocation(locationData)
+                            setLocations([...locations, newLocation])
+                            setFormData(prev => ({ ...prev, location_id: newLocation.id! }))
+                            setIsLocationModalOpen(false)
+                            toast.success('Location created successfully!')
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : 'Failed to create location'
+                            toast.error(message)
+                            throw error
+                        }
+                    }}
+                    initiativeId={initiativeId}
+                />
             </div>
         </div>
     )

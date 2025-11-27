@@ -8,7 +8,7 @@ const router = Router();
 // Get filtered report data for preview
 router.post('/report-data', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const { initiativeId, dateStart, dateEnd, kpiIds, locationIds, beneficiaryGroupIds } = req.body;
+        const { initiativeId, dateStart, dateEnd, kpiIds, locationIds, beneficiaryGroupIds, donorId } = req.body;
 
         if (!initiativeId) {
             res.status(400).json({ error: 'initiativeId is required' });
@@ -22,7 +22,8 @@ router.post('/report-data', authenticateUser, async (req: AuthenticatedRequest, 
             dateEnd,
             kpiIds: Array.isArray(kpiIds) ? kpiIds : undefined,
             locationIds: Array.isArray(locationIds) ? locationIds : undefined,
-            beneficiaryGroupIds: Array.isArray(beneficiaryGroupIds) ? beneficiaryGroupIds : undefined
+            beneficiaryGroupIds: Array.isArray(beneficiaryGroupIds) ? beneficiaryGroupIds : undefined,
+            donorId: donorId || undefined
         });
 
         res.json(reportData);
@@ -48,6 +49,7 @@ router.post('/generate-report', authenticateUser, async (req: AuthenticatedReque
             selectedStory,
             locations,
             beneficiaryGroups,
+            donor,
             deepLink
         } = req.body;
 
@@ -114,10 +116,15 @@ Location: ${selectedStory.location_name || 'Not specified'}
 Date: ${selectedStory.date_represented}`
             : '**Selected Story:** None selected - create a report focused on metrics and impact data without a specific story narrative.';
 
+        const donorText = donor
+            ? `\n**IMPORTANT - Donor-Focused Report:** This report is specifically focused on the impact credited to ${donor.name}${donor.organization ? ` (${donor.organization})` : ''}. All metrics and values shown represent only the portion of impact that has been credited to this donor. Frame the entire report around this donor's specific contribution and impact.`
+            : '';
+
         const userPrompt = `Create a detailed initiative impact report using the following inputs.
 
 **Initiative:** ${initiativeTitle}
 **Date Range:** ${dateRangeText}
+${donorText}
 
 ${storyText}
 
