@@ -145,7 +145,9 @@ export default function InitiativePage() {
                 // Expand the newly created metric
                 setExpandedKPIs(prev => {
                     const newSet = new Set(prev)
-                    newSet.add(newKPI.id)
+                    if (newKPI.id) {
+                        newSet.add(newKPI.id)
+                    }
                     return newSet
                 })
             }

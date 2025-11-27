@@ -183,10 +183,10 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
         }
     }
 
-    const handleDeleteEvidence = async (evidenceId: string) => {
+    const handleDeleteEvidence = async (evidence: Evidence) => {
         if (!confirm('Are you sure you want to delete this evidence?')) return
         try {
-            await apiService.deleteEvidence(evidenceId)
+            await apiService.deleteEvidence(evidence.id)
             toast.success('Evidence deleted successfully')
             loadEvidence()
             onRefresh?.()
