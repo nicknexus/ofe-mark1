@@ -33,9 +33,10 @@ export default function DonorCreditingModal({
     useEffect(() => {
         if (isOpen && donor.id && dashboard) {
             const initializeData = async () => {
+                // Clear cache to ensure fresh data when opening modal (especially after other donors' credits change)
+                apiService.clearCache('/donor-credits')
                 await calculateMetricTotals()
-                await loadCredits()
-                await loadOtherDonorsCredits()
+                await loadCredits() // This will call loadOtherDonorsCredits internally
             }
             initializeData()
         } else {
@@ -124,10 +125,9 @@ export default function DonorCreditingModal({
             })
             setCreditsByMetric(grouped)
             
-            // Reload other donors' credits after loading this donor's credits
-            if (dashboard) {
-                await loadOtherDonorsCredits()
-            }
+            // Always reload other donors' credits after loading this donor's credits
+            // This ensures remaining amounts are always up to date
+            await loadOtherDonorsCredits()
         } catch (error) {
             console.error('Error loading credits:', error)
             toast.error('Failed to load credits')
@@ -263,6 +263,11 @@ export default function DonorCreditingModal({
             }
 
             toast.success('Credits saved successfully!')
+            
+            // Reload credits and other donors' credits to update remaining amounts
+            await loadCredits()
+            await loadOtherDonorsCredits()
+            
             await onSave()
             onClose()
         } catch (error: any) {
