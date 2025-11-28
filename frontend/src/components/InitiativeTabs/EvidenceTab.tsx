@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Search, X, Calendar, MapPin, Users, FileText, Eye, Edit, Trash2, Plus } from 'lucide-react'
+import { Search, X, Calendar, MapPin, Users, FileText, Eye, Edit, Trash2, Plus, Camera, MessageSquare, DollarSign } from 'lucide-react'
 import { apiService } from '../../services/api'
 import { Evidence, Location, BeneficiaryGroup } from '../../types'
 import { formatDate, getEvidenceTypeInfo } from '../../utils'
@@ -46,10 +46,10 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
     const [evidenceTypeDropdownPosition, setEvidenceTypeDropdownPosition] = useState({ top: 0, left: 0 })
 
     const evidenceTypes = [
-        { value: 'visual_proof', label: 'Visual Support', icon: '📷' },
-        { value: 'documentation', label: 'Documentation', icon: '📄' },
-        { value: 'testimony', label: 'Testimony', icon: '🗣️' },
-        { value: 'financials', label: 'Financials', icon: '💰' }
+        { value: 'visual_proof', label: 'Visual Support', icon: Camera },
+        { value: 'documentation', label: 'Documentation', icon: FileText },
+        { value: 'testimony', label: 'Testimony', icon: MessageSquare },
+        { value: 'financials', label: 'Financials', icon: DollarSign }
     ] as const
 
     // Load locations, beneficiary groups, and KPIs
@@ -510,8 +510,8 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                                         }}
                                                         className="rounded border-gray-300 text-green-600 focus:ring-green-500"
                                                     />
-                                                    <div className={`w-6 h-6 ${bgColor} rounded flex items-center justify-center text-sm`}>
-                                                        {type.icon}
+                                                    <div className={`w-6 h-6 ${bgColor} rounded flex items-center justify-center`}>
+                                                        {React.createElement(type.icon, { className: 'w-4 h-4' })}
                                                     </div>
                                                     <span className="text-sm text-gray-700">{type.label}</span>
                                                 </label>
@@ -580,6 +580,8 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                             const typeInfo = getEvidenceTypeInfo(ev.type)
                             // Extract background color from typeInfo.color (e.g., "bg-pink-100 text-pink-800" -> "bg-pink-100")
                             const bgColor = typeInfo.color.split(' ')[0]
+                            const evidenceType = evidenceTypes.find(et => et.value === ev.type)
+                            const IconComponent = evidenceType?.icon || FileText
                             
                             return (
                                 <div
@@ -590,7 +592,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                     {/* Icon */}
                                     <div className="col-span-1 flex items-center justify-center">
                                         <div className={`p-2 rounded-lg ${bgColor}`}>
-                                            <span className="text-lg">{typeInfo.icon}</span>
+                                            <IconComponent className="w-4 h-4" />
                                         </div>
                                     </div>
 

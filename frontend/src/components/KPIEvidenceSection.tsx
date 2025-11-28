@@ -154,14 +154,20 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateF
                 <h3 className="text-base sm:text-lg font-semibold text-gray-900">
                     Evidence ({dateFilter?.isActive ? filteredEvidence.length : evidence.length})
                 </h3>
-                <button
-                    onClick={() => setIsEvidenceModalOpen(true)}
-                    className="btn-secondary flex items-center space-x-2 text-sm"
-                >
-                    <Upload className="w-4 h-4" />
-                    <span className="hidden sm:inline">Add Evidence</span>
-                    <span className="sm:hidden">Add</span>
-                </button>
+                <div className="flex items-center space-x-3">
+                    <div className="text-right text-sm">
+                        <div className="text-lg font-bold text-green-600">{dateFilter?.isActive ? filteredEvidence.length : evidence.length}</div>
+                        <div className="text-xs text-gray-600">Items</div>
+                    </div>
+                    <button
+                        onClick={() => setIsEvidenceModalOpen(true)}
+                        className="btn-secondary flex items-center space-x-2 text-sm"
+                    >
+                        <Upload className="w-4 h-4" />
+                        <span className="hidden sm:inline">Add Evidence</span>
+                        <span className="sm:hidden">Add</span>
+                    </button>
+                </div>
             </div>
 
             {loading ? (

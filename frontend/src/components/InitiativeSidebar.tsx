@@ -9,8 +9,7 @@ import {
     Target,
     BookOpen,
     Sparkles,
-    FileText,
-    Heart
+    FileText
 } from 'lucide-react'
 
 interface InitiativeSidebarProps {
@@ -64,12 +63,6 @@ export default function InitiativeSidebar({
             label: 'Stories',
             icon: BookOpen,
             description: 'Impact Stories'
-        },
-        {
-            id: 'donors',
-            label: 'Donors',
-            icon: Heart,
-            description: 'Donor Management'
         },
         {
             id: 'report',

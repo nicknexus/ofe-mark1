@@ -755,14 +755,28 @@ export default function KPIDetailPage() {
                             <h3 className="text-base sm:text-lg font-semibold text-gray-900">
                                 Impact Claims ({dateFilter.isActive ? filteredUpdates.length : updates.length})
                             </h3>
-                            <button
-                                onClick={() => setIsUpdateModalOpen(true)}
-                                className="btn-secondary flex items-center space-x-2 text-sm"
-                            >
-                                <Plus className="w-4 h-4" />
-                                <span className="hidden sm:inline">Add Impact Claim</span>
-                                <span className="sm:hidden">Add</span>
-                            </button>
+                            <div className="flex items-center space-x-3">
+                                <div className="flex items-center space-x-4 text-sm">
+                                    <div className="text-right">
+                                        <div className="text-lg font-bold text-blue-600">{dateFilter.isActive ? filteredUpdates.length : updates.length}</div>
+                                        <div className="text-xs text-gray-600">Items</div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-lg font-bold text-green-600">
+                                            {dateFilter.isActive ? filteredTotal : updates.reduce((sum, update) => sum + update.value, 0)}
+                                        </div>
+                                        <div className="text-xs text-gray-600">Total {kpi.unit_of_measurement}</div>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setIsUpdateModalOpen(true)}
+                                    className="btn-secondary flex items-center space-x-2 text-sm"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Add Impact Claim</span>
+                                    <span className="sm:hidden">Add</span>
+                                </button>
+                            </div>
                         </div>
 
                         {/* Filtered Total Sum */}

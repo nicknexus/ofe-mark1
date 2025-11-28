@@ -36,7 +36,6 @@ import EvidenceTab from '../components/InitiativeTabs/EvidenceTab'
 import LocationTab from '../components/InitiativeTabs/LocationTab'
 import BeneficiariesTab from '../components/InitiativeTabs/BeneficiariesTab'
 import StoriesTab from '../components/InitiativeTabs/StoriesTab'
-import DonorTab from '../components/InitiativeTabs/DonorTab'
 import ReportTab from '../components/InitiativeTabs/ReportTab'
 import toast from 'react-hot-toast'
 
@@ -405,8 +404,6 @@ export default function InitiativePage() {
                 return <BeneficiariesTab initiativeId={id!} onRefresh={loadDashboard} />
             case 'stories':
                 return <StoriesTab initiativeId={id!} onRefresh={loadDashboard} initialStoryId={initialStoryId} />
-            case 'donors':
-                return <DonorTab initiativeId={id!} dashboard={dashboard} onRefresh={loadDashboard} />
             case 'report':
                 return <ReportTab initiativeId={id!} dashboard={dashboard} />
             default:
