@@ -332,20 +332,20 @@ export default function AddStoryModal({
                                         </button>
                                     </div>
                                 ) : (
-                                    <div className="bg-gradient-to-br from-green-100 to-green-200 rounded-lg flex items-center justify-center" style={{ aspectRatio: '3/4', maxHeight: '150px', minHeight: '120px' }}>
+                                    <div className="bg-gradient-to-br from-primary-100 to-primary-200 rounded-lg flex items-center justify-center" style={{ aspectRatio: '3/4', maxHeight: '150px', minHeight: '120px' }}>
                                         <div className="text-center p-4">
-                                            <div className="w-8 h-8 bg-green-300 rounded-full mx-auto mb-2 flex items-center justify-center">
+                                            <div className="w-8 h-8 bg-primary-300 rounded-full mx-auto mb-2 flex items-center justify-center">
                                                 {formData.media_type === 'photo' ? (
-                                                    <Image className="w-4 h-4 text-green-600" />
+                                                    <Image className="w-4 h-4 text-primary-500" />
                                                 ) : formData.media_type === 'video' ? (
-                                                    <Video className="w-4 h-4 text-green-600" />
+                                                    <Video className="w-4 h-4 text-primary-500" />
                                                 ) : (
-                                                    <Mic className="w-4 h-4 text-green-600" />
+                                                    <Mic className="w-4 h-4 text-primary-500" />
                                                 )}
                                             </div>
-                                            <p className="text-xs font-medium text-green-700 mb-1">No Media</p>
-                                            <Upload className="w-6 h-6 text-green-600 mx-auto mb-2" />
-                                            <p className="text-xs text-green-600 mb-2">
+                                            <p className="text-xs font-medium text-primary-700 mb-1">No Media</p>
+                                            <Upload className="w-6 h-6 text-primary-500 mx-auto mb-2" />
+                                            <p className="text-xs text-primary-500 mb-2">
                                                 Drag and drop or click to browse
                                             </p>
                                             <input
@@ -358,7 +358,7 @@ export default function AddStoryModal({
                                             <button
                                                 type="button"
                                                 onClick={() => fileInputRef.current?.click()}
-                                                className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium transition-colors"
+                                                className="px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-xs font-medium transition-colors"
                                             >
                                                 Browse Files
                                             </button>

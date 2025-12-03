@@ -242,9 +242,9 @@ export default function Dashboard() {
 
     return (
         <>
-            <div className="min-h-screen bg-white">
+            <div className="min-h-screen">
                 {/* Header with Organization Name */}
-                <div className="bg-white border-b border-gray-200">
+                <div className="bg-white border-b border-gray-100 shadow-bubble-sm">
                     <div className="px-4 sm:px-6 lg:px-8 py-6">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                             <div className="space-y-1">
@@ -253,14 +253,14 @@ export default function Dashboard() {
                                         {organization.name}
                                     </h1>
                                 )}
-                                <h2 className="text-lg font-normal text-gray-600">
+                                <h2 className="text-lg font-normal text-gray-500">
                                     Dashboard
                                 </h2>
                             </div>
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={showTutorialAgain}
-                                    className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 transition-colors"
+                                    className="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 bg-white border border-gray-200 rounded-2xl hover:border-gray-300 transition-all duration-200 shadow-bubble-sm"
                                     title="Show tutorial again"
                                 >
                                     <HelpCircle className="w-4 h-4 inline mr-1.5" />
@@ -268,7 +268,7 @@ export default function Dashboard() {
                                 </button>
                                 <button
                                     onClick={() => setShowCreateModal(true)}
-                                    className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors flex items-center gap-1.5"
+                                    className="px-5 py-2.5 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-2xl transition-all duration-200 flex items-center gap-1.5 shadow-bubble-sm"
                                 >
                                     <Plus className="w-4 h-4" />
                                     {initiatives.length === 0 ? 'Get Started' : 'New Initiative'}
@@ -281,10 +281,12 @@ export default function Dashboard() {
                 {/* Small Banner for KPIs */}
                 {!isLoadingStats && allKPIs.length === 0 && initiatives.length > 0 && (
                     <div className="px-4 sm:px-6 lg:px-8 pt-6">
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <BarChart3 className="w-4 h-4 text-blue-600" />
-                                <p className="text-sm text-blue-800">
+                        <div className="bg-white rounded-2xl p-4 flex items-center justify-between shadow-bubble border border-evidence-100">
+                            <div className="flex items-center gap-3">
+                                <div className="icon-bubble-sm">
+                                    <BarChart3 className="w-4 h-4 text-evidence-400" />
+                                </div>
+                                <p className="text-sm text-gray-700 font-medium">
                                     Create your first KPI to start tracking impact
                                 </p>
                             </div>
@@ -294,26 +296,26 @@ export default function Dashboard() {
 
                 {/* Initiatives Section - Front and Center */}
                 <div className="px-4 sm:px-6 lg:px-8 py-8">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-6">Your Initiatives</h2>
+                    <h2 className="text-xl font-semibold text-gray-800 mb-6">Your Initiatives</h2>
 
                     {initiatives.length === 0 ? (
-                        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-                            <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                                <Target className="w-6 h-6 text-primary-600" />
+                        <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-12 text-center">
+                            <div className="icon-bubble mx-auto mb-4">
+                                <Target className="w-6 h-6 text-primary-500" />
                             </div>
-                            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-2">
                                 Welcome to OFE
                             </h3>
-                            <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                            <p className="text-gray-500 mb-6 max-w-md mx-auto">
                                 Let's start by creating your first initiative. Think of it as a project or program you want to track.
                             </p>
                             <button
                                 onClick={() => setShowCreateModal(true)}
-                                className="px-6 py-2.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
+                                className="px-6 py-2.5 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-2xl transition-all duration-200 shadow-bubble-sm"
                             >
                                 Create Your First Initiative
                             </button>
-                            <p className="text-xs text-gray-500 mt-4">
+                            <p className="text-xs text-gray-400 mt-4">
                                 Example: "Youth Training Program 2025" or "Clean Water Project"
                             </p>
                         </div>
@@ -322,7 +324,7 @@ export default function Dashboard() {
                             {initiatives.map((initiative) => (
                                 <div
                                     key={initiative.id}
-                                    className="group bg-white rounded-lg border border-gray-200 hover:border-primary-300 hover:shadow-md transition-all duration-200 relative"
+                                    className="group bg-white rounded-2xl shadow-bubble border border-gray-100/60 hover:shadow-bubble-hover transition-all duration-200 relative"
                                 >
                                     <Link
                                         to={`/initiatives/${initiative.id}`}
@@ -330,14 +332,14 @@ export default function Dashboard() {
                                     >
                                         <div className="flex items-start justify-between mb-4">
                                             <div className="flex items-center space-x-3">
-                                                <div className="p-2 bg-primary-100 rounded-lg">
-                                                    <Target className="w-5 h-5 text-primary-600" />
+                                                <div className="icon-bubble">
+                                                    <Target className="w-5 h-5 text-primary-500" />
                                                 </div>
                                                 <div className="flex-1">
-                                                    <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition-colors mb-1">
+                                                    <h3 className="text-lg font-semibold text-gray-800 group-hover:text-primary-600 transition-colors mb-1">
                                                         {initiative.title}
                                                     </h3>
-                                                    <div className="flex items-center text-xs text-gray-500">
+                                                    <div className="flex items-center text-xs text-gray-400">
                                                         <Calendar className="w-3 h-3 mr-1" />
                                                         <span>Created {formatDate(initiative.created_at || '')}</span>
                                                     </div>
@@ -345,22 +347,22 @@ export default function Dashboard() {
                                             </div>
                                         </div>
 
-                                        <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+                                        <p className="text-gray-500 text-sm mb-4 line-clamp-3">
                                             {truncateText(initiative.description, 120)}
                                         </p>
 
-                                        <div className="flex items-center justify-between text-sm pt-4 border-t border-gray-100">
+                                        <div className="flex items-center justify-between text-sm pt-4 border-t border-gray-100/60">
                                             <div className="flex items-center space-x-4">
-                                                <div className="flex items-center text-blue-600">
+                                                <div className="flex items-center text-evidence-400">
                                                     <BarChart3 className="w-4 h-4 mr-1" />
-                                                    <span>0 KPIs</span>
+                                                    <span className="font-medium">0 KPIs</span>
                                                 </div>
-                                                <div className="flex items-center text-green-600">
+                                                <div className="flex items-center text-impact-400">
                                                     <FileText className="w-4 h-4 mr-1" />
-                                                    <span>0 Evidence</span>
+                                                    <span className="font-medium">0 Evidence</span>
                                                 </div>
                                             </div>
-                                            <span className="text-primary-600 font-medium group-hover:underline">
+                                            <span className="text-primary-500 font-medium group-hover:translate-x-0.5 transition-transform">
                                                 View →
                                             </span>
                                         </div>
@@ -374,10 +376,10 @@ export default function Dashboard() {
                                                 e.stopPropagation()
                                                 openEditModal(initiative)
                                             }}
-                                            className="p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-colors"
+                                            className="p-1.5 bg-white border border-gray-200 rounded-xl shadow-bubble-sm hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
                                             title="Edit Initiative"
                                         >
-                                            <Edit className="w-3 h-3 text-gray-600" />
+                                            <Edit className="w-3.5 h-3.5 text-gray-500" />
                                         </button>
                                         <button
                                             onClick={(e) => {
@@ -385,10 +387,10 @@ export default function Dashboard() {
                                                 e.stopPropagation()
                                                 openDeleteConfirm(initiative)
                                             }}
-                                            className="p-1.5 bg-white border border-red-200 rounded-lg shadow-sm hover:bg-red-50 hover:border-red-300 transition-colors"
+                                            className="p-1.5 bg-white border border-red-200 rounded-xl shadow-bubble-sm hover:bg-red-50 hover:border-red-300 transition-all duration-200"
                                             title="Delete Initiative"
                                         >
-                                            <Trash2 className="w-3 h-3 text-red-600" />
+                                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
                                         </button>
                                     </div>
                                 </div>
@@ -424,32 +426,32 @@ export default function Dashboard() {
             {/* Delete Confirmation Dialog */}
             {deleteConfirmInitiative && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-xl max-w-md w-full p-6 border border-gray-100 shadow-xl">
+                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-bubble-lg border border-gray-100">
                         <div className="flex items-start space-x-4 mb-6">
-                            <div className="p-2 bg-gray-50 rounded-lg">
-                                <Trash2 className="w-5 h-5 text-gray-600" />
+                            <div className="icon-bubble">
+                                <Trash2 className="w-5 h-5 text-red-500" />
                             </div>
                             <div className="flex-1">
-                                <h3 className="text-lg font-normal text-gray-900 mb-1">Delete Initiative</h3>
+                                <h3 className="text-lg font-semibold text-gray-800 mb-1">Delete Initiative</h3>
                                 <p className="text-sm text-gray-500">This action cannot be undone</p>
                             </div>
                         </div>
 
-                        <p className="text-gray-700 mb-6 text-sm leading-relaxed">
-                            Are you sure you want to delete "<strong className="font-medium">{deleteConfirmInitiative.title}</strong>"?
+                        <p className="text-gray-600 mb-6 text-sm leading-relaxed">
+                            Are you sure you want to delete "<strong className="font-medium text-gray-800">{deleteConfirmInitiative.title}</strong>"?
                             This will also delete all associated KPIs, impact claims, and evidence.
                         </p>
 
                         <div className="flex space-x-3">
                             <button
                                 onClick={() => setDeleteConfirmInitiative(null)}
-                                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
+                                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-all duration-200"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={() => handleDeleteInitiative(deleteConfirmInitiative)}
-                                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-lg transition-colors"
+                                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-2xl transition-all duration-200 shadow-bubble-sm"
                             >
                                 Delete Initiative
                             </button>

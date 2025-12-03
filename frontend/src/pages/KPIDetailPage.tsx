@@ -170,28 +170,28 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
     }
 
     const getStatusColor = (dataPoint: DataPointWithEvidence) => {
-        if (dataPoint.isFullySupported) return 'text-green-600'
+        if (dataPoint.isFullySupported) return 'text-primary-500'
         if (dataPoint.completionPercentage && dataPoint.completionPercentage > 0) return 'text-yellow-600'
         return 'text-gray-500'
     }
 
     const getStatusDot = (dataPoint: DataPointWithEvidence) => {
-        if (dataPoint.isFullySupported) return 'bg-green-500'
+        if (dataPoint.isFullySupported) return 'bg-primary-500'
         if (dataPoint.completionPercentage && dataPoint.completionPercentage > 0) return 'bg-yellow-500'
         return 'bg-gray-300'
     }
 
     return (
-        <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+        <div className="space-y-3 max-h-[calc(100vh-480px)] min-h-[200px] overflow-y-auto pr-2 scrollbar-thin">
             {dataPointsWithEvidence
                 .sort((a, b) => new Date(b.date_represented).getTime() - new Date(a.date_represented).getTime())
                 .map((dataPoint) => {
                     const isExpanded = expandedPoints.includes(dataPoint.id!)
                     return (
-                        <div key={dataPoint.id} className="border border-gray-200 rounded-lg">
+                        <div key={dataPoint.id} className="bg-white/80 backdrop-blur-sm border border-gray-100 rounded-2xl shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200">
                             {/* Main Data Point Card */}
                             <div
-                                className="p-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                                className="p-4 cursor-pointer hover:bg-white/90 transition-all duration-200 rounded-2xl"
                                 onClick={() => toggleExpanded(dataPoint.id!)}
                             >
                                 <div className="flex items-center justify-between">
@@ -199,7 +199,7 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
                                         <div className={`w-3 h-3 rounded-full flex-shrink-0 ${getStatusDot(dataPoint)}`}></div>
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center space-x-2 mb-1">
-                                                <span className="text-lg font-bold text-primary-600">
+                                                <span className="text-lg font-bold text-primary-500">
                                                     {dataPoint.value} {kpi.unit_of_measurement}
                                                 </span>
                                                 {dataPoint.label && (
@@ -239,7 +239,7 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
 
                             {/* Expanded Details */}
                             {isExpanded && (
-                                <div className="border-t border-gray-100 p-4 bg-gray-50">
+                                <div className="border-t border-gray-100/60 p-4 bg-offWhite/50 rounded-b-2xl">
                                     {/* Beneficiaries */}
                                     <div className="mb-4">
                                         <div className="flex items-center justify-between mb-2">
@@ -260,7 +260,7 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
                                                 {dataPointBeneficiaries[dataPoint.id!].map((beneficiary: any) => (
                                                     <span
                                                         key={beneficiary.id}
-                                                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800"
+                                                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800"
                                                     >
                                                         {beneficiary.name}
                                                     </span>
@@ -281,7 +281,7 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
                                         </div>
                                         <div className="w-full bg-gray-200 rounded-full h-2">
                                             <div
-                                                className={`h-2 rounded-full ${dataPoint.isFullySupported ? 'bg-green-500' :
+                                                className={`h-2 rounded-full ${dataPoint.isFullySupported ? 'bg-primary-500' :
                                                     dataPoint.completionPercentage && dataPoint.completionPercentage > 0 ? 'bg-yellow-500' : 'bg-gray-300'
                                                     }`}
                                                 style={{ width: `${dataPoint.completionPercentage || 0}%` }}
@@ -379,32 +379,32 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
 
             {/* Delete Confirmation Dialog */}
             {deleteConfirmEvidence && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-xl max-w-md w-full p-6">
+                <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-50">
+                    <div className="bg-white/90 backdrop-blur-xl rounded-3xl max-w-md w-full p-6 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)] border border-white/60">
                         <div className="flex items-center space-x-3 mb-4">
-                            <div className="p-2 bg-red-100 rounded-lg">
+                            <div className="p-2.5 bg-red-100/80 rounded-xl">
                                 <Trash2 className="w-5 h-5 text-red-600" />
                             </div>
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-900">Delete Evidence</h3>
-                                <p className="text-sm text-gray-600">This action cannot be undone</p>
+                                <h3 className="text-lg font-semibold text-gray-800">Delete Evidence</h3>
+                                <p className="text-sm text-gray-500">This action cannot be undone</p>
                             </div>
                         </div>
 
-                        <p className="text-gray-700 mb-6">
-                            Are you sure you want to delete "<strong>{deleteConfirmEvidence.title}</strong>"?
+                        <p className="text-gray-600 mb-6">
+                            Are you sure you want to delete "<strong className="text-gray-800">{deleteConfirmEvidence.title}</strong>"?
                         </p>
 
                         <div className="flex space-x-3">
                             <button
                                 onClick={() => setDeleteConfirmEvidence(null)}
-                                className="btn-secondary flex-1"
+                                className="flex-1 px-5 py-3 text-gray-600 bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-xl hover:bg-white/80 font-medium transition-all duration-200"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={() => handleDeleteEvidence(deleteConfirmEvidence)}
-                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                                className="flex-1 px-5 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all duration-200 font-semibold shadow-lg shadow-red-500/25"
                             >
                                 Delete Evidence
                             </button>
@@ -624,73 +624,76 @@ export default function KPIDetailPage() {
     }
 
     return (
-        <>
+        <div className="min-h-screen">
             {/* Header with back navigation */}
-            <div className="space-y-4 sm:space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
-                    <div className="flex items-center space-x-3 min-w-0">
-                        <Link
-                            to={`/initiatives/${initiativeId}`}
-                            className="text-gray-500 hover:text-gray-700 transition-colors p-1 -ml-1"
-                        >
-                            <ArrowLeft className="w-5 h-5" />
-                        </Link>
-                        <div className="min-w-0">
-                            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 truncate">
-                                {kpi.title}
-                            </h1>
-                            <div className="flex flex-wrap items-center gap-2 mt-1">
-                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(kpi.category)}`}>
-                                    {kpi.category}
-                                </span>
-                                <span className="text-gray-500 text-sm">
-                                    {kpi.metric_type === 'percentage' ? '%' : kpi.unit_of_measurement}
-                                </span>
+            <div className="space-y-4 sm:space-y-5 p-4 sm:p-6 max-w-[1800px] mx-auto">
+                {/* Top Header Bar */}
+                <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-soft-float border border-white/60 p-4 sm:p-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+                        <div className="flex items-center space-x-3 min-w-0">
+                            <Link
+                                to={`/initiatives/${initiativeId}`}
+                                className="text-gray-400 hover:text-gray-600 transition-colors p-2 -ml-2 rounded-xl hover:bg-gray-100/50"
+                            >
+                                <ArrowLeft className="w-5 h-5" />
+                            </Link>
+                            <div className="min-w-0">
+                                <h1 className="text-xl sm:text-2xl font-bold text-gray-800 truncate">
+                                    {kpi.title}
+                                </h1>
+                                <div className="flex flex-wrap items-center gap-2 mt-1">
+                                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getCategoryColor(kpi.category)}`}>
+                                        {kpi.category}
+                                    </span>
+                                    <span className="text-gray-500 text-sm">
+                                        {kpi.metric_type === 'percentage' ? '%' : kpi.unit_of_measurement}
+                                    </span>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 sm:flex-shrink-0">
-                        <button
-                            onClick={() => setIsUpdateModalOpen(true)}
-                            className="btn-primary flex items-center justify-center space-x-2 text-sm"
-                        >
-                            <Plus className="w-4 h-4" />
-                            <span>Add Data</span>
-                        </button>
+                        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 sm:flex-shrink-0">
+                            <button
+                                onClick={() => setIsUpdateModalOpen(true)}
+                                className="flex items-center justify-center space-x-2 px-5 py-2.5 bg-evidence-500 text-white rounded-xl hover:bg-evidence-600 font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25 text-sm"
+                            >
+                                <Plus className="w-4 h-4" />
+                                <span>Add Data</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 {/* Stats Cards */}
                 <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                    <div className="card p-3 sm:p-4 text-center">
-                        <p className="text-lg sm:text-2xl font-bold text-blue-600">{updates.length}</p>
-                        <p className="text-xs sm:text-sm text-gray-600">Impact Claims</p>
+                    <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-soft-float border border-white/60 p-4 text-center">
+                        <p className="text-xl sm:text-2xl font-bold text-evidence-500">{updates.length}</p>
+                        <p className="text-xs sm:text-sm text-gray-500">Impact Claims</p>
                     </div>
-                    <div className="card p-3 sm:p-4 text-center">
-                        <p className="text-lg sm:text-2xl font-bold text-green-600">
+                    <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-soft-float border border-white/60 p-4 text-center">
+                        <p className="text-xl sm:text-2xl font-bold text-impact-500">
                             {updates.reduce((sum, update) => sum + update.value, 0)}
                         </p>
-                        <p className="text-xs sm:text-sm text-gray-600">Total {kpi.unit_of_measurement}</p>
+                        <p className="text-xs sm:text-sm text-gray-500">Total {kpi.unit_of_measurement}</p>
                     </div>
                 </div>
 
                 {/* Evidence Type Statistics - Compact horizontal layout */}
                 {evidenceStats.length > 0 && (
-                    <div className="card p-3">
+                    <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-soft-float border border-white/60 p-4">
                         <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-                            <span className="text-sm font-medium text-gray-700 mr-2">Evidence Types:</span>
+                            <span className="text-sm font-medium text-gray-600 mr-2">Evidence Types:</span>
                             {evidenceStats.map((stat, index) => {
                                 const IconComponent = getEvidenceIcon(stat.type)
                                 const typeInfo = getEvidenceTypeInfo(stat.type)
                                 return (
                                     <div key={stat.type} className="flex items-center space-x-1.5">
-                                        <div className={`p-1 rounded-lg ${typeInfo.color} flex-shrink-0`}>
+                                        <div className={`p-1.5 rounded-lg ${typeInfo.color} flex-shrink-0`}>
                                             <IconComponent className="w-3 h-3" />
                                         </div>
-                                        <span className="text-xs font-medium text-gray-900">{stat.label}</span>
-                                        <span className="text-xs text-gray-600">({stat.count} • {stat.percentage}%)</span>
-                                        {index < evidenceStats.length - 1 && <span className="text-gray-300">|</span>}
+                                        <span className="text-xs font-medium text-gray-800">{stat.label}</span>
+                                        <span className="text-xs text-gray-500">({stat.count} • {stat.percentage}%)</span>
+                                        {index < evidenceStats.length - 1 && <span className="text-gray-200">|</span>}
                                     </div>
                                 )
                             })}
@@ -699,12 +702,12 @@ export default function KPIDetailPage() {
                 )}
 
                 {/* Date Filter */}
-                <div className="card p-4 sm:p-6">
+                <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-soft-float border border-white/60 p-4 sm:p-5">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
-                        <h3 className="text-base sm:text-lg font-semibold text-gray-900">Filter by Date Range</h3>
+                        <h3 className="text-base font-semibold text-gray-800">Filter by Date Range</h3>
                         <div className="flex flex-col sm:flex-row gap-3">
                             <div className="flex items-center space-x-2">
-                                <label className="text-sm text-gray-600">From:</label>
+                                <label className="text-sm text-gray-500">From:</label>
                                 <input
                                     type="date"
                                     value={dateFilter.startDate}
@@ -713,11 +716,11 @@ export default function KPIDetailPage() {
                                         startDate: e.target.value,
                                         isActive: e.target.value !== '' && prev.endDate !== ''
                                     }))}
-                                    className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    className="bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-evidence-400 hover:bg-white/80 transition-all duration-200"
                                 />
                             </div>
                             <div className="flex items-center space-x-2">
-                                <label className="text-sm text-gray-600">To:</label>
+                                <label className="text-sm text-gray-500">To:</label>
                                 <input
                                     type="date"
                                     value={dateFilter.endDate}
@@ -726,12 +729,12 @@ export default function KPIDetailPage() {
                                         endDate: e.target.value,
                                         isActive: prev.startDate !== '' && e.target.value !== ''
                                     }))}
-                                    className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    className="bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-evidence-400 hover:bg-white/80 transition-all duration-200"
                                 />
                             </div>
                             <button
                                 onClick={() => setDateFilter({ startDate: '', endDate: '', isActive: false })}
-                                className="btn-secondary text-sm px-3 py-2"
+                                className="px-4 py-2 text-sm text-gray-600 bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-xl hover:bg-white/80 font-medium transition-all duration-200 disabled:opacity-50"
                                 disabled={!dateFilter.isActive}
                             >
                                 Clear Filter
@@ -739,8 +742,8 @@ export default function KPIDetailPage() {
                         </div>
                     </div>
                     {dateFilter.isActive && (
-                        <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-                            <p className="text-sm text-blue-700">
+                        <div className="mt-3 p-3 bg-evidence-50/60 backdrop-blur-sm rounded-xl border border-evidence-200/40">
+                            <p className="text-sm text-evidence-700">
                                 Showing data from {new Date(dateFilter.startDate).toLocaleDateString()} to {new Date(dateFilter.endDate).toLocaleDateString()}
                             </p>
                         </div>
@@ -748,29 +751,29 @@ export default function KPIDetailPage() {
                 </div>
 
                 {/* Data and Evidence Lists - Full width on desktop */}
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-5">
                     {/* Data Updates Timeline - Takes 2/3 of the space */}
-                    <div className="xl:col-span-2 card p-4 sm:p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+                    <div className="xl:col-span-2 bg-white/80 backdrop-blur-xl rounded-2xl shadow-soft-float border border-white/60 p-4 sm:p-5 flex flex-col max-h-[calc(100vh-320px)]">
+                        <div className="flex items-center justify-between mb-4 flex-shrink-0">
+                            <h3 className="text-base font-semibold text-gray-800">
                                 Impact Claims ({dateFilter.isActive ? filteredUpdates.length : updates.length})
                             </h3>
                             <div className="flex items-center space-x-3">
                                 <div className="flex items-center space-x-4 text-sm">
                                     <div className="text-right">
-                                        <div className="text-lg font-bold text-blue-600">{dateFilter.isActive ? filteredUpdates.length : updates.length}</div>
-                                        <div className="text-xs text-gray-600">Items</div>
+                                        <div className="text-lg font-bold text-evidence-500">{dateFilter.isActive ? filteredUpdates.length : updates.length}</div>
+                                        <div className="text-xs text-gray-500">Items</div>
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-lg font-bold text-green-600">
+                                        <div className="text-lg font-bold text-impact-500">
                                             {dateFilter.isActive ? filteredTotal : updates.reduce((sum, update) => sum + update.value, 0)}
                                         </div>
-                                        <div className="text-xs text-gray-600">Total {kpi.unit_of_measurement}</div>
+                                        <div className="text-xs text-gray-500">Total {kpi.unit_of_measurement}</div>
                                     </div>
                                 </div>
                                 <button
                                     onClick={() => setIsUpdateModalOpen(true)}
-                                    className="btn-secondary flex items-center space-x-2 text-sm"
+                                    className="flex items-center space-x-2 px-4 py-2 bg-evidence-100/80 text-evidence-700 rounded-xl hover:bg-evidence-200/80 font-medium transition-all duration-200 text-sm"
                                 >
                                     <Plus className="w-4 h-4" />
                                     <span className="hidden sm:inline">Add Impact Claim</span>
@@ -781,44 +784,48 @@ export default function KPIDetailPage() {
 
                         {/* Filtered Total Sum */}
                         {dateFilter.isActive && (
-                            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <div className="mb-4 p-3 bg-evidence-50/60 backdrop-blur-sm rounded-xl border border-evidence-200/40 flex-shrink-0">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium text-green-700">Filtered Range Total:</span>
-                                    <span className="text-lg font-bold text-green-600">
+                                    <span className="text-sm font-medium text-evidence-700">Filtered Range Total:</span>
+                                    <span className="text-lg font-bold text-evidence-500">
                                         {filteredTotal} {kpi.unit_of_measurement}
                                     </span>
                                 </div>
                             </div>
                         )}
 
-                        {filteredUpdates.length === 0 ? (
-                            <div className="text-center py-8">
-                                <Calendar className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-4" />
-                                <p className="text-gray-600 text-sm sm:text-base">
-                                    {dateFilter.isActive ? 'No impact claims in selected date range' : 'No impact claims yet'}
-                                </p>
-                                {!dateFilter.isActive && (
-                                    <button
-                                        onClick={() => setIsUpdateModalOpen(true)}
-                                        className="btn-primary mt-4 text-sm"
-                                    >
-                                        Add First Impact Claim
-                                    </button>
-                                )}
-                            </div>
-                        ) : (
-                            <DataPointsList
-                                updates={filteredUpdates}
-                                kpi={kpi}
-                                onRefresh={() => {
-                                    loadKPIData() // This will refresh data points and evidence stats
-                                }}
-                            />
-                        )}
+                        <div className="flex-1 overflow-hidden">
+                            {filteredUpdates.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <div className="w-14 h-14 rounded-2xl bg-gray-100/80 flex items-center justify-center mx-auto mb-4">
+                                        <Calendar className="w-7 h-7 text-gray-400" />
+                                    </div>
+                                    <p className="text-gray-500 text-sm sm:text-base">
+                                        {dateFilter.isActive ? 'No impact claims in selected date range' : 'No impact claims yet'}
+                                    </p>
+                                    {!dateFilter.isActive && (
+                                        <button
+                                            onClick={() => setIsUpdateModalOpen(true)}
+                                            className="mt-4 px-5 py-2.5 bg-evidence-500 text-white rounded-xl hover:bg-evidence-600 font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25 text-sm"
+                                        >
+                                            Add First Impact Claim
+                                        </button>
+                                    )}
+                                </div>
+                            ) : (
+                                <DataPointsList
+                                    updates={filteredUpdates}
+                                    kpi={kpi}
+                                    onRefresh={() => {
+                                        loadKPIData() // This will refresh data points and evidence stats
+                                    }}
+                                />
+                            )}
+                        </div>
                     </div>
 
                     {/* New KPI Evidence Section - Takes 1/3 of the space */}
-                    <div className="xl:col-span-1">
+                    <div className="xl:col-span-1 max-h-[calc(100vh-320px)]">
                         <KPIEvidenceSection
                             kpi={kpi}
                             onRefresh={() => {
@@ -832,13 +839,13 @@ export default function KPIDetailPage() {
 
                 {/* Charts Section - Full width at bottom on desktop */}
                 {updates.length > 0 && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
                         {/* Individual Data Points Chart */}
-                        <div className="card p-4 sm:p-6">
-                            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">
+                        <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-soft-float border border-white/60 p-4 sm:p-5">
+                            <h3 className="text-base font-semibold text-gray-800 mb-4">
                                 Individual Impact Claims
                             </h3>
-                            <ResponsiveContainer width="100%" height={250}>
+                            <ResponsiveContainer width="100%" height={220}>
                                 <LineChart data={updates
                                     .sort((a, b) => new Date(a.date_represented).getTime() - new Date(b.date_represented).getTime())
                                     .map(update => ({
@@ -849,21 +856,23 @@ export default function KPIDetailPage() {
                                         value: update.value,
                                         label: update.label || update.note
                                     }))}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                                     <XAxis
                                         dataKey="date"
-                                        stroke="#6b7280"
-                                        fontSize={12}
+                                        stroke="#9ca3af"
+                                        fontSize={11}
                                     />
                                     <YAxis
-                                        stroke="#6b7280"
-                                        fontSize={12}
+                                        stroke="#9ca3af"
+                                        fontSize={11}
                                     />
                                     <Tooltip
                                         contentStyle={{
-                                            backgroundColor: 'white',
-                                            border: '1px solid #e5e7eb',
-                                            borderRadius: '8px'
+                                            backgroundColor: 'rgba(255,255,255,0.95)',
+                                            backdropFilter: 'blur(8px)',
+                                            border: '1px solid rgba(0,0,0,0.05)',
+                                            borderRadius: '12px',
+                                            boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
                                         }}
                                         formatter={(value, name) => [
                                             `${value} ${kpi.unit_of_measurement || ''}`,
@@ -873,10 +882,10 @@ export default function KPIDetailPage() {
                                     <Line
                                         type="monotone"
                                         dataKey="value"
-                                        stroke="#16a34a"
+                                        stroke="#3db6fd"
                                         strokeWidth={3}
-                                        dot={{ fill: '#16a34a', r: 6 }}
-                                        activeDot={{ r: 8, stroke: '#16a34a', strokeWidth: 2 }}
+                                        dot={{ fill: '#3db6fd', r: 5 }}
+                                        activeDot={{ r: 7, stroke: '#3db6fd', strokeWidth: 2 }}
                                     />
                                 </LineChart>
                             </ResponsiveContainer>
@@ -895,6 +904,6 @@ export default function KPIDetailPage() {
                 metricType={kpi.metric_type}
                 unitOfMeasurement={kpi.unit_of_measurement}
             />
-        </>
+        </div>
     )
 } 

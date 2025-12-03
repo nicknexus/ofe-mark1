@@ -162,7 +162,7 @@ export default function AuthPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-primary-600 text-white py-2.5 px-4 rounded-lg hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm"
+                            className="w-full bg-primary-500 text-white py-2.5 px-4 rounded-lg hover:bg-primary-600 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm"
                         >
                             {loading ? 'Please wait...' : (isSignUp ? 'Create Account' : 'Sign In')}
                         </button>
@@ -174,7 +174,7 @@ export default function AuthPage() {
                                 Already have an account?{' '}
                                 <button
                                     onClick={() => setIsSignUp(false)}
-                                    className="text-primary-600 hover:text-primary-700 font-medium"
+                                    className="text-primary-500 hover:text-primary-700 font-medium"
                                 >
                                     Sign in
                                 </button>
@@ -184,7 +184,7 @@ export default function AuthPage() {
                                 Don't have an account?{' '}
                                 <button
                                     onClick={() => setIsSignUp(true)}
-                                    className="text-primary-600 hover:text-primary-700 font-medium"
+                                    className="text-primary-500 hover:text-primary-700 font-medium"
                                 >
                                     Sign up
                                 </button>

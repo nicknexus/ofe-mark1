@@ -21,7 +21,7 @@ export default function StoryCard({ story, onView }: StoryCardProps) {
                 onClick={() => onView(story)}
             >
                 {/* MEDIA: square like Instagram grid */}
-                <div className="relative aspect-square bg-gradient-to-br from-green-50 to-green-100 overflow-hidden">
+                <div className="relative aspect-square bg-gradient-to-br from-primary-50 to-primary-100 overflow-hidden">
                     {story.media_type === 'text' ? (
                         <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-100">
                             <div className="text-center p-3">
@@ -57,18 +57,18 @@ export default function StoryCard({ story, onView }: StoryCardProps) {
                             </div>
                         )
                     ) : (
-                        <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gradient-to-br from-green-100 to-green-200">
+                        <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-100 to-primary-200">
                             <div className="text-center p-3">
-                                <div className="w-12 h-12 bg-green-300 rounded-full mx-auto mb-2 flex items-center justify-center">
+                                <div className="w-12 h-12 bg-primary-300 rounded-full mx-auto mb-2 flex items-center justify-center">
                                     {story.media_type === 'photo' ? (
-                                        <Image className="w-6 h-6 text-green-600" />
+                                        <Image className="w-6 h-6 text-primary-500" />
                                     ) : story.media_type === 'video' ? (
-                                        <Video className="w-6 h-6 text-green-600" />
+                                        <Video className="w-6 h-6 text-primary-500" />
                                     ) : (
-                                        <Mic className="w-6 h-6 text-green-600" />
+                                        <Mic className="w-6 h-6 text-primary-500" />
                                     )}
                                 </div>
-                                <p className="text-sm font-medium text-green-700">No Media</p>
+                                <p className="text-sm font-medium text-primary-700">No Media</p>
                             </div>
                         </div>
                     )}

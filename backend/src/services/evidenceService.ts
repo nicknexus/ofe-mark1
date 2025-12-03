@@ -4,8 +4,8 @@ import { deleteFromSupabase } from '../utils/fileUpload'
 
 export class EvidenceService {
     static async create(evidence: Evidence, userId: string): Promise<Evidence> {
-        // Extract linkage fields before inserting into evidence table
-        const { kpi_ids, kpi_update_ids, ...evidenceData } = evidence;
+        // Extract linkage fields and file_urls before inserting into evidence table
+        const { kpi_ids, kpi_update_ids, file_urls, ...evidenceData } = evidence;
 
         const { data, error } = await supabase
             .from('evidence')
@@ -14,6 +14,34 @@ export class EvidenceService {
             .single();
 
         if (error) throw new Error(`Failed to create evidence: ${error.message}`);
+
+        // Insert multiple files into evidence_files table if provided
+        if (file_urls && file_urls.length > 0) {
+            const evidenceFiles = file_urls.map((fileUrl, index) => {
+                // Extract filename from URL
+                const fileName = fileUrl.split('/').pop() || `file-${index + 1}`
+                // Try to determine file type from extension
+                const extension = fileName.split('.').pop()?.toLowerCase() || ''
+                const fileType = extension || 'unknown'
+                
+                return {
+                    evidence_id: data.id,
+                    file_url: fileUrl,
+                    file_name: fileName,
+                    file_type: fileType,
+                    display_order: index
+                }
+            })
+
+            const { error: filesError } = await supabase
+                .from('evidence_files')
+                .insert(evidenceFiles)
+
+            if (filesError) {
+                console.error('Failed to insert evidence files:', filesError)
+                // Don't throw - evidence is created, files are optional
+            }
+        }
 
         // Legacy: Link to KPIs if provided
         if (kpi_ids && kpi_ids.length > 0) {
@@ -281,6 +309,58 @@ export class EvidenceService {
             .filter((e: any) => e.user_id === userId);
 
         return evidence;
+    }
+
+    static async getFilesForEvidence(evidenceId: string, userId: string): Promise<any[]> {
+        // First verify the user owns this evidence
+        const { data: evidence, error: evidenceError } = await supabase
+            .from('evidence')
+            .select('id, file_url, file_type')
+            .eq('id', evidenceId)
+            .eq('user_id', userId)
+            .single();
+
+        if (evidenceError || !evidence) {
+            return [];
+        }
+
+        // Try to get files from evidence_files table
+        const { data: files, error: filesError } = await supabase
+            .from('evidence_files')
+            .select('id, file_url, file_name, file_type, file_size, display_order')
+            .eq('evidence_id', evidenceId)
+            .order('display_order', { ascending: true });
+
+        if (filesError) {
+            console.error('Error fetching evidence files:', filesError);
+            // Fall back to the single file_url from evidence table
+            if (evidence.file_url) {
+                return [{
+                    id: evidenceId,
+                    file_url: evidence.file_url,
+                    file_name: evidence.file_url.split('/').pop() || 'file',
+                    file_type: evidence.file_type || 'unknown',
+                    display_order: 0
+                }];
+            }
+            return [];
+        }
+
+        // If no files in evidence_files table, fall back to evidence.file_url
+        if (!files || files.length === 0) {
+            if (evidence.file_url) {
+                return [{
+                    id: evidenceId,
+                    file_url: evidence.file_url,
+                    file_name: evidence.file_url.split('/').pop() || 'file',
+                    file_type: evidence.file_type || 'unknown',
+                    display_order: 0
+                }];
+            }
+            return [];
+        }
+
+        return files;
     }
 
     static async getDataPointsForEvidence(evidenceId: string, userId: string): Promise<any[]> {

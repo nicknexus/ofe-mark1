@@ -79,6 +79,17 @@ router.get('/:id/data-points', authenticateUser, async (req: AuthenticatedReques
     }
 });
 
+// Get files for a specific evidence
+router.get('/:id/files', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const files = await EvidenceService.getFilesForEvidence(req.params.id, req.user!.id);
+        res.json(files);
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+        return;
+    }
+});
+
 // Update evidence
 router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {

@@ -398,6 +398,10 @@ class ApiService {
         return this.request<Evidence>(`/evidence/${id}`)
     }
 
+    async getEvidenceFiles(evidenceId: string): Promise<{ id: string; file_url: string; file_name: string; file_type: string; display_order: number }[]> {
+        return this.request<any[]>(`/evidence/${evidenceId}/files`)
+    }
+
     // Evidence endpoints
     async uploadFile(file: File): Promise<{ file_url: string }> {
         const { data: { session } } = await supabase.auth.getSession()

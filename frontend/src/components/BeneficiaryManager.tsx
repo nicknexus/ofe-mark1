@@ -381,7 +381,7 @@ function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiativeId }:
                                     <button
                                         type="button"
                                         onClick={() => setIsLocationModalOpen(true)}
-                                        className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center space-x-2"
+                                        className="w-full px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center space-x-2"
                                     >
                                         <Plus className="w-4 h-4" />
                                         <span>Create Location</span>

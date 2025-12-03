@@ -184,34 +184,36 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
     }
 
     return (
-        <div className="h-[calc(100vh-64px)] bg-gradient-to-br from-slate-50 via-white to-purple-50/30 overflow-hidden flex flex-col">
-            {/* Header with Search and Add Button */}
-            <div className="p-4 border-b border-gray-200 bg-white/80 backdrop-blur-sm">
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-900">Stories</h2>
-                        <p className="text-sm text-gray-500">Showcase your impact with photos and stories</p>
-                    </div>
-                    <button
-                        onClick={handleAddStory}
-                        className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-                    >
-                        <Plus className="w-5 h-5" />
-                        <span>Add Story</span>
-                    </button>
-                </div>
+        <div className="h-[calc(100vh-64px)] overflow-hidden">
+            <div className="h-full w-full px-4 sm:px-6 py-6 overflow-y-auto">
+                <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 overflow-hidden">
+                    {/* Header with Search and Add Button */}
+                    <div className="p-6 border-b border-gray-100">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <h2 className="text-xl font-semibold text-gray-800">Stories</h2>
+                                <p className="text-sm text-gray-500">Showcase your impact with photos and stories</p>
+                            </div>
+                            <button
+                                onClick={handleAddStory}
+                                className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-medium transition-colors shadow-bubble-sm"
+                            >
+                                <Plus className="w-5 h-5" />
+                                <span>Add Story</span>
+                            </button>
+                        </div>
 
-                {/* Search Bar */}
-                <div className="relative mb-3">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="Search stories by title or description..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                </div>
+                        {/* Search Bar */}
+                        <div className="relative mb-3">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search stories by title or description..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-400 focus:border-transparent bg-gray-50/50 text-sm"
+                            />
+                        </div>
 
                 {/* Master Filter */}
                 <div className="flex items-center gap-2 flex-wrap">
@@ -401,10 +403,10 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                     </>,
                     document.body
                 )}
-            </div>
+                    </div>
 
-            {/* Stories Grid */}
-            <div className="flex-1 overflow-y-auto p-4">
+                    {/* Stories Grid */}
+                    <div className="p-6">
                 {loading ? (
                     <div className="flex items-center justify-center h-64">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -433,6 +435,8 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                         </div>
                     </div>
                 )}
+                    </div>
+                </div>
             </div>
 
             {/* Story Detail Modal */}

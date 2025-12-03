@@ -9,12 +9,14 @@ interface BeneficiariesTabProps {
 
 export default function BeneficiariesTab({ initiativeId, onRefresh }: BeneficiariesTabProps) {
     return (
-        <div className="h-[calc(100vh-64px)] bg-gradient-to-br from-slate-50 via-white to-purple-50/30 overflow-hidden">
-            <div className="h-full w-full px-2 sm:px-4 py-4 space-y-6 overflow-y-auto">
-                <BeneficiaryManager
-                    initiativeId={initiativeId}
-                    onRefresh={onRefresh}
-                />
+        <div className="h-[calc(100vh-64px)] overflow-hidden">
+            <div className="h-full w-full px-4 sm:px-6 py-6 space-y-6 overflow-y-auto">
+                <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
+                    <BeneficiaryManager
+                        initiativeId={initiativeId}
+                        onRefresh={onRefresh}
+                    />
+                </div>
             </div>
         </div>
     )

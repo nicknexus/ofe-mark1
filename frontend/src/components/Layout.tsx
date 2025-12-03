@@ -4,9 +4,6 @@ import {
     LogOut,
     User as UserIcon,
     BarChart3,
-    Target,
-    FileText,
-    Settings,
     Menu,
     X
 } from 'lucide-react'
@@ -42,18 +39,19 @@ export default function Layout({ user, children }: LayoutProps) {
     ]
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen">
             {/* Header */}
-            <header className="bg-white border-b border-gray-200">
+            <header className="bg-white border-b border-gray-100 shadow-bubble-sm">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center h-16">
                         {/* Logo */}
                         <div className="flex items-center">
-                            <Link to="/" className="flex items-center space-x-2 sm:space-x-3">
-                                <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
-                                    <Target className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                                </div>
-                                <span className="text-lg sm:text-xl font-bold text-gray-900">OFE</span>
+                            <Link to="/" className="flex items-center">
+                                <img 
+                                    src="/Nexuslogo.png" 
+                                    alt="Nexus Logo" 
+                                    className="h-10 w-auto"
+                                />
                             </Link>
                         </div>
 
@@ -65,8 +63,8 @@ export default function Layout({ user, children }: LayoutProps) {
                                     <Link
                                         key={link.path}
                                         to={link.path}
-                                        className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${link.active
-                                            ? 'text-primary-600 bg-primary-50'
+                                        className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${link.active
+                                            ? 'text-primary-600 bg-primary-50 shadow-sm'
                                             : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                                             }`}
                                     >
@@ -121,7 +119,7 @@ export default function Layout({ user, children }: LayoutProps) {
                                             to={link.path}
                                             onClick={() => setMobileMenuOpen(false)}
                                             className={`flex items-center space-x-3 px-4 py-3 text-base font-medium rounded-md transition-colors ${link.active
-                                                ? 'text-primary-600 bg-primary-50'
+                                                ? 'text-primary-500 bg-primary-50'
                                                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                                                 }`}
                                         >
@@ -154,7 +152,7 @@ export default function Layout({ user, children }: LayoutProps) {
             </header>
 
             {/* Main Content */}
-            <main className="bg-white relative">
+            <main className="relative min-h-[calc(100vh-64px)]">
                 {children}
             </main>
         </div>

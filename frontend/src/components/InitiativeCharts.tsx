@@ -217,7 +217,7 @@ export default function InitiativeCharts({ kpis, stats }: InitiativeChartsProps)
                 {/* Coverage Legend */}
                 <div className="mt-4 flex items-center justify-center space-x-6 text-sm text-gray-600">
                     <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 bg-green-500 rounded"></div>
+                        <div className="w-3 h-3 bg-primary-500 rounded"></div>
                         <span>80-100% = Fully Proven</span>
                     </div>
                     <div className="flex items-center space-x-2">

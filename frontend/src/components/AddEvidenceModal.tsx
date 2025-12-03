@@ -43,7 +43,7 @@ export default function AddEvidenceModal({
         endDate?: string
     }>({})
     const [loading, setLoading] = useState(false)
-    const [selectedFile, setSelectedFile] = useState<File | null>(null)
+    const [selectedFiles, setSelectedFiles] = useState<File[]>([])
     const [isDragOver, setIsDragOver] = useState(false)
     const [uploadProgress, setUploadProgress] = useState('')
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -66,7 +66,7 @@ export default function AddEvidenceModal({
     const evidenceTypes = [
         { value: 'visual_proof', label: 'Visual Support', icon: Camera, description: 'Photos, videos, screenshots' },
         { value: 'documentation', label: 'Documentation', icon: FileText, description: 'Reports, forms, certificates' },
-        { value: 'testimony', label: 'Testimony', icon: MessageSquare, description: 'Quotes, feedback, stories' },
+        { value: 'testimony', label: 'Testemonies', icon: MessageSquare, description: 'Quotes, feedback, stories' },
         { value: 'financials', label: 'Financials', icon: DollarSign, description: 'Receipts, invoices, budgets' }
     ] as const
 
@@ -288,12 +288,12 @@ export default function AddEvidenceModal({
             // Keep the old format for backward compatibility if needed
             const allDataPoints = kpiSummaries.flatMap(summary => summary.updates)
             setMatchingDataPoints(allDataPoints)
-            // Auto-select all shown impact claims only on initial fetch (not when date range changes)
-            if (!editData && isInitialFetch) {
+            // Auto-select all matching impact claims (date and location match)
+            if (!editData) {
                 setSelectedUpdateIds(allDataPoints.map((dp: any) => dp.id))
                 setIsInitialFetch(false)
             } else {
-                // When date range changes, preserve existing selections and filter out claims that no longer match
+                // When editing, preserve existing selections and filter out claims that no longer match
                 setSelectedUpdateIds(prev => {
                     const newMatchingIds = new Set(allDataPoints.map((dp: any) => dp.id))
                     // Keep only the IDs that are still in the matching set
@@ -314,19 +314,28 @@ export default function AddEvidenceModal({
 
         try {
             let finalFileUrl = formData.file_url
+            const fileUrls: string[] = []
 
-            // If user selected a file, upload it first
-            if (selectedFile) {
-                setUploadProgress('Uploading file...')
-                const uploadResult = await apiService.uploadFile(selectedFile)
-                finalFileUrl = uploadResult.file_url
-                setUploadProgress('File uploaded successfully!')
+            // If user selected files, upload all of them
+            if (selectedFiles.length > 0) {
+                setUploadProgress(`Uploading ${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''}...`)
+                for (let i = 0; i < selectedFiles.length; i++) {
+                    setUploadProgress(`Uploading file ${i + 1} of ${selectedFiles.length}...`)
+                    const uploadResult = await apiService.uploadFile(selectedFiles[i])
+                    fileUrls.push(uploadResult.file_url)
+                    // Keep first file URL for backward compatibility
+                    if (i === 0) {
+                        finalFileUrl = uploadResult.file_url
+                    }
+                }
+                setUploadProgress('Files uploaded successfully!')
             }
 
-            // Create evidence record with the real file URL
+            // Create evidence record with the real file URL(s)
             let submitData: any = {
                 ...formData,
-                file_url: finalFileUrl
+                file_url: finalFileUrl,
+                file_urls: fileUrls.length > 0 ? fileUrls : undefined
             }
 
             // Handle date range logic
@@ -370,7 +379,7 @@ export default function AddEvidenceModal({
                     kpi_ids: preSelectedKPIId ? [preSelectedKPIId] : [],
                     initiative_id: initiativeId
                 })
-                setSelectedFile(null)
+                setSelectedFiles([])
                 setDatePickerValue({})
             }
             setUploadProgress('')
@@ -412,13 +421,14 @@ export default function AddEvidenceModal({
         })
     }
 
-    const handleFileSelect = (file: File) => {
-        setSelectedFile(file)
+    const handleFileSelect = (files: FileList | File[]) => {
+        const fileArray = Array.from(files)
+        setSelectedFiles(prev => [...prev, ...fileArray])
         // Auto-populate title if empty
-        if (!formData.title) {
+        if (!formData.title && fileArray.length > 0) {
             setFormData(prev => ({
                 ...prev,
-                title: file.name.replace(/\.[^/.]+$/, "") // Remove file extension
+                title: fileArray[0].name.replace(/\.[^/.]+$/, "") // Remove file extension
             }))
         }
     }
@@ -437,16 +447,16 @@ export default function AddEvidenceModal({
         e.preventDefault()
         setIsDragOver(false)
 
-        const files = Array.from(e.dataTransfer.files)
+        const files = e.dataTransfer.files
         if (files.length > 0) {
-            handleFileSelect(files[0])
+            handleFileSelect(files)
         }
     }
 
     const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files
         if (files && files.length > 0) {
-            handleFileSelect(files[0])
+            handleFileSelect(files)
         }
     }
 
@@ -454,10 +464,14 @@ export default function AddEvidenceModal({
         fileInputRef.current?.click()
     }
 
-    const removeFile = () => {
-        setSelectedFile(null)
-        if (fileInputRef.current) {
-            fileInputRef.current.value = ''
+    const removeFile = (index?: number) => {
+        if (index !== undefined) {
+            setSelectedFiles(prev => prev.filter((_, i) => i !== index))
+        } else {
+            setSelectedFiles([])
+            if (fileInputRef.current) {
+                fileInputRef.current.value = ''
+            }
         }
     }
 
@@ -472,7 +486,7 @@ export default function AddEvidenceModal({
             case 4:
                 return true // Impact claims step is optional
             case 5:
-                return !!formData.title && (!!selectedFile || !!formData.file_url)
+                return !!formData.title && (selectedFiles.length > 0 || !!formData.file_url)
             default:
                 return false
         }
@@ -501,38 +515,43 @@ export default function AddEvidenceModal({
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60] animate-fade-in">
-            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl transform transition-all duration-200 ease-out animate-slide-up-fast flex flex-col">
+        <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[60] animate-fade-in">
+            <div className="bg-white/70 backdrop-blur-2xl rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-[0_25px_60px_-15px_rgba(61,190,120,0.2)] border border-white/60 transform transition-all duration-200 ease-out animate-slide-up-fast flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50">
-                    <div className="flex-1">
-                        <h2 className="text-xl font-semibold text-gray-900">
-                            {editData ? 'Edit Evidence' : 'Upload Evidence'}
-                        </h2>
-                        <p className="text-sm text-gray-600 mt-1">
-                            {editData ? 'Update your evidence information' : 'Add supporting evidence for your impact claims'}
-                        </p>
+                <div className="flex items-center justify-between p-6 border-b border-impact-200/40 bg-gradient-to-r from-impact-100/50 to-impact-50/30 backdrop-blur-xl">
+                    <div className="flex items-center space-x-3 flex-1">
+                        <div className="w-11 h-11 rounded-xl bg-impact-500/15 backdrop-blur-sm flex items-center justify-center border border-impact-300/30">
+                            <FileText className="w-6 h-6 text-impact-500" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-semibold text-gray-800">
+                                {editData ? 'Edit Evidence' : 'Upload Evidence'}
+                            </h2>
+                            <p className="text-sm text-gray-500 mt-0.5">
+                                {editData ? 'Update your evidence information' : 'Add supporting evidence for your impact claims'}
+                            </p>
+                        </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors duration-150 ml-4"
+                        className="text-gray-400 hover:text-gray-600 p-2 rounded-xl hover:bg-white/60 transition-all duration-200 ml-4"
                     >
                         <X className="w-5 h-5" />
                     </button>
                 </div>
 
                 {/* Progress Steps Indicator */}
-                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <div className="px-6 py-4 border-b border-impact-100/40 bg-white/30 backdrop-blur-xl">
                     <div className="flex items-center justify-center">
                         {steps.map((step, index) => (
                             <React.Fragment key={step.number}>
                                 <div className="flex flex-col items-center">
-                                    <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-200 ${
+                                    <div className={`flex items-center justify-center w-10 h-10 rounded-xl border-2 transition-all duration-200 ${
                                         currentStep > step.number
-                                            ? 'bg-primary-600 border-primary-600 text-white'
+                                            ? 'bg-impact-500 border-impact-500 text-white shadow-lg shadow-impact-500/30'
                                             : currentStep === step.number
-                                            ? 'bg-primary-600 border-primary-600 text-white ring-4 ring-primary-100'
-                                            : 'bg-white border-gray-300 text-gray-400'
+                                            ? 'bg-impact-500 border-impact-500 text-white ring-4 ring-impact-200/50 shadow-lg shadow-impact-500/30'
+                                            : 'bg-white/50 backdrop-blur-sm border-gray-200/60 text-gray-400'
                                     }`}>
                                         {currentStep > step.number ? (
                                             <Check className="w-5 h-5" />
@@ -542,15 +561,15 @@ export default function AddEvidenceModal({
                                     </div>
                                     <div className="mt-2 text-center">
                                         <div className={`text-xs font-medium whitespace-nowrap ${
-                                            currentStep >= step.number ? 'text-gray-900' : 'text-gray-400'
+                                            currentStep >= step.number ? 'text-gray-700' : 'text-gray-400'
                                         }`}>
                                             {step.title}
                                         </div>
                                     </div>
                                 </div>
                                 {index < steps.length - 1 && (
-                                    <div className={`flex-1 h-0.5 mx-4 transition-all duration-200 ${
-                                        currentStep > step.number ? 'bg-primary-600' : 'bg-gray-300'
+                                    <div className={`flex-1 h-0.5 mx-4 rounded-full transition-all duration-200 ${
+                                        currentStep > step.number ? 'bg-impact-500' : 'bg-gray-200/60'
                                     }`} style={{ maxWidth: '120px' }} />
                                 )}
                             </React.Fragment>
@@ -586,7 +605,7 @@ export default function AddEvidenceModal({
                                         onChange={handleInputChange}
                                         className="sr-only"
                                     />
-                                            <Icon className={`w-12 h-12 mb-3 ${formData.type === value ? 'text-primary-600' : 'text-gray-400'}`} />
+                                            <Icon className={`w-12 h-12 mb-3 ${formData.type === value ? 'text-primary-500' : 'text-gray-400'}`} />
                                             <div className="font-semibold text-gray-900 mb-1">{label}</div>
                                             <div className="text-xs text-gray-500 text-center">{description}</div>
                                 </label>
@@ -606,7 +625,7 @@ export default function AddEvidenceModal({
                                 <div className="space-y-6">
                     <div>
                                         <label className="block text-sm font-semibold text-gray-900 mb-3">
-                                            <Calendar className="w-5 h-5 inline mr-2 text-primary-600" />
+                                            <Calendar className="w-5 h-5 inline mr-2 text-primary-500" />
                                             Date this evidence represents <span className="text-red-500">*</span>
                         </label>
                                         <DateRangePicker
@@ -636,7 +655,7 @@ export default function AddEvidenceModal({
 
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-900 mb-3">
-                                            <MapPin className="w-5 h-5 inline mr-2 text-primary-600" />
+                                            <MapPin className="w-5 h-5 inline mr-2 text-primary-500" />
                                             Location (optional)
                                         </label>
                                         <div className="flex gap-3">
@@ -732,7 +751,7 @@ export default function AddEvidenceModal({
                                                 checked={isChecked || isPreSelected}
                                                 onChange={() => !isDisabled && handleKPISelection(kpi.id!)}
                                                 disabled={isDisabled}
-                                                            className="mr-4 w-5 h-5 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+                                                            className="mr-4 w-5 h-5 text-primary-500 rounded border-gray-300 focus:ring-primary-500"
                                         />
                                         <div className="flex-1">
                                                             <div className="flex items-center space-x-3">
@@ -743,7 +762,7 @@ export default function AddEvidenceModal({
                                                         </span>
                                                     )}
                                                 {'total_updates' in kpi && kpi.total_updates > 0 && (
-                                                                    <span className="inline-flex items-center justify-center w-6 h-6 bg-primary-600 text-white text-xs font-bold rounded-full">
+                                                                    <span className="inline-flex items-center justify-center w-6 h-6 bg-primary-500 text-white text-xs font-bold rounded-full">
                                                         {kpi.total_updates > 99 ? '99+' : kpi.total_updates}
                                                     </span>
                                                 )}
@@ -767,7 +786,7 @@ export default function AddEvidenceModal({
                                 <div className="text-center mb-6">
                                     <h3 className="text-2xl font-semibold text-gray-900 mb-2">Impact Claims</h3>
                                     <p className="text-gray-600">
-                                        Review and select the impact claims this evidence supports
+                                        Review and confirm the impact claims this evidence supports
                                         {selectedLocationId && ` at ${locations.find(loc => loc.id === selectedLocationId)?.name || 'selected location'}`}
                                     </p>
                     </div>
@@ -782,34 +801,80 @@ export default function AddEvidenceModal({
                                     </div>
                                 ) : (
                                     <div className="space-y-4">
-                                        <div className="flex items-center justify-between mb-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                                            <span className="text-sm font-medium text-blue-900">
-                                                Selected {selectedUpdateIds.length} impact claim{selectedUpdateIds.length !== 1 ? 's' : ''}
-                                            </span>
-                                <div className="space-x-2">
-                                    <button
-                                        type="button"
-                                                    className="text-sm px-4 py-2 bg-white hover:bg-blue-100 border border-blue-300 rounded-lg text-blue-700 font-medium transition-colors"
-                                        onClick={() => {
-                                            setSelectedUpdateIds(kpiDataSummaries.flatMap((s: any) => s.updates.map((u: any) => u.id)))
-                                            if (editData) setHasChangedDataPoints(true)
-                                        }}
-                                    >
-                                        Select All
-                                    </button>
-                                    <button
-                                        type="button"
-                                                    className="text-sm px-4 py-2 bg-white hover:bg-blue-100 border border-blue-300 rounded-lg text-blue-700 font-medium transition-colors"
-                                        onClick={() => {
-                                            setSelectedUpdateIds([])
-                                            if (editData) setHasChangedDataPoints(true)
-                                        }}
-                                    >
-                                        Clear
-                                    </button>
-                                </div>
-                            </div>
-                            {kpiDataSummaries.map((kpiSummary: any) => {
+                                        {(() => {
+                                            // Calculate average coverage percentage for selected claims
+                                            const selectedClaims = kpiDataSummaries.flatMap((s: any) => 
+                                                s.updates.filter((u: any) => selectedUpdateIds.includes(u.id))
+                                            )
+                                            let totalCoverage = 0
+                                            let claimsWithCoverage = 0
+                                            selectedClaims.forEach((claim: any) => {
+                                                if (claim.date_range_start && claim.date_range_end) {
+                                                    const claimStart = new Date(claim.date_range_start)
+                                                    const claimEnd = new Date(claim.date_range_end)
+                                                    const claimDays = Math.ceil((claimEnd.getTime() - claimStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+                                                    
+                                                    if (datePickerValue.startDate && datePickerValue.endDate) {
+                                                        const evidenceStart = new Date(datePickerValue.startDate)
+                                                        const evidenceEnd = new Date(datePickerValue.endDate)
+                                                        const overlapStart = new Date(Math.max(claimStart.getTime(), evidenceStart.getTime()))
+                                                        const overlapEnd = new Date(Math.min(claimEnd.getTime(), evidenceEnd.getTime()))
+                                                        
+                                                        if (overlapEnd >= overlapStart) {
+                                                            const coveredDays = Math.ceil((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+                                                            totalCoverage += Math.round((coveredDays / claimDays) * 100)
+                                                            claimsWithCoverage++
+                                                        }
+                                                    } else if (datePickerValue.singleDate) {
+                                                        const evidenceDate = new Date(datePickerValue.singleDate)
+                                                        if (evidenceDate >= claimStart && evidenceDate <= claimEnd) {
+                                                            totalCoverage += Math.round((1 / claimDays) * 100)
+                                                            claimsWithCoverage++
+                                                        }
+                                                    }
+                                                } else {
+                                                    totalCoverage += 100
+                                                    claimsWithCoverage++
+                                                }
+                                            })
+                                            const avgCoverage = claimsWithCoverage > 0 ? Math.round(totalCoverage / claimsWithCoverage) : 0
+                                            
+                                            return (
+                                                <div className="mb-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                                                    <p className="text-sm text-blue-800 mb-2">
+                                                        Based on the dates provided, this evidence is going to cover {avgCoverage}% of the following impact claims
+                                                    </p>
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-sm font-medium text-blue-900">
+                                                            Selected {selectedUpdateIds.length} impact claim{selectedUpdateIds.length !== 1 ? 's' : ''}
+                                                        </span>
+                                                        <div className="space-x-2">
+                                                            <button
+                                                                type="button"
+                                                                className="text-sm px-4 py-2 bg-white hover:bg-blue-100 border border-blue-300 rounded-lg text-blue-700 font-medium transition-colors"
+                                                                onClick={() => {
+                                                                    setSelectedUpdateIds(kpiDataSummaries.flatMap((s: any) => s.updates.map((u: any) => u.id)))
+                                                                    if (editData) setHasChangedDataPoints(true)
+                                                                }}
+                                                            >
+                                                                Select All
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="text-sm px-4 py-2 bg-white hover:bg-blue-100 border border-blue-300 rounded-lg text-blue-700 font-medium transition-colors"
+                                                                onClick={() => {
+                                                                    setSelectedUpdateIds([])
+                                                                    if (editData) setHasChangedDataPoints(true)
+                                                                }}
+                                                            >
+                                                                Clear
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })()}
+                                        {kpiDataSummaries.map((kpiSummary: any) => {
                                 const updatesWithCoverage = kpiSummary.updates.map((dataPoint: any) => {
                                     let coveragePercentage = 100
                                     let coverageText = ''
@@ -881,7 +946,7 @@ export default function AddEvidenceModal({
                                                                 setSelectedUpdateIds(prev => checked ? prev.filter(id => id !== dataPoint.id) : [...prev, dataPoint.id])
                                                                 if (editData) setHasChangedDataPoints(true)
                                                             }}
-                                                                                className="mt-1 w-5 h-5 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+                                                                                className="mt-1 w-5 h-5 text-primary-500 rounded border-gray-300 focus:ring-primary-500"
                                                         />
                                                             <div className="flex-1 min-w-0">
                                                                                 <div className="flex items-center space-x-3 mb-2">
@@ -890,7 +955,7 @@ export default function AddEvidenceModal({
                                                         </span>
                                                                     {dataPoint.coverageText && (
                                                                                         <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                                                                            dataPoint.coveragePercentage === 100 ? 'bg-green-100 text-green-700' :
+                                                                            dataPoint.coveragePercentage === 100 ? 'bg-primary-100 text-primary-700' :
                                                                                             dataPoint.coveragePercentage > 0 ? 'bg-blue-100 text-blue-700' :
                                                                             'bg-red-100 text-red-700'
                                                                         }`}>
@@ -900,24 +965,17 @@ export default function AddEvidenceModal({
                                                     </div>
                                                                                 <div className="text-sm text-gray-600 mb-1">
                                                         {dataPoint.date_range_start && dataPoint.date_range_end ? (
-                                                            <>Range: {formatDate(dataPoint.date_range_start)} - {formatDate(dataPoint.date_range_end)}</>
+                                                            <>Date Range: {formatDate(dataPoint.date_range_start)} - {formatDate(dataPoint.date_range_end)}</>
                                                         ) : (
-                                                            <>{formatDate(dataPoint.date_represented)}</>
+                                                            <>Date: {formatDate(dataPoint.date_represented)}</>
                                                         )}
                                                                 </div>
                                                                                 {dataPoint.location_name && (
                                                                                     <div className="text-sm text-gray-600 flex items-center mt-1">
-                                                                                        <MapPin className="w-4 h-4 mr-1 text-primary-600" />
+                                                                                        <MapPin className="w-4 h-4 mr-1 text-primary-500" />
                                                                                         {dataPoint.location_name}
                                                                                     </div>
                                                                                 )}
-                                                                {hasPartialCoverage && (
-                                                                                    <div className="mt-2">
-                                                                                        <p className="text-xs text-blue-700">
-                                                                            Only {dataPoint.coveragePercentage}% coverage
-                                                                        </p>
-                                                                    </div>
-                                                                )}
                                                                 {hasNoCoverage && (
                                                                     <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs">
                                                                                         <p className="text-red-800 font-medium">
@@ -944,12 +1002,15 @@ export default function AddEvidenceModal({
                         {currentStep === 5 && (
                             <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
                                 <div className="text-center mb-6">
-                                    <h3 className="text-2xl font-semibold text-gray-900 mb-2">Finalize Evidence</h3>
+                                    <h3 className="text-2xl font-semibold text-gray-900 mb-2">Details & Upload</h3>
                                     <p className="text-gray-600">Add title, description, and upload your file</p>
                     </div>
 
                                 <div className="space-y-6">
                                     <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-4">
+                                        <p className="text-xs text-blue-800 leading-relaxed mb-2">
+                                            <strong>Evidence Type:</strong> {evidenceTypes.find(et => et.value === formData.type)?.label}
+                                        </p>
                                         <p className="text-xs text-blue-800 leading-relaxed">
                                             <strong>Note:</strong> When creating AI reports, the AI will analyze these sections to generate comprehensive impact narratives.
                                         </p>
@@ -984,7 +1045,7 @@ export default function AddEvidenceModal({
 
                     <div>
                                         <label className="block text-sm font-semibold text-gray-900 mb-2">
-                                            <Upload className="w-5 h-5 inline mr-2 text-primary-600" />
+                                            <Upload className="w-5 h-5 inline mr-2 text-primary-500" />
                             File or Link
                         </label>
 
@@ -992,8 +1053,8 @@ export default function AddEvidenceModal({
                                             className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
                                                 isDragOver
                                 ? 'border-primary-500 bg-primary-50'
-                                : selectedFile || formData.file_url
-                                                        ? 'border-green-400 bg-green-50'
+                                : selectedFiles.length > 0 || formData.file_url
+                                                        ? 'border-primary-400 bg-primary-50'
                                                         : 'border-gray-300 hover:border-primary-400 hover:bg-gray-50'
                                 }`}
                             onDragOver={handleDragOver}
@@ -1001,22 +1062,39 @@ export default function AddEvidenceModal({
                             onDrop={handleDrop}
                             onClick={triggerFileSelect}
                         >
-                            {selectedFile ? (
+                            {selectedFiles.length > 0 ? (
                                                 <div className="space-y-3">
-                                                    <File className="w-12 h-12 text-green-600 mx-auto" />
-                                                    <p className="text-base font-semibold text-green-800">{selectedFile.name}</p>
-                                                    <p className="text-sm text-green-600">
-                                        {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                                    </p>
+                                                    <File className="w-12 h-12 text-primary-500 mx-auto" />
+                                                    <p className="text-base font-semibold text-primary-800">
+                                                        {selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''} selected
+                                                    </p>
+                                                    <div className="space-y-2 max-h-40 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                                                        {selectedFiles.map((file, index) => (
+                                                            <div key={index} className="flex items-center justify-between bg-white rounded p-2 text-sm">
+                                                                <span className="text-gray-700 truncate flex-1">{file.name}</span>
+                                                                <span className="text-gray-500 ml-2">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        removeFile(index)
+                                                                    }}
+                                                                    className="ml-2 text-red-600 hover:text-red-800"
+                                                                >
+                                                                    <X className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                     <button
                                         type="button"
                                         onClick={(e) => {
                                             e.stopPropagation()
                                             removeFile()
                                         }}
-                                                        className="text-sm text-red-600 hover:text-red-800 underline"
+                                                        className="text-sm text-red-600 hover:text-red-800 underline mt-2"
                                     >
-                                        Remove file
+                                        Remove all files
                                     </button>
                                 </div>
                             ) : formData.file_url ? (
@@ -1037,7 +1115,7 @@ export default function AddEvidenceModal({
                                                         <span className="font-semibold">Click to browse</span> or drag files here
                                                     </p>
                                                     <p className="text-sm text-gray-500">
-                                        Images, PDFs, documents, videos
+                                        Images, PDFs, documents, videos (multiple files supported)
                                     </p>
                                 </div>
                             )}
@@ -1049,6 +1127,7 @@ export default function AddEvidenceModal({
                             onChange={handleFileInputChange}
                             className="hidden"
                             accept="image/*,video/*,.pdf,.doc,.docx,.txt,.csv,.xlsx"
+                            multiple
                         />
 
                                         <div className="mt-4">
@@ -1069,12 +1148,12 @@ export default function AddEvidenceModal({
                 </form>
 
                 {/* Navigation Footer */}
-                <div className="border-t border-gray-200 p-6 bg-gray-50">
+                <div className="border-t border-impact-100/40 p-6 bg-white/30 backdrop-blur-xl">
                     <div className="flex items-center justify-between">
                         <button
                             type="button"
                             onClick={currentStep === 1 ? onClose : handleBack}
-                            className="flex items-center space-x-2 px-6 py-3 text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+                            className="flex items-center space-x-2 px-5 py-3 text-gray-600 bg-white/50 backdrop-blur-sm border border-gray-200/60 rounded-xl hover:bg-white/70 font-medium transition-all duration-200"
                         >
                             {currentStep === 1 ? (
                                 <>
@@ -1089,9 +1168,9 @@ export default function AddEvidenceModal({
                             )}
                         </button>
 
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-3 relative z-10">
                         {uploadProgress && (
-                                <div className="px-4 py-2 text-sm text-blue-600 bg-blue-50 rounded-lg">
+                                <div className="px-4 py-2 text-sm text-impact-700 bg-impact-50/80 backdrop-blur-sm rounded-xl border border-impact-200/60">
                                 {uploadProgress}
                             </div>
                         )}
@@ -1100,7 +1179,7 @@ export default function AddEvidenceModal({
                                     type="button"
                                     onClick={handleNext}
                                     disabled={!canProceedToNextStep()}
-                                    className="flex items-center space-x-2 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors shadow-sm hover:shadow-md"
+                                    className="flex items-center space-x-2 px-6 py-3 bg-impact-500 text-white rounded-xl hover:bg-impact-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-200 shadow-lg shadow-impact-500/30 hover:shadow-xl hover:shadow-impact-500/40 relative z-10"
                                 >
                                     <span>Next</span>
                                     <ChevronRight className="w-5 h-5" />
@@ -1108,8 +1187,12 @@ export default function AddEvidenceModal({
                             ) : (
                                 <button
                                     type="submit"
-                                    disabled={loading || !formData.title || (!selectedFile && !formData.file_url)}
-                                    className="flex items-center space-x-2 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors shadow-sm hover:shadow-md"
+                                    disabled={loading || !formData.title}
+                                    onClick={(e) => {
+                                        e.preventDefault()
+                                        handleSubmit(e)
+                                    }}
+                                    className="flex items-center space-x-2 px-6 py-3 bg-impact-500 text-white rounded-xl hover:bg-impact-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-200 shadow-lg shadow-impact-500/30 hover:shadow-xl hover:shadow-impact-500/40 relative z-10"
                                 >
                                     {loading ? (
                                         <>

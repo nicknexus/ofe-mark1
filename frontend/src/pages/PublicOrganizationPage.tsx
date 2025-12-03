@@ -65,7 +65,7 @@ export default function PublicOrganizationPage() {
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
                 <div className="text-center">
-                    <Loader2 className="w-12 h-12 animate-spin text-primary-600 mx-auto mb-4" />
+                    <Loader2 className="w-12 h-12 animate-spin text-primary-500 mx-auto mb-4" />
                     <p className="text-gray-600">Loading organization...</p>
                 </div>
             </div>
@@ -83,7 +83,7 @@ export default function PublicOrganizationPage() {
                     </p>
                     <a
                         href="/"
-                        className="inline-block px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                        className="inline-block px-6 py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
                     >
                         Return to Homepage
                     </a>
@@ -99,7 +99,7 @@ export default function PublicOrganizationPage() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                     <div className="flex items-center space-x-4 mb-4">
                         <div className="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center">
-                            <Building2 className="w-8 h-8 text-primary-600" />
+                            <Building2 className="w-8 h-8 text-primary-500" />
                         </div>
                         <div>
                             <h1 className="text-3xl font-bold text-gray-900">{organization.name}</h1>

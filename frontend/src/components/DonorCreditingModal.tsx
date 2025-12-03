@@ -367,7 +367,7 @@ export default function DonorCreditingModal({
                                                 }`}
                                                 placeholder="0.00"
                                             />
-                                            <div className={`text-xs font-medium whitespace-nowrap ${remaining >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                            <div className={`text-xs font-medium whitespace-nowrap ${remaining >= 0 ? 'text-primary-500' : 'text-red-600'}`}>
                                                 {remaining >= 0 ? `Remaining: ${remaining.toFixed(2)}` : `Exceeds max by ${Math.abs(remaining).toFixed(2)}`}
                                             </div>
                                         </div>

@@ -223,6 +223,7 @@ export interface CreateEvidenceForm {
     description?: string;
     type: 'visual_proof' | 'documentation' | 'testimony' | 'financials';
     file_url?: string;
+    file_urls?: string[]; // Array of file URLs for multiple files support
     date_represented: string;
     date_range_start?: string;
     date_range_end?: string;

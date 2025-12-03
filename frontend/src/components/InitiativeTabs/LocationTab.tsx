@@ -66,31 +66,31 @@ function SortableLocationCard({
             }}
             style={style}
             onClick={() => onListItemClick(location)}
-            className={`p-3 rounded-lg border cursor-pointer transition-all relative group ${
+            className={`p-3 rounded-xl border cursor-pointer transition-all duration-200 relative group ${
                 selectedLocationId === location.id
-                    ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
-                    : 'border-gray-200 hover:border-gray-300 bg-gray-50'
+                    ? 'border-primary-300 bg-primary-50 shadow-bubble-sm'
+                    : 'border-gray-100 hover:border-gray-200 bg-white shadow-bubble-sm hover:shadow-bubble'
             }`}
         >
             {/* Drag Handle - Top Right Corner */}
             <div
                 {...attributes}
                 {...listeners}
-                className="absolute top-1 right-1 cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute top-1 right-1 cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded-lg z-10 opacity-0 group-hover:opacity-100 transition-opacity"
                 style={{ opacity: isDragging ? 1 : undefined }}
                 onClick={(e) => e.stopPropagation()}
             >
                 <GripVertical className="w-3 h-3 text-gray-400" />
             </div>
             <div className="flex items-start justify-between mb-1.5">
-                <h3 className="font-semibold text-gray-900 text-sm pr-8">{location.name}</h3>
+                <h3 className="font-medium text-gray-800 text-sm pr-8">{location.name}</h3>
                 <div className="flex items-center space-x-1">
                     <button
                         onClick={(e) => {
                             e.stopPropagation()
                             onEditClick(location, e)
                         }}
-                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                        className="p-1 text-gray-400 hover:text-primary-500 transition-colors rounded"
                     >
                         <Edit className="w-3.5 h-3.5" />
                     </button>
@@ -99,18 +99,18 @@ function SortableLocationCard({
                             e.stopPropagation()
                             onDeleteClick(e)
                         }}
-                        className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                        className="p-1 text-gray-400 hover:text-red-500 transition-colors rounded"
                     >
                         <Trash2 className="w-3.5 h-3.5" />
                     </button>
                 </div>
             </div>
             {location.description && (
-                <p className="text-xs text-gray-600 mb-1.5 line-clamp-2">
+                <p className="text-xs text-gray-500 mb-1.5 line-clamp-2">
                     {location.description}
                 </p>
             )}
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-gray-400">
                 {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
             </div>
         </div>
@@ -291,7 +291,7 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div className="min-h-screen flex items-center justify-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
             </div>
         )
@@ -299,7 +299,7 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
 
     if (!initiativeId) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center">
                     <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">Invalid initiative ID</p>
@@ -309,23 +309,23 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
     }
 
     return (
-        <div className="h-[calc(100vh-64px)] bg-gradient-to-br from-slate-50 via-white to-blue-50/30 overflow-hidden">
+        <div className="h-[calc(100vh-64px)] overflow-hidden">
             <div className="h-full flex flex-col">
                 {/* Header */}
-                <div className="bg-white border-b border-gray-200 p-3 flex-shrink-0">
+                <div className="bg-white border-b border-gray-100 shadow-bubble-sm p-4 flex-shrink-0">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                            <div className="p-2 bg-green-100 rounded-lg">
-                                <MapPin className="w-5 h-5 text-green-600" />
+                        <div className="flex items-center space-x-3">
+                            <div className="icon-bubble">
+                                <MapPin className="w-5 h-5 text-primary-500" />
                             </div>
                             <div>
-                                <h1 className="text-xl font-bold text-gray-900">Locations</h1>
-                                <p className="text-sm text-gray-600">Manage geographic locations for your initiative</p>
+                                <h1 className="text-xl font-semibold text-gray-800">Locations</h1>
+                                <p className="text-sm text-gray-500">Manage geographic locations for your initiative</p>
                             </div>
                         </div>
                         <button
                             onClick={handleAddClick}
-                            className="inline-flex items-center space-x-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+                            className="inline-flex items-center space-x-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl text-sm font-medium transition-all duration-200 shadow-bubble-sm"
                         >
                             <Plus className="w-4 h-4" />
                             <span>Add Location</span>
@@ -334,9 +334,9 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
                 </div>
 
                 {/* Main Content */}
-                <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-2 p-2 overflow-hidden min-h-0">
+                <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 p-4 overflow-hidden min-h-0">
                     {/* Map - 2/3 width */}
-                    <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm p-2 overflow-hidden flex flex-col min-h-0 h-full">
+                    <div className="lg:col-span-2 bg-white rounded-2xl shadow-bubble border border-gray-100 p-3 overflow-hidden flex flex-col min-h-0 h-full">
                         <LocationMap
                             locations={orderedLocations}
                             onLocationClick={handleLocationClick}
@@ -355,22 +355,24 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
                     </div>
 
                     {/* Location List - 1/3 width */}
-                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-2 overflow-hidden flex flex-col min-h-0 h-full">
-                        <div className="mb-2 flex-shrink-0">
-                            <h2 className="text-base font-semibold text-gray-900 mb-0.5">
+                    <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-4 overflow-hidden flex flex-col min-h-0 h-full">
+                        <div className="mb-3 flex-shrink-0">
+                            <h2 className="text-base font-semibold text-gray-800 mb-0.5">
                                 All Locations ({orderedLocations.length})
                             </h2>
-                            <p className="text-xs text-gray-500">Click a location to view details • Edit button opens editor</p>
+                            <p className="text-xs text-gray-400">Click a location to view details • Edit button opens editor</p>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto space-y-1.5 min-h-0">
+                        <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
                             {orderedLocations.length === 0 ? (
                                 <div className="text-center py-8">
-                                    <MapPin className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                                    <div className="icon-bubble mx-auto mb-3">
+                                        <MapPin className="w-5 h-5 text-gray-400" />
+                                    </div>
                                     <p className="text-gray-500 text-sm mb-3">No locations yet</p>
                                     <button
                                         onClick={handleAddClick}
-                                        className="text-sm text-green-600 hover:text-green-700 font-medium"
+                                        className="text-sm text-primary-500 hover:text-primary-600 font-medium"
                                     >
                                         Add your first location
                                     </button>
@@ -442,40 +444,40 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
 
             {/* Delete Confirmation */}
             {deleteConfirmId && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
-                    <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl">
-                        <div className="text-center mb-6">
-                            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-red-100 to-pink-100 rounded-2xl flex items-center justify-center">
-                                <Trash2 className="w-8 h-8 text-red-600" />
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-bubble-lg border border-gray-100">
+                        <div className="flex items-start space-x-4 mb-6">
+                            <div className="icon-bubble">
+                                <Trash2 className="w-5 h-5 text-red-500" />
                             </div>
-                            <h3 className="text-xl font-bold text-gray-900 mb-2">Delete Location</h3>
-                            <p className="text-gray-500">This action cannot be undone</p>
+                            <div className="flex-1">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-1">Delete Location</h3>
+                                <p className="text-sm text-gray-500">This action cannot be undone</p>
+                            </div>
                         </div>
 
-                        <div className="bg-gradient-to-r from-red-50/50 to-pink-50/50 border border-red-100/60 rounded-xl p-4 mb-6">
-                            <p className="text-gray-700 text-center">
-                                Are you sure you want to delete{' '}
-                                <strong className="text-gray-900">
-                                    "{locations.find((l) => l.id === deleteConfirmId)?.name}"
-                                </strong>
-                                ?
-                            </p>
-                            <p className="text-sm text-gray-600 text-center mt-2">
-                                Impact claims linked to this location will remain but won't be associated with a
-                                location anymore.
-                            </p>
-                        </div>
+                        <p className="text-gray-600 mb-2 text-sm">
+                            Are you sure you want to delete{' '}
+                            <strong className="text-gray-800">
+                                "{locations.find((l) => l.id === deleteConfirmId)?.name}"
+                            </strong>
+                            ?
+                        </p>
+                        <p className="text-xs text-gray-500 mb-6">
+                            Impact claims linked to this location will remain but won't be associated with a
+                            location anymore.
+                        </p>
 
                         <div className="flex space-x-3">
                             <button
                                 onClick={() => setDeleteConfirmId(null)}
-                                className="flex-1 px-6 py-3 bg-gray-100/80 hover:bg-gray-200/80 text-gray-700 hover:text-gray-900 rounded-xl font-semibold transition-all duration-200 hover:scale-[1.02]"
+                                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-all duration-200"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={() => handleDeleteLocation(deleteConfirmId)}
-                                className="flex-1 px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl font-semibold shadow-lg shadow-red-600/25 hover:shadow-xl hover:shadow-red-600/30 transition-all duration-200 hover:scale-[1.02]"
+                                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-2xl transition-all duration-200 shadow-bubble-sm"
                             >
                                 Delete Location
                             </button>

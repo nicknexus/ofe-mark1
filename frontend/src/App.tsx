@@ -9,7 +9,6 @@ import HomePage from './pages/HomePage'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
 import InitiativePage from './pages/InitiativePage'
-import KPIDetailPage from './pages/KPIDetailPage'
 import PublicOrganizationPage from './pages/PublicOrganizationPage'
 import Layout from './components/Layout'
 
@@ -82,7 +81,7 @@ function App() {
                             <Routes>
                                 <Route index element={<Dashboard />} />
                                 <Route path="initiatives/:id" element={<InitiativePage />} />
-                                <Route path="initiatives/:initiativeId/kpis/:kpiId" element={<KPIDetailPage />} />
+                                <Route path="initiatives/:id/metrics/:kpiId" element={<InitiativePage />} />
                             </Routes>
                         </Layout>
                     } />

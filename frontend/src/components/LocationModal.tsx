@@ -207,10 +207,10 @@ export default function LocationModal({
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[200] animate-fade-in">
             <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl transform transition-all duration-200 ease-out animate-slide-up-fast">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
+                <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-primary-100">
                     <div className="flex items-center space-x-3">
-                        <div className="p-2 bg-green-100 rounded-lg">
-                            <MapPin className="w-5 h-5 text-green-600" />
+                        <div className="p-2 bg-primary-100 rounded-lg">
+                            <MapPin className="w-5 h-5 text-primary-500" />
                         </div>
                         <div>
                             <h2 className="text-xl font-semibold text-gray-900">
@@ -363,7 +363,7 @@ export default function LocationModal({
                         </button>
                         <button
                             type="submit"
-                            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-primary-600 to-primary-700 border border-transparent rounded-lg hover:from-primary-700 hover:to-primary-800 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 hover:shadow-lg transform hover:scale-[1.02] flex items-center justify-center space-x-2"
+                            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-primary-500 to-primary-600 border border-transparent rounded-lg hover:from-primary-600 hover:to-primary-700 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 hover:shadow-lg transform hover:scale-[1.02] flex items-center justify-center space-x-2"
                             disabled={loading}
                         >
                             <Save className="w-4 h-4" />

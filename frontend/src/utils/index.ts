@@ -54,7 +54,7 @@ export function formatDateForInput(date: string | Date): string {
 
 // Calculate evidence percentage color and status
 export function getEvidenceColor(percentage: number): string {
-    if (percentage >= 80) return 'text-green-600 bg-green-50'
+    if (percentage >= 80) return 'text-primary-500 bg-primary-50'
     if (percentage >= 30) return 'text-yellow-600 bg-yellow-50'
     return 'text-red-600 bg-red-50'
 }
@@ -79,7 +79,7 @@ export function getCategoryColor(category: 'input' | 'output' | 'impact'): strin
         case 'input':
             return 'bg-blue-100 text-blue-800'
         case 'output':
-            return 'bg-green-100 text-green-800'
+            return 'bg-primary-100 text-primary-800'
         case 'impact':
             return 'bg-purple-100 text-purple-800'
         default:
@@ -95,9 +95,9 @@ export function getEvidenceTypeInfo(type: 'visual_proof' | 'documentation' | 'te
         case 'documentation':
             return { icon: '📄', color: 'bg-blue-100 text-blue-800', label: 'Documentation' }
         case 'testimony':
-            return { icon: '🗣️', color: 'bg-orange-100 text-orange-800', label: 'Testimony' }
+            return { icon: '🗣️', color: 'bg-orange-100 text-orange-800', label: 'Testemonies' }
         case 'financials':
-            return { icon: '💰', color: 'bg-green-100 text-green-800', label: 'Financials' }
+            return { icon: '💰', color: 'bg-primary-100 text-primary-800', label: 'Financials' }
         default:
             return { icon: '📎', color: 'bg-gray-100 text-gray-800', label: 'Other' }
     }

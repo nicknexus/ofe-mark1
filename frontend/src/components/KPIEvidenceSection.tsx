@@ -138,30 +138,30 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateF
 
     if (loading) {
         return (
-            <div className="card p-6">
+            <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-soft-float border border-white/60 p-5 h-full">
                 <div className="animate-pulse space-y-4">
-                    <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                    <div className="h-20 bg-gray-200 rounded"></div>
+                    <div className="h-4 bg-gray-200/60 rounded-lg w-1/4"></div>
+                    <div className="h-20 bg-gray-200/60 rounded-xl"></div>
                 </div>
             </div>
         )
     }
 
     return (
-        <div className="card p-4">
+        <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-soft-float border border-white/60 p-4 sm:p-5 h-full flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
+                <h3 className="text-base font-semibold text-gray-800">
                     Evidence ({dateFilter?.isActive ? filteredEvidence.length : evidence.length})
                 </h3>
                 <div className="flex items-center space-x-3">
                     <div className="text-right text-sm">
-                        <div className="text-lg font-bold text-green-600">{dateFilter?.isActive ? filteredEvidence.length : evidence.length}</div>
-                        <div className="text-xs text-gray-600">Items</div>
+                        <div className="text-lg font-bold text-impact-500">{dateFilter?.isActive ? filteredEvidence.length : evidence.length}</div>
+                        <div className="text-xs text-gray-500">Items</div>
                     </div>
                     <button
                         onClick={() => setIsEvidenceModalOpen(true)}
-                        className="btn-secondary flex items-center space-x-2 text-sm"
+                        className="flex items-center justify-center space-x-2 px-4 py-2 bg-impact-100/80 text-impact-700 rounded-xl hover:bg-impact-200/80 text-sm font-medium transition-all duration-200"
                     >
                         <Upload className="w-4 h-4" />
                         <span className="hidden sm:inline">Add Evidence</span>
@@ -170,98 +170,102 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateF
                 </div>
             </div>
 
-            {loading ? (
-                <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500"></div>
-                </div>
-            ) : filteredEvidence.length === 0 ? (
-                <div className="text-center py-8">
-                    <Upload className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600 text-sm sm:text-base">
-                        {dateFilter?.isActive
-                            ? 'No evidence in selected date range'
-                            : 'No evidence yet'
-                        }
-                    </p>
-                    {!dateFilter?.isActive && (
-                        <button
-                            onClick={() => setIsEvidenceModalOpen(true)}
-                            className="btn-primary mt-4 text-sm"
-                        >
-                            Add First Evidence
-                        </button>
-                    )}
-                </div>
-            ) : (
-                <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
-                    {filteredEvidence
-                        .sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime())
-                        .map(evidenceItem => {
-                            const IconComponent = getEvidenceIcon(evidenceItem.type)
-                            const typeInfo = getEvidenceTypeInfo(evidenceItem.type)
+            <div className="flex-1 overflow-hidden">
+                {loading ? (
+                    <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-impact-500"></div>
+                    </div>
+                ) : filteredEvidence.length === 0 ? (
+                    <div className="text-center py-8">
+                        <div className="w-14 h-14 rounded-2xl bg-gray-100/80 flex items-center justify-center mx-auto mb-4">
+                            <Upload className="w-7 h-7 text-gray-400" />
+                        </div>
+                        <p className="text-gray-500 text-sm sm:text-base">
+                            {dateFilter?.isActive
+                                ? 'No evidence in selected date range'
+                                : 'No evidence yet'
+                            }
+                        </p>
+                        {!dateFilter?.isActive && (
+                            <button
+                                onClick={() => setIsEvidenceModalOpen(true)}
+                                className="mt-4 px-5 py-2.5 bg-impact-500 text-white rounded-xl hover:bg-impact-600 font-semibold transition-all duration-200 shadow-lg shadow-impact-500/25 text-sm"
+                            >
+                                Add First Evidence
+                            </button>
+                        )}
+                    </div>
+                ) : (
+                    <div className="space-y-2 max-h-[calc(100vh-480px)] min-h-[150px] overflow-y-auto pr-2 scrollbar-thin">
+                        {filteredEvidence
+                            .sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime())
+                            .map(evidenceItem => {
+                                const IconComponent = getEvidenceIcon(evidenceItem.type)
+                                const typeInfo = getEvidenceTypeInfo(evidenceItem.type)
 
-                            return (
-                                <div key={evidenceItem.id} className="p-3 border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer" onClick={() => handleEvidenceClick(evidenceItem)}>
-                                    <div className="flex items-start space-x-3">
-                                        <div className={`p-1.5 rounded-lg ${typeInfo.color} flex-shrink-0`}>
-                                            <IconComponent className="w-3 h-3" />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-start justify-between">
-                                                <div className="min-w-0 flex-1">
-                                                    <h4 className="text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors line-clamp-1">
-                                                        {evidenceItem.title}
-                                                    </h4>
-                                                    <div className="flex items-center text-xs text-gray-500 space-x-2 mt-1">
-                                                        <span>
-                                                            {evidenceItem.date_range_start && evidenceItem.date_range_end ? (
-                                                                <>Range: {formatDate(evidenceItem.date_range_start)} - {formatDate(evidenceItem.date_range_end)}</>
-                                                            ) : (
-                                                                <>Date: {formatDate(evidenceItem.date_represented)}</>
-                                                            )}
-                                                        </span>
-                                                        <span>•</span>
-                                                        <span className="capitalize">{evidenceItem.type.replace('_', ' ')}</span>
-                                                    </div>
-                                                    {evidenceItem.description && (
-                                                        <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                                                            {evidenceItem.description}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center space-x-1 flex-shrink-0 ml-2">
-                                                    {evidenceItem.file_url && (
-                                                        <div className="text-gray-400">
-                                                            <ExternalLink className="w-3 h-3" />
+                                return (
+                                    <div key={evidenceItem.id} className="p-3 bg-white/60 backdrop-blur-sm border border-gray-100 rounded-xl hover:border-impact-300 hover:shadow-soft-float transition-all duration-200 cursor-pointer" onClick={() => handleEvidenceClick(evidenceItem)}>
+                                        <div className="flex items-start space-x-3">
+                                            <div className={`p-1.5 rounded-lg ${typeInfo.color} flex-shrink-0`}>
+                                                <IconComponent className="w-3 h-3" />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-start justify-between">
+                                                    <div className="min-w-0 flex-1">
+                                                        <h4 className="text-sm font-medium text-gray-800 hover:text-impact-600 transition-colors line-clamp-1">
+                                                            {evidenceItem.title}
+                                                        </h4>
+                                                        <div className="flex items-center text-xs text-gray-500 space-x-2 mt-1">
+                                                            <span>
+                                                                {evidenceItem.date_range_start && evidenceItem.date_range_end ? (
+                                                                    <>Range: {formatDate(evidenceItem.date_range_start)} - {formatDate(evidenceItem.date_range_end)}</>
+                                                                ) : (
+                                                                    <>Date: {formatDate(evidenceItem.date_represented)}</>
+                                                                )}
+                                                            </span>
+                                                            <span>•</span>
+                                                            <span className="capitalize">{evidenceItem.type.replace('_', ' ')}</span>
                                                         </div>
-                                                    )}
-                                                    <button
-                                                        className="text-gray-400 hover:text-gray-600"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            handleEditEvidence(evidenceItem)
-                                                        }}
-                                                    >
-                                                        <Edit className="w-3 h-3" />
-                                                    </button>
-                                                    <button
-                                                        className="text-gray-400 hover:text-red-600"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            setDeleteConfirmEvidence(evidenceItem)
-                                                        }}
-                                                    >
-                                                        <Trash2 className="w-3 h-3" />
-                                                    </button>
+                                                        {evidenceItem.description && (
+                                                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                                                {evidenceItem.description}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center space-x-1 flex-shrink-0 ml-2">
+                                                        {evidenceItem.file_url && (
+                                                            <div className="text-gray-400">
+                                                                <ExternalLink className="w-3 h-3" />
+                                                            </div>
+                                                        )}
+                                                        <button
+                                                            className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100/50"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                handleEditEvidence(evidenceItem)
+                                                            }}
+                                                        >
+                                                            <Edit className="w-3 h-3" />
+                                                        </button>
+                                                        <button
+                                                            className="text-gray-400 hover:text-red-500 p-1 rounded-lg hover:bg-red-50/50"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                setDeleteConfirmEvidence(evidenceItem)
+                                                            }}
+                                                        >
+                                                            <Trash2 className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            )
-                        })}
-                </div>
-            )}
+                                )
+                            })}
+                    </div>
+                )}
+            </div>
 
             {/* Add Evidence Modal */}
             <AddEvidenceModal
@@ -309,32 +313,32 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateF
 
             {/* Delete Confirmation Dialog */}
             {deleteConfirmEvidence && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
-                    <div className="bg-white rounded-xl max-w-md w-full p-6">
+                <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[60]">
+                    <div className="bg-white/90 backdrop-blur-xl rounded-3xl max-w-md w-full p-6 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)] border border-white/60">
                         <div className="flex items-center space-x-3 mb-4">
-                            <div className="p-2 bg-red-100 rounded-lg">
+                            <div className="p-2.5 bg-red-100/80 rounded-xl">
                                 <Trash2 className="w-5 h-5 text-red-600" />
                             </div>
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-900">Delete Evidence</h3>
-                                <p className="text-sm text-gray-600">This action cannot be undone</p>
+                                <h3 className="text-lg font-semibold text-gray-800">Delete Evidence</h3>
+                                <p className="text-sm text-gray-500">This action cannot be undone</p>
                             </div>
                         </div>
 
-                        <p className="text-gray-700 mb-6">
-                            Are you sure you want to delete "<strong>{deleteConfirmEvidence.title}</strong>"?
+                        <p className="text-gray-600 mb-6">
+                            Are you sure you want to delete "<strong className="text-gray-800">{deleteConfirmEvidence.title}</strong>"?
                         </p>
 
                         <div className="flex space-x-3">
                             <button
                                 onClick={() => setDeleteConfirmEvidence(null)}
-                                className="btn-secondary flex-1"
+                                className="flex-1 px-5 py-3 text-gray-600 bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-xl hover:bg-white/80 font-medium transition-all duration-200"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={() => handleDeleteEvidence(deleteConfirmEvidence)}
-                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                                className="flex-1 px-5 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all duration-200 font-semibold shadow-lg shadow-red-500/25"
                             >
                                 Delete Evidence
                             </button>

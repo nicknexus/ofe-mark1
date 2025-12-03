@@ -48,7 +48,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
     const evidenceTypes = [
         { value: 'visual_proof', label: 'Visual Support', icon: Camera },
         { value: 'documentation', label: 'Documentation', icon: FileText },
-        { value: 'testimony', label: 'Testimony', icon: MessageSquare },
+        { value: 'testimony', label: 'Testemonies', icon: MessageSquare },
         { value: 'financials', label: 'Financials', icon: DollarSign }
     ] as const
 
@@ -244,12 +244,12 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
     }
 
     return (
-        <div className="h-[calc(100vh-64px)] bg-gradient-to-br from-slate-50 via-white to-green-50/30 overflow-hidden flex flex-col">
+        <div className="h-[calc(100vh-64px)] overflow-hidden flex flex-col">
             {/* Header with Search and Add Button */}
-            <div className="p-4 border-b border-gray-200 bg-white/80 backdrop-blur-sm">
+            <div className="p-4 sm:p-6 border-b border-gray-100 bg-white shadow-bubble-sm">
                 <div className="flex items-center justify-between mb-4">
                     <div>
-                        <h2 className="text-2xl font-bold text-gray-900">Evidence</h2>
+                        <h2 className="text-xl font-semibold text-gray-800">Evidence</h2>
                         <p className="text-sm text-gray-500">View and manage all evidence uploaded for this initiative</p>
                     </div>
                     <button
@@ -257,22 +257,22 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                             setEditingEvidence(null)
                             setIsAddModalOpen(true)
                         }}
-                        className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+                        className="flex items-center space-x-2 px-5 py-2.5 bg-evidence-400 hover:bg-evidence-600 text-white rounded-2xl font-medium transition-all duration-200 shadow-bubble-sm"
                     >
-                        <Plus className="w-5 h-5" />
+                        <Plus className="w-4 h-4" />
                         <span>Add Evidence</span>
                     </button>
                 </div>
 
                 {/* Search Bar */}
                 <div className="relative mb-3">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                         type="text"
                         placeholder="Search evidence by title or description..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        className="w-full pl-11 pr-4 py-2.5 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-evidence-400 focus:border-transparent bg-gray-50/50 text-sm"
                     />
                 </div>
 
@@ -292,10 +292,10 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                         <button
                             ref={locationButtonRef}
                             onClick={() => setShowLocationPicker(!showLocationPicker)}
-                            className={`flex items-center space-x-2 px-3 py-2 border rounded-lg text-sm font-medium transition-colors ${
+                            className={`flex items-center space-x-2 px-3 py-2 border rounded-xl text-sm font-medium transition-all duration-200 ${
                                 selectedLocations.length > 0
-                                    ? 'bg-green-50 border-green-300 text-green-700'
-                                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                                    ? 'bg-evidence-50 border-evidence-200 text-evidence-600'
+                                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 shadow-bubble-sm'
                             }`}
                         >
                             <MapPin className="w-4 h-4" />
@@ -312,7 +312,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                         e.stopPropagation()
                                         setSelectedLocations([])
                                     }}
-                                    className="ml-1 text-green-600 hover:text-green-800"
+                                    className="ml-1 text-primary-500 hover:text-primary-700"
                                 >
                                     <X className="w-3 h-3" />
                                 </button>
@@ -352,7 +352,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                                                 setSelectedLocations(selectedLocations.filter(id => id !== location.id))
                                                             }
                                                         }}
-                                                        className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                                        className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
                                                     />
                                                     <span className="text-sm text-gray-700">{location.name}</span>
                                                 </label>
@@ -370,10 +370,10 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                         <button
                             ref={beneficiaryButtonRef}
                             onClick={() => setShowBeneficiaryPicker(!showBeneficiaryPicker)}
-                            className={`flex items-center space-x-2 px-3 py-2 border rounded-lg text-sm font-medium transition-colors ${
+                            className={`flex items-center space-x-2 px-3 py-2 border rounded-xl text-sm font-medium transition-all duration-200 ${
                                 selectedBeneficiaryGroups.length > 0
-                                    ? 'bg-green-50 border-green-300 text-green-700'
-                                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                                    ? 'bg-evidence-50 border-evidence-200 text-evidence-600'
+                                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 shadow-bubble-sm'
                             }`}
                         >
                             <Users className="w-4 h-4" />
@@ -390,7 +390,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                         e.stopPropagation()
                                         setSelectedBeneficiaryGroups([])
                                     }}
-                                    className="ml-1 text-green-600 hover:text-green-800"
+                                    className="ml-1 text-primary-500 hover:text-primary-700"
                                 >
                                     <X className="w-3 h-3" />
                                 </button>
@@ -430,7 +430,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                                                 setSelectedBeneficiaryGroups(selectedBeneficiaryGroups.filter(id => id !== group.id))
                                                             }
                                                         }}
-                                                        className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                                        className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
                                                     />
                                                     <span className="text-sm text-gray-700">{group.name}</span>
                                                 </label>
@@ -448,10 +448,10 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                         <button
                             ref={evidenceTypeButtonRef}
                             onClick={() => setShowEvidenceTypePicker(!showEvidenceTypePicker)}
-                            className={`flex items-center space-x-2 px-3 py-2 border rounded-lg text-sm font-medium transition-colors ${
+                            className={`flex items-center space-x-2 px-3 py-2 border rounded-xl text-sm font-medium transition-all duration-200 ${
                                 selectedEvidenceTypes.length > 0
-                                    ? 'bg-green-50 border-green-300 text-green-700'
-                                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                                    ? 'bg-evidence-50 border-evidence-200 text-evidence-600'
+                                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 shadow-bubble-sm'
                             }`}
                         >
                             <FileText className="w-4 h-4" />
@@ -468,7 +468,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                         e.stopPropagation()
                                         setSelectedEvidenceTypes([])
                                     }}
-                                    className="ml-1 text-green-600 hover:text-green-800"
+                                    className="ml-1 text-primary-500 hover:text-primary-700"
                                 >
                                     <X className="w-3 h-3" />
                                 </button>
@@ -508,7 +508,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                                                 setSelectedEvidenceTypes(selectedEvidenceTypes.filter(t => t !== type.value))
                                                             }
                                                         }}
-                                                        className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                                        className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
                                                     />
                                                     <div className={`w-6 h-6 ${bgColor} rounded flex items-center justify-center`}>
                                                         {React.createElement(type.icon, { className: 'w-4 h-4' })}
@@ -528,26 +528,28 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                     {hasActiveFilters && (
                         <button
                             onClick={clearFilters}
-                            className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50"
+                            className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all duration-200"
                         >
                             <X className="w-4 h-4" />
-                            <span>Clear Filters</span>
+                            <span>Clear</span>
                         </button>
                     )}
                 </div>
             </div>
 
             {/* Evidence List */}
-            <div className="flex-1 overflow-y-auto bg-white">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
                 {loading ? (
                     <div className="flex items-center justify-center h-64">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-evidence-400"></div>
                     </div>
                 ) : evidence.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                        <FileText className="w-16 h-16 mb-4 opacity-50" />
-                        <p className="text-lg font-medium mb-2">No evidence found</p>
-                        <p className="text-sm mb-4">
+                    <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-12 text-center">
+                        <div className="icon-bubble mx-auto mb-4">
+                            <FileText className="w-6 h-6 text-gray-400" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">No evidence found</h3>
+                        <p className="text-gray-500 text-sm mb-6">
                             {hasActiveFilters || searchQuery
                                 ? 'Try adjusting your filters or search query'
                                 : 'Add your first evidence to support your impact claims'}
@@ -558,16 +560,16 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                     setEditingEvidence(null)
                                     setIsAddModalOpen(true)
                                 }}
-                                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+                                className="px-5 py-2.5 bg-evidence-400 hover:bg-evidence-600 text-white rounded-2xl font-medium transition-all duration-200 shadow-bubble-sm"
                             >
                                 Add Evidence
                             </button>
                         )}
                     </div>
                 ) : (
-                    <div className="divide-y divide-gray-200">
+                    <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 overflow-hidden">
                         {/* Header Row */}
-                        <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 grid grid-cols-12 gap-4 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        <div className="px-6 py-3 bg-gray-50/50 border-b border-gray-100 grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wide">
                             <div className="col-span-1"></div>
                             <div className="col-span-5">Name</div>
                             <div className="col-span-2">Type</div>
@@ -576,76 +578,78 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                         </div>
 
                         {/* Evidence Items */}
-                        {evidence.map((ev) => {
-                            const typeInfo = getEvidenceTypeInfo(ev.type)
-                            // Extract background color from typeInfo.color (e.g., "bg-pink-100 text-pink-800" -> "bg-pink-100")
-                            const bgColor = typeInfo.color.split(' ')[0]
-                            const evidenceType = evidenceTypes.find(et => et.value === ev.type)
-                            const IconComponent = evidenceType?.icon || FileText
-                            
-                            return (
-                                <div
-                                    key={ev.id}
-                                    className="px-6 py-4 hover:bg-gray-50 transition-colors cursor-pointer group grid grid-cols-12 gap-4 items-center"
-                                    onClick={() => handleViewEvidence(ev)}
-                                >
-                                    {/* Icon */}
-                                    <div className="col-span-1 flex items-center justify-center">
-                                        <div className={`p-2 rounded-lg ${bgColor}`}>
-                                            <IconComponent className="w-4 h-4" />
-                                        </div>
-                                    </div>
-
-                                    {/* Name */}
-                                    <div className="col-span-5 min-w-0">
-                                        <div className="font-medium text-gray-900 truncate">
-                                            {ev.title || 'Untitled Evidence'}
-                                        </div>
-                                        {ev.description && (
-                                            <div className="text-sm text-gray-500 truncate mt-0.5">
-                                                {ev.description}
+                        <div className="divide-y divide-gray-100">
+                            {evidence.map((ev) => {
+                                const typeInfo = getEvidenceTypeInfo(ev.type)
+                                // Extract background color from typeInfo.color (e.g., "bg-pink-100 text-pink-800" -> "bg-pink-100")
+                                const bgColor = typeInfo.color.split(' ')[0]
+                                const evidenceType = evidenceTypes.find(et => et.value === ev.type)
+                                const IconComponent = evidenceType?.icon || FileText
+                                
+                                return (
+                                    <div
+                                        key={ev.id}
+                                        className="px-6 py-4 hover:bg-gray-50/50 transition-all duration-200 cursor-pointer group grid grid-cols-12 gap-4 items-center"
+                                        onClick={() => handleViewEvidence(ev)}
+                                    >
+                                        {/* Icon */}
+                                        <div className="col-span-1 flex items-center justify-center">
+                                            <div className={`p-2 rounded-xl ${bgColor}`}>
+                                                <IconComponent className="w-4 h-4" />
                                             </div>
-                                        )}
-                                    </div>
+                                        </div>
 
-                                    {/* Type */}
-                                    <div className="col-span-2">
-                                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${typeInfo.color}`}>
-                                            {typeInfo.label}
-                                        </span>
-                                    </div>
+                                        {/* Name */}
+                                        <div className="col-span-5 min-w-0">
+                                            <div className="font-medium text-gray-800 truncate">
+                                                {ev.title || 'Untitled Evidence'}
+                                            </div>
+                                            {ev.description && (
+                                                <div className="text-sm text-gray-500 truncate mt-0.5">
+                                                    {ev.description}
+                                                </div>
+                                            )}
+                                        </div>
 
-                                    {/* Date */}
-                                    <div className="col-span-2 text-sm text-gray-600">
-                                        {formatDate(ev.date_represented)}
-                                    </div>
+                                        {/* Type */}
+                                        <div className="col-span-2">
+                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${typeInfo.color}`}>
+                                                {typeInfo.label}
+                                            </span>
+                                        </div>
 
-                                    {/* Actions */}
-                                    <div className="col-span-2 flex items-center justify-end space-x-2">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleViewEvidence(ev)
-                                            }}
-                                            className="p-1.5 text-gray-400 hover:text-green-600 rounded hover:bg-green-50 transition-colors opacity-0 group-hover:opacity-100"
-                                            title="View"
-                                        >
-                                            <Eye className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleEditEvidence(ev)
-                                            }}
-                                            className="p-1.5 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100"
-                                            title="Edit"
-                                        >
-                                            <Edit className="w-4 h-4" />
-                                        </button>
+                                        {/* Date */}
+                                        <div className="col-span-2 text-sm text-gray-500">
+                                            {formatDate(ev.date_represented)}
+                                        </div>
+
+                                        {/* Actions */}
+                                        <div className="col-span-2 flex items-center justify-end space-x-1">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleViewEvidence(ev)
+                                                }}
+                                                className="p-1.5 text-gray-400 hover:text-evidence-400 rounded-lg hover:bg-evidence-50 transition-all duration-200 opacity-0 group-hover:opacity-100"
+                                                title="View"
+                                            >
+                                                <Eye className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleEditEvidence(ev)
+                                                }}
+                                                className="p-1.5 text-gray-400 hover:text-evidence-400 rounded-lg hover:bg-evidence-50 transition-all duration-200 opacity-0 group-hover:opacity-100"
+                                                title="Edit"
+                                            >
+                                                <Edit className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                            )
-                        })}
+                                )
+                            })}
+                        </div>
                     </div>
                 )}
             </div>

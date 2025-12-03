@@ -156,6 +156,11 @@ export default function AddKPIUpdateModal({
                 throw new Error('Please select a date')
             }
 
+            // Validate label is required
+            if (!formData.label || !formData.label.trim()) {
+                throw new Error('Label or Title is required')
+            }
+
             await onSubmit({
                 ...submitData,
                 beneficiary_group_ids: selectedGroupIds,
@@ -213,7 +218,7 @@ export default function AddKPIUpdateModal({
             case 2:
                 return !!(datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate))
             case 3:
-                return true // Title and description are optional
+                return !!formData.label?.trim() // Label is required
             default:
                 return false
         }
@@ -240,36 +245,43 @@ export default function AddKPIUpdateModal({
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60] animate-fade-in">
-            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl transform transition-all duration-200 ease-out animate-slide-up-fast flex flex-col">
+        <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[60] animate-fade-in">
+            <div className="bg-white/70 backdrop-blur-2xl rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-[0_25px_60px_-15px_rgba(61,182,253,0.2)] border border-white/60 transform transition-all duration-200 ease-out animate-slide-up-fast flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
-                    <div className="flex-1">
-                        <h2 className="text-xl font-semibold text-gray-900">
-                            {editData ? 'Edit Impact Claim' : 'Add Impact Claim'}
-                        </h2>
-                        <p className="text-sm text-gray-600 mt-1">{kpiTitle}</p>
+                <div className="flex items-center justify-between p-6 border-b border-evidence-200/40 bg-gradient-to-r from-evidence-100/50 to-evidence-50/30 backdrop-blur-xl">
+                    <div className="flex items-center space-x-3 flex-1">
+                        <div className="w-11 h-11 rounded-xl bg-evidence-500/15 backdrop-blur-sm flex items-center justify-center border border-evidence-300/30">
+                            <svg className="w-6 h-6 text-evidence-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-semibold text-gray-800">
+                                {editData ? 'Edit Impact Claim' : 'Add Impact Claim'}
+                            </h2>
+                            <p className="text-sm text-gray-500 mt-0.5">{kpiTitle}</p>
+                        </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors duration-150 ml-4"
+                        className="text-gray-400 hover:text-gray-600 p-2 rounded-xl hover:bg-white/60 transition-all duration-200 ml-4"
                     >
                         <X className="w-5 h-5" />
                     </button>
                 </div>
 
                 {/* Progress Steps Indicator */}
-                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <div className="px-6 py-4 border-b border-evidence-100/40 bg-white/30 backdrop-blur-xl">
                     <div className="flex items-center justify-center">
                         {steps.map((step, index) => (
                             <React.Fragment key={step.number}>
                                 <div className="flex flex-col items-center">
-                                    <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-200 ${
+                                    <div className={`flex items-center justify-center w-10 h-10 rounded-xl border-2 transition-all duration-200 ${
                                         currentStep > step.number
-                                            ? 'bg-blue-600 border-blue-600 text-white'
+                                            ? 'bg-evidence-500 border-evidence-500 text-white shadow-lg shadow-evidence-500/30'
                                             : currentStep === step.number
-                                            ? 'bg-blue-600 border-blue-600 text-white ring-4 ring-blue-100'
-                                            : 'bg-white border-gray-300 text-gray-400'
+                                            ? 'bg-evidence-500 border-evidence-500 text-white ring-4 ring-evidence-200/50 shadow-lg shadow-evidence-500/30'
+                                            : 'bg-white/50 backdrop-blur-sm border-gray-200/60 text-gray-400'
                                     }`}>
                                         {currentStep > step.number ? (
                                             <Check className="w-5 h-5" />
@@ -279,15 +291,15 @@ export default function AddKPIUpdateModal({
                                     </div>
                                     <div className="mt-2 text-center">
                                         <div className={`text-xs font-medium whitespace-nowrap ${
-                                            currentStep >= step.number ? 'text-gray-900' : 'text-gray-400'
+                                            currentStep >= step.number ? 'text-gray-700' : 'text-gray-400'
                                         }`}>
                                             {step.title}
                                         </div>
                                     </div>
                                 </div>
                                 {index < steps.length - 1 && (
-                                    <div className={`flex-1 h-0.5 mx-4 transition-all duration-200 ${
-                                        currentStep > step.number ? 'bg-blue-600' : 'bg-gray-300'
+                                    <div className={`flex-1 h-0.5 mx-4 rounded-full transition-all duration-200 ${
+                                        currentStep > step.number ? 'bg-evidence-500' : 'bg-gray-200/60'
                                     }`} style={{ maxWidth: '120px' }} />
                                 )}
                             </React.Fragment>
@@ -302,15 +314,11 @@ export default function AddKPIUpdateModal({
                         {currentStep === 1 && (
                             <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
                                 <div className="text-center mb-8">
-                                    <h3 className="text-2xl font-semibold text-gray-900 mb-2">Enter the Value</h3>
-                                    <p className="text-gray-600">What is the measurement for this impact claim?</p>
+                                    <h3 className="text-2xl font-semibold text-gray-900 mb-2">Impact Claim</h3>
+                                    <p className="text-gray-600">Enter the measurable value for this impact claim</p>
                                 </div>
                                 
                                 <div className="bg-gray-50 rounded-xl p-8 border-2 border-gray-200">
-                                    <label className="block text-sm font-semibold text-gray-900 mb-4">
-                                        <Hash className="w-5 h-5 inline mr-2 text-blue-600" />
-                                        Value <span className="text-red-500">*</span>
-                                    </label>
                                     <div className="relative">
                                         <input
                                             type="number"
@@ -332,11 +340,6 @@ export default function AddKPIUpdateModal({
                                             </span>
                                         </div>
                                     </div>
-                                    <p className="text-sm text-gray-500 mt-4 text-center">
-                                        {metricType === 'percentage' 
-                                            ? 'Enter a value between 0 and 100'
-                                            : `Enter the ${unitOfMeasurement.toLowerCase()} value`}
-                                    </p>
                                 </div>
                             </div>
                         )}
@@ -458,7 +461,7 @@ export default function AddKPIUpdateModal({
                             <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
                                 <div className="text-center mb-6">
                                     <h3 className="text-2xl font-semibold text-gray-900 mb-2">Add Details</h3>
-                                    <p className="text-gray-600">Provide a title and description for this impact claim</p>
+                                    <p className="text-gray-600">Provide a Title and Description for this Impact Claim</p>
                                 </div>
                                 
                                 <div className="space-y-6">
@@ -471,7 +474,7 @@ export default function AddKPIUpdateModal({
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-900 mb-3">
                                             <FileText className="w-5 h-5 inline mr-2 text-blue-600" />
-                                            Label or Title (optional)
+                                            Label or Title <span className="text-red-500">*</span>
                                         </label>
                                         <input
                                             type="text"
@@ -480,6 +483,7 @@ export default function AddKPIUpdateModal({
                                             onChange={handleInputChange}
                                             className="input-field text-base py-3"
                                             placeholder="e.g., Week 2 Update, Follow-up Training Day"
+                                            required
                                         />
                                     </div>
 
@@ -499,11 +503,8 @@ export default function AddKPIUpdateModal({
                                     </div>
 
                                     <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-5 mt-6">
-                                        <h4 className="text-sm font-semibold text-blue-900 mb-2">📋 About Impact Claims</h4>
                                         <p className="text-xs text-blue-800 leading-relaxed">
-                                            An impact claim represents a specific measurement of your work. You can set a date range (e.g., 3 days) 
-                                            to represent work that spans multiple days. Evidence you upload may cover only part of this range, 
-                                            and the system will show how many days your evidence covers (e.g., "Evidence covers 1 of 3 days").
+                                            An Impact Claim records impact by location and date. Evidence is automatically linked when it overlaps in date and location.
                                         </p>
                                     </div>
                                 </div>
@@ -513,12 +514,12 @@ export default function AddKPIUpdateModal({
                 </form>
 
                 {/* Navigation Footer */}
-                <div className="border-t border-gray-200 p-6 bg-gray-50">
+                <div className="border-t border-evidence-100/40 p-6 bg-white/30 backdrop-blur-xl">
                     <div className="flex items-center justify-between">
                         <button
                             type="button"
                             onClick={currentStep === 1 ? onClose : handleBack}
-                            className="flex items-center space-x-2 px-6 py-3 text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+                            className="flex items-center space-x-2 px-5 py-3 text-gray-600 bg-white/50 backdrop-blur-sm border border-gray-200/60 rounded-xl hover:bg-white/70 font-medium transition-all duration-200"
                         >
                             {currentStep === 1 ? (
                                 <>
@@ -539,7 +540,7 @@ export default function AddKPIUpdateModal({
                                     type="button"
                                     onClick={handleNext}
                                     disabled={!canProceedToNextStep()}
-                                    className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors shadow-sm hover:shadow-md"
+                                    className="flex items-center space-x-2 px-6 py-3 bg-evidence-500 text-white rounded-xl hover:bg-evidence-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/30 hover:shadow-xl hover:shadow-evidence-500/40"
                                 >
                                     <span>Next</span>
                                     <ChevronRight className="w-5 h-5" />
@@ -549,7 +550,7 @@ export default function AddKPIUpdateModal({
                                     type="submit"
                                     onClick={handleSubmit}
                                     disabled={loading || formData.value === 0}
-                                    className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors shadow-sm hover:shadow-md"
+                                    className="flex items-center space-x-2 px-6 py-3 bg-evidence-500 text-white rounded-xl hover:bg-evidence-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/30 hover:shadow-xl hover:shadow-evidence-500/40"
                                 >
                                     {loading ? (
                                         <>

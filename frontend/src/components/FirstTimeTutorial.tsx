@@ -78,7 +78,7 @@ export default function FirstTimeTutorial({ onClose, onGetStarted }: FirstTimeTu
 
                 <div className="text-center">
                     <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <IconComponent className="w-8 h-8 text-primary-600" />
+                        <IconComponent className="w-8 h-8 text-primary-500" />
                     </div>
 
                     <h2 className="text-2xl font-bold text-gray-900 mb-3">
@@ -103,7 +103,7 @@ export default function FirstTimeTutorial({ onClose, onGetStarted }: FirstTimeTu
                             <div
                                 key={index}
                                 className={`w-2 h-2 rounded-full ${index === currentStep
-                                    ? 'bg-primary-600'
+                                    ? 'bg-primary-500'
                                     : index < currentStep
                                         ? 'bg-primary-300'
                                         : 'bg-gray-200'
@@ -132,7 +132,7 @@ export default function FirstTimeTutorial({ onClose, onGetStarted }: FirstTimeTu
 
                         <button
                             onClick={handleNext}
-                            className="flex items-center space-x-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
+                            className="flex items-center space-x-2 bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 transition-colors"
                         >
                             <span>
                                 {currentStep === steps.length - 1 ? 'Get Started' : 'Next'}

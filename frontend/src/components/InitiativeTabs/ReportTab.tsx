@@ -455,7 +455,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
     }
 
     return (
-        <div className="h-[calc(100vh-64px)] overflow-y-auto bg-gray-50 relative">
+        <div className="h-[calc(100vh-64px)] overflow-y-auto relative">
             {/* Full-screen loading overlay */}
             {loadingReport && (
                 <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 flex items-center justify-center">
@@ -464,17 +464,17 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                             <div className="w-20 h-20 mx-auto mb-6">
                                 <div className="relative w-full h-full">
                                     <div className="absolute inset-0 border-4 border-primary-200 rounded-full"></div>
-                                    <div className="absolute inset-0 border-4 border-primary-600 rounded-full border-t-transparent animate-spin"></div>
+                                    <div className="absolute inset-0 border-4 border-primary-500 rounded-full border-t-transparent animate-spin"></div>
                                 </div>
                             </div>
-                            <Sparkles className="w-12 h-12 text-primary-600 mx-auto mb-4 animate-pulse" />
+                            <Sparkles className="w-12 h-12 text-primary-500 mx-auto mb-4 animate-pulse" />
                         </div>
                         <h2 className="text-2xl font-bold text-gray-900 mb-2">Generating Impact Report</h2>
                         <p className="text-lg text-gray-600 mb-8">{loadingMessage || 'Processing...'}</p>
                         <div className="flex items-center justify-center space-x-2">
-                            <div className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                            <div className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                            <div className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                            <div className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                            <div className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                            <div className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                         </div>
                     </div>
                 </div>
@@ -482,21 +482,21 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
             <div className="max-w-7xl mx-auto p-6 space-y-6">
                 {/* Header */}
-                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
                     <div className="flex items-center space-x-3 mb-4">
-                        <div className="p-2 bg-primary-100 rounded-lg">
-                            <Sparkles className="w-6 h-6 text-primary-600" />
+                        <div className="icon-bubble">
+                            <Sparkles className="w-5 h-5 text-primary-500" />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">AI Report Generator</h1>
+                            <h1 className="text-xl font-semibold text-gray-800">AI Report Generator</h1>
                             <p className="text-sm text-gray-500">Generate professional impact reports powered by AI</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Filters Panel */}
-                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Filters</h2>
+                <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
+                    <h2 className="text-base font-semibold text-gray-800 mb-4">Filters</h2>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         {/* Date Range */}
@@ -513,13 +513,13 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
                         {/* KPI Multi-Select */}
                         <div className="relative" ref={kpiPickerRef}>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-gray-600 mb-2">
                                 <BarChart3 className="w-4 h-4 inline mr-1" />
                                 Metrics ({selectedKPIIds.length} selected)
                             </label>
                             <button
                                 onClick={() => setShowKPIPicker(!showKPIPicker)}
-                                className="w-full px-4 py-2 text-left bg-white border border-gray-300 rounded-lg hover:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                className="w-full px-4 py-2.5 text-left bg-white border border-gray-200 rounded-xl hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm shadow-bubble-sm"
                             >
                                 {selectedKPIIds.length === 0
                                     ? 'Select metrics...'
@@ -527,7 +527,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                 }
                             </button>
                             {showKPIPicker && (
-                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-bubble max-h-60 overflow-y-auto">
                                     {kpis.length === 0 ? (
                                         <div className="p-4 text-sm text-gray-500">No metrics available</div>
                                     ) : (
@@ -552,13 +552,13 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
                         {/* Location Multi-Select */}
                         <div className="relative" ref={locationPickerRef}>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-gray-600 mb-2">
                                 <MapPin className="w-4 h-4 inline mr-1" />
                                 Locations ({selectedLocationIds.length} selected)
                             </label>
                             <button
                                 onClick={() => setShowLocationPicker(!showLocationPicker)}
-                                className="w-full px-4 py-2 text-left bg-white border border-gray-300 rounded-lg hover:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                className="w-full px-4 py-2.5 text-left bg-white border border-gray-200 rounded-xl hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm shadow-bubble-sm"
                             >
                                 {selectedLocationIds.length === 0
                                     ? 'Select locations...'
@@ -566,7 +566,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                 }
                             </button>
                             {showLocationPicker && (
-                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-bubble max-h-60 overflow-y-auto">
                                     {locations.length === 0 ? (
                                         <div className="p-4 text-sm text-gray-500">No locations available</div>
                                     ) : (
@@ -591,13 +591,13 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
                         {/* Beneficiary Group Multi-Select */}
                         <div className="relative" ref={beneficiaryPickerRef}>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-gray-600 mb-2">
                                 <Users className="w-4 h-4 inline mr-1" />
                                 Beneficiary Groups ({selectedBeneficiaryGroupIds.length} selected)
                             </label>
                             <button
                                 onClick={() => setShowBeneficiaryPicker(!showBeneficiaryPicker)}
-                                className="w-full px-4 py-2 text-left bg-white border border-gray-300 rounded-lg hover:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                className="w-full px-4 py-2.5 text-left bg-white border border-gray-200 rounded-xl hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm shadow-bubble-sm"
                             >
                                 {selectedBeneficiaryGroupIds.length === 0
                                     ? 'Select beneficiary groups...'
@@ -605,7 +605,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                 }
                             </button>
                             {showBeneficiaryPicker && (
-                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-bubble max-h-60 overflow-y-auto">
                                     {beneficiaryGroups.length === 0 ? (
                                         <div className="p-4 text-sm text-gray-500">No beneficiary groups available</div>
                                     ) : (
@@ -633,7 +633,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                     <button
                         onClick={handleApplyFilters}
                         disabled={loadingData}
-                        className="w-full md:w-auto px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                        className="w-full md:w-auto px-6 py-2.5 bg-primary-500 text-white rounded-2xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 font-medium transition-all duration-200 shadow-bubble-sm"
                     >
                         {loadingData ? (
                             <>
@@ -654,17 +654,17 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                     <div className="space-y-6">
                         {/* Totals Section */}
                         {reportData.totals.length > 0 && (
-                            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                                <h2 className="text-lg font-semibold text-gray-900 mb-4">Metrics Summary</h2>
+                            <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
+                                <h2 className="text-base font-semibold text-gray-800 mb-4">Metrics Summary</h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {reportData.totals.map(total => (
-                                        <div key={total.kpi_id} className="p-4 bg-gray-50 rounded-lg">
-                                            <h3 className="font-medium text-gray-900">{total.kpi_title}</h3>
-                                            <p className="text-2xl font-bold text-primary-600 mt-2">
-                                                {total.total_value} {total.unit_of_measurement}
+                                        <div key={total.kpi_id} className="p-4 bg-gray-50/50 rounded-xl border border-gray-100">
+                                            <h3 className="font-medium text-gray-700 text-sm">{total.kpi_title}</h3>
+                                            <p className="text-2xl font-semibold text-impact-500 mt-2">
+                                                {total.total_value} <span className="text-sm font-normal text-gray-500">{total.unit_of_measurement}</span>
                                             </p>
                                             {total.kpi_description && (
-                                                <p className="text-sm text-gray-500 mt-1">{total.kpi_description}</p>
+                                                <p className="text-xs text-gray-500 mt-1">{total.kpi_description}</p>
                                             )}
                                         </div>
                                     ))}
@@ -674,23 +674,23 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
                         {/* Stories List */}
                         {reportData.stories.length > 0 && (
-                            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                                <h2 className="text-lg font-semibold text-gray-900 mb-4">Stories ({reportData.stories.length})</h2>
+                            <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
+                                <h2 className="text-base font-semibold text-gray-800 mb-4">Stories ({reportData.stories.length})</h2>
                                 <div className="space-y-3">
                                     {reportData.stories.map(story => (
                                         <div
                                             key={story.id}
                                             onClick={() => setSelectedStory(story)}
-                                            className={`p-4 border rounded-lg cursor-pointer transition-colors ${selectedStory?.id === story.id
-                                                ? 'border-primary-500 bg-primary-50'
-                                                : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
+                                            className={`p-4 border rounded-xl cursor-pointer transition-all duration-200 ${selectedStory?.id === story.id
+                                                ? 'border-primary-300 bg-primary-50 shadow-bubble-sm'
+                                                : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
                                                 }`}
                                         >
-                                            <h3 className="font-medium text-gray-900">{story.title}</h3>
+                                            <h3 className="font-medium text-gray-800">{story.title}</h3>
                                             {story.description && (
-                                                <p className="text-sm text-gray-600 mt-1 line-clamp-2">{story.description}</p>
+                                                <p className="text-sm text-gray-500 mt-1 line-clamp-2">{story.description}</p>
                                             )}
-                                            <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                                            <div className="flex items-center space-x-4 mt-2 text-xs text-gray-400">
                                                 {story.location_name && (
                                                     <span className="flex items-center">
                                                         <MapPin className="w-3 h-3 mr-1" />
@@ -707,19 +707,19 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
                         {/* Locations List */}
                         {reportData.locations.length > 0 && (
-                            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                                <h2 className="text-lg font-semibold text-gray-900 mb-4">Locations ({reportData.locations.length})</h2>
+                            <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
+                                <h2 className="text-base font-semibold text-gray-800 mb-4">Locations ({reportData.locations.length})</h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     {reportData.locations.map(location => (
-                                        <div key={location.id} className="p-3 bg-gray-50 rounded-lg">
+                                        <div key={location.id} className="p-3 bg-gray-50/50 rounded-xl border border-gray-100">
                                             <div className="flex items-center space-x-2">
-                                                <MapPin className="w-4 h-4 text-primary-600" />
-                                                <span className="font-medium text-gray-900">{location.name}</span>
+                                                <MapPin className="w-4 h-4 text-primary-500" />
+                                                <span className="font-medium text-gray-800 text-sm">{location.name}</span>
                                             </div>
                                             {location.description && (
-                                                <p className="text-sm text-gray-600 mt-1">{location.description}</p>
+                                                <p className="text-xs text-gray-500 mt-1">{location.description}</p>
                                             )}
-                                            <p className="text-xs text-gray-500 mt-1">
+                                            <p className="text-xs text-gray-400 mt-1">
                                                 {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
                                             </p>
                                         </div>
@@ -729,19 +729,19 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                         )}
 
                         {/* Story Selection and Generate Button */}
-                        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                            <h2 className="text-lg font-semibold text-gray-900 mb-4">Generate Report</h2>
+                        <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
+                            <h2 className="text-base font-semibold text-gray-800 mb-4">Generate Report</h2>
                             {reportData.stories.length > 0 && !selectedStory ? (
                                 <p className="text-sm text-gray-500 mb-4">Optional: Select a story above to anchor the report narrative, or generate without a story.</p>
                             ) : selectedStory ? (
                                 <p className="text-sm text-gray-600 mb-4">
-                                    Selected story: <strong>{selectedStory.title}</strong>
+                                    Selected story: <strong className="text-gray-800">{selectedStory.title}</strong>
                                 </p>
                             ) : null}
                             <button
                                 onClick={handleGenerateReport}
                                 disabled={loadingReport}
-                                className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                                className="px-6 py-2.5 bg-primary-500 text-white rounded-2xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 font-medium transition-all duration-200 shadow-bubble-sm"
                             >
                                 {loadingReport ? (
                                     <>
@@ -759,9 +759,9 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
                         {/* Report Dashboard */}
                         {reportText && reportDashboardData && reportData && (
-                            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                            <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
                                 <div className="flex items-center justify-between mb-4">
-                                    <h2 className="text-lg font-semibold text-gray-900">Report Dashboard</h2>
+                                    <h2 className="text-base font-semibold text-gray-800">Report Dashboard</h2>
                                     <button
                                         onClick={async () => {
                                             try {
@@ -784,13 +784,13 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                                 toast.error('Failed to download PDF', { id: 'pdf-download' })
                                             }
                                         }}
-                                        className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center space-x-2"
+                                        className="px-4 py-2 bg-primary-500 text-white rounded-2xl hover:bg-primary-600 flex items-center space-x-2 text-sm font-medium transition-all duration-200 shadow-bubble-sm"
                                     >
                                         <Download className="w-4 h-4" />
                                         <span>Download as PDF</span>
                                     </button>
                                 </div>
-                                <div className="border border-gray-200 rounded-lg overflow-auto bg-gray-50" style={{ maxHeight: '900px' }}>
+                                <div className="border border-gray-100 rounded-xl overflow-auto bg-gray-50/50" style={{ maxHeight: '900px' }}>
                                     {dashboard && (
                                         <ReportDashboard
                                             dashboard={dashboard}
@@ -813,10 +813,12 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
                 {/* Empty State */}
                 {!reportData && (
-                    <div className="bg-white rounded-lg shadow-sm p-12 border border-gray-200 text-center">
-                        <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No Report Data</h3>
-                        <p className="text-gray-500 mb-6">
+                    <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-12 text-center">
+                        <div className="icon-bubble mx-auto mb-4">
+                            <FileText className="w-6 h-6 text-gray-400" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">No Report Data</h3>
+                        <p className="text-gray-500 text-sm">
                             Apply filters above to see metrics, stories, and locations for your report.
                         </p>
                     </div>

@@ -80,19 +80,19 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
                                 )}
                             </div>
                         ) : (
-                            <div className="relative w-full aspect-video bg-gradient-to-br from-green-100 to-green-200 rounded-lg flex items-center justify-center">
+                            <div className="relative w-full aspect-video bg-gradient-to-br from-primary-100 to-primary-200 rounded-lg flex items-center justify-center">
                                 <div className="text-center p-6">
-                                    <div className="w-20 h-20 bg-green-300 rounded-full mx-auto mb-3 flex items-center justify-center">
+                                    <div className="w-20 h-20 bg-primary-300 rounded-full mx-auto mb-3 flex items-center justify-center">
                                         {story.media_type === 'photo' ? (
-                                            <Image className="w-10 h-10 text-green-600" />
+                                            <Image className="w-10 h-10 text-primary-500" />
                                         ) : story.media_type === 'video' ? (
-                                            <Video className="w-10 h-10 text-green-600" />
+                                            <Video className="w-10 h-10 text-primary-500" />
                                         ) : (
-                                            <Mic className="w-10 h-10 text-green-600" />
+                                            <Mic className="w-10 h-10 text-primary-500" />
                                         )}
                                     </div>
-                                    <p className="text-lg font-medium text-green-700">No Media</p>
-                                    <p className="text-sm text-green-600 mt-1">Media not uploaded</p>
+                                    <p className="text-lg font-medium text-primary-700">No Media</p>
+                                    <p className="text-sm text-primary-500 mt-1">Media not uploaded</p>
                                 </div>
                             </div>
                         )}

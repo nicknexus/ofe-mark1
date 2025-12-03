@@ -203,7 +203,7 @@ export default function KPICharts({ kpi, updates, evidence, proofPercentage }: K
                     <div className="h-250 flex flex-col justify-center">
                         {/* Proof Percentage Circle */}
                         <div className="text-center mb-6">
-                            <div className={`inline-flex items-center justify-center w-32 h-32 rounded-full text-4xl font-bold ${proofPercentage >= 80 ? 'bg-green-100 text-green-600' :
+                            <div className={`inline-flex items-center justify-center w-32 h-32 rounded-full text-4xl font-bold ${proofPercentage >= 80 ? 'bg-primary-100 text-primary-500' :
                                 proofPercentage >= 30 ? 'bg-yellow-100 text-yellow-600' :
                                     'bg-red-100 text-red-600'
                                 }`}>
@@ -222,8 +222,8 @@ export default function KPICharts({ kpi, updates, evidence, proofPercentage }: K
                                 <p className="text-lg font-semibold text-gray-900">{evidence.length}</p>
                                 <p className="text-xs text-gray-600">Evidence Items</p>
                             </div>
-                            <div className="p-3 bg-green-50 rounded-lg">
-                                <p className="text-lg font-semibold text-green-600">
+                            <div className="p-3 bg-primary-50 rounded-lg">
+                                <p className="text-lg font-semibold text-primary-500">
                                     {updates.filter(u => evidence.some(e =>
                                         e.date_represented === u.date_represented ||
                                         (e.date_range_start && e.date_range_end &&

@@ -106,3 +106,4 @@ COMMENT ON COLUMN donor_credits.kpi_update_id IS 'Optional: If specified, credit
 COMMENT ON COLUMN donor_credits.credited_value IS 'The numeric value from the metric that is credited to this donor.';
 COMMENT ON COLUMN donor_credits.credited_percentage IS 'Optional percentage of the total metric value credited to this donor.';
 
+

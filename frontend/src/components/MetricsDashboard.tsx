@@ -61,13 +61,13 @@ function SortableMetricCard({ kpi, metricColor, filteredTotal, onMetricCardClick
         <div
             ref={setNodeRef}
             style={style}
-            className="bg-white/80 backdrop-blur-sm border border-gray-200/60 rounded-lg p-2 hover:shadow-md hover:border-blue-300 cursor-pointer transition-all relative group"
+            className="bg-white rounded-xl shadow-bubble-sm border border-gray-100 p-3 hover:shadow-bubble hover:border-gray-200 cursor-pointer transition-all duration-200 relative group"
         >
             {/* Drag Handle - Top Right Corner */}
             <div
                 {...attributes}
                 {...listeners}
-                className="absolute top-1 right-1 cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute top-1 right-1 cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded-lg z-10 opacity-0 group-hover:opacity-100 transition-opacity"
                 style={{ opacity: isDragging ? 1 : undefined }}
             >
                 <GripVertical className="w-3 h-3 text-gray-400" />
@@ -77,12 +77,12 @@ function SortableMetricCard({ kpi, metricColor, filteredTotal, onMetricCardClick
             >
                 <div className="flex items-center justify-between mb-1">
                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: metricColor }} />
-                    <span className="text-xs text-gray-500 truncate ml-1 flex-1">{kpi.unit_of_measurement || ''}</span>
+                    <span className="text-xs text-gray-400 truncate ml-1 flex-1">{kpi.unit_of_measurement || ''}</span>
                 </div>
-                <div className="text-xs font-semibold text-gray-900 truncate mb-1" title={kpi.title}>
+                <div className="text-xs font-medium text-gray-700 truncate mb-1" title={kpi.title}>
                     {kpi.title}
                 </div>
-                <div className="text-base font-bold" style={{ color: metricColor }}>
+                <div className="text-base font-semibold" style={{ color: metricColor }}>
                     {filteredTotal.toLocaleString()}
                 </div>
             </div>
@@ -696,9 +696,9 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     const yTicks = generateYTicks()
 
     return (
-        <div className="h-full flex flex-col overflow-hidden px-3 pt-2 pb-2 space-y-1.5">
+        <div className="h-full flex flex-col overflow-hidden px-4 pt-4 pb-4 space-y-4">
             {/* Master Filter Bar */}
-            <div className="bg-white/80 backdrop-blur-sm border border-gray-200/60 rounded-lg p-1.5 flex items-center justify-between flex-wrap gap-1.5 flex-shrink-0">
+            <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-3 flex items-center justify-between flex-wrap gap-2 flex-shrink-0">
                 <div className="flex items-center space-x-2 flex-wrap">
                     <span className="text-xs font-semibold text-gray-700">Filters:</span>
 
@@ -727,7 +727,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setShowLocationPicker(false)
                                 setShowBeneficiaryPicker(false)
                             }}
-                            className="flex items-center space-x-1 px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded text-xs font-medium transition-colors border border-blue-200"
+                            className="flex items-center space-x-1 px-3 py-1.5 bg-evidence-50 hover:bg-evidence-100 text-evidence-600 rounded-xl text-xs font-medium transition-all duration-200 border border-evidence-200"
                         >
                             <Filter className="w-3 h-3" />
                             <span>Metrics</span>
@@ -742,7 +742,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             <>
                                 <div className="fixed inset-0 z-[9998]" onClick={() => setShowMetricsPicker(false)} />
                                 <div
-                                    className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] p-2 min-w-[200px] max-h-64 overflow-y-auto"
+                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-bubble z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
                                     style={{
                                         top: `${metricsDropdownPosition.top}px`,
                                         left: `${metricsDropdownPosition.left}px`
@@ -810,12 +810,12 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setShowMetricsPicker(false)
                                 setShowBeneficiaryPicker(false)
                             }}
-                            className="flex items-center space-x-1 px-2 py-1 bg-green-50 hover:bg-green-100 text-green-700 rounded text-xs font-medium transition-colors border border-green-200"
+                            className="flex items-center space-x-1 px-2 py-1 bg-primary-50 hover:bg-primary-100 text-primary-700 rounded text-xs font-medium transition-colors border border-primary-200"
                         >
                             <MapPin className="w-3 h-3" />
                             <span>Location</span>
                             {selectedLocations.length > 0 && (
-                                <span className="ml-1 bg-green-600 text-white text-[10px] px-1 rounded-full">
+                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
                                     {selectedLocations.length}
                                 </span>
                             )}
@@ -865,7 +865,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                                                 setSelectedLocations(selectedLocations.filter(id => id !== location.id))
                                                             }
                                                         }}
-                                                        className="w-3 h-3 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                                                        className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
                                                     />
                                                     <span className="text-xs text-gray-700 truncate flex-1">
                                                         {location.name}
@@ -991,7 +991,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     items={displayKPIs.map(kpi => kpi.id!)}
                     strategy={horizontalListSortingStrategy}
                 >
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 flex-shrink-0">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 flex-shrink-0">
                         {displayKPIs.map((kpi, index) => {
                             const metricColor = getKPIColor(kpi.category, index)
                             return (
@@ -1008,7 +1008,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                         {kpis.length < 6 && onAddKPI && (
                             <button
                                 onClick={onAddKPI}
-                                className="bg-white/80 backdrop-blur-sm border-2 border-dashed border-gray-300/60 rounded-lg p-2 hover:shadow-md hover:border-blue-400 hover:bg-blue-50/50 cursor-pointer transition-all flex flex-col items-center justify-center min-h-[80px]"
+                                className="bg-white rounded-xl border-2 border-dashed border-gray-200 p-3 hover:shadow-bubble hover:border-primary-300 hover:bg-primary-50/30 cursor-pointer transition-all duration-200 flex flex-col items-center justify-center min-h-[80px]"
                             >
                                 <Plus className="w-5 h-5 text-gray-400 mb-1" />
                                 <span className="text-xs text-gray-500 font-medium">Add Metric</span>
@@ -1019,37 +1019,37 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
             </DndContext>
 
             {/* Graph and Map Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-1.5 h-[25vh] lg:h-[50vh] overflow-hidden">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 h-[25vh] lg:h-[50vh] overflow-hidden">
                 {/* Graph - Left - 3/5 width */}
-                <div className="lg:col-span-3 bg-gradient-to-br from-blue-50/30 to-indigo-50/20 border border-blue-100/60 rounded-lg p-1.5 flex flex-col min-h-0 overflow-hidden">
-                    <div className="flex items-center justify-between mb-2">
+                <div className="lg:col-span-3 bg-white rounded-2xl shadow-bubble border border-gray-100 p-4 flex flex-col min-h-0 overflow-hidden">
+                    <div className="flex items-center justify-between mb-3">
                         <div>
-                            <h3 className="text-sm font-semibold text-gray-900">Metrics Over Time</h3>
+                            <h3 className="text-sm font-semibold text-gray-800">Metrics Over Time</h3>
                         </div>
-                        <div className="flex items-center space-x-1">
+                        <div className="flex items-center space-x-2">
                             {/* Cumulative/Non-cumulative Toggle - Always visible to persist month-to-month view */}
-                            <div className="flex items-center space-x-0.5 bg-white/80 rounded p-0.5 mr-1">
+                            <div className="flex items-center bg-gray-50 rounded-xl p-0.5">
                                 <button
                                     onClick={() => setIsCumulative(true)}
-                                    className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${isCumulative
-                                        ? 'bg-blue-600 text-white'
-                                        : 'text-gray-600 hover:bg-gray-100'
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${isCumulative
+                                        ? 'bg-white text-gray-800 shadow-bubble-sm'
+                                        : 'text-gray-500 hover:text-gray-700'
                                         }`}
                                 >
                                     Cumulative
                                 </button>
                                 <button
                                     onClick={() => setIsCumulative(false)}
-                                    className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${!isCumulative
-                                        ? 'bg-blue-600 text-white'
-                                        : 'text-gray-600 hover:bg-gray-100'
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${!isCumulative
+                                        ? 'bg-white text-gray-800 shadow-bubble-sm'
+                                        : 'text-gray-500 hover:text-gray-700'
                                         }`}
                                 >
                                     Monthly
                                 </button>
                             </div>
                             {/* Time Frame Filters */}
-                            <div className="flex items-center space-x-0.5 bg-white/80 rounded p-0.5">
+                            <div className="flex items-center bg-gray-50 rounded-xl p-0.5">
                                 {(['all', '1month', '6months', '1year', '5years'] as const).map((tf) => (
                                     <button
                                         key={tf}
@@ -1057,9 +1057,9 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                             setTimeFrame(tf)
                                             // Preserve monthly view state when switching time frames
                                         }}
-                                        className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${timeFrame === tf
-                                            ? 'bg-blue-600 text-white'
-                                            : 'text-gray-600 hover:bg-gray-100'
+                                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${timeFrame === tf
+                                            ? 'bg-white text-gray-800 shadow-bubble-sm'
+                                            : 'text-gray-500 hover:text-gray-700'
                                             }`}
                                     >
                                         {tf === 'all' ? 'All' : tf === '1month' ? '1M' : tf === '6months' ? '6M' : tf === '1year' ? '1Y' : '5Y'}
@@ -1164,13 +1164,13 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                 </div>
 
                 {/* Map - Right - 2/5 width */}
-                <div className="lg:col-span-2 bg-white border border-gray-200/60 rounded-lg p-1.5 flex flex-col relative min-h-0 overflow-hidden">
-                    <div className="flex items-center justify-between mb-1.5 flex-shrink-0">
-                        <h3 className="text-sm font-semibold text-gray-900">Locations</h3>
+                <div className="lg:col-span-2 bg-white rounded-2xl shadow-bubble border border-gray-100 p-4 flex flex-col relative min-h-0 overflow-hidden">
+                    <div className="flex items-center justify-between mb-3 flex-shrink-0">
+                        <h3 className="text-sm font-semibold text-gray-800">Locations</h3>
                         {onNavigateToLocations && (
                             <button
                                 onClick={onNavigateToLocations}
-                                className="flex items-center space-x-1 px-2 py-1 bg-green-50 hover:bg-green-100 text-green-700 rounded text-xs font-medium transition-colors border border-green-200"
+                                className="flex items-center space-x-1 px-2.5 py-1 bg-primary-50 hover:bg-primary-100 text-primary-600 rounded-lg text-xs font-medium transition-all duration-200"
                             >
                                 <ExternalLink className="w-3 h-3" />
                                 <span>View All</span>
@@ -1217,32 +1217,36 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
             </div>
 
             {/* Bottom Stats Cards - Skinnier */}
-            <div className="grid grid-cols-2 gap-1.5 flex-shrink-0 h-auto">
+            <div className="grid grid-cols-2 gap-4 flex-shrink-0 h-auto">
                 {/* Total Data Points */}
-                <div className="bg-gradient-to-br from-blue-50/50 to-indigo-50/50 border border-blue-100/60 rounded-lg p-1.5">
-                    <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center space-x-1">
-                            <BarChart3 className="w-3 h-3 text-blue-600" />
-                            <h4 className="text-xs font-semibold text-gray-900">Impact Claims</h4>
+                <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-4 impact-border">
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                            <div className="w-8 h-8 rounded-lg bg-impact-50 flex items-center justify-center">
+                                <BarChart3 className="w-4 h-4 text-impact-400" />
+                            </div>
+                            <h4 className="text-xs font-medium text-gray-600">Impact Claims</h4>
                         </div>
                     </div>
                     <div className="flex items-baseline space-x-1">
-                        <span className="text-base font-bold text-blue-600">
+                        <span className="text-xl font-semibold text-impact-500">
                             {filteredUpdates.length.toLocaleString()}
                         </span>
                     </div>
                 </div>
 
                 {/* Evidence Coverage */}
-                <div className="bg-gradient-to-br from-green-50/50 to-emerald-50/50 border border-green-100/60 rounded-lg p-1.5">
-                    <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center space-x-1">
-                            <Target className="w-3 h-3 text-green-600" />
-                            <h4 className="text-xs font-semibold text-gray-900">Evidence Coverage</h4>
+                <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-4 evidence-border">
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                            <div className="w-8 h-8 rounded-lg bg-evidence-50 flex items-center justify-center">
+                                <Target className="w-4 h-4 text-evidence-400" />
+                            </div>
+                            <h4 className="text-xs font-medium text-gray-600">Evidence Coverage</h4>
                         </div>
                     </div>
                     <div className="flex items-baseline space-x-1">
-                        <span className="text-base font-bold text-green-600">
+                        <span className="text-xl font-semibold text-evidence-500">
                             {stats.evidence_coverage_percentage}%
                         </span>
                     </div>

@@ -35,6 +35,7 @@ interface ExpandableKPICardProps {
     kpi: any
     kpiTotal: number
     isExpanded: boolean
+    renderAsPage?: boolean // When true, renders as full page instead of portal overlay
     onToggleExpand: () => void
     onAddUpdate: () => void
     onAddEvidence: () => void
@@ -49,6 +50,7 @@ export default function ExpandableKPICard({
     kpi,
     kpiTotal,
     isExpanded,
+    renderAsPage = false,
     onToggleExpand,
     onAddUpdate,
     onAddEvidence,
@@ -59,9 +61,9 @@ export default function ExpandableKPICard({
     onRefresh
 }: ExpandableKPICardProps) {
 
-    // Lock body scroll when expanded
+    // Lock body scroll when expanded (only for portal mode, not page mode)
     useEffect(() => {
-        if (isExpanded) {
+        if (isExpanded && !renderAsPage) {
             document.body.style.overflow = 'hidden'
         } else {
             document.body.style.overflow = 'unset'
@@ -71,7 +73,7 @@ export default function ExpandableKPICard({
         return () => {
             document.body.style.overflow = 'unset'
         }
-    }, [isExpanded])
+    }, [isExpanded, renderAsPage])
 
     // Time frame filter state
     const [timeFrame, setTimeFrame] = useState<'all' | '1month' | '6months' | '1year' | '5years'>('all')
@@ -371,7 +373,7 @@ export default function ExpandableKPICard({
             updateDate.setHours(0, 0, 0, 0)
             const updateStart = update.date_range_start ? parseLocalDate(update.date_range_start) : null
             const updateEnd = update.date_range_end ? parseLocalDate(update.date_range_end) : null
-            
+
             // If update is a date range, check if it overlaps with filter range
             if (updateStart && updateEnd) {
                 updateStart.setHours(0, 0, 0, 0)
@@ -395,40 +397,40 @@ export default function ExpandableKPICard({
             // Start from the month before the first impact claim
             const firstMonthStart = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
             firstMonthStart.setMonth(firstMonthStart.getMonth() - 1)
-            
+
             const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-            
+
             // Group updates by month
             const monthlyTotals: Record<string, number> = {}
-            
+
             filteredUpdates.forEach(update => {
                 const updateDate = getEffectiveDate(update)
                 const monthKey = `${updateDate.getFullYear()}-${String(updateDate.getMonth() + 1).padStart(2, '0')}`
-                
+
                 if (!monthlyTotals[monthKey]) {
                     monthlyTotals[monthKey] = 0
                 }
                 monthlyTotals[monthKey] += (update.value || 0)
             })
-            
+
             // Generate monthly data points
             let currentMonthDate = new Date(firstMonthStart)
             while (currentMonthDate <= currentMonth) {
                 const monthKey = `${currentMonthDate.getFullYear()}-${String(currentMonthDate.getMonth() + 1).padStart(2, '0')}`
                 const monthName = currentMonthDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
                 const monthlyTotal = monthlyTotals[monthKey] || 0
-                
+
                 data.push({
                     date: monthName,
                     cumulative: monthlyTotal,
                     value: monthlyTotal,
                     fullDate: new Date(currentMonthDate)
                 })
-                
+
                 // Move to next month
                 currentMonthDate.setMonth(currentMonthDate.getMonth() + 1)
             }
-            
+
             return data
         }
 
@@ -488,7 +490,7 @@ export default function ExpandableKPICard({
     const getXAxisInterval = () => {
         // Non-cumulative mode: show every month (interval 0)
         if (!isCumulative && timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate) return 0
-        
+
         // If viewing 1 month, show all labels (every day)
         if (timeFrame === '1month') return 0
 
@@ -558,7 +560,7 @@ export default function ExpandableKPICard({
     const calculateEvidenceTypePercentages = () => {
         // Total data points (claims) for this KPI
         const totalDataPoints = kpiUpdates?.length || 0
-        
+
         if (!evidence || evidence.length === 0 || totalDataPoints === 0) {
             return {
                 visual_proof: { count: 0, percentage: 0 },
@@ -582,7 +584,7 @@ export default function ExpandableKPICard({
         // Go through each evidence item and track which data points it covers
         evidence.forEach((ev: any) => {
             if (!ev.type || !dataPointsCoveredByType.hasOwnProperty(ev.type)) return
-            
+
             // Get data points covered by this evidence
             // Check if evidence has kpi_update_ids (new precise linking)
             if (ev.kpi_update_ids && Array.isArray(ev.kpi_update_ids)) {
@@ -613,21 +615,21 @@ export default function ExpandableKPICard({
 
         // Calculate percentage for each type: (unique data points covered / total data points) * 100
         return {
-            visual_proof: { 
-                count: dataPointsCoveredByType.visual_proof.size, 
-                percentage: totalDataPoints > 0 ? Math.round((dataPointsCoveredByType.visual_proof.size / totalDataPoints) * 100) : 0 
+            visual_proof: {
+                count: dataPointsCoveredByType.visual_proof.size,
+                percentage: totalDataPoints > 0 ? Math.round((dataPointsCoveredByType.visual_proof.size / totalDataPoints) * 100) : 0
             },
-            documentation: { 
-                count: dataPointsCoveredByType.documentation.size, 
-                percentage: totalDataPoints > 0 ? Math.round((dataPointsCoveredByType.documentation.size / totalDataPoints) * 100) : 0 
+            documentation: {
+                count: dataPointsCoveredByType.documentation.size,
+                percentage: totalDataPoints > 0 ? Math.round((dataPointsCoveredByType.documentation.size / totalDataPoints) * 100) : 0
             },
-            testimony: { 
-                count: dataPointsCoveredByType.testimony.size, 
-                percentage: totalDataPoints > 0 ? Math.round((dataPointsCoveredByType.testimony.size / totalDataPoints) * 100) : 0 
+            testimony: {
+                count: dataPointsCoveredByType.testimony.size,
+                percentage: totalDataPoints > 0 ? Math.round((dataPointsCoveredByType.testimony.size / totalDataPoints) * 100) : 0
             },
-            financials: { 
-                count: dataPointsCoveredByType.financials.size, 
-                percentage: totalDataPoints > 0 ? Math.round((dataPointsCoveredByType.financials.size / totalDataPoints) * 100) : 0 
+            financials: {
+                count: dataPointsCoveredByType.financials.size,
+                percentage: totalDataPoints > 0 ? Math.round((dataPointsCoveredByType.financials.size / totalDataPoints) * 100) : 0
             }
         }
     }
@@ -645,9 +647,337 @@ export default function ExpandableKPICard({
         }
     }
 
+    // When renderAsPage is true, skip the card wrapper and collapsed view entirely
+    if (renderAsPage && isExpanded) {
+        return (
+            <>
+                {/* Full Page View - No card wrapper */}
+                <div className="h-[calc(100vh-64px)] flex flex-col overflow-hidden">
+                    {/* Header - Compact */}
+                    <div className="flex-shrink-0 bg-white/80 backdrop-blur-xl border-b border-gray-100/60 px-4 py-2 shadow-soft-float">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                                <button onClick={(e) => { e.stopPropagation(); onToggleExpand() }} className="p-1.5 hover:bg-red-50 rounded-lg transition-all duration-200 border border-gray-100">
+                                    <X className="w-4 h-4 text-red-500" />
+                                </button>
+                                <div>
+                                    <h2 className="text-base font-bold text-gray-800">{kpi.title}</h2>
+                                    <p className="text-xs text-gray-500 line-clamp-1 max-w-md">{kpi.description}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center space-x-1.5">
+                                <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-1 px-2.5 py-1.5 bg-evidence-100/80 hover:bg-evidence-200/80 text-evidence-700 rounded-lg text-xs font-medium transition-all duration-200">
+                                    <Plus className="w-3.5 h-3.5" /><span>Impact Claim</span>
+                                </button>
+                                {kpi.total_updates > 0 && (
+                                    <button onClick={(e) => { e.stopPropagation(); onAddEvidence() }} className="flex items-center space-x-1 px-2.5 py-1.5 bg-impact-100/80 hover:bg-impact-200/80 text-impact-700 rounded-lg text-xs font-medium transition-all duration-200">
+                                        <Upload className="w-3.5 h-3.5" /><span>Evidence</span>
+                                    </button>
+                                )}
+                                <button onClick={(e) => { e.stopPropagation(); setIsCreditingModalOpen(true) }} className="flex items-center space-x-1 px-2.5 py-1.5 bg-purple-100/80 hover:bg-purple-200/80 text-purple-700 rounded-lg text-xs font-medium transition-all duration-200">
+                                    <Heart className="w-3.5 h-3.5" /><span>Credit</span>
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); onEdit() }} className="p-1.5 bg-white/60 hover:bg-white/80 border border-gray-200/60 text-gray-600 rounded-lg transition-all duration-200">
+                                    <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); onDelete() }} className="p-1.5 bg-red-50/80 hover:bg-red-100 text-red-500 rounded-lg transition-all duration-200">
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Content - Fit to screen */}
+                    <div className="flex-1 p-3 flex flex-col gap-2 max-w-[1800px] mx-auto overflow-hidden w-full min-h-0">
+                        {kpiUpdates.length === 0 && !loadingEvidence && evidence.length === 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-6">
+                                <div className="bg-white/80 backdrop-blur-xl border border-evidence-200/60 rounded-2xl p-6 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200">
+                                    <div className="text-center">
+                                        <div className="w-16 h-16 mx-auto mb-4 bg-evidence-100/80 rounded-2xl flex items-center justify-center">
+                                            <BarChart3 className="w-8 h-8 text-evidence-500" />
+                                        </div>
+                                        <h5 className="text-lg font-bold text-gray-800 mb-2">Impact Claims</h5>
+                                        <p className="text-sm text-gray-500 mb-4">You haven't added any of this type, add it here!</p>
+                                        <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-5 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25">
+                                            <Plus className="w-4 h-4" /><span>Add Impact Claim</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="bg-white/80 backdrop-blur-xl border border-impact-200/60 rounded-2xl p-6 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200">
+                                    <div className="text-center">
+                                        <div className="w-16 h-16 mx-auto mb-4 bg-impact-100/80 rounded-2xl flex items-center justify-center">
+                                            <FileText className="w-8 h-8 text-impact-500" />
+                                        </div>
+                                        <h5 className="text-lg font-bold text-gray-800 mb-2">Evidence</h5>
+                                        <p className="text-sm text-gray-500 mb-4">You haven't added any of this type, add it here!</p>
+                                        <button onClick={(e) => { e.stopPropagation(); onAddEvidence() }} className="inline-flex items-center space-x-2 px-5 py-2.5 bg-impact-500 hover:bg-impact-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-impact-500/25">
+                                            <Plus className="w-4 h-4" /><span>Add Evidence</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="grid grid-cols-3 gap-2 flex-shrink-0">
+                                    <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-xl p-2.5 shadow-soft-float">
+                                        <div className="flex items-center space-x-2">
+                                            <div className="p-1.5 bg-evidence-100/80 rounded-lg"><BarChart3 className="w-4 h-4 text-evidence-500" /></div>
+                                            <div><p className="text-xs text-gray-500">Impact Claims</p><p className="text-lg font-bold text-evidence-500">{kpi.total_updates}</p></div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white/80 backdrop-blur-xl border border-impact-100/60 rounded-xl p-2.5 shadow-soft-float">
+                                        <div className="flex items-center space-x-2">
+                                            <div className="p-1.5 bg-impact-100/80 rounded-lg"><FileText className="w-4 h-4 text-impact-500" /></div>
+                                            <div><p className="text-xs text-gray-500">Evidence Items</p><p className="text-lg font-bold text-impact-500">{kpi.evidence_count}</p></div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-2.5 shadow-soft-float">
+                                        <div className="flex items-center space-x-2">
+                                            <div className="p-1.5 bg-primary-100/80 rounded-lg"><Target className="w-4 h-4 text-primary-500" /></div>
+                                            <div><p className="text-xs text-gray-500">Evidence Coverage</p><p className="text-lg font-bold text-primary-500">{kpi.evidence_percentage}%</p></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between gap-2 h-8 bg-white/60 backdrop-blur-sm border border-gray-100/60 rounded-lg px-3 flex-shrink-0">
+                                    {(['visual_proof', 'documentation', 'testimony', 'financials'] as const).map((type) => {
+                                        const IconComponent = getEvidenceIcon(type)
+                                        const typeInfo = getEvidenceTypeInfo(type)
+                                        const percentage = evidenceTypePercentages[type].percentage
+                                        const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' : typeInfo.color.includes('blue') ? 'text-blue-600' : typeInfo.color.includes('orange') ? 'text-orange-600' : typeInfo.color.includes('green') ? 'text-primary-500' : 'text-gray-600'
+                                        return (
+                                            <div key={type} className="flex items-center gap-1.5 flex-1 min-w-0">
+                                                <IconComponent className={`w-3.5 h-3.5 ${colorClasses} flex-shrink-0`} />
+                                                <div className="flex flex-col items-start min-w-0 flex-1 overflow-hidden">
+                                                    <span className="text-[9px] font-medium text-gray-700 truncate w-full leading-tight">{typeInfo.label}</span>
+                                                    <span className="text-[8px] font-bold text-gray-600 leading-tight whitespace-nowrap">{percentage}%</span>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 flex-1 min-h-0 overflow-hidden">
+                                    <div className="lg:col-span-3 bg-white/80 backdrop-blur-xl border border-gray-100/60 rounded-xl p-3 flex flex-col shadow-soft-float min-h-0 overflow-hidden">
+                                        <div className="flex items-center justify-between mb-2 flex-shrink-0">
+                                            <div>
+                                                <h5 className="text-base font-semibold text-gray-900">{isCumulative ? 'Cumulative Progress' : 'Monthly Progress'}</h5>
+                                                <p className="text-xs text-gray-500">{isCumulative ? 'Running total over time' : 'Monthly totals'}</p>
+                                            </div>
+                                            <div className="flex items-center space-x-2 flex-wrap">
+                                                <DateRangePicker value={datePickerValue} onChange={setDatePickerValue} maxDate={getLocalDateString(new Date())} placeholder="Filter by date" className="w-auto" />
+                                                {timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
+                                                    <div className="flex items-center space-x-0.5 bg-gray-100 rounded-lg p-0.5">
+                                                        <button onClick={() => setIsCumulative(true)} className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${isCumulative ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
+                                                        <button onClick={() => setIsCumulative(false)} className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${!isCumulative ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
+                                                    </div>
+                                                )}
+                                                <div className="flex bg-gray-100 rounded-lg p-0.5">
+                                                    {['all', '1month', '6months', '1year', '5years'].map((tf) => (
+                                                        <button key={tf} onClick={() => { setTimeFrame(tf as any); setDatePickerValue({}); setIsCumulative(true) }} className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === tf && !datePickerValue.singleDate && !datePickerValue.startDate ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+                                                            {tf === 'all' ? 'All' : tf === '1month' ? '1M' : tf === '6months' ? '6M' : tf === '1year' ? '1Y' : '5Y'}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 min-h-[120px] flex items-center justify-center">
+                                            {kpiUpdates && kpiUpdates.length > 0 ? (
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <LineChart data={chartData}>
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                                        <XAxis dataKey="date" stroke="#9ca3af" fontSize={10} tick={{ fill: '#9ca3af' }} angle={-45} textAnchor="end" height={50} interval={getXAxisInterval()} tickMargin={6} />
+                                                        <YAxis stroke="#9ca3af" fontSize={10} tick={{ fill: '#9ca3af' }} domain={maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax']} ticks={yTicks.length > 0 ? yTicks : undefined} tickFormatter={(value) => { if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`; if (value >= 1000) return `${(value / 1000).toFixed(1)}K`; return value.toString() }} />
+                                                        <Tooltip contentStyle={{ backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '10px', padding: '8px 10px', fontSize: '11px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} formatter={(value: any) => [typeof value === 'number' ? value.toLocaleString() + (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '') : value, 'Cumulative Total']} labelFormatter={(label) => { const dp = chartData.find(d => d.date === label); return dp?.fullDate ? formatDate(dp.fullDate) : `Date: ${label}` }} cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '5 5' }} />
+                                                        <Line type="monotone" dataKey="cumulative" stroke="#3db6fd" strokeWidth={2.5} dot={false} activeDot={{ r: 5, fill: '#3db6fd', stroke: 'white', strokeWidth: 2 }} strokeLinecap="round" />
+                                                    </LineChart>
+                                                </ResponsiveContainer>
+                                            ) : (
+                                                <div className="h-full flex flex-col items-center justify-center text-gray-500">
+                                                    <BarChart3 className="w-10 h-10 mb-3 opacity-50" />
+                                                    <h4 className="text-base font-semibold text-gray-700 mb-1">No Data Yet</h4>
+                                                    <p className="text-xs text-center max-w-xs">Add data to see your activity over time</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="lg:col-span-2 flex flex-col gap-2 min-h-0 overflow-hidden">
+                                        {kpiUpdates && kpiUpdates.length > 0 ? (
+                                            <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-xl p-3 shadow-soft-float flex flex-col flex-1 min-h-0">
+                                                <div className="flex items-center justify-between mb-2 flex-shrink-0">
+                                                    <h5 className="text-sm font-semibold text-gray-800">Impact Claims ({kpiUpdates.length})</h5>
+                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-1.5 px-3 py-1.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-lg font-semibold text-xs transition-all duration-200 shadow-lg shadow-evidence-500/25"><Plus className="w-3.5 h-3.5" /><span>Add</span></button>
+                                                </div>
+                                                <div className="flex-1 overflow-y-auto space-y-1 pr-1 min-h-0">
+                                                    {kpiUpdates.map((update, index) => (
+                                                        <div key={update.id || index} className="border border-gray-100/80 rounded-lg bg-white/60 hover:bg-evidence-50/50 hover:border-evidence-200 cursor-pointer transition-all duration-200 p-2" onClick={() => handleDataPointClick(update)}>
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="min-w-0 flex-1">
+                                                                    <span className="text-xs font-semibold text-evidence-600">{update.value?.toLocaleString()} {kpi.unit_of_measurement}</span>
+                                                                    <div className="flex items-center space-x-1.5 mt-0.5"><Calendar className="w-2.5 h-2.5 text-gray-400" /><span className="text-[10px] text-gray-500">{update.date_range_start && update.date_range_end ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}` : formatDate(update.date_represented)}</span></div>
+                                                                </div>
+                                                                <Eye className="w-3 h-3 text-gray-400" />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-evidence-300/60 rounded-xl p-4 shadow-soft-float flex-1">
+                                                <div className="text-center">
+                                                    <div className="w-10 h-10 mx-auto mb-2 bg-evidence-100/80 rounded-lg flex items-center justify-center"><BarChart3 className="w-5 h-5 text-evidence-500" /></div>
+                                                    <h5 className="text-sm font-semibold text-gray-800 mb-2">Impact Claims</h5>
+                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-1.5 px-4 py-2 bg-evidence-500 hover:bg-evidence-600 text-white rounded-lg font-semibold text-xs transition-all duration-200 shadow-lg shadow-evidence-500/25"><Plus className="w-4 h-4" /><span>Add</span></button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {!loadingEvidence && evidence.length > 0 ? (
+                                            <div className="bg-white/80 backdrop-blur-xl border border-impact-100/60 rounded-xl p-3 shadow-soft-float flex flex-col flex-1 min-h-0">
+                                                <div className="flex items-center justify-between mb-2 flex-shrink-0">
+                                                    <h5 className="text-sm font-semibold text-gray-800">Evidence ({evidence.length})</h5>
+                                                    <button onClick={(e) => { e.stopPropagation(); onAddEvidence() }} className="flex items-center space-x-1.5 px-3 py-1.5 bg-impact-500 hover:bg-impact-600 text-white rounded-lg font-semibold text-xs transition-all duration-200 shadow-lg shadow-impact-500/25"><Plus className="w-3.5 h-3.5" /><span>Add</span></button>
+                                                </div>
+                                                <div className="flex-1 overflow-y-auto space-y-1 pr-1 min-h-0">
+                                                    {evidence.map((ev) => (
+                                                        <div key={ev.id} className="border border-gray-100/80 rounded-lg bg-white/60 hover:bg-impact-50/50 hover:border-impact-200 cursor-pointer transition-all duration-200 p-2" onClick={() => handleEvidenceClick(ev)}>
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center space-x-2 min-w-0 flex-1">
+                                                                    <div className="w-5 h-5 bg-impact-100/80 rounded flex items-center justify-center flex-shrink-0"><FileText className="w-2.5 h-2.5 text-impact-500" /></div>
+                                                                    <div className="min-w-0 flex-1"><div className="text-[10px] font-medium text-gray-800 truncate">{ev.title || 'Untitled Evidence'}</div></div>
+                                                                </div>
+                                                                <Eye className="w-3 h-3 text-gray-400" />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ) : loadingEvidence ? (
+                                            <div className="bg-white/80 backdrop-blur-xl border border-impact-100/60 rounded-xl p-3 shadow-soft-float flex-1">
+                                                <div className="text-center py-4 text-gray-500"><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-impact-500 mx-auto mb-1"></div><p className="text-xs">Loading...</p></div>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-impact-300/60 rounded-xl p-4 shadow-soft-float flex-1">
+                                                <div className="text-center">
+                                                    <div className="w-10 h-10 mx-auto mb-2 bg-impact-100/80 rounded-lg flex items-center justify-center"><FileText className="w-5 h-5 text-impact-500" /></div>
+                                                    <h5 className="text-sm font-semibold text-gray-800 mb-2">Evidence</h5>
+                                                    <button onClick={(e) => { e.stopPropagation(); onAddEvidence() }} className="inline-flex items-center space-x-1.5 px-4 py-2 bg-impact-500 hover:bg-impact-600 text-white rounded-lg font-semibold text-xs transition-all duration-200 shadow-lg shadow-impact-500/25"><Plus className="w-4 h-4" /><span>Add</span></button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+
+                {/* Modals for page mode */}
+                {selectedDataPoint && createPortal(
+                    <DataPointPreviewModal
+                        dataPoint={selectedDataPoint}
+                        kpi={selectedDataPoint.kpi || kpi}
+                        isOpen={isDataPointPreviewOpen}
+                        onClose={() => { setIsDataPointPreviewOpen(false); setSelectedDataPoint(null) }}
+                        onEdit={(dp) => { setEditingDataPoint(dp); setIsDataPointPreviewOpen(false); setSelectedDataPoint(null); setIsEditDataPointModalOpen(true) }}
+                        onDelete={(dp) => { setDeleteConfirmDataPoint(dp); setIsDataPointPreviewOpen(false); setSelectedDataPoint(null) }}
+                        onEvidenceClick={(ev) => { setSelectedEvidence(ev); setIsDataPointPreviewOpen(false); setIsEvidencePreviewOpen(true) }}
+                    />,
+                    document.body
+                )}
+
+                {selectedEvidence && createPortal(
+                    <EvidencePreviewModal
+                        evidence={selectedEvidence}
+                        isOpen={isEvidencePreviewOpen}
+                        onClose={() => setIsEvidencePreviewOpen(false)}
+                        onEdit={(ev) => { setSelectedEvidence(ev); setIsEvidencePreviewOpen(false); setIsEditEvidenceModalOpen(true) }}
+                        onDelete={(ev) => { setDeleteConfirmEvidence(ev); setIsEvidencePreviewOpen(false) }}
+                        onDataPointClick={(dp) => { setSelectedDataPoint(dp); setIsEvidencePreviewOpen(false); setIsDataPointPreviewOpen(true) }}
+                    />,
+                    document.body
+                )}
+
+                {editingDataPoint && createPortal(
+                    <AddKPIUpdateModal
+                        isOpen={isEditDataPointModalOpen}
+                        onClose={() => { setIsEditDataPointModalOpen(false); setEditingDataPoint(null) }}
+                        onSubmit={handleUpdateDataPoint}
+                        kpiTitle={kpi.title}
+                        kpiId={kpi.id}
+                        metricType={kpi.metric_type || 'number'}
+                        unitOfMeasurement={kpi.unit_of_measurement || ''}
+                        initiativeId={initiativeId}
+                        editData={editingDataPoint}
+                    />,
+                    document.body
+                )}
+
+                {selectedEvidence && createPortal(
+                    <AddEvidenceModal
+                        isOpen={isEditEvidenceModalOpen}
+                        onClose={() => { setIsEditEvidenceModalOpen(false); setSelectedEvidence(null) }}
+                        onSubmit={handleUpdateEvidence}
+                        availableKPIs={[kpi]}
+                        initiativeId={kpi.initiative_id}
+                        preSelectedKPIId={kpi.id}
+                        editData={selectedEvidence}
+                    />,
+                    document.body
+                )}
+
+                {deleteConfirmDataPoint && createPortal(
+                    <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[80]">
+                        <div className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-3xl max-w-md w-full p-6 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)]">
+                            <div className="flex items-center space-x-3 mb-4">
+                                <div className="p-2.5 bg-red-100/80 rounded-xl"><Trash2 className="w-5 h-5 text-red-500" /></div>
+                                <div><h3 className="text-lg font-semibold text-gray-800">Delete Impact Claim</h3><p className="text-sm text-gray-500">This action cannot be undone</p></div>
+                            </div>
+                            <p className="text-gray-600 mb-6">Are you sure you want to delete this impact claim?</p>
+                            <div className="flex space-x-3">
+                                <button onClick={() => setDeleteConfirmDataPoint(null)} className="flex-1 px-5 py-3 text-gray-600 bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-xl hover:bg-white/80 font-medium transition-all duration-200">Cancel</button>
+                                <button onClick={() => handleDeleteDataPoint(deleteConfirmDataPoint)} className="flex-1 px-5 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all duration-200 font-semibold shadow-lg shadow-red-500/25">Delete</button>
+                            </div>
+                        </div>
+                    </div>,
+                    document.body
+                )}
+
+                {deleteConfirmEvidence && createPortal(
+                    <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[80]">
+                        <div className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-3xl max-w-md w-full p-6 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)]">
+                            <div className="flex items-center space-x-3 mb-4">
+                                <div className="p-2.5 bg-red-100/80 rounded-xl"><Trash2 className="w-5 h-5 text-red-500" /></div>
+                                <div><h3 className="text-lg font-semibold text-gray-800">Delete Evidence</h3><p className="text-sm text-gray-500">This action cannot be undone</p></div>
+                            </div>
+                            <p className="text-gray-600 mb-6">Are you sure you want to delete this evidence?</p>
+                            <div className="flex space-x-3">
+                                <button onClick={() => setDeleteConfirmEvidence(null)} className="flex-1 px-5 py-3 text-gray-600 bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-xl hover:bg-white/80 font-medium transition-all duration-200">Cancel</button>
+                                <button onClick={() => handleDeleteEvidence(deleteConfirmEvidence)} className="flex-1 px-5 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all duration-200 font-semibold shadow-lg shadow-red-500/25">Delete</button>
+                            </div>
+                        </div>
+                    </div>,
+                    document.body
+                )}
+
+                {isCreditingModalOpen && initiativeId && (
+                    <MetricCreditingModal
+                        isOpen={isCreditingModalOpen}
+                        onClose={() => setIsCreditingModalOpen(false)}
+                        onSave={async () => { onRefresh?.() }}
+                        kpi={kpi}
+                        kpiUpdates={kpiUpdates}
+                        initiativeId={initiativeId}
+                    />
+                )}
+            </>
+        )
+    }
+
     return (
         <div className={`bg-white/90 backdrop-blur-xl border-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden ${(kpi.evidence_percentage || 0) >= 80
-            ? 'border-green-300/60 hover:border-green-400/60'
+            ? 'border-primary-300/60 hover:border-primary-400/60'
             : (kpi.evidence_percentage || 0) >= 30
                 ? 'border-yellow-300/60 hover:border-yellow-400/60'
                 : 'border-red-300/60 hover:border-red-400/60'
@@ -721,7 +1051,7 @@ export default function ExpandableKPICard({
                                 const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' :
                                     typeInfo.color.includes('blue') ? 'text-blue-600' :
                                         typeInfo.color.includes('orange') ? 'text-orange-600' :
-                                            typeInfo.color.includes('green') ? 'text-green-600' :
+                                            typeInfo.color.includes('green') ? 'text-primary-500' :
                                                 'text-gray-600'
 
                                 return (
@@ -745,7 +1075,7 @@ export default function ExpandableKPICard({
                     <div className="flex items-center justify-between text-[10px] mb-1">
                         <span className="font-semibold text-gray-600">Evidence Coverage</span>
                         <span className={`font-bold ${(kpi.evidence_percentage || 0) >= 80
-                            ? 'text-green-600'
+                            ? 'text-primary-500'
                             : (kpi.evidence_percentage || 0) >= 30
                                 ? 'text-yellow-600'
                                 : 'text-red-600'
@@ -756,7 +1086,7 @@ export default function ExpandableKPICard({
                     <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                         <div
                             className={`h-full rounded-full transition-all duration-500 ${(kpi.evidence_percentage || 0) >= 80
-                                ? 'bg-gradient-to-r from-green-500 to-green-600'
+                                ? 'bg-gradient-to-r from-primary-500 to-primary-600'
                                 : (kpi.evidence_percentage || 0) >= 30
                                     ? 'bg-gradient-to-r from-yellow-500 to-yellow-600'
                                     : 'bg-gradient-to-r from-red-500 to-red-600'
@@ -769,11 +1099,12 @@ export default function ExpandableKPICard({
                 </div>
             </div>
 
-            {/* Expanded View - Full Screen Modal (excluding sidebar) */}
-            {isExpanded && createPortal(
-                <div className="fixed top-0 right-0 bottom-0 z-50 bg-white overflow-y-auto" style={{ position: 'fixed', top: 0, left: '224px', right: 0, bottom: 0, width: 'calc(100vw - 224px)', height: '100vh' }}>
+            {/* Expanded View - Full Screen (as page or portal) */}
+            {isExpanded && (renderAsPage ? (
+                // Render as inline page content (not portal)
+                <div className="h-[calc(100vh-64px)] overflow-y-auto">
                     {/* Header */}
-                    <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-4">
+                    <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-100/60 p-4 shadow-soft-float">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-4">
                                 <button
@@ -781,12 +1112,12 @@ export default function ExpandableKPICard({
                                         e.stopPropagation()
                                         onToggleExpand()
                                     }}
-                                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                    className="p-2.5 hover:bg-red-50 rounded-xl transition-all duration-200 border border-gray-100"
                                 >
-                                    <X className="w-5 h-5 text-red-600" />
+                                    <X className="w-5 h-5 text-red-500" />
                                 </button>
                                 <div>
-                                    <h2 className="text-xl font-bold text-gray-900">{kpi.title}</h2>
+                                    <h2 className="text-xl font-bold text-gray-800">{kpi.title}</h2>
                                     <p className="text-sm text-gray-500">{kpi.description}</p>
                                 </div>
                             </div>
@@ -796,7 +1127,7 @@ export default function ExpandableKPICard({
                                         e.stopPropagation()
                                         onAddUpdate()
                                     }}
-                                    className="flex items-center space-x-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm font-medium transition-colors"
+                                    className="flex items-center space-x-2 px-4 py-2.5 bg-evidence-100/80 hover:bg-evidence-200/80 text-evidence-700 rounded-xl text-sm font-medium transition-all duration-200"
                                 >
                                     <Plus className="w-4 h-4" />
                                     <span>Add Impact Claim</span>
@@ -807,7 +1138,7 @@ export default function ExpandableKPICard({
                                             e.stopPropagation()
                                             onAddEvidence()
                                         }}
-                                        className="flex items-center space-x-2 px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg text-sm font-medium transition-colors"
+                                        className="flex items-center space-x-2 px-4 py-2.5 bg-impact-100/80 hover:bg-impact-200/80 text-impact-700 rounded-xl text-sm font-medium transition-all duration-200"
                                     >
                                         <Upload className="w-4 h-4" />
                                         <span>Add Evidence</span>
@@ -818,7 +1149,7 @@ export default function ExpandableKPICard({
                                         e.stopPropagation()
                                         setIsCreditingModalOpen(true)
                                     }}
-                                    className="flex items-center space-x-2 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-sm font-medium transition-colors"
+                                    className="flex items-center space-x-2 px-4 py-2.5 bg-purple-100/80 hover:bg-purple-200/80 text-purple-700 rounded-xl text-sm font-medium transition-all duration-200"
                                 >
                                     <Heart className="w-4 h-4" />
                                     <span>Credit to Donor</span>
@@ -828,7 +1159,7 @@ export default function ExpandableKPICard({
                                         e.stopPropagation()
                                         onEdit()
                                     }}
-                                    className="flex items-center space-x-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg text-sm font-medium transition-colors"
+                                    className="flex items-center space-x-2 px-4 py-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/60 text-gray-600 rounded-xl text-sm font-medium transition-all duration-200"
                                 >
                                     <Edit className="w-4 h-4" />
                                     <span>Edit</span>
@@ -838,7 +1169,7 @@ export default function ExpandableKPICard({
                                         e.stopPropagation()
                                         onDelete()
                                     }}
-                                    className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
+                                    className="p-2.5 bg-red-50/80 hover:bg-red-100 text-red-500 rounded-xl transition-all duration-200"
                                 >
                                     <Trash2 className="w-4 h-4" />
                                 </button>
@@ -846,49 +1177,49 @@ export default function ExpandableKPICard({
                         </div>
                     </div>
 
-                    {/* Content */}
-                    <div className="p-4 space-y-4">
+                    {/* Content - Reuse the same content structure */}
+                    <div className="p-4 space-y-4 max-w-[1600px] mx-auto">
                         {/* Check if metric is completely fresh (no claims AND no evidence) */}
                         {kpiUpdates.length === 0 && !loadingEvidence && evidence.length === 0 ? (
                             /* Fresh Metric - Show only Add buttons */
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-12">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-8">
                                 {/* Add Impact Claim */}
-                                <div className="bg-gradient-to-br from-blue-500/20 via-blue-600/15 to-blue-700/20 border-3 border-blue-500 rounded-2xl p-10 shadow-xl shadow-blue-500/10">
+                                <div className="bg-white/80 backdrop-blur-xl border border-evidence-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200">
                                     <div className="text-center">
-                                        <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-                                            <BarChart3 className="w-12 h-12 text-white" />
+                                        <div className="w-20 h-20 mx-auto mb-5 bg-evidence-100/80 rounded-2xl flex items-center justify-center">
+                                            <BarChart3 className="w-10 h-10 text-evidence-500" />
                                         </div>
-                                        <h5 className="text-2xl font-bold text-blue-900 mb-3">Impact Claims</h5>
-                                        <p className="text-base text-blue-800 mb-8 font-medium">You haven't added any of this type, add it here!</p>
+                                        <h5 className="text-xl font-bold text-gray-800 mb-2">Impact Claims</h5>
+                                        <p className="text-sm text-gray-500 mb-6">You haven't added any of this type, add it here!</p>
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation()
                                                 onAddUpdate()
                                             }}
-                                            className="inline-flex items-center space-x-3 px-10 py-5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl font-semibold text-lg transition-all duration-200 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transform hover:scale-105"
+                                            className="inline-flex items-center space-x-2 px-6 py-3 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
                                         >
-                                            <Plus className="w-6 h-6" />
+                                            <Plus className="w-5 h-5" />
                                             <span>Add Impact Claim</span>
                                         </button>
                                     </div>
                                 </div>
 
                                 {/* Add Evidence */}
-                                <div className="bg-gradient-to-br from-green-500/20 via-green-600/15 to-green-700/20 border-3 border-green-500 rounded-2xl p-10 shadow-xl shadow-green-500/10">
+                                <div className="bg-white/80 backdrop-blur-xl border border-impact-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200">
                                     <div className="text-center">
-                                        <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/30">
-                                            <FileText className="w-12 h-12 text-white" />
+                                        <div className="w-20 h-20 mx-auto mb-5 bg-impact-100/80 rounded-2xl flex items-center justify-center">
+                                            <FileText className="w-10 h-10 text-impact-500" />
                                         </div>
-                                        <h5 className="text-2xl font-bold text-green-900 mb-3">Evidence</h5>
-                                        <p className="text-base text-green-800 mb-8 font-medium">You haven't added any of this type, add it here!</p>
+                                        <h5 className="text-xl font-bold text-gray-800 mb-2">Evidence</h5>
+                                        <p className="text-sm text-gray-500 mb-6">You haven't added any of this type, add it here!</p>
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation()
                                                 onAddEvidence()
                                             }}
-                                            className="inline-flex items-center space-x-3 px-10 py-5 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl font-semibold text-lg transition-all duration-200 shadow-lg shadow-green-500/30 hover:shadow-xl hover:shadow-green-500/40 transform hover:scale-105"
+                                            className="inline-flex items-center space-x-2 px-6 py-3 bg-impact-500 hover:bg-impact-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-impact-500/25"
                                         >
-                                            <Plus className="w-6 h-5" />
+                                            <Plus className="w-5 h-5" />
                                             <span>Add Evidence</span>
                                         </button>
                                     </div>
@@ -898,438 +1229,812 @@ export default function ExpandableKPICard({
                             <>
                                 {/* Stats Grid */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3">
-                                <div className="flex items-center space-x-3">
-                                    <div className="p-2 bg-blue-100 rounded-lg">
-                                        <BarChart3 className="w-5 h-5 text-blue-600" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-gray-600">Impact Claims</p>
-                                        <p className="text-xl font-bold text-blue-600">{kpi.total_updates}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="bg-green-50/50 border border-green-100 rounded-xl p-3">
-                                <div className="flex items-center space-x-3">
-                                    <div className="p-2 bg-green-100 rounded-lg">
-                                        <FileText className="w-5 h-5 text-green-600" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-gray-600">Evidence Items</p>
-                                        <p className="text-xl font-bold text-green-600">{kpi.evidence_count}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="bg-green-50/50 border border-green-100 rounded-xl p-3">
-                                <div className="flex items-center space-x-3">
-                                    <div className="p-2 bg-green-100 rounded-lg">
-                                        <Target className="w-5 h-5 text-green-600" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-gray-600">Evidence Coverage</p>
-                                        <p className="text-xl font-bold text-green-600">{kpi.evidence_percentage}%</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Evidence Type Icons Row - Below Stats Cards */}
-                        <div className="flex items-center justify-between gap-2 h-10 bg-gray-50/50 border border-gray-200 rounded-lg px-3 py-1">
-                            {(['visual_proof', 'documentation', 'testimony', 'financials'] as const).map((type) => {
-                                const IconComponent = getEvidenceIcon(type)
-                                const typeInfo = getEvidenceTypeInfo(type)
-                                const percentage = evidenceTypePercentages[type].percentage
-
-                                // Extract color classes from typeInfo
-                                const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' :
-                                    typeInfo.color.includes('blue') ? 'text-blue-600' :
-                                        typeInfo.color.includes('orange') ? 'text-orange-600' :
-                                            typeInfo.color.includes('green') ? 'text-green-600' :
-                                                'text-gray-600'
-
-                                return (
-                                    <div
-                                        key={type}
-                                        className="flex items-center gap-1.5 flex-1 min-w-0"
-                                    >
-                                        <IconComponent className={`w-3.5 h-3.5 ${colorClasses} flex-shrink-0`} />
-                                        <div className="flex flex-col items-start min-w-0 flex-1 overflow-hidden">
-                                            <span className="text-[9px] font-medium text-gray-700 truncate w-full leading-tight">
-                                                {typeInfo.label}
-                                            </span>
-                                            <span className="text-[8px] font-bold text-gray-600 leading-tight whitespace-nowrap">
-                                                {percentage}%
-                                            </span>
+                                    <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-2xl p-4 shadow-soft-float">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="p-2.5 bg-evidence-100/80 rounded-xl">
+                                                <BarChart3 className="w-5 h-5 text-evidence-500" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm text-gray-500">Impact Claims</p>
+                                                <p className="text-xl font-bold text-evidence-500">{kpi.total_updates}</p>
+                                            </div>
                                         </div>
                                     </div>
-                                )
-                            })}
-                        </div>
 
-                        {/* Chart and Data Sections - 3/5 chart + 2/5 data/evidence */}
-                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-                            {/* Chart Section - 3/5 width */}
-                            <div className="lg:col-span-3 bg-gradient-to-br from-blue-50/30 to-indigo-50/20 border border-blue-100/60 rounded-xl p-4 flex flex-col">
-                                <div className="flex items-center justify-between mb-4">
-                                    <div>
-                                        <h5 className="text-lg font-semibold text-gray-900">{isCumulative ? 'Cumulative Progress' : 'Monthly Progress'}</h5>
-                                        <p className="text-sm text-gray-500">{isCumulative ? 'Running total over time' : 'Monthly totals over time'}</p>
-                                    </div>
-                                    <div className="flex items-center space-x-2 flex-wrap">
-                                        {/* Date Filter */}
-                                        <div className="relative">
-                                            <DateRangePicker
-                                                value={datePickerValue}
-                                                onChange={setDatePickerValue}
-                                                maxDate={getLocalDateString(new Date())}
-                                                placeholder="Filter by date"
-                                                className="w-auto"
-                                            />
+                                    <div className="bg-white/80 backdrop-blur-xl border border-impact-100/60 rounded-2xl p-4 shadow-soft-float">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="p-2.5 bg-impact-100/80 rounded-xl">
+                                                <FileText className="w-5 h-5 text-impact-500" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm text-gray-500">Evidence Items</p>
+                                                <p className="text-xl font-bold text-impact-500">{kpi.evidence_count}</p>
+                                            </div>
                                         </div>
-                                        
-                                        {/* Cumulative/Non-cumulative Toggle */}
-                                        {timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
-                                            <div className="flex items-center space-x-0.5 bg-gray-100 rounded-lg p-0.5">
-                                                <button
-                                                    onClick={() => setIsCumulative(true)}
-                                                    className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${isCumulative
-                                                        ? 'bg-white text-gray-900 shadow-sm'
-                                                        : 'text-gray-600 hover:text-gray-900'
-                                                        }`}
-                                                >
-                                                    Cumulative
-                                                </button>
-                                                <button
-                                                    onClick={() => setIsCumulative(false)}
-                                                    className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${!isCumulative
-                                                        ? 'bg-white text-gray-900 shadow-sm'
-                                                        : 'text-gray-600 hover:text-gray-900'
-                                                        }`}
-                                                >
-                                                    Monthly
-                                                </button>
+                                    </div>
+
+                                    <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-2xl p-4 shadow-soft-float">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="p-2.5 bg-primary-100/80 rounded-xl">
+                                                <Target className="w-5 h-5 text-primary-500" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm text-gray-500">Evidence Coverage</p>
+                                                <p className="text-xl font-bold text-primary-500">{kpi.evidence_percentage}%</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Evidence Type Icons Row */}
+                                <div className="flex items-center justify-between gap-2 h-10 bg-white/60 backdrop-blur-sm border border-gray-100/60 rounded-xl px-4 py-1">
+                                    {(['visual_proof', 'documentation', 'testimony', 'financials'] as const).map((type) => {
+                                        const IconComponent = getEvidenceIcon(type)
+                                        const typeInfo = getEvidenceTypeInfo(type)
+                                        const percentage = evidenceTypePercentages[type].percentage
+
+                                        const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' :
+                                            typeInfo.color.includes('blue') ? 'text-blue-600' :
+                                                typeInfo.color.includes('orange') ? 'text-orange-600' :
+                                                    typeInfo.color.includes('green') ? 'text-primary-500' :
+                                                        'text-gray-600'
+
+                                        return (
+                                            <div key={type} className="flex items-center gap-1.5 flex-1 min-w-0">
+                                                <IconComponent className={`w-3.5 h-3.5 ${colorClasses} flex-shrink-0`} />
+                                                <div className="flex flex-col items-start min-w-0 flex-1 overflow-hidden">
+                                                    <span className="text-[9px] font-medium text-gray-700 truncate w-full leading-tight">
+                                                        {typeInfo.label}
+                                                    </span>
+                                                    <span className="text-[8px] font-bold text-gray-600 leading-tight whitespace-nowrap">
+                                                        {percentage}%
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+
+                                {/* Chart and Data Sections */}
+                                <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                                    {/* Chart Section */}
+                                    <div className="lg:col-span-3 bg-white/80 backdrop-blur-xl border border-gray-100/60 rounded-2xl p-4 flex flex-col shadow-soft-float">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div>
+                                                <h5 className="text-lg font-semibold text-gray-900">{isCumulative ? 'Cumulative Progress' : 'Monthly Progress'}</h5>
+                                                <p className="text-sm text-gray-500">{isCumulative ? 'Running total over time' : 'Monthly totals over time'}</p>
+                                            </div>
+                                            <div className="flex items-center space-x-2 flex-wrap">
+                                                <div className="relative">
+                                                    <DateRangePicker
+                                                        value={datePickerValue}
+                                                        onChange={setDatePickerValue}
+                                                        maxDate={getLocalDateString(new Date())}
+                                                        placeholder="Filter by date"
+                                                        className="w-auto"
+                                                    />
+                                                </div>
+
+                                                {timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
+                                                    <div className="flex items-center space-x-0.5 bg-gray-100 rounded-lg p-0.5">
+                                                        <button
+                                                            onClick={() => setIsCumulative(true)}
+                                                            className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${isCumulative
+                                                                ? 'bg-white text-gray-900 shadow-sm'
+                                                                : 'text-gray-600 hover:text-gray-900'
+                                                                }`}
+                                                        >
+                                                            Cumulative
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setIsCumulative(false)}
+                                                            className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${!isCumulative
+                                                                ? 'bg-white text-gray-900 shadow-sm'
+                                                                : 'text-gray-600 hover:text-gray-900'
+                                                                }`}
+                                                        >
+                                                            Monthly
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                                <div className="flex bg-gray-100 rounded-lg p-0.5">
+                                                    {['all', '1month', '6months', '1year', '5years'].map((tf) => (
+                                                        <button
+                                                            key={tf}
+                                                            onClick={() => {
+                                                                setTimeFrame(tf as any)
+                                                                setDatePickerValue({})
+                                                                setIsCumulative(true)
+                                                            }}
+                                                            className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === tf && !datePickerValue.singleDate && !datePickerValue.startDate
+                                                                ? 'bg-white text-gray-900 shadow-sm'
+                                                                : 'text-gray-600 hover:text-gray-900'
+                                                                }`}
+                                                        >
+                                                            {tf === 'all' ? 'All' : tf === '1month' ? '1M' : tf === '6months' ? '6M' : tf === '1year' ? '1Y' : '5Y'}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex-1 h-64 flex items-center justify-center">
+                                            {kpiUpdates && kpiUpdates.length > 0 ? (
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <LineChart data={chartData}>
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                                        <XAxis dataKey="date" stroke="#9ca3af" fontSize={11} tick={{ fill: '#9ca3af' }} angle={-45} textAnchor="end" height={60} interval={getXAxisInterval()} tickMargin={8} />
+                                                        <YAxis stroke="#9ca3af" fontSize={11} tick={{ fill: '#9ca3af' }} domain={maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax']} ticks={yTicks.length > 0 ? yTicks : undefined} tickFormatter={(value) => { if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`; if (value >= 1000) return `${(value / 1000).toFixed(1)}K`; return value.toString() }} />
+                                                        <Tooltip contentStyle={{ backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '12px', padding: '10px 12px', fontSize: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} formatter={(value: any) => { const unit = kpi.unit_of_measurement || ''; const formattedValue = typeof value === 'number' ? value.toLocaleString() + (unit ? ` ${unit}` : '') : value; return [formattedValue, 'Cumulative Total'] }} labelFormatter={(label) => { const dataPoint = chartData.find(d => d.date === label); if (dataPoint?.fullDate) { return formatDate(dataPoint.fullDate) } return `Date: ${label}` }} cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '5 5' }} />
+                                                        <Line type="monotone" dataKey="cumulative" stroke="#3db6fd" strokeWidth={3.5} dot={false} activeDot={{ r: 6, fill: '#3db6fd', stroke: 'white', strokeWidth: 2 }} strokeLinecap="round" />
+                                                    </LineChart>
+                                                </ResponsiveContainer>
+                                            ) : (
+                                                <div className="h-full flex flex-col items-center justify-center text-gray-500">
+                                                    <BarChart3 className="w-12 h-12 mb-4 opacity-50" />
+                                                    <h4 className="text-lg font-semibold text-gray-700 mb-2">No Data Yet</h4>
+                                                    <p className="text-sm text-center max-w-xs">Come back when you add data to see your activity over time</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Impact Claims and Evidence Sections */}
+                                    <div className="lg:col-span-2 space-y-4">
+                                        {/* Impact Claims */}
+                                        {kpiUpdates && kpiUpdates.length > 0 ? (
+                                            <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-2xl p-4 shadow-soft-float flex flex-col max-h-[calc(50vh-100px)]">
+                                                <div className="flex items-center justify-between mb-3 flex-shrink-0">
+                                                    <h5 className="text-base font-semibold text-gray-800">Impact Claims</h5>
+                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-2 px-4 py-2 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25">
+                                                        <Plus className="w-4 h-4" /><span>Add</span>
+                                                    </button>
+                                                </div>
+                                                <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+                                                    {kpiUpdates.map((update, index) => (
+                                                        <div key={update.id || index} className="border border-gray-100/80 rounded-xl bg-white/60 hover:bg-evidence-50/50 hover:border-evidence-200 cursor-pointer transition-all duration-200 p-2.5" onClick={() => handleDataPointClick(update)}>
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="min-w-0 flex-1">
+                                                                    <span className="text-sm font-semibold text-evidence-600">{update.value?.toLocaleString()} {kpi.unit_of_measurement}</span>
+                                                                    <div className="flex items-center space-x-2 mt-0.5">
+                                                                        <Calendar className="w-3 h-3 text-gray-400" />
+                                                                        <span className="text-xs text-gray-500">{update.date_range_start && update.date_range_end ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}` : formatDate(update.date_represented)}</span>
+                                                                    </div>
+                                                                </div>
+                                                                <Eye className="w-3.5 h-3.5 text-gray-400" />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-evidence-300/60 rounded-2xl p-6 shadow-soft-float">
+                                                <div className="text-center">
+                                                    <div className="w-14 h-14 mx-auto mb-3 bg-evidence-100/80 rounded-xl flex items-center justify-center"><BarChart3 className="w-7 h-7 text-evidence-500" /></div>
+                                                    <h5 className="text-base font-semibold text-gray-800 mb-2">Impact Claims</h5>
+                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-5 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25">
+                                                        <Plus className="w-5 h-5" /><span>Add Impact Claim</span>
+                                                    </button>
+                                                </div>
                                             </div>
                                         )}
-                                        
-                                        {/* Time Frame Filters */}
-                                        <div className="flex bg-gray-100 rounded-lg p-0.5">
-                                            <button
-                                                onClick={() => {
-                                                    setTimeFrame('all')
-                                                    setDatePickerValue({})
-                                                    setIsCumulative(true)
-                                                }}
-                                                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate
-                                                    ? 'bg-white text-gray-900 shadow-sm'
-                                                    : 'text-gray-600 hover:text-gray-900'
-                                                    }`}
-                                            >
-                                                All
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setTimeFrame('1month')
-                                                    setDatePickerValue({})
-                                                    setIsCumulative(true)
-                                                }}
-                                                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '1month' && !datePickerValue.singleDate && !datePickerValue.startDate
-                                                    ? 'bg-white text-gray-900 shadow-sm'
-                                                    : 'text-gray-600 hover:text-gray-900'
-                                                    }`}
-                                            >
-                                                1M
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setTimeFrame('6months')
-                                                    setDatePickerValue({})
-                                                    setIsCumulative(true)
-                                                }}
-                                                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '6months' && !datePickerValue.singleDate && !datePickerValue.startDate
-                                                    ? 'bg-white text-gray-900 shadow-sm'
-                                                    : 'text-gray-600 hover:text-gray-900'
-                                                    }`}
-                                            >
-                                                6M
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setTimeFrame('1year')
-                                                    setDatePickerValue({})
-                                                    setIsCumulative(true)
-                                                }}
-                                                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '1year' && !datePickerValue.singleDate && !datePickerValue.startDate
-                                                    ? 'bg-white text-gray-900 shadow-sm'
-                                                    : 'text-gray-600 hover:text-gray-900'
-                                                    }`}
-                                            >
-                                                1Y
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setTimeFrame('5years')
-                                                    setDatePickerValue({})
-                                                    setIsCumulative(true)
-                                                }}
-                                                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '5years' && !datePickerValue.singleDate && !datePickerValue.startDate
-                                                    ? 'bg-white text-gray-900 shadow-sm'
-                                                    : 'text-gray-600 hover:text-gray-900'
-                                                    }`}
-                                            >
-                                                5Y
-                                            </button>
-                                        </div>
+
+                                        {/* Evidence */}
+                                        {!loadingEvidence && evidence.length > 0 ? (
+                                            <div className="bg-white/80 backdrop-blur-xl border border-impact-100/60 rounded-2xl p-4 shadow-soft-float flex flex-col max-h-[calc(50vh-100px)]">
+                                                <div className="flex items-center justify-between mb-3 flex-shrink-0">
+                                                    <h5 className="text-base font-semibold text-gray-800">Evidence</h5>
+                                                    <button onClick={(e) => { e.stopPropagation(); onAddEvidence() }} className="flex items-center space-x-2 px-4 py-2 bg-impact-500 hover:bg-impact-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-impact-500/25">
+                                                        <Plus className="w-4 h-4" /><span>Add</span>
+                                                    </button>
+                                                </div>
+                                                <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+                                                    {evidence.map((evidenceItem) => (
+                                                        <div key={evidenceItem.id} className="border border-gray-100/80 rounded-xl bg-white/60 hover:bg-impact-50/50 hover:border-impact-200 cursor-pointer transition-all duration-200 p-2.5" onClick={() => handleEvidenceClick(evidenceItem)}>
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center space-x-2 min-w-0 flex-1">
+                                                                    <div className="w-6 h-6 bg-impact-100/80 rounded-lg flex items-center justify-center flex-shrink-0"><FileText className="w-3 h-3 text-impact-500" /></div>
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <div className="text-xs font-medium text-gray-800 truncate">{evidenceItem.title || 'Untitled Evidence'}</div>
+                                                                        <div className="text-xs text-gray-500">Click to view</div>
+                                                                    </div>
+                                                                </div>
+                                                                <Eye className="w-3.5 h-3.5 text-gray-400" />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ) : loadingEvidence ? (
+                                            <div className="bg-white/80 backdrop-blur-xl border border-impact-100/60 rounded-2xl p-4 shadow-soft-float">
+                                                <div className="text-center py-8 text-gray-500">
+                                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-impact-500 mx-auto mb-2"></div>
+                                                    <p className="text-sm">Loading evidence...</p>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-impact-300/60 rounded-2xl p-6 shadow-soft-float">
+                                                <div className="text-center">
+                                                    <div className="w-14 h-14 mx-auto mb-3 bg-impact-100/80 rounded-xl flex items-center justify-center"><FileText className="w-7 h-7 text-impact-500" /></div>
+                                                    <h5 className="text-base font-semibold text-gray-800 mb-2">Evidence</h5>
+                                                    <button onClick={(e) => { e.stopPropagation(); onAddEvidence() }} className="inline-flex items-center space-x-2 px-5 py-2.5 bg-impact-500 hover:bg-impact-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-impact-500/25">
+                                                        <Plus className="w-5 h-5" /><span>Add Evidence</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-
-                                <div className="flex-1 h-64 flex items-center justify-center">
-                                    {kpiUpdates && kpiUpdates.length > 0 ? (
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <LineChart data={chartData}>
-                                                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                                                <XAxis
-                                                    dataKey="date"
-                                                    stroke="#6b7280"
-                                                    fontSize={11}
-                                                    tick={{ fill: '#6b7280' }}
-                                                    angle={-45}
-                                                    textAnchor="end"
-                                                    height={60}
-                                                    interval={getXAxisInterval()}
-                                                    tickMargin={8}
-                                                />
-                                                <YAxis
-                                                    stroke="#6b7280"
-                                                    fontSize={11}
-                                                    tick={{ fill: '#6b7280' }}
-                                                    domain={maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax']}
-                                                    ticks={yTicks.length > 0 ? yTicks : undefined}
-                                                    tickFormatter={(value) => {
-                                                        if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
-                                                        if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
-                                                        return value.toString()
-                                                    }}
-                                                />
-                                                <Tooltip
-                                                    contentStyle={{
-                                                        backgroundColor: 'white',
-                                                        border: '1px solid #e5e7eb',
-                                                        borderRadius: '8px',
-                                                        padding: '10px 12px',
-                                                        fontSize: '12px',
-                                                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-                                                    }}
-                                                    formatter={(value: any, name: string) => {
-                                                        const unit = kpi.unit_of_measurement || ''
-                                                        const formattedValue = typeof value === 'number'
-                                                            ? value.toLocaleString() + (unit ? ` ${unit}` : '')
-                                                            : value
-                                                        return [formattedValue, 'Cumulative Total']
-                                                    }}
-                                                    labelFormatter={(label) => {
-                                                        // Find the actual date from chartData
-                                                        const dataPoint = chartData.find(d => d.date === label)
-                                                        if (dataPoint?.fullDate) {
-                                                            return formatDate(dataPoint.fullDate)
-                                                        }
-                                                        return `Date: ${label}`
-                                                    }}
-                                                    cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '5 5' }}
-                                                />
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="cumulative"
-                                                    stroke="#16a34a"
-                                                    strokeWidth={3.5}
-                                                    dot={false}
-                                                    activeDot={{ r: 6, fill: '#16a34a', stroke: 'white', strokeWidth: 2 }}
-                                                    strokeLinecap="round"
-                                                />
-                                            </LineChart>
-                                        </ResponsiveContainer>
-                                    ) : (
-                                        <div className="h-full flex flex-col items-center justify-center text-gray-500">
-                                            <BarChart3 className="w-12 h-12 mb-4 opacity-50" />
-                                            <h4 className="text-lg font-semibold text-gray-700 mb-2">No Data Yet</h4>
-                                            <p className="text-sm text-center max-w-xs">
-                                                Come back when you add data to see your activity over time
-                                            </p>
-                                        </div>
-                                    )}
+                            </>
+                        )}
+                    </div>
+                </div>
+            ) : createPortal(
+                <div className="fixed top-0 right-0 bottom-0 z-50 overflow-y-auto" style={{ position: 'fixed', top: 0, left: '224px', right: 0, bottom: 0, width: 'calc(100vw - 224px)', height: '100vh' }}>
+                    {/* Header */}
+                    <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-100/60 p-4 shadow-soft-float">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-4">
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        onToggleExpand()
+                                    }}
+                                    className="p-2.5 hover:bg-red-50 rounded-xl transition-all duration-200 border border-gray-100"
+                                >
+                                    <X className="w-5 h-5 text-red-500" />
+                                </button>
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-800">{kpi.title}</h2>
+                                    <p className="text-sm text-gray-500">{kpi.description}</p>
                                 </div>
                             </div>
-
-                            {/* Impact Claims and Evidence Sections - 2/5 width */}
-                            <div className="lg:col-span-2 space-y-4">
-                                {/* Impact Claims Section */}
-                                {kpiUpdates && kpiUpdates.length > 0 ? (
-                                    <div className="bg-gradient-to-br from-blue-50/30 to-indigo-50/20 border border-blue-100/60 rounded-xl p-4">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h5 className="text-lg font-semibold text-gray-900">Impact Claims</h5>
-                                        <div className="flex items-center space-x-3">
-                                            <div className="flex items-center space-x-2 text-sm text-gray-500">
-                                                <BarChart3 className="w-4 h-4" />
-                                                <span>{kpi.total_updates || 0} total</span>
-                                            </div>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    onAddUpdate()
-                                                }}
-                                                className="flex items-center space-x-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-semibold text-sm transition-all duration-200 shadow-lg shadow-blue-600/20 hover:shadow-xl hover:shadow-blue-600/30 transform hover:scale-105"
-                                            >
-                                                <Plus className="w-5 h-5" />
-                                                <span>Add Impact Claim</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                        <div className="max-h-64 overflow-y-auto space-y-1.5">
-                                            {kpiUpdates.map((update, index) => {
-                                                const hasDateRange = update.date_range_start && update.date_range_end
-                                                const displayDate = hasDateRange
-                                                    ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}`
-                                                    : formatDate(update.date_represented)
-
-                                                const updateLocation = update.location_id ? updateLocations[update.location_id] : null
-
-                                                return (
-                                                    <div
-                                                        key={update.id || index}
-                                                        className="border border-blue-100/60 rounded-md bg-white/50 hover:bg-blue-50/50 cursor-pointer transition-colors p-2"
-                                                        onClick={() => handleDataPointClick(update)}
-                                                    >
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="min-w-0 flex-1">
-                                                                <div className="flex items-center space-x-2">
-                                                                    <span className="text-sm font-semibold text-blue-600">
-                                                                        {update.value?.toLocaleString()} {kpi.unit_of_measurement}
-                                                                    </span>
-                                                                </div>
-                                                                <div className="flex items-center space-x-2 mt-0.5">
-                                                                    <Calendar className="w-3 h-3 text-gray-400" />
-                                                                    <span className="text-xs text-gray-500">{displayDate}</span>
-                                                                </div>
-                                                                {updateLocation && (
-                                                                    <div className="flex items-center space-x-1 mt-0.5">
-                                                                        <MapPin className="w-3 h-3 text-gray-400" />
-                                                                        <span className="text-xs text-gray-500">{updateLocation.name}</span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            <Eye className="w-3.5 h-3.5 text-gray-400" />
-                                                        </div>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="bg-gradient-to-br from-blue-600/10 to-blue-700/10 border-2 border-blue-600 rounded-xl p-6">
-                                        <div className="text-center">
-                                            <BarChart3 className="w-12 h-12 mx-auto mb-3 text-blue-600" />
-                                            <h5 className="text-lg font-semibold text-blue-900 mb-2">Impact Claims</h5>
-                                            <p className="text-sm text-blue-800 mb-4">You haven't added any of this type, add it here!</p>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    onAddUpdate()
-                                                }}
-                                                className="inline-flex items-center space-x-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors duration-200"
-                                            >
-                                                <Plus className="w-5 h-5" />
-                                                <span>Add Impact Claim</span>
-                                            </button>
-                                        </div>
-                                    </div>
+                            <div className="flex items-center space-x-2">
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        onAddUpdate()
+                                    }}
+                                    className="flex items-center space-x-2 px-4 py-2.5 bg-evidence-100/80 hover:bg-evidence-200/80 text-evidence-700 rounded-xl text-sm font-medium transition-all duration-200"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    <span>Add Impact Claim</span>
+                                </button>
+                                {kpi.total_updates > 0 && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            onAddEvidence()
+                                        }}
+                                        className="flex items-center space-x-2 px-4 py-2.5 bg-impact-100/80 hover:bg-impact-200/80 text-impact-700 rounded-xl text-sm font-medium transition-all duration-200"
+                                    >
+                                        <Upload className="w-4 h-4" />
+                                        <span>Add Evidence</span>
+                                    </button>
                                 )}
-
-                                {/* Evidence Section */}
-                                {!loadingEvidence && evidence.length > 0 ? (
-                                    <div className="bg-gradient-to-br from-green-50/30 to-emerald-50/20 border border-green-100/60 rounded-xl p-4">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h5 className="text-lg font-semibold text-gray-900">Evidence</h5>
-                                        <div className="flex items-center space-x-3">
-                                            <div className="flex items-center space-x-2 text-sm text-gray-500">
-                                                <FileText className="w-4 h-4" />
-                                                <span>{kpi.evidence_count || 0} items</span>
-                                            </div>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    onAddEvidence()
-                                                }}
-                                                className="flex items-center space-x-2 px-5 py-2.5 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-semibold text-sm transition-all duration-200 shadow-lg shadow-green-600/20 hover:shadow-xl hover:shadow-green-600/30 transform hover:scale-105"
-                                            >
-                                                <Plus className="w-5 h-5" />
-                                                <span>Add Evidence</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                        <div className="max-h-64 overflow-y-auto space-y-1.5">
-                                            {evidence.map((evidenceItem) => {
-                                                return (
-                                                    <div
-                                                        key={evidenceItem.id}
-                                                        className="border border-green-100/60 rounded-md bg-white/50 hover:bg-green-50/50 cursor-pointer transition-colors p-2"
-                                                        onClick={() => handleEvidenceClick(evidenceItem)}
-                                                    >
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex items-center space-x-2 min-w-0 flex-1">
-                                                                <div className="w-5 h-5 bg-green-100 rounded flex items-center justify-center flex-shrink-0">
-                                                                    <FileText className="w-3 h-3 text-green-600" />
-                                                                </div>
-                                                                <div className="min-w-0 flex-1">
-                                                                    <div className="text-xs font-medium text-gray-900 truncate">
-                                                                        {evidenceItem.title || 'Untitled Evidence'}
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-500">
-                                                                        Click to view
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <Eye className="w-3.5 h-3.5 text-gray-400" />
-                                                        </div>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
-                                ) : loadingEvidence ? (
-                                    <div className="bg-gradient-to-br from-green-50/30 to-emerald-50/20 border border-green-100/60 rounded-xl p-4">
-                                        <div className="text-center py-8 text-gray-500">
-                                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600 mx-auto mb-2"></div>
-                                            <p className="text-sm">Loading evidence...</p>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="bg-gradient-to-br from-green-600/10 to-green-700/10 border-2 border-green-600 rounded-xl p-6">
-                                        <div className="text-center">
-                                            <FileText className="w-12 h-12 mx-auto mb-3 text-green-600" />
-                                            <h5 className="text-lg font-semibold text-green-900 mb-2">Evidence</h5>
-                                            <p className="text-sm text-green-800 mb-4">You haven't added any of this type, add it here!</p>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    onAddEvidence()
-                                                }}
-                                                className="inline-flex items-center space-x-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors duration-200"
-                                            >
-                                                <Plus className="w-5 h-5" />
-                                                <span>Add Evidence</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        setIsCreditingModalOpen(true)
+                                    }}
+                                    className="flex items-center space-x-2 px-4 py-2.5 bg-purple-100/80 hover:bg-purple-200/80 text-purple-700 rounded-xl text-sm font-medium transition-all duration-200"
+                                >
+                                    <Heart className="w-4 h-4" />
+                                    <span>Credit to Donor</span>
+                                </button>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        onEdit()
+                                    }}
+                                    className="flex items-center space-x-2 px-4 py-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/60 text-gray-600 rounded-xl text-sm font-medium transition-all duration-200"
+                                >
+                                    <Edit className="w-4 h-4" />
+                                    <span>Edit</span>
+                                </button>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        onDelete()
+                                    }}
+                                    className="p-2.5 bg-red-50/80 hover:bg-red-100 text-red-500 rounded-xl transition-all duration-200"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
                             </div>
                         </div>
-                        </>
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-4 space-y-4 max-w-[1600px] mx-auto">
+                        {/* Check if metric is completely fresh (no claims AND no evidence) */}
+                        {kpiUpdates.length === 0 && !loadingEvidence && evidence.length === 0 ? (
+                            /* Fresh Metric - Show only Add buttons */
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-8">
+                                {/* Add Impact Claim */}
+                                <div className="bg-white/80 backdrop-blur-xl border border-evidence-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200">
+                                    <div className="text-center">
+                                        <div className="w-20 h-20 mx-auto mb-5 bg-evidence-100/80 rounded-2xl flex items-center justify-center">
+                                            <BarChart3 className="w-10 h-10 text-evidence-500" />
+                                        </div>
+                                        <h5 className="text-xl font-bold text-gray-800 mb-2">Impact Claims</h5>
+                                        <p className="text-sm text-gray-500 mb-6">You haven't added any of this type, add it here!</p>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                onAddUpdate()
+                                            }}
+                                            className="inline-flex items-center space-x-2 px-6 py-3 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
+                                        >
+                                            <Plus className="w-5 h-5" />
+                                            <span>Add Impact Claim</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Add Evidence */}
+                                <div className="bg-white/80 backdrop-blur-xl border border-impact-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200">
+                                    <div className="text-center">
+                                        <div className="w-20 h-20 mx-auto mb-5 bg-impact-100/80 rounded-2xl flex items-center justify-center">
+                                            <FileText className="w-10 h-10 text-impact-500" />
+                                        </div>
+                                        <h5 className="text-xl font-bold text-gray-800 mb-2">Evidence</h5>
+                                        <p className="text-sm text-gray-500 mb-6">You haven't added any of this type, add it here!</p>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                onAddEvidence()
+                                            }}
+                                            className="inline-flex items-center space-x-2 px-6 py-3 bg-impact-500 hover:bg-impact-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-impact-500/25"
+                                        >
+                                            <Plus className="w-5 h-5" />
+                                            <span>Add Evidence</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Stats Grid */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-2xl p-4 shadow-soft-float">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="p-2.5 bg-evidence-100/80 rounded-xl">
+                                                <BarChart3 className="w-5 h-5 text-evidence-500" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm text-gray-500">Impact Claims</p>
+                                                <p className="text-xl font-bold text-evidence-500">{kpi.total_updates}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white/80 backdrop-blur-xl border border-impact-100/60 rounded-2xl p-4 shadow-soft-float">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="p-2.5 bg-impact-100/80 rounded-xl">
+                                                <FileText className="w-5 h-5 text-impact-500" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm text-gray-500">Evidence Items</p>
+                                                <p className="text-xl font-bold text-impact-500">{kpi.evidence_count}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-2xl p-4 shadow-soft-float">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="p-2.5 bg-primary-100/80 rounded-xl">
+                                                <Target className="w-5 h-5 text-primary-500" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm text-gray-500">Evidence Coverage</p>
+                                                <p className="text-xl font-bold text-primary-500">{kpi.evidence_percentage}%</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Evidence Type Icons Row - Below Stats Cards */}
+                                <div className="flex items-center justify-between gap-2 h-10 bg-white/60 backdrop-blur-sm border border-gray-100/60 rounded-xl px-4 py-1">
+                                    {(['visual_proof', 'documentation', 'testimony', 'financials'] as const).map((type) => {
+                                        const IconComponent = getEvidenceIcon(type)
+                                        const typeInfo = getEvidenceTypeInfo(type)
+                                        const percentage = evidenceTypePercentages[type].percentage
+
+                                        // Extract color classes from typeInfo
+                                        const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' :
+                                            typeInfo.color.includes('blue') ? 'text-blue-600' :
+                                                typeInfo.color.includes('orange') ? 'text-orange-600' :
+                                                    typeInfo.color.includes('green') ? 'text-primary-500' :
+                                                        'text-gray-600'
+
+                                        return (
+                                            <div
+                                                key={type}
+                                                className="flex items-center gap-1.5 flex-1 min-w-0"
+                                            >
+                                                <IconComponent className={`w-3.5 h-3.5 ${colorClasses} flex-shrink-0`} />
+                                                <div className="flex flex-col items-start min-w-0 flex-1 overflow-hidden">
+                                                    <span className="text-[9px] font-medium text-gray-700 truncate w-full leading-tight">
+                                                        {typeInfo.label}
+                                                    </span>
+                                                    <span className="text-[8px] font-bold text-gray-600 leading-tight whitespace-nowrap">
+                                                        {percentage}%
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+
+                                {/* Chart and Data Sections - 3/5 chart + 2/5 data/evidence */}
+                                <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                                    {/* Chart Section - 3/5 width */}
+                                    <div className="lg:col-span-3 bg-white/80 backdrop-blur-xl border border-gray-100/60 rounded-2xl p-4 flex flex-col shadow-soft-float">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div>
+                                                <h5 className="text-lg font-semibold text-gray-900">{isCumulative ? 'Cumulative Progress' : 'Monthly Progress'}</h5>
+                                                <p className="text-sm text-gray-500">{isCumulative ? 'Running total over time' : 'Monthly totals over time'}</p>
+                                            </div>
+                                            <div className="flex items-center space-x-2 flex-wrap">
+                                                {/* Date Filter */}
+                                                <div className="relative">
+                                                    <DateRangePicker
+                                                        value={datePickerValue}
+                                                        onChange={setDatePickerValue}
+                                                        maxDate={getLocalDateString(new Date())}
+                                                        placeholder="Filter by date"
+                                                        className="w-auto"
+                                                    />
+                                                </div>
+
+                                                {/* Cumulative/Non-cumulative Toggle */}
+                                                {timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
+                                                    <div className="flex items-center space-x-0.5 bg-gray-100 rounded-lg p-0.5">
+                                                        <button
+                                                            onClick={() => setIsCumulative(true)}
+                                                            className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${isCumulative
+                                                                ? 'bg-white text-gray-900 shadow-sm'
+                                                                : 'text-gray-600 hover:text-gray-900'
+                                                                }`}
+                                                        >
+                                                            Cumulative
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setIsCumulative(false)}
+                                                            className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${!isCumulative
+                                                                ? 'bg-white text-gray-900 shadow-sm'
+                                                                : 'text-gray-600 hover:text-gray-900'
+                                                                }`}
+                                                        >
+                                                            Monthly
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                                {/* Time Frame Filters */}
+                                                <div className="flex bg-gray-100 rounded-lg p-0.5">
+                                                    <button
+                                                        onClick={() => {
+                                                            setTimeFrame('all')
+                                                            setDatePickerValue({})
+                                                            setIsCumulative(true)
+                                                        }}
+                                                        className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate
+                                                            ? 'bg-white text-gray-900 shadow-sm'
+                                                            : 'text-gray-600 hover:text-gray-900'
+                                                            }`}
+                                                    >
+                                                        All
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setTimeFrame('1month')
+                                                            setDatePickerValue({})
+                                                            setIsCumulative(true)
+                                                        }}
+                                                        className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '1month' && !datePickerValue.singleDate && !datePickerValue.startDate
+                                                            ? 'bg-white text-gray-900 shadow-sm'
+                                                            : 'text-gray-600 hover:text-gray-900'
+                                                            }`}
+                                                    >
+                                                        1M
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setTimeFrame('6months')
+                                                            setDatePickerValue({})
+                                                            setIsCumulative(true)
+                                                        }}
+                                                        className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '6months' && !datePickerValue.singleDate && !datePickerValue.startDate
+                                                            ? 'bg-white text-gray-900 shadow-sm'
+                                                            : 'text-gray-600 hover:text-gray-900'
+                                                            }`}
+                                                    >
+                                                        6M
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setTimeFrame('1year')
+                                                            setDatePickerValue({})
+                                                            setIsCumulative(true)
+                                                        }}
+                                                        className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '1year' && !datePickerValue.singleDate && !datePickerValue.startDate
+                                                            ? 'bg-white text-gray-900 shadow-sm'
+                                                            : 'text-gray-600 hover:text-gray-900'
+                                                            }`}
+                                                    >
+                                                        1Y
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setTimeFrame('5years')
+                                                            setDatePickerValue({})
+                                                            setIsCumulative(true)
+                                                        }}
+                                                        className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '5years' && !datePickerValue.singleDate && !datePickerValue.startDate
+                                                            ? 'bg-white text-gray-900 shadow-sm'
+                                                            : 'text-gray-600 hover:text-gray-900'
+                                                            }`}
+                                                    >
+                                                        5Y
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex-1 h-64 flex items-center justify-center">
+                                            {kpiUpdates && kpiUpdates.length > 0 ? (
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <LineChart data={chartData}>
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                                                        <XAxis
+                                                            dataKey="date"
+                                                            stroke="#6b7280"
+                                                            fontSize={11}
+                                                            tick={{ fill: '#6b7280' }}
+                                                            angle={-45}
+                                                            textAnchor="end"
+                                                            height={60}
+                                                            interval={getXAxisInterval()}
+                                                            tickMargin={8}
+                                                        />
+                                                        <YAxis
+                                                            stroke="#6b7280"
+                                                            fontSize={11}
+                                                            tick={{ fill: '#6b7280' }}
+                                                            domain={maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax']}
+                                                            ticks={yTicks.length > 0 ? yTicks : undefined}
+                                                            tickFormatter={(value) => {
+                                                                if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
+                                                                if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
+                                                                return value.toString()
+                                                            }}
+                                                        />
+                                                        <Tooltip
+                                                            contentStyle={{
+                                                                backgroundColor: 'rgba(255,255,255,0.95)',
+                                                                backdropFilter: 'blur(8px)',
+                                                                border: '1px solid rgba(0,0,0,0.05)',
+                                                                borderRadius: '12px',
+                                                                padding: '10px 12px',
+                                                                fontSize: '12px',
+                                                                boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                                                            }}
+                                                            formatter={(value: any, name: string) => {
+                                                                const unit = kpi.unit_of_measurement || ''
+                                                                const formattedValue = typeof value === 'number'
+                                                                    ? value.toLocaleString() + (unit ? ` ${unit}` : '')
+                                                                    : value
+                                                                return [formattedValue, 'Cumulative Total']
+                                                            }}
+                                                            labelFormatter={(label) => {
+                                                                // Find the actual date from chartData
+                                                                const dataPoint = chartData.find(d => d.date === label)
+                                                                if (dataPoint?.fullDate) {
+                                                                    return formatDate(dataPoint.fullDate)
+                                                                }
+                                                                return `Date: ${label}`
+                                                            }}
+                                                            cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '5 5' }}
+                                                        />
+                                                        <Line
+                                                            type="monotone"
+                                                            dataKey="cumulative"
+                                                            stroke="#16a34a"
+                                                            strokeWidth={3.5}
+                                                            dot={false}
+                                                            activeDot={{ r: 6, fill: '#16a34a', stroke: 'white', strokeWidth: 2 }}
+                                                            strokeLinecap="round"
+                                                        />
+                                                    </LineChart>
+                                                </ResponsiveContainer>
+                                            ) : (
+                                                <div className="h-full flex flex-col items-center justify-center text-gray-500">
+                                                    <BarChart3 className="w-12 h-12 mb-4 opacity-50" />
+                                                    <h4 className="text-lg font-semibold text-gray-700 mb-2">No Data Yet</h4>
+                                                    <p className="text-sm text-center max-w-xs">
+                                                        Come back when you add data to see your activity over time
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Impact Claims and Evidence Sections - 2/5 width */}
+                                    <div className="lg:col-span-2 space-y-4">
+                                        {/* Impact Claims Section */}
+                                        {kpiUpdates && kpiUpdates.length > 0 ? (
+                                            <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-2xl p-4 shadow-soft-float flex flex-col max-h-[calc(50vh-100px)]">
+                                                <div className="flex items-center justify-between mb-3 flex-shrink-0">
+                                                    <h5 className="text-base font-semibold text-gray-800">Impact Claims</h5>
+                                                    <div className="flex items-center space-x-3">
+                                                        <div className="flex items-center space-x-2 text-sm text-gray-500">
+                                                            <BarChart3 className="w-4 h-4" />
+                                                            <span>{kpi.total_updates || 0} total</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                onAddUpdate()
+                                                            }}
+                                                            className="flex items-center space-x-2 px-4 py-2 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25"
+                                                        >
+                                                            <Plus className="w-4 h-4" />
+                                                            <span>Add</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+                                                    {kpiUpdates.map((update, index) => {
+                                                        const hasDateRange = update.date_range_start && update.date_range_end
+                                                        const displayDate = hasDateRange
+                                                            ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}`
+                                                            : formatDate(update.date_represented)
+
+                                                        const updateLocation = update.location_id ? updateLocations[update.location_id] : null
+
+                                                        return (
+                                                            <div
+                                                                key={update.id || index}
+                                                                className="border border-gray-100/80 rounded-xl bg-white/60 hover:bg-evidence-50/50 hover:border-evidence-200 cursor-pointer transition-all duration-200 p-2.5"
+                                                                onClick={() => handleDataPointClick(update)}
+                                                            >
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <div className="flex items-center space-x-2">
+                                                                            <span className="text-sm font-semibold text-evidence-600">
+                                                                                {update.value?.toLocaleString()} {kpi.unit_of_measurement}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="flex items-center space-x-2 mt-0.5">
+                                                                            <Calendar className="w-3 h-3 text-gray-400" />
+                                                                            <span className="text-xs text-gray-500">{displayDate}</span>
+                                                                        </div>
+                                                                        {updateLocation && (
+                                                                            <div className="flex items-center space-x-1 mt-0.5">
+                                                                                <MapPin className="w-3 h-3 text-gray-400" />
+                                                                                <span className="text-xs text-gray-500">{updateLocation.name}</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    <Eye className="w-3.5 h-3.5 text-gray-400" />
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-evidence-300/60 rounded-2xl p-6 shadow-soft-float">
+                                                <div className="text-center">
+                                                    <div className="w-14 h-14 mx-auto mb-3 bg-evidence-100/80 rounded-xl flex items-center justify-center">
+                                                        <BarChart3 className="w-7 h-7 text-evidence-500" />
+                                                    </div>
+                                                    <h5 className="text-base font-semibold text-gray-800 mb-2">Impact Claims</h5>
+                                                    <p className="text-sm text-gray-500 mb-4">You haven't added any of this type, add it here!</p>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            onAddUpdate()
+                                                        }}
+                                                        className="inline-flex items-center space-x-2 px-5 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
+                                                    >
+                                                        <Plus className="w-5 h-5" />
+                                                        <span>Add Impact Claim</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Evidence Section */}
+                                        {!loadingEvidence && evidence.length > 0 ? (
+                                            <div className="bg-white/80 backdrop-blur-xl border border-impact-100/60 rounded-2xl p-4 shadow-soft-float flex flex-col max-h-[calc(50vh-100px)]">
+                                                <div className="flex items-center justify-between mb-3 flex-shrink-0">
+                                                    <h5 className="text-base font-semibold text-gray-800">Evidence</h5>
+                                                    <div className="flex items-center space-x-3">
+                                                        <div className="flex items-center space-x-2 text-sm text-gray-500">
+                                                            <FileText className="w-4 h-4" />
+                                                            <span>{kpi.evidence_count || 0} items</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                onAddEvidence()
+                                                            }}
+                                                            className="flex items-center space-x-2 px-4 py-2 bg-impact-500 hover:bg-impact-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-impact-500/25"
+                                                        >
+                                                            <Plus className="w-4 h-4" />
+                                                            <span>Add</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+                                                    {evidence.map((evidenceItem) => {
+                                                        return (
+                                                            <div
+                                                                key={evidenceItem.id}
+                                                                className="border border-gray-100/80 rounded-xl bg-white/60 hover:bg-impact-50/50 hover:border-impact-200 cursor-pointer transition-all duration-200 p-2.5"
+                                                                onClick={() => handleEvidenceClick(evidenceItem)}
+                                                            >
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center space-x-2 min-w-0 flex-1">
+                                                                        <div className="w-6 h-6 bg-impact-100/80 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                                            <FileText className="w-3 h-3 text-impact-500" />
+                                                                        </div>
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <div className="text-xs font-medium text-gray-800 truncate">
+                                                                                {evidenceItem.title || 'Untitled Evidence'}
+                                                                            </div>
+                                                                            <div className="text-xs text-gray-500">
+                                                                                Click to view
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <Eye className="w-3.5 h-3.5 text-gray-400" />
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ) : loadingEvidence ? (
+                                            <div className="bg-white/80 backdrop-blur-xl border border-impact-100/60 rounded-2xl p-4 shadow-soft-float">
+                                                <div className="text-center py-8 text-gray-500">
+                                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-impact-500 mx-auto mb-2"></div>
+                                                    <p className="text-sm">Loading evidence...</p>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-impact-300/60 rounded-2xl p-6 shadow-soft-float">
+                                                <div className="text-center">
+                                                    <div className="w-14 h-14 mx-auto mb-3 bg-impact-100/80 rounded-xl flex items-center justify-center">
+                                                        <FileText className="w-7 h-7 text-impact-500" />
+                                                    </div>
+                                                    <h5 className="text-base font-semibold text-gray-800 mb-2">Evidence</h5>
+                                                    <p className="text-sm text-gray-500 mb-4">You haven't added any of this type, add it here!</p>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            onAddEvidence()
+                                                        }}
+                                                        className="inline-flex items-center space-x-2 px-5 py-2.5 bg-impact-500 hover:bg-impact-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-impact-500/25"
+                                                    >
+                                                        <Plus className="w-5 h-5" />
+                                                        <span>Add Evidence</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </>
                         )}
                     </div>
                 </div>,
                 document.body
-            )}
+            ))}
 
             {/* Data Point Preview Modal */}
             {selectedDataPoint && createPortal(
@@ -1423,37 +2128,34 @@ export default function ExpandableKPICard({
 
             {/* Delete Data Point Confirmation */}
             {deleteConfirmDataPoint && createPortal(
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
-                    <div className="bg-white/95 backdrop-blur-xl border border-gray-200/60 rounded-3xl max-w-md w-full p-8 shadow-2xl shadow-gray-900/20">
-                        <div className="text-center mb-6">
-                            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-red-100 to-pink-100 rounded-2xl flex items-center justify-center">
-                                <Trash2 className="w-8 h-8 text-red-600" />
+                <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[80]">
+                    <div className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-3xl max-w-md w-full p-6 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)]">
+                        <div className="flex items-center space-x-3 mb-4">
+                            <div className="p-2.5 bg-red-100/80 rounded-xl">
+                                <Trash2 className="w-5 h-5 text-red-500" />
                             </div>
-                            <h3 className="text-2xl font-bold text-gray-900 mb-2">Delete Impact Claim</h3>
-                            <p className="text-gray-500">This action cannot be undone</p>
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-800">Delete Impact Claim</h3>
+                                <p className="text-sm text-gray-500">This action cannot be undone</p>
+                            </div>
                         </div>
 
-                        <div className="bg-gradient-to-r from-red-50/50 to-pink-50/50 border border-red-100/60 rounded-2xl p-4 mb-6">
-                            <p className="text-gray-700 text-center">
-                                Are you sure you want to delete this impact claim?
-                            </p>
-                            <p className="text-sm text-gray-600 text-center mt-2">
-                                This will permanently remove the impact claim and its associated information.
-                            </p>
-                        </div>
+                        <p className="text-gray-600 mb-6">
+                            Are you sure you want to delete this impact claim and its associated information?
+                        </p>
 
                         <div className="flex space-x-3">
                             <button
                                 onClick={() => setDeleteConfirmDataPoint(null)}
-                                className="flex-1 px-6 py-3 bg-gray-100/80 hover:bg-gray-200/80 text-gray-700 hover:text-gray-900 rounded-xl font-semibold transition-all duration-200 hover:scale-[1.02]"
+                                className="flex-1 px-5 py-3 text-gray-600 bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-xl hover:bg-white/80 font-medium transition-all duration-200"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={() => handleDeleteDataPoint(deleteConfirmDataPoint)}
-                                className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold transition-all duration-200 hover:scale-[1.02]"
+                                className="flex-1 px-5 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all duration-200 font-semibold shadow-lg shadow-red-500/25"
                             >
-                                Delete Impact Claim
+                                Delete
                             </button>
                         </div>
                     </div>
@@ -1463,37 +2165,34 @@ export default function ExpandableKPICard({
 
             {/* Delete Evidence Confirmation */}
             {deleteConfirmEvidence && createPortal(
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
-                    <div className="bg-white/95 backdrop-blur-xl border border-gray-200/60 rounded-3xl max-w-md w-full p-8 shadow-2xl shadow-gray-900/20">
-                        <div className="text-center mb-6">
-                            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-red-100 to-pink-100 rounded-2xl flex items-center justify-center">
-                                <Trash2 className="w-8 h-8 text-red-600" />
+                <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[80]">
+                    <div className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-3xl max-w-md w-full p-6 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)]">
+                        <div className="flex items-center space-x-3 mb-4">
+                            <div className="p-2.5 bg-red-100/80 rounded-xl">
+                                <Trash2 className="w-5 h-5 text-red-500" />
                             </div>
-                            <h3 className="text-2xl font-bold text-gray-900 mb-2">Delete Evidence</h3>
-                            <p className="text-gray-500">This action cannot be undone</p>
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-800">Delete Evidence</h3>
+                                <p className="text-sm text-gray-500">This action cannot be undone</p>
+                            </div>
                         </div>
 
-                        <div className="bg-gradient-to-r from-red-50/50 to-pink-50/50 border border-red-100/60 rounded-2xl p-4 mb-6">
-                            <p className="text-gray-700 text-center">
-                                Are you sure you want to delete this evidence?
-                            </p>
-                            <p className="text-sm text-gray-600 text-center mt-2">
-                                This will permanently remove the evidence and its associated information.
-                            </p>
-                        </div>
+                        <p className="text-gray-600 mb-6">
+                            Are you sure you want to delete this evidence and its associated information?
+                        </p>
 
                         <div className="flex space-x-3">
                             <button
                                 onClick={() => setDeleteConfirmEvidence(null)}
-                                className="flex-1 px-6 py-3 bg-gray-100/80 hover:bg-gray-200/80 text-gray-700 hover:text-gray-900 rounded-xl font-semibold transition-all duration-200 hover:scale-[1.02]"
+                                className="flex-1 px-5 py-3 text-gray-600 bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-xl hover:bg-white/80 font-medium transition-all duration-200"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={() => handleDeleteEvidence(deleteConfirmEvidence)}
-                                className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold transition-all duration-200 hover:scale-[1.02]"
+                                className="flex-1 px-5 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all duration-200 font-semibold shadow-lg shadow-red-500/25"
                             >
-                                Delete Evidence
+                                Delete
                             </button>
                         </div>
                     </div>

@@ -300,14 +300,14 @@ export default function DataPointPreviewModal({
                                             }
                                         case 'financials':
                                             return {
-                                                headerBg: 'bg-gradient-to-r from-green-100/80 to-emerald-100/60',
-                                                headerBorder: 'border-green-200/60',
-                                                headerIcon: 'text-green-700',
+                                                headerBg: 'bg-gradient-to-r from-primary-100/80 to-primary-100/60',
+                                                headerBorder: 'border-primary-200/60',
+                                                headerIcon: 'text-primary-700',
                                                 headerText: 'text-gray-900',
-                                                cardBg: 'bg-gradient-to-br from-green-50/50 to-emerald-50/30',
-                                                cardBorder: 'border-green-100/60',
-                                                itemBorder: 'border-green-100/40',
-                                                dotColor: 'bg-green-400'
+                                                cardBg: 'bg-gradient-to-br from-primary-50/50 to-primary-50/30',
+                                                cardBorder: 'border-primary-100/60',
+                                                itemBorder: 'border-primary-100/40',
+                                                dotColor: 'bg-primary-400'
                                             }
                                         default:
                                             return {

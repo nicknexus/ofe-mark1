@@ -365,7 +365,7 @@ export default function LocationMap({
             ref={mapContainerRef}
             className="relative w-full h-full rounded-lg overflow-hidden border-2 border-gray-300/60 bg-gradient-to-br from-blue-50 via-indigo-50/30 to-cyan-50 shadow-inner"
         >
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-100/20 via-white/40 to-green-100/20 pointer-events-none z-[1]" />
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-100/20 via-white/40 to-primary-100/20 pointer-events-none z-[1]" />
             
             <MapContainer
                 center={center}
@@ -456,8 +456,8 @@ export default function LocationMap({
                         <div className="p-4">
                             <div className="flex items-start justify-between mb-3">
                                 <div className="flex items-center space-x-2">
-                                    <div className="p-2 bg-green-100 rounded-lg">
-                                        <MapPin className="w-4 h-4 text-green-600" />
+                                    <div className="p-2 bg-primary-100 rounded-lg">
+                                        <MapPin className="w-4 h-4 text-primary-500" />
                                     </div>
                                     <div>
                                         <h3 className="font-semibold text-gray-900 text-sm">{location.name}</h3>
@@ -489,7 +489,7 @@ export default function LocationMap({
                                             setMapClickPopup(null)
                                         }
                                     }}
-                                    className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium transition-colors"
+                                    className="flex-1 px-3 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-xs font-medium transition-colors"
                                 >
                                     Apply Filter
                                 </button>
