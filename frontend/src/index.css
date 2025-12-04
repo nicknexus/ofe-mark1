@@ -23,10 +23,10 @@
 #root {
     min-height: 100vh;
     background:
-        radial-gradient(ellipse 35% 30% at 92% 12%, rgba(120, 180, 145, 0.22) 0%, transparent 70%),
-        radial-gradient(ellipse 40% 35% at 85% 88%, rgba(100, 170, 130, 0.20) 0%, transparent 70%),
-        radial-gradient(ellipse 30% 25% at 15% 75%, rgba(115, 175, 140, 0.18) 0%, transparent 65%),
-        radial-gradient(ellipse 25% 30% at 60% 95%, rgba(110, 165, 135, 0.16) 0%, transparent 70%),
+        radial-gradient(ellipse 35% 30% at 92% 12%, rgba(192, 223, 161, 0.22) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 35% at 85% 88%, rgba(192, 223, 161, 0.20) 0%, transparent 70%),
+        radial-gradient(ellipse 30% 25% at 15% 75%, rgba(192, 223, 161, 0.18) 0%, transparent 65%),
+        radial-gradient(ellipse 25% 30% at 60% 95%, rgba(192, 223, 161, 0.16) 0%, transparent 70%),
         linear-gradient(180deg, #F7F8FA 0%, #F9FAFB 50%, #F6F7F9 100%);
     background-attachment: fixed;
 }
@@ -303,6 +303,179 @@
 .custom-marker {
     background: transparent !important;
     border: none !important;
+}
+
+/* ========================================
+   Leaflet Map Dashboard Styling
+   ======================================== */
+
+/* Modern dashboard map container */
+.leaflet-map-dashboard {
+    border-radius: 16px !important;
+    overflow: hidden !important;
+}
+
+.leaflet-map-dashboard .leaflet-container {
+    border-radius: 16px !important;
+}
+
+/* Base leaflet container styling for all maps */
+.leaflet-container {
+    width: 100%;
+    height: 100%;
+    background-color: #F8F9FB;
+    /* Off-white to match app background */
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Rounded corners and modern shadow for map wrapper */
+.leaflet-container {
+    border-radius: 16px;
+    box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.04),
+        0 4px 12px rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+/* Ensure tiles have no visible gaps during load */
+.leaflet-tile-container {
+    background-color: #F8F9FB;
+}
+
+.leaflet-tile {
+    background-color: transparent;
+}
+
+/* Loading state - subtle pulse animation */
+.leaflet-tile-loaded {
+    opacity: 1;
+    transition: opacity 0.25s ease-in-out;
+}
+
+.leaflet-tile:not(.leaflet-tile-loaded) {
+    opacity: 0.5;
+    background-color: #F3F5F8;
+}
+
+/* Hide the pane backgrounds to avoid grey flashes */
+.leaflet-tile-pane {
+    background-color: #F8F9FB;
+}
+
+.leaflet-overlay-pane {
+    background-color: transparent;
+}
+
+/* Modern attribution styling */
+.leaflet-control-attribution {
+    background: rgba(255, 255, 255, 0.85) !important;
+    backdrop-filter: blur(8px);
+    border-radius: 8px !important;
+    padding: 4px 8px !important;
+    font-size: 10px !important;
+    color: #6B7280 !important;
+    margin: 8px !important;
+    border: 1px solid rgba(0, 0, 0, 0.04) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+}
+
+.leaflet-control-attribution a {
+    color: #9CA3AF !important;
+    text-decoration: none !important;
+}
+
+.leaflet-control-attribution a:hover {
+    color: #6B7280 !important;
+}
+
+/* Modern zoom controls (if using default Leaflet zoom) */
+.leaflet-control-zoom {
+    border: none !important;
+    border-radius: 12px !important;
+    overflow: hidden;
+    box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.04),
+        0 4px 12px rgba(0, 0, 0, 0.03) !important;
+    margin: 12px !important;
+}
+
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out {
+    background: white !important;
+    color: #374151 !important;
+    border: none !important;
+    width: 36px !important;
+    height: 36px !important;
+    line-height: 36px !important;
+    font-size: 18px !important;
+    font-weight: 500 !important;
+    transition: background-color 0.15s ease !important;
+}
+
+.leaflet-control-zoom-in:hover,
+.leaflet-control-zoom-out:hover {
+    background: #F3F4F6 !important;
+    color: #111827 !important;
+}
+
+.leaflet-control-zoom-in {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+    border-radius: 12px 12px 0 0 !important;
+}
+
+.leaflet-control-zoom-out {
+    border-radius: 0 0 12px 12px !important;
+}
+
+/* Modern tooltip styling */
+.leaflet-tooltip {
+    background: rgba(17, 24, 39, 0.9) !important;
+    backdrop-filter: blur(8px);
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    color: white !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.leaflet-tooltip-top:before,
+.leaflet-tooltip-bottom:before,
+.leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before {
+    border-top-color: rgba(17, 24, 39, 0.9) !important;
+}
+
+/* Popup styling to match dashboard */
+.leaflet-popup-content-wrapper {
+    background: white !important;
+    border-radius: 12px !important;
+    box-shadow:
+        0 4px 6px rgba(0, 0, 0, 0.05),
+        0 10px 20px rgba(0, 0, 0, 0.08) !important;
+    padding: 0 !important;
+}
+
+.leaflet-popup-content {
+    margin: 12px !important;
+    font-size: 13px !important;
+    color: #374151 !important;
+}
+
+.leaflet-popup-tip {
+    background: white !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+}
+
+.leaflet-popup-close-button {
+    color: #9CA3AF !important;
+    font-size: 18px !important;
+    padding: 8px !important;
+}
+
+.leaflet-popup-close-button:hover {
+    color: #374151 !important;
 }
 
 /* Dim Leaflet map when modal backdrop is present */

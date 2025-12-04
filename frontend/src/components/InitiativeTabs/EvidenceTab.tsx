@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Search, X, Calendar, MapPin, Users, FileText, Eye, Edit, Trash2, Plus, Camera, MessageSquare, DollarSign } from 'lucide-react'
+import { Search, X, Calendar, MapPin, Users, FileText, Eye, Edit, Trash2, Plus, Camera, MessageSquare, DollarSign, ChevronDown } from 'lucide-react'
 import { apiService } from '../../services/api'
 import { Evidence, Location, BeneficiaryGroup } from '../../types'
 import { formatDate, getEvidenceTypeInfo } from '../../utils'
@@ -244,7 +244,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
     }
 
     return (
-        <div className="h-[calc(100vh-64px)] overflow-hidden flex flex-col">
+        <div className="h-screen overflow-hidden flex flex-col">
             {/* Header with Search and Add Button */}
             <div className="p-4 sm:p-6 border-b border-gray-100 bg-white shadow-bubble-sm">
                 <div className="flex items-center justify-between mb-4">
@@ -257,7 +257,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                             setEditingEvidence(null)
                             setIsAddModalOpen(true)
                         }}
-                        className="flex items-center space-x-2 px-5 py-2.5 bg-evidence-400 hover:bg-evidence-600 text-white rounded-2xl font-medium transition-all duration-200 shadow-bubble-sm"
+                        className="flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-medium transition-all duration-200 shadow-bubble-sm"
                     >
                         <Plus className="w-4 h-4" />
                         <span>Add Evidence</span>
@@ -292,14 +292,12 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                         <button
                             ref={locationButtonRef}
                             onClick={() => setShowLocationPicker(!showLocationPicker)}
-                            className={`flex items-center space-x-2 px-3 py-2 border rounded-xl text-sm font-medium transition-all duration-200 ${
-                                selectedLocations.length > 0
-                                    ? 'bg-evidence-50 border-evidence-200 text-evidence-600'
-                                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 shadow-bubble-sm'
-                            }`}
+                            className="flex items-center pl-0 pr-4 h-10 bg-white hover:bg-gray-50 text-gray-700 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border border-gray-200 border-l-0 shadow-bubble-sm"
                         >
-                            <MapPin className="w-4 h-4" />
-                            <span>
+                            <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+                                <MapPin className="w-5 h-5 text-gray-600" />
+                            </div>
+                            <span className="ml-3">
                                 {selectedLocations.length === 0
                                     ? 'Location'
                                     : selectedLocations.length === 1
@@ -307,16 +305,11 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                     : `${selectedLocations.length} locations`}
                             </span>
                             {selectedLocations.length > 0 && (
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        setSelectedLocations([])
-                                    }}
-                                    className="ml-1 text-primary-500 hover:text-primary-700"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
+                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
+                                    {selectedLocations.length}
+                                </span>
                             )}
+                            <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showLocationPicker ? 'rotate-180' : ''}`} />
                         </button>
 
                         {showLocationPicker && locationButtonRef.current && createPortal(
@@ -326,21 +319,35 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                     onClick={() => setShowLocationPicker(false)}
                                 />
                                 <div
-                                    className="fixed z-[9999] mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto"
+                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
                                     style={{
                                         top: `${locationDropdownPosition.top}px`,
                                         left: `${locationDropdownPosition.left}px`
                                     }}
                                     onClick={(e) => e.stopPropagation()}
                                 >
-                                    <div className="p-2">
-                                        {locations.length === 0 ? (
-                                            <p className="text-sm text-gray-500 p-2">No locations available</p>
-                                        ) : (
-                                            locations.map((location) => (
+                                    {locations.length === 0 ? (
+                                        <p className="text-xs text-gray-500">No locations available</p>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-xs font-semibold text-gray-700">Select Locations</span>
+                                                {selectedLocations.length > 0 && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            setSelectedLocations([])
+                                                        }}
+                                                        className="text-xs text-blue-600 hover:text-blue-800"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {locations.map((location) => (
                                                 <label
                                                     key={location.id}
-                                                    className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
+                                                    className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
                                                 >
                                                     <input
                                                         type="checkbox"
@@ -352,13 +359,13 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                                                 setSelectedLocations(selectedLocations.filter(id => id !== location.id))
                                                             }
                                                         }}
-                                                        className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                                                        className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
                                                     />
-                                                    <span className="text-sm text-gray-700">{location.name}</span>
+                                                    <span className="text-xs text-gray-700 truncate flex-1">{location.name}</span>
                                                 </label>
-                                            ))
-                                        )}
-                                    </div>
+                                            ))}
+                                        </>
+                                    )}
                                 </div>
                             </>,
                             document.body
@@ -370,14 +377,12 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                         <button
                             ref={beneficiaryButtonRef}
                             onClick={() => setShowBeneficiaryPicker(!showBeneficiaryPicker)}
-                            className={`flex items-center space-x-2 px-3 py-2 border rounded-xl text-sm font-medium transition-all duration-200 ${
-                                selectedBeneficiaryGroups.length > 0
-                                    ? 'bg-evidence-50 border-evidence-200 text-evidence-600'
-                                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 shadow-bubble-sm'
-                            }`}
+                            className="flex items-center pl-0 pr-4 h-10 bg-white hover:bg-gray-50 text-gray-700 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border border-gray-200 border-l-0 shadow-bubble-sm"
                         >
-                            <Users className="w-4 h-4" />
-                            <span>
+                            <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+                                <Users className="w-5 h-5 text-gray-600" />
+                            </div>
+                            <span className="ml-3">
                                 {selectedBeneficiaryGroups.length === 0
                                     ? 'Beneficiary Group'
                                     : selectedBeneficiaryGroups.length === 1
@@ -385,16 +390,11 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                     : `${selectedBeneficiaryGroups.length} groups`}
                             </span>
                             {selectedBeneficiaryGroups.length > 0 && (
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        setSelectedBeneficiaryGroups([])
-                                    }}
-                                    className="ml-1 text-primary-500 hover:text-primary-700"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
+                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
+                                    {selectedBeneficiaryGroups.length}
+                                </span>
                             )}
+                            <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showBeneficiaryPicker ? 'rotate-180' : ''}`} />
                         </button>
 
                         {showBeneficiaryPicker && beneficiaryButtonRef.current && createPortal(
@@ -404,21 +404,35 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                     onClick={() => setShowBeneficiaryPicker(false)}
                                 />
                                 <div
-                                    className="fixed z-[9999] mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto"
+                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
                                     style={{
                                         top: `${beneficiaryDropdownPosition.top}px`,
                                         left: `${beneficiaryDropdownPosition.left}px`
                                     }}
                                     onClick={(e) => e.stopPropagation()}
                                 >
-                                    <div className="p-2">
-                                        {beneficiaryGroups.length === 0 ? (
-                                            <p className="text-sm text-gray-500 p-2">No beneficiary groups available</p>
-                                        ) : (
-                                            beneficiaryGroups.map((group) => (
+                                    {beneficiaryGroups.length === 0 ? (
+                                        <p className="text-xs text-gray-500">No beneficiary groups available</p>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-xs font-semibold text-gray-700">Select Beneficiary Groups</span>
+                                                {selectedBeneficiaryGroups.length > 0 && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            setSelectedBeneficiaryGroups([])
+                                                        }}
+                                                        className="text-xs text-blue-600 hover:text-blue-800"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {beneficiaryGroups.map((group) => (
                                                 <label
                                                     key={group.id}
-                                                    className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
+                                                    className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
                                                 >
                                                     <input
                                                         type="checkbox"
@@ -430,13 +444,13 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                                                 setSelectedBeneficiaryGroups(selectedBeneficiaryGroups.filter(id => id !== group.id))
                                                             }
                                                         }}
-                                                        className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                                                        className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
                                                     />
-                                                    <span className="text-sm text-gray-700">{group.name}</span>
+                                                    <span className="text-xs text-gray-700 truncate flex-1">{group.name}</span>
                                                 </label>
-                                            ))
-                                        )}
-                                    </div>
+                                            ))}
+                                        </>
+                                    )}
                                 </div>
                             </>,
                             document.body
@@ -448,14 +462,12 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                         <button
                             ref={evidenceTypeButtonRef}
                             onClick={() => setShowEvidenceTypePicker(!showEvidenceTypePicker)}
-                            className={`flex items-center space-x-2 px-3 py-2 border rounded-xl text-sm font-medium transition-all duration-200 ${
-                                selectedEvidenceTypes.length > 0
-                                    ? 'bg-evidence-50 border-evidence-200 text-evidence-600'
-                                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 shadow-bubble-sm'
-                            }`}
+                            className="flex items-center pl-0 pr-4 h-10 bg-white hover:bg-gray-50 text-gray-700 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border border-gray-200 border-l-0 shadow-bubble-sm"
                         >
-                            <FileText className="w-4 h-4" />
-                            <span>
+                            <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+                                <FileText className="w-5 h-5 text-gray-600" />
+                            </div>
+                            <span className="ml-3">
                                 {selectedEvidenceTypes.length === 0
                                     ? 'Evidence Type'
                                     : selectedEvidenceTypes.length === 1
@@ -463,16 +475,11 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                     : `${selectedEvidenceTypes.length} types`}
                             </span>
                             {selectedEvidenceTypes.length > 0 && (
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        setSelectedEvidenceTypes([])
-                                    }}
-                                    className="ml-1 text-primary-500 hover:text-primary-700"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
+                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
+                                    {selectedEvidenceTypes.length}
+                                </span>
                             )}
+                            <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showEvidenceTypePicker ? 'rotate-180' : ''}`} />
                         </button>
 
                         {showEvidenceTypePicker && evidenceTypeButtonRef.current && createPortal(
@@ -482,42 +489,54 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                     onClick={() => setShowEvidenceTypePicker(false)}
                                 />
                                 <div
-                                    className="fixed z-[9999] mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto"
+                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
                                     style={{
                                         top: `${evidenceTypeDropdownPosition.top}px`,
                                         left: `${evidenceTypeDropdownPosition.left}px`
                                     }}
                                     onClick={(e) => e.stopPropagation()}
                                 >
-                                    <div className="p-2">
-                                        {evidenceTypes.map((type) => {
-                                            const typeInfo = getEvidenceTypeInfo(type.value)
-                                            const bgColor = typeInfo.color.split(' ')[0]
-                                            return (
-                                                <label
-                                                    key={type.value}
-                                                    className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedEvidenceTypes.includes(type.value)}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) {
-                                                                setSelectedEvidenceTypes([...selectedEvidenceTypes, type.value])
-                                                            } else {
-                                                                setSelectedEvidenceTypes(selectedEvidenceTypes.filter(t => t !== type.value))
-                                                            }
-                                                        }}
-                                                        className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
-                                                    />
-                                                    <div className={`w-6 h-6 ${bgColor} rounded flex items-center justify-center`}>
-                                                        {React.createElement(type.icon, { className: 'w-4 h-4' })}
-                                                    </div>
-                                                    <span className="text-sm text-gray-700">{type.label}</span>
-                                                </label>
-                                            )
-                                        })}
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs font-semibold text-gray-700">Select Evidence Types</span>
+                                        {selectedEvidenceTypes.length > 0 && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setSelectedEvidenceTypes([])
+                                                }}
+                                                className="text-xs text-blue-600 hover:text-blue-800"
+                                            >
+                                                Clear
+                                            </button>
+                                        )}
                                     </div>
+                                    {evidenceTypes.map((type) => {
+                                        const typeInfo = getEvidenceTypeInfo(type.value)
+                                        const bgColor = typeInfo.color.split(' ')[0]
+                                        return (
+                                            <label
+                                                key={type.value}
+                                                className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedEvidenceTypes.includes(type.value)}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setSelectedEvidenceTypes([...selectedEvidenceTypes, type.value])
+                                                        } else {
+                                                            setSelectedEvidenceTypes(selectedEvidenceTypes.filter(t => t !== type.value))
+                                                        }
+                                                    }}
+                                                    className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
+                                                />
+                                                <div className={`w-6 h-6 ${bgColor} rounded flex items-center justify-center`}>
+                                                    {React.createElement(type.icon, { className: 'w-4 h-4' })}
+                                                </div>
+                                                <span className="text-xs text-gray-700 truncate flex-1">{type.label}</span>
+                                            </label>
+                                        )
+                                    })}
                                 </div>
                             </>,
                             document.body
@@ -560,7 +579,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                     setEditingEvidence(null)
                                     setIsAddModalOpen(true)
                                 }}
-                                className="px-5 py-2.5 bg-evidence-400 hover:bg-evidence-600 text-white rounded-2xl font-medium transition-all duration-200 shadow-bubble-sm"
+                                className="px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-medium transition-all duration-200 shadow-bubble-sm"
                             >
                                 Add Evidence
                             </button>

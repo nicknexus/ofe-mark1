@@ -309,7 +309,7 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
     }
 
     return (
-        <div className="h-[calc(100vh-64px)] overflow-hidden">
+        <div className="h-screen overflow-hidden">
             <div className="h-full flex flex-col">
                 {/* Header */}
                 <div className="bg-white border-b border-gray-100 shadow-bubble-sm p-4 flex-shrink-0">

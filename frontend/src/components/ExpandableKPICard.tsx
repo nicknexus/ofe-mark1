@@ -652,7 +652,7 @@ export default function ExpandableKPICard({
         return (
             <>
                 {/* Full Page View - No card wrapper */}
-                <div className="h-[calc(100vh-64px)] flex flex-col overflow-hidden">
+                <div className="h-screen flex flex-col overflow-hidden">
                     {/* Header - Compact */}
                     <div className="flex-shrink-0 bg-white/80 backdrop-blur-xl border-b border-gray-100/60 px-4 py-2 shadow-soft-float">
                         <div className="flex items-center justify-between">
@@ -666,17 +666,6 @@ export default function ExpandableKPICard({
                                 </div>
                             </div>
                             <div className="flex items-center space-x-1.5">
-                                <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-1 px-2.5 py-1.5 bg-evidence-100/80 hover:bg-evidence-200/80 text-evidence-700 rounded-lg text-xs font-medium transition-all duration-200">
-                                    <Plus className="w-3.5 h-3.5" /><span>Impact Claim</span>
-                                </button>
-                                {kpi.total_updates > 0 && (
-                                    <button onClick={(e) => { e.stopPropagation(); onAddEvidence() }} className="flex items-center space-x-1 px-2.5 py-1.5 bg-impact-100/80 hover:bg-impact-200/80 text-impact-700 rounded-lg text-xs font-medium transition-all duration-200">
-                                        <Upload className="w-3.5 h-3.5" /><span>Evidence</span>
-                                    </button>
-                                )}
-                                <button onClick={(e) => { e.stopPropagation(); setIsCreditingModalOpen(true) }} className="flex items-center space-x-1 px-2.5 py-1.5 bg-purple-100/80 hover:bg-purple-200/80 text-purple-700 rounded-lg text-xs font-medium transition-all duration-200">
-                                    <Heart className="w-3.5 h-3.5" /><span>Credit</span>
-                                </button>
                                 <button onClick={(e) => { e.stopPropagation(); onEdit() }} className="p-1.5 bg-white/60 hover:bg-white/80 border border-gray-200/60 text-gray-600 rounded-lg transition-all duration-200">
                                     <Edit className="w-3.5 h-3.5" />
                                 </button>
@@ -759,22 +748,22 @@ export default function ExpandableKPICard({
 
                                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 flex-1 min-h-0 overflow-hidden">
                                     <div className="lg:col-span-3 bg-white/80 backdrop-blur-xl border border-gray-100/60 rounded-xl p-3 flex flex-col shadow-soft-float min-h-0 overflow-hidden">
-                                        <div className="flex items-center justify-between mb-2 flex-shrink-0">
-                                            <div>
-                                                <h5 className="text-base font-semibold text-gray-900">{isCumulative ? 'Cumulative Progress' : 'Monthly Progress'}</h5>
-                                                <p className="text-xs text-gray-500">{isCumulative ? 'Running total over time' : 'Monthly totals'}</p>
+                                        <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
+                                            <div className="flex-shrink-0 min-w-0">
+                                                <h5 className="text-sm lg:text-base font-semibold text-gray-900 truncate">{isCumulative ? 'Cumulative Progress' : 'Monthly Progress'}</h5>
+                                                <p className="text-[10px] lg:text-xs text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals'}</p>
                                             </div>
-                                            <div className="flex items-center space-x-2 flex-wrap">
-                                                <DateRangePicker value={datePickerValue} onChange={setDatePickerValue} maxDate={getLocalDateString(new Date())} placeholder="Filter by date" className="w-auto" />
+                                            <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
+                                                <DateRangePicker value={datePickerValue} onChange={setDatePickerValue} maxDate={getLocalDateString(new Date())} placeholder="Date" className="w-auto text-[10px] lg:text-xs" />
                                                 {timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
-                                                    <div className="flex items-center space-x-0.5 bg-gray-100 rounded-lg p-0.5">
-                                                        <button onClick={() => setIsCumulative(true)} className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${isCumulative ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
-                                                        <button onClick={() => setIsCumulative(false)} className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${!isCumulative ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
+                                                    <div className="flex items-center bg-gray-100 rounded-md lg:rounded-lg p-0.5">
+                                                        <button onClick={() => setIsCumulative(true)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${isCumulative ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
+                                                        <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
                                                     </div>
                                                 )}
-                                                <div className="flex bg-gray-100 rounded-lg p-0.5">
+                                                <div className="flex bg-gray-100 rounded-md lg:rounded-lg p-0.5">
                                                     {['all', '1month', '6months', '1year', '5years'].map((tf) => (
-                                                        <button key={tf} onClick={() => { setTimeFrame(tf as any); setDatePickerValue({}); setIsCumulative(true) }} className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === tf && !datePickerValue.singleDate && !datePickerValue.startDate ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+                                                        <button key={tf} onClick={() => { setTimeFrame(tf as any); setDatePickerValue({}); setIsCumulative(true) }} className={`px-1.5 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${timeFrame === tf && !datePickerValue.singleDate && !datePickerValue.startDate ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
                                                             {tf === 'all' ? 'All' : tf === '1month' ? '1M' : tf === '6months' ? '6M' : tf === '1year' ? '1Y' : '5Y'}
                                                         </button>
                                                     ))}
@@ -1102,7 +1091,7 @@ export default function ExpandableKPICard({
             {/* Expanded View - Full Screen (as page or portal) */}
             {isExpanded && (renderAsPage ? (
                 // Render as inline page content (not portal)
-                <div className="h-[calc(100vh-64px)] overflow-y-auto">
+                <div className="h-screen overflow-y-auto">
                     {/* Header */}
                     <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-100/60 p-4 shadow-soft-float">
                         <div className="flex items-center justify-between">
@@ -1299,59 +1288,22 @@ export default function ExpandableKPICard({
                                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
                                     {/* Chart Section */}
                                     <div className="lg:col-span-3 bg-white/80 backdrop-blur-xl border border-gray-100/60 rounded-2xl p-4 flex flex-col shadow-soft-float">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <div>
-                                                <h5 className="text-lg font-semibold text-gray-900">{isCumulative ? 'Cumulative Progress' : 'Monthly Progress'}</h5>
-                                                <p className="text-sm text-gray-500">{isCumulative ? 'Running total over time' : 'Monthly totals over time'}</p>
+                                        <div className="flex items-center justify-between mb-4 gap-2">
+                                            <div className="flex-shrink-0 min-w-0">
+                                                <h5 className="text-base lg:text-lg font-semibold text-gray-900 truncate">{isCumulative ? 'Cumulative Progress' : 'Monthly Progress'}</h5>
+                                                <p className="text-xs lg:text-sm text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals over time'}</p>
                                             </div>
-                                            <div className="flex items-center space-x-2 flex-wrap">
-                                                <div className="relative">
-                                                    <DateRangePicker
-                                                        value={datePickerValue}
-                                                        onChange={setDatePickerValue}
-                                                        maxDate={getLocalDateString(new Date())}
-                                                        placeholder="Filter by date"
-                                                        className="w-auto"
-                                                    />
-                                                </div>
-
+                                            <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
+                                                <DateRangePicker value={datePickerValue} onChange={setDatePickerValue} maxDate={getLocalDateString(new Date())} placeholder="Date" className="w-auto" />
                                                 {timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
-                                                    <div className="flex items-center space-x-0.5 bg-gray-100 rounded-lg p-0.5">
-                                                        <button
-                                                            onClick={() => setIsCumulative(true)}
-                                                            className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${isCumulative
-                                                                ? 'bg-white text-gray-900 shadow-sm'
-                                                                : 'text-gray-600 hover:text-gray-900'
-                                                                }`}
-                                                        >
-                                                            Cumulative
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setIsCumulative(false)}
-                                                            className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${!isCumulative
-                                                                ? 'bg-white text-gray-900 shadow-sm'
-                                                                : 'text-gray-600 hover:text-gray-900'
-                                                                }`}
-                                                        >
-                                                            Monthly
-                                                        </button>
+                                                    <div className="flex items-center bg-gray-100 rounded-md lg:rounded-lg p-0.5">
+                                                        <button onClick={() => setIsCumulative(true)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${isCumulative ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
+                                                        <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
                                                     </div>
                                                 )}
-
-                                                <div className="flex bg-gray-100 rounded-lg p-0.5">
+                                                <div className="flex bg-gray-100 rounded-md lg:rounded-lg p-0.5">
                                                     {['all', '1month', '6months', '1year', '5years'].map((tf) => (
-                                                        <button
-                                                            key={tf}
-                                                            onClick={() => {
-                                                                setTimeFrame(tf as any)
-                                                                setDatePickerValue({})
-                                                                setIsCumulative(true)
-                                                            }}
-                                                            className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === tf && !datePickerValue.singleDate && !datePickerValue.startDate
-                                                                ? 'bg-white text-gray-900 shadow-sm'
-                                                                : 'text-gray-600 hover:text-gray-900'
-                                                                }`}
-                                                        >
+                                                        <button key={tf} onClick={() => { setTimeFrame(tf as any); setDatePickerValue({}); setIsCumulative(true) }} className={`px-1.5 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${timeFrame === tf && !datePickerValue.singleDate && !datePickerValue.startDate ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
                                                             {tf === 'all' ? 'All' : tf === '1month' ? '1M' : tf === '6months' ? '6M' : tf === '1year' ? '1Y' : '5Y'}
                                                         </button>
                                                     ))}
@@ -1672,114 +1624,25 @@ export default function ExpandableKPICard({
                                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
                                     {/* Chart Section - 3/5 width */}
                                     <div className="lg:col-span-3 bg-white/80 backdrop-blur-xl border border-gray-100/60 rounded-2xl p-4 flex flex-col shadow-soft-float">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <div>
-                                                <h5 className="text-lg font-semibold text-gray-900">{isCumulative ? 'Cumulative Progress' : 'Monthly Progress'}</h5>
-                                                <p className="text-sm text-gray-500">{isCumulative ? 'Running total over time' : 'Monthly totals over time'}</p>
+                                        <div className="flex items-center justify-between mb-4 gap-2">
+                                            <div className="flex-shrink-0 min-w-0">
+                                                <h5 className="text-base lg:text-lg font-semibold text-gray-900 truncate">{isCumulative ? 'Cumulative Progress' : 'Monthly Progress'}</h5>
+                                                <p className="text-xs lg:text-sm text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals over time'}</p>
                                             </div>
-                                            <div className="flex items-center space-x-2 flex-wrap">
-                                                {/* Date Filter */}
-                                                <div className="relative">
-                                                    <DateRangePicker
-                                                        value={datePickerValue}
-                                                        onChange={setDatePickerValue}
-                                                        maxDate={getLocalDateString(new Date())}
-                                                        placeholder="Filter by date"
-                                                        className="w-auto"
-                                                    />
-                                                </div>
-
-                                                {/* Cumulative/Non-cumulative Toggle */}
+                                            <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
+                                                <DateRangePicker value={datePickerValue} onChange={setDatePickerValue} maxDate={getLocalDateString(new Date())} placeholder="Date" className="w-auto" />
                                                 {timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
-                                                    <div className="flex items-center space-x-0.5 bg-gray-100 rounded-lg p-0.5">
-                                                        <button
-                                                            onClick={() => setIsCumulative(true)}
-                                                            className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${isCumulative
-                                                                ? 'bg-white text-gray-900 shadow-sm'
-                                                                : 'text-gray-600 hover:text-gray-900'
-                                                                }`}
-                                                        >
-                                                            Cumulative
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setIsCumulative(false)}
-                                                            className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${!isCumulative
-                                                                ? 'bg-white text-gray-900 shadow-sm'
-                                                                : 'text-gray-600 hover:text-gray-900'
-                                                                }`}
-                                                        >
-                                                            Monthly
-                                                        </button>
+                                                    <div className="flex items-center bg-gray-100 rounded-md lg:rounded-lg p-0.5">
+                                                        <button onClick={() => setIsCumulative(true)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${isCumulative ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
+                                                        <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
                                                     </div>
                                                 )}
-
-                                                {/* Time Frame Filters */}
-                                                <div className="flex bg-gray-100 rounded-lg p-0.5">
-                                                    <button
-                                                        onClick={() => {
-                                                            setTimeFrame('all')
-                                                            setDatePickerValue({})
-                                                            setIsCumulative(true)
-                                                        }}
-                                                        className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate
-                                                            ? 'bg-white text-gray-900 shadow-sm'
-                                                            : 'text-gray-600 hover:text-gray-900'
-                                                            }`}
-                                                    >
-                                                        All
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            setTimeFrame('1month')
-                                                            setDatePickerValue({})
-                                                            setIsCumulative(true)
-                                                        }}
-                                                        className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '1month' && !datePickerValue.singleDate && !datePickerValue.startDate
-                                                            ? 'bg-white text-gray-900 shadow-sm'
-                                                            : 'text-gray-600 hover:text-gray-900'
-                                                            }`}
-                                                    >
-                                                        1M
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            setTimeFrame('6months')
-                                                            setDatePickerValue({})
-                                                            setIsCumulative(true)
-                                                        }}
-                                                        className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '6months' && !datePickerValue.singleDate && !datePickerValue.startDate
-                                                            ? 'bg-white text-gray-900 shadow-sm'
-                                                            : 'text-gray-600 hover:text-gray-900'
-                                                            }`}
-                                                    >
-                                                        6M
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            setTimeFrame('1year')
-                                                            setDatePickerValue({})
-                                                            setIsCumulative(true)
-                                                        }}
-                                                        className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '1year' && !datePickerValue.singleDate && !datePickerValue.startDate
-                                                            ? 'bg-white text-gray-900 shadow-sm'
-                                                            : 'text-gray-600 hover:text-gray-900'
-                                                            }`}
-                                                    >
-                                                        1Y
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            setTimeFrame('5years')
-                                                            setDatePickerValue({})
-                                                            setIsCumulative(true)
-                                                        }}
-                                                        className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${timeFrame === '5years' && !datePickerValue.singleDate && !datePickerValue.startDate
-                                                            ? 'bg-white text-gray-900 shadow-sm'
-                                                            : 'text-gray-600 hover:text-gray-900'
-                                                            }`}
-                                                    >
-                                                        5Y
-                                                    </button>
+                                                <div className="flex bg-gray-100 rounded-md lg:rounded-lg p-0.5">
+                                                    {['all', '1month', '6months', '1year', '5years'].map((tf) => (
+                                                        <button key={tf} onClick={() => { setTimeFrame(tf as any); setDatePickerValue({}); setIsCumulative(true) }} className={`px-1.5 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${timeFrame === tf && !datePickerValue.singleDate && !datePickerValue.startDate ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+                                                            {tf === 'all' ? 'All' : tf === '1month' ? '1M' : tf === '6months' ? '6M' : tf === '1year' ? '1Y' : '5Y'}
+                                                        </button>
+                                                    ))}
                                                 </div>
                                             </div>
                                         </div>

@@ -9,6 +9,7 @@ import HomePage from './pages/HomePage'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
 import InitiativePage from './pages/InitiativePage'
+import AccountPage from './pages/AccountPage'
 import PublicOrganizationPage from './pages/PublicOrganizationPage'
 import Layout from './components/Layout'
 
@@ -82,6 +83,7 @@ function App() {
                                 <Route index element={<Dashboard />} />
                                 <Route path="initiatives/:id" element={<InitiativePage />} />
                                 <Route path="initiatives/:id/metrics/:kpiId" element={<InitiativePage />} />
+                                <Route path="account" element={<AccountPage />} />
                             </Routes>
                         </Layout>
                     } />

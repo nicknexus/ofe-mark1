@@ -184,7 +184,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
     }
 
     return (
-        <div className="h-[calc(100vh-64px)] overflow-hidden">
+        <div className="h-screen overflow-hidden">
             <div className="h-full w-full px-4 sm:px-6 py-6 overflow-y-auto">
                 <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 overflow-hidden">
                     {/* Header with Search and Add Button */}
@@ -217,75 +217,79 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
 
                 {/* Master Filter */}
                 <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                        ref={locationButtonRef}
-                        onClick={(e) => {
-                            const rect = e.currentTarget.getBoundingClientRect()
-                            setLocationDropdownPosition({
-                                top: rect.bottom + 4,
-                                left: rect.left
-                            })
-                            setShowLocationPicker(!showLocationPicker)
-                            setShowBeneficiaryPicker(false)
-                        }}
-                        className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                            selectedLocations.length > 0
-                                ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                    >
-                        <MapPin className="w-4 h-4" />
-                        <span>Locations</span>
-                        {selectedLocations.length > 0 && (
-                            <span className="bg-blue-600 text-white rounded-full px-2 py-0.5 text-xs">
-                                {selectedLocations.length}
-                            </span>
-                        )}
-                        <ChevronDown className="w-4 h-4" />
-                    </button>
-
-                    <button
-                        ref={beneficiaryButtonRef}
-                        onClick={(e) => {
-                            const rect = e.currentTarget.getBoundingClientRect()
-                            setBeneficiaryDropdownPosition({
-                                top: rect.bottom + 4,
-                                left: rect.left
-                            })
-                            setShowBeneficiaryPicker(!showBeneficiaryPicker)
-                            setShowLocationPicker(false)
-                        }}
-                        className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                            selectedBeneficiaryGroups.length > 0
-                                ? 'bg-purple-100 text-purple-700 border border-purple-300'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                    >
-                        <Users className="w-4 h-4" />
-                        <span>Beneficiaries</span>
-                        {selectedBeneficiaryGroups.length > 0 && (
-                            <span className="bg-purple-600 text-white rounded-full px-2 py-0.5 text-xs">
-                                {selectedBeneficiaryGroups.length}
-                            </span>
-                        )}
-                        <ChevronDown className="w-4 h-4" />
-                    </button>
-
+                    {/* Date Filter - First */}
                     <div className="relative">
                         <DateRangePicker
                             value={datePickerValue}
                             onChange={setDatePickerValue}
-                            placeholder="Date"
+                            placeholder="Filter by date"
+                            className="w-auto"
                         />
+                    </div>
+
+                    {/* Location Filter */}
+                    <div className="relative">
+                        <button
+                            ref={locationButtonRef}
+                            onClick={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect()
+                                setLocationDropdownPosition({
+                                    top: rect.bottom + 4,
+                                    left: rect.left
+                                })
+                                setShowLocationPicker(!showLocationPicker)
+                                setShowBeneficiaryPicker(false)
+                            }}
+                            className="flex items-center pl-0 pr-4 h-10 bg-white hover:bg-gray-50 text-gray-700 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border border-gray-200 border-l-0 shadow-bubble-sm"
+                        >
+                            <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+                                <MapPin className="w-5 h-5 text-gray-600" />
+                            </div>
+                            <span className="ml-3">Location</span>
+                            {selectedLocations.length > 0 && (
+                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
+                                    {selectedLocations.length}
+                                </span>
+                            )}
+                            <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showLocationPicker ? 'rotate-180' : ''}`} />
+                        </button>
+                    </div>
+
+                    {/* Beneficiary Filter */}
+                    <div className="relative">
+                        <button
+                            ref={beneficiaryButtonRef}
+                            onClick={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect()
+                                setBeneficiaryDropdownPosition({
+                                    top: rect.bottom + 4,
+                                    left: rect.left
+                                })
+                                setShowBeneficiaryPicker(!showBeneficiaryPicker)
+                                setShowLocationPicker(false)
+                            }}
+                            className="flex items-center pl-0 pr-4 h-10 bg-white hover:bg-gray-50 text-gray-700 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border border-gray-200 border-l-0 shadow-bubble-sm"
+                        >
+                            <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+                                <Users className="w-5 h-5 text-gray-600" />
+                            </div>
+                            <span className="ml-3">Beneficiary Group</span>
+                            {selectedBeneficiaryGroups.length > 0 && (
+                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
+                                    {selectedBeneficiaryGroups.length}
+                                </span>
+                            )}
+                            <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showBeneficiaryPicker ? 'rotate-180' : ''}`} />
+                        </button>
                     </div>
 
                     {hasActiveFilters && (
                         <button
                             onClick={clearFilters}
-                            className="flex items-center space-x-1 px-3 py-1.5 bg-red-50 text-red-700 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
+                            className="flex items-center space-x-1 px-2 py-1 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded text-xs font-medium transition-colors border border-gray-200"
                         >
-                            <X className="w-4 h-4" />
-                            <span>Clear Filters</span>
+                            <X className="w-3 h-3" />
+                            <span>Clear</span>
                         </button>
                     )}
                 </div>
@@ -295,7 +299,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                     <>
                         <div className="fixed inset-0 z-[9998]" onClick={() => setShowLocationPicker(false)} />
                         <div
-                            className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] p-2 min-w-[200px] max-h-64 overflow-y-auto"
+                            className="fixed bg-white border border-gray-100 rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
                             style={{
                                 top: `${locationDropdownPosition.top}px`,
                                 left: `${locationDropdownPosition.left}px`
@@ -335,7 +339,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                                                         setSelectedLocations(selectedLocations.filter(id => id !== location.id))
                                                     }
                                                 }}
-                                                className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
                                             />
                                             <span className="text-xs text-gray-700 truncate flex-1">{location.name}</span>
                                         </label>
@@ -352,7 +356,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                     <>
                         <div className="fixed inset-0 z-[9998]" onClick={() => setShowBeneficiaryPicker(false)} />
                         <div
-                            className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] p-2 min-w-[200px] max-h-64 overflow-y-auto"
+                            className="fixed bg-white border border-gray-100 rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
                             style={{
                                 top: `${beneficiaryDropdownPosition.top}px`,
                                 left: `${beneficiaryDropdownPosition.left}px`
@@ -364,7 +368,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                             ) : (
                                 <>
                                     <div className="flex items-center justify-between mb-2">
-                                        <span className="text-xs font-semibold text-gray-700">Select Beneficiaries</span>
+                                        <span className="text-xs font-semibold text-gray-700">Select Beneficiary Groups</span>
                                         {selectedBeneficiaryGroups.length > 0 && (
                                             <button
                                                 onClick={(e) => {
@@ -392,7 +396,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                                                         setSelectedBeneficiaryGroups(selectedBeneficiaryGroups.filter(id => id !== group.id))
                                                     }
                                                 }}
-                                                className="w-3 h-3 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                                                className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
                                             />
                                             <span className="text-xs text-gray-700 truncate flex-1">{group.name}</span>
                                         </label>

@@ -316,11 +316,20 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                             map.boxZoom.disable()
                             map.keyboard.disable()
 
-                            // Add tile layer
-                            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                                attribution: '',
-                                maxZoom: 18
-                            }).addTo(map)
+                            // Add Carto Voyager tile layer - modern with blue water and colors
+                            const cartoTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                                attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+                                subdomains: 'abcd',
+                                maxZoom: 20
+                            })
+                            
+                            // Fallback to OpenStreetMap if Carto fails
+                            cartoTileLayer.on('tileerror', () => {
+                                console.warn('Carto tiles failed in PDF export, using OSM fallback')
+                                cartoTileLayer.setUrl('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
+                            })
+                            
+                            cartoTileLayer.addTo(map)
 
                             // Add modern markers - green pins with modern styling
                             locations.forEach(loc => {
@@ -455,7 +464,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
     }
 
     return (
-        <div className="h-[calc(100vh-64px)] overflow-y-auto relative">
+        <div className="h-screen overflow-y-auto relative">
             {/* Full-screen loading overlay */}
             {loadingReport && (
                 <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 flex items-center justify-center">

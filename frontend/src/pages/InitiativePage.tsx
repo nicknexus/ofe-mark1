@@ -20,8 +20,9 @@ import {
     DollarSign
 } from 'lucide-react'
 import { apiService } from '../services/api'
-import { InitiativeDashboard, LoadingState, CreateKPIForm, CreateKPIUpdateForm, CreateEvidenceForm } from '../types'
+import { InitiativeDashboard, LoadingState, CreateKPIForm, CreateKPIUpdateForm, CreateEvidenceForm, User, Organization } from '../types'
 import { formatDate, getEvidenceColor, getCategoryColor, getEvidenceTypeInfo, getEvidenceStatus } from '../utils'
+import { AuthService } from '../services/auth'
 import CreateKPIModal from '../components/CreateKPIModal'
 import AddKPIUpdateModal from '../components/AddKPIUpdateModal'
 import AddEvidenceModal from '../components/AddEvidenceModal'
@@ -40,6 +41,8 @@ import ReportTab from '../components/InitiativeTabs/ReportTab'
 import toast from 'react-hot-toast'
 
 export default function InitiativePage() {
+    const [user, setUser] = useState<User | null>(null)
+    const [organization, setOrganization] = useState<Organization | null>(null)
     const { id, kpiId } = useParams<{ id: string; kpiId?: string }>()
     const navigate = useNavigate()
     const [dashboard, setDashboard] = useState<InitiativeDashboard | null>(null)
@@ -65,10 +68,35 @@ export default function InitiativePage() {
     const [selectedKPI, setSelectedKPI] = useState<any>(null)
 
     useEffect(() => {
+        // Load user and organization
+        const loadUserAndOrg = async () => {
+            try {
+                const currentUser = await AuthService.getCurrentUser()
+                setUser(currentUser)
+                
+                const orgs = await apiService.getOrganizations()
+                if (orgs && orgs.length > 0) {
+                    setOrganization(orgs[0])
+                }
+            } catch (error) {
+                console.error('Error loading user or organization:', error)
+            }
+        }
+        loadUserAndOrg()
+
         if (id) {
             loadDashboard()
         }
     }, [id])
+
+    const handleSignOut = async () => {
+        try {
+            await AuthService.signOut()
+            toast.success('Signed out successfully')
+        } catch (error) {
+            toast.error('Failed to sign out')
+        }
+    }
 
     // Handle URL-based metric expansion
     useEffect(() => {
@@ -356,6 +384,8 @@ export default function InitiativePage() {
                                 setInitialStoryId(storyId)
                                 setActiveTab('stories')
                             }}
+                            user={user}
+                            organization={organization}
                         />
                     </div>
                 )}
@@ -440,6 +470,14 @@ export default function InitiativePage() {
         )
     }
 
+    if (!user) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+            </div>
+        )
+    }
+
     return (
         <div className="relative">
             {/* Fixed Sidebar */}
@@ -449,6 +487,8 @@ export default function InitiativePage() {
                 initiativeTitle={dashboard.initiative.title}
                 initiativeId={id!}
                 initiativeSlug={dashboard.initiative.slug}
+                user={user}
+                onSignOut={handleSignOut}
             />
 
             {/* Main Content with left margin for sidebar */}

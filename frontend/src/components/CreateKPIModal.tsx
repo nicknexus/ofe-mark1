@@ -61,7 +61,7 @@ export default function CreateKPIModal({
 
     return (
         <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[60] animate-fade-in">
-            <div className="bg-white/70 backdrop-blur-2xl rounded-3xl max-w-lg w-full max-h-[90vh] overflow-hidden shadow-[0_25px_60px_-15px_rgba(129,179,147,0.2)] border border-white/60 transform transition-all duration-200 ease-out animate-slide-up-fast">
+            <div className="bg-white/70 backdrop-blur-2xl rounded-3xl max-w-lg w-full max-h-[90vh] overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] border border-white/60 transform transition-all duration-200 ease-out animate-slide-up-fast">
                 <div className="overflow-y-auto max-h-[90vh]">
                 {/* Header */}
                 <div className="flex items-center justify-between p-5 sm:p-6 border-b border-primary-200/40 bg-gradient-to-r from-primary-100/50 to-primary-50/30 backdrop-blur-xl">

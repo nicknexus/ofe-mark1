@@ -516,7 +516,7 @@ export default function AddEvidenceModal({
 
     return (
         <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[60] animate-fade-in">
-            <div className="bg-white/70 backdrop-blur-2xl rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-[0_25px_60px_-15px_rgba(61,190,120,0.2)] border border-white/60 transform transition-all duration-200 ease-out animate-slide-up-fast flex flex-col">
+            <div className="bg-white/70 backdrop-blur-2xl rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] border border-white/60 transform transition-all duration-200 ease-out animate-slide-up-fast flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-impact-200/40 bg-gradient-to-r from-impact-100/50 to-impact-50/30 backdrop-blur-xl">
                     <div className="flex items-center space-x-3 flex-1">

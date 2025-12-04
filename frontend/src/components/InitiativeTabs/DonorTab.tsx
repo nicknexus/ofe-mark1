@@ -66,7 +66,7 @@ export default function DonorTab({ initiativeId, dashboard, onRefresh }: DonorTa
     )
 
     return (
-        <div className="h-[calc(100vh-64px)] bg-gradient-to-br from-slate-50 via-white to-purple-50/30 overflow-hidden flex flex-col">
+        <div className="h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30 overflow-hidden flex flex-col">
             {/* Header with Search and Add Button */}
             <div className="p-4 border-b border-gray-200 bg-white/80 backdrop-blur-sm">
                 <div className="flex items-center justify-between mb-4">

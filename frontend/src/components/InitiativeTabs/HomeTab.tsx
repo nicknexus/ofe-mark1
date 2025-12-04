@@ -6,7 +6,7 @@ interface HomeTabProps {
 
 export default function HomeTab({ children }: HomeTabProps) {
     return (
-        <div className="h-[calc(100vh-64px)] overflow-hidden">
+        <div className="h-screen overflow-hidden">
             {children}
         </div>
     )

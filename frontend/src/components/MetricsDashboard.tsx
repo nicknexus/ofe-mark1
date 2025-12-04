@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
-import { TrendingUp, Target, BarChart3, Calendar, FileText, Filter, ChevronDown, X, MapPin, ExternalLink, Plus, Users, GripVertical } from 'lucide-react'
+import React, { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
+import { TrendingUp, Target, BarChart3, Calendar, FileText, Filter, ChevronDown, X, MapPin, ExternalLink, Plus, Users, GripVertical, Settings } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import {
     DndContext,
@@ -31,7 +32,8 @@ import {
 import LocationMap from './LocationMap'
 import DateRangePicker from './DateRangePicker'
 import { apiService } from '../services/api'
-import { Location, BeneficiaryGroup } from '../types'
+import { Location, BeneficiaryGroup, User, Organization } from '../types'
+import { AuthService } from '../services/auth'
 import { getCategoryColor, parseLocalDate, isSameDay, compareDates, getLocalDateString, formatDate } from '../utils'
 import toast from 'react-hot-toast'
 
@@ -61,7 +63,7 @@ function SortableMetricCard({ kpi, metricColor, filteredTotal, onMetricCardClick
         <div
             ref={setNodeRef}
             style={style}
-            className="bg-white rounded-xl shadow-bubble-sm border border-gray-100 p-3 hover:shadow-bubble hover:border-gray-200 cursor-pointer transition-all duration-200 relative group"
+            className="bg-white rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.15)] border border-gray-100 p-3 hover:shadow-[0_4px_20px_rgba(0,0,0,0.18)] hover:border-gray-200 cursor-pointer transition-all duration-200 relative group"
         >
             {/* Drag Handle - Top Right Corner */}
             <div
@@ -104,9 +106,11 @@ interface MetricsDashboardProps {
     onMetricCardClick?: (kpiId: string) => void
     onAddKPI?: () => void
     onStoryClick?: (storyId: string) => void
+    user?: User | null
+    organization?: Organization | null
 }
 
-export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = [], initiativeId, onNavigateToLocations, onMetricCardClick, onAddKPI, onStoryClick }: MetricsDashboardProps) {
+export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = [], initiativeId, onNavigateToLocations, onMetricCardClick, onAddKPI, onStoryClick, user, organization }: MetricsDashboardProps) {
     const [timeFrame, setTimeFrame] = useState<'all' | '1month' | '6months' | '1year' | '5years'>('all')
     const [isCumulative, setIsCumulative] = useState(true)
     const [visibleKPIs, setVisibleKPIs] = useState<Set<string>>(new Set())
@@ -186,6 +190,32 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     const [locationDropdownPosition, setLocationDropdownPosition] = useState({ top: 0, left: 0 })
     const [beneficiaryDropdownPosition, setBeneficiaryDropdownPosition] = useState({ top: 0, left: 0 })
     const [metricsDropdownPosition, setMetricsDropdownPosition] = useState({ top: 0, left: 0 })
+    const [userMenuOpen, setUserMenuOpen] = useState(false)
+    const userMenuRef = useRef<HTMLDivElement>(null)
+
+    // Close user menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+                setUserMenuOpen(false)
+            }
+        }
+        if (userMenuOpen) {
+            document.addEventListener('mousedown', handleClickOutside)
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside)
+        }
+    }, [userMenuOpen])
+
+    const handleSignOut = async () => {
+        try {
+            await AuthService.signOut()
+            toast.success('Signed out successfully')
+        } catch (error) {
+            toast.error('Failed to sign out')
+        }
+    }
 
     // Load locations
     useEffect(() => {
@@ -698,10 +728,8 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     return (
         <div className="h-full flex flex-col overflow-hidden px-4 pt-4 pb-4 space-y-4">
             {/* Master Filter Bar */}
-            <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-3 flex items-center justify-between flex-wrap gap-2 flex-shrink-0">
-                <div className="flex items-center space-x-2 flex-wrap">
-                    <span className="text-xs font-semibold text-gray-700">Filters:</span>
-
+            <div className="bg-transparent p-3 flex items-center justify-between flex-wrap gap-2 flex-shrink-0">
+                <div className="flex items-center space-x-2 flex-wrap flex-1">
                     {/* Date Filter */}
                     <div className="relative">
                         <DateRangePicker
@@ -727,10 +755,12 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setShowLocationPicker(false)
                                 setShowBeneficiaryPicker(false)
                             }}
-                            className="flex items-center space-x-1 px-3 py-1.5 bg-evidence-50 hover:bg-evidence-100 text-evidence-600 rounded-xl text-xs font-medium transition-all duration-200 border border-evidence-200"
+                            className="flex items-center pl-0 pr-4 h-10 bg-white hover:bg-gray-50 text-gray-700 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border border-gray-200 border-l-0 shadow-bubble-sm"
                         >
-                            <Filter className="w-3 h-3" />
-                            <span>Metrics</span>
+                            <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+                                <Filter className="w-5 h-5 text-gray-600" />
+                            </div>
+                            <span className="ml-3">Metrics</span>
                             {visibleKPIs.size > 0 && visibleKPIs.size < kpis.length && (
                                 <span className="ml-1 bg-blue-600 text-white text-[10px] px-1 rounded-full">
                                     {visibleKPIs.size}
@@ -742,7 +772,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             <>
                                 <div className="fixed inset-0 z-[9998]" onClick={() => setShowMetricsPicker(false)} />
                                 <div
-                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-bubble z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
+                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
                                     style={{
                                         top: `${metricsDropdownPosition.top}px`,
                                         left: `${metricsDropdownPosition.left}px`
@@ -810,10 +840,12 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setShowMetricsPicker(false)
                                 setShowBeneficiaryPicker(false)
                             }}
-                            className="flex items-center space-x-1 px-2 py-1 bg-primary-50 hover:bg-primary-100 text-primary-700 rounded text-xs font-medium transition-colors border border-primary-200"
+                            className="flex items-center pl-0 pr-4 h-10 bg-white hover:bg-gray-50 text-gray-700 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border border-gray-200 border-l-0 shadow-bubble-sm"
                         >
-                            <MapPin className="w-3 h-3" />
-                            <span>Location</span>
+                            <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+                                <MapPin className="w-5 h-5 text-gray-600" />
+                            </div>
+                            <span className="ml-3">Location</span>
                             {selectedLocations.length > 0 && (
                                 <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
                                     {selectedLocations.length}
@@ -825,7 +857,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             <>
                                 <div className="fixed inset-0 z-[9998]" onClick={() => setShowLocationPicker(false)} />
                                 <div
-                                    className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] p-2 min-w-[200px] max-h-64 overflow-y-auto"
+                                    className="fixed bg-white border border-gray-200 rounded-lg shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-2 min-w-[200px] max-h-64 overflow-y-auto"
                                     style={{
                                         top: `${locationDropdownPosition.top}px`,
                                         left: `${locationDropdownPosition.left}px`
@@ -894,10 +926,12 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setShowLocationPicker(false)
                                 setShowMetricsPicker(false)
                             }}
-                            className="flex items-center space-x-1 px-2 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded text-xs font-medium transition-colors border border-orange-200"
+                            className="flex items-center pl-0 pr-4 h-10 bg-white hover:bg-gray-50 text-gray-700 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border border-gray-200 border-l-0 shadow-bubble-sm"
                         >
-                            <Users className="w-3 h-3" />
-                            <span>Beneficiaries</span>
+                            <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+                                <Users className="w-5 h-5 text-gray-600" />
+                            </div>
+                            <span className="ml-3">Beneficiaries</span>
                             {selectedBeneficiaryGroups.length > 0 && (
                                 <span className="ml-1 bg-orange-600 text-white text-[10px] px-1 rounded-full">
                                     {selectedBeneficiaryGroups.length}
@@ -909,7 +943,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             <>
                                 <div className="fixed inset-0 z-[9998]" onClick={() => setShowBeneficiaryPicker(false)} />
                                 <div
-                                    className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] p-2 min-w-[200px] max-h-64 overflow-y-auto"
+                                    className="fixed bg-white border border-gray-200 rounded-lg shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-2 min-w-[200px] max-h-64 overflow-y-auto"
                                     style={{
                                         top: `${beneficiaryDropdownPosition.top}px`,
                                         left: `${beneficiaryDropdownPosition.left}px`
@@ -979,6 +1013,55 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                         </button>
                     )}
                 </div>
+
+                {/* Right side: Settings and User Profile */}
+                <div className="flex items-center gap-3">
+                    {/* Settings Button - Circle Icon */}
+                    <Link
+                        to="/account"
+                        className="w-10 h-10 rounded-full bg-white/80 hover:bg-white border border-gray-200 hover:border-gray-300 flex items-center justify-center transition-all duration-200 shadow-bubble-sm"
+                        title="Settings"
+                    >
+                        <Settings className="w-5 h-5 text-gray-700" />
+                    </Link>
+
+                    {/* User Profile with Organization and Dropdown */}
+                    {user && (
+                        <div className="hidden md:block relative" ref={userMenuRef}>
+                            <button
+                                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                                className="flex items-center gap-2 px-3 h-10 bg-white/80 hover:bg-white border border-gray-200 hover:border-gray-300 rounded-full transition-all duration-200 shadow-bubble-sm min-w-[180px]"
+                            >
+                                <div className="flex flex-col items-start flex-1 min-w-0 justify-center">
+                                    <span className="text-xs font-medium text-gray-900 truncate w-full leading-tight">
+                                        {user.name || user.email}
+                                    </span>
+                                    {organization && (
+                                        <span className="text-[10px] text-gray-500 truncate w-full leading-tight">
+                                            {organization.name}
+                                        </span>
+                                    )}
+                                </div>
+                                <ChevronDown className={`w-3 h-3 text-gray-500 flex-shrink-0 transition-transform duration-200 ${userMenuOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            
+                            {/* Dropdown Menu */}
+                            {userMenuOpen && (
+                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-bubble-lg border border-gray-200 overflow-hidden z-50">
+                                    <button
+                                        onClick={() => {
+                                            handleSignOut()
+                                            setUserMenuOpen(false)
+                                        }}
+                                        className="w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                                    >
+                                        Sign Out
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Top Metric Cards - 6 across max */}
@@ -1008,7 +1091,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                         {kpis.length < 6 && onAddKPI && (
                             <button
                                 onClick={onAddKPI}
-                                className="bg-white rounded-xl border-2 border-dashed border-gray-200 p-3 hover:shadow-bubble hover:border-primary-300 hover:bg-primary-50/30 cursor-pointer transition-all duration-200 flex flex-col items-center justify-center min-h-[80px]"
+                                className="bg-white rounded-xl border-2 border-dashed border-gray-200 p-3 hover:shadow-[0_4px_20px_rgba(0,0,0,0.18)] hover:border-primary-300 hover:bg-primary-50/30 cursor-pointer transition-all duration-200 flex flex-col items-center justify-center min-h-[80px]"
                             >
                                 <Plus className="w-5 h-5 text-gray-400 mb-1" />
                                 <span className="text-xs text-gray-500 font-medium">Add Metric</span>
@@ -1019,9 +1102,9 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
             </DndContext>
 
             {/* Graph and Map Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 h-[25vh] lg:h-[50vh] overflow-hidden">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 h-[25vh] lg:h-[50vh]">
                 {/* Graph - Left - 3/5 width */}
-                <div className="lg:col-span-3 bg-white rounded-2xl shadow-bubble border border-gray-100 p-4 flex flex-col min-h-0 overflow-hidden">
+                <div className="lg:col-span-3 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.18)] border border-gray-100 p-4 flex flex-col min-h-0 overflow-hidden">
                     <div className="flex items-center justify-between mb-3">
                         <div>
                             <h3 className="text-sm font-semibold text-gray-800">Metrics Over Time</h3>
@@ -1032,7 +1115,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 <button
                                     onClick={() => setIsCumulative(true)}
                                     className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${isCumulative
-                                        ? 'bg-white text-gray-800 shadow-bubble-sm'
+                                        ? 'bg-white text-gray-800 shadow-[0_2px_10px_rgba(0,0,0,0.15)]'
                                         : 'text-gray-500 hover:text-gray-700'
                                         }`}
                                 >
@@ -1041,7 +1124,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 <button
                                     onClick={() => setIsCumulative(false)}
                                     className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${!isCumulative
-                                        ? 'bg-white text-gray-800 shadow-bubble-sm'
+                                        ? 'bg-white text-gray-800 shadow-[0_2px_10px_rgba(0,0,0,0.15)]'
                                         : 'text-gray-500 hover:text-gray-700'
                                         }`}
                                 >
@@ -1058,7 +1141,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                             // Preserve monthly view state when switching time frames
                                         }}
                                         className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${timeFrame === tf
-                                            ? 'bg-white text-gray-800 shadow-bubble-sm'
+                                            ? 'bg-white text-gray-800 shadow-[0_2px_10px_rgba(0,0,0,0.15)]'
                                             : 'text-gray-500 hover:text-gray-700'
                                             }`}
                                     >
@@ -1164,7 +1247,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                 </div>
 
                 {/* Map - Right - 2/5 width */}
-                <div className="lg:col-span-2 bg-white rounded-2xl shadow-bubble border border-gray-100 p-4 flex flex-col relative min-h-0 overflow-hidden">
+                <div className="lg:col-span-2 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.18)] border border-gray-100 p-4 flex flex-col relative min-h-0 overflow-hidden">
                     <div className="flex items-center justify-between mb-3 flex-shrink-0">
                         <h3 className="text-sm font-semibold text-gray-800">Locations</h3>
                         {onNavigateToLocations && (
@@ -1219,7 +1302,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
             {/* Bottom Stats Cards - Skinnier */}
             <div className="grid grid-cols-2 gap-4 flex-shrink-0 h-auto">
                 {/* Total Data Points */}
-                <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-4 impact-border">
+                <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.18)] border border-gray-100 p-4 impact-border">
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center space-x-2">
                             <div className="w-8 h-8 rounded-lg bg-impact-50 flex items-center justify-center">
@@ -1236,7 +1319,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                 </div>
 
                 {/* Evidence Coverage */}
-                <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-4 evidence-border">
+                <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.18)] border border-gray-100 p-4 evidence-border">
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center space-x-2">
                             <div className="w-8 h-8 rounded-lg bg-evidence-50 flex items-center justify-center">

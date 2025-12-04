@@ -166,7 +166,7 @@ export default function LocationDetailsModal({
     return (
         <>
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
-                <div className="bg-white rounded-xl max-w-7xl w-full h-[90vh] max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+                <div className="bg-white rounded-xl max-w-7xl w-full h-[90vh] max-h-[90vh] overflow-hidden flex flex-col shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)]">
                     {/* Header */}
                     <div className="flex items-start justify-between p-6 border-b border-gray-200 flex-shrink-0">
                         <div className="flex items-start space-x-4 flex-1">

@@ -73,7 +73,7 @@ export default function MetricsTab({
     }
 
     return (
-        <div className="h-[calc(100vh-64px)] overflow-hidden">
+        <div className="h-screen overflow-hidden">
             <div className="h-full w-full px-4 sm:px-6 py-6 space-y-6 overflow-y-auto">
                 {kpis.length === 0 ? (
                     /* Empty State - Only show Add Metric button */

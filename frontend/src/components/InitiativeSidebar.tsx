@@ -1,16 +1,19 @@
-import React from 'react'
-import { Link } from 'react-router-dom'
+import React, { useState, useRef, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
     Home,
     BarChart3,
     MapPin,
     Users,
     ArrowLeft,
-    Target,
     BookOpen,
     Sparkles,
-    FileText
+    FileText,
+    Settings,
+    LogOut,
+    User as UserIcon
 } from 'lucide-react'
+import { User } from '../types'
 
 interface InitiativeSidebarProps {
     activeTab: string
@@ -18,6 +21,8 @@ interface InitiativeSidebarProps {
     initiativeTitle: string
     initiativeId: string
     initiativeSlug?: string
+    user: User
+    onSignOut: () => void
 }
 
 export default function InitiativeSidebar({
@@ -25,8 +30,27 @@ export default function InitiativeSidebar({
     onTabChange,
     initiativeTitle,
     initiativeId,
-    initiativeSlug
+    initiativeSlug,
+    user,
+    onSignOut
 }: InitiativeSidebarProps) {
+    const navigate = useNavigate()
+    const [settingsOpen, setSettingsOpen] = useState(false)
+    const settingsRef = useRef<HTMLDivElement>(null)
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+                setSettingsOpen(false)
+            }
+        }
+
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside)
+        }
+    }, [])
     const tabs = [
         {
             id: 'home',
@@ -73,12 +97,12 @@ export default function InitiativeSidebar({
     ]
 
     return (
-        <div className="fixed left-0 top-16 w-56 h-[calc(100vh-64px)] bg-white border-r border-gray-100 shadow-bubble-sm flex flex-col z-30">
+        <div className="fixed left-0 top-0 w-56 h-screen bg-white border-r border-gray-100 shadow-bubble-sm flex flex-col z-30">
             {/* Header */}
             <div className="p-4 border-b border-gray-100">
                 <div className="flex items-center space-x-2 mb-3">
                     <div className="icon-bubble-sm">
-                        <Target className="w-4 h-4 text-primary-500" />
+                        <img src="/Nexuslogo.png" alt="Nexus Logo" className="w-5 h-5 object-contain" />
                     </div>
                     <div className="min-w-0">
                         <h2 className="text-base font-semibold text-gray-800 truncate">
@@ -110,12 +134,12 @@ export default function InitiativeSidebar({
                                 key={tab.id}
                                 onClick={() => onTabChange(tab.id)}
                                 className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200 ${isActive
-                                    ? 'bg-primary-50 shadow-bubble-sm text-primary-700'
+                                    ? 'bg-primary-100 shadow-bubble-sm text-primary-700'
                                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'
                                     }`}
                             >
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isActive ? 'bg-primary-100' : 'bg-gray-100'}`}>
-                                    <Icon className={`w-4 h-4 ${isActive ? 'text-primary-500' : 'text-gray-400'}`} />
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isActive ? 'bg-primary-200' : 'bg-gray-100'}`}>
+                                    <Icon className={`w-4 h-4 ${isActive ? 'text-primary-700' : 'text-gray-400'}`} />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="font-medium text-sm">{tab.label}</div>
@@ -128,12 +152,53 @@ export default function InitiativeSidebar({
             </div>
 
             {/* Footer */}
-            <div className="p-3 border-t border-gray-100">
+            <div className="p-3 border-t border-gray-100 space-y-2">
                 <div className="text-xs text-gray-400 text-center">
                     {initiativeSlug ? (
                         <span className="font-mono bg-gray-50 px-2 py-1 rounded-lg">{initiativeSlug}</span>
                     ) : (
                         <span>ID: {initiativeId.slice(0, 8)}...</span>
+                    )}
+                </div>
+                
+                {/* Settings Gear Icon */}
+                <div className="relative" ref={settingsRef}>
+                    <button
+                        onClick={() => setSettingsOpen(!settingsOpen)}
+                        className="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200 text-gray-600 hover:bg-gray-50 hover:text-gray-800"
+                    >
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100">
+                            <Settings className="w-4 h-4 text-gray-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm">Settings</div>
+                        </div>
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    {settingsOpen && (
+                        <div className="absolute bottom-full left-0 mb-2 w-full bg-white rounded-xl shadow-bubble-lg border border-gray-100 overflow-hidden">
+                            <button
+                                onClick={() => {
+                                    navigate('/account')
+                                    setSettingsOpen(false)
+                                }}
+                                className="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                            >
+                                <UserIcon className="w-4 h-4" />
+                                <span>Account</span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    onSignOut()
+                                    setSettingsOpen(false)
+                                }}
+                                className="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-t border-gray-100"
+                            >
+                                <LogOut className="w-4 h-4" />
+                                <span>Sign Out</span>
+                            </button>
+                        </div>
                     )}
                 </div>
             </div>

@@ -7,19 +7,19 @@ export default {
     theme: {
         extend: {
             colors: {
-                // Nexus green palette based on #81b393
+                // Nexus green palette based on #c0dfa1
                 primary: {
-                    50: '#f0f7f3',
-                    100: '#dceee3',
-                    200: '#bdddc9',
-                    300: '#9ecbb0',
-                    400: '#81b393',  // Secondary accent
-                    500: '#81b393',  // Main brand green
-                    600: '#6a9b7c',
-                    700: '#578266',
-                    800: '#476952',
-                    900: '#3b5644',
-                    950: '#1f2f25',
+                    50: '#f4f9f0',
+                    100: '#e8f3df',
+                    200: '#d1e7bf',
+                    300: '#badb9f',
+                    400: '#a3cf7f',  // Secondary accent
+                    500: '#c0dfa1',  // Main brand green
+                    600: '#a8c889',
+                    700: '#90b171',
+                    800: '#789a59',
+                    900: '#608341',
+                    950: '#486c29',
                 },
                 // Dark grey text color
                 secondary: {
