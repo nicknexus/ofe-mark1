@@ -41,11 +41,14 @@ export default function BeneficiaryGroupDetailsModal({
                 apiService.getStories(initiativeId, { beneficiaryGroupIds: [beneficiaryGroup.id] }),
             ])
                 .then(async ([updates, storiesData]) => {
-                    setKpiUpdates(updates || [])
-                    setStories(storiesData || [])
+                    const updatesArray = Array.isArray(updates) ? updates : []
+                    const storiesArray = Array.isArray(storiesData) ? storiesData : []
+                    
+                    setKpiUpdates(updatesArray)
+                    setStories(storiesArray)
                     
                     // Get evidence linked to these KPI updates
-                    const updateIds = (updates || []).map((u: any) => u.id).filter(Boolean)
+                    const updateIds = updatesArray.map((u: any) => u.id).filter(Boolean)
                     if (updateIds.length > 0) {
                         try {
                             const allEvidence: Evidence[] = []
