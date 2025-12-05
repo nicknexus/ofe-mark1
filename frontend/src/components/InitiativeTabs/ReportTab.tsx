@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { FileText, Calendar, BarChart3, MapPin, Users, Sparkles, Download, Loader2, X } from 'lucide-react'
+import { FileText, Calendar, BarChart3, MapPin, Users, Sparkles, Download, Loader2, X, ChevronLeft, ChevronRight, Check, BookOpen, Plus } from 'lucide-react'
 import { apiService } from '../../services/api'
 import { KPI, Location, BeneficiaryGroup, Story, InitiativeDashboard } from '../../types'
 import DateRangePicker from '../DateRangePicker'
@@ -96,6 +96,12 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
     const [showBeneficiaryPicker, setShowBeneficiaryPicker] = useState(false)
     const [showDashboard, setShowDashboard] = useState(true)
 
+    // Step wizard state
+    const [currentStep, setCurrentStep] = useState(1)
+    const totalSteps = 4
+    const containerRef = useRef<HTMLDivElement>(null)
+    const formContentRef = useRef<HTMLDivElement>(null)
+
     // Refs for click outside detection
     const kpiPickerRef = useRef<HTMLDivElement>(null)
     const locationPickerRef = useRef<HTMLDivElement>(null)
@@ -103,6 +109,14 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
     // Storage key for this initiative's report
     const storageKey = `report-${initiativeId}`
+
+    // Steps definition
+    const steps = [
+        { number: 1, title: 'Filters', icon: Calendar },
+        { number: 2, title: 'Review Data', icon: BarChart3 },
+        { number: 3, title: 'Add Story', icon: BookOpen },
+        { number: 4, title: 'Generate', icon: Sparkles }
+    ]
 
     // Load saved report data from localStorage on mount or when initiativeId changes
     useEffect(() => {
@@ -191,6 +205,13 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
         }
     }, [])
 
+    // Scroll to top when step changes
+    useEffect(() => {
+        if (formContentRef.current) {
+            formContentRef.current.scrollTop = 0
+        }
+    }, [currentStep])
+
     const handleApplyFilters = async () => {
         if (!initiativeId) return
 
@@ -210,7 +231,8 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
             setReportData(data)
             setSelectedStory(null)
-            // Keep existing reportText and reportDashboardData until a new report is generated
+            // Move to next step after loading data
+            setCurrentStep(2)
         } catch (error) {
             console.error('Error loading report data:', error)
             toast.error('Failed to load report data')
@@ -354,19 +376,19 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                             // Calculate bounds and spread to determine appropriate zoom
                             const bounds = L.latLngBounds(locations.map(loc => [loc.latitude, loc.longitude]))
                             const center = bounds.getCenter()
-                            
+
                             // Calculate spread (distance in degrees)
                             const latDiff = bounds.getNorth() - bounds.getSouth()
                             const lngDiff = bounds.getEast() - bounds.getWest()
                             const maxSpread = Math.max(latDiff, lngDiff)
-                            
+
                             // Determine zoom strategy based on spread
                             // Small spread (< 5 degrees) = close together (city/region level) - zoom in more
                             // Medium spread (5-30 degrees) = moderate distance (country level) - moderate zoom
                             // Large spread (> 30 degrees) = far apart (continent/global) - zoom out
                             let padding: [number, number]
                             let maxZoom: number
-                            
+
                             if (maxSpread < 5) {
                                 // Very close together - zoom in significantly
                                 padding = [20, 20]
@@ -384,7 +406,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                 padding = [50, 50]
                                 maxZoom = 3
                             }
-                            
+
                             // Initialize map with canvas renderer - top-down view (no tilt)
                             const map = L.map('pdf-map-temp', {
                                 renderer: L.canvas(),
@@ -411,13 +433,13 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                 subdomains: 'abcd',
                                 maxZoom: 20
                             })
-                            
+
                             // Fallback to OpenStreetMap if Carto fails
                             cartoTileLayer.on('tileerror', () => {
                                 console.warn('Carto tiles failed in PDF export, using OSM fallback')
                                 cartoTileLayer.setUrl('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
                             })
-                            
+
                             cartoTileLayer.addTo(map)
 
                             // Add modern markers - green pins with modern styling
@@ -448,7 +470,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
                             // Fit bounds with appropriate padding and max zoom
                             if (locations.length > 1) {
-                                map.fitBounds(bounds, { 
+                                map.fitBounds(bounds, {
                                     padding: padding,
                                     maxZoom: maxZoom
                                 })
@@ -507,10 +529,10 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                 mapImage,
                 hasBeneficiaryGroups: selectedBeneficiaryGroupIds.length > 0
             })
-            
+
             // Show dashboard when report is generated
             setShowDashboard(true)
-            
+
             // Save to localStorage (will be handled by useEffect, but ensure it's saved immediately)
             try {
                 const dataToSave = {
@@ -530,6 +552,15 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
             } catch (error) {
                 console.error('Failed to save report to localStorage:', error)
             }
+
+            // Scroll to top after report is generated
+            setTimeout(() => {
+                if (containerRef.current) {
+                    containerRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+                }
+                // Also scroll the window in case the container is the viewport
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+            }, 100)
 
         } catch (error: any) {
             console.error('Error generating report:', error)
@@ -580,8 +611,82 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
         )
     }
 
+    const canProceedToNextStep = () => {
+        switch (currentStep) {
+            case 1:
+                // Can proceed from filters - no mandatory selection needed
+                return true
+            case 2:
+                // Must have report data loaded
+                return !!reportData
+            case 3:
+                // Story is optional, can always proceed
+                return true
+            case 4:
+                // Generate step - need report data
+                return !!reportData
+            default:
+                return false
+        }
+    }
+
+    const handleNext = () => {
+        if (currentStep === 1) {
+            // On step 1, apply filters and then move to step 2
+            handleApplyFilters()
+        } else if (canProceedToNextStep() && currentStep < totalSteps) {
+            setCurrentStep(currentStep + 1)
+        }
+    }
+
+    const handleBack = () => {
+        if (currentStep > 1) {
+            setCurrentStep(currentStep - 1)
+        }
+    }
+
+    const handleStartNewReport = () => {
+        // Reset everything for a new report
+        setReportText(null)
+        setReportDashboardData(null)
+        setReportData(null)
+        setSelectedStory(null)
+        setDateRange({})
+        setSelectedKPIIds([])
+        setSelectedLocationIds([])
+        setSelectedBeneficiaryGroupIds([])
+        setCurrentStep(1)
+        setShowDashboard(true)
+
+        // Clear localStorage
+        try {
+            localStorage.removeItem(storageKey)
+        } catch (error) {
+            console.error('Failed to clear localStorage:', error)
+        }
+
+        // Scroll to top
+        setTimeout(() => {
+            if (containerRef.current) {
+                containerRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+        }, 100)
+    }
+
+    // New Report Button Component
+    const NewReportButton = () => (
+        <button
+            onClick={handleStartNewReport}
+            className="flex items-center space-x-2 px-6 py-3 bg-primary-100 text-primary-700 rounded-2xl hover:bg-primary-200 font-semibold transition-all duration-200 shadow-bubble-sm"
+        >
+            <Plus className="w-5 h-5" />
+            <span>Make New Report</span>
+        </button>
+    )
+
     return (
-        <div className="h-screen overflow-y-auto relative">
+        <div ref={containerRef} className="h-screen overflow-y-auto relative">
             {/* Full-screen loading overlay */}
             {loadingReport && (
                 <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 flex items-center justify-center">
@@ -607,397 +712,565 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
             )}
 
             <div className="max-w-7xl mx-auto p-6 space-y-6">
-                {/* Header */}
-                <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
-                    <div className="flex items-center space-x-3 mb-4">
-                        <div className="icon-bubble">
-                            <Sparkles className="w-5 h-5 text-primary-500" />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-semibold text-gray-800">AI Report Generator</h1>
-                            <p className="text-sm text-gray-500">Generate professional impact reports powered by AI</p>
-                        </div>
-                    </div>
-                </div>
-
                 {/* Report Dashboard - Shown at top when generated */}
                 {showDashboard && reportText && reportDashboardData && reportData && (
-                    <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-base font-semibold text-gray-800">Report Dashboard</h2>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={async () => {
-                                        try {
-                                            toast.loading('Generating PDF...', { id: 'pdf-download' })
-                                            const filename = `${dashboard?.initiative.title.replace(/[^a-z0-9]/gi, '_')}_Report_${new Date().toISOString().split('T')[0]}.pdf`
-                                            const pdfBlob = await convertReportToPDF('report-dashboard', filename)
-
-                                            const url = URL.createObjectURL(pdfBlob)
-                                            const link = document.createElement('a')
-                                            link.href = url
-                                            link.download = filename
-                                            document.body.appendChild(link)
-                                            link.click()
-                                            document.body.removeChild(link)
-                                            URL.revokeObjectURL(url)
-
-                                            toast.success('PDF downloaded successfully!', { id: 'pdf-download' })
-                                        } catch (error) {
-                                            console.error('Error downloading PDF:', error)
-                                            toast.error('Failed to download PDF', { id: 'pdf-download' })
-                                        }
-                                    }}
-                                    className="px-4 py-2 bg-primary-500 text-white rounded-2xl hover:bg-primary-600 flex items-center space-x-2 text-sm font-medium transition-all duration-200 shadow-bubble-sm"
-                                >
-                                    <Download className="w-4 h-4" />
-                                    <span>Download as PDF</span>
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setShowDashboard(false)
-                                        // Update localStorage with new showDashboard state
-                                        try {
-                                            const saved = localStorage.getItem(storageKey)
-                                            if (saved) {
-                                                const parsed = JSON.parse(saved)
-                                                parsed.showDashboard = false
-                                                localStorage.setItem(storageKey, JSON.stringify(parsed))
-                                            }
-                                        } catch (error) {
-                                            console.error('Failed to update localStorage:', error)
-                                        }
-                                    }}
-                                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all duration-200"
-                                    title="Close dashboard"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
-                        </div>
-                        <div className="border border-gray-100 rounded-xl overflow-auto bg-gray-50/50" style={{ maxHeight: '900px' }}>
-                            {dashboard && (
-                                <ReportDashboard
-                                    dashboard={dashboard}
-                                    overviewSummary={reportDashboardData.overviewSummary}
-                                    totals={reportData.totals}
-                                    beneficiaryText={reportDashboardData.beneficiaryText}
-                                    hasBeneficiaryGroups={reportDashboardData.hasBeneficiaryGroups}
-                                    selectedStory={selectedStory || undefined}
-                                    locations={reportData.locations}
-                                    dateStart={dateRange.startDate || dateRange.singleDate}
-                                    dateEnd={dateRange.endDate || dateRange.singleDate}
-                                    mapImage={reportDashboardData.mapImage}
-                                />
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* Filters Panel */}
-                <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
-                    <h2 className="text-base font-semibold text-gray-800 mb-4">Filters</h2>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        {/* Date Range */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                <Calendar className="w-4 h-4 inline mr-1" />
-                                Date Range
-                            </label>
-                            <DateRangePicker
-                                value={dateRange}
-                                onChange={setDateRange}
-                            />
+                    <>
+                        {/* Make New Report Button - Above Dashboard */}
+                        <div className="flex justify-center">
+                            <NewReportButton />
                         </div>
 
-                        {/* KPI Multi-Select */}
-                        <div className="relative" ref={kpiPickerRef}>
-                            <label className="block text-sm font-medium text-gray-600 mb-2">
-                                <BarChart3 className="w-4 h-4 inline mr-1" />
-                                Metrics ({selectedKPIIds.length} selected)
-                            </label>
-                            <button
-                                onClick={() => setShowKPIPicker(!showKPIPicker)}
-                                className="w-full px-4 py-2.5 text-left bg-white border border-gray-200 rounded-xl hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm shadow-bubble-sm"
-                            >
-                                {selectedKPIIds.length === 0
-                                    ? 'Select metrics...'
-                                    : `${selectedKPIIds.length} metric${selectedKPIIds.length > 1 ? 's' : ''} selected`
-                                }
-                            </button>
-                            {showKPIPicker && (
-                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-bubble max-h-60 overflow-y-auto">
-                                    {kpis.length === 0 ? (
-                                        <div className="p-4 text-sm text-gray-500">No metrics available</div>
-                                    ) : (
-                                        kpis.map(kpi => (
-                                            <label
-                                                key={kpi.id}
-                                                className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedKPIIds.includes(kpi.id!)}
-                                                    onChange={() => toggleKPI(kpi.id!)}
-                                                    className="mr-2"
-                                                />
-                                                <span className="text-sm">{kpi.title}</span>
-                                            </label>
-                                        ))
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Location Multi-Select */}
-                        <div className="relative" ref={locationPickerRef}>
-                            <label className="block text-sm font-medium text-gray-600 mb-2">
-                                <MapPin className="w-4 h-4 inline mr-1" />
-                                Locations ({selectedLocationIds.length} selected)
-                            </label>
-                            <button
-                                onClick={() => setShowLocationPicker(!showLocationPicker)}
-                                className="w-full px-4 py-2.5 text-left bg-white border border-gray-200 rounded-xl hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm shadow-bubble-sm"
-                            >
-                                {selectedLocationIds.length === 0
-                                    ? 'Select locations...'
-                                    : `${selectedLocationIds.length} location${selectedLocationIds.length > 1 ? 's' : ''} selected`
-                                }
-                            </button>
-                            {showLocationPicker && (
-                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-bubble max-h-60 overflow-y-auto">
-                                    {locations.length === 0 ? (
-                                        <div className="p-4 text-sm text-gray-500">No locations available</div>
-                                    ) : (
-                                        locations.map(location => (
-                                            <label
-                                                key={location.id}
-                                                className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedLocationIds.includes(location.id!)}
-                                                    onChange={() => toggleLocation(location.id!)}
-                                                    className="mr-2"
-                                                />
-                                                <span className="text-sm">{location.name}</span>
-                                            </label>
-                                        ))
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Beneficiary Group Multi-Select */}
-                        <div className="relative" ref={beneficiaryPickerRef}>
-                            <label className="block text-sm font-medium text-gray-600 mb-2">
-                                <Users className="w-4 h-4 inline mr-1" />
-                                Beneficiary Groups ({selectedBeneficiaryGroupIds.length} selected)
-                            </label>
-                            <button
-                                onClick={() => setShowBeneficiaryPicker(!showBeneficiaryPicker)}
-                                className="w-full px-4 py-2.5 text-left bg-white border border-gray-200 rounded-xl hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm shadow-bubble-sm"
-                            >
-                                {selectedBeneficiaryGroupIds.length === 0
-                                    ? 'Select beneficiary groups...'
-                                    : `${selectedBeneficiaryGroupIds.length} group${selectedBeneficiaryGroupIds.length > 1 ? 's' : ''} selected`
-                                }
-                            </button>
-                            {showBeneficiaryPicker && (
-                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-bubble max-h-60 overflow-y-auto">
-                                    {beneficiaryGroups.length === 0 ? (
-                                        <div className="p-4 text-sm text-gray-500">No beneficiary groups available</div>
-                                    ) : (
-                                        beneficiaryGroups.map(group => (
-                                            <label
-                                                key={group.id}
-                                                className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedBeneficiaryGroupIds.includes(group.id!)}
-                                                    onChange={() => toggleBeneficiaryGroup(group.id!)}
-                                                    className="mr-2"
-                                                />
-                                                <span className="text-sm">{group.name}</span>
-                                            </label>
-                                        ))
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Apply Filters Button */}
-                    <button
-                        onClick={handleApplyFilters}
-                        disabled={loadingData}
-                        className="w-full md:w-auto px-6 py-2.5 bg-primary-500 text-white rounded-2xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 font-medium transition-all duration-200 shadow-bubble-sm"
-                    >
-                        {loadingData ? (
-                            <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span>Loading...</span>
-                            </>
-                        ) : (
-                            <>
-                                <FileText className="w-4 h-4" />
-                                <span>Apply Filters</span>
-                            </>
-                        )}
-                    </button>
-                </div>
-
-                {/* Results Preview Panel - Shown after filters applied */}
-                {reportData && (
-                    <div className="space-y-6">
-                        {/* Totals Section */}
-                        {reportData.totals.length > 0 && (
-                            <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
-                                <h2 className="text-base font-semibold text-gray-800 mb-4">Metrics Summary</h2>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {reportData.totals.map(total => (
-                                        <div key={total.kpi_id} className="p-4 bg-gray-50/50 rounded-xl border border-gray-100">
-                                            <h3 className="font-medium text-gray-700 text-sm">{total.kpi_title}</h3>
-                                            <p className="text-2xl font-semibold text-impact-500 mt-2">
-                                                {total.total_value} <span className="text-sm font-normal text-gray-500">{total.unit_of_measurement}</span>
-                                            </p>
-                                            {total.kpi_description && (
-                                                <p className="text-xs text-gray-500 mt-1">{total.kpi_description}</p>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Stories List */}
-                        {reportData.stories.length > 0 && (
-                            <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
-                                <h2 className="text-base font-semibold text-gray-800 mb-4">Stories ({reportData.stories.length})</h2>
-                                <div className="space-y-3">
-                                    {reportData.stories.map(story => (
-                                        <div
-                                            key={story.id}
-                                            onClick={() => setSelectedStory(story)}
-                                            className={`p-4 border rounded-xl cursor-pointer transition-all duration-200 ${selectedStory?.id === story.id
-                                                ? 'border-primary-300 bg-primary-50 shadow-bubble-sm'
-                                                : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
-                                                }`}
-                                        >
-                                            <h3 className="font-medium text-gray-800">{story.title}</h3>
-                                            {story.description && (
-                                                <p className="text-sm text-gray-500 mt-1 line-clamp-2">{story.description}</p>
-                                            )}
-                                            <div className="flex items-center space-x-4 mt-2 text-xs text-gray-400">
-                                                {story.location_name && (
-                                                    <span className="flex items-center">
-                                                        <MapPin className="w-3 h-3 mr-1" />
-                                                        {story.location_name}
-                                                    </span>
-                                                )}
-                                                <span>{story.date_represented}</span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Locations List */}
-                        {reportData.locations.length > 0 && (
-                            <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
-                                <h2 className="text-base font-semibold text-gray-800 mb-4">Locations ({reportData.locations.length})</h2>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {reportData.locations.map(location => (
-                                        <div key={location.id} className="p-3 bg-gray-50/50 rounded-xl border border-gray-100">
-                                            <div className="flex items-center space-x-2">
-                                                <MapPin className="w-4 h-4 text-primary-500" />
-                                                <span className="font-medium text-gray-800 text-sm">{location.name}</span>
-                                            </div>
-                                            {location.description && (
-                                                <p className="text-xs text-gray-500 mt-1">{location.description}</p>
-                                            )}
-                                            <p className="text-xs text-gray-400 mt-1">
-                                                {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Story Selection and Generate Button */}
                         <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
-                            <h2 className="text-base font-semibold text-gray-800 mb-4">Generate Report</h2>
-                            {reportData.stories.length > 0 && !selectedStory ? (
-                                <p className="text-sm text-gray-500 mb-4">Optional: Select a story above to anchor the report narrative, or generate without a story.</p>
-                            ) : selectedStory ? (
-                                <p className="text-sm text-gray-600 mb-4">
-                                    Selected story: <strong className="text-gray-800">{selectedStory.title}</strong>
-                                </p>
-                            ) : null}
-                            {reportText && reportDashboardData && !showDashboard && (
-                                <div className="mb-4 p-3 bg-primary-50 border border-primary-200 rounded-xl">
-                                    <p className="text-sm text-gray-700">
-                                        Report generated successfully. <button
-                                            onClick={() => {
-                                                setShowDashboard(true)
-                                                // Update localStorage with new showDashboard state
-                                                try {
-                                                    const saved = localStorage.getItem(storageKey)
-                                                    if (saved) {
-                                                        const parsed = JSON.parse(saved)
-                                                        parsed.showDashboard = true
-                                                        localStorage.setItem(storageKey, JSON.stringify(parsed))
-                                                    }
-                                                } catch (error) {
-                                                    console.error('Failed to update localStorage:', error)
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-base font-semibold text-gray-800">Report Dashboard</h2>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                toast.loading('Generating PDF...', { id: 'pdf-download' })
+                                                const filename = `${dashboard?.initiative.title.replace(/[^a-z0-9]/gi, '_')}_Report_${new Date().toISOString().split('T')[0]}.pdf`
+                                                const pdfBlob = await convertReportToPDF('report-dashboard', filename)
+
+                                                const url = URL.createObjectURL(pdfBlob)
+                                                const link = document.createElement('a')
+                                                link.href = url
+                                                link.download = filename
+                                                document.body.appendChild(link)
+                                                link.click()
+                                                document.body.removeChild(link)
+                                                URL.revokeObjectURL(url)
+
+                                                toast.success('PDF downloaded successfully!', { id: 'pdf-download' })
+                                            } catch (error) {
+                                                console.error('Error downloading PDF:', error)
+                                                toast.error('Failed to download PDF', { id: 'pdf-download' })
+                                            }
+                                        }}
+                                        className="px-4 py-2 bg-primary-500 text-white rounded-2xl hover:bg-primary-600 flex items-center space-x-2 text-sm font-medium transition-all duration-200 shadow-bubble-sm"
+                                    >
+                                        <Download className="w-4 h-4" />
+                                        <span>Download as PDF</span>
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowDashboard(false)
+                                            // Update localStorage with new showDashboard state
+                                            try {
+                                                const saved = localStorage.getItem(storageKey)
+                                                if (saved) {
+                                                    const parsed = JSON.parse(saved)
+                                                    parsed.showDashboard = false
+                                                    localStorage.setItem(storageKey, JSON.stringify(parsed))
                                                 }
-                                            }}
-                                            className="text-primary-600 hover:text-primary-700 font-medium underline"
-                                        >
-                                            Show dashboard
-                                        </button>
-                                    </p>
+                                            } catch (error) {
+                                                console.error('Failed to update localStorage:', error)
+                                            }
+                                        }}
+                                        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all duration-200"
+                                        title="Close dashboard"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="border border-gray-100 rounded-xl overflow-auto bg-gray-50/50" style={{ maxHeight: '900px' }}>
+                                {dashboard && (
+                                    <ReportDashboard
+                                        dashboard={dashboard}
+                                        overviewSummary={reportDashboardData.overviewSummary}
+                                        totals={reportData.totals}
+                                        beneficiaryText={reportDashboardData.beneficiaryText}
+                                        hasBeneficiaryGroups={reportDashboardData.hasBeneficiaryGroups}
+                                        selectedStory={selectedStory || undefined}
+                                        locations={reportData.locations}
+                                        dateStart={dateRange.startDate || dateRange.singleDate}
+                                        dateEnd={dateRange.endDate || dateRange.singleDate}
+                                        mapImage={reportDashboardData.mapImage}
+                                    />
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Make New Report Button - Below Dashboard */}
+                        <div className="flex justify-center">
+                            <NewReportButton />
+                        </div>
+                    </>
+                )}
+
+                {/* Step Wizard - Only show if no report generated OR dashboard is hidden */}
+                {(!reportText || !reportDashboardData || !showDashboard) && (
+                    <div className="bg-white/70 backdrop-blur-2xl rounded-3xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.15)] border border-white/60 overflow-hidden">
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-primary-200/40 bg-gradient-to-r from-primary-100/50 to-primary-50/30 backdrop-blur-xl">
+                            <div className="flex items-center space-x-3 flex-1">
+                                <div className="w-11 h-11 rounded-xl bg-primary-500/15 backdrop-blur-sm flex items-center justify-center border border-primary-300/30">
+                                    <Sparkles className="w-6 h-6 text-primary-500" />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-semibold text-gray-800">AI Report Generator</h2>
+                                    <p className="text-sm text-gray-500 mt-0.5">Generate professional impact reports powered by AI</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Progress Steps Indicator */}
+                        <div className="px-6 py-4 border-b border-primary-100/40 bg-white/30 backdrop-blur-xl">
+                            <div className="flex items-center justify-center">
+                                {steps.map((step, index) => (
+                                    <React.Fragment key={step.number}>
+                                        <div className="flex flex-col items-center">
+                                            <div className={`flex items-center justify-center w-10 h-10 rounded-xl border-2 transition-all duration-200 ${currentStep > step.number
+                                                ? 'bg-primary-500 border-primary-500 text-white shadow-lg shadow-primary-500/30'
+                                                : currentStep === step.number
+                                                    ? 'bg-primary-500 border-primary-500 text-white ring-4 ring-primary-200/50 shadow-lg shadow-primary-500/30'
+                                                    : 'bg-white/50 backdrop-blur-sm border-gray-200/60 text-gray-400'
+                                                }`}>
+                                                {currentStep > step.number ? (
+                                                    <Check className="w-5 h-5" />
+                                                ) : (
+                                                    <step.icon className="w-5 h-5" />
+                                                )}
+                                            </div>
+                                            <div className="mt-2 text-center">
+                                                <div className={`text-xs font-medium whitespace-nowrap ${currentStep >= step.number ? 'text-gray-700' : 'text-gray-400'
+                                                    }`}>
+                                                    {step.title}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {index < steps.length - 1 && (
+                                            <div className={`flex-1 h-0.5 mx-4 rounded-full transition-all duration-200 ${currentStep > step.number ? 'bg-primary-500' : 'bg-gray-200/60'
+                                                }`} style={{ maxWidth: '120px' }} />
+                                        )}
+                                    </React.Fragment>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Step Content */}
+                        <div ref={formContentRef} className="p-8 min-h-[400px] max-h-[60vh] overflow-y-auto">
+                            {/* Step 1: Filters */}
+                            {currentStep === 1 && (
+                                <div className="space-y-6 animate-fade-in max-w-3xl mx-auto">
+                                    <div className="text-center mb-8">
+                                        <h3 className="text-2xl font-semibold text-gray-900 mb-2">Select Report Filters</h3>
+                                        <p className="text-gray-600">Choose the data you want to include in your report</p>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {/* Date Range */}
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-900 mb-3">
+                                                <Calendar className="w-5 h-5 inline mr-2 text-primary-600" />
+                                                Date Range
+                                            </label>
+                                            <DateRangePicker
+                                                value={dateRange}
+                                                onChange={setDateRange}
+                                            />
+                                        </div>
+
+                                        {/* KPI Multi-Select */}
+                                        <div className="relative" ref={kpiPickerRef}>
+                                            <label className="block text-sm font-semibold text-gray-900 mb-3">
+                                                <BarChart3 className="w-5 h-5 inline mr-2 text-primary-600" />
+                                                Metrics ({selectedKPIIds.length} selected)
+                                            </label>
+                                            <button
+                                                onClick={() => setShowKPIPicker(!showKPIPicker)}
+                                                className="w-full px-4 py-3 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm shadow-bubble-sm transition-all"
+                                            >
+                                                {selectedKPIIds.length === 0
+                                                    ? 'All metrics (default)'
+                                                    : `${selectedKPIIds.length} metric${selectedKPIIds.length > 1 ? 's' : ''} selected`
+                                                }
+                                            </button>
+                                            {showKPIPicker && (
+                                                <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-200 rounded-xl shadow-bubble max-h-60 overflow-y-auto">
+                                                    {kpis.length === 0 ? (
+                                                        <div className="p-4 text-sm text-gray-500">No metrics available</div>
+                                                    ) : (
+                                                        kpis.map(kpi => (
+                                                            <label
+                                                                key={kpi.id}
+                                                                className={`flex items-center px-4 py-3 cursor-pointer transition-all ${selectedKPIIds.includes(kpi.id!) ? 'bg-primary-50' : 'hover:bg-gray-50'
+                                                                    }`}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedKPIIds.includes(kpi.id!)}
+                                                                    onChange={() => toggleKPI(kpi.id!)}
+                                                                    className="mr-3 w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+                                                                />
+                                                                <span className="text-sm font-medium">{kpi.title}</span>
+                                                            </label>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Location Multi-Select */}
+                                        <div className="relative" ref={locationPickerRef}>
+                                            <label className="block text-sm font-semibold text-gray-900 mb-3">
+                                                <MapPin className="w-5 h-5 inline mr-2 text-primary-600" />
+                                                Locations ({selectedLocationIds.length} selected)
+                                            </label>
+                                            <button
+                                                onClick={() => setShowLocationPicker(!showLocationPicker)}
+                                                className="w-full px-4 py-3 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm shadow-bubble-sm transition-all"
+                                            >
+                                                {selectedLocationIds.length === 0
+                                                    ? 'All locations (default)'
+                                                    : `${selectedLocationIds.length} location${selectedLocationIds.length > 1 ? 's' : ''} selected`
+                                                }
+                                            </button>
+                                            {showLocationPicker && (
+                                                <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-200 rounded-xl shadow-bubble max-h-60 overflow-y-auto">
+                                                    {locations.length === 0 ? (
+                                                        <div className="p-4 text-sm text-gray-500">No locations available</div>
+                                                    ) : (
+                                                        locations.map(location => (
+                                                            <label
+                                                                key={location.id}
+                                                                className={`flex items-center px-4 py-3 cursor-pointer transition-all ${selectedLocationIds.includes(location.id!) ? 'bg-primary-50' : 'hover:bg-gray-50'
+                                                                    }`}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedLocationIds.includes(location.id!)}
+                                                                    onChange={() => toggleLocation(location.id!)}
+                                                                    className="mr-3 w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+                                                                />
+                                                                <span className="text-sm font-medium">{location.name}</span>
+                                                            </label>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Beneficiary Group Multi-Select */}
+                                        <div className="relative" ref={beneficiaryPickerRef}>
+                                            <label className="block text-sm font-semibold text-gray-900 mb-3">
+                                                <Users className="w-5 h-5 inline mr-2 text-primary-600" />
+                                                Beneficiary Groups ({selectedBeneficiaryGroupIds.length} selected)
+                                            </label>
+                                            <button
+                                                onClick={() => setShowBeneficiaryPicker(!showBeneficiaryPicker)}
+                                                className="w-full px-4 py-3 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm shadow-bubble-sm transition-all"
+                                            >
+                                                {selectedBeneficiaryGroupIds.length === 0
+                                                    ? 'All groups (default)'
+                                                    : `${selectedBeneficiaryGroupIds.length} group${selectedBeneficiaryGroupIds.length > 1 ? 's' : ''} selected`
+                                                }
+                                            </button>
+                                            {showBeneficiaryPicker && (
+                                                <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-200 rounded-xl shadow-bubble max-h-60 overflow-y-auto">
+                                                    {beneficiaryGroups.length === 0 ? (
+                                                        <div className="p-4 text-sm text-gray-500">No beneficiary groups available</div>
+                                                    ) : (
+                                                        beneficiaryGroups.map(group => (
+                                                            <label
+                                                                key={group.id}
+                                                                className={`flex items-center px-4 py-3 cursor-pointer transition-all ${selectedBeneficiaryGroupIds.includes(group.id!) ? 'bg-primary-50' : 'hover:bg-gray-50'
+                                                                    }`}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedBeneficiaryGroupIds.includes(group.id!)}
+                                                                    onChange={() => toggleBeneficiaryGroup(group.id!)}
+                                                                    className="mr-3 w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+                                                                />
+                                                                <span className="text-sm font-medium">{group.name}</span>
+                                                            </label>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             )}
-                            <button
-                                onClick={handleGenerateReport}
-                                disabled={loadingReport}
-                                className="px-6 py-2.5 bg-primary-500 text-white rounded-2xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 font-medium transition-all duration-200 shadow-bubble-sm"
-                            >
-                                {loadingReport ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                        <span>Generating...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Sparkles className="w-4 h-4" />
-                                        <span>Generate AI Report</span>
-                                    </>
-                                )}
-                            </button>
+
+                            {/* Step 2: Review Data */}
+                            {currentStep === 2 && (
+                                <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
+                                    <div className="text-center mb-8">
+                                        <h3 className="text-2xl font-semibold text-gray-900 mb-2">Review Your Data</h3>
+                                        <p className="text-gray-600">Here's a summary of the data that will be included in your report</p>
+                                    </div>
+
+                                    {loadingData ? (
+                                        <div className="flex items-center justify-center py-12">
+                                            <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+                                            <span className="ml-3 text-gray-600">Loading data...</span>
+                                        </div>
+                                    ) : reportData ? (
+                                        <div className="space-y-6">
+                                            {/* Metrics Summary */}
+                                            {reportData.totals.length > 0 && (
+                                                <div className="bg-gray-50 rounded-xl border-2 border-gray-200 p-6">
+                                                    <h4 className="font-semibold text-gray-800 mb-4 flex items-center">
+                                                        <BarChart3 className="w-5 h-5 mr-2 text-primary-600" />
+                                                        Metrics Summary ({reportData.totals.length})
+                                                    </h4>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                        {reportData.totals.map(total => (
+                                                            <div key={total.kpi_id} className="p-4 bg-white rounded-xl border border-gray-100 shadow-sm">
+                                                                <h5 className="font-medium text-gray-700 text-sm truncate">{total.kpi_title}</h5>
+                                                                <p className="text-2xl font-bold text-impact-500 mt-2">
+                                                                    {total.total_value} <span className="text-sm font-normal text-gray-500">{total.unit_of_measurement}</span>
+                                                                </p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Locations */}
+                                            {reportData.locations.length > 0 && (
+                                                <div className="bg-gray-50 rounded-xl border-2 border-gray-200 p-6">
+                                                    <h4 className="font-semibold text-gray-800 mb-4 flex items-center">
+                                                        <MapPin className="w-5 h-5 mr-2 text-primary-600" />
+                                                        Locations ({reportData.locations.length})
+                                                    </h4>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {reportData.locations.map(location => (
+                                                            <span key={location.id} className="px-3 py-1.5 bg-white rounded-full border border-gray-200 text-sm font-medium text-gray-700">
+                                                                {location.name}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* No data warning */}
+                                            {reportData.totals.length === 0 && reportData.locations.length === 0 && (
+                                                <div className="text-center py-12 bg-yellow-50 rounded-xl border-2 border-dashed border-yellow-300">
+                                                    <FileText className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+                                                    <p className="text-yellow-700 font-medium">No data found for the selected filters.</p>
+                                                    <p className="text-yellow-600 text-sm mt-1">Try adjusting your filter selections.</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
+                                            <p className="text-gray-500">No data loaded. Go back to filters and try again.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Step 3: Add Story */}
+                            {currentStep === 3 && (
+                                <div className="space-y-6 animate-fade-in max-w-3xl mx-auto">
+                                    <div className="text-center mb-8">
+                                        <h3 className="text-2xl font-semibold text-gray-900 mb-2">Add a Story (Optional)</h3>
+                                        <p className="text-gray-600">Select a story to anchor your report narrative, or skip to generate without one</p>
+                                    </div>
+
+                                    {reportData?.stories && reportData.stories.length > 0 ? (
+                                        <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                                            {reportData.stories.map(story => (
+                                                <div
+                                                    key={story.id}
+                                                    onClick={() => setSelectedStory(selectedStory?.id === story.id ? null : story)}
+                                                    className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 ${selectedStory?.id === story.id
+                                                        ? 'border-primary-400 bg-primary-50 shadow-lg shadow-primary-500/10'
+                                                        : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
+                                                        }`}
+                                                >
+                                                    <div className="flex items-start justify-between">
+                                                        <div className="flex-1">
+                                                            <h4 className="font-semibold text-gray-800">{story.title}</h4>
+                                                            {story.description && (
+                                                                <p className="text-sm text-gray-500 mt-1 line-clamp-2">{story.description}</p>
+                                                            )}
+                                                            <div className="flex items-center space-x-4 mt-2 text-xs text-gray-400">
+                                                                {story.location_name && (
+                                                                    <span className="flex items-center">
+                                                                        <MapPin className="w-3 h-3 mr-1" />
+                                                                        {story.location_name}
+                                                                    </span>
+                                                                )}
+                                                                <span className="flex items-center">
+                                                                    <Calendar className="w-3 h-3 mr-1" />
+                                                                    {story.date_represented}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        {selectedStory?.id === story.id && (
+                                                            <div className="w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center ml-3">
+                                                                <Check className="w-4 h-4 text-white" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
+                                            <BookOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                                            <p className="text-gray-500 font-medium">No stories available for the selected filters.</p>
+                                            <p className="text-gray-400 text-sm mt-1">You can proceed without a story.</p>
+                                        </div>
+                                    )}
+
+                                    {selectedStory && (
+                                        <div className="bg-primary-50 border-2 border-primary-200 rounded-xl p-4">
+                                            <p className="text-sm text-primary-800">
+                                                <strong>Selected:</strong> {selectedStory.title}
+                                            </p>
+                                            <button
+                                                onClick={() => setSelectedStory(null)}
+                                                className="text-xs text-primary-600 hover:text-primary-700 underline mt-1"
+                                            >
+                                                Clear selection
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Step 4: Generate */}
+                            {currentStep === 4 && (
+                                <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
+                                    <div className="text-center mb-8">
+                                        <h3 className="text-2xl font-semibold text-gray-900 mb-2">Ready to Generate</h3>
+                                        <p className="text-gray-600">Review your selections and generate your AI-powered impact report</p>
+                                    </div>
+
+                                    {/* Summary */}
+                                    <div className="bg-gray-50 rounded-xl border-2 border-gray-200 p-6 space-y-4">
+                                        <h4 className="font-semibold text-gray-800">Report Summary</h4>
+
+                                        <div className="grid grid-cols-2 gap-4 text-sm">
+                                            <div className="bg-white rounded-lg p-3 border border-gray-100">
+                                                <span className="text-gray-500">Metrics</span>
+                                                <p className="font-semibold text-gray-800">{reportData?.totals.length || 0} included</p>
+                                            </div>
+                                            <div className="bg-white rounded-lg p-3 border border-gray-100">
+                                                <span className="text-gray-500">Locations</span>
+                                                <p className="font-semibold text-gray-800">{reportData?.locations.length || 0} included</p>
+                                            </div>
+                                            <div className="bg-white rounded-lg p-3 border border-gray-100">
+                                                <span className="text-gray-500">Date Range</span>
+                                                <p className="font-semibold text-gray-800">
+                                                    {dateRange.startDate && dateRange.endDate
+                                                        ? `${dateRange.startDate} - ${dateRange.endDate}`
+                                                        : dateRange.singleDate || 'All dates'
+                                                    }
+                                                </p>
+                                            </div>
+                                            <div className="bg-white rounded-lg p-3 border border-gray-100">
+                                                <span className="text-gray-500">Featured Story</span>
+                                                <p className="font-semibold text-gray-800 truncate">{selectedStory?.title || 'None'}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-primary-50 border-2 border-primary-200 rounded-xl p-5 text-center">
+                                        <Sparkles className="w-10 h-10 text-primary-500 mx-auto mb-3" />
+                                        <p className="text-sm text-primary-800 leading-relaxed">
+                                            Our AI will analyze your data and generate a professional impact report with insights, metrics visualization, and narrative content.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Navigation Footer */}
+                        <div className="border-t border-primary-100/40 p-6 bg-white/30 backdrop-blur-xl">
+                            <div className="flex items-center justify-between max-w-3xl mx-auto">
+                                <button
+                                    type="button"
+                                    onClick={handleBack}
+                                    disabled={currentStep === 1}
+                                    className={`flex items-center space-x-2 px-5 py-3 text-gray-600 bg-white/50 backdrop-blur-sm border border-gray-200/60 rounded-xl font-medium transition-all duration-200 ${currentStep === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/70'
+                                        }`}
+                                >
+                                    <ChevronLeft className="w-5 h-5" />
+                                    <span>Back</span>
+                                </button>
+
+                                <div className="flex items-center space-x-3">
+                                    {currentStep < totalSteps ? (
+                                        <button
+                                            type="button"
+                                            onClick={handleNext}
+                                            disabled={loadingData || !canProceedToNextStep()}
+                                            className="flex items-center space-x-2 px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-200 shadow-lg shadow-primary-500/30 hover:shadow-xl hover:shadow-primary-500/40"
+                                        >
+                                            {loadingData ? (
+                                                <>
+                                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                                    <span>Loading...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span>{currentStep === 1 ? 'Apply & Continue' : 'Next'}</span>
+                                                    <ChevronRight className="w-5 h-5" />
+                                                </>
+                                            )}
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={handleGenerateReport}
+                                            disabled={loadingReport || !reportData}
+                                            className="flex items-center space-x-2 px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-200 shadow-lg shadow-primary-500/30 hover:shadow-xl hover:shadow-primary-500/40"
+                                        >
+                                            {loadingReport ? (
+                                                <>
+                                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                                    <span>Generating...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Sparkles className="w-5 h-5" />
+                                                    <span>Generate Report</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
 
-                {/* Empty State */}
-                {!reportData && (
-                    <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-12 text-center">
-                        <div className="icon-bubble mx-auto mb-4">
-                            <FileText className="w-6 h-6 text-gray-400" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-gray-800 mb-2">No Report Data</h3>
-                        <p className="text-gray-500 text-sm">
-                            Apply filters above to see metrics, stories, and locations for your report.
+                {/* Show dashboard link if hidden but report exists */}
+                {reportText && reportDashboardData && !showDashboard && (
+                    <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6 text-center">
+                        <p className="text-gray-600 mb-4">
+                            You have a previously generated report.
                         </p>
+                        <div className="flex items-center justify-center gap-4">
+                            <button
+                                onClick={() => {
+                                    setShowDashboard(true)
+                                    try {
+                                        const saved = localStorage.getItem(storageKey)
+                                        if (saved) {
+                                            const parsed = JSON.parse(saved)
+                                            parsed.showDashboard = true
+                                            localStorage.setItem(storageKey, JSON.stringify(parsed))
+                                        }
+                                    } catch (error) {
+                                        console.error('Failed to update localStorage:', error)
+                                    }
+                                }}
+                                className="px-6 py-3 bg-primary-500 text-white rounded-2xl hover:bg-primary-600 font-semibold transition-all duration-200 shadow-bubble-sm"
+                            >
+                                Show Report Dashboard
+                            </button>
+                            <NewReportButton />
+                        </div>
                     </div>
                 )}
             </div>
         </div>
     )
 }
-
