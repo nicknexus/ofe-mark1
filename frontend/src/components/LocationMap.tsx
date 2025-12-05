@@ -181,7 +181,7 @@ function CustomMarkerWrapper({
             {(isSelected || isHovered) && (
                 <div
                     className={`absolute inset-0 rounded-full animate-ping ${
-                        isSelected ? 'bg-blue-500' : 'bg-green-500'
+                        isSelected ? 'bg-blue-500' : 'bg-primary-500'
                     }`}
                     style={{
                         width: isSelected ? '32px' : '24px',
@@ -198,7 +198,7 @@ function CustomMarkerWrapper({
             {(isSelected || isHovered) && (
                 <div
                     className={`absolute inset-0 rounded-full ${
-                        isSelected ? 'bg-blue-500' : 'bg-green-500'
+                        isSelected ? 'bg-blue-500' : 'bg-primary-500'
                     }`}
                     style={{
                         width: isSelected ? '28px' : '20px',
@@ -214,7 +214,7 @@ function CustomMarkerWrapper({
             {/* Main marker circle */}
             <div
                 className={`rounded-full transition-all duration-200 border-2 border-white ${
-                    isSelected ? 'bg-blue-500' : 'bg-green-500'
+                    isSelected ? 'bg-blue-500' : 'bg-primary-500'
                 }`}
                 style={{
                     width: isSelected ? '20px' : isHovered ? '16px' : '12px',
@@ -241,7 +241,7 @@ function CustomMarkerWrapper({
                     className="absolute left-1/2 top-0 transform -translate-x-1/2 -translate-y-full"
                     style={{ marginTop: '-18px' }}
                 >
-                    <div className="w-2.5 h-2.5 rounded-full bg-green-500 opacity-90">
+                    <div className="w-2.5 h-2.5 rounded-full bg-primary-500 opacity-90">
                         <div className="w-1 h-1 rounded-full bg-white absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2" />
                     </div>
                 </div>
@@ -283,7 +283,7 @@ function LocationMarker({
     // Create custom icon using DivIcon
     const icon = useMemo(() => {
         const size = isSelected ? 40 : isHovered ? 36 : 32
-        const color = isSelected ? '#3b82f6' : '#10b981'
+        const color = isSelected ? '#3b82f6' : '#c0dfa1'
         
         return L.divIcon({
             className: 'custom-marker',

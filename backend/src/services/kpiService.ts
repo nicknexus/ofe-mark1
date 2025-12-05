@@ -200,6 +200,11 @@ export class KPIService {
 
     // KPI Updates
     static async addUpdate(update: KPIUpdate, userId: string): Promise<KPIUpdate> {
+        // Validate location_id is required
+        if (!update.location_id || !update.location_id.trim()) {
+            throw new Error('Location is required for impact claims')
+        }
+
         // Support optional beneficiary_group_ids on creation
         const { beneficiary_group_ids, ...insertData } = (update as any)
 
@@ -243,6 +248,11 @@ export class KPIService {
 
     static async updateKPIUpdate(id: string, updates: Partial<KPIUpdate>, userId: string): Promise<KPIUpdate> {
         const { beneficiary_group_ids, ...updateData } = (updates as any)
+
+        // Validate location_id is required if it's being updated
+        if ('location_id' in updateData && (!updateData.location_id || !updateData.location_id.trim())) {
+            throw new Error('Location is required for impact claims')
+        }
 
         const { data, error } = await supabase
             .from('kpi_updates')
@@ -327,6 +337,12 @@ export class KPIService {
             .from('evidence_kpi_updates')
             .select('evidence_id, kpi_update_id');
 
+        // Helper to parse date as UTC midnight (avoids timezone issues with date-only strings)
+        const parseUTCDate = (dateStr: string): Date => {
+            const [year, month, day] = dateStr.split('T')[0].split('-').map(Number);
+            return new Date(Date.UTC(year, month - 1, day));
+        };
+
         // Calculate completion percentage for each individual data point
         const updatesWithCompletion = (updates || []).map(update => {
             // First, collect explicitly linked evidence via evidence_kpi_updates
@@ -348,24 +364,25 @@ export class KPIService {
 
             if (update.date_range_start && update.date_range_end) {
                 // For date range updates, calculate based on days covered
-                const startDate = new Date(update.date_range_start);
-                const endDate = new Date(update.date_range_end);
-                const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                const startDate = parseUTCDate(update.date_range_start);
+                const endDate = parseUTCDate(update.date_range_end);
+                const totalDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
-                const coveredDays = new Set();
+                const coveredDays = new Set<string>();
                 relevantEvidence.forEach((evidence: any) => {
                     if (evidence.date_range_start && evidence.date_range_end) {
-                        const evidenceStart = new Date(evidence.date_range_start);
-                        const evidenceEnd = new Date(evidence.date_range_end);
-                        for (let d = new Date(evidenceStart); d <= evidenceEnd; d.setDate(d.getDate() + 1)) {
+                        const evidenceStart = parseUTCDate(evidence.date_range_start);
+                        const evidenceEnd = parseUTCDate(evidence.date_range_end);
+                        // Iterate using UTC day increments
+                        for (let d = new Date(evidenceStart.getTime()); d <= evidenceEnd; d.setUTCDate(d.getUTCDate() + 1)) {
                             if (d >= startDate && d <= endDate) {
                                 coveredDays.add(d.toISOString().split('T')[0]);
                             }
                         }
-                    } else {
-                        const evidenceDate = new Date(evidence.date_represented);
+                    } else if (evidence.date_represented) {
+                        const evidenceDate = parseUTCDate(evidence.date_represented);
                         if (evidenceDate >= startDate && evidenceDate <= endDate) {
-                            coveredDays.add(evidence.date_represented);
+                            coveredDays.add(evidence.date_represented.split('T')[0]);
                         }
                     }
                 });

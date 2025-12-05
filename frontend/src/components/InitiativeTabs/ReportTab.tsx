@@ -333,11 +333,11 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
                             // Add modern markers - green pins with modern styling
                             locations.forEach(loc => {
-                                // Modern pin style - using dashboard green color
+                                // Modern pin style - using main site green color
                                 L.circleMarker([loc.latitude, loc.longitude], {
                                     radius: 12,
                                     color: '#ffffff',
-                                    fillColor: '#97b599', // Dashboard green color
+                                    fillColor: '#c0dfa1', // Main site green (primary-500)
                                     fillOpacity: 1,
                                     weight: 3,
                                     className: 'modern-pin'
@@ -349,7 +349,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                 L.circleMarker([loc.latitude, loc.longitude], {
                                     radius: 18,
                                     color: 'transparent',
-                                    fillColor: '#97b599',
+                                    fillColor: '#c0dfa1', // Main site green (primary-500)
                                     fillOpacity: 0.2,
                                     weight: 0,
                                     className: 'modern-pin-glow'

@@ -108,9 +108,10 @@ interface MetricsDashboardProps {
     onStoryClick?: (storyId: string) => void
     user?: User | null
     organization?: Organization | null
+    onOrderChange?: (orderedIds: string[]) => void
 }
 
-export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = [], initiativeId, onNavigateToLocations, onMetricCardClick, onAddKPI, onStoryClick, user, organization }: MetricsDashboardProps) {
+export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = [], initiativeId, onNavigateToLocations, onMetricCardClick, onAddKPI, onStoryClick, user, organization, onOrderChange }: MetricsDashboardProps) {
     const [timeFrame, setTimeFrame] = useState<'all' | '1month' | '6months' | '1year' | '5years'>('all')
     const [isCumulative, setIsCumulative] = useState(true)
     const [visibleKPIs, setVisibleKPIs] = useState<Set<string>>(new Set())
@@ -124,7 +125,11 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
             return orderA - orderB
         })
         setOrderedKPIs(sorted)
-    }, [kpis])
+        // Notify parent of initial order
+        if (onOrderChange) {
+            onOrderChange(sorted.map(k => k.id))
+        }
+    }, [kpis, onOrderChange])
 
     // Drag and drop sensors
     const sensors = useSensors(
@@ -151,6 +156,11 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
 
         const newOrderedKPIs = arrayMove(orderedKPIs, oldIndex, newIndex)
         setOrderedKPIs(newOrderedKPIs)
+        
+        // Notify parent of new order immediately
+        if (onOrderChange) {
+            onOrderChange(newOrderedKPIs.map(k => k.id))
+        }
 
         // Update display_order in backend
         if (initiativeId) {
@@ -165,6 +175,9 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                 toast.error('Failed to save order')
                 // Revert on error
                 setOrderedKPIs(orderedKPIs)
+                if (onOrderChange) {
+                    onOrderChange(orderedKPIs.map(k => k.id))
+                }
             }
         }
     }
@@ -651,8 +664,8 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
         return Math.floor((dataPointCount - 1) / 30)
     }
 
-    // Get top 6 KPIs for metric cards (from ordered KPIs, then filtered)
-    const displayKPIs = orderedKPIs.filter(kpi => filteredKPIs.some(fk => fk.id === kpi.id)).slice(0, 6)
+    // Get top 12 KPIs for metric cards (from ordered KPIs, then filtered)
+    const displayKPIs = orderedKPIs.filter(kpi => filteredKPIs.some(fk => fk.id === kpi.id)).slice(0, 12)
 
     // Calculate dynamic max value with headroom for the graph
     const calculateMaxWithHeadroom = () => {
@@ -755,14 +768,26 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setShowLocationPicker(false)
                                 setShowBeneficiaryPicker(false)
                             }}
-                            className="flex items-center pl-0 pr-4 h-10 bg-white hover:bg-gray-50 text-gray-700 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border border-gray-200 border-l-0 shadow-bubble-sm"
+                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${
+                                visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
+                                    ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
+                                    : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                            }`}
                         >
-                            <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
-                                <Filter className="w-5 h-5 text-gray-600" />
+                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                                visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
+                                    ? 'bg-primary-100 border-primary-500'
+                                    : 'bg-gray-100 border-gray-200'
+                            }`}>
+                                <Filter className={`w-5 h-5 ${
+                                    visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
+                                        ? 'text-primary-500'
+                                        : 'text-gray-600'
+                                }`} />
                             </div>
                             <span className="ml-3">Metrics</span>
                             {visibleKPIs.size > 0 && visibleKPIs.size < kpis.length && (
-                                <span className="ml-1 bg-blue-600 text-white text-[10px] px-1 rounded-full">
+                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
                                     {visibleKPIs.size}
                                 </span>
                             )}
@@ -840,10 +865,22 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setShowMetricsPicker(false)
                                 setShowBeneficiaryPicker(false)
                             }}
-                            className="flex items-center pl-0 pr-4 h-10 bg-white hover:bg-gray-50 text-gray-700 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border border-gray-200 border-l-0 shadow-bubble-sm"
+                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${
+                                selectedLocations.length > 0
+                                    ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
+                                    : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                            }`}
                         >
-                            <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
-                                <MapPin className="w-5 h-5 text-gray-600" />
+                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                                selectedLocations.length > 0
+                                    ? 'bg-primary-100 border-primary-500'
+                                    : 'bg-gray-100 border-gray-200'
+                            }`}>
+                                <MapPin className={`w-5 h-5 ${
+                                    selectedLocations.length > 0
+                                        ? 'text-primary-500'
+                                        : 'text-gray-600'
+                                }`} />
                             </div>
                             <span className="ml-3">Location</span>
                             {selectedLocations.length > 0 && (
@@ -926,14 +963,26 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setShowLocationPicker(false)
                                 setShowMetricsPicker(false)
                             }}
-                            className="flex items-center pl-0 pr-4 h-10 bg-white hover:bg-gray-50 text-gray-700 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border border-gray-200 border-l-0 shadow-bubble-sm"
+                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${
+                                selectedBeneficiaryGroups.length > 0
+                                    ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
+                                    : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                            }`}
                         >
-                            <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
-                                <Users className="w-5 h-5 text-gray-600" />
+                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                                selectedBeneficiaryGroups.length > 0
+                                    ? 'bg-primary-100 border-primary-500'
+                                    : 'bg-gray-100 border-gray-200'
+                            }`}>
+                                <Users className={`w-5 h-5 ${
+                                    selectedBeneficiaryGroups.length > 0
+                                        ? 'text-primary-500'
+                                        : 'text-gray-600'
+                                }`} />
                             </div>
                             <span className="ml-3">Beneficiaries</span>
                             {selectedBeneficiaryGroups.length > 0 && (
-                                <span className="ml-1 bg-orange-600 text-white text-[10px] px-1 rounded-full">
+                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
                                     {selectedBeneficiaryGroups.length}
                                 </span>
                             )}
@@ -1064,7 +1113,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                 </div>
             </div>
 
-            {/* Top Metric Cards - 6 across max */}
+            {/* Top Metric Cards - 12 across max (2 rows of 6) */}
             <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
@@ -1077,18 +1126,33 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 flex-shrink-0">
                         {displayKPIs.map((kpi, index) => {
                             const metricColor = getKPIColor(kpi.category, index)
+                            const isLastInFirstRow = index === 5 && displayKPIs.length === 6
                             return (
-                                <SortableMetricCard
-                                    key={kpi.id}
-                                    kpi={kpi}
-                                    metricColor={metricColor}
-                                    filteredTotal={filteredTotals[kpi.id] || 0}
-                                    onMetricCardClick={onMetricCardClick}
-                                />
+                                <div key={kpi.id} className="relative">
+                                    <SortableMetricCard
+                                        kpi={kpi}
+                                        metricColor={metricColor}
+                                        filteredTotal={filteredTotals[kpi.id] || 0}
+                                        onMetricCardClick={onMetricCardClick}
+                                    />
+                                    {/* Small plus button on right edge of last card when exactly 6 metrics */}
+                                    {isLastInFirstRow && onAddKPI && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                onAddKPI()
+                                            }}
+                                            className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 bg-primary-500 hover:bg-primary-600 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-110 z-10"
+                                            title="Add Metric"
+                                        >
+                                            <Plus className="w-3.5 h-3.5 text-white" />
+                                        </button>
+                                    )}
+                                </div>
                             )
                         })}
-                        {/* Plus box to add new metric - only show if fewer than 6 KPIs */}
-                        {kpis.length < 6 && onAddKPI && (
+                        {/* Plus box to add new metric - show if fewer than 6 OR between 7-11 KPIs (not exactly 6) */}
+                        {kpis.length < 12 && kpis.length !== 6 && onAddKPI && (
                             <button
                                 onClick={onAddKPI}
                                 className="bg-white rounded-xl border-2 border-dashed border-gray-200 p-3 hover:shadow-[0_4px_20px_rgba(0,0,0,0.18)] hover:border-primary-300 hover:bg-primary-50/30 cursor-pointer transition-all duration-200 flex flex-col items-center justify-center min-h-[80px]"
@@ -1101,8 +1165,8 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                 </SortableContext>
             </DndContext>
 
-            {/* Graph and Map Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 h-[25vh] lg:h-[50vh]">
+            {/* Graph and Map Row - dynamically sized based on metric card count */}
+            <div className={`grid grid-cols-1 lg:grid-cols-5 gap-4 flex-1 ${displayKPIs.length > 6 ? 'min-h-[20vh]' : 'h-[25vh] lg:h-[50vh]'}`}>
                 {/* Graph - Left - 3/5 width */}
                 <div className="lg:col-span-3 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.18)] border border-gray-100 p-4 flex flex-col min-h-0 overflow-hidden">
                     <div className="flex items-center justify-between mb-3">
@@ -1115,7 +1179,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 <button
                                     onClick={() => setIsCumulative(true)}
                                     className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${isCumulative
-                                        ? 'bg-white text-gray-800 shadow-[0_2px_10px_rgba(0,0,0,0.15)]'
+                                        ? 'bg-primary-500 text-white shadow-[0_2px_10px_rgba(192,223,161,0.3)]'
                                         : 'text-gray-500 hover:text-gray-700'
                                         }`}
                                 >
@@ -1124,7 +1188,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 <button
                                     onClick={() => setIsCumulative(false)}
                                     className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${!isCumulative
-                                        ? 'bg-white text-gray-800 shadow-[0_2px_10px_rgba(0,0,0,0.15)]'
+                                        ? 'bg-primary-500 text-white shadow-[0_2px_10px_rgba(192,223,161,0.3)]'
                                         : 'text-gray-500 hover:text-gray-700'
                                         }`}
                                 >
@@ -1141,7 +1205,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                             // Preserve monthly view state when switching time frames
                                         }}
                                         className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${timeFrame === tf
-                                            ? 'bg-white text-gray-800 shadow-[0_2px_10px_rgba(0,0,0,0.15)]'
+                                            ? 'bg-primary-500 text-white shadow-[0_2px_10px_rgba(192,223,161,0.3)]'
                                             : 'text-gray-500 hover:text-gray-700'
                                             }`}
                                     >
@@ -1299,42 +1363,63 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                 </div>
             </div>
 
-            {/* Bottom Stats Cards - Skinnier */}
-            <div className="grid grid-cols-2 gap-4 flex-shrink-0 h-auto">
-                {/* Total Data Points */}
-                <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.18)] border border-gray-100 p-4 impact-border">
-                    <div className="flex items-center justify-between mb-2">
+            {/* Bottom Stats Cards - Minimal single line when 2 rows of metrics */}
+            {displayKPIs.length > 6 ? (
+                <div className="flex gap-3 flex-shrink-0">
+                    {/* Impact Claims - inline minimal */}
+                    <div className="flex-1 bg-white rounded-xl shadow-bubble-sm border border-gray-100 impact-border px-3 py-1.5 flex items-center justify-between">
                         <div className="flex items-center space-x-2">
-                            <div className="w-8 h-8 rounded-lg bg-impact-50 flex items-center justify-center">
-                                <BarChart3 className="w-4 h-4 text-impact-400" />
-                            </div>
-                            <h4 className="text-xs font-medium text-gray-600">Impact Claims</h4>
+                            <BarChart3 className="w-3.5 h-3.5 text-impact-400" />
+                            <span className="text-[11px] font-medium text-gray-600">Impact Claims</span>
                         </div>
+                        <span className="text-sm font-semibold text-impact-500">{filteredUpdates.length.toLocaleString()}</span>
                     </div>
-                    <div className="flex items-baseline space-x-1">
-                        <span className="text-xl font-semibold text-impact-500">
-                            {filteredUpdates.length.toLocaleString()}
-                        </span>
+                    {/* Evidence Coverage - inline minimal */}
+                    <div className="flex-1 bg-white rounded-xl shadow-bubble-sm border border-gray-100 evidence-border px-3 py-1.5 flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                            <Target className="w-3.5 h-3.5 text-evidence-400" />
+                            <span className="text-[11px] font-medium text-gray-600">Evidence Coverage</span>
+                        </div>
+                        <span className="text-sm font-semibold text-evidence-500">{stats.evidence_coverage_percentage}%</span>
                     </div>
                 </div>
+            ) : (
+                <div className="grid grid-cols-2 gap-4 flex-shrink-0 h-auto">
+                    {/* Total Data Points */}
+                    <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.18)] border border-gray-100 p-4 impact-border">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                                <div className="w-8 h-8 rounded-lg bg-impact-50 flex items-center justify-center">
+                                    <BarChart3 className="w-4 h-4 text-impact-400" />
+                                </div>
+                                <h4 className="text-xs font-medium text-gray-600">Impact Claims</h4>
+                            </div>
+                        </div>
+                        <div className="flex items-baseline space-x-1">
+                            <span className="text-xl font-semibold text-impact-500">
+                                {filteredUpdates.length.toLocaleString()}
+                            </span>
+                        </div>
+                    </div>
 
-                {/* Evidence Coverage */}
-                <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.18)] border border-gray-100 p-4 evidence-border">
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center space-x-2">
-                            <div className="w-8 h-8 rounded-lg bg-evidence-50 flex items-center justify-center">
-                                <Target className="w-4 h-4 text-evidence-400" />
+                    {/* Evidence Coverage */}
+                    <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.18)] border border-gray-100 p-4 evidence-border">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                                <div className="w-8 h-8 rounded-lg bg-evidence-50 flex items-center justify-center">
+                                    <Target className="w-4 h-4 text-evidence-400" />
+                                </div>
+                                <h4 className="text-xs font-medium text-gray-600">Evidence Coverage</h4>
                             </div>
-                            <h4 className="text-xs font-medium text-gray-600">Evidence Coverage</h4>
+                        </div>
+                        <div className="flex items-baseline space-x-1">
+                            <span className="text-xl font-semibold text-evidence-500">
+                                {stats.evidence_coverage_percentage}%
+                            </span>
                         </div>
                     </div>
-                    <div className="flex items-baseline space-x-1">
-                        <span className="text-xl font-semibold text-evidence-500">
-                            {stats.evidence_coverage_percentage}%
-                        </span>
-                    </div>
                 </div>
-            </div>
+            )}
         </div>
     )
 }

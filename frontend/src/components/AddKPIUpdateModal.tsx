@@ -161,10 +161,15 @@ export default function AddKPIUpdateModal({
                 throw new Error('Label or Title is required')
             }
 
+            // Validate location is required
+            if (!selectedLocationId || !selectedLocationId.trim()) {
+                throw new Error('Location is required')
+            }
+
             await onSubmit({
                 ...submitData,
                 beneficiary_group_ids: selectedGroupIds,
-                location_id: selectedLocationId || undefined
+                location_id: selectedLocationId
             })
             // Only reset if creating new (not editing)
             if (!editData) {
@@ -216,7 +221,7 @@ export default function AddKPIUpdateModal({
             case 1:
                 return formData.value > 0
             case 2:
-                return !!(datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate))
+                return !!(datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate)) && !!selectedLocationId
             case 3:
                 return !!formData.label?.trim() // Label is required
             default:
@@ -314,7 +319,7 @@ export default function AddKPIUpdateModal({
                         {currentStep === 1 && (
                             <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
                                 <div className="text-center mb-8">
-                                    <h3 className="text-2xl font-semibold text-gray-900 mb-2">Impact Claim</h3>
+                                    <h3 className="text-2xl font-semibold text-gray-900 mb-2">{kpiTitle}</h3>
                                     <p className="text-gray-600">Enter the measurable value for this impact claim</p>
                                 </div>
                                 
@@ -327,17 +332,49 @@ export default function AddKPIUpdateModal({
                                             onChange={handleInputChange}
                                             onFocus={handleValueFocus}
                                             onBlur={handleValueBlur}
-                                            className="input-field text-3xl font-semibold text-center pr-20 py-6 transition-all duration-150 hover:border-gray-400"
+                                            className="input-field text-3xl font-semibold text-center py-6 transition-all duration-150 hover:border-gray-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             placeholder="0"
                                             required
                                             min="0"
                                             step={metricType === 'percentage' ? '0.01' : '1'}
                                             max={metricType === 'percentage' ? '100' : undefined}
+                                            style={{ paddingRight: '140px' }}
                                         />
-                                        <div className="absolute inset-y-0 right-0 flex items-center pr-6 pointer-events-none">
-                                            <span className="text-gray-600 text-lg font-medium">
+                                        <div className="absolute inset-y-0 right-0 flex items-center gap-3 pr-4">
+                                            <span className="text-gray-600 text-lg font-medium pointer-events-none">
                                                 {metricType === 'percentage' ? '%' : unitOfMeasurement}
                                             </span>
+                                            <div className="flex flex-col pointer-events-auto">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const step = metricType === 'percentage' ? 0.01 : 1
+                                                        const max = metricType === 'percentage' ? 100 : undefined
+                                                        const newValue = Math.min((formData.value || 0) + step, max || Infinity)
+                                                        setFormData(prev => ({ ...prev, value: newValue }))
+                                                    }}
+                                                    className="flex items-center justify-center w-6 h-6 hover:bg-gray-200 rounded-t transition-colors border border-gray-300 border-b-0"
+                                                    tabIndex={-1}
+                                                >
+                                                    <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                                    </svg>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const step = metricType === 'percentage' ? 0.01 : 1
+                                                        const newValue = Math.max((formData.value || 0) - step, 0)
+                                                        setFormData(prev => ({ ...prev, value: newValue }))
+                                                    }}
+                                                    className="flex items-center justify-center w-6 h-6 hover:bg-gray-200 rounded-b transition-colors border border-gray-300"
+                                                    tabIndex={-1}
+                                                >
+                                                    <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -386,13 +423,14 @@ export default function AddKPIUpdateModal({
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-900 mb-3">
                                             <MapPin className="w-5 h-5 inline mr-2 text-blue-600" />
-                                            Location (optional)
+                                            Location <span className="text-red-500">*</span>
                                         </label>
                                         <div className="flex gap-3">
                                             <select
                                                 value={selectedLocationId}
                                                 onChange={(e) => setSelectedLocationId(e.target.value)}
                                                 className="input-field flex-1 text-base py-3"
+                                                required
                                             >
                                                 <option value="">Select a location...</option>
                                                 {locations.map((location) => (

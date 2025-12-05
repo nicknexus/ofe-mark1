@@ -133,13 +133,13 @@ export default function InitiativeSidebar({
                             <button
                                 key={tab.id}
                                 onClick={() => onTabChange(tab.id)}
-                                className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200 ${isActive
-                                    ? 'bg-primary-100 shadow-bubble-sm text-primary-700'
-                                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'
+                                className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200 border-2 ${isActive
+                                    ? 'border-primary-500 bg-white shadow-bubble-sm text-gray-700'
+                                    : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-800'
                                     }`}
                             >
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isActive ? 'bg-primary-200' : 'bg-gray-100'}`}>
-                                    <Icon className={`w-4 h-4 ${isActive ? 'text-primary-700' : 'text-gray-400'}`} />
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isActive ? 'bg-gray-100' : 'bg-gray-100'}`}>
+                                    <Icon className={`w-4 h-4 ${isActive ? 'text-primary-500' : 'text-gray-400'}`} />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="font-medium text-sm">{tab.label}</div>

@@ -3,6 +3,28 @@ import { BarChart3, Plus, Target, Upload } from 'lucide-react'
 import { InitiativeDashboard } from '../../types'
 import ExpandableKPICard from '../ExpandableKPICard'
 
+// Color palette matching MetricsDashboard - for metrics past 12, default to site green
+const METRIC_COLOR_PALETTE = [
+    '#3b82f6', // blue
+    '#10b981', // green
+    '#8b5cf6', // purple
+    '#f59e0b', // amber
+    '#ef4444', // red
+    '#06b6d4', // cyan
+    '#ec4899', // pink
+    '#84cc16', // lime
+    '#f97316', // orange
+    '#6366f1', // indigo
+    '#14b8a6', // teal
+    '#a855f7', // violet
+]
+const DEFAULT_METRIC_COLOR = '#c0dfa1' // site green (primary-500)
+
+const getMetricColor = (index: number): string => {
+    if (index >= METRIC_COLOR_PALETTE.length) return DEFAULT_METRIC_COLOR
+    return METRIC_COLOR_PALETTE[index]
+}
+
 interface MetricsTabProps {
     dashboard: InitiativeDashboard | null
     kpiTotals: Record<string, number>
@@ -19,6 +41,7 @@ interface MetricsTabProps {
     onToggleKPIExpansion: (kpiId: string) => void
     initiativeId?: string
     onRefresh?: () => void
+    orderedKPIIds?: string[] // KPI IDs in display order (from home tab drag/drop)
 }
 
 export default function MetricsTab({
@@ -36,7 +59,8 @@ export default function MetricsTab({
     onDeleteKPI,
     onToggleKPIExpansion,
     initiativeId,
-    onRefresh
+    onRefresh,
+    orderedKPIIds = []
 }: MetricsTabProps) {
     if (!dashboard) return null
 
@@ -51,8 +75,19 @@ export default function MetricsTab({
     const expandedKpiId = expandedKPIs.size > 0 ? Array.from(expandedKPIs)[0] : null
     const expandedKpi = expandedKpiId ? kpis.find(k => k.id === expandedKpiId) : null
 
+    // Get color index based on ordered IDs (from home tab) or fallback to kpis array order
+    const getOrderedIndex = (kpiId: string): number => {
+        if (orderedKPIIds.length > 0) {
+            const orderedIndex = orderedKPIIds.indexOf(kpiId)
+            if (orderedIndex !== -1) return orderedIndex
+        }
+        // Fallback to original kpis array order
+        return kpis.findIndex(k => k.id === kpiId)
+    }
+
     // If a metric is expanded, render only that metric's detail view (not overlay)
     if (expandedKpi) {
+        const expandedKpiIndex = getOrderedIndex(expandedKpi.id!)
         return (
             <ExpandableKPICard
                 key={expandedKpi.id}
@@ -68,6 +103,7 @@ export default function MetricsTab({
                 kpiUpdates={allKPIUpdates.filter(update => update.kpi_id === expandedKpi.id)}
                 initiativeId={initiativeId || initiative.id}
                 onRefresh={onRefresh}
+                metricColor={getMetricColor(expandedKpiIndex)}
             />
         )
     }
@@ -173,8 +209,9 @@ export default function MetricsTab({
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    {filteredKpis.map((kpi) => (
-                                        kpi.id && (
+                                    {filteredKpis.map((kpi) => {
+                                        const kpiIndex = getOrderedIndex(kpi.id!)
+                                        return kpi.id && (
                                             <ExpandableKPICard
                                                 key={kpi.id}
                                                 kpi={kpi}
@@ -188,9 +225,10 @@ export default function MetricsTab({
                                                 kpiUpdates={allKPIUpdates.filter(update => update.kpi_id === kpi.id)}
                                                 initiativeId={initiativeId || initiative.id}
                                                 onRefresh={onRefresh}
+                                                metricColor={getMetricColor(kpiIndex)}
                                             />
                                         )
-                                    ))}
+                                    })}
                                 </div>
                             )}
                         </div>

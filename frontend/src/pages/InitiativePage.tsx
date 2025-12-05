@@ -52,6 +52,7 @@ export default function InitiativePage() {
     const [categoryFilter, setCategoryFilter] = useState<'all' | 'input' | 'output' | 'impact'>('all')
     const [expandedKPIs, setExpandedKPIs] = useState<Set<string>>(new Set())
     const [allKPIUpdates, setAllKPIUpdates] = useState<any[]>([])
+    const [orderedKPIIds, setOrderedKPIIds] = useState<string[]>([])
 
     // Sidebar navigation state
     const [activeTab, setActiveTab] = useState('home')
@@ -386,6 +387,7 @@ export default function InitiativePage() {
                             }}
                             user={user}
                             organization={organization}
+                            onOrderChange={setOrderedKPIIds}
                         />
                     </div>
                 )}
@@ -416,6 +418,7 @@ export default function InitiativePage() {
                         onAddEvidence={openEvidenceModal}
                         onEditKPI={openEditModal}
                         onDeleteKPI={openDeleteConfirm}
+                        orderedKPIIds={orderedKPIIds}
                         onToggleKPIExpansion={toggleKPIExpansion}
                         initiativeId={id}
                         onRefresh={loadDashboard}

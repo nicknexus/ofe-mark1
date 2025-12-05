@@ -240,10 +240,22 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                                 setShowLocationPicker(!showLocationPicker)
                                 setShowBeneficiaryPicker(false)
                             }}
-                            className="flex items-center pl-0 pr-4 h-10 bg-white hover:bg-gray-50 text-gray-700 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border border-gray-200 border-l-0 shadow-bubble-sm"
+                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${
+                                selectedLocations.length > 0
+                                    ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
+                                    : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                            }`}
                         >
-                            <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
-                                <MapPin className="w-5 h-5 text-gray-600" />
+                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                                selectedLocations.length > 0
+                                    ? 'bg-primary-100 border-primary-500'
+                                    : 'bg-gray-100 border-gray-200'
+                            }`}>
+                                <MapPin className={`w-5 h-5 ${
+                                    selectedLocations.length > 0
+                                        ? 'text-primary-500'
+                                        : 'text-gray-600'
+                                }`} />
                             </div>
                             <span className="ml-3">Location</span>
                             {selectedLocations.length > 0 && (
@@ -268,10 +280,22 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                                 setShowBeneficiaryPicker(!showBeneficiaryPicker)
                                 setShowLocationPicker(false)
                             }}
-                            className="flex items-center pl-0 pr-4 h-10 bg-white hover:bg-gray-50 text-gray-700 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border border-gray-200 border-l-0 shadow-bubble-sm"
+                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${
+                                selectedBeneficiaryGroups.length > 0
+                                    ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
+                                    : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                            }`}
                         >
-                            <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
-                                <Users className="w-5 h-5 text-gray-600" />
+                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                                selectedBeneficiaryGroups.length > 0
+                                    ? 'bg-primary-100 border-primary-500'
+                                    : 'bg-gray-100 border-gray-200'
+                            }`}>
+                                <Users className={`w-5 h-5 ${
+                                    selectedBeneficiaryGroups.length > 0
+                                        ? 'text-primary-500'
+                                        : 'text-gray-600'
+                                }`} />
                             </div>
                             <span className="ml-3">Beneficiary Group</span>
                             {selectedBeneficiaryGroups.length > 0 && (

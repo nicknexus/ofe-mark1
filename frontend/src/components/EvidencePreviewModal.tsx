@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { X, Calendar, FileText, Camera, MessageSquare, DollarSign, ExternalLink, Download, Edit, BarChart3, MapPin, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { X, Calendar, FileText, Camera, MessageSquare, DollarSign, ExternalLink, Download, Edit, BarChart3, MapPin, Trash2, ChevronLeft, ChevronRight, Eye } from 'lucide-react'
 import { Evidence, Location } from '../types'
 import { formatDate, getEvidenceTypeInfo } from '../utils'
 import { apiService } from '../services/api'
@@ -44,7 +44,6 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                 setLocation(null)
             }
         } else if (!isOpen) {
-            // Reset loading states when modal closes
             setImageLoading(true)
             setEvidenceFiles([])
             setCurrentFileIndex(0)
@@ -59,7 +58,6 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
             if (files && files.length > 0) {
                 setEvidenceFiles(files)
             } else if (evidence.file_url) {
-                // Fallback to single file
                 setEvidenceFiles([{
                     id: evidence.id,
                     file_url: evidence.file_url,
@@ -72,7 +70,6 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
             }
         } catch (error) {
             console.error('Failed to load evidence files:', error)
-            // Fallback to single file from evidence
             if (evidence.file_url) {
                 setEvidenceFiles([{
                     id: evidence.id,
@@ -106,7 +103,6 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
             document.body.appendChild(link)
             link.click()
             document.body.removeChild(link)
-            // Small delay between downloads
             await new Promise(resolve => setTimeout(resolve, 300))
         }
     }
@@ -118,7 +114,6 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
             const dataPoints = await apiService.getDataPointsForEvidence(evidence.id)
             setLinkedDataPoints(dataPoints || [])
             
-            // Load locations for data points that have location_id
             const locationIds = dataPoints
                 .filter((dp: any) => dp.location_id)
                 .map((dp: any) => dp.location_id)
@@ -175,7 +170,6 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
 
     const typeInfo = getEvidenceTypeInfo(evidence.type)
     const IconComponent = getEvidenceIcon(evidence.type)
-
     const currentFile = evidenceFiles[currentFileIndex]
 
     const isImage = (fileUrl: string) => {
@@ -190,85 +184,78 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
 
     const isPDF = (fileUrl: string) => fileUrl && fileUrl.includes('.pdf')
 
+    const hasDateRange = evidence.date_range_start && evidence.date_range_end
+    const displayDate = hasDateRange
+        ? `${formatDate(evidence.date_range_start)} - ${formatDate(evidence.date_range_end)}`
+        : formatDate(evidence.date_represented)
+
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[70]">
-            <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)]">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[70] animate-fade-in">
+            <div className="bubble-card max-w-4xl w-full max-h-[90vh] overflow-hidden animate-slide-up">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                    <div className="flex items-center space-x-3">
-                        <div className={`p-2 rounded-lg ${typeInfo.color}`}>
+                <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                    <div className="flex items-center gap-4">
+                        <div className={`icon-bubble ${typeInfo.color}`}>
                             <IconComponent className="w-5 h-5" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-semibold text-gray-900">{evidence.title}</h2>
-                            <p className="text-sm text-gray-600 capitalize">{evidence.type.replace('_', ' ')}</p>
+                            <h2 className="text-xl font-bold text-gray-900">Evidence</h2>
+                            <p className="text-sm text-gray-500">{evidence.title}</p>
                         </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                        {onEdit && (
-                            <button
-                                onClick={() => onEdit(evidence)}
-                                className="flex items-center space-x-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm"
-                            >
-                                <Edit className="w-4 h-4" />
-                                <span>Edit</span>
-                            </button>
-                        )}
-                        {onDelete && (
-                            <button
-                                onClick={() => {
-                                    onDelete(evidence)
-                                    onClose()
-                                }}
-                                className="flex items-center space-x-2 px-3 py-1.5 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors text-sm"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                                <span>Delete</span>
-                            </button>
-                        )}
-                        <button
-                            onClick={onClose}
-                            className="text-gray-400 hover:text-gray-600 p-1"
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
-                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
+                    >
+                        <X className="w-5 h-5 text-gray-400" />
+                    </button>
                 </div>
 
+                {/* Content */}
                 <div className="flex flex-col lg:flex-row max-h-[calc(90vh-80px)]">
-                    {/* Content Preview (Left side on desktop) */}
+                    {/* Left Side - File Preview */}
                     {evidenceFiles.length > 0 && (
-                        <div className="flex-1 p-6 flex flex-col bg-gray-50 relative">
-                            {/* File counter and navigation */}
-                            {evidenceFiles.length > 1 && (
-                                <div className="flex items-center justify-between mb-4">
-                                    <button
-                                        onClick={handlePrevFile}
-                                        className="p-2 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors"
-                                    >
-                                        <ChevronLeft className="w-5 h-5 text-gray-600" />
-                                    </button>
-                                    <div className="text-sm text-gray-600 font-medium">
-                                        {currentFileIndex + 1} of {evidenceFiles.length} files
+                        <div className="w-full lg:w-1/2 p-6 border-r border-gray-200 overflow-y-auto">
+                            <div className="sticky top-0 bg-white pb-4 mb-4 border-b border-gray-100">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="icon-bubble-sm bg-primary-100">
+                                            <FileText className="w-4 h-4 text-primary-600" />
+                                        </div>
+                                        <h3 className="text-sm font-semibold text-gray-700">Files</h3>
+                                        <span className="status-pill">{evidenceFiles.length}</span>
                                     </div>
-                                    <button
-                                        onClick={handleNextFile}
-                                        className="p-2 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors"
-                                    >
-                                        <ChevronRight className="w-5 h-5 text-gray-600" />
-                                    </button>
+                                    {evidenceFiles.length > 1 && (
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={handlePrevFile}
+                                                className="p-1.5 bg-white rounded-lg shadow-sm hover:bg-gray-50 transition-colors border border-gray-200"
+                                            >
+                                                <ChevronLeft className="w-4 h-4 text-gray-600" />
+                                            </button>
+                                            <span className="text-xs text-gray-500 font-medium px-2">
+                                                {currentFileIndex + 1} of {evidenceFiles.length}
+                                            </span>
+                                            <button
+                                                onClick={handleNextFile}
+                                                className="p-1.5 bg-white rounded-lg shadow-sm hover:bg-gray-50 transition-colors border border-gray-200"
+                                            >
+                                                <ChevronRight className="w-4 h-4 text-gray-600" />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
+                            </div>
 
-                            {/* Current file preview */}
-                            <div className="flex-1 flex items-center justify-center">
+                            {/* File Preview */}
+                            <div className="flex items-center justify-center min-h-[400px] bg-gray-50 rounded-xl p-6 mb-4">
                                 {loadingFiles ? (
                                     <div className="flex flex-col items-center space-y-2">
                                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
                                         <p className="text-sm text-gray-500">Loading files...</p>
                                     </div>
                                 ) : currentFile && isImage(currentFile.file_url) ? (
-                                    <div className="max-w-full max-h-full relative">
+                                    <div className="max-w-full max-h-[500px] relative">
                                         {imageLoading && (
                                             <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg z-10">
                                                 <div className="flex flex-col items-center space-y-2">
@@ -280,7 +267,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                         <img
                                             src={currentFile.file_url}
                                             alt={currentFile.file_name}
-                                            className="max-w-full max-h-80 object-contain rounded-lg shadow-lg"
+                                            className="max-w-full max-h-[500px] object-contain rounded-lg shadow-lg"
                                             onLoad={() => setImageLoading(false)}
                                             onError={() => setImageLoading(false)}
                                         />
@@ -347,9 +334,9 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                 ) : null}
                             </div>
 
-                            {/* Thumbnail strip for multiple files */}
+                            {/* Thumbnail strip */}
                             {evidenceFiles.length > 1 && (
-                                <div className="mt-4 flex justify-center space-x-2 overflow-x-auto py-2">
+                                <div className="flex justify-center space-x-2 overflow-x-auto py-2 mb-4">
                                     {evidenceFiles.map((file, index) => (
                                         <button
                                             key={file.id}
@@ -379,9 +366,9 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                 </div>
                             )}
 
-                            {/* Download All button */}
+                            {/* Download All */}
                             {evidenceFiles.length > 1 && (
-                                <div className="mt-4 flex justify-center">
+                                <div className="flex justify-center">
                                     <button
                                         onClick={handleDownloadAll}
                                         className="btn-secondary inline-flex items-center space-x-2"
@@ -394,249 +381,236 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                         </div>
                     )}
 
-                    {/* Details Panel (Right side on desktop) */}
-                    <div className="w-full lg:w-96 p-6 border-t lg:border-t-0 lg:border-l border-gray-200 overflow-y-auto">
-                        <div className="space-y-6">
-                            {/* Description */}
-                            {evidence.description && (
-                                <div>
-                                    <h3 className="text-sm font-medium text-gray-700 mb-2">Description</h3>
-                                    <p className="text-sm text-gray-600">{evidence.description}</p>
+                    {/* Right Side - Details */}
+                    <div className="w-full lg:w-1/2 p-6 overflow-y-auto">
+                        {/* Main Evidence Display */}
+                        <div className="bg-gradient-to-br from-primary-50/80 to-primary-50/40 rounded-2xl p-6 border border-primary-100/60 mb-6">
+                            <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium text-primary-600 mb-2 uppercase tracking-wide">Evidence Type</p>
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-3 rounded-lg ${typeInfo.color}`}>
+                                            <IconComponent className="w-6 h-6" />
+                                        </div>
+                                        <h3 className="text-2xl font-bold text-gray-900">{typeInfo.label}</h3>
+                                    </div>
                                 </div>
-                            )}
+                            </div>
+                        </div>
 
-                            {/* Date Information */}
-                            <div>
-                                <h3 className="text-sm font-medium text-gray-700 mb-2">Date</h3>
-                                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                                    <Calendar className="w-4 h-4" />
-                                    <span>
-                                        {evidence.date_range_start && evidence.date_range_end ? (
-                                            <>Range: {formatDate(evidence.date_range_start)} - {formatDate(evidence.date_range_end)}</>
-                                        ) : (
-                                            <>Date: {formatDate(evidence.date_represented)}</>
-                                        )}
-                                    </span>
+                        {/* Info Grid */}
+                        <div className="grid grid-cols-1 gap-4 mb-6">
+                            {/* Date */}
+                            <div className="bubble-card p-4">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="icon-bubble-sm bg-primary-100">
+                                        <Calendar className="w-4 h-4 text-primary-600" />
+                                    </div>
+                                    <h3 className="text-sm font-semibold text-gray-700">
+                                        {hasDateRange ? 'Date Range' : 'Date'}
+                                    </h3>
                                 </div>
+                                <p className="text-base font-medium text-gray-900 ml-12">
+                                    {displayDate}
+                                </p>
                             </div>
 
                             {/* Location */}
                             {evidence.location_id && (
-                                <div>
-                                    <h3 className="text-sm font-medium text-gray-700 mb-2">Location</h3>
+                                <div className="bubble-card p-4">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="icon-bubble-sm bg-orange-100">
+                                            <MapPin className="w-4 h-4 text-orange-600" />
+                                        </div>
+                                        <h3 className="text-sm font-semibold text-gray-700">Location</h3>
+                                    </div>
                                     {loadingLocation ? (
-                                        <div className="text-center py-2">
-                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-500 mx-auto"></div>
+                                        <div className="ml-12">
+                                            <div className="animate-pulse h-4 bg-gray-200 rounded w-32"></div>
                                         </div>
                                     ) : location ? (
-                                        <div className="flex items-start space-x-2 text-sm text-gray-600">
-                                            <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                                            <div className="space-y-1">
-                                                <p className="font-medium text-gray-700">{location.name}</p>
-                                                {location.description && (
-                                                    <p className="text-xs text-gray-500">{location.description}</p>
-                                                )}
-                                                {location.latitude && location.longitude && (
-                                                    <p className="text-xs text-gray-500">
-                                                        {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
-                                                    </p>
-                                                )}
-                                            </div>
+                                        <div className="ml-12">
+                                            <p className="text-base font-medium text-gray-900">{location.name}</p>
+                                            {location.description && (
+                                                <p className="text-xs text-gray-500 mt-1">{location.description}</p>
+                                            )}
                                         </div>
                                     ) : (
-                                        <p className="text-sm text-gray-500">Location not found</p>
+                                        <p className="text-sm text-gray-400 ml-12">Location not found</p>
                                     )}
                                 </div>
                             )}
+                        </div>
 
-                            {/* File Information */}
-                            {evidenceFiles.length > 0 && (
-                                <div>
-                                    <h3 className="text-sm font-medium text-gray-700 mb-2">
-                                        Files ({evidenceFiles.length})
-                                    </h3>
-                                    <div className="space-y-2">
-                                        {evidenceFiles.map((file, index) => (
-                                            <div key={file.id} className="flex items-center justify-between text-sm">
-                                                <span className="text-gray-600 truncate flex-1 mr-2">
-                                                    {index + 1}. {file.file_name}
-                                                </span>
-                                                <a
-                                                    href={file.file_url}
-                                                    download={file.file_name}
-                                                    className="text-primary-500 hover:text-primary-700"
-                                                >
-                                                    <Download className="w-4 h-4" />
-                                                </a>
-                                            </div>
-                                        ))}
-                                        {evidenceFiles.length > 1 && (
-                                            <button
-                                                onClick={handleDownloadAll}
-                                                className="w-full mt-2 btn-secondary text-xs inline-flex items-center justify-center space-x-1"
-                                            >
-                                                <Download className="w-3 h-3" />
-                                                <span>Download All</span>
-                                            </button>
-                                        )}
+                        {/* Description */}
+                        {evidence.description && (
+                            <div className="bubble-card p-4 mb-6">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="icon-bubble-sm bg-purple-100">
+                                        <MessageSquare className="w-4 h-4 text-purple-600" />
                                     </div>
+                                    <h3 className="text-sm font-semibold text-gray-700">Description</h3>
                                 </div>
-                            )}
-
-                            {/* Metadata */}
-                            <div>
-                                <h3 className="text-sm font-medium text-gray-700 mb-2">Details</h3>
-                                <div className="space-y-1 text-sm text-gray-600">
-                                    <p>Type: <span className="capitalize">{evidence.type.replace('_', ' ')}</span></p>
-                                    {evidence.created_at && (
-                                        <p>Uploaded: {formatDate(evidence.created_at.split('T')[0])}</p>
-                                    )}
-                                </div>
+                                <p className="text-gray-700 ml-12 whitespace-pre-wrap">{evidence.description}</p>
                             </div>
+                        )}
 
-                            {/* Linked Impact Claims */}
-                            <div>
-                                <div className="flex items-center space-x-2 mb-3">
-                                    <BarChart3 className="w-4 h-4 text-gray-600" />
-                                    <h3 className="text-sm font-medium text-gray-700">Supporting Impact Claims</h3>
-                                    <span className="text-xs text-gray-500">({linkedDataPoints.length})</span>
+                        {/* Linked Impact Claims - Blue Branded */}
+                        <div className="bubble-card p-5">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="icon-bubble-sm bg-blue-100">
+                                    <BarChart3 className="w-4 h-4 text-blue-600" />
                                 </div>
-                                {loadingDataPoints ? (
-                                    <div className="text-center py-4">
-                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-500 mx-auto"></div>
-                                    </div>
-                                ) : linkedDataPoints.length > 0 ? (
-                                    (() => {
-                                        // Group impact claims by metric
-                                        const groupedByKPI: Record<string, { kpi: any, dataPoints: any[] }> = {}
-                                        
-                                        linkedDataPoints.forEach((dataPoint) => {
-                                            const kpiId = dataPoint.kpi?.id || 'unknown'
-                                            if (!groupedByKPI[kpiId]) {
-                                                groupedByKPI[kpiId] = {
-                                                    kpi: dataPoint.kpi,
-                                                    dataPoints: []
-                                                }
+                                <h3 className="text-sm font-semibold text-gray-700">Supporting Impact Claims</h3>
+                                <span className="status-pill">{linkedDataPoints.length}</span>
+                            </div>
+                            {loadingDataPoints ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                                </div>
+                            ) : linkedDataPoints.length > 0 ? (
+                                (() => {
+                                    const groupedByKPI: Record<string, { kpi: any, dataPoints: any[] }> = {}
+                                    
+                                    linkedDataPoints.forEach((dataPoint) => {
+                                        const kpiId = dataPoint.kpi?.id || 'unknown'
+                                        if (!groupedByKPI[kpiId]) {
+                                            groupedByKPI[kpiId] = {
+                                                kpi: dataPoint.kpi,
+                                                dataPoints: []
                                             }
-                                            groupedByKPI[kpiId].dataPoints.push(dataPoint)
-                                        })
-                                        
-                                        return (
-                                            <div className="space-y-2.5">
-                                                {Object.values(groupedByKPI).map((group, groupIndex) => {
-                                                    // Calculate total for this metric
-                                                    const total = group.dataPoints.reduce((sum, dp) => sum + (dp.value || 0), 0)
-                                                    
-                                                    return (
-                                                        <div key={group.kpi?.id || groupIndex} className="bg-gradient-to-br from-blue-50/50 to-indigo-50/30 rounded-lg border border-blue-100/60 overflow-hidden">
-                                                            {/* Metric Card Header */}
-                                                            <div className="px-3 py-2.5 bg-gradient-to-r from-blue-100/80 to-indigo-100/60 border-b-2 border-blue-200/60 shadow-sm">
-                                                                <div className="flex items-center space-x-2 min-w-0">
-                                                                    <BarChart3 className="w-4 h-4 text-blue-700 flex-shrink-0" />
-                                                                    <div className="min-w-0 flex-1">
-                                                                        <div className="text-sm font-bold text-gray-900 truncate">
-                                                                            {group.kpi?.title || 'Unknown Metric'}
-                                                                        </div>
-                                                                        <div className="flex items-baseline space-x-1 mt-0.5">
-                                                                            <span className="text-sm font-bold text-blue-700">
-                                                                                {total.toLocaleString()}
-                                                                            </span>
-                                                                            <span className="text-xs text-gray-600 font-medium">
-                                                                                {group.kpi?.unit_of_measurement || ''}
-                                                                            </span>
-                                                                        </div>
+                                        }
+                                        groupedByKPI[kpiId].dataPoints.push(dataPoint)
+                                    })
+                                    
+                                    return (
+                                        <div className="space-y-2.5">
+                                            {Object.values(groupedByKPI).map((group, groupIndex) => {
+                                                const total = group.dataPoints.reduce((sum, dp) => sum + (dp.value || 0), 0)
+                                                
+                                                return (
+                                                    <div key={group.kpi?.id || groupIndex} className="bg-gradient-to-br from-blue-50/50 to-indigo-50/30 rounded-lg border border-blue-100/60 overflow-hidden">
+                                                        {/* Metric Card Header */}
+                                                        <div className="px-3 py-2.5 bg-gradient-to-r from-blue-100/80 to-indigo-100/60 border-b-2 border-blue-200/60 shadow-sm">
+                                                            <div className="flex items-center space-x-2 min-w-0">
+                                                                <BarChart3 className="w-4 h-4 text-blue-700 flex-shrink-0" />
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="text-sm font-bold text-gray-900 truncate">
+                                                                        {group.kpi?.title || 'Unknown Metric'}
+                                                                    </div>
+                                                                    <div className="flex items-baseline space-x-1 mt-0.5">
+                                                                        <span className="text-sm font-bold text-blue-700">
+                                                                            {total.toLocaleString()}
+                                                                        </span>
+                                                                        <span className="text-xs text-gray-600 font-medium">
+                                                                            {group.kpi?.unit_of_measurement || ''}
+                                                                        </span>
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                            
-                                                            {/* Compact Impact Claims List */}
-                                                            <div className={`px-3 py-1.5 space-y-1 ${group.dataPoints.length > 3 ? 'max-h-[150px] overflow-y-auto' : ''}`}>
-                                                                {group.dataPoints.map((dataPoint, idx) => {
-                                                                    const hasDateRange = dataPoint.date_range_start && dataPoint.date_range_end
-                                                                    const displayDate = hasDateRange
-                                                                        ? `${formatDate(dataPoint.date_range_start)} - ${formatDate(dataPoint.date_range_end)}`
-                                                                        : formatDate(dataPoint.date_represented)
-                                                                    
-                                                                    // Calculate date coverage: how many days in the claim range the evidence covers
-                                                                    let dateCoverageText = ''
-                                                                    if (hasDateRange && evidence) {
-                                                                        const claimStart = new Date(dataPoint.date_range_start)
-                                                                        const claimEnd = new Date(dataPoint.date_range_end)
-                                                                        const claimDays = Math.ceil((claimEnd.getTime() - claimStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
-                                                                        
-                                                                        // Calculate how many days the evidence covers
-                                                                        let coveredDays = 0
-                                                                        if (evidence.date_range_start && evidence.date_range_end) {
-                                                                            const evidenceStart = new Date(evidence.date_range_start)
-                                                                            const evidenceEnd = new Date(evidence.date_range_end)
-                                                                            const overlapStart = new Date(Math.max(claimStart.getTime(), evidenceStart.getTime()))
-                                                                            const overlapEnd = new Date(Math.min(claimEnd.getTime(), evidenceEnd.getTime()))
-                                                                            if (overlapEnd >= overlapStart) {
-                                                                                coveredDays = Math.ceil((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
-                                                                            }
-                                                                        } else if (evidence.date_represented) {
-                                                                            const evidenceDate = new Date(evidence.date_represented)
-                                                                            if (evidenceDate >= claimStart && evidenceDate <= claimEnd) {
-                                                                                coveredDays = 1
-                                                                            }
-                                                                        }
-                                                                        
-                                                                        dateCoverageText = `Evidence covers ${coveredDays} of ${claimDays} days`
-                                                                    }
-                                                                    
-                                                                    const dataPointLocation = dataPoint.location_id ? dataPointLocations[dataPoint.location_id] : null
+                                                        </div>
+                                                        
+                                                        {/* Impact Claims List */}
+                                                        <div className={`px-3 py-1.5 space-y-1 ${group.dataPoints.length > 3 ? 'max-h-[150px] overflow-y-auto' : ''}`}>
+                                                            {group.dataPoints.map((dataPoint, idx) => {
+                                                                const hasDateRange = dataPoint.date_range_start && dataPoint.date_range_end
+                                                                const displayDate = hasDateRange
+                                                                    ? `${formatDate(dataPoint.date_range_start)} - ${formatDate(dataPoint.date_range_end)}`
+                                                                    : formatDate(dataPoint.date_represented)
+                                                                
+                                                                const dataPointLocation = dataPoint.location_id ? dataPointLocations[dataPoint.location_id] : null
 
-                                                                    return (
-                                                                        <div 
-                                                                            key={dataPoint.id} 
-                                                                            onClick={() => onDataPointClick?.(dataPoint, group.kpi)}
-                                                                            className={`flex items-center justify-between py-1.5 px-2 rounded-md transition-all ${
-                                                                                onDataPointClick ? 'hover:bg-white/80 cursor-pointer hover:shadow-sm' : ''
-                                                                            } ${idx < group.dataPoints.length - 1 ? 'border-b border-blue-100/40' : ''}`}
-                                                                        >
-                                                                            <div className="flex items-center space-x-2 min-w-0 flex-1">
-                                                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0"></div>
-                                                                                <div className="min-w-0 flex-1">
-                                                                                    <div className="flex items-center space-x-2">
-                                                                                        <span className="text-xs font-medium text-gray-900">
-                                                                                            {dataPoint.value?.toLocaleString()} {group.kpi?.unit_of_measurement || ''}
-                                                                                        </span>
-                                                                                        <span className="text-[10px] text-gray-500 flex items-center">
-                                                                                            <Calendar className="w-2.5 h-2.5 mr-0.5" />
-                                                                                            {displayDate.length > 20 ? displayDate.substring(0, 20) + '...' : displayDate}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    {dataPointLocation && (
-                                                                                        <div className="flex items-center space-x-1 text-[10px] text-gray-500 mt-0.5">
-                                                                                            <MapPin className="w-2.5 h-2.5" />
-                                                                                            <span className="truncate">{dataPointLocation.name}</span>
-                                                                                        </div>
-                                                                                    )}
-                                                                                    {dateCoverageText && (
-                                                                                        <div className="text-[10px] text-blue-600 font-medium mt-0.5">
-                                                                                            {dateCoverageText}
-                                                                                        </div>
-                                                                                    )}
+                                                                return (
+                                                                    <div 
+                                                                        key={dataPoint.id} 
+                                                                        onClick={() => onDataPointClick?.(dataPoint, group.kpi)}
+                                                                        className={`flex items-center justify-between py-1.5 px-2 rounded-md transition-all ${
+                                                                            onDataPointClick ? 'hover:bg-white/80 cursor-pointer hover:shadow-sm' : ''
+                                                                        } ${idx < group.dataPoints.length - 1 ? 'border-b border-blue-100/40' : ''}`}
+                                                                    >
+                                                                        <div className="flex items-center space-x-2 min-w-0 flex-1">
+                                                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0"></div>
+                                                                            <div className="min-w-0 flex-1">
+                                                                                <div className="flex items-center space-x-2">
+                                                                                    <span className="text-xs font-medium text-gray-900">
+                                                                                        {dataPoint.value?.toLocaleString()} {group.kpi?.unit_of_measurement || ''}
+                                                                                    </span>
+                                                                                    <span className="text-[10px] text-gray-500 flex items-center">
+                                                                                        <Calendar className="w-2.5 h-2.5 mr-0.5" />
+                                                                                        {displayDate.length > 20 ? displayDate.substring(0, 20) + '...' : displayDate}
+                                                                                    </span>
                                                                                 </div>
+                                                                                {dataPointLocation && (
+                                                                                    <div className="flex items-center space-x-1 text-[10px] text-gray-500 mt-0.5">
+                                                                                        <MapPin className="w-2.5 h-2.5" />
+                                                                                        <span className="truncate">{dataPointLocation.name}</span>
+                                                                                    </div>
+                                                                                )}
                                                                             </div>
                                                                         </div>
-                                                                    )
-                                                                })}
-                                                            </div>
+                                                                        {onDataPointClick && (
+                                                                            <Eye className="w-3 h-3 text-gray-400 ml-2 flex-shrink-0" />
+                                                                        )}
+                                                                    </div>
+                                                                )
+                                                            })}
                                                         </div>
-                                                    )
-                                                })}
-                                            </div>
-                                        )
-                                    })()
-                                ) : (
-                                    <p className="text-sm text-gray-500 text-center py-4">No impact claims linked to this evidence</p>
-                                )}
-                            </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    )
+                                })()
+                            ) : (
+                                <div className="text-center py-8">
+                                    <div className="icon-bubble mx-auto mb-3 bg-gray-100">
+                                        <BarChart3 className="w-5 h-5 text-gray-400" />
+                                    </div>
+                                    <p className="text-sm text-gray-500">No impact claims linked to this evidence</p>
+                                </div>
+                            )}
                         </div>
+                    </div>
+                </div>
+
+                {/* Footer Actions */}
+                <div className="flex items-center justify-between p-5 border-t border-gray-100 bg-gray-50/50">
+                    <div>
+                        {onDelete && (
+                            <button
+                                onClick={() => {
+                                    onDelete(evidence)
+                                    onClose()
+                                }}
+                                className="flex items-center gap-2 px-4 py-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-colors text-sm font-medium"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                <span>Delete Evidence</span>
+                            </button>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={onClose}
+                            className="btn-secondary py-2.5 px-5 text-sm"
+                        >
+                            Close
+                        </button>
+                        {onEdit && (
+                            <button
+                                onClick={() => {
+                                    onEdit(evidence)
+                                    onClose()
+                                }}
+                                className="btn-primary flex items-center gap-2 py-2.5 px-5 text-sm"
+                            >
+                                <Edit className="w-4 h-4" />
+                                <span>Edit Evidence</span>
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
         </div>
     )
-} 
+}
