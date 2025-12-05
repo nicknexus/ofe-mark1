@@ -186,7 +186,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
 
     const hasDateRange = evidence.date_range_start && evidence.date_range_end
     const displayDate = hasDateRange
-        ? `${formatDate(evidence.date_range_start)} - ${formatDate(evidence.date_range_end)}`
+        ? `${formatDate(evidence.date_range_start!)} - ${formatDate(evidence.date_range_end!)}`
         : formatDate(evidence.date_represented)
 
     return (

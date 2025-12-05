@@ -111,7 +111,7 @@ export default function AllEvidenceModal({
                                             {typeEvidence.map((ev) => {
                                                 const hasDateRange = ev.date_range_start && ev.date_range_end
                                                 const displayDate = hasDateRange
-                                                    ? `${formatDate(ev.date_range_start)} - ${formatDate(ev.date_range_end)}`
+                                                    ? `${formatDate(ev.date_range_start!)} - ${formatDate(ev.date_range_end!)}`
                                                     : formatDate(ev.date_represented)
 
                                                 return (

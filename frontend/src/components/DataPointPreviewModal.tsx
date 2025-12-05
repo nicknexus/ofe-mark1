@@ -423,11 +423,6 @@ export default function DataPointPreviewModal({
                                                                         )}
                                                                     </div>
                                                                 </div>
-                                                        {evidence.value_supported && (
-                                                            <span className="text-xs font-medium text-gray-600 bg-white/60 px-2 py-1 rounded-md ml-2">
-                                                                +{evidence.value_supported.toLocaleString()} {kpi.unit_of_measurement}
-                                                            </span>
-                                                        )}
                                                         {onEvidenceClick && (
                                                             <Eye className="w-4 h-4 text-gray-400 ml-2 flex-shrink-0" />
                                                         )}
