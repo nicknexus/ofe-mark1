@@ -12,9 +12,15 @@ import {
     Search,
     Play,
     Loader2,
-    Star
+    Star,
+    ArrowRight,
+    TrendingUp,
+    Zap
 } from 'lucide-react'
 import { Organization } from '../types'
+
+// Hero image
+const heroImage = '/landingpagephoto.png'
 
 interface HomePageProps {
     onGetStarted: () => void
@@ -32,32 +38,38 @@ export default function HomePage({ onGetStarted }: HomePageProps) {
         {
             name: 'Impact Tracking',
             description: 'Monitor Inputs, Outputs, and Impact Metrics with effortless clarity.',
-            icon: BarChart3
+            icon: BarChart3,
+            color: 'from-blue-500 to-indigo-600'
         },
         {
             name: 'Evidence Library',
             description: 'Upload photos, videos, and reports into a structured evidence archive.',
-            icon: Camera
+            icon: Camera,
+            color: 'from-pink-500 to-rose-600'
         },
         {
             name: 'Verification Layer',
             description: 'Enable independent reviewers to verify your evidence transparently.',
-            icon: Shield
+            icon: Shield,
+            color: 'from-purple-500 to-violet-600'
         },
         {
             name: 'Program Dashboard',
             description: 'Organize all initiatives with clean coverage insights.',
-            icon: FileText
+            icon: FileText,
+            color: 'from-cyan-500 to-blue-600'
         },
         {
             name: 'Donor Reporting',
             description: 'Show donors exactly how contributions translate into real-world change.',
-            icon: Users
+            icon: Users,
+            color: 'from-orange-500 to-amber-600'
         },
         {
             name: 'Works Everywhere',
             description: 'A cloud-native, role-based platform accessible globally.',
-            icon: Globe
+            icon: Globe,
+            color: 'from-teal-500 to-green-600'
         }
     ]
 
@@ -87,34 +99,35 @@ export default function HomePage({ onGetStarted }: HomePageProps) {
     }, [searchQuery])
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 text-gray-900">
+        <div className="min-h-screen text-secondary-600">
             {/* NAV */}
-            <nav className="border-b border-green-100 bg-white/80 backdrop-blur-md">
+            <nav className="border-b border-gray-100/60 bg-white/90 backdrop-blur-md sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto h-16 flex items-center justify-between px-6">
-                    <div className="flex items-center space-x-2">
-                        <div className="w-8 h-8 flex items-center justify-center rounded-md bg-gradient-to-br from-emerald-500 to-green-600 shadow-lg shadow-emerald-500/30">
-                            <Target className="w-4 h-4 text-white" />
-                        </div>
-                        <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent">OFE</span>
+                    <div className="flex items-center">
+                        <img 
+                            src="/Nexuslogo.png" 
+                            alt="Nexus Logo" 
+                            className="h-16 w-auto"
+                        />
                     </div>
 
                     {/* Search */}
                     <div className="relative w-full max-w-md mx-6 hidden sm:block">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 w-4 h-4" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                         <input
                             type="text"
                             value={searchQuery}
                             placeholder="Search organizations"
                             onChange={(e) => setSearchQuery(e.target.value)}
                             onFocus={() => searchQuery.length >= 2 && setShowResults(true)}
-                            className="w-full pl-10 pr-4 py-2 border border-emerald-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm bg-white/80 backdrop-blur-sm transition-all"
+                            className="input-field pl-10 pr-4 py-2.5 bg-white/80 backdrop-blur-sm"
                         />
                         {isSearching &&
-                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-emerald-500 w-4 h-4" />
+                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-primary-500 w-4 h-4" />
                         }
 
                         {showResults && searchResults.length > 0 && (
-                            <div className="absolute z-50 mt-2 w-full bg-white border border-emerald-100 rounded-lg shadow-xl shadow-emerald-500/10">
+                            <div className="absolute z-50 mt-2 w-full bubble-card p-0 overflow-hidden">
                                 {searchResults.map((org) => (
                                     <Link
                                         key={org.id}
@@ -123,11 +136,11 @@ export default function HomePage({ onGetStarted }: HomePageProps) {
                                             setShowResults(false)
                                             setSearchQuery('')
                                         }}
-                                        className="block px-4 py-3 hover:bg-emerald-50 transition-colors"
+                                        className="block px-4 py-3 hover:bg-gray-50/80 transition-colors border-b border-gray-100/60 last:border-0"
                                     >
-                                        <p className="font-medium text-emerald-900">{org.name}</p>
+                                        <p className="font-medium text-secondary-600">{org.name}</p>
                                         {org.description &&
-                                            <p className="text-xs text-gray-600 mt-1 line-clamp-2">{org.description}</p>
+                                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">{org.description}</p>
                                         }
                                     </Link>
                                 ))}
@@ -135,7 +148,7 @@ export default function HomePage({ onGetStarted }: HomePageProps) {
                         )}
 
                         {showResults && searchQuery.length >= 2 && !isSearching && searchResults.length === 0 && (
-                            <div className="absolute z-50 mt-2 w-full bg-white border border-emerald-100 rounded-lg shadow-xl shadow-emerald-500/10 p-4 text-sm text-gray-500 text-center">
+                            <div className="absolute z-50 mt-2 w-full bubble-card p-4 text-sm text-gray-500 text-center">
                                 No organizations found
                             </div>
                         )}
@@ -143,7 +156,7 @@ export default function HomePage({ onGetStarted }: HomePageProps) {
 
                     <button
                         onClick={onGetStarted}
-                        className="bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-all shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50"
+                        className="btn-primary"
                     >
                         Get Started
                     </button>
@@ -151,76 +164,123 @@ export default function HomePage({ onGetStarted }: HomePageProps) {
             </nav>
 
             {/* HERO */}
-            <section className="pt-24 pb-20">
-                <div className="max-w-7xl mx-auto px-6 lg:flex lg:items-center lg:justify-between">
-                    <div className="max-w-xl">
-                        <p className="text-xs font-medium uppercase tracking-wider text-emerald-600">
-                            Now Live
-                        </p>
-                        <h1 className="mt-4 text-4xl lg:text-6xl font-bold leading-tight tracking-tight bg-gradient-to-r from-emerald-600 via-green-600 to-emerald-700 bg-clip-text text-transparent">
-                            Opportunity of Evidence System
-                        </h1>
-                        <p className="mt-6 text-lg text-gray-700 leading-relaxed">
-                            A minimal, transparent platform to help NGOs manage impact, organize evidence,
-                            and communicate real progress to stakeholders.
-                        </p>
+            <section className="relative min-h-[85vh] flex items-center pt-20 pb-32 overflow-hidden">
+                {/* Background gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-primary-50/30 via-white to-primary-50/20"></div>
+                
+                <div className="relative max-w-7xl mx-auto px-6 w-full">
+                    <div className="grid lg:grid-cols-2 gap-12 items-center">
+                        {/* Left Content */}
+                        <div className="space-y-8">
+                            <div className="inline-flex items-center space-x-2 px-4 py-2 rounded-full bg-primary-100/80 border border-primary-200/60 w-fit">
+                                <div className="w-2 h-2 rounded-full bg-primary-500 animate-pulse-soft"></div>
+                                <p className="text-xs font-medium uppercase tracking-wider text-primary-700">
+                                    Now Live
+                                </p>
+                            </div>
+                            
+                            <h1 className="text-5xl lg:text-7xl font-bold leading-tight tracking-tight text-secondary-600">
+                                <span className="bg-gradient-to-r from-primary-500 to-primary-600 bg-clip-text text-transparent">Transparent</span>{' '}
+                                Reporting Made Easy
+                            </h1>
+                            <p className="text-lg text-gray-500 -mt-2">
+                                by Nexus Impacts
+                            </p>
+                            
+                            <p className="text-lg text-gray-600 leading-relaxed max-w-xl">
+                                A minimal, transparent platform to help NGOs manage impact, organize evidence,
+                                and communicate real progress to stakeholders.
+                            </p>
 
-                        <div className="mt-8 flex items-center gap-4">
-                            <button
-                                onClick={onGetStarted}
-                                className="bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white px-5 py-3 rounded-md text-sm font-medium transition-all shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50"
-                            >
-                                Start Tracking Impact
-                            </button>
+                            <div className="flex flex-wrap items-center gap-4">
+                                <button
+                                    onClick={onGetStarted}
+                                    className="btn-primary flex items-center space-x-2 group"
+                                >
+                                    <span>Start Tracking Impact</span>
+                                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                </button>
 
-                            <button className="flex items-center text-emerald-600 hover:text-emerald-700 text-sm font-medium transition-colors">
-                                <Play className="w-4 h-4 mr-2" />
-                                Watch Demo →
-                            </button>
-                        </div>
-                    </div>
+                                <button className="btn-secondary flex items-center space-x-2 group">
+                                    <Play className="w-4 h-4" />
+                                    <span>Watch Demo</span>
+                                </button>
+                            </div>
 
-                    {/* Simple dashboard preview minimal */}
-                    <div className="mt-14 lg:mt-0 lg:ml-10 w-full max-w-lg">
-                        <div className="rounded-2xl border border-emerald-100 bg-white/80 backdrop-blur-sm p-6 shadow-xl shadow-emerald-500/10">
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-green-50 p-4 border border-emerald-100">
-                                    <p className="text-emerald-600 text-xs font-medium">Active Metrics</p>
-                                    <p className="text-2xl font-semibold mt-2 text-emerald-700">12</p>
+                            {/* Stats Preview */}
+                            <div className="grid grid-cols-3 gap-4 pt-8">
+                                <div className="bubble-card p-4 text-center">
+                                    <div className="text-2xl font-bold text-primary-600">12</div>
+                                    <div className="text-xs text-gray-600 mt-1">Active Metrics</div>
                                 </div>
-
-                                <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-green-50 p-4 border border-emerald-100">
-                                    <p className="text-emerald-600 text-xs font-medium">Impact Verified</p>
-                                    <p className="text-2xl font-semibold mt-2 text-emerald-700">87%</p>
+                                <div className="bubble-card p-4 text-center">
+                                    <div className="text-2xl font-bold text-primary-600">87%</div>
+                                    <div className="text-xs text-gray-600 mt-1">Verified</div>
                                 </div>
-
-                                <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-green-50 p-4 border border-emerald-100">
-                                    <p className="text-emerald-600 text-xs font-medium">Evidence Items</p>
-                                    <p className="text-2xl font-semibold mt-2 text-emerald-700">143</p>
+                                <div className="bubble-card p-4 text-center">
+                                    <div className="text-2xl font-bold text-primary-600">143</div>
+                                    <div className="text-xs text-gray-600 mt-1">Evidence Items</div>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Right Hero Image */}
+                        <div className="relative lg:block hidden">
+                            <div className="bubble-card overflow-hidden p-2">
+                                <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-gradient-to-br from-primary-100 to-primary-50">
+                                    <img 
+                                        src={heroImage} 
+                                        alt="Impact tracking dashboard"
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                            // Fallback to gradient if image doesn't exist
+                                            const target = e.target as HTMLImageElement
+                                            target.style.display = 'none'
+                                            target.parentElement!.style.background = 'linear-gradient(135deg, #c0dfa1 0%, #a8c889 100%)'
+                                        }}
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+                                </div>
+                            </div>
+                            {/* Floating decoration */}
+                            <div className="absolute -top-4 -right-4 w-24 h-24 bg-primary-200/40 rounded-full blur-2xl"></div>
+                            <div className="absolute -bottom-4 -left-4 w-32 h-32 bg-primary-300/30 rounded-full blur-3xl"></div>
                         </div>
                     </div>
                 </div>
             </section>
 
             {/* FEATURES */}
-            <section className="py-20 border-t border-emerald-100">
+            <section className="py-24 border-t border-gray-100/60 bg-white/50">
                 <div className="max-w-7xl mx-auto px-6">
-                    <h2 className="text-center text-3xl font-semibold bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent">
-                        Everything you need to track real impact
-                    </h2>
+                    <div className="text-center mb-16">
+                        <h2 className="text-4xl font-bold text-secondary-600 mb-4">
+                            Everything you need to track real impact
+                        </h2>
+                        <p className="text-gray-600 max-w-2xl mx-auto">
+                            Powerful tools designed to bring clarity and transparency to your impact measurement
+                        </p>
+                    </div>
 
-                    <div className="mt-16 grid sm:grid-cols-2 lg:grid-cols-3 gap-12">
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         {features.map((f) => (
-                            <div key={f.name} className="flex flex-col space-y-3 group">
-                                <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 shadow-lg shadow-emerald-500/30 group-hover:shadow-emerald-500/50 transition-all">
-                                    <f.icon className="text-white w-5 h-5" />
+                            <div 
+                                key={f.name} 
+                                className="bubble-card bubble-card-hover p-6 group cursor-pointer transition-all duration-200"
+                            >
+                                <div className="flex items-start space-x-4">
+                                    <div className={`icon-bubble bg-gradient-to-br ${f.color} shadow-bubble-sm flex-shrink-0 group-hover:scale-110 transition-transform`}>
+                                        <f.icon className="text-white w-5 h-5" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-semibold text-secondary-600 mb-2 group-hover:text-primary-600 transition-colors">
+                                            {f.name}
+                                        </h3>
+                                        <p className="text-sm text-gray-600 leading-relaxed">
+                                            {f.description}
+                                        </p>
+                                    </div>
                                 </div>
-                                <p className="font-semibold text-emerald-900">{f.name}</p>
-                                <p className="text-sm text-gray-700 leading-relaxed">
-                                    {f.description}
-                                </p>
                             </div>
                         ))}
                     </div>
@@ -228,27 +288,35 @@ export default function HomePage({ onGetStarted }: HomePageProps) {
             </section>
 
             {/* TESTIMONIALS */}
-            <section className="py-24 bg-gradient-to-br from-emerald-50/50 to-green-50/50 border-t border-emerald-100">
+            <section className="py-24 border-t border-gray-100/60">
                 <div className="max-w-7xl mx-auto px-6">
-                    <h2 className="text-center text-3xl font-semibold bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent">
-                        Trusted by organizations around the world
-                    </h2>
+                    <div className="text-center mb-16">
+                        <h2 className="text-4xl font-bold text-secondary-600 mb-4">
+                            Trusted by organizations around the world
+                        </h2>
+                        <p className="text-gray-600">See what our users are saying</p>
+                    </div>
 
-                    <div className="mt-16 grid sm:grid-cols-2 lg:grid-cols-3 gap-10">
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         {[1, 2, 3].map((_, i) => (
-                            <div key={i} className="bg-white/80 backdrop-blur-sm p-8 rounded-2xl shadow-lg shadow-emerald-500/10 border border-emerald-100 hover:border-emerald-200 transition-all">
+                            <div key={i} className="bubble-card bubble-card-hover p-8">
                                 <div className="flex mb-4">
-                                    {[...Array(5)].map((_, i) => (
-                                        <Star key={i} className="w-5 h-5 text-emerald-400 fill-current" />
+                                    {[...Array(5)].map((_, j) => (
+                                        <Star key={j} className="w-5 h-5 text-primary-400 fill-current" />
                                     ))}
                                 </div>
 
-                                <p className="text-gray-700 text-sm leading-relaxed mb-6">
+                                <p className="text-gray-600 text-sm leading-relaxed mb-6">
                                     "Simple, structured, and clear. OFE helped us transform
-                                    our reporting with clean evidence and transparent Metrics."
+                                    our reporting with clean evidence and transparent metrics."
                                 </p>
 
-                                <p className="font-medium text-sm text-emerald-700">Program Director</p>
+                                <div className="flex items-center space-x-3 pt-4 border-t border-gray-100/60">
+                                    <div className="icon-bubble-sm bg-primary-100">
+                                        <Users className="w-4 h-4 text-primary-600" />
+                                    </div>
+                                    <p className="font-medium text-sm text-secondary-600">Program Director</p>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -256,32 +324,40 @@ export default function HomePage({ onGetStarted }: HomePageProps) {
             </section>
 
             {/* CTA */}
-            <section className="py-24 text-center">
-                <h2 className="text-4xl font-semibold bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent">Ready to get started?</h2>
-                <p className="mt-4 text-gray-700">
-                    Join NGOs using OFE to bring clarity and transparency to their impact.
-                </p>
+            <section className="py-24 border-t border-gray-100/60 bg-gradient-to-br from-primary-50/30 to-white">
+                <div className="max-w-4xl mx-auto px-6 text-center">
+                    <div className="bubble-card p-12">
+                        <div className="icon-bubble mx-auto mb-6 bg-gradient-to-br from-primary-500 to-primary-600">
+                            <Zap className="w-6 h-6 text-white" />
+                        </div>
+                        <h2 className="text-4xl font-bold text-secondary-600 mb-4">Ready to get started?</h2>
+                        <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
+                            Join NGOs using OFE to bring clarity and transparency to their impact.
+                        </p>
 
-                <div className="mt-8 flex justify-center gap-4">
-                    <button
-                        onClick={onGetStarted}
-                        className="bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white px-6 py-3 rounded-md text-sm transition-all shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50"
-                    >
-                        Start Free Trial
-                    </button>
+                        <div className="flex flex-wrap justify-center gap-4">
+                            <button
+                                onClick={onGetStarted}
+                                className="btn-primary flex items-center space-x-2 group"
+                            >
+                                <span>Start Free Trial</span>
+                                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                            </button>
 
-                    <button className="text-emerald-600 hover:text-emerald-700 text-sm font-medium transition-colors">Schedule Demo →</button>
+                            <button className="btn-secondary">Schedule Demo</button>
+                        </div>
+                    </div>
                 </div>
             </section>
 
             {/* FOOTER */}
-            <footer className="py-12 border-t border-emerald-100 bg-white/50">
+            <footer className="py-12 border-t border-gray-100/60 bg-white/80">
                 <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center">
-                    <div className="flex items-center space-x-2">
-                        <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-green-600 rounded-md flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                            <Target className="w-4 h-4 text-white" />
+                    <div className="flex items-center space-x-3">
+                        <div className="icon-bubble-sm">
+                            <Target className="w-5 h-5 text-primary-600" />
                         </div>
-                        <span className="font-bold text-lg bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent">OFE</span>
+                        <span className="font-bold text-lg text-secondary-600">OFE</span>
                     </div>
                     <p className="text-gray-500 text-sm mt-4 sm:mt-0">© 2025 OFE. All rights reserved.</p>
                 </div>
