@@ -5,9 +5,11 @@ import BeneficiaryManager from '../BeneficiaryManager'
 interface BeneficiariesTabProps {
     initiativeId: string
     onRefresh?: () => void
+    onStoryClick?: (storyId: string) => void
+    onMetricClick?: (kpiId: string) => void
 }
 
-export default function BeneficiariesTab({ initiativeId, onRefresh }: BeneficiariesTabProps) {
+export default function BeneficiariesTab({ initiativeId, onRefresh, onStoryClick, onMetricClick }: BeneficiariesTabProps) {
     return (
         <div className="h-screen overflow-hidden">
             <div className="h-full w-full px-4 sm:px-6 py-6 space-y-6 overflow-y-auto">
@@ -15,6 +17,8 @@ export default function BeneficiariesTab({ initiativeId, onRefresh }: Beneficiar
                     <BeneficiaryManager
                         initiativeId={initiativeId}
                         onRefresh={onRefresh}
+                        onStoryClick={onStoryClick}
+                        onMetricClick={onMetricClick}
                     />
                 </div>
             </div>

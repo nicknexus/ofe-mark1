@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, Users, Edit, Trash2, X, ChevronDown, ChevronRight, MapPin, AlertCircle, GripVertical } from 'lucide-react'
+import { Plus, Users, Edit, Trash2, X, MapPin, AlertCircle, BarChart3 } from 'lucide-react'
 import { apiService } from '../services/api'
 import { BeneficiaryGroup, Location } from '../types'
 import { formatDate } from '../utils'
 import toast from 'react-hot-toast'
 import LocationModal from './LocationModal'
+import BeneficiaryGroupDetailsModal from './BeneficiaryGroupDetailsModal'
 import {
     DndContext,
     closestCenter,
@@ -23,25 +24,21 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
-// Sortable Beneficiary Group Card Component
+// Sortable Beneficiary Group Card Component - Simple card like StoriesTab
 function SortableBeneficiaryGroupCard({
     group,
-    isExpanded,
-    dataPoints,
     location,
     ageRange,
     dataPointCount,
-    onToggleExpansion,
+    onClick,
     onEdit,
     onDelete,
 }: {
     group: BeneficiaryGroup
-    isExpanded: boolean
-    dataPoints: any[]
     location: Location | null
     ageRange: string | null
     dataPointCount: number
-    onToggleExpansion: () => void
+    onClick: () => void
     onEdit: (e: React.MouseEvent) => void
     onDelete: (e: React.MouseEvent) => void
 }) {
@@ -64,168 +61,65 @@ function SortableBeneficiaryGroupCard({
         <div
             ref={setNodeRef}
             style={style}
-            className={`bg-white/90 backdrop-blur-xl border-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden relative group ${
-                isExpanded ? 'border-blue-400/60' : 'border-gray-200/60 hover:border-gray-300/60'
-            }`}
+            className="bubble-card overflow-hidden transition-all hover:shadow-bubble-hover cursor-pointer group relative"
+            onClick={onClick}
         >
-            {/* Drag Handle - Top Right Corner */}
-            <div
-                {...attributes}
-                {...listeners}
-                className="absolute top-1 right-1 cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-                style={{ opacity: isDragging ? 1 : undefined }}
-                onClick={(e) => e.stopPropagation()}
-            >
-                <GripVertical className="w-3 h-3 text-gray-400" />
-            </div>
-            {/* Card Content - Compact Horizontal Layout */}
-            <div
-                className="cursor-pointer flex flex-col"
-                onClick={onToggleExpansion}
-            >
-                {/* Main Content Section - Horizontal */}
-                <div className="flex min-h-0">
-                    {/* Left Section - ~70% width */}
-                    <div className="w-[70%] bg-gradient-to-br from-purple-50/50 to-pink-50/30 p-2 flex flex-row items-center gap-3">
-                        {/* Group Name */}
-                        <h3 className="text-lg font-bold text-gray-900 line-clamp-1 flex-1 pr-8">{group.name}</h3>
-                        
-                        {/* Total Number */}
-                        {group.total_number !== null && group.total_number !== undefined ? (
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-2xl font-extrabold text-gray-900 tracking-tight leading-none">
-                                    {group.total_number.toLocaleString()}
-                                </span>
-                                <span className="text-xs font-medium text-gray-600">
-                                    beneficiaries
-                                </span>
-                            </div>
-                        ) : (
-                            <div className="text-xs text-gray-400 font-medium">No count</div>
-                        )}
-                    </div>
-
-                    {/* Right Section - ~30% width */}
-                    <div className="w-[30%] bg-gradient-to-br from-orange-50/50 to-yellow-50/30 p-2 flex items-center justify-around border-l border-gray-200/50 text-center">
-                        {/* Data Points */}
-                        <div>
-                            <div className="text-[8px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">
-                                Impact Claims
-                            </div>
-                            <div className="text-lg font-extrabold text-orange-700">
-                                {dataPointCount}
+            <div className="p-4">
+                <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                        <div className="icon-bubble-sm bg-blue-100 flex-shrink-0">
+                            <Users className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <h3 className="text-base font-semibold text-gray-900 mb-1 line-clamp-1">
+                                {group.name}
+                            </h3>
+                            <div className="flex items-center space-x-3 text-xs text-gray-500">
+                                {group.total_number !== null && group.total_number !== undefined && (
+                                    <span>{group.total_number.toLocaleString()} beneficiaries</span>
+                                )}
+                                {ageRange && <span>Age: {ageRange}</span>}
+                                {location && (
+                                    <span className="flex items-center space-x-1">
+                                        <MapPin className="w-3 h-3" />
+                                        <span className="truncate max-w-[120px]">{location.name}</span>
+                                    </span>
+                                )}
                             </div>
                         </div>
-
-                        {/* Location */}
-                        {location && (
-                            <div>
-                                <div className="text-[8px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">
-                                    Location
-                                </div>
-                                <div className="text-xs font-bold text-gray-700 line-clamp-1" title={location.name}>
-                                    {location.name}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Age Range */}
-                        {ageRange && (
-                            <div>
-                                <div className="text-[8px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">
-                                    Age
-                                </div>
-                                <div className="text-xs font-bold text-gray-700">
-                                    {ageRange}
-                                </div>
-                            </div>
-                        )}
                     </div>
-                </div>
-
-                {/* Bottom Section - Actions Bar */}
-                <div className="px-2 py-1 bg-gradient-to-r from-gray-50 to-gray-100/50 border-t border-gray-200/50 flex items-center justify-between">
-                    <div className="flex items-center space-x-1">
-                        {isExpanded ? (
-                            <ChevronDown className="w-3 h-3 text-gray-500" />
-                        ) : (
-                            <ChevronRight className="w-3 h-3 text-gray-500" />
-                        )}
-                        <span className="text-[10px] font-semibold text-gray-600">
-                            {dataPoints.length > 0 ? `${dataPoints.length} linked` : 'No links'}
-                        </span>
-                    </div>
-                    <div className="flex items-center space-x-1">
+                    <div className="flex items-center space-x-1 flex-shrink-0">
                         <button
-                            onClick={onEdit}
-                            className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-700 transition-colors"
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                onEdit(e)
+                            }}
+                            className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors opacity-0 group-hover:opacity-100"
                             title="Edit Group"
                         >
-                            <Edit className="w-3 h-3" />
+                            <Edit className="w-4 h-4" />
                         </button>
                         <button
-                            onClick={onDelete}
-                            className="p-1 hover:bg-red-100 rounded text-gray-500 hover:text-red-600 transition-colors"
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                onDelete(e)
+                            }}
+                            className="p-1.5 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
                             title="Delete Group"
                         >
-                            <Trash2 className="w-3 h-3" />
+                            <Trash2 className="w-4 h-4" />
                         </button>
                     </div>
                 </div>
-            </div>
-
-            {/* Expanded Data Points */}
-            {isExpanded && (
-                <div className="border-t border-gray-200 bg-gray-50 p-3">
-                    {dataPoints.length === 0 ? (
-                        <p className="text-xs text-gray-500 text-center py-2">
-                            No impact claims linked yet
-                        </p>
-                    ) : (
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                            {(() => {
-                                // Group data points by KPI for better readability
-                                const groupedByKPI = dataPoints.reduce((acc: any, dataPoint: any) => {
-                                    const kpiId = dataPoint.kpi?.id || dataPoint.kpis?.id || 'unknown'
-                                    const kpiTitle = dataPoint.kpi?.title || dataPoint.kpis?.title || 'Unknown KPI'
-                                    const kpiUnit = dataPoint.kpi?.unit_of_measurement || dataPoint.kpis?.unit_of_measurement || ''
-
-                                    if (!acc[kpiId]) {
-                                        acc[kpiId] = {
-                                            title: kpiTitle,
-                                            unit: kpiUnit,
-                                            dataPoints: []
-                                        }
-                                    }
-                                    acc[kpiId].dataPoints.push(dataPoint)
-                                    return acc
-                                }, {})
-
-                                return Object.entries(groupedByKPI).map(([kpiId, kpiData]: [string, any]) => (
-                                    <div key={kpiId} className="bg-white rounded-lg border border-gray-200 p-2">
-                                        <div className="text-xs font-medium text-gray-800 mb-1.5 flex items-center">
-                                            <div className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-1.5"></div>
-                                            {kpiData.title}
-                                        </div>
-                                        <div className="space-y-1 pl-3">
-                                            {kpiData.dataPoints.map((dataPoint: any) => (
-                                                <div key={dataPoint.id} className="flex items-center justify-between text-xs py-0.5">
-                                                    <span className="font-medium text-purple-600">
-                                                        {dataPoint.value?.toLocaleString()} {kpiData.unit}
-                                                    </span>
-                                                    <span className="text-gray-500">
-                                                        {dataPoint.date_represented ? formatDate(dataPoint.date_represented) : 'N/A'}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))
-                            })()}
-                        </div>
-                    )}
+                <div className="flex items-center space-x-4 pt-3 border-t border-gray-100">
+                    <div className="flex items-center space-x-2">
+                        <BarChart3 className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-600">
+                            {dataPointCount} {dataPointCount === 1 ? 'impact claim' : 'impact claims'}
+                        </span>
+                    </div>
                 </div>
-            )}
+            </div>
         </div>
     )
 }
@@ -233,6 +127,8 @@ function SortableBeneficiaryGroupCard({
 interface BeneficiaryManagerProps {
     initiativeId: string
     onRefresh?: () => void
+    onStoryClick?: (storyId: string) => void
+    onMetricClick?: (kpiId: string) => void
 }
 
 interface CreateGroupModalProps {
@@ -519,15 +415,15 @@ function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiativeId }:
     )
 }
 
-export default function BeneficiaryManager({ initiativeId, onRefresh }: BeneficiaryManagerProps) {
+export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryClick, onMetricClick }: BeneficiaryManagerProps) {
     const [groups, setGroups] = useState<BeneficiaryGroup[]>([])
     const [orderedGroups, setOrderedGroups] = useState<BeneficiaryGroup[]>([])
     const [loading, setLoading] = useState(true)
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [editingGroup, setEditingGroup] = useState<BeneficiaryGroup | null>(null)
     const [deleteConfirmGroup, setDeleteConfirmGroup] = useState<BeneficiaryGroup | null>(null)
-    const [expandedGroups, setExpandedGroups] = useState<string[]>([])
-    const [groupDataPoints, setGroupDataPoints] = useState<Record<string, any[]>>({})
+    const [selectedGroup, setSelectedGroup] = useState<BeneficiaryGroup | null>(null)
+    const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
     const [dataPointCounts, setDataPointCounts] = useState<Record<string, number>>({})
     const [locations, setLocations] = useState<Location[]>([])
     const [locationsMap, setLocationsMap] = useState<Record<string, Location>>({})
@@ -676,21 +572,9 @@ export default function BeneficiaryManager({ initiativeId, onRefresh }: Benefici
         }
     }
 
-    const toggleGroupExpansion = async (groupId: string) => {
-        if (expandedGroups.includes(groupId)) {
-            setExpandedGroups(prev => prev.filter(id => id !== groupId))
-        } else {
-            setExpandedGroups(prev => [...prev, groupId])
-            // Load data points for this group if not already loaded
-            if (!groupDataPoints[groupId]) {
-                try {
-                    const dataPoints = await apiService.getKPIUpdatesForBeneficiaryGroup(groupId)
-                    setGroupDataPoints(prev => ({ ...prev, [groupId]: (dataPoints as any[]) || [] }))
-                } catch (error) {
-                    console.error('Error loading data points for group:', error)
-                }
-            }
-        }
+    const handleGroupClick = (group: BeneficiaryGroup) => {
+        setSelectedGroup(group)
+        setIsDetailsModalOpen(true)
     }
 
     if (loading) {
@@ -745,10 +629,8 @@ export default function BeneficiaryManager({ initiativeId, onRefresh }: Benefici
                         items={orderedGroups.map(group => group.id!)}
                         strategy={verticalListSortingStrategy}
                     >
-                        <div className="space-y-2 flex-1 overflow-y-auto pr-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 flex-1 overflow-y-auto pr-2">
                             {orderedGroups.map(group => {
-                                const isExpanded = expandedGroups.includes(group.id!)
-                                const dataPoints = groupDataPoints[group.id!] || []
                                 const location = group.location_id ? locationsMap[group.location_id] : null
                                 const ageRange = group.age_range_start && group.age_range_end 
                                     ? `${group.age_range_start}-${group.age_range_end}`
@@ -760,12 +642,10 @@ export default function BeneficiaryManager({ initiativeId, onRefresh }: Benefici
                                     <SortableBeneficiaryGroupCard
                                         key={group.id}
                                         group={group}
-                                        isExpanded={isExpanded}
-                                        dataPoints={dataPoints}
                                         location={location}
                                         ageRange={ageRange}
                                         dataPointCount={dataPointCounts[group.id!] || 0}
-                                        onToggleExpansion={() => toggleGroupExpansion(group.id!)}
+                                        onClick={() => handleGroupClick(group)}
                                         onEdit={(e) => {
                                             e.stopPropagation()
                                             setEditingGroup(group)
@@ -798,6 +678,26 @@ export default function BeneficiaryManager({ initiativeId, onRefresh }: Benefici
                 editData={editingGroup}
                 initiativeId={initiativeId}
             />
+
+            {/* Beneficiary Group Details Modal */}
+            {selectedGroup && (
+                <BeneficiaryGroupDetailsModal
+                    isOpen={isDetailsModalOpen}
+                    onClose={() => {
+                        setIsDetailsModalOpen(false)
+                        setSelectedGroup(null)
+                    }}
+                    beneficiaryGroup={selectedGroup}
+                    onEditClick={(group) => {
+                        setIsDetailsModalOpen(false)
+                        setSelectedGroup(null)
+                        setEditingGroup(group)
+                    }}
+                    onStoryClick={onStoryClick}
+                    onMetricClick={onMetricClick}
+                    initiativeId={initiativeId}
+                />
+            )}
 
             {/* Delete Confirmation */}
             {deleteConfirmGroup && (

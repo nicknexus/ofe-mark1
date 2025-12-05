@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { FileText, Calendar, BarChart3, MapPin, Users, Sparkles, Download, Loader2 } from 'lucide-react'
+import { FileText, Calendar, BarChart3, MapPin, Users, Sparkles, Download, Loader2, X } from 'lucide-react'
 import { apiService } from '../../services/api'
 import { KPI, Location, BeneficiaryGroup, Story, InitiativeDashboard } from '../../types'
 import DateRangePicker from '../DateRangePicker'
@@ -94,11 +94,65 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
     const [showKPIPicker, setShowKPIPicker] = useState(false)
     const [showLocationPicker, setShowLocationPicker] = useState(false)
     const [showBeneficiaryPicker, setShowBeneficiaryPicker] = useState(false)
+    const [showDashboard, setShowDashboard] = useState(true)
 
     // Refs for click outside detection
     const kpiPickerRef = useRef<HTMLDivElement>(null)
     const locationPickerRef = useRef<HTMLDivElement>(null)
     const beneficiaryPickerRef = useRef<HTMLDivElement>(null)
+
+    // Storage key for this initiative's report
+    const storageKey = `report-${initiativeId}`
+
+    // Load saved report data from localStorage on mount or when initiativeId changes
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem(storageKey)
+            if (saved) {
+                const parsed = JSON.parse(saved)
+                if (parsed.reportText) setReportText(parsed.reportText)
+                if (parsed.reportDashboardData) setReportDashboardData(parsed.reportDashboardData)
+                if (parsed.reportData) setReportData(parsed.reportData)
+                if (parsed.selectedStory) setSelectedStory(parsed.selectedStory)
+                if (parsed.dateRange) setDateRange(parsed.dateRange)
+                if (typeof parsed.showDashboard === 'boolean') setShowDashboard(parsed.showDashboard)
+            } else {
+                // Clear state if no saved data for this initiative
+                setReportText(null)
+                setReportDashboardData(null)
+                setReportData(null)
+                setSelectedStory(null)
+                setShowDashboard(true)
+            }
+        } catch (error) {
+            console.error('Failed to load saved report:', error)
+            // Clear state on error
+            setReportText(null)
+            setReportDashboardData(null)
+            setReportData(null)
+            setSelectedStory(null)
+            setShowDashboard(true)
+        }
+    }, [initiativeId, storageKey])
+
+    // Save report data to localStorage whenever it changes
+    useEffect(() => {
+        if (reportText && reportDashboardData && reportData) {
+            try {
+                const dataToSave = {
+                    reportText,
+                    reportDashboardData,
+                    reportData,
+                    selectedStory,
+                    dateRange,
+                    showDashboard
+                }
+                localStorage.setItem(storageKey, JSON.stringify(dataToSave))
+            } catch (error) {
+                console.error('Failed to save report to localStorage:', error)
+            }
+        }
+    }, [reportText, reportDashboardData, reportData, selectedStory, dateRange, showDashboard, storageKey])
 
     // Load filter options
     useEffect(() => {
@@ -156,7 +210,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
             setReportData(data)
             setSelectedStory(null)
-            setReportText(null)
+            // Keep existing reportText and reportDashboardData until a new report is generated
         } catch (error) {
             console.error('Error loading report data:', error)
             toast.error('Failed to load report data')
@@ -297,15 +351,50 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
                     setTimeout(() => {
                         try {
+                            // Calculate bounds and spread to determine appropriate zoom
+                            const bounds = L.latLngBounds(locations.map(loc => [loc.latitude, loc.longitude]))
+                            const center = bounds.getCenter()
+                            
+                            // Calculate spread (distance in degrees)
+                            const latDiff = bounds.getNorth() - bounds.getSouth()
+                            const lngDiff = bounds.getEast() - bounds.getWest()
+                            const maxSpread = Math.max(latDiff, lngDiff)
+                            
+                            // Determine zoom strategy based on spread
+                            // Small spread (< 5 degrees) = close together (city/region level) - zoom in more
+                            // Medium spread (5-30 degrees) = moderate distance (country level) - moderate zoom
+                            // Large spread (> 30 degrees) = far apart (continent/global) - zoom out
+                            let padding: [number, number]
+                            let maxZoom: number
+                            
+                            if (maxSpread < 5) {
+                                // Very close together - zoom in significantly
+                                padding = [20, 20]
+                                maxZoom = 12
+                            } else if (maxSpread < 15) {
+                                // Moderately close - zoom in moderately
+                                padding = [30, 30]
+                                maxZoom = 8
+                            } else if (maxSpread < 30) {
+                                // Moderate distance - country level
+                                padding = [40, 40]
+                                maxZoom = 5
+                            } else {
+                                // Far apart - continent/global level
+                                padding = [50, 50]
+                                maxZoom = 3
+                            }
+                            
                             // Initialize map with canvas renderer - top-down view (no tilt)
                             const map = L.map('pdf-map-temp', {
                                 renderer: L.canvas(),
-                                center: [locations[0].latitude, locations[0].longitude],
-                                zoom: locations.length > 1 ? 0 : 1, // Even more zoomed out
+                                center: [center.lat, center.lng],
+                                zoom: 2, // Initial zoom, will be adjusted by fitBounds
                                 zoomControl: false,
                                 attributionControl: false,
                                 maxBoundsViscosity: 1.0,
-                                worldCopyJump: false
+                                worldCopyJump: false,
+                                maxZoom: maxZoom
                             })
 
                             // Ensure top-down view (disable any tilt/rotation)
@@ -357,10 +446,15 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                     .addTo(map)
                             })
 
-                            // Fit bounds if multiple locations - more padding for zoomed out view
+                            // Fit bounds with appropriate padding and max zoom
                             if (locations.length > 1) {
-                                const bounds = L.latLngBounds(locations.map(loc => [loc.latitude, loc.longitude]))
-                                map.fitBounds(bounds, { padding: [60, 60] })
+                                map.fitBounds(bounds, { 
+                                    padding: padding,
+                                    maxZoom: maxZoom
+                                })
+                            } else {
+                                // Single location - zoom in closer
+                                map.setView([locations[0].latitude, locations[0].longitude], 10)
                             }
 
                             // Wait for map to be ready, then export using html2canvas
@@ -413,6 +507,29 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                 mapImage,
                 hasBeneficiaryGroups: selectedBeneficiaryGroupIds.length > 0
             })
+            
+            // Show dashboard when report is generated
+            setShowDashboard(true)
+            
+            // Save to localStorage (will be handled by useEffect, but ensure it's saved immediately)
+            try {
+                const dataToSave = {
+                    reportText: result.reportText,
+                    reportDashboardData: {
+                        overviewSummary: overviewSummary || 'No overview available',
+                        beneficiaryText: beneficiaryText || 'No beneficiary information available',
+                        mapImage,
+                        hasBeneficiaryGroups: selectedBeneficiaryGroupIds.length > 0
+                    },
+                    reportData,
+                    selectedStory: selectedStory || null,
+                    dateRange,
+                    showDashboard: true
+                }
+                localStorage.setItem(storageKey, JSON.stringify(dataToSave))
+            } catch (error) {
+                console.error('Failed to save report to localStorage:', error)
+            }
 
         } catch (error: any) {
             console.error('Error generating report:', error)
@@ -502,6 +619,80 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                         </div>
                     </div>
                 </div>
+
+                {/* Report Dashboard - Shown at top when generated */}
+                {showDashboard && reportText && reportDashboardData && reportData && (
+                    <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-base font-semibold text-gray-800">Report Dashboard</h2>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            toast.loading('Generating PDF...', { id: 'pdf-download' })
+                                            const filename = `${dashboard?.initiative.title.replace(/[^a-z0-9]/gi, '_')}_Report_${new Date().toISOString().split('T')[0]}.pdf`
+                                            const pdfBlob = await convertReportToPDF('report-dashboard', filename)
+
+                                            const url = URL.createObjectURL(pdfBlob)
+                                            const link = document.createElement('a')
+                                            link.href = url
+                                            link.download = filename
+                                            document.body.appendChild(link)
+                                            link.click()
+                                            document.body.removeChild(link)
+                                            URL.revokeObjectURL(url)
+
+                                            toast.success('PDF downloaded successfully!', { id: 'pdf-download' })
+                                        } catch (error) {
+                                            console.error('Error downloading PDF:', error)
+                                            toast.error('Failed to download PDF', { id: 'pdf-download' })
+                                        }
+                                    }}
+                                    className="px-4 py-2 bg-primary-500 text-white rounded-2xl hover:bg-primary-600 flex items-center space-x-2 text-sm font-medium transition-all duration-200 shadow-bubble-sm"
+                                >
+                                    <Download className="w-4 h-4" />
+                                    <span>Download as PDF</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowDashboard(false)
+                                        // Update localStorage with new showDashboard state
+                                        try {
+                                            const saved = localStorage.getItem(storageKey)
+                                            if (saved) {
+                                                const parsed = JSON.parse(saved)
+                                                parsed.showDashboard = false
+                                                localStorage.setItem(storageKey, JSON.stringify(parsed))
+                                            }
+                                        } catch (error) {
+                                            console.error('Failed to update localStorage:', error)
+                                        }
+                                    }}
+                                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all duration-200"
+                                    title="Close dashboard"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="border border-gray-100 rounded-xl overflow-auto bg-gray-50/50" style={{ maxHeight: '900px' }}>
+                            {dashboard && (
+                                <ReportDashboard
+                                    dashboard={dashboard}
+                                    overviewSummary={reportDashboardData.overviewSummary}
+                                    totals={reportData.totals}
+                                    beneficiaryText={reportDashboardData.beneficiaryText}
+                                    hasBeneficiaryGroups={reportDashboardData.hasBeneficiaryGroups}
+                                    selectedStory={selectedStory || undefined}
+                                    locations={reportData.locations}
+                                    dateStart={dateRange.startDate || dateRange.singleDate}
+                                    dateEnd={dateRange.endDate || dateRange.singleDate}
+                                    mapImage={reportDashboardData.mapImage}
+                                />
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 {/* Filters Panel */}
                 <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
@@ -747,6 +938,31 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                     Selected story: <strong className="text-gray-800">{selectedStory.title}</strong>
                                 </p>
                             ) : null}
+                            {reportText && reportDashboardData && !showDashboard && (
+                                <div className="mb-4 p-3 bg-primary-50 border border-primary-200 rounded-xl">
+                                    <p className="text-sm text-gray-700">
+                                        Report generated successfully. <button
+                                            onClick={() => {
+                                                setShowDashboard(true)
+                                                // Update localStorage with new showDashboard state
+                                                try {
+                                                    const saved = localStorage.getItem(storageKey)
+                                                    if (saved) {
+                                                        const parsed = JSON.parse(saved)
+                                                        parsed.showDashboard = true
+                                                        localStorage.setItem(storageKey, JSON.stringify(parsed))
+                                                    }
+                                                } catch (error) {
+                                                    console.error('Failed to update localStorage:', error)
+                                                }
+                                            }}
+                                            className="text-primary-600 hover:text-primary-700 font-medium underline"
+                                        >
+                                            Show dashboard
+                                        </button>
+                                    </p>
+                                </div>
+                            )}
                             <button
                                 onClick={handleGenerateReport}
                                 disabled={loadingReport}
@@ -765,58 +981,6 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                 )}
                             </button>
                         </div>
-
-                        {/* Report Dashboard */}
-                        {reportText && reportDashboardData && reportData && (
-                            <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h2 className="text-base font-semibold text-gray-800">Report Dashboard</h2>
-                                    <button
-                                        onClick={async () => {
-                                            try {
-                                                toast.loading('Generating PDF...', { id: 'pdf-download' })
-                                                const filename = `${dashboard?.initiative.title.replace(/[^a-z0-9]/gi, '_')}_Report_${new Date().toISOString().split('T')[0]}.pdf`
-                                                const pdfBlob = await convertReportToPDF('report-dashboard', filename)
-
-                                                const url = URL.createObjectURL(pdfBlob)
-                                                const link = document.createElement('a')
-                                                link.href = url
-                                                link.download = filename
-                                                document.body.appendChild(link)
-                                                link.click()
-                                                document.body.removeChild(link)
-                                                URL.revokeObjectURL(url)
-
-                                                toast.success('PDF downloaded successfully!', { id: 'pdf-download' })
-                                            } catch (error) {
-                                                console.error('Error downloading PDF:', error)
-                                                toast.error('Failed to download PDF', { id: 'pdf-download' })
-                                            }
-                                        }}
-                                        className="px-4 py-2 bg-primary-500 text-white rounded-2xl hover:bg-primary-600 flex items-center space-x-2 text-sm font-medium transition-all duration-200 shadow-bubble-sm"
-                                    >
-                                        <Download className="w-4 h-4" />
-                                        <span>Download as PDF</span>
-                                    </button>
-                                </div>
-                                <div className="border border-gray-100 rounded-xl overflow-auto bg-gray-50/50" style={{ maxHeight: '900px' }}>
-                                    {dashboard && (
-                                        <ReportDashboard
-                                            dashboard={dashboard}
-                                            overviewSummary={reportDashboardData.overviewSummary}
-                                            totals={reportData.totals}
-                                            beneficiaryText={reportDashboardData.beneficiaryText}
-                                            hasBeneficiaryGroups={reportDashboardData.hasBeneficiaryGroups}
-                                            selectedStory={selectedStory || undefined}
-                                            locations={reportData.locations}
-                                            dateStart={dateRange.startDate || dateRange.singleDate}
-                                            dateEnd={dateRange.endDate || dateRange.singleDate}
-                                            mapImage={reportDashboardData.mapImage}
-                                        />
-                                    )}
-                                </div>
-                            </div>
-                        )}
                     </div>
                 )}
 

@@ -153,14 +153,6 @@ export default function InitiativeSidebar({
 
             {/* Footer */}
             <div className="p-3 border-t border-gray-100 space-y-2">
-                <div className="text-xs text-gray-400 text-center">
-                    {initiativeSlug ? (
-                        <span className="font-mono bg-gray-50 px-2 py-1 rounded-lg">{initiativeSlug}</span>
-                    ) : (
-                        <span>ID: {initiativeId.slice(0, 8)}...</span>
-                    )}
-                </div>
-                
                 {/* Settings Gear Icon */}
                 <div className="relative" ref={settingsRef}>
                     <button

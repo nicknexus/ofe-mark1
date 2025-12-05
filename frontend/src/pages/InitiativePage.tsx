@@ -435,7 +435,15 @@ export default function InitiativePage() {
                     onMetricClick={handleMetricCardClick}
                 />
             case 'beneficiaries':
-                return <BeneficiariesTab initiativeId={id!} onRefresh={loadDashboard} />
+                return <BeneficiariesTab 
+                    initiativeId={id!} 
+                    onRefresh={loadDashboard}
+                    onStoryClick={(storyId) => {
+                        setInitialStoryId(storyId)
+                        setActiveTab('stories')
+                    }}
+                    onMetricClick={handleMetricCardClick}
+                />
             case 'stories':
                 return <StoriesTab initiativeId={id!} onRefresh={loadDashboard} initialStoryId={initialStoryId} />
             case 'report':

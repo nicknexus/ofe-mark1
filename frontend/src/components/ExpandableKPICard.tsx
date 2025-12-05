@@ -787,24 +787,26 @@ export default function ExpandableKPICard({
             <>
                 {/* Full Page View - No card wrapper */}
                 <div className="h-screen flex flex-col overflow-hidden">
-                    {/* Header - Compact */}
-                    <div className="flex-shrink-0 bg-white/80 backdrop-blur-xl border-b border-gray-100/60 px-4 py-2 shadow-soft-float">
+                    {/* Header - Prominent */}
+                    <div className="flex-shrink-0 bg-white/80 backdrop-blur-xl border-b border-gray-100/60 px-6 py-3.5 shadow-soft-float">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                                <button onClick={(e) => { e.stopPropagation(); onToggleExpand() }} className="p-1.5 hover:bg-red-50 rounded-lg transition-all duration-200 border border-gray-100">
-                                    <X className="w-4 h-4 text-red-500" />
+                            <div className="flex items-center space-x-4">
+                                <button onClick={(e) => { e.stopPropagation(); onToggleExpand() }} className="p-2.5 hover:bg-red-50 rounded-xl transition-all duration-200 border border-gray-200">
+                                    <X className="w-5 h-5 text-red-500" />
                                 </button>
                                 <div>
-                                    <h2 className="text-base font-bold text-gray-800">{kpi.title}</h2>
-                                    <p className="text-xs text-gray-500 line-clamp-1 max-w-md">{kpi.description}</p>
+                                    <h2 className="text-2xl font-bold text-gray-900">{kpi.title}</h2>
+                                    {kpi.description && (
+                                        <p className="text-sm text-gray-500 line-clamp-1 max-w-lg mt-1">{kpi.description}</p>
+                                    )}
                                 </div>
                             </div>
-                            <div className="flex items-center space-x-1.5">
-                                <button onClick={(e) => { e.stopPropagation(); onEdit() }} className="p-1.5 bg-white/60 hover:bg-white/80 border border-gray-200/60 text-gray-600 rounded-lg transition-all duration-200">
-                                    <Edit className="w-3.5 h-3.5" />
+                            <div className="flex items-center space-x-2">
+                                <button onClick={(e) => { e.stopPropagation(); onEdit() }} className="p-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/60 text-gray-600 rounded-xl transition-all duration-200">
+                                    <Edit className="w-5 h-5" />
                                 </button>
-                                <button onClick={(e) => { e.stopPropagation(); onDelete() }} className="p-1.5 bg-red-50/80 hover:bg-red-100 text-red-500 rounded-lg transition-all duration-200">
-                                    <Trash2 className="w-3.5 h-3.5" />
+                                <button onClick={(e) => { e.stopPropagation(); onDelete() }} className="p-2.5 bg-red-50/80 hover:bg-red-100 text-red-500 rounded-xl transition-all duration-200">
+                                    <Trash2 className="w-5 h-5" />
                                 </button>
                             </div>
                         </div>
@@ -812,29 +814,17 @@ export default function ExpandableKPICard({
 
                     {/* Content - Fit to screen */}
                     <div className="flex-1 p-3 flex flex-col gap-2 max-w-[1800px] mx-auto overflow-hidden w-full min-h-0">
-                        {kpiUpdates.length === 0 && !loadingEvidence && evidence.length === 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-6">
-                                <div className="bg-white/80 backdrop-blur-xl border border-evidence-200/60 rounded-2xl p-6 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200">
+                        {kpiUpdates.length === 0 ? (
+                            <div className="flex justify-center items-center py-12">
+                                <div className="bg-white/80 backdrop-blur-xl border border-evidence-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200 max-w-md">
                                     <div className="text-center">
-                                        <div className="w-16 h-16 mx-auto mb-4 bg-evidence-100/80 rounded-2xl flex items-center justify-center">
-                                            <BarChart3 className="w-8 h-8 text-evidence-500" />
+                                        <div className="w-20 h-20 mx-auto mb-5 bg-evidence-100/80 rounded-2xl flex items-center justify-center">
+                                            <BarChart3 className="w-10 h-10 text-evidence-500" />
                                         </div>
-                                        <h5 className="text-lg font-bold text-gray-800 mb-2">Impact Claims</h5>
-                                        <p className="text-sm text-gray-500 mb-4">You haven't added any of this type, add it here!</p>
-                                        <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-5 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25">
-                                            <Plus className="w-4 h-4" /><span>Add Impact Claim</span>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="bg-white/80 backdrop-blur-xl border border-impact-200/60 rounded-2xl p-6 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200">
-                                    <div className="text-center">
-                                        <div className="w-16 h-16 mx-auto mb-4 bg-impact-100/80 rounded-2xl flex items-center justify-center">
-                                            <FileText className="w-8 h-8 text-impact-500" />
-                                        </div>
-                                        <h5 className="text-lg font-bold text-gray-800 mb-2">Evidence</h5>
-                                        <p className="text-sm text-gray-500 mb-4">You haven't added any of this type, add it here!</p>
-                                        <button onClick={(e) => { e.stopPropagation(); onAddEvidence() }} className="inline-flex items-center space-x-2 px-5 py-2.5 bg-impact-500 hover:bg-impact-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-impact-500/25">
-                                            <Plus className="w-4 h-4" /><span>Add Evidence</span>
+                                        <h5 className="text-xl font-bold text-gray-800 mb-2">Create Your First Impact Claim</h5>
+                                        <p className="text-sm text-gray-500 mb-6">Start tracking your impact by adding your first impact claim for this metric.</p>
+                                        <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-6 py-3 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25">
+                                            <Plus className="w-5 h-5" /><span>Add Impact Claim</span>
                                         </button>
                                     </div>
                                 </div>
@@ -862,7 +852,7 @@ export default function ExpandableKPICard({
                                     </div>
                                 </div>
 
-                                <div className="flex items-center justify-between gap-2 h-8 bg-white/60 backdrop-blur-sm border border-gray-100/60 rounded-lg px-3 flex-shrink-0">
+                                <div className="flex items-center justify-between gap-2 h-11 bg-white/60 backdrop-blur-sm border border-gray-100/60 rounded-lg px-3 flex-shrink-0">
                                     {(['visual_proof', 'documentation', 'testimony', 'financials'] as const).map((type) => {
                                         const IconComponent = getEvidenceIcon(type)
                                         const typeInfo = getEvidenceTypeInfo(type)
@@ -904,7 +894,7 @@ export default function ExpandableKPICard({
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="flex-1 min-h-[120px] flex items-center justify-center">
+                                        <div className="flex-1 min-h-[100px] flex items-center justify-center">
                                             {kpiUpdates && kpiUpdates.length > 0 ? (
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <LineChart data={chartData}>
@@ -954,7 +944,7 @@ export default function ExpandableKPICard({
                                                                                         <span>{supportPercentage}% Supported</span>
                                                                                     </div>
                                                                                 )}
-                                                                                {supportPercentage === 0 && (
+                                                                                {supportPercentage === 0 && !loadingEvidence && (
                                                                                     <div className="flex items-center justify-center px-2 py-1 rounded-md text-[10px] font-medium w-[85px] whitespace-nowrap bg-red-100 text-red-700">
                                                                                         <span>0% Supported</span>
                                                                                     </div>
@@ -1345,18 +1335,17 @@ export default function ExpandableKPICard({
 
                     {/* Content - Reuse the same content structure */}
                     <div className="p-4 space-y-4 max-w-[1600px] mx-auto">
-                        {/* Check if metric is completely fresh (no claims AND no evidence) */}
-                        {kpiUpdates.length === 0 && !loadingEvidence && evidence.length === 0 ? (
-                            /* Fresh Metric - Show only Add buttons */
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-8">
-                                {/* Add Impact Claim */}
-                                <div className="bg-white/80 backdrop-blur-xl border border-evidence-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200">
+                        {/* Check if metric has no claims - show only impact claim container */}
+                        {kpiUpdates.length === 0 ? (
+                            /* Fresh Metric - Show only Add Impact Claim button */
+                            <div className="flex justify-center items-center py-12">
+                                <div className="bg-white/80 backdrop-blur-xl border border-evidence-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200 max-w-md">
                                     <div className="text-center">
                                         <div className="w-20 h-20 mx-auto mb-5 bg-evidence-100/80 rounded-2xl flex items-center justify-center">
                                             <BarChart3 className="w-10 h-10 text-evidence-500" />
                                         </div>
-                                        <h5 className="text-xl font-bold text-gray-800 mb-2">Impact Claims</h5>
-                                        <p className="text-sm text-gray-500 mb-6">You haven't added any of this type, add it here!</p>
+                                        <h5 className="text-xl font-bold text-gray-800 mb-2">Create Your First Impact Claim</h5>
+                                        <p className="text-sm text-gray-500 mb-6">Start tracking your impact by adding your first impact claim for this metric.</p>
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation()
@@ -1366,27 +1355,6 @@ export default function ExpandableKPICard({
                                         >
                                             <Plus className="w-5 h-5" />
                                             <span>Add Impact Claim</span>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Add Evidence */}
-                                <div className="bg-white/80 backdrop-blur-xl border border-impact-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200">
-                                    <div className="text-center">
-                                        <div className="w-20 h-20 mx-auto mb-5 bg-impact-100/80 rounded-2xl flex items-center justify-center">
-                                            <FileText className="w-10 h-10 text-impact-500" />
-                                        </div>
-                                        <h5 className="text-xl font-bold text-gray-800 mb-2">Evidence</h5>
-                                        <p className="text-sm text-gray-500 mb-6">You haven't added any of this type, add it here!</p>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                onAddEvidence()
-                                            }}
-                                            className="inline-flex items-center space-x-2 px-6 py-3 bg-impact-500 hover:bg-impact-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-impact-500/25"
-                                        >
-                                            <Plus className="w-5 h-5" />
-                                            <span>Add Evidence</span>
                                         </button>
                                     </div>
                                 </div>
@@ -1543,7 +1511,7 @@ export default function ExpandableKPICard({
                                                                                         <span>{supportPercentage}% Supported</span>
                                                                                     </div>
                                                                                 )}
-                                                                                {supportPercentage === 0 && (
+                                                                                {supportPercentage === 0 && !loadingEvidence && (
                                                                                     <div className="flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium w-[110px] whitespace-nowrap bg-red-100 text-red-700">
                                                                                         <span>0% covered</span>
                                                                                     </div>
@@ -1674,18 +1642,17 @@ export default function ExpandableKPICard({
 
                     {/* Content */}
                     <div className="p-4 space-y-4 max-w-[1600px] mx-auto">
-                        {/* Check if metric is completely fresh (no claims AND no evidence) */}
-                        {kpiUpdates.length === 0 && !loadingEvidence && evidence.length === 0 ? (
-                            /* Fresh Metric - Show only Add buttons */
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-8">
-                                {/* Add Impact Claim */}
-                                <div className="bg-white/80 backdrop-blur-xl border border-evidence-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200">
+                        {/* Check if metric has no claims - show only impact claim container */}
+                        {kpiUpdates.length === 0 ? (
+                            /* Fresh Metric - Show only Add Impact Claim button */
+                            <div className="flex justify-center items-center py-12">
+                                <div className="bg-white/80 backdrop-blur-xl border border-evidence-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200 max-w-md">
                                     <div className="text-center">
                                         <div className="w-20 h-20 mx-auto mb-5 bg-evidence-100/80 rounded-2xl flex items-center justify-center">
                                             <BarChart3 className="w-10 h-10 text-evidence-500" />
                                         </div>
-                                        <h5 className="text-xl font-bold text-gray-800 mb-2">Impact Claims</h5>
-                                        <p className="text-sm text-gray-500 mb-6">You haven't added any of this type, add it here!</p>
+                                        <h5 className="text-xl font-bold text-gray-800 mb-2">Create Your First Impact Claim</h5>
+                                        <p className="text-sm text-gray-500 mb-6">Start tracking your impact by adding your first impact claim for this metric.</p>
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation()
@@ -1695,27 +1662,6 @@ export default function ExpandableKPICard({
                                         >
                                             <Plus className="w-5 h-5" />
                                             <span>Add Impact Claim</span>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Add Evidence */}
-                                <div className="bg-white/80 backdrop-blur-xl border border-impact-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200">
-                                    <div className="text-center">
-                                        <div className="w-20 h-20 mx-auto mb-5 bg-impact-100/80 rounded-2xl flex items-center justify-center">
-                                            <FileText className="w-10 h-10 text-impact-500" />
-                                        </div>
-                                        <h5 className="text-xl font-bold text-gray-800 mb-2">Evidence</h5>
-                                        <p className="text-sm text-gray-500 mb-6">You haven't added any of this type, add it here!</p>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                onAddEvidence()
-                                            }}
-                                            className="inline-flex items-center space-x-2 px-6 py-3 bg-impact-500 hover:bg-impact-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-impact-500/25"
-                                        >
-                                            <Plus className="w-5 h-5" />
-                                            <span>Add Evidence</span>
                                         </button>
                                     </div>
                                 </div>

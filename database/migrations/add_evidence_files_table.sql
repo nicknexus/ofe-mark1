@@ -96,3 +96,4 @@ ON CONFLICT DO NOTHING;
 COMMENT ON TABLE evidence_files IS 'Stores multiple file attachments for evidence items. The original file_url column in evidence table is kept for backward compatibility but new files should use this table.';
 
 
+

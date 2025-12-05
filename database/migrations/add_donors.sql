@@ -107,3 +107,4 @@ COMMENT ON COLUMN donor_credits.credited_value IS 'The numeric value from the me
 COMMENT ON COLUMN donor_credits.credited_percentage IS 'Optional percentage of the total metric value credited to this donor.';
 
 
+

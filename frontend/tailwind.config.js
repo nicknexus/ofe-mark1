@@ -7,6 +7,22 @@ export default {
     theme: {
         extend: {
             colors: {
+                // Override pure black with custom grey
+                black: '#465360',
+                // Override very dark grays (almost black) with custom grey
+                gray: {
+                    50: '#f9fafb',
+                    100: '#f3f4f6',
+                    200: '#e5e7eb',
+                    300: '#d1d5db',
+                    400: '#9ca3af',
+                    500: '#6b7280',
+                    600: '#4b5563',
+                    700: '#374151',
+                    800: '#465360', // Override dark gray with custom grey
+                    900: '#465360', // Override darkest gray with custom grey
+                    950: '#465360',
+                },
                 // Nexus green palette based on #c0dfa1
                 primary: {
                     50: '#f4f9f0',

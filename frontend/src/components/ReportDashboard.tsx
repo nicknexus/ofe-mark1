@@ -79,12 +79,12 @@ export default function ReportDashboard({
                         right: 0,
                         bottom: 0,
                         background: `
-                            radial-gradient(ellipse 900px 700px at 20% 30%, rgba(151, 181, 153, 0.55) 0%, transparent 55%),
-                            radial-gradient(ellipse 700px 900px at 80% 70%, rgba(151, 181, 153, 0.5) 0%, transparent 55%),
-                            radial-gradient(ellipse 800px 600px at 50% 20%, rgba(151, 181, 153, 0.45) 0%, transparent 50%),
-                            radial-gradient(ellipse 600px 800px at 10% 80%, rgba(151, 181, 153, 0.5) 0%, transparent 50%),
-                            radial-gradient(ellipse 700px 700px at 90% 30%, rgba(151, 181, 153, 0.4) 0%, transparent 45%),
-                            radial-gradient(ellipse 650px 550px at 30% 60%, rgba(151, 181, 153, 0.45) 0%, transparent 48%)
+                            radial-gradient(ellipse 900px 700px at 20% 30%, rgba(192, 223, 161, 0.55) 0%, transparent 55%),
+                            radial-gradient(ellipse 700px 900px at 80% 70%, rgba(192, 223, 161, 0.5) 0%, transparent 55%),
+                            radial-gradient(ellipse 800px 600px at 50% 20%, rgba(192, 223, 161, 0.45) 0%, transparent 50%),
+                            radial-gradient(ellipse 600px 800px at 10% 80%, rgba(192, 223, 161, 0.5) 0%, transparent 50%),
+                            radial-gradient(ellipse 700px 700px at 90% 30%, rgba(192, 223, 161, 0.4) 0%, transparent 45%),
+                            radial-gradient(ellipse 650px 550px at 30% 60%, rgba(192, 223, 161, 0.45) 0%, transparent 48%)
                         `,
                         filter: 'blur(50px)',
                         WebkitFilter: 'blur(50px)'
@@ -99,7 +99,7 @@ export default function ReportDashboard({
                         right: '-8%',
                         width: '700px',
                         height: '700px',
-                        background: 'radial-gradient(circle, rgba(151, 181, 153, 0.45) 0%, transparent 65%)',
+                        background: 'radial-gradient(circle, rgba(192, 223, 161, 0.45) 0%, transparent 65%)',
                         borderRadius: '50%',
                         filter: 'blur(70px)',
                         WebkitFilter: 'blur(70px)'
@@ -112,7 +112,7 @@ export default function ReportDashboard({
                         left: '-4%',
                         width: '600px',
                         height: '600px',
-                        background: 'radial-gradient(circle, rgba(151, 181, 153, 0.5) 0%, transparent 65%)',
+                        background: 'radial-gradient(circle, rgba(192, 223, 161, 0.5) 0%, transparent 65%)',
                         borderRadius: '50%',
                         filter: 'blur(65px)',
                         WebkitFilter: 'blur(65px)'
@@ -126,7 +126,7 @@ export default function ReportDashboard({
                         transform: 'translate(-50%, -50%)',
                         width: '800px',
                         height: '800px',
-                        background: 'radial-gradient(circle, rgba(151, 181, 153, 0.3) 0%, transparent 60%)',
+                        background: 'radial-gradient(circle, rgba(192, 223, 161, 0.3) 0%, transparent 60%)',
                         borderRadius: '50%',
                         filter: 'blur(90px)',
                         WebkitFilter: 'blur(90px)'
@@ -157,7 +157,7 @@ export default function ReportDashboard({
                 <div
                     className="relative overflow-hidden"
                     style={{
-                        background: '#97b599',
+                        background: '#c0dfa1',
                         padding: '20px 30px',
                         color: 'white',
                         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
@@ -199,7 +199,7 @@ export default function ReportDashboard({
                                     className="rounded-xl overflow-hidden"
                                     style={{
                                         background: '#ffffff',
-                                        border: '1px solid rgba(6, 78, 59, 0.2)',
+                                        border: '1px solid rgba(96, 131, 65, 0.2)',
                                         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
                                         display: 'flex',
                                         flexDirection: 'column',
@@ -235,7 +235,7 @@ export default function ReportDashboard({
                                         </div>
                                         <h3
                                             className="font-bold mb-2"
-                                            style={{ fontSize: '16px', color: '#065f46' }}
+                                            style={{ fontSize: '16px', color: '#608341' }}
                                         >
                                             {selectedStory.title}
                                         </h3>
@@ -255,10 +255,10 @@ export default function ReportDashboard({
                             <div className="col-span-2 space-y-4">
                                 <div>
                                     <div className="flex items-center gap-2 mb-3">
-                                        <BarChart3 className="w-4 h-4" style={{ color: '#065f46' }} />
+                                        <BarChart3 className="w-4 h-4" style={{ color: '#608341' }} />
                                         <h2
                                             className="font-bold"
-                                            style={{ fontSize: '14px', color: '#065f46' }}
+                                            style={{ fontSize: '14px', color: '#608341' }}
                                         >
                                             Key Metrics
                                         </h2>
@@ -270,7 +270,7 @@ export default function ReportDashboard({
                                                 className="rounded-xl p-2.5"
                                                 style={{
                                                     background: '#ffffff',
-                                                    border: '1px solid rgba(6, 78, 59, 0.2)',
+                                                    border: '1px solid rgba(96, 131, 65, 0.2)',
                                                     boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
                                                     transition: 'all 0.3s ease',
                                                     minHeight: '80px',
@@ -283,7 +283,7 @@ export default function ReportDashboard({
                                                     className="font-semibold mb-1"
                                                     style={{
                                                         fontSize: '9px',
-                                                        color: '#065f46',
+                                                        color: '#608341',
                                                         lineHeight: '1.3',
                                                         wordBreak: 'break-word',
                                                         overflow: 'hidden',
@@ -300,7 +300,7 @@ export default function ReportDashboard({
                                                 <div>
                                                     <div
                                                         className="font-bold"
-                                                        style={{ fontSize: '16px', color: '#047857', lineHeight: '1.2' }}
+                                                        style={{ fontSize: '16px', color: '#608341', lineHeight: '1.2' }}
                                                     >
                                                         {total.total_value.toLocaleString()}
                                                     </div>
@@ -321,15 +321,15 @@ export default function ReportDashboard({
                                     className="rounded-xl p-3"
                                     style={{
                                         background: '#ffffff',
-                                        border: '1px solid rgba(6, 78, 59, 0.2)',
+                                        border: '1px solid rgba(96, 131, 65, 0.2)',
                                         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
                                     }}
                                 >
                                     <div className="flex items-center gap-2 mb-2" style={{ alignItems: 'center' }}>
-                                        <FileText className="w-3 h-3" style={{ color: '#065f46', flexShrink: 0, verticalAlign: 'middle' }} />
+                                        <FileText className="w-3 h-3" style={{ color: '#608341', flexShrink: 0, verticalAlign: 'middle' }} />
                                         <h2
                                             className="font-bold"
-                                            style={{ fontSize: '12px', color: '#065f46', lineHeight: '1.2', margin: 0 }}
+                                            style={{ fontSize: '12px', color: '#608341', lineHeight: '1.2', margin: 0 }}
                                         >
                                             Overview Summary
                                         </h2>
@@ -348,15 +348,15 @@ export default function ReportDashboard({
                                         className="rounded-xl p-3"
                                         style={{
                                             background: '#ffffff',
-                                            border: '1px solid rgba(6, 78, 59, 0.2)',
+                                            border: '1px solid rgba(96, 131, 65, 0.2)',
                                             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
                                         }}
                                     >
                                         <div className="flex items-center gap-2 mb-2" style={{ alignItems: 'center' }}>
-                                            <Users className="w-3 h-3" style={{ color: '#065f46', flexShrink: 0, verticalAlign: 'middle' }} />
+                                            <Users className="w-3 h-3" style={{ color: '#608341', flexShrink: 0, verticalAlign: 'middle' }} />
                                             <h2
                                                 className="font-bold"
-                                                style={{ fontSize: '12px', color: '#065f46', lineHeight: '1.2', margin: 0 }}
+                                                style={{ fontSize: '12px', color: '#608341', lineHeight: '1.2', margin: 0 }}
                                             >
                                                 Beneficiary Breakdown
                                             </h2>
@@ -381,18 +381,18 @@ export default function ReportDashboard({
                                                 className="rounded-xl overflow-hidden flex-1"
                                                 style={{
                                                     background: '#ffffff',
-                                                    border: '1px solid rgba(6, 78, 59, 0.2)',
+                                                    border: '1px solid rgba(96, 131, 65, 0.2)',
                                                     boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
                                                     display: 'flex',
                                                     flexDirection: 'column'
                                                 }}
                                             >
-                                                <div className="p-3 border-b flex-shrink-0" style={{ borderColor: 'rgba(6, 78, 59, 0.2)' }}>
+                                                <div className="p-3 border-b flex-shrink-0" style={{ borderColor: 'rgba(96, 131, 65, 0.2)' }}>
                                                     <div className="flex items-center gap-2">
-                                                        <BarChart3 className="w-3 h-3" style={{ color: '#065f46' }} />
+                                                        <BarChart3 className="w-3 h-3" style={{ color: '#608341' }} />
                                                         <h3
                                                             className="font-bold"
-                                                            style={{ fontSize: '11px', color: '#065f46' }}
+                                                            style={{ fontSize: '11px', color: '#608341' }}
                                                         >
                                                             Metric Totals
                                                         </h3>
@@ -429,7 +429,7 @@ export default function ReportDashboard({
                                                             <Tooltip
                                                                 contentStyle={{
                                                                     backgroundColor: 'white',
-                                                                    border: '1px solid rgba(6, 78, 59, 0.2)',
+                                                                    border: '1px solid rgba(96, 131, 65, 0.2)',
                                                                     borderRadius: '6px',
                                                                     fontSize: '11px',
                                                                     padding: '6px 8px'
@@ -439,7 +439,7 @@ export default function ReportDashboard({
                                                             />
                                                             <Bar
                                                                 dataKey="value"
-                                                                fill="#97b599"
+                                                                fill="#c0dfa1"
                                                                 radius={[4, 4, 0, 0]}
                                                             />
                                                         </BarChart>
@@ -453,7 +453,7 @@ export default function ReportDashboard({
                                                     className="rounded-xl overflow-hidden"
                                                     style={{
                                                         background: '#ffffff',
-                                                        border: '1px solid rgba(6, 78, 59, 0.2)',
+                                                        border: '1px solid rgba(96, 131, 65, 0.2)',
                                                         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
                                                         display: 'flex',
                                                         flexDirection: 'column',
@@ -461,12 +461,12 @@ export default function ReportDashboard({
                                                         flexShrink: 0
                                                     }}
                                                 >
-                                                    <div className="p-2 border-b" style={{ borderColor: 'rgba(6, 78, 59, 0.2)' }}>
+                                                    <div className="p-2 border-b" style={{ borderColor: 'rgba(96, 131, 65, 0.2)' }}>
                                                         <div className="flex items-center gap-2">
-                                                            <MapPin className="w-3 h-3" style={{ color: '#065f46' }} />
+                                                            <MapPin className="w-3 h-3" style={{ color: '#608341' }} />
                                                             <h3
                                                                 className="font-bold"
-                                                                style={{ fontSize: '11px', color: '#065f46' }}
+                                                                style={{ fontSize: '11px', color: '#608341' }}
                                                             >
                                                                 Locations
                                                             </h3>
@@ -490,13 +490,13 @@ export default function ReportDashboard({
                                                                     className="px-2 py-1 rounded-lg"
                                                                     style={{
                                                                         background: '#f0fdf4',
-                                                                        border: '1px solid rgba(6, 78, 59, 0.2)',
+                                                                        border: '1px solid rgba(96, 131, 65, 0.2)',
                                                                         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
                                                                     }}
                                                                 >
                                                                     <div
                                                                         className="font-semibold"
-                                                                        style={{ fontSize: '9px', color: '#065f46', marginBottom: '1px' }}
+                                                                        style={{ fontSize: '9px', color: '#608341', marginBottom: '1px' }}
                                                                     >
                                                                         {location.name}
                                                                     </div>
@@ -524,10 +524,10 @@ export default function ReportDashboard({
                                 {totals.length > 0 && (
                                     <div>
                                         <div className="flex items-center gap-2 mb-3" style={{ alignItems: 'center' }}>
-                                            <BarChart3 className="w-4 h-4" style={{ color: '#065f46', flexShrink: 0, verticalAlign: 'middle' }} />
+                                            <BarChart3 className="w-4 h-4" style={{ color: '#608341', flexShrink: 0, verticalAlign: 'middle' }} />
                                             <h2
                                                 className="font-bold"
-                                                style={{ fontSize: '14px', color: '#065f46', lineHeight: '1.2', margin: 0 }}
+                                                style={{ fontSize: '14px', color: '#608341', lineHeight: '1.2', margin: 0 }}
                                             >
                                                 Key Metrics
                                             </h2>
@@ -539,7 +539,7 @@ export default function ReportDashboard({
                                                     className="rounded-xl p-2.5"
                                                     style={{
                                                         background: '#ffffff',
-                                                        border: '1px solid rgba(6, 78, 59, 0.2)',
+                                                        border: '1px solid rgba(96, 131, 65, 0.2)',
                                                         boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
                                                         transition: 'all 0.3s ease',
                                                         minHeight: '80px',
@@ -552,7 +552,7 @@ export default function ReportDashboard({
                                                         className="font-semibold mb-1"
                                                         style={{
                                                             fontSize: '9px',
-                                                            color: '#065f46',
+                                                            color: '#608341',
                                                             lineHeight: '1.3',
                                                             wordBreak: 'break-word',
                                                             overflow: 'hidden',
@@ -569,7 +569,7 @@ export default function ReportDashboard({
                                                     <div>
                                                         <div
                                                             className="font-bold"
-                                                            style={{ fontSize: '16px', color: '#047857', lineHeight: '1.2' }}
+                                                            style={{ fontSize: '16px', color: '#608341', lineHeight: '1.2' }}
                                                         >
                                                             {total.total_value.toLocaleString()}
                                                         </div>
@@ -591,15 +591,15 @@ export default function ReportDashboard({
                                     className="rounded-xl p-3"
                                     style={{
                                         background: '#ffffff',
-                                        border: '1px solid rgba(6, 78, 59, 0.2)',
+                                        border: '1px solid rgba(96, 131, 65, 0.2)',
                                         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
                                     }}
                                 >
                                     <div className="flex items-center gap-2 mb-2" style={{ alignItems: 'center' }}>
-                                        <FileText className="w-3 h-3" style={{ color: '#065f46', flexShrink: 0, verticalAlign: 'middle' }} />
+                                        <FileText className="w-3 h-3" style={{ color: '#608341', flexShrink: 0, verticalAlign: 'middle' }} />
                                         <h2
                                             className="font-bold"
-                                            style={{ fontSize: '12px', color: '#065f46', lineHeight: '1.2', margin: 0 }}
+                                            style={{ fontSize: '12px', color: '#608341', lineHeight: '1.2', margin: 0 }}
                                         >
                                             Overview Summary
                                         </h2>
@@ -618,15 +618,15 @@ export default function ReportDashboard({
                                         className="rounded-xl p-3"
                                         style={{
                                             background: '#ffffff',
-                                            border: '1px solid rgba(6, 78, 59, 0.2)',
+                                            border: '1px solid rgba(96, 131, 65, 0.2)',
                                             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
                                         }}
                                     >
                                         <div className="flex items-center gap-2 mb-2" style={{ alignItems: 'center' }}>
-                                            <Users className="w-3 h-3" style={{ color: '#065f46', flexShrink: 0, verticalAlign: 'middle' }} />
+                                            <Users className="w-3 h-3" style={{ color: '#608341', flexShrink: 0, verticalAlign: 'middle' }} />
                                             <h2
                                                 className="font-bold"
-                                                style={{ fontSize: '12px', color: '#065f46', lineHeight: '1.2', margin: 0 }}
+                                                style={{ fontSize: '12px', color: '#608341', lineHeight: '1.2', margin: 0 }}
                                             >
                                                 Beneficiary Breakdown
                                             </h2>
@@ -648,18 +648,18 @@ export default function ReportDashboard({
                                             className="rounded-xl overflow-hidden flex-1"
                                             style={{
                                                 background: '#ffffff',
-                                                border: '1px solid rgba(6, 78, 59, 0.2)',
+                                                border: '1px solid rgba(96, 131, 65, 0.2)',
                                                 boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
                                                 display: 'flex',
                                                 flexDirection: 'column'
                                             }}
                                         >
-                                            <div className="p-3 border-b flex-shrink-0" style={{ borderColor: 'rgba(6, 78, 59, 0.2)' }}>
+                                            <div className="p-3 border-b flex-shrink-0" style={{ borderColor: 'rgba(96, 131, 65, 0.2)' }}>
                                                 <div className="flex items-center gap-2">
-                                                    <BarChart3 className="w-3 h-3" style={{ color: '#065f46' }} />
+                                                    <BarChart3 className="w-3 h-3" style={{ color: '#608341' }} />
                                                     <h3
                                                         className="font-bold"
-                                                        style={{ fontSize: '11px', color: '#065f46' }}
+                                                        style={{ fontSize: '11px', color: '#608341' }}
                                                     >
                                                         Metric Totals
                                                     </h3>
@@ -696,7 +696,7 @@ export default function ReportDashboard({
                                                         <Tooltip
                                                             contentStyle={{
                                                                 backgroundColor: 'white',
-                                                                border: '1px solid rgba(6, 78, 59, 0.2)',
+                                                                border: '1px solid rgba(96, 131, 65, 0.2)',
                                                                 borderRadius: '6px',
                                                                 fontSize: '11px',
                                                                 padding: '6px 8px'
@@ -706,7 +706,7 @@ export default function ReportDashboard({
                                                         />
                                                         <Bar
                                                             dataKey="value"
-                                                            fill="#97b599"
+                                                            fill="#c0dfa1"
                                                             radius={[4, 4, 0, 0]}
                                                         />
                                                     </BarChart>
@@ -720,7 +720,7 @@ export default function ReportDashboard({
                                                 className="rounded-xl overflow-hidden"
                                                 style={{
                                                     background: '#ffffff',
-                                                    border: '1px solid rgba(6, 78, 59, 0.2)',
+                                                    border: '1px solid rgba(96, 131, 65, 0.2)',
                                                     boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
                                                     display: 'flex',
                                                     flexDirection: 'column',
@@ -728,12 +728,12 @@ export default function ReportDashboard({
                                                     flexShrink: 0
                                                 }}
                                             >
-                                                <div className="p-2 border-b" style={{ borderColor: 'rgba(6, 78, 59, 0.2)' }}>
+                                                <div className="p-2 border-b" style={{ borderColor: 'rgba(96, 131, 65, 0.2)' }}>
                                                     <div className="flex items-center gap-2">
-                                                        <MapPin className="w-3 h-3" style={{ color: '#065f46' }} />
+                                                        <MapPin className="w-3 h-3" style={{ color: '#608341' }} />
                                                         <h3
                                                             className="font-bold"
-                                                            style={{ fontSize: '11px', color: '#065f46' }}
+                                                            style={{ fontSize: '11px', color: '#608341' }}
                                                         >
                                                             Locations
                                                         </h3>
@@ -757,13 +757,13 @@ export default function ReportDashboard({
                                                                 className="px-2 py-1 rounded-lg"
                                                                 style={{
                                                                     background: '#f0fdf4',
-                                                                    border: '1px solid rgba(6, 78, 59, 0.2)',
+                                                                    border: '1px solid rgba(96, 131, 65, 0.2)',
                                                                     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
                                                                 }}
                                                             >
                                                                 <div
                                                                     className="font-semibold"
-                                                                    style={{ fontSize: '9px', color: '#065f46', marginBottom: '1px' }}
+                                                                    style={{ fontSize: '9px', color: '#608341', marginBottom: '1px' }}
                                                                 >
                                                                     {location.name}
                                                                 </div>
@@ -788,12 +788,12 @@ export default function ReportDashboard({
                     <div
                         className="text-center pt-4 pb-2 border-t"
                         style={{
-                            borderColor: 'rgba(6, 78, 59, 0.2)',
+                            borderColor: 'rgba(96, 131, 65, 0.2)',
                             color: '#6b7280',
                             fontSize: '10px'
                         }}
                     >
-                        <div className="font-semibold mb-0.5" style={{ color: '#065f46' }}>
+                        <div className="font-semibold mb-0.5" style={{ color: '#608341' }}>
                             Nexus Impacts | Know Your Mark On The World
                         </div>
                         <div>

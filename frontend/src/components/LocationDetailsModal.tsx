@@ -165,13 +165,13 @@ export default function LocationDetailsModal({
 
     return (
         <>
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[70] animate-fade-in">
-                <div className="bubble-card max-w-7xl w-full h-[90vh] max-h-[90vh] overflow-hidden flex flex-col animate-slide-up">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+                <div className="bg-white rounded-xl max-w-7xl w-full h-[90vh] max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
                     {/* Header */}
-                    <div className="flex items-start justify-between p-6 border-b border-gray-100 flex-shrink-0">
+                    <div className="flex items-start justify-between p-6 border-b border-gray-200 flex-shrink-0">
                         <div className="flex items-start space-x-4 flex-1">
-                            <div className="icon-bubble">
-                                <MapPin className="w-5 h-5 text-primary-500" />
+                            <div className="p-3 bg-primary-100 rounded-xl">
+                                <MapPin className="w-6 h-6 text-primary-500" />
                             </div>
                             <div className="flex-1">
                                 <h2 className="text-2xl font-bold text-gray-900 mb-2">{location.name}</h2>
@@ -201,7 +201,7 @@ export default function LocationDetailsModal({
                                         onClose()
                                         onEditClick(location)
                                     }}
-                                    className="flex items-center space-x-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 transition-colors text-sm"
+                                    className="flex items-center space-x-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm"
                                 >
                                     <Edit className="w-4 h-4" />
                                     <span>Edit</span>
@@ -209,9 +209,9 @@ export default function LocationDetailsModal({
                             )}
                             <button
                                 onClick={onClose}
-                                className="text-gray-400 hover:text-gray-600 p-2 rounded-xl hover:bg-gray-100 transition-colors flex-shrink-0"
+                                className="text-gray-400 hover:text-gray-600 p-1 transition-colors flex-shrink-0"
                             >
-                                <X className="w-5 h-5" />
+                                <X className="w-6 h-6" />
                             </button>
                         </div>
                     </div>
@@ -224,13 +224,13 @@ export default function LocationDetailsModal({
                                 <span className="ml-3 text-gray-600">Loading location data...</span>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-3 divide-x divide-gray-100" style={{ height: '100%', overflow: 'hidden', display: 'grid' }}>
+                            <div className="grid grid-cols-3 divide-x divide-gray-200" style={{ height: '100%', overflow: 'hidden', display: 'grid' }}>
                                 {/* Left Column - Stories */}
-                                <div className="overflow-y-auto p-6" style={{ height: '100%', overflowY: 'auto' }}>
-                                    <div className="flex items-center space-x-2 mb-4">
+                                <div className="overflow-y-auto p-4" style={{ height: '100%', overflowY: 'auto' }}>
+                                    <div className="flex items-center space-x-2 mb-3">
                                         <MessageSquare className="w-4 h-4 text-gray-600" />
                                         <h3 className="text-sm font-semibold text-gray-900">Stories</h3>
-                                        <span className="status-pill">{stories.length}</span>
+                                        <span className="text-xs text-gray-500">({stories.length})</span>
                                     </div>
                                     {stories.length === 0 ? (
                                         <div className="text-center py-8">
@@ -240,24 +240,23 @@ export default function LocationDetailsModal({
                                     ) : (
                                         <div className="space-y-3">
                                             {stories.map((story) => (
-                                                <div 
-                                                    key={story.id} 
+                                                <div
+                                                    key={story.id}
                                                     onClick={() => {
                                                         if (story.id && onStoryClick) {
                                                             onClose()
                                                             onStoryClick(story.id)
                                                         }
                                                     }}
-                                                    className={`bubble-card overflow-hidden transition-all ${
-                                                        onStoryClick && story.id
-                                                            ? 'hover:shadow-bubble-hover hover:border-blue-200 cursor-pointer'
-                                                            : 'hover:shadow-bubble-hover'
-                                                    }`}
+                                                    className={`bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm transition-all ${onStoryClick && story.id
+                                                            ? 'hover:shadow-md hover:border-blue-300 cursor-pointer'
+                                                            : 'hover:shadow-md'
+                                                        }`}
                                                 >
                                                     {story.media_url && story.media_type === 'photo' && (
                                                         <div className="w-full h-48 bg-gray-100 overflow-hidden">
-                                                            <img 
-                                                                src={story.media_url} 
+                                                            <img
+                                                                src={story.media_url}
                                                                 alt={story.title}
                                                                 className="w-full h-full object-cover"
                                                             />
@@ -284,11 +283,11 @@ export default function LocationDetailsModal({
                                 </div>
 
                                 {/* Middle Column - Metrics */}
-                                <div className="overflow-y-auto p-6" style={{ height: '100%', overflowY: 'auto' }}>
-                                    <div className="flex items-center space-x-2 mb-4">
+                                <div className="overflow-y-auto p-4" style={{ height: '100%', overflowY: 'auto' }}>
+                                    <div className="flex items-center space-x-2 mb-3">
                                         <BarChart3 className="w-4 h-4 text-gray-600" />
                                         <h3 className="text-sm font-semibold text-gray-900">Metrics</h3>
-                                        <span className="status-pill">{Object.keys(metricsByKPI).length}</span>
+                                        <span className="text-xs text-gray-500">({Object.keys(metricsByKPI).length})</span>
                                     </div>
                                     {Object.keys(metricsByKPI).length === 0 ? (
                                         <div className="text-center py-8">
@@ -298,8 +297,8 @@ export default function LocationDetailsModal({
                                     ) : (
                                         <div className="space-y-3">
                                             {Object.values(metricsByKPI).map((group, idx) => (
-                                                <div 
-                                                    key={group.kpi?.id || idx} 
+                                                <div
+                                                    key={group.kpi?.id || idx}
                                                     onClick={(e) => {
                                                         e.stopPropagation()
                                                         if (group.kpi?.id && onMetricClick) {
@@ -307,11 +306,10 @@ export default function LocationDetailsModal({
                                                             onMetricClick(group.kpi.id)
                                                         }
                                                     }}
-                                                    className={`bubble-card transition-all ${
-                                                        onMetricClick && group.kpi?.id
-                                                            ? 'hover:shadow-bubble-hover hover:border-blue-200 cursor-pointer'
-                                                            : 'hover:shadow-bubble-hover'
-                                                    }`}
+                                                    className={`bg-white rounded-xl border-2 transition-all ${onMetricClick && group.kpi?.id
+                                                            ? 'border-blue-200 hover:border-blue-400 hover:shadow-lg cursor-pointer'
+                                                            : 'border-blue-100'
+                                                        } overflow-hidden shadow-sm hover:shadow-md`}
                                                 >
                                                     {/* Modern Metric Card */}
                                                     <div className="p-4">
@@ -372,7 +370,7 @@ export default function LocationDetailsModal({
                                                 const typeInfo = getEvidenceTypeInfo(type as any)
                                                 const IconComponent = getEvidenceIcon(type)
                                                 const colors = getTypeColors(type)
-                                                
+
                                                 return (
                                                     <div key={type} className={`rounded-lg border ${colors.cardBorder} overflow-hidden ${colors.cardBg}`}>
                                                         {/* Evidence Type Card Header */}
@@ -389,19 +387,18 @@ export default function LocationDetailsModal({
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        
+
                                                         {/* Evidence Items List */}
                                                         <div className={`px-3 py-1.5 space-y-1 ${evidenceList.length > 3 ? 'max-h-[150px] overflow-y-auto' : ''}`}>
                                                             {evidenceList.map((ev, idx) => (
-                                                                <div 
+                                                                <div
                                                                     key={ev.id}
                                                                     onClick={() => {
                                                                         setSelectedEvidence(ev)
                                                                         setIsEvidencePreviewOpen(true)
                                                                     }}
-                                                                    className={`flex items-center justify-between py-1.5 px-2 rounded-md transition-all cursor-pointer hover:bg-white/80 hover:shadow-sm ${
-                                                                        idx < evidenceList.length - 1 ? `border-b ${colors.itemBorder}` : ''
-                                                                    }`}
+                                                                    className={`flex items-center justify-between py-1.5 px-2 rounded-md transition-all cursor-pointer hover:bg-white/80 hover:shadow-sm ${idx < evidenceList.length - 1 ? `border-b ${colors.itemBorder}` : ''
+                                                                        }`}
                                                                 >
                                                                     <div className="flex items-center space-x-2 min-w-0 flex-1">
                                                                         <div className={`w-1.5 h-1.5 rounded-full ${colors.dotColor} flex-shrink-0`}></div>

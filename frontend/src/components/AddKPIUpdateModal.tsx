@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { X, Calendar, Hash, MapPin, FileText, Users, Plus, ChevronLeft, ChevronRight, Check, Loader2 } from 'lucide-react'
 import { CreateKPIUpdateForm, BeneficiaryGroup, Location } from '../types'
 import { apiService } from '../services/api'
@@ -51,6 +51,7 @@ export default function AddKPIUpdateModal({
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
     const totalSteps = 3
+    const formContentRef = useRef<HTMLFormElement>(null)
 
     // Reset step when modal opens/closes
     useEffect(() => {
@@ -58,6 +59,13 @@ export default function AddKPIUpdateModal({
             setCurrentStep(1)
         }
     }, [isOpen])
+
+    // Scroll to top when step changes
+    useEffect(() => {
+        if (formContentRef.current) {
+            formContentRef.current.scrollTop = 0
+        }
+    }, [currentStep])
 
     // Load data when modal opens
     useEffect(() => {
@@ -313,7 +321,7 @@ export default function AddKPIUpdateModal({
                 </div>
 
                 {/* Form Content */}
-                <form onSubmit={(e) => { e.preventDefault(); if (currentStep === totalSteps) handleSubmit(e); }} className="flex-1 overflow-y-auto">
+                <form ref={formContentRef} onSubmit={(e) => { e.preventDefault(); if (currentStep === totalSteps) handleSubmit(e); }} className="flex-1 overflow-y-auto">
                     <div className="p-8 min-h-[400px]">
                         {/* Step 1: Value */}
                         {currentStep === 1 && (
