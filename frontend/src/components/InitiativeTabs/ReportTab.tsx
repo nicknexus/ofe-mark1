@@ -1020,7 +1020,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                                         {reportData.totals.map(total => (
                                                             <div key={total.kpi_id} className="p-4 bg-white rounded-xl border border-gray-100 shadow-sm">
                                                                 <h5 className="font-medium text-gray-700 text-sm truncate">{total.kpi_title}</h5>
-                                                                <p className="text-2xl font-bold text-impact-500 mt-2">
+                                                                <p className="text-2xl font-bold text-evidence-500 mt-2">
                                                                     {total.total_value} <span className="text-sm font-normal text-gray-500">{total.unit_of_measurement}</span>
                                                                 </p>
                                                             </div>

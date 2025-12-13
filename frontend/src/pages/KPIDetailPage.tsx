@@ -655,7 +655,7 @@ export default function KPIDetailPage() {
                         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 sm:flex-shrink-0">
                             <button
                                 onClick={() => setIsUpdateModalOpen(true)}
-                                className="flex items-center justify-center space-x-2 px-5 py-2.5 bg-evidence-500 text-white rounded-xl hover:bg-evidence-600 font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25 text-sm"
+                                className="flex items-center justify-center space-x-2 px-5 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25 text-sm"
                             >
                                 <Plus className="w-4 h-4" />
                                 <span>Add Data</span>
@@ -667,11 +667,11 @@ export default function KPIDetailPage() {
                 {/* Stats Cards */}
                 <div className="grid grid-cols-2 gap-3 sm:gap-4">
                     <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-soft-float border border-white/60 p-4 text-center">
-                        <p className="text-xl sm:text-2xl font-bold text-evidence-500">{updates.length}</p>
+                        <p className="text-xl sm:text-2xl font-bold text-primary-500">{updates.length}</p>
                         <p className="text-xs sm:text-sm text-gray-500">Impact Claims</p>
                     </div>
                     <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-soft-float border border-white/60 p-4 text-center">
-                        <p className="text-xl sm:text-2xl font-bold text-impact-500">
+                        <p className="text-xl sm:text-2xl font-bold text-evidence-500">
                             {updates.reduce((sum, update) => sum + update.value, 0)}
                         </p>
                         <p className="text-xs sm:text-sm text-gray-500">Total {kpi.unit_of_measurement}</p>
@@ -743,7 +743,7 @@ export default function KPIDetailPage() {
                     </div>
                     {dateFilter.isActive && (
                         <div className="mt-3 p-3 bg-evidence-50/60 backdrop-blur-sm rounded-xl border border-evidence-200/40">
-                            <p className="text-sm text-evidence-700">
+                            <p className="text-sm text-primary-700">
                                 Showing data from {new Date(dateFilter.startDate).toLocaleDateString()} to {new Date(dateFilter.endDate).toLocaleDateString()}
                             </p>
                         </div>
@@ -761,11 +761,11 @@ export default function KPIDetailPage() {
                             <div className="flex items-center space-x-3">
                                 <div className="flex items-center space-x-4 text-sm">
                                     <div className="text-right">
-                                        <div className="text-lg font-bold text-evidence-500">{dateFilter.isActive ? filteredUpdates.length : updates.length}</div>
+                                        <div className="text-lg font-bold text-primary-500">{dateFilter.isActive ? filteredUpdates.length : updates.length}</div>
                                         <div className="text-xs text-gray-500">Items</div>
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-lg font-bold text-impact-500">
+                                        <div className="text-lg font-bold text-evidence-500">
                                             {dateFilter.isActive ? filteredTotal : updates.reduce((sum, update) => sum + update.value, 0)}
                                         </div>
                                         <div className="text-xs text-gray-500">Total {kpi.unit_of_measurement}</div>
@@ -773,7 +773,7 @@ export default function KPIDetailPage() {
                                 </div>
                                 <button
                                     onClick={() => setIsUpdateModalOpen(true)}
-                                    className="flex items-center space-x-2 px-4 py-2 bg-evidence-100/80 text-evidence-700 rounded-xl hover:bg-evidence-200/80 font-medium transition-all duration-200 text-sm"
+                                    className="flex items-center space-x-2 px-4 py-2 bg-primary-100/80 text-primary-700 rounded-xl hover:bg-primary-200/80 font-medium transition-all duration-200 text-sm"
                                 >
                                     <Plus className="w-4 h-4" />
                                     <span className="hidden sm:inline">Add Impact Claim</span>
@@ -786,8 +786,8 @@ export default function KPIDetailPage() {
                         {dateFilter.isActive && (
                             <div className="mb-4 p-3 bg-evidence-50/60 backdrop-blur-sm rounded-xl border border-evidence-200/40 flex-shrink-0">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium text-evidence-700">Filtered Range Total:</span>
-                                    <span className="text-lg font-bold text-evidence-500">
+                                    <span className="text-sm font-medium text-primary-700">Filtered Range Total:</span>
+                                    <span className="text-lg font-bold text-primary-500">
                                         {filteredTotal} {kpi.unit_of_measurement}
                                     </span>
                                 </div>
@@ -806,7 +806,7 @@ export default function KPIDetailPage() {
                                     {!dateFilter.isActive && (
                                         <button
                                             onClick={() => setIsUpdateModalOpen(true)}
-                                            className="mt-4 px-5 py-2.5 bg-evidence-500 text-white rounded-xl hover:bg-evidence-600 font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25 text-sm"
+                                            className="mt-4 px-5 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25 text-sm"
                                         >
                                             Add First Impact Claim
                                         </button>

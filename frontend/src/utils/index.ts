@@ -93,7 +93,7 @@ export function getEvidenceTypeInfo(type: 'visual_proof' | 'documentation' | 'te
         case 'visual_proof':
             return { icon: '📷', color: 'bg-pink-100 text-pink-800', label: 'Visual Support' }
         case 'documentation':
-            return { icon: '📄', color: 'bg-blue-100 text-blue-800', label: 'Documentation' }
+            return { icon: '📄', color: 'bg-evidence-100 text-evidence-700', label: 'Documentation' }
         case 'testimony':
             return { icon: '🗣️', color: 'bg-orange-100 text-orange-800', label: 'Testemonies' }
         case 'financials':

@@ -802,6 +802,14 @@ export default function ExpandableKPICard({
                                 </div>
                             </div>
                             <div className="flex items-center space-x-2">
+                                <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25">
+                                    <Plus className="w-4 h-4" />
+                                    <span>Add Impact Claim</span>
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); onAddEvidence() }} className="flex items-center space-x-2 px-4 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25">
+                                    <Upload className="w-4 h-4" />
+                                    <span>Add Evidence</span>
+                                </button>
                                 <button onClick={(e) => { e.stopPropagation(); onEdit() }} className="p-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/60 text-gray-600 rounded-xl transition-all duration-200">
                                     <Edit className="w-5 h-5" />
                                 </button>
@@ -816,14 +824,14 @@ export default function ExpandableKPICard({
                     <div className="flex-1 p-3 flex flex-col gap-2 max-w-[1800px] mx-auto overflow-hidden w-full min-h-0">
                         {kpiUpdates.length === 0 ? (
                             <div className="flex justify-center items-center py-12">
-                                <div className="bg-white/80 backdrop-blur-xl border border-evidence-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200 max-w-md">
+                                <div className="bg-white/80 backdrop-blur-xl border border-primary-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200 max-w-md">
                                     <div className="text-center">
-                                        <div className="w-20 h-20 mx-auto mb-5 bg-evidence-100/80 rounded-2xl flex items-center justify-center">
-                                            <BarChart3 className="w-10 h-10 text-evidence-500" />
+                                        <div className="w-20 h-20 mx-auto mb-5 bg-primary-100/80 rounded-2xl flex items-center justify-center">
+                                            <BarChart3 className="w-10 h-10 text-primary-500" />
                                         </div>
                                         <h5 className="text-xl font-bold text-gray-800 mb-2">Create Your First Impact Claim</h5>
                                         <p className="text-sm text-gray-500 mb-6">Start tracking your impact by adding your first impact claim for this metric.</p>
-                                        <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-6 py-3 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25">
+                                        <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25">
                                             <Plus className="w-5 h-5" /><span>Add Impact Claim</span>
                                         </button>
                                     </div>
@@ -832,16 +840,16 @@ export default function ExpandableKPICard({
                         ) : (
                             <>
                                 <div className="grid grid-cols-3 gap-2 flex-shrink-0">
-                                    <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-xl p-2.5 shadow-soft-float">
+                                    <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-2.5 shadow-soft-float">
                                         <div className="flex items-center space-x-2">
-                                            <div className="p-1.5 bg-evidence-100/80 rounded-lg"><BarChart3 className="w-4 h-4 text-evidence-500" /></div>
-                                            <div><p className="text-xs text-gray-500">Impact Claims</p><p className="text-lg font-bold text-evidence-500">{kpi.total_updates}</p></div>
+                                            <div className="p-1.5 bg-primary-100/80 rounded-lg"><BarChart3 className="w-4 h-4 text-primary-500" /></div>
+                                            <div><p className="text-xs text-gray-500">Impact Claims</p><p className="text-lg font-bold text-primary-500">{kpi.total_updates}</p></div>
                                         </div>
                                     </div>
-                                    <div className="bg-white/80 backdrop-blur-xl border border-impact-100/60 rounded-xl p-2.5 shadow-soft-float">
+                                    <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-xl p-2.5 shadow-soft-float">
                                         <div className="flex items-center space-x-2">
-                                            <div className="p-1.5 bg-impact-100/80 rounded-lg"><FileText className="w-4 h-4 text-impact-500" /></div>
-                                            <div><p className="text-xs text-gray-500">Evidence Items</p><p className="text-lg font-bold text-impact-500">{kpi.evidence_count}</p></div>
+                                            <div className="p-1.5 bg-evidence-100/80 rounded-lg"><FileText className="w-4 h-4 text-evidence-500" /></div>
+                                            <div><p className="text-xs text-gray-500">Evidence Items</p><p className="text-lg font-bold text-evidence-500">{kpi.evidence_count}</p></div>
                                         </div>
                                     </div>
                                     <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-2.5 shadow-soft-float">
@@ -857,7 +865,7 @@ export default function ExpandableKPICard({
                                         const IconComponent = getEvidenceIcon(type)
                                         const typeInfo = getEvidenceTypeInfo(type)
                                         const percentage = evidenceTypePercentages[type].percentage
-                                        const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' : typeInfo.color.includes('blue') ? 'text-blue-600' : typeInfo.color.includes('orange') ? 'text-orange-600' : typeInfo.color.includes('green') ? 'text-primary-500' : 'text-gray-600'
+                                        const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' : typeInfo.color.includes('blue') ? 'text-evidence-600' : typeInfo.color.includes('orange') ? 'text-orange-600' : typeInfo.color.includes('green') ? 'text-primary-500' : 'text-gray-600'
                                         return (
                                             <div key={type} className="flex items-center gap-1.5 flex-1 min-w-0">
                                                 <IconComponent className={`w-3.5 h-3.5 ${colorClasses} flex-shrink-0`} />
@@ -918,17 +926,17 @@ export default function ExpandableKPICard({
                                     {/* Impact Claims - Full Height */}
                                     <div className="lg:col-span-2 flex flex-col min-h-0 overflow-hidden">
                                         {kpiUpdates && kpiUpdates.length > 0 ? (
-                                            <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-xl p-3 shadow-soft-float flex flex-col flex-1 min-h-0">
+                                            <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-3 shadow-soft-float flex flex-col flex-1 min-h-0">
                                                 <div className="flex items-center justify-between mb-2 flex-shrink-0">
                                                     <h5 className="text-sm font-semibold text-gray-800">Impact Claims ({kpiUpdates.length})</h5>
-                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-1.5 px-3 py-1.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-lg font-semibold text-xs transition-all duration-200 shadow-lg shadow-evidence-500/25"><Plus className="w-3.5 h-3.5" /><span>Add</span></button>
+                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25"><Plus className="w-4 h-4" /><span>Add Impact Claim</span></button>
                                                 </div>
                                                 <div className="flex-1 overflow-y-auto space-y-1 pr-1 min-h-0">
                                                     {kpiUpdates.map((update, index) => (
-                                                        <div key={update.id || index} className="border border-gray-100/80 rounded-lg bg-white/60 hover:bg-evidence-50/50 hover:border-evidence-200 cursor-pointer transition-all duration-200 p-2" onClick={() => handleDataPointClick(update)}>
+                                                        <div key={update.id || index} className="border border-gray-100/80 rounded-lg bg-white/60 hover:bg-primary-50/50 hover:border-primary-200 cursor-pointer transition-all duration-200 p-2" onClick={() => handleDataPointClick(update)}>
                                                             <div className="flex items-center justify-between">
                                                                 <div className="min-w-0 flex-1">
-                                                                    <span className="text-xs font-semibold text-evidence-600">{update.value?.toLocaleString()} {kpi.unit_of_measurement}</span>
+                                                                    <span className="text-xs font-semibold text-primary-600">{update.value?.toLocaleString()} {kpi.unit_of_measurement}</span>
                                                                     <div className="flex items-center space-x-1.5 mt-0.5"><Calendar className="w-2.5 h-2.5 text-gray-400" /><span className="text-[10px] text-gray-500">{update.date_range_start && update.date_range_end ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}` : formatDate(update.date_represented)}</span></div>
                                                                 </div>
                                                                 <div className="flex items-center gap-1.5">
@@ -949,17 +957,15 @@ export default function ExpandableKPICard({
                                                                                         <span>0% Supported</span>
                                                                                     </div>
                                                                                 )}
-                                                                                {supportPercentage < 100 && (
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={(e) => handleAddEvidenceForClaim(update, e)}
-                                                                                        className="flex items-center gap-1 px-2 py-1 bg-impact-100 hover:bg-impact-200 text-impact-700 rounded-md text-[10px] font-medium transition-colors"
-                                                                                        title="Add supporting evidence for this claim"
-                                                                                    >
-                                                                                        <Upload className="w-2.5 h-2.5" />
-                                                                                        <span>Support</span>
-                                                                                    </button>
-                                                                                )}
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={(e) => handleAddEvidenceForClaim(update, e)}
+                                                                                    className="flex items-center gap-1 px-2 py-1 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-[10px] font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
+                                                                                    title="Add supporting evidence for this claim"
+                                                                                >
+                                                                                    <Upload className="w-2.5 h-2.5" />
+                                                                                    <span>Add Evidence</span>
+                                                                                </button>
                                                                             </>
                                                                         )
                                                                     })()}
@@ -973,7 +979,7 @@ export default function ExpandableKPICard({
                                                 <div className="pt-2 mt-2 border-t border-gray-100 flex-shrink-0">
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); setIsAllEvidenceModalOpen(true) }}
-                                                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-impact-50 hover:bg-impact-100 text-impact-700 rounded-lg font-semibold text-xs transition-all duration-200 border border-impact-200"
+                                                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-xs transition-all duration-200 shadow-lg shadow-evidence-500/25"
                                                     >
                                                         <FileText className="w-3.5 h-3.5" />
                                                         <span>View All Evidence ({evidence.length})</span>
@@ -981,11 +987,11 @@ export default function ExpandableKPICard({
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-evidence-300/60 rounded-xl p-4 shadow-soft-float flex-1">
+                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-primary-300/60 rounded-xl p-4 shadow-soft-float flex-1">
                                                 <div className="text-center">
-                                                    <div className="w-10 h-10 mx-auto mb-2 bg-evidence-100/80 rounded-lg flex items-center justify-center"><BarChart3 className="w-5 h-5 text-evidence-500" /></div>
+                                                    <div className="w-10 h-10 mx-auto mb-2 bg-primary-100/80 rounded-lg flex items-center justify-center"><BarChart3 className="w-5 h-5 text-primary-500" /></div>
                                                     <h5 className="text-sm font-semibold text-gray-800 mb-2">Impact Claims</h5>
-                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-1.5 px-4 py-2 bg-evidence-500 hover:bg-evidence-600 text-white rounded-lg font-semibold text-xs transition-all duration-200 shadow-lg shadow-evidence-500/25"><Plus className="w-4 h-4" /><span>Add</span></button>
+                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25"><Plus className="w-4 h-4" /><span>Add Impact Claim</span></button>
                                                 </div>
                                             </div>
                                         )}
@@ -1132,11 +1138,11 @@ export default function ExpandableKPICard({
     }
 
     return (
-        <div className={`bg-white/90 backdrop-blur-xl border-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden ${(kpi.evidence_percentage || 0) >= 80
-            ? 'border-primary-300/60 hover:border-primary-400/60'
+        <div className={`bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] border transition-all duration-300 overflow-hidden ${(kpi.evidence_percentage || 0) >= 80
+            ? 'border-primary-200/60 hover:border-primary-300/60'
             : (kpi.evidence_percentage || 0) >= 30
-                ? 'border-yellow-300/60 hover:border-yellow-400/60'
-                : 'border-red-300/60 hover:border-red-400/60'
+                ? 'border-yellow-200/60 hover:border-yellow-300/60'
+                : 'border-red-200/60 hover:border-red-300/60'
             }`}>
             {/* Collapsed View - New Layout */}
             <div
@@ -1146,7 +1152,7 @@ export default function ExpandableKPICard({
                 {/* Main Content Section */}
                 <div className="flex flex-1 min-h-0">
                     {/* Left Section - ~70% width */}
-                    <div className="w-[70%] bg-gradient-to-br from-blue-50/50 to-indigo-50/30 p-2.5 flex flex-col">
+                    <div className="w-[70%] p-3 flex flex-col">
                         {/* Category Badge */}
                         <div className="mb-2">
                             <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${getCategoryColor(kpi.category)}`}>
@@ -1175,23 +1181,23 @@ export default function ExpandableKPICard({
                     </div>
 
                     {/* Right Section - ~30% width */}
-                    <div className="w-[30%] bg-gradient-to-br from-purple-50/50 to-pink-50/30 p-3 flex flex-col border-l border-gray-200/50">
+                    <div className="w-[30%] p-3 flex flex-col border-l border-gray-100">
                         {/* Impact Claims */}
                         <div className="mb-2">
                             <div className="text-[9px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">
                                 Impact Claims
                             </div>
-                            <div className="text-2xl font-extrabold text-purple-700">
+                            <div className="text-2xl font-extrabold text-primary-500">
                                 {kpi.total_updates || 0}
                             </div>
                         </div>
 
-                        {/* Evidence Claims */}
+                        {/* Evidence Items */}
                         <div className="mb-3">
                             <div className="text-[9px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">
-                                Evidence Claims
+                                Evidence Items
                             </div>
-                            <div className="text-2xl font-extrabold text-pink-700">
+                            <div className="text-2xl font-extrabold text-evidence-500">
                                 {kpi.evidence_count || 0}
                             </div>
                         </div>
@@ -1205,7 +1211,7 @@ export default function ExpandableKPICard({
 
                                 // Extract color classes from typeInfo
                                 const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' :
-                                    typeInfo.color.includes('blue') ? 'text-blue-600' :
+                                    typeInfo.color.includes('blue') ? 'text-evidence-600' :
                                         typeInfo.color.includes('orange') ? 'text-orange-600' :
                                             typeInfo.color.includes('green') ? 'text-primary-500' :
                                                 'text-gray-600'
@@ -1227,7 +1233,7 @@ export default function ExpandableKPICard({
                 </div>
 
                 {/* Progress Bar Section - Full width at bottom */}
-                <div className="px-3 py-2 bg-gradient-to-r from-gray-50 to-gray-100/50 border-t border-gray-200/50">
+                <div className="px-3 py-2.5 border-t border-gray-100">
                     <div className="flex items-center justify-between text-[10px] mb-1">
                         <span className="font-semibold text-gray-600">Evidence Coverage</span>
                         <span className={`font-bold ${(kpi.evidence_percentage || 0) >= 80
@@ -1283,7 +1289,7 @@ export default function ExpandableKPICard({
                                         e.stopPropagation()
                                         onAddUpdate()
                                     }}
-                                    className="flex items-center space-x-2 px-4 py-2.5 bg-evidence-100/80 hover:bg-evidence-200/80 text-evidence-700 rounded-xl text-sm font-medium transition-all duration-200"
+                                    className="flex items-center space-x-2 px-4 py-2.5 bg-primary-100/80 hover:bg-primary-200/80 text-evidence-700 rounded-xl text-sm font-medium transition-all duration-200"
                                 >
                                     <Plus className="w-4 h-4" />
                                     <span>Add Impact Claim</span>
@@ -1294,7 +1300,7 @@ export default function ExpandableKPICard({
                                             e.stopPropagation()
                                             onAddEvidence()
                                         }}
-                                        className="flex items-center space-x-2 px-4 py-2.5 bg-impact-100/80 hover:bg-impact-200/80 text-impact-700 rounded-xl text-sm font-medium transition-all duration-200"
+                                        className="flex items-center space-x-2 px-4 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
                                     >
                                         <Upload className="w-4 h-4" />
                                         <span>Add Evidence</span>
@@ -1339,10 +1345,10 @@ export default function ExpandableKPICard({
                         {kpiUpdates.length === 0 ? (
                             /* Fresh Metric - Show only Add Impact Claim button */
                             <div className="flex justify-center items-center py-12">
-                                <div className="bg-white/80 backdrop-blur-xl border border-evidence-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200 max-w-md">
+                                <div className="bg-white/80 backdrop-blur-xl border border-primary-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200 max-w-md">
                                     <div className="text-center">
-                                        <div className="w-20 h-20 mx-auto mb-5 bg-evidence-100/80 rounded-2xl flex items-center justify-center">
-                                            <BarChart3 className="w-10 h-10 text-evidence-500" />
+                                        <div className="w-20 h-20 mx-auto mb-5 bg-primary-100/80 rounded-2xl flex items-center justify-center">
+                                            <BarChart3 className="w-10 h-10 text-primary-500" />
                                         </div>
                                         <h5 className="text-xl font-bold text-gray-800 mb-2">Create Your First Impact Claim</h5>
                                         <p className="text-sm text-gray-500 mb-6">Start tracking your impact by adding your first impact claim for this metric.</p>
@@ -1351,7 +1357,7 @@ export default function ExpandableKPICard({
                                                 e.stopPropagation()
                                                 onAddUpdate()
                                             }}
-                                            className="inline-flex items-center space-x-2 px-6 py-3 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
+                                            className="inline-flex items-center space-x-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25"
                                         >
                                             <Plus className="w-5 h-5" />
                                             <span>Add Impact Claim</span>
@@ -1363,26 +1369,26 @@ export default function ExpandableKPICard({
                             <>
                                 {/* Stats Grid */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                    <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-2xl p-4 shadow-soft-float">
+                                    <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-2xl p-4 shadow-soft-float">
                                         <div className="flex items-center space-x-3">
-                                            <div className="p-2.5 bg-evidence-100/80 rounded-xl">
-                                                <BarChart3 className="w-5 h-5 text-evidence-500" />
+                                            <div className="p-2.5 bg-primary-100/80 rounded-xl">
+                                                <BarChart3 className="w-5 h-5 text-primary-500" />
                                             </div>
                                             <div>
                                                 <p className="text-sm text-gray-500">Impact Claims</p>
-                                                <p className="text-xl font-bold text-evidence-500">{kpi.total_updates}</p>
+                                                <p className="text-xl font-bold text-primary-500">{kpi.total_updates}</p>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="bg-white/80 backdrop-blur-xl border border-impact-100/60 rounded-2xl p-4 shadow-soft-float">
+                                    <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-2xl p-4 shadow-soft-float">
                                         <div className="flex items-center space-x-3">
-                                            <div className="p-2.5 bg-impact-100/80 rounded-xl">
-                                                <FileText className="w-5 h-5 text-impact-500" />
+                                            <div className="p-2.5 bg-evidence-100/80 rounded-xl">
+                                                <FileText className="w-5 h-5 text-evidence-500" />
                                             </div>
                                             <div>
                                                 <p className="text-sm text-gray-500">Evidence Items</p>
-                                                <p className="text-xl font-bold text-impact-500">{kpi.evidence_count}</p>
+                                                <p className="text-xl font-bold text-evidence-500">{kpi.evidence_count}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -1408,7 +1414,7 @@ export default function ExpandableKPICard({
                                         const percentage = evidenceTypePercentages[type].percentage
 
                                         const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' :
-                                            typeInfo.color.includes('blue') ? 'text-blue-600' :
+                                            typeInfo.color.includes('blue') ? 'text-evidence-600' :
                                                 typeInfo.color.includes('orange') ? 'text-orange-600' :
                                                     typeInfo.color.includes('green') ? 'text-primary-500' :
                                                         'text-gray-600'
@@ -1480,19 +1486,19 @@ export default function ExpandableKPICard({
                                     {/* Impact Claims - Full Height */}
                                     <div className="lg:col-span-2 flex flex-col">
                                         {kpiUpdates && kpiUpdates.length > 0 ? (
-                                            <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-2xl p-4 shadow-soft-float flex flex-col flex-1 max-h-[calc(100vh-400px)]">
+                                            <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-2xl p-4 shadow-soft-float flex flex-col flex-1 max-h-[calc(100vh-400px)]">
                                                 <div className="flex items-center justify-between mb-3 flex-shrink-0">
                                                     <h5 className="text-base font-semibold text-gray-800">Impact Claims ({kpiUpdates.length})</h5>
-                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-2 px-4 py-2 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25">
+                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25">
                                                         <Plus className="w-4 h-4" /><span>Add</span>
                                                     </button>
                                                 </div>
                                                 <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
                                                     {kpiUpdates.map((update, index) => (
-                                                        <div key={update.id || index} className="border border-gray-100/80 rounded-xl bg-white/60 hover:bg-evidence-50/50 hover:border-evidence-200 cursor-pointer transition-all duration-200 p-2.5" onClick={() => handleDataPointClick(update)}>
+                                                        <div key={update.id || index} className="border border-gray-100/80 rounded-xl bg-white/60 hover:bg-primary-50/50 hover:border-primary-200 cursor-pointer transition-all duration-200 p-2.5" onClick={() => handleDataPointClick(update)}>
                                                             <div className="flex items-center justify-between">
                                                                 <div className="min-w-0 flex-1">
-                                                                    <span className="text-sm font-semibold text-evidence-600">{update.value?.toLocaleString()} {kpi.unit_of_measurement}</span>
+                                                                    <span className="text-sm font-semibold text-primary-600">{update.value?.toLocaleString()} {kpi.unit_of_measurement}</span>
                                                                     <div className="flex items-center space-x-2 mt-0.5">
                                                                         <Calendar className="w-3 h-3 text-gray-400" />
                                                                         <span className="text-xs text-gray-500">{update.date_range_start && update.date_range_end ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}` : formatDate(update.date_represented)}</span>
@@ -1516,17 +1522,15 @@ export default function ExpandableKPICard({
                                                                                         <span>0% covered</span>
                                                                                     </div>
                                                                                 )}
-                                                                                {supportPercentage < 100 && (
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={(e) => handleAddEvidenceForClaim(update, e)}
-                                                                                        className="flex items-center gap-1 px-2.5 py-1.5 bg-impact-100 hover:bg-impact-200 text-impact-700 rounded-lg text-xs font-medium transition-colors"
-                                                                                        title="Add supporting evidence for this claim"
-                                                                                    >
-                                                                                        <Upload className="w-3 h-3" />
-                                                                                        <span>Support</span>
-                                                                                    </button>
-                                                                                )}
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={(e) => handleAddEvidenceForClaim(update, e)}
+                                                                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-xs font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
+                                                                                    title="Add supporting evidence for this claim"
+                                                                                >
+                                                                                    <Upload className="w-3 h-3" />
+                                                                                    <span>Add Evidence</span>
+                                                                                </button>
                                                                             </>
                                                                         )
                                                                     })()}
@@ -1540,7 +1544,7 @@ export default function ExpandableKPICard({
                                                 <div className="pt-3 mt-3 border-t border-gray-100 flex-shrink-0">
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); setIsAllEvidenceModalOpen(true) }}
-                                                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-impact-50 hover:bg-impact-100 text-impact-700 rounded-xl font-semibold text-sm transition-all duration-200 border border-impact-200"
+                                                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25"
                                                     >
                                                         <FileText className="w-4 h-4" />
                                                         <span>View All Evidence ({evidence.length})</span>
@@ -1548,11 +1552,11 @@ export default function ExpandableKPICard({
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-evidence-300/60 rounded-2xl p-6 shadow-soft-float flex-1">
+                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-primary-300/60 rounded-2xl p-6 shadow-soft-float flex-1">
                                                 <div className="text-center">
-                                                    <div className="w-14 h-14 mx-auto mb-3 bg-evidence-100/80 rounded-xl flex items-center justify-center"><BarChart3 className="w-7 h-7 text-evidence-500" /></div>
+                                                    <div className="w-14 h-14 mx-auto mb-3 bg-primary-100/80 rounded-xl flex items-center justify-center"><BarChart3 className="w-7 h-7 text-primary-500" /></div>
                                                     <h5 className="text-base font-semibold text-gray-800 mb-2">Impact Claims</h5>
-                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-5 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25">
+                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25">
                                                         <Plus className="w-5 h-5" /><span>Add Impact Claim</span>
                                                     </button>
                                                 </div>
@@ -1590,7 +1594,7 @@ export default function ExpandableKPICard({
                                         e.stopPropagation()
                                         onAddUpdate()
                                     }}
-                                    className="flex items-center space-x-2 px-4 py-2.5 bg-evidence-100/80 hover:bg-evidence-200/80 text-evidence-700 rounded-xl text-sm font-medium transition-all duration-200"
+                                    className="flex items-center space-x-2 px-4 py-2.5 bg-primary-100/80 hover:bg-primary-200/80 text-evidence-700 rounded-xl text-sm font-medium transition-all duration-200"
                                 >
                                     <Plus className="w-4 h-4" />
                                     <span>Add Impact Claim</span>
@@ -1601,7 +1605,7 @@ export default function ExpandableKPICard({
                                             e.stopPropagation()
                                             onAddEvidence()
                                         }}
-                                        className="flex items-center space-x-2 px-4 py-2.5 bg-impact-100/80 hover:bg-impact-200/80 text-impact-700 rounded-xl text-sm font-medium transition-all duration-200"
+                                        className="flex items-center space-x-2 px-4 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
                                     >
                                         <Upload className="w-4 h-4" />
                                         <span>Add Evidence</span>
@@ -1646,10 +1650,10 @@ export default function ExpandableKPICard({
                         {kpiUpdates.length === 0 ? (
                             /* Fresh Metric - Show only Add Impact Claim button */
                             <div className="flex justify-center items-center py-12">
-                                <div className="bg-white/80 backdrop-blur-xl border border-evidence-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200 max-w-md">
+                                <div className="bg-white/80 backdrop-blur-xl border border-primary-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200 max-w-md">
                                     <div className="text-center">
-                                        <div className="w-20 h-20 mx-auto mb-5 bg-evidence-100/80 rounded-2xl flex items-center justify-center">
-                                            <BarChart3 className="w-10 h-10 text-evidence-500" />
+                                        <div className="w-20 h-20 mx-auto mb-5 bg-primary-100/80 rounded-2xl flex items-center justify-center">
+                                            <BarChart3 className="w-10 h-10 text-primary-500" />
                                         </div>
                                         <h5 className="text-xl font-bold text-gray-800 mb-2">Create Your First Impact Claim</h5>
                                         <p className="text-sm text-gray-500 mb-6">Start tracking your impact by adding your first impact claim for this metric.</p>
@@ -1658,7 +1662,7 @@ export default function ExpandableKPICard({
                                                 e.stopPropagation()
                                                 onAddUpdate()
                                             }}
-                                            className="inline-flex items-center space-x-2 px-6 py-3 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
+                                            className="inline-flex items-center space-x-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25"
                                         >
                                             <Plus className="w-5 h-5" />
                                             <span>Add Impact Claim</span>
@@ -1670,26 +1674,26 @@ export default function ExpandableKPICard({
                             <>
                                 {/* Stats Grid */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                    <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-2xl p-4 shadow-soft-float">
+                                    <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-2xl p-4 shadow-soft-float">
                                         <div className="flex items-center space-x-3">
-                                            <div className="p-2.5 bg-evidence-100/80 rounded-xl">
-                                                <BarChart3 className="w-5 h-5 text-evidence-500" />
+                                            <div className="p-2.5 bg-primary-100/80 rounded-xl">
+                                                <BarChart3 className="w-5 h-5 text-primary-500" />
                                             </div>
                                             <div>
                                                 <p className="text-sm text-gray-500">Impact Claims</p>
-                                                <p className="text-xl font-bold text-evidence-500">{kpi.total_updates}</p>
+                                                <p className="text-xl font-bold text-primary-500">{kpi.total_updates}</p>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="bg-white/80 backdrop-blur-xl border border-impact-100/60 rounded-2xl p-4 shadow-soft-float">
+                                    <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-2xl p-4 shadow-soft-float">
                                         <div className="flex items-center space-x-3">
-                                            <div className="p-2.5 bg-impact-100/80 rounded-xl">
-                                                <FileText className="w-5 h-5 text-impact-500" />
+                                            <div className="p-2.5 bg-evidence-100/80 rounded-xl">
+                                                <FileText className="w-5 h-5 text-evidence-500" />
                                             </div>
                                             <div>
                                                 <p className="text-sm text-gray-500">Evidence Items</p>
-                                                <p className="text-xl font-bold text-impact-500">{kpi.evidence_count}</p>
+                                                <p className="text-xl font-bold text-evidence-500">{kpi.evidence_count}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -1716,7 +1720,7 @@ export default function ExpandableKPICard({
 
                                         // Extract color classes from typeInfo
                                         const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' :
-                                            typeInfo.color.includes('blue') ? 'text-blue-600' :
+                                            typeInfo.color.includes('blue') ? 'text-evidence-600' :
                                                 typeInfo.color.includes('orange') ? 'text-orange-600' :
                                                     typeInfo.color.includes('green') ? 'text-primary-500' :
                                                         'text-gray-600'
@@ -1848,7 +1852,7 @@ export default function ExpandableKPICard({
                                     {/* Impact Claims - Full Height */}
                                     <div className="lg:col-span-2 flex flex-col">
                                         {kpiUpdates && kpiUpdates.length > 0 ? (
-                                            <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-2xl p-4 shadow-soft-float flex flex-col flex-1 max-h-[calc(100vh-400px)]">
+                                            <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-2xl p-4 shadow-soft-float flex flex-col flex-1 max-h-[calc(100vh-400px)]">
                                                 <div className="flex items-center justify-between mb-3 flex-shrink-0">
                                                     <h5 className="text-base font-semibold text-gray-800">Impact Claims ({kpiUpdates.length})</h5>
                                                     <div className="flex items-center space-x-3">
@@ -1861,7 +1865,7 @@ export default function ExpandableKPICard({
                                                                 e.stopPropagation()
                                                                 onAddUpdate()
                                                             }}
-                                                            className="flex items-center space-x-2 px-4 py-2 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25"
+                                                            className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25"
                                                         >
                                                             <Plus className="w-4 h-4" />
                                                             <span>Add</span>
@@ -1880,13 +1884,13 @@ export default function ExpandableKPICard({
                                                         return (
                                                             <div
                                                                 key={update.id || index}
-                                                                className="border border-gray-100/80 rounded-xl bg-white/60 hover:bg-evidence-50/50 hover:border-evidence-200 cursor-pointer transition-all duration-200 p-2.5"
+                                                                className="border border-gray-100/80 rounded-xl bg-white/60 hover:bg-primary-50/50 hover:border-primary-200 cursor-pointer transition-all duration-200 p-2.5"
                                                                 onClick={() => handleDataPointClick(update)}
                                                             >
                                                                 <div className="flex items-center justify-between">
                                                                     <div className="min-w-0 flex-1">
                                                                         <div className="flex items-center space-x-2">
-                                                                            <span className="text-sm font-semibold text-evidence-600">
+                                                                            <span className="text-sm font-semibold text-primary-600">
                                                                                 {update.value?.toLocaleString()} {kpi.unit_of_measurement}
                                                                             </span>
                                                                         </div>
@@ -1914,17 +1918,15 @@ export default function ExpandableKPICard({
                                                                                             <span>{supportPercentage}% Supported</span>
                                                                                         </div>
                                                                                     )}
-                                                                                    {supportPercentage < 100 && (
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={(e) => handleAddEvidenceForClaim(update, e)}
-                                                                                            className="flex items-center gap-1 px-2.5 py-1.5 bg-impact-100 hover:bg-impact-200 text-impact-700 rounded-lg text-xs font-medium transition-colors"
-                                                                                            title="Add supporting evidence for this claim"
-                                                                                        >
-                                                                                            <Upload className="w-3 h-3" />
-                                                                                            <span>Support</span>
-                                                                                        </button>
-                                                                                    )}
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={(e) => handleAddEvidenceForClaim(update, e)}
+                                                                                        className="flex items-center gap-1 px-2.5 py-1.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-xs font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
+                                                                                        title="Add supporting evidence for this claim"
+                                                                                    >
+                                                                                        <Upload className="w-3 h-3" />
+                                                                                        <span>Add Evidence</span>
+                                                                                    </button>
                                                                                 </>
                                                                             )
                                                                         })()}
@@ -1939,7 +1941,7 @@ export default function ExpandableKPICard({
                                                 <div className="pt-3 mt-3 border-t border-gray-100 flex-shrink-0">
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); setIsAllEvidenceModalOpen(true) }}
-                                                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-impact-50 hover:bg-impact-100 text-impact-700 rounded-xl font-semibold text-sm transition-all duration-200 border border-impact-200"
+                                                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25"
                                                     >
                                                         <FileText className="w-4 h-4" />
                                                         <span>View All Evidence ({evidence.length})</span>
@@ -1947,10 +1949,10 @@ export default function ExpandableKPICard({
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-evidence-300/60 rounded-2xl p-6 shadow-soft-float flex-1">
+                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-primary-300/60 rounded-2xl p-6 shadow-soft-float flex-1">
                                                 <div className="text-center">
-                                                    <div className="w-14 h-14 mx-auto mb-3 bg-evidence-100/80 rounded-xl flex items-center justify-center">
-                                                        <BarChart3 className="w-7 h-7 text-evidence-500" />
+                                                    <div className="w-14 h-14 mx-auto mb-3 bg-primary-100/80 rounded-xl flex items-center justify-center">
+                                                        <BarChart3 className="w-7 h-7 text-primary-500" />
                                                     </div>
                                                     <h5 className="text-base font-semibold text-gray-800 mb-2">Impact Claims</h5>
                                                     <p className="text-sm text-gray-500 mb-4">You haven't added any of this type, add it here!</p>
@@ -1959,7 +1961,7 @@ export default function ExpandableKPICard({
                                                             e.stopPropagation()
                                                             onAddUpdate()
                                                         }}
-                                                        className="inline-flex items-center space-x-2 px-5 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
+                                                        className="inline-flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25"
                                                     >
                                                         <Plus className="w-5 h-5" />
                                                         <span>Add Impact Claim</span>

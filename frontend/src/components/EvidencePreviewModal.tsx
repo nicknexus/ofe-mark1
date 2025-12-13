@@ -192,38 +192,38 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
     return (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[70] animate-fade-in">
             <div className="bubble-card max-w-4xl w-full max-h-[90vh] overflow-hidden animate-slide-up">
-                {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-100">
-                    <div className="flex items-center gap-4">
-                        <div className={`icon-bubble ${typeInfo.color}`}>
-                            <IconComponent className="w-5 h-5" />
+                {/* Header - Evidence grey */}
+                <div className="flex items-center justify-between p-5 bg-gradient-to-r from-evidence-500 to-evidence-600">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+                            <FileText className="w-5 h-5 text-white" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-gray-900">Evidence</h2>
-                            <p className="text-sm text-gray-500">{evidence.title}</p>
+                            <h2 className="text-lg font-bold text-white">Evidence</h2>
+                            <p className="text-sm text-white/80">{typeInfo.label}</p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
+                        className="p-2 rounded-xl hover:bg-white/20 transition-colors"
                     >
-                        <X className="w-5 h-5 text-gray-400" />
+                        <X className="w-5 h-5 text-white" />
                     </button>
                 </div>
 
                 {/* Content */}
-                <div className="flex flex-col lg:flex-row max-h-[calc(90vh-80px)]">
+                <div className="flex flex-col lg:flex-row max-h-[calc(90vh-140px)]">
                     {/* Left Side - File Preview */}
                     {evidenceFiles.length > 0 && (
-                        <div className="w-full lg:w-1/2 p-6 border-r border-gray-200 overflow-y-auto">
-                            <div className="sticky top-0 bg-white pb-4 mb-4 border-b border-gray-100">
+                        <div className="w-full lg:w-1/2 p-5 border-r border-gray-200 overflow-y-auto">
+                            <div className="sticky top-0 bg-white pb-3 mb-3 border-b border-gray-100">
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="icon-bubble-sm bg-primary-100">
-                                            <FileText className="w-4 h-4 text-primary-600" />
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-7 h-7 rounded-lg bg-evidence-500 flex items-center justify-center shadow-lg shadow-evidence-500/25">
+                                            <FileText className="w-3.5 h-3.5 text-white" />
                                         </div>
                                         <h3 className="text-sm font-semibold text-gray-700">Files</h3>
-                                        <span className="status-pill">{evidenceFiles.length}</span>
+                                        <span className="text-xs bg-evidence-100 text-evidence-700 px-2 py-0.5 rounded-full font-medium">{evidenceFiles.length}</span>
                                     </div>
                                     {evidenceFiles.length > 1 && (
                                         <div className="flex items-center gap-2">
@@ -248,18 +248,18 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                             </div>
 
                             {/* File Preview */}
-                            <div className="flex items-center justify-center min-h-[400px] bg-gray-50 rounded-xl p-6 mb-4">
+                            <div className="flex items-center justify-center min-h-[350px] bg-gray-50 rounded-xl p-5 mb-3">
                                 {loadingFiles ? (
                                     <div className="flex flex-col items-center space-y-2">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-evidence-500"></div>
                                         <p className="text-sm text-gray-500">Loading files...</p>
                                     </div>
                                 ) : currentFile && isImage(currentFile.file_url) ? (
-                                    <div className="max-w-full max-h-[500px] relative">
+                                    <div className="max-w-full max-h-[400px] relative">
                                         {imageLoading && (
                                             <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg z-10">
                                                 <div className="flex flex-col items-center space-y-2">
-                                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500"></div>
+                                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-evidence-500"></div>
                                                     <p className="text-xs text-gray-500">Loading image...</p>
                                                 </div>
                                             </div>
@@ -267,7 +267,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                         <img
                                             src={currentFile.file_url}
                                             alt={currentFile.file_name}
-                                            className="max-w-full max-h-[500px] object-contain rounded-lg shadow-lg"
+                                            className="max-w-full max-h-[400px] object-contain rounded-lg shadow-lg"
                                             onLoad={() => setImageLoading(false)}
                                             onError={() => setImageLoading(false)}
                                         />
@@ -289,7 +289,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                                         href={currentFile.file_url}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="flex-1 btn-primary inline-flex items-center justify-center space-x-2"
+                                                        className="flex-1 bg-evidence-500 hover:bg-evidence-600 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-200 inline-flex items-center justify-center space-x-2 shadow-lg shadow-evidence-500/25"
                                                     >
                                                         <ExternalLink className="w-4 h-4" />
                                                         <span>View</span>
@@ -316,7 +316,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                                 href={currentFile.file_url}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="btn-primary inline-flex items-center space-x-2"
+                                                className="bg-evidence-500 hover:bg-evidence-600 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-200 inline-flex items-center space-x-2 shadow-lg shadow-evidence-500/25"
                                             >
                                                 <ExternalLink className="w-4 h-4" />
                                                 <span>View</span>
@@ -336,7 +336,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
 
                             {/* Thumbnail strip */}
                             {evidenceFiles.length > 1 && (
-                                <div className="flex justify-center space-x-2 overflow-x-auto py-2 mb-4">
+                                <div className="flex justify-center space-x-2 overflow-x-auto py-2 mb-3">
                                     {evidenceFiles.map((file, index) => (
                                         <button
                                             key={file.id}
@@ -344,9 +344,9 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                                 setCurrentFileIndex(index)
                                                 setImageLoading(true)
                                             }}
-                                            className={`flex-shrink-0 w-14 h-14 rounded-lg border-2 overflow-hidden transition-all ${
+                                            className={`flex-shrink-0 w-12 h-12 rounded-lg border-2 overflow-hidden transition-all ${
                                                 index === currentFileIndex 
-                                                    ? 'border-primary-500 ring-2 ring-primary-200' 
+                                                    ? 'border-evidence-500 ring-2 ring-evidence-200' 
                                                     : 'border-gray-200 hover:border-gray-300'
                                             }`}
                                         >
@@ -358,7 +358,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                                 />
                                             ) : (
                                                 <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                                                    <FileText className="w-6 h-6 text-gray-400" />
+                                                    <FileText className="w-5 h-5 text-gray-400" />
                                                 </div>
                                             )}
                                         </button>
@@ -371,7 +371,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                 <div className="flex justify-center">
                                     <button
                                         onClick={handleDownloadAll}
-                                        className="btn-secondary inline-flex items-center space-x-2"
+                                        className="btn-secondary inline-flex items-center space-x-2 text-sm"
                                     >
                                         <Download className="w-4 h-4" />
                                         <span>Download All ({evidenceFiles.length} files)</span>
@@ -382,199 +382,208 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                     )}
 
                     {/* Right Side - Details */}
-                    <div className="w-full lg:w-1/2 p-6 overflow-y-auto">
-                        {/* Main Evidence Display */}
-                        <div className="bg-gradient-to-br from-primary-50/80 to-primary-50/40 rounded-2xl p-6 border border-primary-100/60 mb-6">
-                            <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                    <p className="text-sm font-medium text-primary-600 mb-2 uppercase tracking-wide">Evidence Type</p>
-                                    <div className="flex items-center gap-3">
-                                        <div className={`p-3 rounded-lg ${typeInfo.color}`}>
-                                            <IconComponent className="w-6 h-6" />
-                                        </div>
-                                        <h3 className="text-2xl font-bold text-gray-900">{typeInfo.label}</h3>
+                    <div className={`w-full ${evidenceFiles.length > 0 ? 'lg:w-1/2' : ''} p-5 overflow-y-auto`}>
+                        {/* Main Evidence Banner - Title, Type, Date, Location */}
+                        <div className="bg-gradient-to-br from-evidence-50/80 to-evidence-50/40 rounded-2xl border border-evidence-100/60 overflow-hidden mb-4">
+                            {/* Top Row - Title and Type */}
+                            <div className="p-5 pb-3">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-semibold text-evidence-600 mb-1.5 uppercase tracking-wider">Evidence Title</p>
+                                        <h3 className="text-xl font-bold text-gray-900 line-clamp-2">{evidence.title}</h3>
+                                    </div>
+                                    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${typeInfo.color} flex-shrink-0`}>
+                                        <IconComponent className="w-4 h-4" />
+                                        <span className="text-xs font-semibold">{typeInfo.label}</span>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-
-                        {/* Info Grid */}
-                        <div className="grid grid-cols-1 gap-4 mb-6">
-                            {/* Date */}
-                            <div className="bubble-card p-4">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <div className="icon-bubble-sm bg-primary-100">
+                            
+                            {/* Bottom Row - Date and Location */}
+                            <div className="px-5 pb-4 pt-2 flex flex-wrap items-center gap-5 border-t border-evidence-100/40">
+                                {/* Date */}
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-lg bg-white/80 flex items-center justify-center border border-evidence-200/40">
                                         <Calendar className="w-4 h-4 text-primary-600" />
                                     </div>
-                                    <h3 className="text-sm font-semibold text-gray-700">
-                                        {hasDateRange ? 'Date Range' : 'Date'}
-                                    </h3>
-                                </div>
-                                <p className="text-base font-medium text-gray-900 ml-12">
-                                    {displayDate}
-                                </p>
-                            </div>
-
-                            {/* Location */}
-                            {evidence.location_id && (
-                                <div className="bubble-card p-4">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <div className="icon-bubble-sm bg-orange-100">
-                                            <MapPin className="w-4 h-4 text-orange-600" />
-                                        </div>
-                                        <h3 className="text-sm font-semibold text-gray-700">Location</h3>
+                                    <div>
+                                        <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">
+                                            {hasDateRange ? 'Date Range' : 'Date'}
+                                        </p>
+                                        <p className="text-sm font-semibold text-gray-800">{displayDate}</p>
                                     </div>
-                                    {loadingLocation ? (
-                                        <div className="ml-12">
-                                            <div className="animate-pulse h-4 bg-gray-200 rounded w-32"></div>
+                                </div>
+                                
+                                {/* Divider */}
+                                {evidence.location_id && (
+                                    <div className="w-px h-10 bg-evidence-200/40"></div>
+                                )}
+                                
+                                {/* Location */}
+                                {evidence.location_id && (
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-8 h-8 rounded-lg bg-white/80 flex items-center justify-center border border-evidence-200/40">
+                                            <MapPin className="w-4 h-4 text-primary-600" />
                                         </div>
-                                    ) : location ? (
-                                        <div className="ml-12">
-                                            <p className="text-base font-medium text-gray-900">{location.name}</p>
-                                            {location.description && (
-                                                <p className="text-xs text-gray-500 mt-1">{location.description}</p>
+                                        <div>
+                                            <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Location</p>
+                                            {loadingLocation ? (
+                                                <div className="animate-pulse h-4 bg-gray-200 rounded w-20"></div>
+                                            ) : location ? (
+                                                <p className="text-sm font-semibold text-gray-800">{location.name}</p>
+                                            ) : (
+                                                <p className="text-sm text-gray-400 italic">Not found</p>
                                             )}
                                         </div>
-                                    ) : (
-                                        <p className="text-sm text-gray-400 ml-12">Location not found</p>
-                                    )}
-                                </div>
-                            )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
-                        {/* Description */}
+                        {/* Description - Green accent */}
                         {evidence.description && (
-                            <div className="bubble-card p-4 mb-6">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <div className="icon-bubble-sm bg-purple-100">
-                                        <MessageSquare className="w-4 h-4 text-purple-600" />
+                            <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
+                                        <MessageSquare className="w-4 h-4 text-primary-600" />
                                     </div>
-                                    <h3 className="text-sm font-semibold text-gray-700">Description</h3>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-semibold text-primary-600 mb-1 uppercase tracking-wider">Description</p>
+                                        <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{evidence.description}</p>
+                                    </div>
                                 </div>
-                                <p className="text-gray-700 ml-12 whitespace-pre-wrap">{evidence.description}</p>
                             </div>
                         )}
 
-                        {/* Linked Impact Claims - Blue Branded */}
-                        <div className="bubble-card p-5">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="icon-bubble-sm bg-blue-100">
-                                    <BarChart3 className="w-4 h-4 text-blue-600" />
+                        {/* Linked Impact Claims */}
+                        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                            {/* Header */}
+                            <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center shadow-lg shadow-primary-500/25">
+                                        <BarChart3 className="w-4 h-4 text-white" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Supporting Impact Claims</p>
+                                        <p className="text-lg font-bold text-gray-900">{linkedDataPoints.length} <span className="text-sm font-normal text-gray-500">claims</span></p>
+                                    </div>
                                 </div>
-                                <h3 className="text-sm font-semibold text-gray-700">Supporting Impact Claims</h3>
-                                <span className="status-pill">{linkedDataPoints.length}</span>
                             </div>
-                            {loadingDataPoints ? (
-                                <div className="flex items-center justify-center py-8">
-                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                                </div>
-                            ) : linkedDataPoints.length > 0 ? (
-                                (() => {
-                                    const groupedByKPI: Record<string, { kpi: any, dataPoints: any[] }> = {}
-                                    
-                                    linkedDataPoints.forEach((dataPoint) => {
-                                        const kpiId = dataPoint.kpi?.id || 'unknown'
-                                        if (!groupedByKPI[kpiId]) {
-                                            groupedByKPI[kpiId] = {
-                                                kpi: dataPoint.kpi,
-                                                dataPoints: []
+                            
+                            <div className="p-4">
+                                {loadingDataPoints ? (
+                                    <div className="flex items-center justify-center py-8">
+                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+                                    </div>
+                                ) : linkedDataPoints.length > 0 ? (
+                                    (() => {
+                                        const groupedByKPI: Record<string, { kpi: any, dataPoints: any[] }> = {}
+                                        
+                                        linkedDataPoints.forEach((dataPoint) => {
+                                            const kpiId = dataPoint.kpi?.id || 'unknown'
+                                            if (!groupedByKPI[kpiId]) {
+                                                groupedByKPI[kpiId] = {
+                                                    kpi: dataPoint.kpi,
+                                                    dataPoints: []
+                                                }
                                             }
-                                        }
-                                        groupedByKPI[kpiId].dataPoints.push(dataPoint)
-                                    })
-                                    
-                                    return (
-                                        <div className="space-y-2.5">
-                                            {Object.values(groupedByKPI).map((group, groupIndex) => {
-                                                const total = group.dataPoints.reduce((sum, dp) => sum + (dp.value || 0), 0)
-                                                
-                                                return (
-                                                    <div key={group.kpi?.id || groupIndex} className="bg-gradient-to-br from-blue-50/50 to-indigo-50/30 rounded-lg border border-blue-100/60 overflow-hidden">
-                                                        {/* Metric Card Header */}
-                                                        <div className="px-3 py-2.5 bg-gradient-to-r from-blue-100/80 to-indigo-100/60 border-b-2 border-blue-200/60 shadow-sm">
-                                                            <div className="flex items-center space-x-2 min-w-0">
-                                                                <BarChart3 className="w-4 h-4 text-blue-700 flex-shrink-0" />
-                                                                <div className="min-w-0 flex-1">
-                                                                    <div className="text-sm font-bold text-gray-900 truncate">
-                                                                        {group.kpi?.title || 'Unknown Metric'}
-                                                                    </div>
-                                                                    <div className="flex items-baseline space-x-1 mt-0.5">
-                                                                        <span className="text-sm font-bold text-blue-700">
-                                                                            {total.toLocaleString()}
-                                                                        </span>
-                                                                        <span className="text-xs text-gray-600 font-medium">
-                                                                            {group.kpi?.unit_of_measurement || ''}
-                                                                        </span>
+                                            groupedByKPI[kpiId].dataPoints.push(dataPoint)
+                                        })
+                                        
+                                        return (
+                                            <div className="space-y-3">
+                                                {Object.values(groupedByKPI).map((group, groupIndex) => {
+                                                    const total = group.dataPoints.reduce((sum, dp) => sum + (dp.value || 0), 0)
+                                                    
+                                                    return (
+                                                        <div key={group.kpi?.id || groupIndex} className="bg-gradient-to-br from-primary-50/50 to-primary-50/30 rounded-xl border border-primary-100/60 overflow-hidden">
+                                                            {/* Metric Card Header */}
+                                                            <div className="px-4 py-3 bg-gradient-to-r from-primary-100/80 to-primary-100/60 border-b border-primary-200/40">
+                                                                <div className="flex items-center space-x-2 min-w-0">
+                                                                    <BarChart3 className="w-4 h-4 text-primary-700 flex-shrink-0" />
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <div className="text-sm font-bold text-gray-900 truncate">
+                                                                            {group.kpi?.title || 'Unknown Metric'}
+                                                                        </div>
+                                                                        <div className="flex items-baseline space-x-1 mt-0.5">
+                                                                            <span className="text-sm font-bold text-primary-700">
+                                                                                {total.toLocaleString()}
+                                                                            </span>
+                                                                            <span className="text-xs text-gray-600 font-medium">
+                                                                                {group.kpi?.unit_of_measurement || ''}
+                                                                            </span>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                        
-                                                        {/* Impact Claims List */}
-                                                        <div className={`px-3 py-1.5 space-y-1 ${group.dataPoints.length > 3 ? 'max-h-[150px] overflow-y-auto' : ''}`}>
-                                                            {group.dataPoints.map((dataPoint, idx) => {
-                                                                const hasDateRange = dataPoint.date_range_start && dataPoint.date_range_end
-                                                                const displayDate = hasDateRange
-                                                                    ? `${formatDate(dataPoint.date_range_start)} - ${formatDate(dataPoint.date_range_end)}`
-                                                                    : formatDate(dataPoint.date_represented)
-                                                                
-                                                                const dataPointLocation = dataPoint.location_id ? dataPointLocations[dataPoint.location_id] : null
+                                                            
+                                                            {/* Impact Claims List */}
+                                                            <div className={`px-3 py-2 space-y-1 ${group.dataPoints.length > 3 ? 'max-h-[150px] overflow-y-auto' : ''}`}>
+                                                                {group.dataPoints.map((dataPoint, idx) => {
+                                                                    const hasDateRange = dataPoint.date_range_start && dataPoint.date_range_end
+                                                                    const dpDisplayDate = hasDateRange
+                                                                        ? `${formatDate(dataPoint.date_range_start)} - ${formatDate(dataPoint.date_range_end)}`
+                                                                        : formatDate(dataPoint.date_represented)
+                                                                    
+                                                                    const dataPointLocation = dataPoint.location_id ? dataPointLocations[dataPoint.location_id] : null
 
-                                                                return (
-                                                                    <div 
-                                                                        key={dataPoint.id} 
-                                                                        onClick={() => onDataPointClick?.(dataPoint, group.kpi)}
-                                                                        className={`flex items-center justify-between py-1.5 px-2 rounded-md transition-all ${
-                                                                            onDataPointClick ? 'hover:bg-white/80 cursor-pointer hover:shadow-sm' : ''
-                                                                        } ${idx < group.dataPoints.length - 1 ? 'border-b border-blue-100/40' : ''}`}
-                                                                    >
-                                                                        <div className="flex items-center space-x-2 min-w-0 flex-1">
-                                                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0"></div>
-                                                                            <div className="min-w-0 flex-1">
-                                                                                <div className="flex items-center space-x-2">
-                                                                                    <span className="text-xs font-medium text-gray-900">
-                                                                                        {dataPoint.value?.toLocaleString()} {group.kpi?.unit_of_measurement || ''}
-                                                                                    </span>
-                                                                                    <span className="text-[10px] text-gray-500 flex items-center">
-                                                                                        <Calendar className="w-2.5 h-2.5 mr-0.5" />
-                                                                                        {displayDate.length > 20 ? displayDate.substring(0, 20) + '...' : displayDate}
-                                                                                    </span>
-                                                                                </div>
-                                                                                {dataPointLocation && (
-                                                                                    <div className="flex items-center space-x-1 text-[10px] text-gray-500 mt-0.5">
-                                                                                        <MapPin className="w-2.5 h-2.5" />
-                                                                                        <span className="truncate">{dataPointLocation.name}</span>
+                                                                    return (
+                                                                        <div 
+                                                                            key={dataPoint.id} 
+                                                                            onClick={() => onDataPointClick?.(dataPoint, group.kpi)}
+                                                                            className={`flex items-center justify-between py-2 px-2.5 rounded-lg transition-all ${
+                                                                                onDataPointClick ? 'hover:bg-white/80 cursor-pointer hover:shadow-sm' : ''
+                                                                            } ${idx < group.dataPoints.length - 1 ? 'border-b border-primary-100/40' : ''}`}
+                                                                        >
+                                                                            <div className="flex items-center space-x-2 min-w-0 flex-1">
+                                                                                <div className="w-2 h-2 rounded-full bg-primary-400 flex-shrink-0"></div>
+                                                                                <div className="min-w-0 flex-1">
+                                                                                    <div className="flex items-center space-x-2">
+                                                                                        <span className="text-xs font-semibold text-gray-900">
+                                                                                            {dataPoint.value?.toLocaleString()} {group.kpi?.unit_of_measurement || ''}
+                                                                                        </span>
+                                                                                        <span className="text-[10px] text-gray-500 flex items-center">
+                                                                                            <Calendar className="w-2.5 h-2.5 mr-0.5" />
+                                                                                            {dpDisplayDate.length > 20 ? dpDisplayDate.substring(0, 20) + '...' : dpDisplayDate}
+                                                                                        </span>
                                                                                     </div>
-                                                                                )}
+                                                                                    {dataPointLocation && (
+                                                                                        <div className="flex items-center space-x-1 text-[10px] text-gray-500 mt-0.5">
+                                                                                            <MapPin className="w-2.5 h-2.5" />
+                                                                                            <span className="truncate">{dataPointLocation.name}</span>
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
                                                                             </div>
+                                                                            {onDataPointClick && (
+                                                                                <Eye className="w-3.5 h-3.5 text-gray-400 ml-2 flex-shrink-0" />
+                                                                            )}
                                                                         </div>
-                                                                        {onDataPointClick && (
-                                                                            <Eye className="w-3 h-3 text-gray-400 ml-2 flex-shrink-0" />
-                                                                        )}
-                                                                    </div>
-                                                                )
-                                                            })}
+                                                                    )
+                                                                })}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                )
-                                            })}
+                                                    )
+                                                })}
+                                            </div>
+                                        )
+                                    })()
+                                ) : (
+                                    <div className="text-center py-8">
+                                        <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                                            <BarChart3 className="w-5 h-5 text-gray-400" />
                                         </div>
-                                    )
-                                })()
-                            ) : (
-                                <div className="text-center py-8">
-                                    <div className="icon-bubble mx-auto mb-3 bg-gray-100">
-                                        <BarChart3 className="w-5 h-5 text-gray-400" />
+                                        <p className="text-sm font-medium text-gray-600 mb-1">No Linked Claims</p>
+                                        <p className="text-xs text-gray-500">This evidence is not linked to any impact claims</p>
                                     </div>
-                                    <p className="text-sm text-gray-500">No impact claims linked to this evidence</p>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 {/* Footer Actions */}
-                <div className="flex items-center justify-between p-5 border-t border-gray-100 bg-gray-50/50">
+                <div className="flex items-center justify-between p-4 border-t border-gray-100 bg-gray-50/50">
                     <div>
                         {onDelete && (
                             <button
@@ -602,7 +611,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                     onEdit(evidence)
                                     onClose()
                                 }}
-                                className="btn-primary flex items-center gap-2 py-2.5 px-5 text-sm"
+                                className="flex items-center gap-2 py-2.5 px-5 text-sm bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
                             >
                                 <Edit className="w-4 h-4" />
                                 <span>Edit Evidence</span>

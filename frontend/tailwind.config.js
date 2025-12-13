@@ -53,14 +53,14 @@ export default {
                 },
                 // Modern dashboard colors
                 evidence: {
-                    50: '#dff3ff',
-                    100: '#bae6ff',
-                    200: '#7dd3fc',
-                    300: '#38bdf8',
-                    400: '#3db6fd',  // Main evidence blue
-                    500: '#3db6fd',
-                    600: '#0284c7',
-                    700: '#0369a1',
+                    50: '#f0f5f4',
+                    100: '#d9e8e7',
+                    200: '#b3d1cf',
+                    300: '#8db9b7',
+                    400: '#82a3a1',  // Main evidence color
+                    500: '#82a3a1',
+                    600: '#6d8d8b',
+                    700: '#5a7573',
                 },
                 impact: {
                     50: '#e4fce9',

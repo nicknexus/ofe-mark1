@@ -261,10 +261,10 @@ export default function AddKPIUpdateModal({
         <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[60] animate-fade-in">
             <div className="bg-white/70 backdrop-blur-2xl rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] border border-white/60 transform transition-all duration-200 ease-out animate-slide-up-fast flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-evidence-200/40 bg-gradient-to-r from-evidence-100/50 to-evidence-50/30 backdrop-blur-xl">
+                <div className="flex items-center justify-between p-6 border-b border-primary-200/40 bg-gradient-to-r from-primary-100/50 to-primary-50/30 backdrop-blur-xl">
                     <div className="flex items-center space-x-3 flex-1">
-                        <div className="w-11 h-11 rounded-xl bg-evidence-500/15 backdrop-blur-sm flex items-center justify-center border border-evidence-300/30">
-                            <svg className="w-6 h-6 text-evidence-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="w-11 h-11 rounded-xl bg-primary-500/15 backdrop-blur-sm flex items-center justify-center border border-primary-300/30">
+                            <svg className="w-6 h-6 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                             </svg>
                         </div>
@@ -284,16 +284,16 @@ export default function AddKPIUpdateModal({
                 </div>
 
                 {/* Progress Steps Indicator */}
-                <div className="px-6 py-4 border-b border-evidence-100/40 bg-white/30 backdrop-blur-xl">
+                <div className="px-6 py-4 border-b border-primary-100/40 bg-white/30 backdrop-blur-xl">
                     <div className="flex items-center justify-center">
                         {steps.map((step, index) => (
                             <React.Fragment key={step.number}>
                                 <div className="flex flex-col items-center">
                                     <div className={`flex items-center justify-center w-10 h-10 rounded-xl border-2 transition-all duration-200 ${
                                         currentStep > step.number
-                                            ? 'bg-evidence-500 border-evidence-500 text-white shadow-lg shadow-evidence-500/30'
+                                            ? 'bg-primary-500 border-primary-500 text-white shadow-lg shadow-primary-500/30'
                                             : currentStep === step.number
-                                            ? 'bg-evidence-500 border-evidence-500 text-white ring-4 ring-evidence-200/50 shadow-lg shadow-evidence-500/30'
+                                            ? 'bg-primary-500 border-primary-500 text-white ring-4 ring-primary-200/50 shadow-lg shadow-primary-500/30'
                                             : 'bg-white/50 backdrop-blur-sm border-gray-200/60 text-gray-400'
                                     }`}>
                                         {currentStep > step.number ? (
@@ -312,7 +312,7 @@ export default function AddKPIUpdateModal({
                                 </div>
                                 {index < steps.length - 1 && (
                                     <div className={`flex-1 h-0.5 mx-4 rounded-full transition-all duration-200 ${
-                                        currentStep > step.number ? 'bg-evidence-500' : 'bg-gray-200/60'
+                                        currentStep > step.number ? 'bg-primary-500' : 'bg-gray-200/60'
                                     }`} style={{ maxWidth: '120px' }} />
                                 )}
                             </React.Fragment>
@@ -560,7 +560,7 @@ export default function AddKPIUpdateModal({
                 </form>
 
                 {/* Navigation Footer */}
-                <div className="border-t border-evidence-100/40 p-6 bg-white/30 backdrop-blur-xl">
+                <div className="border-t border-primary-100/40 p-6 bg-white/30 backdrop-blur-xl">
                     <div className="flex items-center justify-between">
                         <button
                             type="button"
@@ -586,7 +586,7 @@ export default function AddKPIUpdateModal({
                                     type="button"
                                     onClick={handleNext}
                                     disabled={!canProceedToNextStep()}
-                                    className="flex items-center space-x-2 px-6 py-3 bg-evidence-500 text-white rounded-xl hover:bg-evidence-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/30 hover:shadow-xl hover:shadow-evidence-500/40"
+                                    className="flex items-center space-x-2 px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-200 shadow-lg shadow-primary-500/30 hover:shadow-xl hover:shadow-primary-500/40"
                                 >
                                     <span>Next</span>
                                     <ChevronRight className="w-5 h-5" />
@@ -596,7 +596,7 @@ export default function AddKPIUpdateModal({
                                     type="submit"
                                     onClick={handleSubmit}
                                     disabled={loading || formData.value === 0}
-                                    className="flex items-center space-x-2 px-6 py-3 bg-evidence-500 text-white rounded-xl hover:bg-evidence-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/30 hover:shadow-xl hover:shadow-evidence-500/40"
+                                    className="flex items-center space-x-2 px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-200 shadow-lg shadow-primary-500/30 hover:shadow-xl hover:shadow-primary-500/40"
                                 >
                                     {loading ? (
                                         <>

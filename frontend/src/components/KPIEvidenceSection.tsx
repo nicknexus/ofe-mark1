@@ -156,12 +156,12 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateF
                 </h3>
                 <div className="flex items-center space-x-3">
                     <div className="text-right text-sm">
-                        <div className="text-lg font-bold text-impact-500">{dateFilter?.isActive ? filteredEvidence.length : evidence.length}</div>
+                        <div className="text-lg font-bold text-evidence-500">{dateFilter?.isActive ? filteredEvidence.length : evidence.length}</div>
                         <div className="text-xs text-gray-500">Items</div>
                     </div>
                     <button
                         onClick={() => setIsEvidenceModalOpen(true)}
-                        className="flex items-center justify-center space-x-2 px-4 py-2 bg-impact-100/80 text-impact-700 rounded-xl hover:bg-impact-200/80 text-sm font-medium transition-all duration-200"
+                        className="flex items-center justify-center space-x-2 px-4 py-2 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
                     >
                         <Upload className="w-4 h-4" />
                         <span className="hidden sm:inline">Add Evidence</span>
@@ -173,7 +173,7 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateF
             <div className="flex-1 overflow-hidden">
                 {loading ? (
                     <div className="flex items-center justify-center py-8">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-impact-500"></div>
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-evidence-500"></div>
                     </div>
                 ) : filteredEvidence.length === 0 ? (
                     <div className="text-center py-8">
@@ -189,7 +189,7 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateF
                         {!dateFilter?.isActive && (
                             <button
                                 onClick={() => setIsEvidenceModalOpen(true)}
-                                className="mt-4 px-5 py-2.5 bg-impact-500 text-white rounded-xl hover:bg-impact-600 font-semibold transition-all duration-200 shadow-lg shadow-impact-500/25 text-sm"
+                                className="mt-4 px-5 py-2.5 bg-evidence-500 text-white rounded-xl hover:bg-evidence-600 font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25 text-sm"
                             >
                                 Add First Evidence
                             </button>
@@ -204,7 +204,7 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateF
                                 const typeInfo = getEvidenceTypeInfo(evidenceItem.type)
 
                                 return (
-                                    <div key={evidenceItem.id} className="p-3 bg-white/60 backdrop-blur-sm border border-gray-100 rounded-xl hover:border-impact-300 hover:shadow-soft-float transition-all duration-200 cursor-pointer" onClick={() => handleEvidenceClick(evidenceItem)}>
+                                    <div key={evidenceItem.id} className="p-3 bg-white/60 backdrop-blur-sm border border-gray-100 rounded-xl hover:border-evidence-300 hover:shadow-soft-float transition-all duration-200 cursor-pointer" onClick={() => handleEvidenceClick(evidenceItem)}>
                                         <div className="flex items-start space-x-3">
                                             <div className={`p-1.5 rounded-lg ${typeInfo.color} flex-shrink-0`}>
                                                 <IconComponent className="w-3 h-3" />
@@ -212,7 +212,7 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateF
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-start justify-between">
                                                     <div className="min-w-0 flex-1">
-                                                        <h4 className="text-sm font-medium text-gray-800 hover:text-impact-600 transition-colors line-clamp-1">
+                                                        <h4 className="text-sm font-medium text-gray-800 hover:text-evidence-600 transition-colors line-clamp-1">
                                                             {evidenceItem.title}
                                                         </h4>
                                                         <div className="flex items-center text-xs text-gray-500 space-x-2 mt-1">

@@ -6,6 +6,7 @@ import { Evidence, Location, BeneficiaryGroup } from '../../types'
 import { formatDate, getEvidenceTypeInfo } from '../../utils'
 import DateRangePicker from '../DateRangePicker'
 import EvidencePreviewModal from '../EvidencePreviewModal'
+import DataPointPreviewModal from '../DataPointPreviewModal'
 import AddEvidenceModal from '../AddEvidenceModal'
 import toast from 'react-hot-toast'
 
@@ -25,6 +26,9 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
     const [editingEvidence, setEditingEvidence] = useState<Evidence | null>(null)
     const [isAddModalOpen, setIsAddModalOpen] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
+    const [selectedDataPoint, setSelectedDataPoint] = useState<any>(null)
+    const [selectedDataPointKpi, setSelectedDataPointKpi] = useState<any>(null)
+    const [isDataPointPreviewOpen, setIsDataPointPreviewOpen] = useState(false)
 
     // Master filter state
     const [datePickerValue, setDatePickerValue] = useState<{
@@ -82,14 +86,14 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
             setLoading(true)
             // Get all evidence for the initiative
             const allEvidence = await apiService.getEvidence(initiativeId)
-            
+
             // Apply client-side filters since API doesn't support all filters
             let filtered = allEvidence || []
 
             // Filter by search query
             if (searchQuery.trim()) {
                 const query = searchQuery.trim().toLowerCase()
-                filtered = filtered.filter(ev => 
+                filtered = filtered.filter(ev =>
                     ev.title?.toLowerCase().includes(query) ||
                     ev.description?.toLowerCase().includes(query)
                 )
@@ -99,11 +103,11 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
             if (datePickerValue.startDate || datePickerValue.endDate || datePickerValue.singleDate) {
                 const filterDate = datePickerValue.singleDate || datePickerValue.startDate
                 const endDate = datePickerValue.endDate || datePickerValue.singleDate
-                
+
                 filtered = filtered.filter(ev => {
                     const evDate = ev.date_represented || ev.date_range_start
                     if (!evDate) return false
-                    
+
                     if (filterDate && endDate) {
                         return evDate >= filterDate && evDate <= endDate
                     } else if (filterDate) {
@@ -196,10 +200,26 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
         }
     }
 
-    const handleSaveEvidence = async () => {
-        apiService.clearCache('/evidence')
-        await loadEvidence()
-        onRefresh?.()
+    const handleSaveEvidence = async (evidenceData: any) => {
+        try {
+            if (editingEvidence?.id) {
+                // Update existing evidence
+                await apiService.updateEvidence(editingEvidence.id, evidenceData)
+                toast.success('Evidence updated successfully!')
+            } else {
+                // Create new evidence
+                await apiService.createEvidence(evidenceData)
+                toast.success('Evidence added successfully!')
+            }
+
+            apiService.clearCache('/evidence')
+            await loadEvidence()
+            onRefresh?.()
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to save evidence'
+            toast.error(message)
+            throw error
+        }
     }
 
     // Filter dropdown positioning
@@ -233,7 +253,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
         }
     }, [showEvidenceTypePicker])
 
-    const hasActiveFilters = selectedLocations.length > 0 || selectedBeneficiaryGroups.length > 0 || 
+    const hasActiveFilters = selectedLocations.length > 0 || selectedBeneficiaryGroups.length > 0 ||
         selectedEvidenceTypes.length > 0 || datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate)
 
     const clearFilters = () => {
@@ -257,7 +277,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                             setEditingEvidence(null)
                             setIsAddModalOpen(true)
                         }}
-                        className="flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-medium transition-all duration-200 shadow-bubble-sm"
+                        className="flex items-center space-x-2 px-5 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25"
                     >
                         <Plus className="w-4 h-4" />
                         <span>Add Evidence</span>
@@ -292,29 +312,26 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                         <button
                             ref={locationButtonRef}
                             onClick={() => setShowLocationPicker(!showLocationPicker)}
-                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${
-                                selectedLocations.length > 0
-                                    ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
-                                    : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
-                            }`}
+                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${selectedLocations.length > 0
+                                ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
+                                : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                                }`}
                         >
-                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                                selectedLocations.length > 0
-                                    ? 'bg-primary-100 border-primary-500'
-                                    : 'bg-gray-100 border-gray-200'
-                            }`}>
-                                <MapPin className={`w-5 h-5 ${
-                                    selectedLocations.length > 0
-                                        ? 'text-primary-500'
-                                        : 'text-gray-600'
-                                }`} />
+                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedLocations.length > 0
+                                ? 'bg-primary-100 border-primary-500'
+                                : 'bg-gray-100 border-gray-200'
+                                }`}>
+                                <MapPin className={`w-5 h-5 ${selectedLocations.length > 0
+                                    ? 'text-primary-500'
+                                    : 'text-gray-600'
+                                    }`} />
                             </div>
                             <span className="ml-3">
                                 {selectedLocations.length === 0
                                     ? 'Location'
                                     : selectedLocations.length === 1
-                                    ? locations.find(l => l.id === selectedLocations[0])?.name || '1 location'
-                                    : `${selectedLocations.length} locations`}
+                                        ? locations.find(l => l.id === selectedLocations[0])?.name || '1 location'
+                                        : `${selectedLocations.length} locations`}
                             </span>
                             {selectedLocations.length > 0 && (
                                 <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
@@ -389,29 +406,26 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                         <button
                             ref={beneficiaryButtonRef}
                             onClick={() => setShowBeneficiaryPicker(!showBeneficiaryPicker)}
-                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${
-                                selectedBeneficiaryGroups.length > 0
-                                    ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
-                                    : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
-                            }`}
+                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${selectedBeneficiaryGroups.length > 0
+                                ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
+                                : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                                }`}
                         >
-                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                                selectedBeneficiaryGroups.length > 0
-                                    ? 'bg-primary-100 border-primary-500'
-                                    : 'bg-gray-100 border-gray-200'
-                            }`}>
-                                <Users className={`w-5 h-5 ${
-                                    selectedBeneficiaryGroups.length > 0
-                                        ? 'text-primary-500'
-                                        : 'text-gray-600'
-                                }`} />
+                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedBeneficiaryGroups.length > 0
+                                ? 'bg-primary-100 border-primary-500'
+                                : 'bg-gray-100 border-gray-200'
+                                }`}>
+                                <Users className={`w-5 h-5 ${selectedBeneficiaryGroups.length > 0
+                                    ? 'text-primary-500'
+                                    : 'text-gray-600'
+                                    }`} />
                             </div>
                             <span className="ml-3">
                                 {selectedBeneficiaryGroups.length === 0
                                     ? 'Beneficiary Group'
                                     : selectedBeneficiaryGroups.length === 1
-                                    ? beneficiaryGroups.find(bg => bg.id === selectedBeneficiaryGroups[0])?.name || '1 group'
-                                    : `${selectedBeneficiaryGroups.length} groups`}
+                                        ? beneficiaryGroups.find(bg => bg.id === selectedBeneficiaryGroups[0])?.name || '1 group'
+                                        : `${selectedBeneficiaryGroups.length} groups`}
                             </span>
                             {selectedBeneficiaryGroups.length > 0 && (
                                 <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
@@ -486,29 +500,26 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                         <button
                             ref={evidenceTypeButtonRef}
                             onClick={() => setShowEvidenceTypePicker(!showEvidenceTypePicker)}
-                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${
-                                selectedEvidenceTypes.length > 0
-                                    ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
-                                    : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
-                            }`}
+                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${selectedEvidenceTypes.length > 0
+                                ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
+                                : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                                }`}
                         >
-                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                                selectedEvidenceTypes.length > 0
-                                    ? 'bg-primary-100 border-primary-500'
-                                    : 'bg-gray-100 border-gray-200'
-                            }`}>
-                                <FileText className={`w-5 h-5 ${
-                                    selectedEvidenceTypes.length > 0
-                                        ? 'text-primary-500'
-                                        : 'text-gray-600'
-                                }`} />
+                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedEvidenceTypes.length > 0
+                                ? 'bg-primary-100 border-primary-500'
+                                : 'bg-gray-100 border-gray-200'
+                                }`}>
+                                <FileText className={`w-5 h-5 ${selectedEvidenceTypes.length > 0
+                                    ? 'text-primary-500'
+                                    : 'text-gray-600'
+                                    }`} />
                             </div>
                             <span className="ml-3">
                                 {selectedEvidenceTypes.length === 0
                                     ? 'Evidence Type'
                                     : selectedEvidenceTypes.length === 1
-                                    ? evidenceTypes.find(et => et.value === selectedEvidenceTypes[0])?.label || '1 type'
-                                    : `${selectedEvidenceTypes.length} types`}
+                                        ? evidenceTypes.find(et => et.value === selectedEvidenceTypes[0])?.label || '1 type'
+                                        : `${selectedEvidenceTypes.length} types`}
                             </span>
                             {selectedEvidenceTypes.length > 0 && (
                                 <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
@@ -615,7 +626,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                     setEditingEvidence(null)
                                     setIsAddModalOpen(true)
                                 }}
-                                className="px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-medium transition-all duration-200 shadow-bubble-sm"
+                                className="px-5 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25"
                             >
                                 Add Evidence
                             </button>
@@ -640,7 +651,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                 const bgColor = typeInfo.color.split(' ')[0]
                                 const evidenceType = evidenceTypes.find(et => et.value === ev.type)
                                 const IconComponent = evidenceType?.icon || FileText
-                                
+
                                 return (
                                     <div
                                         key={ev.id}
@@ -720,9 +731,30 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                     evidence={selectedEvidence}
                     onEdit={handleEditEvidence}
                     onDelete={handleDeleteEvidence}
-                    onDataPointClick={(dataPoint) => {
-                        // Navigate to metric detail if needed
-                        console.log('Data point clicked:', dataPoint)
+                    onDataPointClick={(dataPoint, kpi) => {
+                        setSelectedDataPoint(dataPoint)
+                        setSelectedDataPointKpi(kpi)
+                        setIsPreviewModalOpen(false)
+                        setIsDataPointPreviewOpen(true)
+                    }}
+                />
+            )}
+
+            {/* Data Point Preview Modal - opens when clicking impact claim from evidence */}
+            {selectedDataPoint && (
+                <DataPointPreviewModal
+                    isOpen={isDataPointPreviewOpen}
+                    onClose={() => {
+                        setIsDataPointPreviewOpen(false)
+                        setSelectedDataPoint(null)
+                        setSelectedDataPointKpi(null)
+                    }}
+                    dataPoint={selectedDataPoint}
+                    kpi={selectedDataPointKpi || selectedDataPoint.kpi}
+                    onEvidenceClick={(ev) => {
+                        setSelectedEvidence(ev)
+                        setIsDataPointPreviewOpen(false)
+                        setIsPreviewModalOpen(true)
                     }}
                 />
             )}

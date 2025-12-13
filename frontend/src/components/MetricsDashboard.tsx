@@ -1372,7 +1372,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             <BarChart3 className="w-3.5 h-3.5 text-impact-400" />
                             <span className="text-[11px] font-medium text-gray-600">Impact Claims</span>
                         </div>
-                        <span className="text-sm font-semibold text-impact-500">{filteredUpdates.length.toLocaleString()}</span>
+                        <span className="text-sm font-semibold text-primary-500">{filteredUpdates.length.toLocaleString()}</span>
                     </div>
                     {/* Evidence Coverage - inline minimal */}
                     <div className="flex-1 bg-white rounded-xl shadow-bubble-sm border border-gray-100 evidence-border px-3 py-1.5 flex items-center justify-between">
@@ -1396,7 +1396,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             </div>
                         </div>
                         <div className="flex items-baseline space-x-1">
-                            <span className="text-xl font-semibold text-impact-500">
+                            <span className="text-xl font-semibold text-primary-500">
                                 {filteredUpdates.length.toLocaleString()}
                             </span>
                         </div>

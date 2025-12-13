@@ -118,14 +118,14 @@ export default function LocationDetailsModal({
                 }
             case 'documentation':
                 return {
-                    headerBg: 'bg-gradient-to-r from-blue-100/80 to-indigo-100/60',
-                    headerBorder: 'border-blue-200/60',
-                    headerIcon: 'text-blue-700',
+                    headerBg: 'bg-gradient-to-r from-evidence-100/80 to-evidence-100/60',
+                    headerBorder: 'border-evidence-200/60',
+                    headerIcon: 'text-evidence-700',
                     headerText: 'text-gray-900',
-                    cardBg: 'bg-gradient-to-br from-blue-50/50 to-indigo-50/30',
-                    cardBorder: 'border-blue-100/60',
-                    itemBorder: 'border-blue-100/40',
-                    dotColor: 'bg-blue-400'
+                    cardBg: 'bg-gradient-to-br from-evidence-50/50 to-evidence-50/30',
+                    cardBorder: 'border-evidence-100/60',
+                    itemBorder: 'border-evidence-100/40',
+                    dotColor: 'bg-evidence-400'
                 }
             case 'testimony':
                 return {
@@ -249,8 +249,8 @@ export default function LocationDetailsModal({
                                                         }
                                                     }}
                                                     className={`bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm transition-all ${onStoryClick && story.id
-                                                            ? 'hover:shadow-md hover:border-blue-300 cursor-pointer'
-                                                            : 'hover:shadow-md'
+                                                        ? 'hover:shadow-md hover:border-blue-300 cursor-pointer'
+                                                        : 'hover:shadow-md'
                                                         }`}
                                                 >
                                                     {story.media_url && story.media_type === 'photo' && (
@@ -307,8 +307,8 @@ export default function LocationDetailsModal({
                                                         }
                                                     }}
                                                     className={`bg-white rounded-xl border-2 transition-all ${onMetricClick && group.kpi?.id
-                                                            ? 'border-blue-200 hover:border-blue-400 hover:shadow-lg cursor-pointer'
-                                                            : 'border-blue-100'
+                                                        ? 'border-blue-200 hover:border-blue-400 hover:shadow-lg cursor-pointer'
+                                                        : 'border-blue-100'
                                                         } overflow-hidden shadow-sm hover:shadow-md`}
                                                 >
                                                     {/* Modern Metric Card */}
