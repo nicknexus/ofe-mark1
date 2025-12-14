@@ -9,6 +9,7 @@ import EvidencePreviewModal from '../EvidencePreviewModal'
 import DataPointPreviewModal from '../DataPointPreviewModal'
 import AddEvidenceModal from '../AddEvidenceModal'
 import toast from 'react-hot-toast'
+import { useTutorial } from '../../context/TutorialContext'
 
 interface EvidenceTabProps {
     initiativeId: string
@@ -16,6 +17,7 @@ interface EvidenceTabProps {
 }
 
 export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProps) {
+    const { isActive: isTutorialActive, currentStep, advanceStep } = useTutorial()
     const [evidence, setEvidence] = useState<Evidence[]>([])
     const [loading, setLoading] = useState(false)
     const [locations, setLocations] = useState<Location[]>([])
@@ -210,6 +212,11 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                 // Create new evidence
                 await apiService.createEvidence(evidenceData)
                 toast.success('Evidence added successfully!')
+
+                // Advance tutorial if on create-evidence step
+                if (isTutorialActive && currentStep === 'create-evidence') {
+                    advanceStep()
+                }
             }
 
             apiService.clearCache('/evidence')
@@ -277,6 +284,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                             setEditingEvidence(null)
                             setIsAddModalOpen(true)
                         }}
+                        data-tutorial="add-evidence"
                         className="flex items-center space-x-2 px-5 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25"
                     >
                         <Plus className="w-4 h-4" />

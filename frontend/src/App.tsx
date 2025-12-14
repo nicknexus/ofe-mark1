@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthService } from './services/auth'
 import { User } from './types'
+import { TutorialProvider } from './context/TutorialContext'
+import InteractiveTutorial from './components/InteractiveTutorial'
 
 // Pages
 import HomePage from './pages/HomePage'
@@ -78,14 +80,17 @@ function App() {
                 {/* Authenticated routes */}
                 {user ? (
                     <Route path="/*" element={
-                        <Layout user={user}>
-                            <Routes>
-                                <Route index element={<Dashboard />} />
-                                <Route path="initiatives/:id" element={<InitiativePage />} />
-                                <Route path="initiatives/:id/metrics/:kpiId" element={<InitiativePage />} />
-                                <Route path="account" element={<AccountPage />} />
-                            </Routes>
-                        </Layout>
+                        <TutorialProvider>
+                            <Layout user={user}>
+                                <Routes>
+                                    <Route index element={<Dashboard />} />
+                                    <Route path="initiatives/:id" element={<InitiativePage />} />
+                                    <Route path="initiatives/:id/metrics/:kpiId" element={<InitiativePage />} />
+                                    <Route path="account" element={<AccountPage />} />
+                                </Routes>
+                            </Layout>
+                            <InteractiveTutorial />
+                        </TutorialProvider>
                     } />
                 ) : (
                     <Route path="/*" element={<HomePage onGetStarted={handleGetStarted} />} />

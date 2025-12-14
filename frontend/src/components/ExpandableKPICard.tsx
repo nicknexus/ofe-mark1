@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useTutorial } from '../context/TutorialContext'
 import {
     ChevronDown,
     ChevronUp,
@@ -85,6 +86,9 @@ export default function ExpandableKPICard({
 
     // Use provided color or default to site green
     const chartColor = metricColor || DEFAULT_METRIC_COLOR
+
+    // Tutorial hook for advancing steps
+    const { isActive: isTutorialActive, currentStep, advanceStep } = useTutorial()
 
     // Lock body scroll when expanded (only for portal mode, not page mode)
     useEffect(() => {
@@ -339,6 +343,11 @@ export default function ExpandableKPICard({
 
             setIsEasyEvidenceModalOpen(false)
             setSelectedClaimForEvidence(null)
+
+            // Advance tutorial if on create-evidence step
+            if (isTutorialActive && currentStep === 'create-evidence') {
+                advanceStep()
+            }
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to add evidence'
             toast.error(message)
@@ -416,6 +425,23 @@ export default function ExpandableKPICard({
         // Calculate percentage
         const percentage = Math.round((coveredDays.size / claimDays) * 100)
         return Math.min(percentage, 100) // Cap at 100%
+    }
+
+    // Get count of evidence pieces linked to a claim
+    const getClaimEvidenceCount = (claim: any): number => {
+        if (!claim || !claim.id || !evidence || evidence.length === 0) return 0
+
+        const linkedEvidence = evidence.filter((ev: any) => {
+            if (ev.kpi_update_ids && Array.isArray(ev.kpi_update_ids)) {
+                return ev.kpi_update_ids.includes(claim.id)
+            }
+            if (ev.evidence_kpi_updates && Array.isArray(ev.evidence_kpi_updates)) {
+                return ev.evidence_kpi_updates.some((link: any) => link.kpi_update_id === claim.id)
+            }
+            return false
+        })
+
+        return linkedEvidence.length
     }
 
     // Check if an impact claim has evidence supporting it (for boolean checks)
@@ -802,11 +828,11 @@ export default function ExpandableKPICard({
                                 </div>
                             </div>
                             <div className="flex items-center space-x-2">
-                                <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25">
+                                <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} data-tutorial="add-impact-claim" className="flex items-center space-x-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25">
                                     <Plus className="w-4 h-4" />
                                     <span>Add Impact Claim</span>
                                 </button>
-                                <button onClick={(e) => { e.stopPropagation(); onAddEvidence() }} className="flex items-center space-x-2 px-4 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25">
+                                <button onClick={(e) => { e.stopPropagation(); onAddEvidence() }} data-tutorial="add-evidence" className="flex items-center space-x-2 px-4 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25">
                                     <Upload className="w-4 h-4" />
                                     <span>Add Evidence</span>
                                 </button>
@@ -942,24 +968,26 @@ export default function ExpandableKPICard({
                                                                 <div className="flex items-center gap-1.5">
                                                                     {(() => {
                                                                         const supportPercentage = getClaimSupportPercentage(update)
+                                                                        const evidenceCount = getClaimEvidenceCount(update)
                                                                         return (
                                                                             <>
                                                                                 {supportPercentage > 0 && (
-                                                                                    <div className={`flex items-center justify-center px-2 py-1 rounded-md text-[10px] font-medium w-[85px] whitespace-nowrap ${supportPercentage === 100
+                                                                                    <div className={`flex items-center justify-center px-2 py-1 rounded-md text-[10px] font-medium whitespace-nowrap ${supportPercentage === 100
                                                                                         ? 'bg-primary-100 text-primary-700'
                                                                                         : 'bg-yellow-100 text-yellow-700'
                                                                                         }`}>
-                                                                                        <span>{supportPercentage}% Supported</span>
+                                                                                        <span>{evidenceCount} | {supportPercentage}% Coverage</span>
                                                                                     </div>
                                                                                 )}
                                                                                 {supportPercentage === 0 && !loadingEvidence && (
-                                                                                    <div className="flex items-center justify-center px-2 py-1 rounded-md text-[10px] font-medium w-[85px] whitespace-nowrap bg-red-100 text-red-700">
-                                                                                        <span>0% Supported</span>
+                                                                                    <div className="flex items-center justify-center px-2 py-1 rounded-md text-[10px] font-medium whitespace-nowrap bg-red-100 text-red-700">
+                                                                                        <span>0 | 0% Coverage</span>
                                                                                     </div>
                                                                                 )}
                                                                                 <button
                                                                                     type="button"
                                                                                     onClick={(e) => handleAddEvidenceForClaim(update, e)}
+                                                                                    data-tutorial="quick-add-evidence"
                                                                                     className="flex items-center gap-1 px-2 py-1 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-[10px] font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
                                                                                     title="Add supporting evidence for this claim"
                                                                                 >
@@ -1507,19 +1535,20 @@ export default function ExpandableKPICard({
                                                                 <div className="flex items-center gap-2">
                                                                     {(() => {
                                                                         const supportPercentage = getClaimSupportPercentage(update)
+                                                                        const evidenceCount = getClaimEvidenceCount(update)
                                                                         return (
                                                                             <>
                                                                                 {supportPercentage > 0 && (
-                                                                                    <div className={`flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium w-[110px] whitespace-nowrap ${supportPercentage === 100
+                                                                                    <div className={`flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${supportPercentage === 100
                                                                                         ? 'bg-primary-100 text-primary-700'
                                                                                         : 'bg-yellow-100 text-yellow-700'
                                                                                         }`}>
-                                                                                        <span>{supportPercentage}% Supported</span>
+                                                                                        <span>{evidenceCount} | {supportPercentage}% Coverage</span>
                                                                                     </div>
                                                                                 )}
                                                                                 {supportPercentage === 0 && !loadingEvidence && (
-                                                                                    <div className="flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium w-[110px] whitespace-nowrap bg-red-100 text-red-700">
-                                                                                        <span>0% covered</span>
+                                                                                    <div className="flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-red-100 text-red-700">
+                                                                                        <span>0 | 0% Coverage</span>
                                                                                     </div>
                                                                                 )}
                                                                                 <button
@@ -1908,14 +1937,20 @@ export default function ExpandableKPICard({
                                                                     <div className="flex items-center gap-2">
                                                                         {(() => {
                                                                             const supportPercentage = getClaimSupportPercentage(update)
+                                                                            const evidenceCount = getClaimEvidenceCount(update)
                                                                             return (
                                                                                 <>
                                                                                     {supportPercentage > 0 && (
-                                                                                        <div className={`flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium w-[110px] whitespace-nowrap ${supportPercentage === 100
+                                                                                        <div className={`flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${supportPercentage === 100
                                                                                             ? 'bg-primary-100 text-primary-700'
                                                                                             : 'bg-yellow-100 text-yellow-700'
                                                                                             }`}>
-                                                                                            <span>{supportPercentage}% Supported</span>
+                                                                                            <span>{evidenceCount} | {supportPercentage}% Coverage</span>
+                                                                                        </div>
+                                                                                    )}
+                                                                                    {supportPercentage === 0 && !loadingEvidence && (
+                                                                                        <div className="flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-red-100 text-red-700">
+                                                                                            <span>0 | 0% Coverage</span>
                                                                                         </div>
                                                                                     )}
                                                                                     <button

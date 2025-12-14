@@ -175,6 +175,7 @@ export interface User {
     email: string;
     name?: string;
     organization?: string;
+    has_completed_tutorial?: boolean;
 }
 
 export interface InitiativeDashboard {

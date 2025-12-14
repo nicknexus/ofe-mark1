@@ -4,18 +4,20 @@ import {
     Plus,
     MapPin,
     Edit,
-    Trash2
+    Trash2,
+    GraduationCap
 } from 'lucide-react'
 import { apiService } from '../services/api'
 import { Initiative, LoadingState, CreateInitiativeForm, KPI, Organization, Location } from '../types'
 import { formatDate, truncateText } from '../utils'
 import toast from 'react-hot-toast'
 import CreateInitiativeModal from '../components/CreateInitiativeModal'
-import FirstTimeTutorial from '../components/FirstTimeTutorial'
 import LocationMap from '../components/LocationMap'
+import { useTutorial } from '../context/TutorialContext'
 
 export default function Dashboard() {
     const navigate = useNavigate()
+    const { isActive: isTutorialActive, currentStep, advanceStep, startTutorial } = useTutorial()
     const [initiatives, setInitiatives] = useState<Initiative[]>([])
     const [allKPIs, setAllKPIs] = useState<KPI[]>([])
     const [allLocations, setAllLocations] = useState<Location[]>([])
@@ -24,7 +26,6 @@ export default function Dashboard() {
     const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: true })
     const [isLoadingStats, setIsLoadingStats] = useState(true)
     const [showCreateModal, setShowCreateModal] = useState(false)
-    const [showTutorial, setShowTutorial] = useState(false)
     const [showEditModal, setShowEditModal] = useState(false)
     const [deleteConfirmInitiative, setDeleteConfirmInitiative] = useState<Initiative | null>(null)
     const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null)
@@ -41,7 +42,7 @@ export default function Dashboard() {
 
         // Listen for tutorial trigger from header
         const handleShowTutorial = () => {
-            setShowTutorial(true)
+            startTutorial()
         }
         window.addEventListener('show-tutorial', handleShowTutorial)
         return () => {
@@ -105,7 +106,6 @@ export default function Dashboard() {
         } finally {
             setIsLoadingData(false)
             loadingPromise.current = null
-            checkFirstTimeUser()
         }
     }
 
@@ -137,37 +137,19 @@ export default function Dashboard() {
         }
     }
 
-    const checkFirstTimeUser = () => {
-        const hasSeenTutorial = localStorage.getItem('ofe-tutorial-seen')
-        if (!hasSeenTutorial) {
-            // Delay showing tutorial slightly to let dashboard load
-            setTimeout(() => {
-                setShowTutorial(true)
-            }, 1000)
-        }
-    }
-
-    const handleTutorialClose = () => {
-        setShowTutorial(false)
-        localStorage.setItem('ofe-tutorial-seen', 'true')
-    }
-
-    const handleTutorialGetStarted = () => {
-        setShowTutorial(false)
-        localStorage.setItem('ofe-tutorial-seen', 'true')
-        setShowCreateModal(true)
-    }
-
-    const showTutorialAgain = () => {
-        setShowTutorial(true)
-    }
-
     const handleCreateInitiative = async (formData: CreateInitiativeForm) => {
         try {
-            await apiService.createInitiative(formData)
+            const newInitiative = await apiService.createInitiative(formData)
             toast.success('Initiative created successfully!')
             // Only refresh initiatives, not all data
             await refreshInitiatives()
+            
+            // If tutorial is active and on create-initiative step, advance to next step
+            if (isTutorialActive && currentStep === 'create-initiative' && newInitiative?.id) {
+                advanceStep({ initiativeId: newInitiative.id })
+                // Navigate to the new initiative
+                navigate(`/initiatives/${newInitiative.id}`)
+            }
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to create initiative'
             toast.error(message)
@@ -260,13 +242,24 @@ export default function Dashboard() {
                         <div className="lg:col-span-2 bg-white rounded-2xl shadow-bubble border border-gray-100 overflow-hidden flex flex-col">
                             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
                                 <h2 className="text-lg font-semibold text-gray-800">Your Initiatives</h2>
-                                <button
-                                    onClick={() => setShowCreateModal(true)}
-                                    className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-all duration-200 flex items-center gap-1.5 shadow-bubble-sm"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    {initiatives.length === 0 ? 'Get Started' : 'New Initiative'}
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={startTutorial}
+                                        className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200 flex items-center gap-1.5"
+                                        title="Start Tutorial"
+                                    >
+                                        <GraduationCap className="w-4 h-4" />
+                                        <span className="hidden sm:inline">Tutorial</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setShowCreateModal(true)}
+                                        data-tutorial="create-initiative"
+                                        className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-all duration-200 flex items-center gap-1.5 shadow-bubble-sm"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        {initiatives.length === 0 ? 'Get Started' : 'New Initiative'}
+                                    </button>
+                                </div>
                             </div>
                             
                             <div className="p-6 flex-1 overflow-y-auto min-h-0">
@@ -434,12 +427,6 @@ export default function Dashboard() {
                 </div>
             )}
 
-            {showTutorial && (
-                <FirstTimeTutorial
-                    onClose={handleTutorialClose}
-                    onGetStarted={handleTutorialGetStarted}
-                />
-            )}
         </>
     )
 } 

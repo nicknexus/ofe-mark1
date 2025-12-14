@@ -122,6 +122,7 @@ export default function MetricsTab({
                             <p className="text-gray-500 mb-6">Create your first metric to start tracking your initiative's impact</p>
                             <button
                                 onClick={onAddKPI}
+                                data-tutorial="add-metric"
                                 className="inline-flex items-center space-x-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl text-sm font-medium transition-all duration-200 shadow-bubble-sm"
                             >
                                 <Plus className="w-4 h-4" />
@@ -185,6 +186,7 @@ export default function MetricsTab({
 
                                     <button
                                         onClick={onAddKPI}
+                                        data-tutorial="add-metric"
                                         className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl text-sm font-medium transition-all duration-200 shadow-bubble-sm"
                                     >
                                         <Plus className="w-4 h-4" />

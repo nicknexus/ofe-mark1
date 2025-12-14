@@ -88,11 +88,12 @@ export class AuthService {
             id: user.id,
             email: user.email || '',
             name: user.user_metadata?.name,
-            organization: user.user_metadata?.organization
+            organization: user.user_metadata?.organization,
+            has_completed_tutorial: user.user_metadata?.has_completed_tutorial
         }
     }
 
-    static async updateProfile(updates: { name?: string; organization?: string }) {
+    static async updateProfile(updates: { name?: string; organization?: string; has_completed_tutorial?: boolean }) {
         const { data, error } = await supabase.auth.updateUser({
             data: updates
         })
@@ -113,7 +114,8 @@ export class AuthService {
                     id: session.user.id,
                     email: session.user.email || '',
                     name: session.user.user_metadata?.name,
-                    organization: session.user.user_metadata?.organization
+                    organization: session.user.user_metadata?.organization,
+                    has_completed_tutorial: session.user.user_metadata?.has_completed_tutorial
                 }
                 callback(user)
             } else {
