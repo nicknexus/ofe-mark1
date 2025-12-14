@@ -95,23 +95,25 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
 
             setDataPointsWithEvidence(updatesWithEvidence)
 
-            // Load beneficiaries for all data points in parallel (PERFORMANCE OPTIMIZATION)
-            const beneficiaryPromises = updates.map(update =>
-                apiService.getBeneficiaryGroupsForUpdate(update.id!).catch(error => {
-                    console.error('Error loading beneficiaries for update:', update.id, error)
-                    return []
-                })
-            )
-
-            const beneficiaryResults = await Promise.allSettled(beneficiaryPromises)
-            const beneficiaryData = beneficiaryResults.map((result, index) => ({
-                updateId: updates[index].id,
-                beneficiaries: result.status === 'fulfilled' ? (result.value as any[] || []) : []
-            }))
+            // Load beneficiaries in batches to avoid rate limiting
             const beneficiaryMap: Record<string, any[]> = {}
-            beneficiaryData.forEach(result => {
-                beneficiaryMap[result.updateId!] = result.beneficiaries as any[]
-            })
+            const batchSize = 2
+            for (let i = 0; i < updates.length; i += batchSize) {
+                const batch = updates.slice(i, i + batchSize)
+                await Promise.all(batch.map(async (update) => {
+                    try {
+                        const groups = await apiService.getBeneficiaryGroupsForUpdate(update.id!)
+                        beneficiaryMap[update.id!] = Array.isArray(groups) ? groups : []
+                    } catch (error) {
+                        console.error('Error loading beneficiaries for update:', update.id, error)
+                        beneficiaryMap[update.id!] = []
+                    }
+                }))
+                // Delay between batches
+                if (i + batchSize < updates.length) {
+                    await new Promise(resolve => setTimeout(resolve, 300))
+                }
+            }
             setDataPointBeneficiaries(beneficiaryMap)
 
         } catch (error) {
@@ -543,7 +545,7 @@ export default function KPIDetailPage() {
             // Go through each evidence item and track which data points it covers
             evidence.forEach((ev: any) => {
                 if (!ev.type || !dataPointsCoveredByType.hasOwnProperty(ev.type)) return
-                
+
                 // Get data points covered by this evidence
                 if (ev.kpi_update_ids && Array.isArray(ev.kpi_update_ids)) {
                     ev.kpi_update_ids.forEach((updateId: string) => {

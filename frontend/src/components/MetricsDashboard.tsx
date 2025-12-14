@@ -156,7 +156,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
 
         const newOrderedKPIs = arrayMove(orderedKPIs, oldIndex, newIndex)
         setOrderedKPIs(newOrderedKPIs)
-        
+
         // Notify parent of new order immediately
         if (onOrderChange) {
             onOrderChange(newOrderedKPIs.map(k => k.id))
@@ -248,23 +248,32 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
         }
     }, [initiativeId])
 
-    // Load beneficiary groups for updates (cache them)
+    // Load beneficiary groups for updates (cache them) - batched to avoid rate limiting
     useEffect(() => {
         if (kpiUpdates.length === 0) return
 
         const loadBeneficiaryGroupsForUpdates = async () => {
             const cache: Record<string, string[]> = {}
-            const promises = kpiUpdates.map(async (update) => {
-                if (!update.id) return
-                try {
-                    const groups = await apiService.getBeneficiaryGroupsForUpdate(update.id)
-                    const groupIds = Array.isArray(groups) ? groups.map((g: any) => g.id).filter(Boolean) : []
-                    cache[update.id] = groupIds
-                } catch (error) {
-                    cache[update.id] = []
+            const updatesWithIds = kpiUpdates.filter(u => u.id)
+
+            // Process in batches of 2 with 300ms delay between batches to avoid rate limiting
+            const batchSize = 2
+            for (let i = 0; i < updatesWithIds.length; i += batchSize) {
+                const batch = updatesWithIds.slice(i, i + batchSize)
+                await Promise.all(batch.map(async (update) => {
+                    try {
+                        const groups = await apiService.getBeneficiaryGroupsForUpdate(update.id!)
+                        const groupIds = Array.isArray(groups) ? groups.map((g: any) => g.id).filter(Boolean) : []
+                        cache[update.id!] = groupIds
+                    } catch (error) {
+                        cache[update.id!] = []
+                    }
+                }))
+                // Delay between batches to avoid rate limiting
+                if (i + batchSize < updatesWithIds.length) {
+                    await new Promise(resolve => setTimeout(resolve, 300))
                 }
-            })
-            await Promise.all(promises)
+            }
             setUpdateBeneficiaryGroupsCache(cache)
         }
 
@@ -768,22 +777,19 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setShowLocationPicker(false)
                                 setShowBeneficiaryPicker(false)
                             }}
-                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${
-                                visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
+                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
                                     ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
                                     : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
-                            }`}
+                                }`}
                         >
-                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                                visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
+                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
                                     ? 'bg-primary-100 border-primary-500'
                                     : 'bg-gray-100 border-gray-200'
-                            }`}>
-                                <Filter className={`w-5 h-5 ${
-                                    visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
+                                }`}>
+                                <Filter className={`w-5 h-5 ${visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
                                         ? 'text-primary-500'
                                         : 'text-gray-600'
-                                }`} />
+                                    }`} />
                             </div>
                             <span className="ml-3">Metrics</span>
                             {visibleKPIs.size > 0 && visibleKPIs.size < kpis.length && (
@@ -865,22 +871,19 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setShowMetricsPicker(false)
                                 setShowBeneficiaryPicker(false)
                             }}
-                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${
-                                selectedLocations.length > 0
+                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${selectedLocations.length > 0
                                     ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
                                     : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
-                            }`}
+                                }`}
                         >
-                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                                selectedLocations.length > 0
+                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedLocations.length > 0
                                     ? 'bg-primary-100 border-primary-500'
                                     : 'bg-gray-100 border-gray-200'
-                            }`}>
-                                <MapPin className={`w-5 h-5 ${
-                                    selectedLocations.length > 0
+                                }`}>
+                                <MapPin className={`w-5 h-5 ${selectedLocations.length > 0
                                         ? 'text-primary-500'
                                         : 'text-gray-600'
-                                }`} />
+                                    }`} />
                             </div>
                             <span className="ml-3">Location</span>
                             {selectedLocations.length > 0 && (
@@ -963,22 +966,19 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setShowLocationPicker(false)
                                 setShowMetricsPicker(false)
                             }}
-                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${
-                                selectedBeneficiaryGroups.length > 0
+                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${selectedBeneficiaryGroups.length > 0
                                     ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
                                     : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
-                            }`}
+                                }`}
                         >
-                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                                selectedBeneficiaryGroups.length > 0
+                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedBeneficiaryGroups.length > 0
                                     ? 'bg-primary-100 border-primary-500'
                                     : 'bg-gray-100 border-gray-200'
-                            }`}>
-                                <Users className={`w-5 h-5 ${
-                                    selectedBeneficiaryGroups.length > 0
+                                }`}>
+                                <Users className={`w-5 h-5 ${selectedBeneficiaryGroups.length > 0
                                         ? 'text-primary-500'
                                         : 'text-gray-600'
-                                }`} />
+                                    }`} />
                             </div>
                             <span className="ml-3">Beneficiaries</span>
                             {selectedBeneficiaryGroups.length > 0 && (
@@ -1093,7 +1093,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 </div>
                                 <ChevronDown className={`w-3 h-3 text-gray-500 flex-shrink-0 transition-transform duration-200 ${userMenuOpen ? 'rotate-180' : ''}`} />
                             </button>
-                            
+
                             {/* Dropdown Menu */}
                             {userMenuOpen && (
                                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-bubble-lg border border-gray-200 overflow-hidden z-50">
