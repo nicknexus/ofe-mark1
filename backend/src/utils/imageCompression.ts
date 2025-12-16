@@ -1,5 +1,3 @@
-import sharp from 'sharp';
-
 /**
  * IMAGE COMPRESSION UTILITY
  * 
@@ -13,7 +11,28 @@ import sharp from 'sharp';
  * - PNG with transparency → PNG (compressed)
  * - PNG without transparency → JPEG
  * - Preserves EXIF orientation
+ * 
+ * Note: Sharp is loaded dynamically to prevent server crashes if it fails to load
+ * (e.g., in some serverless environments). If sharp fails, images pass through uncompressed.
  */
+
+// Lazy-load sharp to prevent server crash if it fails to load
+let sharp: typeof import('sharp') | null = null;
+let sharpLoadAttempted = false;
+
+async function getSharp(): Promise<typeof import('sharp') | null> {
+    if (sharpLoadAttempted) return sharp;
+    sharpLoadAttempted = true;
+    
+    try {
+        sharp = (await import('sharp')).default;
+        console.log('[ImageCompression] Sharp loaded successfully');
+    } catch (error) {
+        console.warn('[ImageCompression] Sharp failed to load, compression disabled:', error);
+        sharp = null;
+    }
+    return sharp;
+}
 
 // Compression settings
 const MAX_WIDTH = 2000;
@@ -75,9 +94,20 @@ export async function compressImage(
         };
     }
 
+    // Try to load sharp - if it fails, return original
+    const sharpModule = await getSharp();
+    if (!sharpModule) {
+        return {
+            buffer,
+            mimetype,
+            size: originalSize,
+            wasCompressed: false,
+        };
+    }
+
     try {
         // Load image with sharp
-        let image = sharp(buffer, { failOnError: false });
+        let image = sharpModule(buffer, { failOnError: false });
         
         // Get metadata to check dimensions and if PNG has alpha
         const metadata = await image.metadata();
