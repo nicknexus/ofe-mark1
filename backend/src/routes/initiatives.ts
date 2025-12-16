@@ -77,6 +77,9 @@ router.get('/:id/dashboard', authenticateUser, async (req: AuthenticatedRequest,
         const totalKPIs = kpis.length;
         const kpisWithEvidence = kpis.filter(kpi => kpi.evidence_percentage > 0).length;
         const overallEvidencePercentage = totalKPIs > 0 ? Math.round(kpisWithEvidence / totalKPIs * 100) : 0;
+        
+        // Calculate total evidence pieces
+        const totalEvidence = Object.values(evidenceStats).reduce((sum: number, count: any) => sum + (count || 0), 0);
 
         res.json({
             initiative,
@@ -85,7 +88,8 @@ router.get('/:id/dashboard', authenticateUser, async (req: AuthenticatedRequest,
                 total_kpis: totalKPIs,
                 evidence_coverage_percentage: overallEvidencePercentage,
                 evidence_types: evidenceStats,
-                recent_updates: kpis.reduce((acc, kpi) => acc + kpi.total_updates, 0)
+                recent_updates: kpis.reduce((acc, kpi) => acc + kpi.total_updates, 0),
+                total_evidence: totalEvidence
             }
         });
     } catch (error) {

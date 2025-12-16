@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { ReportService } from '../services/reportService';
 import { openai, isOpenAIConfigured } from '../utils/openai';
+import { supabase } from '../utils/supabase';
 
 const router = Router();
 
@@ -72,11 +73,12 @@ router.post('/generate-report', authenticateUser, async (req: AuthenticatedReque
 
         // Build system prompt
         const systemPrompt = `You are an expert at writing humanitarian and charity impact reports. 
-You receive metrics, descriptions, locations, and a chosen story. 
+You receive metrics, descriptions, locations, beneficiary groups, and a chosen story. 
 Your job is to create a professional impact report. 
 Keep it factual and follow the structure given.
 Write in a clear, professional tone suitable for stakeholders, donors, and partners.
 Use specific numbers and data points from the metrics provided.
+When beneficiary groups are provided, pay special attention to their descriptions as they contain the most important information about who is being served. Also incorporate the group names, locations, age ranges, and total numbers into your narrative.
 Make the report engaging but factual.`;
 
         // Build user prompt with all data
@@ -102,10 +104,72 @@ Make the report engaging but factual.`;
             ).join('\n')
             : 'No locations specified';
 
-        const beneficiaryGroupsText = beneficiaryGroups && beneficiaryGroups.length > 0
-            ? beneficiaryGroups.map((bg: any) =>
-                `- ${bg.name}${bg.description ? `: ${bg.description}` : ''}`
-            ).join('\n')
+        // Enrich beneficiary groups with location names
+        let enrichedBeneficiaryGroups = beneficiaryGroups || [];
+        if (enrichedBeneficiaryGroups.length > 0) {
+            // Get unique location IDs from beneficiary groups
+            const locationIds = [...new Set(enrichedBeneficiaryGroups
+                .map((bg: any) => bg.location_id)
+                .filter((id: string) => id))];
+            
+            // Fetch location names
+            if (locationIds.length > 0) {
+                const { data: locationData } = await supabase
+                    .from('locations')
+                    .select('id, name')
+                    .in('id', locationIds);
+                
+                const locationMap = new Map(
+                    (locationData || []).map((loc: any) => [loc.id, loc.name])
+                );
+                
+                // Enrich beneficiary groups with location names
+                enrichedBeneficiaryGroups = enrichedBeneficiaryGroups.map((bg: any) => ({
+                    ...bg,
+                    location_name: bg.location_id ? locationMap.get(bg.location_id) : null
+                }));
+            }
+        }
+
+        // Format beneficiary groups with all details: name, location, age range, total number, description (most important)
+        const beneficiaryGroupsText = enrichedBeneficiaryGroups.length > 0
+            ? enrichedBeneficiaryGroups.map((bg: any) => {
+                const parts: string[] = [];
+                
+                // Group name (always include)
+                parts.push(bg.name);
+                
+                // Location
+                if (bg.location_name) {
+                    parts.push(`Location: ${bg.location_name}`);
+                }
+                
+                // Age range
+                if (bg.age_range_start !== null && bg.age_range_start !== undefined && 
+                    bg.age_range_end !== null && bg.age_range_end !== undefined) {
+                    parts.push(`Age range: ${bg.age_range_start}-${bg.age_range_end}`);
+                } else if (bg.age_range_start !== null && bg.age_range_start !== undefined) {
+                    parts.push(`Age: ${bg.age_range_start}+`);
+                } else if (bg.age_range_end !== null && bg.age_range_end !== undefined) {
+                    parts.push(`Age: up to ${bg.age_range_end}`);
+                }
+                
+                // Total number
+                if (bg.total_number !== null && bg.total_number !== undefined) {
+                    parts.push(`Total beneficiaries: ${bg.total_number.toLocaleString()}`);
+                }
+                
+                // Description (most important - include prominently)
+                const description = bg.description ? bg.description.trim() : '';
+                
+                // Format: Name - Location, Age, Total | Description (if available)
+                let formatted = parts.join(', ');
+                if (description) {
+                    formatted += ` | ${description}`;
+                }
+                
+                return `- ${formatted}`;
+            }).join('\n')
             : 'No beneficiary groups specified';
 
         const storyText = selectedStory

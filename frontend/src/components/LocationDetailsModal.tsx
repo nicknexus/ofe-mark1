@@ -165,13 +165,13 @@ export default function LocationDetailsModal({
 
     return (
         <>
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
-                <div className="bg-white rounded-xl max-w-7xl w-full h-[90vh] max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[70] animate-fade-in">
+                <div className="bubble-card max-w-7xl w-full h-[90vh] max-h-[90vh] overflow-hidden flex flex-col animate-slide-up">
                     {/* Header */}
-                    <div className="flex items-start justify-between p-6 border-b border-gray-200 flex-shrink-0">
+                    <div className="flex items-start justify-between p-6 border-b border-gray-100 flex-shrink-0">
                         <div className="flex items-start space-x-4 flex-1">
-                            <div className="p-3 bg-primary-100 rounded-xl">
-                                <MapPin className="w-6 h-6 text-primary-500" />
+                            <div className="icon-bubble">
+                                <MapPin className="w-5 h-5 text-primary-500" />
                             </div>
                             <div className="flex-1">
                                 <h2 className="text-2xl font-bold text-gray-900 mb-2">{location.name}</h2>
@@ -201,7 +201,7 @@ export default function LocationDetailsModal({
                                         onClose()
                                         onEditClick(location)
                                     }}
-                                    className="flex items-center space-x-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm"
+                                    className="flex items-center space-x-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 transition-colors text-sm"
                                 >
                                     <Edit className="w-4 h-4" />
                                     <span>Edit</span>
@@ -209,50 +209,54 @@ export default function LocationDetailsModal({
                             )}
                             <button
                                 onClick={onClose}
-                                className="text-gray-400 hover:text-gray-600 p-1 transition-colors flex-shrink-0"
+                                className="text-gray-400 hover:text-gray-600 p-2 rounded-xl hover:bg-gray-100 transition-colors flex-shrink-0"
                             >
-                                <X className="w-6 h-6" />
+                                <X className="w-5 h-5" />
                             </button>
                         </div>
                     </div>
 
                     {/* Content - 3 Column Layout */}
-                    <div className="flex-1 overflow-hidden min-h-0" style={{ display: 'flex', flexDirection: 'column' }}>
+                    <div className="flex-1 overflow-hidden min-h-0 p-6">
                         {loading ? (
                             <div className="flex items-center justify-center py-12">
                                 <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
                                 <span className="ml-3 text-gray-600">Loading location data...</span>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-3 divide-x divide-gray-200" style={{ height: '100%', overflow: 'hidden', display: 'grid' }}>
+                            <div className="grid grid-cols-3 gap-6 h-full">
                                 {/* Left Column - Stories */}
-                                <div className="overflow-y-auto p-4" style={{ height: '100%', overflowY: 'auto' }}>
-                                    <div className="flex items-center space-x-2 mb-3">
-                                        <MessageSquare className="w-4 h-4 text-gray-600" />
-                                        <h3 className="text-sm font-semibold text-gray-900">Stories</h3>
-                                        <span className="text-xs text-gray-500">({stories.length})</span>
-                                    </div>
-                                    {stories.length === 0 ? (
-                                        <div className="text-center py-8">
-                                            <MessageSquare className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                                            <p className="text-xs text-gray-500">No stories</p>
+                                <div className="bubble-card overflow-hidden flex flex-col min-h-0 h-full">
+                                    <div className="px-6 py-4 border-b border-gray-100 flex-shrink-0">
+                                        <div className="flex items-center space-x-2">
+                                            <MessageSquare className="w-4 h-4 text-gray-600" />
+                                            <h3 className="text-sm font-semibold text-gray-900">Stories</h3>
+                                            <span className="status-pill">{stories.length}</span>
                                         </div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {stories.map((story) => (
-                                                <div
-                                                    key={story.id}
-                                                    onClick={() => {
-                                                        if (story.id && onStoryClick) {
-                                                            onClose()
-                                                            onStoryClick(story.id)
-                                                        }
-                                                    }}
-                                                    className={`bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm transition-all ${onStoryClick && story.id
-                                                        ? 'hover:shadow-md hover:border-blue-300 cursor-pointer'
-                                                        : 'hover:shadow-md'
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto p-6 min-h-0">
+                                        {stories.length === 0 ? (
+                                            <div className="text-center py-8">
+                                                <MessageSquare className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                                                <p className="text-xs text-gray-500">No stories</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {stories.map((story) => (
+                                                    <div 
+                                                        key={story.id} 
+                                                        onClick={() => {
+                                                            if (story.id && onStoryClick) {
+                                                                onClose()
+                                                                onStoryClick(story.id)
+                                                            }
+                                                        }}
+                                                        className={`bubble-card overflow-hidden transition-all ${
+                                                            onStoryClick && story.id
+                                                                ? 'hover:shadow-bubble-hover hover:border-blue-200 cursor-pointer'
+                                                                : 'hover:shadow-bubble-hover'
                                                         }`}
-                                                >
+                                                    >
                                                     {story.media_url && story.media_type === 'photo' && (
                                                         <div className="w-full h-48 bg-gray-100 overflow-hidden">
                                                             <img
@@ -276,41 +280,46 @@ export default function LocationDetailsModal({
                                                             <span>{formatDate(story.date_represented)}</span>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Middle Column - Metrics */}
-                                <div className="overflow-y-auto p-4" style={{ height: '100%', overflowY: 'auto' }}>
-                                    <div className="flex items-center space-x-2 mb-3">
-                                        <BarChart3 className="w-4 h-4 text-gray-600" />
-                                        <h3 className="text-sm font-semibold text-gray-900">Metrics</h3>
-                                        <span className="text-xs text-gray-500">({Object.keys(metricsByKPI).length})</span>
-                                    </div>
-                                    {Object.keys(metricsByKPI).length === 0 ? (
-                                        <div className="text-center py-8">
-                                            <BarChart3 className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                                            <p className="text-xs text-gray-500">No metrics</p>
+                                <div className="bubble-card overflow-hidden flex flex-col min-h-0 h-full">
+                                    <div className="px-6 py-4 border-b border-gray-100 flex-shrink-0">
+                                        <div className="flex items-center space-x-2">
+                                            <BarChart3 className="w-4 h-4 text-gray-600" />
+                                            <h3 className="text-sm font-semibold text-gray-900">Metrics</h3>
+                                            <span className="status-pill">{Object.keys(metricsByKPI).length}</span>
                                         </div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {Object.values(metricsByKPI).map((group, idx) => (
-                                                <div
-                                                    key={group.kpi?.id || idx}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        if (group.kpi?.id && onMetricClick) {
-                                                            onClose()
-                                                            onMetricClick(group.kpi.id)
-                                                        }
-                                                    }}
-                                                    className={`bg-white rounded-xl border-2 transition-all ${onMetricClick && group.kpi?.id
-                                                        ? 'border-blue-200 hover:border-blue-400 hover:shadow-lg cursor-pointer'
-                                                        : 'border-blue-100'
-                                                        } overflow-hidden shadow-sm hover:shadow-md`}
-                                                >
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto p-6 min-h-0">
+                                        {Object.keys(metricsByKPI).length === 0 ? (
+                                            <div className="text-center py-8">
+                                                <BarChart3 className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                                                <p className="text-xs text-gray-500">No metrics</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {Object.values(metricsByKPI).map((group, idx) => (
+                                                    <div 
+                                                        key={group.kpi?.id || idx} 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            if (group.kpi?.id && onMetricClick) {
+                                                                onClose()
+                                                                onMetricClick(group.kpi.id)
+                                                            }
+                                                        }}
+                                                        className={`bubble-card transition-all ${
+                                                            onMetricClick && group.kpi?.id
+                                                                ? 'hover:shadow-bubble-hover hover:border-blue-200 cursor-pointer'
+                                                                : 'hover:shadow-bubble-hover'
+                                                        }`}
+                                                    >
                                                     {/* Modern Metric Card */}
                                                     <div className="p-4">
                                                         <div className="flex items-start justify-between mb-3">
@@ -346,19 +355,23 @@ export default function LocationDetailsModal({
                                                             </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Right Column - Evidence */}
-                                <div className="overflow-y-auto p-4" style={{ height: '100%', overflowY: 'auto' }}>
-                                    <div className="flex items-center space-x-2 mb-3">
-                                        <FileText className="w-4 h-4 text-gray-600" />
-                                        <h3 className="text-sm font-semibold text-gray-900">Evidence</h3>
-                                        <span className="text-xs text-gray-500">({evidence.length})</span>
+                                <div className="bubble-card overflow-hidden flex flex-col min-h-0 h-full">
+                                    <div className="px-6 py-4 border-b border-gray-100 flex-shrink-0">
+                                        <div className="flex items-center space-x-2">
+                                            <FileText className="w-4 h-4 text-gray-600" />
+                                            <h3 className="text-sm font-semibold text-gray-900">Evidence</h3>
+                                            <span className="text-xs text-gray-500">({evidence.length})</span>
+                                        </div>
                                     </div>
+                                    <div className="flex-1 overflow-y-auto p-6 min-h-0">
                                     {Object.keys(evidenceByType).length === 0 ? (
                                         <div className="text-center py-8">
                                             <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
@@ -421,6 +434,7 @@ export default function LocationDetailsModal({
                                             })}
                                         </div>
                                     )}
+                                    </div>
                                 </div>
                             </div>
                         )}

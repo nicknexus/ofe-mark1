@@ -313,6 +313,11 @@ export default function AddEvidenceModal({
         setUploadProgress('')
 
         try {
+            // Validate that a file is uploaded or URL is provided
+            if (selectedFiles.length === 0 && !formData.file_url && (!editData || !editData.file_url)) {
+                throw new Error('Please upload a file or provide a file URL')
+            }
+
             let finalFileUrl = formData.file_url
             const fileUrls: string[] = []
             const fileSizes: number[] = [] // Track file sizes for storage tracking
@@ -356,6 +361,11 @@ export default function AddEvidenceModal({
                 throw new Error('Please select a date')
             }
 
+            // Validate location is selected
+            if (!selectedLocationId) {
+                throw new Error('Please select a location')
+            }
+
             // Include selected impact claims for precise linking
             // Only include kpi_update_ids if it's a new evidence or if editing and user has changed selection
             if (!editData || hasChangedDataPoints) {
@@ -367,7 +377,7 @@ export default function AddEvidenceModal({
                 submitData.kpi_ids = formData.kpi_ids
             }
 
-            submitData.location_id = selectedLocationId || undefined
+            submitData.location_id = selectedLocationId
 
             setUploadProgress(editData ? 'Updating evidence record...' : 'Creating evidence record...')
             await onSubmit(submitData)
@@ -483,13 +493,13 @@ export default function AddEvidenceModal({
             case 1:
                 return !!formData.type
             case 2:
-                return !!(datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate))
+                return !!(datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate)) && !!selectedLocationId
             case 3:
                 return !!(formData.kpi_ids && formData.kpi_ids.length > 0)
             case 4:
                 return true // Impact claims step is optional
             case 5:
-                return !!formData.title && (selectedFiles.length > 0 || !!formData.file_url)
+                return !!formData.title && (selectedFiles.length > 0 || !!formData.file_url || (editData && editData.file_url))
             default:
                 return false
         }
@@ -659,13 +669,14 @@ export default function AddEvidenceModal({
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-900 mb-3">
                                             <MapPin className="w-5 h-5 inline mr-2 text-primary-500" />
-                                            Location (optional)
+                                            Location <span className="text-red-500">*</span>
                                         </label>
                                         <div className="flex gap-3">
                                             <select
                                                 value={selectedLocationId}
                                                 onChange={(e) => setSelectedLocationId(e.target.value)}
                                                 className="input-field flex-1 text-base py-3"
+                                                required
                                             >
                                                 <option value="">Select a location...</option>
                                                 {locations.map((location) => (
@@ -1049,7 +1060,7 @@ export default function AddEvidenceModal({
                     <div>
                                         <label className="block text-sm font-semibold text-gray-900 mb-2">
                                             <Upload className="w-5 h-5 inline mr-2 text-primary-500" />
-                            File or Link
+                            File or Link <span className="text-red-400">*</span>
                         </label>
 
                         <div
@@ -1140,7 +1151,7 @@ export default function AddEvidenceModal({
                                 value={formData.file_url || ''}
                                 onChange={handleInputChange}
                                                 className="input-field text-base py-3"
-                                placeholder="Or paste a link to online evidence (https://...)"
+                                placeholder="Or paste a link to online evidence (https://...) - Required if no file uploaded"
                             />
                         </div>
                     </div>

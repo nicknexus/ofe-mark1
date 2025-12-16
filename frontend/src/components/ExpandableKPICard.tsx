@@ -324,34 +324,31 @@ export default function ExpandableKPICard({
         }
     }
 
-    // Handler for easy evidence upload (single claim)
+    // Handler for easy evidence upload (single claim) - legacy, kept for compatibility
     const handleEasyEvidenceSubmit = async (evidenceData: any) => {
-        try {
-            await apiService.createEvidence(evidenceData)
+        await apiService.createEvidence(evidenceData)
+    }
 
-            // Clear cache and refresh data
-            if (initiativeId) {
-                apiService.clearCache(`/initiatives/${initiativeId}/dashboard`)
-            }
-            apiService.clearCache(`/evidence?initiative_id=${initiativeId}&kpi_id=${kpi.id}`)
-            onRefresh?.()
+    // Handler called once after all evidence is batch-created
+    const handleEasyEvidenceBatchComplete = async () => {
+        // Clear cache and refresh data
+        if (initiativeId) {
+            apiService.clearCache(`/initiatives/${initiativeId}/dashboard`)
+        }
+        apiService.clearCache(`/evidence?initiative_id=${initiativeId}&kpi_id=${kpi.id}`)
+        onRefresh?.()
 
-            // Reload evidence immediately to update UI
-            if (kpi.id && initiativeId) {
-                await loadEvidence()
-            }
+        // Reload evidence immediately to update UI
+        if (kpi.id && initiativeId) {
+            await loadEvidence()
+        }
 
-            setIsEasyEvidenceModalOpen(false)
-            setSelectedClaimForEvidence(null)
+        setIsEasyEvidenceModalOpen(false)
+        setSelectedClaimForEvidence(null)
 
-            // Advance tutorial if on create-evidence step
-            if (isTutorialActive && currentStep === 'create-evidence') {
-                advanceStep()
-            }
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to add evidence'
-            toast.error(message)
-            throw error
+        // Advance tutorial if on create-evidence step
+        if (isTutorialActive && currentStep === 'create-evidence') {
+            advanceStep()
         }
     }
 
@@ -1139,6 +1136,7 @@ export default function ExpandableKPICard({
                             setSelectedClaimForEvidence(null)
                         }}
                         onSubmit={handleEasyEvidenceSubmit}
+                        onBatchComplete={handleEasyEvidenceBatchComplete}
                         impactClaim={selectedClaimForEvidence}
                         kpi={kpi}
                         initiativeId={initiativeId || kpi.initiative_id || ''}
@@ -2206,6 +2204,7 @@ export default function ExpandableKPICard({
                         setSelectedClaimForEvidence(null)
                     }}
                     onSubmit={handleEasyEvidenceSubmit}
+                    onBatchComplete={handleEasyEvidenceBatchComplete}
                     impactClaim={selectedClaimForEvidence}
                     kpi={kpi}
                     initiativeId={initiativeId || kpi.initiative_id || ''}

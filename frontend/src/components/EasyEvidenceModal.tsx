@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { X, Upload, File, Loader2, Check, Camera, FileText, MessageSquare, DollarSign, Calendar, MapPin, AlertCircle, ChevronDown } from 'lucide-react'
+import { X, Upload, File, Loader2, Check, Camera, FileText, MessageSquare, DollarSign, Calendar, MapPin, AlertCircle, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { CreateEvidenceForm, Location } from '../types'
 import { apiService } from '../services/api'
 import { formatDate } from '../utils'
@@ -9,6 +9,7 @@ interface EasyEvidenceModalProps {
     isOpen: boolean
     onClose: () => void
     onSubmit: (data: CreateEvidenceForm) => Promise<void>
+    onBatchComplete?: () => Promise<void> // Called once after all evidence is created
     impactClaim: any // The selected impact claim
     kpi: any // The KPI this claim belongs to
     initiativeId: string
@@ -19,12 +20,14 @@ interface FileWithType {
     type: 'visual_proof' | 'documentation' | 'testimony' | 'financials'
     title: string
     description: string
+    previewUrl?: string
 }
 
 export default function EasyEvidenceModal({
     isOpen,
     onClose,
     onSubmit,
+    onBatchComplete,
     impactClaim,
     kpi,
     initiativeId
@@ -35,8 +38,7 @@ export default function EasyEvidenceModal({
     const [uploadProgress, setUploadProgress] = useState('')
     const [location, setLocation] = useState<Location | null>(null)
     const [loadingLocation, setLoadingLocation] = useState(false)
-    const [evidenceTypeModalOpen, setEvidenceTypeModalOpen] = useState(false)
-    const [editingFileIndex, setEditingFileIndex] = useState<number | null>(null)
+    const [currentStep, setCurrentStep] = useState(1)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
@@ -46,6 +48,34 @@ export default function EasyEvidenceModal({
             setLocation(null)
         }
     }, [isOpen, impactClaim?.location_id])
+
+    // Reset step when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            setCurrentStep(1)
+        }
+    }, [isOpen])
+
+    // Generate preview URLs for image files
+    useEffect(() => {
+        selectedFiles.forEach((fileWithType, index) => {
+            if (!fileWithType.previewUrl && isImageFile(fileWithType.file)) {
+                const url = URL.createObjectURL(fileWithType.file)
+                setSelectedFiles(prev => prev.map((item, i) => 
+                    i === index ? { ...item, previewUrl: url } : item
+                ))
+            }
+        })
+
+        // Cleanup URLs on unmount
+        return () => {
+            selectedFiles.forEach(fileWithType => {
+                if (fileWithType.previewUrl) {
+                    URL.revokeObjectURL(fileWithType.previewUrl)
+                }
+            })
+        }
+    }, [selectedFiles.length])
 
     const loadLocation = async () => {
         if (!impactClaim?.location_id) return
@@ -67,6 +97,10 @@ export default function EasyEvidenceModal({
         { value: 'testimony', label: 'Testimonies', icon: MessageSquare, description: 'Quotes, feedback, stories' },
         { value: 'financials', label: 'Financials', icon: DollarSign, description: 'Receipts, invoices, budgets' }
     ] as const
+
+    const isImageFile = (file: File) => {
+        return file.type.startsWith('image/')
+    }
 
     if (!isOpen) return null
 
@@ -120,20 +154,15 @@ export default function EasyEvidenceModal({
     }
 
     const removeFile = (index: number) => {
+        const fileToRemove = selectedFiles[index]
+        if (fileToRemove.previewUrl) {
+            URL.revokeObjectURL(fileToRemove.previewUrl)
+        }
         setSelectedFiles(prev => prev.filter((_, i) => i !== index))
     }
 
-    const openEvidenceTypeModal = (index: number) => {
-        setEditingFileIndex(index)
-        setEvidenceTypeModalOpen(true)
-    }
-
-    const selectEvidenceType = (type: 'visual_proof' | 'documentation' | 'testimony' | 'financials') => {
-        if (editingFileIndex !== null) {
-            setSelectedFiles(prev => prev.map((item, i) => i === editingFileIndex ? { ...item, type } : item))
-        }
-        setEvidenceTypeModalOpen(false)
-        setEditingFileIndex(null)
+    const updateFileType = (index: number, type: 'visual_proof' | 'documentation' | 'testimony' | 'financials') => {
+        setSelectedFiles(prev => prev.map((item, i) => i === index ? { ...item, type } : item))
     }
 
     const updateFileTitle = (index: number, title: string) => {
@@ -160,18 +189,26 @@ export default function EasyEvidenceModal({
         }
 
         setLoading(true)
+        const totalFiles = selectedFiles.length
 
         try {
-            // Create evidence for each file
-            for (let i = 0; i < selectedFiles.length; i++) {
+            // Step 1: Upload all files first
+            setUploadProgress(`Uploading ${totalFiles} file${totalFiles > 1 ? 's' : ''}...`)
+            const uploadResults: { file: typeof selectedFiles[0], result: { file_url: string, size: number } }[] = []
+            
+            for (let i = 0; i < totalFiles; i++) {
                 const fileWithType = selectedFiles[i]
-                setUploadProgress(`Processing ${i + 1} of ${selectedFiles.length}...`)
-
-                // Upload file
-                setUploadProgress(`Uploading file ${i + 1} of ${selectedFiles.length}...`)
+                setUploadProgress(`Uploading file ${i + 1} of ${totalFiles}...`)
                 const uploadResult = await apiService.uploadFile(fileWithType.file)
+                uploadResults.push({ file: fileWithType, result: uploadResult })
+            }
 
-                setUploadProgress(`Creating evidence ${i + 1} of ${selectedFiles.length}...`)
+            // Step 2: Create all evidence records (without triggering parent refresh)
+            setUploadProgress(`Creating ${totalFiles} evidence record${totalFiles > 1 ? 's' : ''}...`)
+            
+            for (let i = 0; i < uploadResults.length; i++) {
+                const { file: fileWithType, result: uploadResult } = uploadResults[i]
+                setUploadProgress(`Creating evidence ${i + 1} of ${totalFiles}...`)
 
                 // Create evidence data - auto-fill from impact claim
                 const evidenceData: CreateEvidenceForm = {
@@ -195,16 +232,22 @@ export default function EasyEvidenceModal({
                     file_sizes: [uploadResult.size]
                 }
 
-                await onSubmit(evidenceData)
+                // Create evidence directly via API (don't trigger parent refresh)
+                await apiService.createEvidence(evidenceData)
             }
 
-            const count = selectedFiles.length
-            
+            // Step 3: Trigger single refresh after all evidence is created
+            setUploadProgress('Refreshing...')
+            if (onBatchComplete) {
+                await onBatchComplete()
+            }
+
             // Reset form
             setSelectedFiles([])
             setUploadProgress('')
+            setCurrentStep(1)
 
-            toast.success(`Successfully added ${count} evidence ${count === 1 ? 'item' : 'items'}!`)
+            toast.success(`Successfully added ${totalFiles} evidence ${totalFiles === 1 ? 'item' : 'items'}!`)
             onClose()
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to add evidence'
@@ -215,12 +258,18 @@ export default function EasyEvidenceModal({
         }
     }
 
-    const hasFiles = selectedFiles.length > 0
+    const canProceedToStep2 = selectedFiles.length > 0
+    const canSubmit = selectedFiles.length > 0 && selectedFiles.every(f => f.title.trim())
+
+    const steps = [
+        { number: 1, title: 'Upload Files' },
+        { number: 2, title: 'Configure Details' }
+    ]
 
     return (
         <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center p-4 z-[80]">
-            <div className={`bg-white/95 backdrop-blur-xl border border-white/60 rounded-3xl w-full ${hasFiles ? 'max-w-6xl' : 'max-w-2xl'} shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] max-h-[90vh] overflow-hidden flex flex-col transition-all duration-300`}>
-                {/* Header - Evidence grey with green accent */}
+            <div className="bg-white/95 backdrop-blur-xl border border-white/60 rounded-3xl w-full max-w-4xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] min-h-[75vh] max-h-[95vh] overflow-hidden flex flex-col transition-all duration-300">
+                {/* Header */}
                 <div className="flex items-center justify-between p-5 bg-gradient-to-r from-evidence-500 to-evidence-600 flex-shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
@@ -241,217 +290,104 @@ export default function EasyEvidenceModal({
                     </button>
                 </div>
 
-                {/* Impact Claim Summary - Green accent bar */}
-                <div className="px-5 py-4 bg-gradient-to-r from-primary-50 to-primary-100/50 border-b border-primary-200/40 flex-shrink-0">
-                    <div className="flex items-center gap-2 mb-2">
-                        <div className="w-2 h-2 rounded-full bg-primary-500"></div>
-                        <span className="text-xs font-semibold text-primary-700 uppercase tracking-wide">
-                            Supporting this Impact Claim
-                        </span>
-                    </div>
+                {/* Impact Claim Summary */}
+                <div className="px-5 py-5 bg-gradient-to-r from-primary-50 to-primary-100/50 border-b border-primary-200/40 flex-shrink-0">
                     <div className="flex items-center justify-between">
-                        <div>
-                            <div className="flex items-center gap-3">
-                                <span className="text-2xl font-bold text-primary-700">
-                                    {impactClaim.value?.toLocaleString()} {kpi.unit_of_measurement}
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full bg-primary-500"></div>
+                                <span className="text-sm font-semibold text-primary-600 uppercase tracking-wide">
+                                    Supporting
                                 </span>
                             </div>
-                            <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
+                            <span className="text-2xl font-bold text-primary-700">
+                                {impactClaim.value?.toLocaleString()} {kpi.unit_of_measurement}
+                            </span>
+                            <div className="flex items-center gap-4 text-sm text-gray-600">
                                 <div className="flex items-center gap-1.5">
-                                    <Calendar className="w-3.5 h-3.5 text-primary-500" />
+                                    <Calendar className="w-4 h-4 text-primary-500" />
                                     <span>{getDateDisplay()}</span>
                                 </div>
                                 {impactClaim.location_id && (
                                     <div className="flex items-center gap-1.5">
-                                        <MapPin className="w-3.5 h-3.5 text-primary-500" />
+                                        <MapPin className="w-4 h-4 text-primary-500" />
                                         {loadingLocation ? (
-                                            <span className="text-gray-400">Loading...</span>
+                                            <span className="text-gray-400">...</span>
                                         ) : location ? (
                                             <span>{location.name}</span>
                                         ) : (
-                                            <span className="text-gray-400">Location not found</span>
+                                            <span className="text-gray-400">—</span>
                                         )}
                                     </div>
                                 )}
                             </div>
                         </div>
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 rounded-lg shadow-lg shadow-primary-500/25">
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 rounded-lg shadow-sm">
                             <Check className="w-3.5 h-3.5 text-white" />
                             <span className="text-xs font-semibold text-white">Auto-linked</span>
                         </div>
                     </div>
                 </div>
 
-                {/* Form */}
-                <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
-                    {hasFiles ? (
-                        <div className="flex flex-1 min-h-0">
-                            {/* Left Column - Upload Area */}
-                            <div className="w-1/2 border-r border-gray-100 overflow-y-auto">
-                                <div className="p-5 space-y-4">
-                                    {/* Disclaimer Banner - Green styling */}
-                                    <div className="bg-primary-50 border border-primary-200 rounded-xl p-4 flex items-start gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-primary-500/25">
-                                            <AlertCircle className="w-4 h-4 text-white" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-semibold text-primary-800 mb-1">
-                                                Upload all evidence you have
-                                            </p>
-                                            <p className="text-xs text-primary-700">
-                                                To sufficiently support this claim, upload all relevant evidence files. You can assign different evidence types to each file.
-                                            </p>
-                                        </div>
+                {/* Progress Steps */}
+                <div className="px-5 py-5 border-b border-gray-100 bg-white/50 flex-shrink-0">
+                    <div className="flex items-center justify-center">
+                        {steps.map((step, index) => (
+                            <React.Fragment key={step.number}>
+                                <div className="flex items-center gap-2">
+                                    <div className={`flex items-center justify-center w-8 h-8 rounded-lg border-2 transition-all duration-200 ${
+                                        currentStep > step.number
+                                            ? 'bg-evidence-500 border-evidence-500 text-white shadow-sm'
+                                            : currentStep === step.number
+                                            ? 'bg-evidence-500 border-evidence-500 text-white ring-2 ring-evidence-200/50 shadow-sm'
+                                            : 'bg-white border-gray-200 text-gray-400'
+                                    }`}>
+                                        {currentStep > step.number ? (
+                                            <Check className="w-4 h-4" />
+                                        ) : (
+                                            <span className="text-sm font-semibold">{step.number}</span>
+                                        )}
                                     </div>
+                                    <span className={`text-base font-medium whitespace-nowrap ${
+                                        currentStep >= step.number ? 'text-gray-700' : 'text-gray-400'
+                                    }`}>
+                                        {step.title}
+                                    </span>
+                                </div>
+                                {index < steps.length - 1 && (
+                                    <div className={`w-20 h-0.5 mx-5 rounded-full transition-all duration-200 ${
+                                        currentStep > step.number ? 'bg-evidence-500' : 'bg-gray-200'
+                                    }`} />
+                                )}
+                            </React.Fragment>
+                        ))}
+                    </div>
+                </div>
 
-                                    {/* File Upload */}
+                {/* Content */}
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                    {currentStep === 1 ? (
+                        /* Step 1: Upload Files */
+                        <div className="p-5">
+                            <div className="max-w-xl mx-auto space-y-4">
+                                {/* Info Banner */}
+                                <div className="bg-primary-50 border border-primary-200 rounded-xl p-3 flex items-start gap-3">
+                                    <div className="w-7 h-7 rounded-lg bg-primary-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-primary-500/25">
+                                        <AlertCircle className="w-3.5 h-3.5 text-white" />
+                                    </div>
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                            Upload Files <span className="text-gray-400 font-normal">(photos, documents, etc.)</span>
-                                        </label>
-                                        <div
-                                            className={`border-2 border-dashed rounded-xl p-6 text-center transition-all duration-200 cursor-pointer ${
-                                                isDragOver
-                                                    ? 'border-evidence-500 bg-evidence-50/50'
-                                                    : 'border-gray-200 hover:border-evidence-400 hover:bg-evidence-50/30'
-                                            }`}
-                                            onDrop={handleDrop}
-                                            onDragOver={handleDragOver}
-                                            onDragLeave={handleDragLeave}
-                                            onClick={() => fileInputRef.current?.click()}
-                                        >
-                                            <input
-                                                type="file"
-                                                ref={fileInputRef}
-                                                onChange={handleFileSelect}
-                                                multiple
-                                                className="hidden"
-                                                accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
-                                            />
-                                            <Upload className="w-8 h-8 mx-auto text-evidence-500 mb-2" />
-                                            <p className="text-sm text-gray-600">
-                                                Drag & drop files here, or <span className="text-evidence-600 font-medium">browse</span>
-                                            </p>
-                                            <p className="text-xs text-gray-400 mt-1">
-                                                Images, PDFs, and documents supported
-                                            </p>
-                                        </div>
+                                        <p className="text-sm font-semibold text-primary-800 mb-0.5">
+                                            Upload all evidence you have
+                                        </p>
+                                        <p className="text-xs text-primary-700">
+                                            Upload all relevant files. You can configure each in the next step.
+                                        </p>
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* Right Column - File Cards */}
-                            <div className="w-1/2 overflow-y-auto bg-gray-50/30">
-                                <div className="p-5">
-                                    <div className="text-sm font-semibold text-gray-700 mb-4 sticky top-0 bg-gray-50/30 pb-2 border-b border-gray-200 flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded-lg bg-evidence-500 flex items-center justify-center">
-                                            <FileText className="w-3.5 h-3.5 text-white" />
-                                        </div>
-                                        Configure Evidence ({selectedFiles.length} {selectedFiles.length === 1 ? 'file' : 'files'})
-                                    </div>
-                                    <div className="space-y-4">
-                                        {selectedFiles.map((fileWithType, index) => {
-                                            const Icon = evidenceTypes.find(t => t.value === fileWithType.type)?.icon || FileText
-                                            return (
-                                                <div
-                                                    key={index}
-                                                    className="bg-white rounded-lg p-3 border border-gray-200 space-y-2.5 shadow-sm"
-                                                >
-                                                    {/* File Info Header */}
-                                                    <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-                                                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                                            <File className="w-3 h-3 text-evidence-500 flex-shrink-0" />
-                                                            <span className="text-xs font-medium text-gray-700 truncate">{fileWithType.file.name}</span>
-                                                            <span className="text-[10px] text-gray-400 flex-shrink-0">
-                                                                ({(fileWithType.file.size / 1024).toFixed(1)} KB)
-                                                            </span>
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeFile(index)}
-                                                            className="p-0.5 hover:bg-gray-200 rounded transition-colors flex-shrink-0"
-                                                        >
-                                                            <X className="w-3 h-3 text-gray-400" />
-                                                        </button>
-                                                    </div>
-
-                                                    {/* Evidence Type Selection */}
-                                                    <div>
-                                                        <label className="block text-[10px] font-semibold text-gray-600 mb-1">
-                                                            Type <span className="text-red-400">*</span>
-                                                        </label>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => openEvidenceTypeModal(index)}
-                                                            className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-evidence-400 hover:bg-evidence-50/50 transition-all duration-200 flex items-center justify-between bg-white"
-                                                        >
-                                                            <div className="flex items-center gap-2">
-                                                                <Icon className="w-3.5 h-3.5 text-evidence-500" />
-                                                                <span className="text-gray-700">{evidenceTypes.find(t => t.value === fileWithType.type)?.label}</span>
-                                                            </div>
-                                                            <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-                                                        </button>
-                                                    </div>
-
-                                                    {/* Title */}
-                                                    <div>
-                                                        <label className="block text-[10px] font-semibold text-gray-600 mb-1">
-                                                            Title <span className="text-red-400">*</span>
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            value={fileWithType.title}
-                                                            onChange={(e) => updateFileTitle(index, e.target.value)}
-                                                            placeholder="e.g., Receipt for meal distribution"
-                                                            className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-1 focus:ring-evidence-500/20 focus:border-evidence-500 transition-all duration-200"
-                                                            required
-                                                        />
-                                                    </div>
-
-                                                    {/* Description */}
-                                                    <div>
-                                                        <label className="block text-[10px] font-semibold text-gray-600 mb-1">
-                                                            Description <span className="text-gray-400 font-normal">(optional)</span>
-                                                        </label>
-                                                        <textarea
-                                                            value={fileWithType.description}
-                                                            onChange={(e) => updateFileDescription(index, e.target.value)}
-                                                            placeholder="Describe what this evidence shows..."
-                                                            rows={1.5}
-                                                            className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-1 focus:ring-evidence-500/20 focus:border-evidence-500 transition-all duration-200 resize-none"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="p-5 space-y-4 overflow-y-auto">
-                            {/* Disclaimer Banner - Green styling */}
-                            <div className="bg-primary-50 border border-primary-200 rounded-xl p-4 flex items-start gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-primary-500/25">
-                                    <AlertCircle className="w-4 h-4 text-white" />
-                                </div>
-                                <div>
-                                    <p className="text-sm font-semibold text-primary-800 mb-1">
-                                        Upload all evidence you have
-                                    </p>
-                                    <p className="text-xs text-primary-700">
-                                        To sufficiently support this claim, upload all relevant evidence files. You can assign different evidence types to each file.
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* File Upload */}
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Upload Files <span className="text-gray-400 font-normal">(photos, documents, etc.)</span>
-                                </label>
+                                {/* Upload Area */}
                                 <div
-                                    className={`border-2 border-dashed rounded-xl p-6 text-center transition-all duration-200 cursor-pointer ${
+                                    className={`border-2 border-dashed rounded-xl p-5 text-center transition-all duration-200 cursor-pointer ${
                                         isDragOver
                                             ? 'border-evidence-500 bg-evidence-50/50'
                                             : 'border-gray-200 hover:border-evidence-400 hover:bg-evidence-50/30'
@@ -469,100 +405,233 @@ export default function EasyEvidenceModal({
                                         className="hidden"
                                         accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
                                     />
-                                    <Upload className="w-8 h-8 mx-auto text-evidence-500 mb-2" />
-                                    <p className="text-sm text-gray-600">
-                                        Drag & drop files here, or <span className="text-evidence-600 font-medium">browse</span>
+                                    <Upload className="w-10 h-10 mx-auto text-evidence-500 mb-2" />
+                                    <p className="text-sm text-gray-700 font-medium mb-0.5">
+                                        Drag & drop files here, or <span className="text-evidence-600">browse</span>
                                     </p>
-                                    <p className="text-xs text-gray-400 mt-1">
+                                    <p className="text-xs text-gray-400">
                                         Images, PDFs, and documents supported
                                     </p>
                                 </div>
+
+                                {/* File List */}
+                                {selectedFiles.length > 0 && (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="text-sm font-semibold text-gray-700">
+                                                Uploaded Files ({selectedFiles.length})
+                                            </h4>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedFiles([])}
+                                                className="text-xs text-red-500 hover:text-red-700"
+                                            >
+                                                Remove all
+                                            </button>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            {selectedFiles.map((fileWithType, index) => (
+                                                <div
+                                                    key={index}
+                                                    className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg border border-gray-200"
+                                                >
+                                                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                                        <div className="w-7 h-7 rounded-lg bg-evidence-100 flex items-center justify-center flex-shrink-0">
+                                                            {isImageFile(fileWithType.file) ? (
+                                                                <Camera className="w-3.5 h-3.5 text-evidence-500" />
+                                                            ) : (
+                                                                <FileText className="w-3.5 h-3.5 text-evidence-500" />
+                                                            )}
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="text-sm font-medium text-gray-800 truncate">
+                                                                {fileWithType.file.name}
+                                                            </p>
+                                                            <p className="text-xs text-gray-500">
+                                                                {(fileWithType.file.size / 1024).toFixed(1)} KB
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeFile(index)}
+                                                        className="p-1 hover:bg-gray-200 rounded-lg transition-colors flex-shrink-0"
+                                                    >
+                                                        <X className="w-3.5 h-3.5 text-gray-400" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
+                    ) : (
+                        /* Step 2: Configure Details */
+                        <div className="p-5 space-y-4">
+                                {selectedFiles.map((fileWithType, index) => {
+                                    const TypeIcon = evidenceTypes.find(t => t.value === fileWithType.type)?.icon || FileText
+                                    return (
+                                        <div
+                                            key={index}
+                                            className="flex gap-5 p-4 bg-white rounded-xl border border-gray-200 shadow-sm"
+                                        >
+                                            {/* Left: Preview */}
+                                            <div className="w-40 flex-shrink-0">
+                                                <div className="aspect-square rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
+                                                    {fileWithType.previewUrl ? (
+                                                        <img
+                                                            src={fileWithType.previewUrl}
+                                                            alt={fileWithType.file.name}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
+                                                            <FileText className="w-10 h-10 mb-2" />
+                                                            <span className="text-xs text-center px-2">
+                                                                {fileWithType.file.name.split('.').pop()?.toUpperCase()}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-2 truncate text-center">
+                                                    {fileWithType.file.name}
+                                                </p>
+                                            </div>
+
+                                            {/* Right: Form Fields */}
+                                            <div className="flex-1 space-y-3">
+                                                {/* Evidence Type */}
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                                                        Evidence Type <span className="text-red-400">*</span>
+                                                    </label>
+                                                    <div className="grid grid-cols-4 gap-2">
+                                                        {evidenceTypes.map((type) => {
+                                                            const Icon = type.icon
+                                                            const isSelected = fileWithType.type === type.value
+                                                            return (
+                                                                <button
+                                                                    key={type.value}
+                                                                    type="button"
+                                                                    onClick={() => updateFileType(index, type.value)}
+                                                                    className={`p-2 rounded-lg border-2 transition-all duration-200 flex flex-col items-center gap-1 ${
+                                                                        isSelected
+                                                                            ? 'border-evidence-500 bg-evidence-50'
+                                                                            : 'border-gray-200 hover:border-evidence-300 hover:bg-gray-50'
+                                                                    }`}
+                                                                >
+                                                                    <Icon className={`w-4 h-4 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
+                                                                    <span className={`text-[10px] font-medium ${isSelected ? 'text-evidence-700' : 'text-gray-600'}`}>
+                                                                        {type.label}
+                                                                    </span>
+                                                                </button>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                </div>
+
+                                                {/* Title */}
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                                                        Title <span className="text-red-400">*</span>
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={fileWithType.title}
+                                                        onChange={(e) => updateFileTitle(index, e.target.value)}
+                                                        placeholder="e.g., Receipt for meal distribution"
+                                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-evidence-500/20 focus:border-evidence-500 transition-all duration-200"
+                                                        required
+                                                    />
+                                                </div>
+
+                                                {/* Description */}
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                                                        Description <span className="text-gray-400 font-normal">(optional)</span>
+                                                    </label>
+                                                    <textarea
+                                                        value={fileWithType.description}
+                                                        onChange={(e) => updateFileDescription(index, e.target.value)}
+                                                        placeholder="Describe what this evidence shows..."
+                                                        rows={2}
+                                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-evidence-500/20 focus:border-evidence-500 transition-all duration-200 resize-none"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Remove Button */}
+                                            <button
+                                                type="button"
+                                                onClick={() => removeFile(index)}
+                                                className="p-1.5 h-fit hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+                                            >
+                                                <X className="w-4 h-4 text-gray-400" />
+                                            </button>
+                                        </div>
+                                    )
+                                })}
+                        </div>
                     )}
-                </form>
+                </div>
 
                 {/* Footer */}
                 <div className="flex items-center justify-between p-5 border-t border-gray-100/60 bg-gray-50/50 flex-shrink-0">
                     <button
                         type="button"
-                        onClick={onClose}
-                        className="px-5 py-2.5 text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 font-medium transition-all duration-200"
+                        onClick={currentStep === 1 ? onClose : () => setCurrentStep(1)}
+                        className="flex items-center gap-2 px-5 py-2.5 text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 font-medium transition-all duration-200"
                         disabled={loading}
                     >
-                        Cancel
-                    </button>
-                    <button
-                        type="submit"
-                        onClick={handleSubmit}
-                        disabled={loading || selectedFiles.length === 0 || selectedFiles.some(f => !f.title.trim())}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {loading ? (
-                            <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span>{uploadProgress || 'Adding...'}</span>
-                            </>
+                        {currentStep === 1 ? (
+                            'Cancel'
                         ) : (
                             <>
-                                <Check className="w-4 h-4" />
-                                <span>Add {selectedFiles.length > 0 ? `${selectedFiles.length} ` : ''}Evidence</span>
+                                <ChevronLeft className="w-4 h-4" />
+                                Back
                             </>
                         )}
                     </button>
+
+                    {loading && (
+                        <div className="px-4 py-2 text-sm text-evidence-700 bg-evidence-50 rounded-xl border border-evidence-200">
+                            {uploadProgress}
+                        </div>
+                    )}
+
+                    {currentStep === 1 ? (
+                        <button
+                            type="button"
+                            onClick={() => setCurrentStep(2)}
+                            disabled={!canProceedToStep2}
+                            className="flex items-center gap-2 px-6 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Next
+                            <ChevronRight className="w-4 h-4" />
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={handleSubmit}
+                            disabled={loading || !canSubmit}
+                            className="flex items-center gap-2 px-6 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {loading ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <span>Adding...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Check className="w-4 h-4" />
+                                    <span>Add {selectedFiles.length} Evidence</span>
+                                </>
+                            )}
+                        </button>
+                    )}
                 </div>
             </div>
-
-            {/* Evidence Type Selection Modal */}
-            {evidenceTypeModalOpen && (
-                <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-[90]" onClick={() => { setEvidenceTypeModalOpen(false); setEditingFileIndex(null) }}>
-                    <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                        {/* Modal Header - Evidence grey */}
-                        <div className="p-4 bg-evidence-500 flex items-center justify-between">
-                            <h3 className="text-lg font-bold text-white">Select Evidence Type</h3>
-                            <button
-                                onClick={() => { setEvidenceTypeModalOpen(false); setEditingFileIndex(null) }}
-                                className="p-1 hover:bg-white/20 rounded-lg transition-colors"
-                            >
-                                <X className="w-5 h-5 text-white" />
-                            </button>
-                        </div>
-                        <div className="p-4 space-y-2">
-                            {evidenceTypes.map((type) => {
-                                const TypeIcon = type.icon
-                                const isSelected = editingFileIndex !== null && selectedFiles[editingFileIndex]?.type === type.value
-                                return (
-                                    <button
-                                        key={type.value}
-                                        type="button"
-                                        onClick={() => selectEvidenceType(type.value)}
-                                        className={`w-full p-4 rounded-xl border-2 text-left transition-all duration-200 ${
-                                            isSelected
-                                                ? 'border-evidence-500 bg-evidence-50'
-                                                : 'border-gray-200 hover:border-evidence-400 hover:bg-evidence-50/50'
-                                        }`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className={`p-2 rounded-lg ${isSelected ? 'bg-evidence-500 shadow-lg shadow-evidence-500/25' : 'bg-gray-100'}`}>
-                                                <TypeIcon className={`w-5 h-5 ${isSelected ? 'text-white' : 'text-gray-600'}`} />
-                                            </div>
-                                            <div className="flex-1">
-                                                <div className={`text-sm font-semibold ${isSelected ? 'text-evidence-700' : 'text-gray-900'}`}>
-                                                    {type.label}
-                                                </div>
-                                                <div className="text-xs text-gray-500 mt-0.5">{type.description}</div>
-                                            </div>
-                                            {isSelected && (
-                                                <Check className="w-5 h-5 text-evidence-600" />
-                                            )}
-                                        </div>
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     )
 }

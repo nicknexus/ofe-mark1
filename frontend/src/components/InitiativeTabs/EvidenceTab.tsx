@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Search, X, Calendar, MapPin, Users, FileText, Eye, Edit, Trash2, Plus, Camera, MessageSquare, DollarSign, ChevronDown } from 'lucide-react'
+import { Search, X, Calendar, MapPin, Users, FileText, Eye, Edit, Trash2, Plus, Camera, MessageSquare, DollarSign, ChevronDown, List, Grid } from 'lucide-react'
 import { apiService } from '../../services/api'
 import { Evidence, Location, BeneficiaryGroup } from '../../types'
 import { formatDate, getEvidenceTypeInfo } from '../../utils'
@@ -31,6 +31,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
     const [selectedDataPoint, setSelectedDataPoint] = useState<any>(null)
     const [selectedDataPointKpi, setSelectedDataPointKpi] = useState<any>(null)
     const [isDataPointPreviewOpen, setIsDataPointPreviewOpen] = useState(false)
+    const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
 
     // Master filter state
     const [datePickerValue, setDatePickerValue] = useState<{
@@ -268,6 +269,15 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
         setSelectedBeneficiaryGroups([])
         setSelectedEvidenceTypes([])
         setDatePickerValue({})
+    }
+
+    const isImage = (fileUrl?: string) => {
+        if (!fileUrl) return false
+        return fileUrl.includes('.jpg') ||
+            fileUrl.includes('.jpeg') ||
+            fileUrl.includes('.png') ||
+            fileUrl.includes('.gif') ||
+            fileUrl.includes('.webp')
     }
 
     return (
@@ -608,6 +618,32 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                             <span>Clear</span>
                         </button>
                     )}
+
+                    {/* View Toggle */}
+                    <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5 ml-2">
+                        <button
+                            onClick={() => setViewMode('list')}
+                            className={`p-1.5 rounded-md transition-all ${
+                                viewMode === 'list'
+                                    ? 'bg-white text-evidence-500 shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                            title="List view"
+                        >
+                            <List className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('grid')}
+                            className={`p-1.5 rounded-md transition-all ${
+                                viewMode === 'grid'
+                                    ? 'bg-white text-evidence-500 shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                            title="Grid view"
+                        >
+                            <Grid className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -640,14 +676,14 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                             </button>
                         )}
                     </div>
-                ) : (
+                ) : viewMode === 'list' ? (
                     <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 overflow-hidden">
                         {/* Header Row */}
                         <div className="px-6 py-3 bg-gray-50/50 border-b border-gray-100 grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wide">
                             <div className="col-span-1"></div>
-                            <div className="col-span-5">Name</div>
+                            <div className="col-span-4">Name</div>
                             <div className="col-span-2">Type</div>
-                            <div className="col-span-2">Date</div>
+                            <div className="col-span-3">Date</div>
                             <div className="col-span-2"></div>
                         </div>
 
@@ -674,7 +710,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                         </div>
 
                                         {/* Name */}
-                                        <div className="col-span-5 min-w-0">
+                                        <div className="col-span-4 min-w-0">
                                             <div className="font-medium text-gray-800 truncate">
                                                 {ev.title || 'Untitled Evidence'}
                                             </div>
@@ -693,8 +729,10 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                         </div>
 
                                         {/* Date */}
-                                        <div className="col-span-2 text-sm text-gray-500">
-                                            {formatDate(ev.date_represented)}
+                                        <div className="col-span-3 text-xs text-gray-500 whitespace-nowrap">
+                                            {ev.date_range_start && ev.date_range_end
+                                                ? `${formatDate(ev.date_range_start)} - ${formatDate(ev.date_range_end)}`
+                                                : formatDate(ev.date_represented)}
                                         </div>
 
                                         {/* Actions */}
@@ -724,6 +762,92 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                 )
                             })}
                         </div>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {evidence.map((ev) => {
+                            const typeInfo = getEvidenceTypeInfo(ev.type)
+                            const bgColor = typeInfo.color.split(' ')[0]
+                            const evidenceType = evidenceTypes.find(et => et.value === ev.type)
+                            const IconComponent = evidenceType?.icon || FileText
+                            const hasImagePreview = isImage(ev.file_url)
+
+                            return (
+                                <div
+                                    key={ev.id}
+                                    className="bg-white rounded-xl shadow-bubble border border-gray-100 overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer group"
+                                    onClick={() => handleViewEvidence(ev)}
+                                >
+                                    {/* Preview Image/Icon */}
+                                    <div className="relative w-full aspect-square bg-gray-100 overflow-hidden">
+                                        {hasImagePreview && ev.file_url ? (
+                                            <>
+                                                <img
+                                                    src={ev.file_url}
+                                                    alt={ev.title || 'Evidence preview'}
+                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                                    onError={(e) => {
+                                                        const target = e.target as HTMLImageElement
+                                                        target.style.display = 'none'
+                                                        const fallback = target.nextElementSibling as HTMLElement
+                                                        if (fallback) fallback.style.display = 'flex'
+                                                    }}
+                                                />
+                                                <div className={`w-full h-full hidden items-center justify-center ${bgColor}`}>
+                                                    <IconComponent className="w-12 h-12 text-gray-400" />
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className={`w-full h-full flex items-center justify-center ${bgColor}`}>
+                                                <IconComponent className="w-12 h-12 text-gray-400" />
+                                            </div>
+                                        )}
+                                        {/* Overlay on hover */}
+                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                            <Eye className="w-6 h-6 text-white" />
+                                        </div>
+                                    </div>
+
+                                    {/* Content */}
+                                    <div className="p-4">
+                                        <div className="flex items-start justify-between gap-2 mb-2">
+                                            <h3 className="font-semibold text-gray-800 text-sm line-clamp-2 flex-1">
+                                                {ev.title || 'Untitled Evidence'}
+                                            </h3>
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${typeInfo.color}`}>
+                                                {typeInfo.label}
+                                            </span>
+                                        </div>
+                                        
+                                        {ev.description && (
+                                            <p className="text-xs text-gray-500 line-clamp-2 mb-2">
+                                                {ev.description}
+                                            </p>
+                                        )}
+
+                                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                                            <div className="text-xs text-gray-500">
+                                                {ev.date_range_start && ev.date_range_end
+                                                    ? `${formatDate(ev.date_range_start)} - ${formatDate(ev.date_range_end)}`
+                                                    : formatDate(ev.date_represented)}
+                                            </div>
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleEditEvidence(ev)
+                                                    }}
+                                                    className="p-1.5 text-gray-400 hover:text-evidence-400 rounded-lg hover:bg-evidence-50 transition-all"
+                                                    title="Edit"
+                                                >
+                                                    <Edit className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })}
                     </div>
                 )}
             </div>

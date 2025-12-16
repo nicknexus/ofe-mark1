@@ -100,6 +100,7 @@ interface MetricsDashboardProps {
         total_kpis: number
         evidence_coverage_percentage: number
         recent_updates: number
+        total_evidence?: number
     }
     kpiUpdates?: any[]
     initiativeId?: string
@@ -1407,9 +1408,17 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                         </div>
                         <span className="text-sm font-semibold text-evidence-500">{stats.evidence_coverage_percentage}%</span>
                     </div>
+                    {/* Total Evidence - inline minimal */}
+                    <div className="flex-1 bg-white rounded-xl shadow-bubble-sm border border-gray-100 evidence-border px-3 py-1.5 flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                            <FileText className="w-3.5 h-3.5 text-evidence-400" />
+                            <span className="text-[11px] font-medium text-gray-600">Evidence Uploaded</span>
+                        </div>
+                        <span className="text-sm font-semibold text-evidence-500">{(stats.total_evidence || 0).toLocaleString()}</span>
+                    </div>
                 </div>
             ) : (
-                <div className="grid grid-cols-2 gap-4 flex-shrink-0 h-auto">
+                <div className="grid grid-cols-3 gap-4 flex-shrink-0 h-auto">
                     {/* Total Data Points */}
                     <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.18)] border border-gray-100 p-4 impact-border">
                         <div className="flex items-center justify-between mb-2">
@@ -1440,6 +1449,23 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                         <div className="flex items-baseline space-x-1">
                             <span className="text-xl font-semibold text-evidence-500">
                                 {stats.evidence_coverage_percentage}%
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Total Evidence Uploaded */}
+                    <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.18)] border border-gray-100 p-4 evidence-border">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                                <div className="w-8 h-8 rounded-lg bg-evidence-50 flex items-center justify-center">
+                                    <FileText className="w-4 h-4 text-evidence-400" />
+                                </div>
+                                <h4 className="text-xs font-medium text-gray-600">Evidence Uploaded</h4>
+                            </div>
+                        </div>
+                        <div className="flex items-baseline space-x-1">
+                            <span className="text-xl font-semibold text-evidence-500">
+                                {(stats.total_evidence || 0).toLocaleString()}
                             </span>
                         </div>
                     </div>
