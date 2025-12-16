@@ -34,6 +34,7 @@ import DateRangePicker from './DateRangePicker'
 import { apiService } from '../services/api'
 import { Location, BeneficiaryGroup, User, Organization } from '../types'
 import { AuthService } from '../services/auth'
+import { useStorage } from '../context/StorageContext'
 import { getCategoryColor, parseLocalDate, isSameDay, compareDates, getLocalDateString, formatDate } from '../utils'
 import toast from 'react-hot-toast'
 
@@ -90,13 +91,6 @@ function SortableMetricCard({ kpi, metricColor, filteredTotal, onMetricCardClick
             </div>
         </div>
     )
-}
-
-interface StorageUsage {
-    storage_used_bytes: number
-    used_gb: number
-    used_percentage: number
-    placeholder_max_gb: number
 }
 
 interface MetricsDashboardProps {
@@ -211,21 +205,8 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     const [beneficiaryDropdownPosition, setBeneficiaryDropdownPosition] = useState({ top: 0, left: 0 })
     const [metricsDropdownPosition, setMetricsDropdownPosition] = useState({ top: 0, left: 0 })
     const [userMenuOpen, setUserMenuOpen] = useState(false)
-    const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null)
+    const { storageUsage } = useStorage()
     const userMenuRef = useRef<HTMLDivElement>(null)
-
-    // Load storage usage
-    useEffect(() => {
-        const loadStorage = async () => {
-            try {
-                const usage = await apiService.getStorageUsage()
-                setStorageUsage(usage)
-            } catch (error) {
-                console.error('Failed to load storage:', error)
-            }
-        }
-        loadStorage()
-    }, [])
 
     // Close user menu when clicking outside
     useEffect(() => {

@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { StorageService, PLACEHOLDER_MAX_STORAGE_BYTES } from '../services/storageService';
+import { getCompressionStatus } from '../utils/imageCompression';
 
 const router = Router();
 
@@ -15,6 +16,26 @@ const router = Router();
  * - Add upgrade-required flag
  * - Add subscription info
  */
+
+// Compression status diagnostic endpoint (no auth required for debugging)
+router.get('/compression-status', async (req, res: Response): Promise<void> => {
+    try {
+        const status = await getCompressionStatus();
+        console.log('[StorageRoute] Compression status requested:', status);
+        res.json({
+            ...status,
+            message: status.available 
+                ? '✅ Image compression is ACTIVE' 
+                : '❌ Image compression is DISABLED - images will upload uncompressed',
+        });
+    } catch (error) {
+        console.error('Compression status error:', error);
+        res.status(500).json({ 
+            error: 'Failed to get compression status',
+            details: error instanceof Error ? error.message : String(error)
+        });
+    }
+});
 
 // Get storage usage for current user
 router.get('/usage', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {

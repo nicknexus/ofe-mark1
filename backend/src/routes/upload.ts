@@ -29,11 +29,17 @@ router.post('/file', authenticateUser, upload.single('file'), async (req: Authen
 
         // Compress images before upload (invisible to user)
         // Only affects image/* MIME types, PDFs/videos/docs pass through unchanged
+        const originalSize = req.file.size
+        const originalMimetype = req.file.mimetype
         let finalBuffer = req.file.buffer
         let finalMimetype = req.file.mimetype
         let finalSize = req.file.size
+        let wasCompressed = false
+
+        console.log(`[Upload] Received file: ${req.file.originalname} (${originalMimetype}, ${originalSize} bytes)`)
 
         if (isCompressibleImage(req.file.mimetype)) {
+            console.log(`[Upload] File is compressible image, attempting compression...`)
             const compressionResult = await compressImage(
                 req.file.buffer,
                 req.file.mimetype,
@@ -42,15 +48,27 @@ router.post('/file', authenticateUser, upload.single('file'), async (req: Authen
             finalBuffer = compressionResult.buffer
             finalMimetype = compressionResult.mimetype
             finalSize = compressionResult.size
+            wasCompressed = compressionResult.wasCompressed
+            
+            if (wasCompressed) {
+                const savings = Math.round((1 - finalSize / originalSize) * 100)
+                console.log(`[Upload] ✅ Compressed: ${originalSize} → ${finalSize} bytes (${savings}% reduction)`)
+            } else {
+                console.log(`[Upload] ⚠️ Not compressed (sharp unavailable or compression not beneficial)`)
+            }
             
             // Update file object for uploadToSupabase
             req.file.buffer = finalBuffer
             req.file.mimetype = finalMimetype
             req.file.size = finalSize
+        } else {
+            console.log(`[Upload] Non-image file, skipping compression`)
         }
 
         // Upload to Supabase Storage (uses potentially compressed buffer)
+        console.log(`[Upload] Uploading to Supabase...`)
         const fileUrl = await uploadToSupabase(req.file, req.user.id)
+        console.log(`[Upload] ✅ Uploaded successfully: ${fileUrl}`)
 
         // Track storage usage using FINAL size (compressed if applicable)
         const organizationId = await StorageService.getOrganizationIdForUser(req.user.id)
@@ -64,7 +82,14 @@ router.post('/file', authenticateUser, upload.single('file'), async (req: Authen
             filename: req.file.originalname,
             originalname: req.file.originalname,
             size: finalSize, // Return compressed size
-            mimetype: finalMimetype
+            mimetype: finalMimetype,
+            // Compression info for debugging
+            compression: {
+                wasCompressed,
+                originalSize,
+                finalSize,
+                savings: wasCompressed ? Math.round((1 - finalSize / originalSize) * 100) : 0
+            }
         })
     } catch (error) {
         console.error('File upload error:', error)

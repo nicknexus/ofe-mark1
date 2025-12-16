@@ -19,19 +19,62 @@
 // Lazy-load sharp to prevent server crash if it fails to load
 let sharp: typeof import('sharp') | null = null;
 let sharpLoadAttempted = false;
+let sharpLoadError: string | null = null;
+let sharpVersion: string | null = null;
 
 async function getSharp(): Promise<typeof import('sharp') | null> {
     if (sharpLoadAttempted) return sharp;
     sharpLoadAttempted = true;
     
     try {
-        sharp = (await import('sharp')).default;
-        console.log('[ImageCompression] Sharp loaded successfully');
-    } catch (error) {
-        console.warn('[ImageCompression] Sharp failed to load, compression disabled:', error);
+        const sharpModule = await import('sharp');
+        sharp = sharpModule.default;
+        
+        // Try to get version info
+        try {
+            // @ts-ignore - versions property exists at runtime
+            const versions = sharp.versions || {};
+            sharpVersion = `sharp: ${versions.sharp || 'unknown'}, libvips: ${versions.vips || 'unknown'}`;
+        } catch {
+            sharpVersion = 'version info unavailable';
+        }
+        
+        console.log(`[ImageCompression] ✅ Sharp loaded successfully (${sharpVersion})`);
+        console.log(`[ImageCompression] Platform: ${process.platform}, Arch: ${process.arch}, Node: ${process.version}`);
+    } catch (error: any) {
+        sharpLoadError = error?.message || String(error);
+        console.error('[ImageCompression] ❌ Sharp failed to load:', sharpLoadError);
+        console.error('[ImageCompression] Stack:', error?.stack);
+        console.error(`[ImageCompression] Platform: ${process.platform}, Arch: ${process.arch}, Node: ${process.version}`);
         sharp = null;
     }
     return sharp;
+}
+
+/**
+ * Get compression status for diagnostics
+ */
+export interface CompressionStatus {
+    available: boolean;
+    sharpLoaded: boolean;
+    sharpVersion: string | null;
+    loadError: string | null;
+    platform: string;
+    arch: string;
+    nodeVersion: string;
+}
+
+export async function getCompressionStatus(): Promise<CompressionStatus> {
+    await getSharp(); // Ensure load attempt
+    return {
+        available: sharp !== null,
+        sharpLoaded: sharp !== null,
+        sharpVersion,
+        loadError: sharpLoadError,
+        platform: process.platform,
+        arch: process.arch,
+        nodeVersion: process.version,
+    };
 }
 
 // Compression settings

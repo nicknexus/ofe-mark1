@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast'
 import { AuthService } from './services/auth'
 import { User } from './types'
 import { TutorialProvider } from './context/TutorialContext'
+import { StorageProvider } from './context/StorageContext'
 import InteractiveTutorial from './components/InteractiveTutorial'
 
 // Pages
@@ -80,17 +81,19 @@ function App() {
                 {/* Authenticated routes */}
                 {user ? (
                     <Route path="/*" element={
-                        <TutorialProvider>
-                            <Layout user={user}>
-                                <Routes>
-                                    <Route index element={<Dashboard />} />
-                                    <Route path="initiatives/:id" element={<InitiativePage />} />
-                                    <Route path="initiatives/:id/metrics/:kpiId" element={<InitiativePage />} />
-                                    <Route path="account" element={<AccountPage />} />
-                                </Routes>
-                            </Layout>
-                            <InteractiveTutorial />
-                        </TutorialProvider>
+                        <StorageProvider>
+                            <TutorialProvider>
+                                <Layout user={user}>
+                                    <Routes>
+                                        <Route index element={<Dashboard />} />
+                                        <Route path="initiatives/:id" element={<InitiativePage />} />
+                                        <Route path="initiatives/:id/metrics/:kpiId" element={<InitiativePage />} />
+                                        <Route path="account" element={<AccountPage />} />
+                                    </Routes>
+                                </Layout>
+                                <InteractiveTutorial />
+                            </TutorialProvider>
+                        </StorageProvider>
                     } />
                 ) : (
                     <Route path="/*" element={<HomePage onGetStarted={handleGetStarted} />} />

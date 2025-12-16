@@ -11,14 +11,8 @@ import {
 import { AuthService } from '../services/auth'
 import { apiService } from '../services/api'
 import { User, Organization } from '../types'
+import { useStorage } from '../context/StorageContext'
 import toast from 'react-hot-toast'
-
-interface StorageUsage {
-    storage_used_bytes: number
-    used_gb: number
-    used_percentage: number
-    placeholder_max_gb: number
-}
 
 interface LayoutProps {
     user: User
@@ -31,7 +25,7 @@ export default function Layout({ user, children }: LayoutProps) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const [userMenuOpen, setUserMenuOpen] = useState(false)
     const [organization, setOrganization] = useState<Organization | null>(null)
-    const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null)
+    const { storageUsage } = useStorage()
     const userMenuRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
@@ -46,18 +40,6 @@ export default function Layout({ user, children }: LayoutProps) {
             }
         }
         loadOrganization()
-    }, [])
-
-    useEffect(() => {
-        const loadStorage = async () => {
-            try {
-                const usage = await apiService.getStorageUsage()
-                setStorageUsage(usage)
-            } catch (error) {
-                console.error('Failed to load storage:', error)
-            }
-        }
-        loadStorage()
     }, [])
 
     // Close user menu when clicking outside

@@ -426,7 +426,12 @@ class ApiService {
             throw new Error(errorData.error || 'File upload failed')
         }
 
-        return response.json()
+        const result = await response.json()
+        
+        // Trigger storage refresh after successful upload
+        window.dispatchEvent(new Event('storage-updated'))
+        
+        return result
     }
 
     async createEvidence(evidence: CreateEvidenceForm): Promise<Evidence> {
@@ -444,9 +449,14 @@ class ApiService {
     }
 
     async deleteEvidence(id: string): Promise<void> {
-        return this.request<void>(`/evidence/${id}`, {
+        const result = await this.request<void>(`/evidence/${id}`, {
             method: 'DELETE'
         })
+        
+        // Trigger storage refresh after deletion
+        window.dispatchEvent(new Event('storage-updated'))
+        
+        return result
     }
 
     async getEvidenceForDataPoint(updateId: string): Promise<Evidence[]> {

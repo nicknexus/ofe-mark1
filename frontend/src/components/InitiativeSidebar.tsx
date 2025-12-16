@@ -15,14 +15,7 @@ import {
     HardDrive
 } from 'lucide-react'
 import { User } from '../types'
-import { apiService } from '../services/api'
-
-interface StorageUsage {
-    storage_used_bytes: number
-    used_gb: number
-    used_percentage: number
-    placeholder_max_gb: number
-}
+import { useStorage } from '../context/StorageContext'
 
 interface InitiativeSidebarProps {
     activeTab: string
@@ -45,7 +38,7 @@ export default function InitiativeSidebar({
 }: InitiativeSidebarProps) {
     const navigate = useNavigate()
     const [settingsOpen, setSettingsOpen] = useState(false)
-    const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null)
+    const { storageUsage } = useStorage()
     const settingsRef = useRef<HTMLDivElement>(null)
 
     // Close dropdown when clicking outside
@@ -60,18 +53,6 @@ export default function InitiativeSidebar({
         return () => {
             document.removeEventListener('mousedown', handleClickOutside)
         }
-    }, [])
-
-    useEffect(() => {
-        const loadStorage = async () => {
-            try {
-                const usage = await apiService.getStorageUsage()
-                setStorageUsage(usage)
-            } catch (error) {
-                console.error('Failed to load storage:', error)
-            }
-        }
-        loadStorage()
     }, [])
     const tabs = [
         {
