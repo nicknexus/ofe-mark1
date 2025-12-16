@@ -37,8 +37,13 @@ app.use(cors({
     origin: process.env.NODE_ENV === 'production'
         ? true // Allow all origins for now (adjust in production as needed)
         : devOrigins,
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
+
+// Handle preflight requests explicitly
+app.options('*', cors());
 
 // Rate limiting - disabled in development to avoid hitting limits during hot reloading
 if (process.env.NODE_ENV === 'production') {
