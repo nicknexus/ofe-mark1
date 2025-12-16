@@ -28,22 +28,45 @@ dotenv.config();
 
 const app = express();
 
+// CORS - must be before other middleware
+const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://app.nexusimpacts.com',
+    'https://nexusimpacts.com'
+];
+
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'production')) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    } else if (process.env.NODE_ENV === 'production') {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    
+    // Handle preflight
+    if (req.method === 'OPTIONS') {
+        console.log('[CORS] Preflight request for:', req.path);
+        res.status(200).end();
+        return;
+    }
+    next();
+});
+
 // Security middleware
 app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" } // Allow serving uploaded files
 }));
-const devOrigins = ['http://localhost:3000', 'http://localhost:5173']
-app.use(cors({
-    origin: process.env.NODE_ENV === 'production'
-        ? true // Allow all origins for now (adjust in production as needed)
-        : devOrigins,
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
-}));
 
-// Handle preflight requests explicitly
-app.options('*', cors());
+// Also use cors middleware as backup
+app.use(cors({
+    origin: true,
+    credentials: true
+}));
 
 // Rate limiting - disabled in development to avoid hitting limits during hot reloading
 if (process.env.NODE_ENV === 'production') {
@@ -62,12 +85,18 @@ app.use(express.urlencoded({ extended: true }));
 // Serve static files from uploads directory (disabled for serverless)
 // app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
+// Request logging for debugging
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - Origin: ${req.headers.origin || 'none'}`);
+    next();
+});
+
 // Environment check endpoint
 app.get('/', (req, res) => {
     res.json({
         message: 'OFE API is running!',
         status: 'OK',
-        available_endpoints: ['/test', '/health', '/api/initiatives', '/api/kpis', '/api/evidence', '/api/locations'],
+        available_endpoints: ['/test', '/health', '/api/initiatives', '/api/kpis', '/api/evidence', '/api/locations', '/api/storage'],
         timestamp: new Date().toISOString()
     });
 });
