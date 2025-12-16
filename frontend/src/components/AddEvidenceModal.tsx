@@ -315,6 +315,7 @@ export default function AddEvidenceModal({
         try {
             let finalFileUrl = formData.file_url
             const fileUrls: string[] = []
+            const fileSizes: number[] = [] // Track file sizes for storage tracking
 
             // If user selected files, upload all of them
             if (selectedFiles.length > 0) {
@@ -323,6 +324,7 @@ export default function AddEvidenceModal({
                     setUploadProgress(`Uploading file ${i + 1} of ${selectedFiles.length}...`)
                     const uploadResult = await apiService.uploadFile(selectedFiles[i])
                     fileUrls.push(uploadResult.file_url)
+                    fileSizes.push(uploadResult.size) // Store file size for storage tracking
                     // Keep first file URL for backward compatibility
                     if (i === 0) {
                         finalFileUrl = uploadResult.file_url
@@ -331,11 +333,12 @@ export default function AddEvidenceModal({
                 setUploadProgress('Files uploaded successfully!')
             }
 
-            // Create evidence record with the real file URL(s)
+            // Create evidence record with the real file URL(s) and sizes
             let submitData: any = {
                 ...formData,
                 file_url: finalFileUrl,
-                file_urls: fileUrls.length > 0 ? fileUrls : undefined
+                file_urls: fileUrls.length > 0 ? fileUrls : undefined,
+                file_sizes: fileSizes.length > 0 ? fileSizes : undefined // Pass file sizes for storage tracking
             }
 
             // Handle date range logic

@@ -1,11 +1,12 @@
 import { supabase } from '../utils/supabase'
 import { Evidence } from '../types'
 import { deleteFromSupabase } from '../utils/fileUpload'
+import { StorageService } from './storageService'
 
 export class EvidenceService {
     static async create(evidence: Evidence, userId: string): Promise<Evidence> {
-        // Extract linkage fields and file_urls before inserting into evidence table
-        const { kpi_ids, kpi_update_ids, file_urls, ...evidenceData } = evidence;
+        // Extract linkage fields and file_urls/file_sizes before inserting into evidence table
+        const { kpi_ids, kpi_update_ids, file_urls, file_sizes, ...evidenceData } = evidence;
 
         const { data, error } = await supabase
             .from('evidence')
@@ -23,12 +24,15 @@ export class EvidenceService {
                 // Try to determine file type from extension
                 const extension = fileName.split('.').pop()?.toLowerCase() || ''
                 const fileType = extension || 'unknown'
+                // Get file size if provided (for storage tracking)
+                const fileSize = file_sizes?.[index] || 0
                 
                 return {
                     evidence_id: data.id,
                     file_url: fileUrl,
                     file_name: fileName,
                     file_type: fileType,
+                    file_size: fileSize, // Store file size for storage tracking
                     display_order: index
                 }
             })
@@ -219,10 +223,10 @@ export class EvidenceService {
     }
 
     static async delete(id: string, userId: string): Promise<void> {
-        // Get evidence record first to delete associated file
+        // Get evidence record first to delete associated file and track storage
         const { data: evidence, error: fetchError } = await supabase
             .from('evidence')
-            .select('file_url')
+            .select('file_url, initiative_id')
             .eq('id', id)
             .eq('user_id', userId)
             .single();
@@ -233,6 +237,18 @@ export class EvidenceService {
             }
             throw new Error(`Failed to fetch evidence: ${fetchError.message}`);
         }
+
+        // Get all files associated with this evidence (for storage tracking)
+        const { data: evidenceFiles } = await supabase
+            .from('evidence_files')
+            .select('file_size')
+            .eq('evidence_id', id);
+
+        // Calculate total file size for storage decrement
+        const totalFileSize = (evidenceFiles || []).reduce(
+            (sum, file) => sum + (file.file_size || 0), 
+            0
+        );
 
         // Delete links first (both legacy and new)
         const { error: linkError } = await supabase
@@ -249,6 +265,12 @@ export class EvidenceService {
 
         if (linkError2) throw new Error(`Failed to delete evidence data point links: ${linkError2.message}`);
 
+        // Delete evidence_files records (cascade should handle this but be explicit)
+        await supabase
+            .from('evidence_files')
+            .delete()
+            .eq('evidence_id', id);
+
         // Delete evidence record
         const { error } = await supabase
             .from('evidence')
@@ -261,6 +283,14 @@ export class EvidenceService {
         // Delete file from Supabase Storage if it exists
         if (evidence?.file_url) {
             await deleteFromSupabase(evidence.file_url);
+        }
+
+        // Decrement storage usage (Phase 1: tracking only)
+        if (totalFileSize > 0 && evidence?.initiative_id) {
+            const organizationId = await StorageService.getOrganizationIdFromInitiative(evidence.initiative_id);
+            if (organizationId) {
+                await StorageService.decrementStorage(organizationId, totalFileSize);
+            }
         }
 
         return;

@@ -5,12 +5,20 @@ import {
     Settings,
     Menu,
     X,
-    ChevronDown
+    ChevronDown,
+    HardDrive
 } from 'lucide-react'
 import { AuthService } from '../services/auth'
 import { apiService } from '../services/api'
 import { User, Organization } from '../types'
 import toast from 'react-hot-toast'
+
+interface StorageUsage {
+    storage_used_bytes: number
+    used_gb: number
+    used_percentage: number
+    placeholder_max_gb: number
+}
 
 interface LayoutProps {
     user: User
@@ -23,6 +31,7 @@ export default function Layout({ user, children }: LayoutProps) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const [userMenuOpen, setUserMenuOpen] = useState(false)
     const [organization, setOrganization] = useState<Organization | null>(null)
+    const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null)
     const userMenuRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
@@ -37,6 +46,18 @@ export default function Layout({ user, children }: LayoutProps) {
             }
         }
         loadOrganization()
+    }, [])
+
+    useEffect(() => {
+        const loadStorage = async () => {
+            try {
+                const usage = await apiService.getStorageUsage()
+                setStorageUsage(usage)
+            } catch (error) {
+                console.error('Failed to load storage:', error)
+            }
+        }
+        loadStorage()
     }, [])
 
     // Close user menu when clicking outside
@@ -109,8 +130,31 @@ export default function Layout({ user, children }: LayoutProps) {
                             <span className="text-sm text-gray-500">Dashboard</span>
                         </div>
 
-                        {/* Right side: Tutorial, Settings, User Profile */}
+                        {/* Right side: Storage, Tutorial, Settings, User Profile */}
                         <div className="flex items-center gap-3">
+                            {/* Storage Bar */}
+                            {storageUsage && (
+                                <Link
+                                    to="/account"
+                                    className="hidden sm:flex items-center gap-2 px-3 h-10 bg-white/80 hover:bg-white border border-gray-200 hover:border-gray-300 rounded-full transition-all duration-200 shadow-bubble-sm"
+                                    title={`${storageUsage.used_gb >= 1 ? storageUsage.used_gb.toFixed(2) + ' GB' : ((storageUsage.storage_used_bytes || 0) / (1024 * 1024)).toFixed(1) + ' MB'} / ${storageUsage.placeholder_max_gb} GB`}
+                                >
+                                    <HardDrive className="w-4 h-4 text-gray-500" />
+                                    <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                        <div 
+                                            className="h-full bg-blue-500 rounded-full"
+                                            style={{ width: `${Math.max(Math.min(storageUsage.used_percentage, 100), storageUsage.storage_used_bytes > 0 ? 2 : 0)}%` }}
+                                        />
+                                    </div>
+                                    <span className="text-xs text-gray-500">
+                                        {storageUsage.used_gb >= 1 
+                                            ? `${storageUsage.used_gb.toFixed(1)}GB`
+                                            : `${((storageUsage.storage_used_bytes || 0) / (1024 * 1024)).toFixed(0)}MB`
+                                        }
+                                    </span>
+                                </Link>
+                            )}
+
                             {/* Tutorial Button - Circle Icon */}
                             <button
                                 onClick={handleTutorialClick}
@@ -151,6 +195,13 @@ export default function Layout({ user, children }: LayoutProps) {
                                 {/* Dropdown Menu */}
                                 {userMenuOpen && (
                                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-bubble-lg border border-gray-200 overflow-hidden z-50">
+                                        <Link
+                                            to="/account"
+                                            onClick={() => setUserMenuOpen(false)}
+                                            className="block w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left border-b border-gray-100"
+                                        >
+                                            Account Settings
+                                        </Link>
                                         <button
                                             onClick={() => {
                                                 handleSignOut()

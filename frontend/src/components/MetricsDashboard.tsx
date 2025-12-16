@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { TrendingUp, Target, BarChart3, Calendar, FileText, Filter, ChevronDown, X, MapPin, ExternalLink, Plus, Users, GripVertical, Settings } from 'lucide-react'
+import { TrendingUp, Target, BarChart3, Calendar, FileText, Filter, ChevronDown, X, MapPin, ExternalLink, Plus, Users, GripVertical, Settings, HardDrive } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import {
     DndContext,
@@ -90,6 +90,13 @@ function SortableMetricCard({ kpi, metricColor, filteredTotal, onMetricCardClick
             </div>
         </div>
     )
+}
+
+interface StorageUsage {
+    storage_used_bytes: number
+    used_gb: number
+    used_percentage: number
+    placeholder_max_gb: number
 }
 
 interface MetricsDashboardProps {
@@ -204,7 +211,21 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     const [beneficiaryDropdownPosition, setBeneficiaryDropdownPosition] = useState({ top: 0, left: 0 })
     const [metricsDropdownPosition, setMetricsDropdownPosition] = useState({ top: 0, left: 0 })
     const [userMenuOpen, setUserMenuOpen] = useState(false)
+    const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null)
     const userMenuRef = useRef<HTMLDivElement>(null)
+
+    // Load storage usage
+    useEffect(() => {
+        const loadStorage = async () => {
+            try {
+                const usage = await apiService.getStorageUsage()
+                setStorageUsage(usage)
+            } catch (error) {
+                console.error('Failed to load storage:', error)
+            }
+        }
+        loadStorage()
+    }, [])
 
     // Close user menu when clicking outside
     useEffect(() => {
@@ -778,17 +799,17 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setShowBeneficiaryPicker(false)
                             }}
                             className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
-                                    ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
-                                    : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                                ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
+                                : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
                                 }`}
                         >
                             <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
-                                    ? 'bg-primary-100 border-primary-500'
-                                    : 'bg-gray-100 border-gray-200'
+                                ? 'bg-primary-100 border-primary-500'
+                                : 'bg-gray-100 border-gray-200'
                                 }`}>
                                 <Filter className={`w-5 h-5 ${visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
-                                        ? 'text-primary-500'
-                                        : 'text-gray-600'
+                                    ? 'text-primary-500'
+                                    : 'text-gray-600'
                                     }`} />
                             </div>
                             <span className="ml-3">Metrics</span>
@@ -872,17 +893,17 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setShowBeneficiaryPicker(false)
                             }}
                             className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${selectedLocations.length > 0
-                                    ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
-                                    : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                                ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
+                                : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
                                 }`}
                         >
                             <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedLocations.length > 0
-                                    ? 'bg-primary-100 border-primary-500'
-                                    : 'bg-gray-100 border-gray-200'
+                                ? 'bg-primary-100 border-primary-500'
+                                : 'bg-gray-100 border-gray-200'
                                 }`}>
                                 <MapPin className={`w-5 h-5 ${selectedLocations.length > 0
-                                        ? 'text-primary-500'
-                                        : 'text-gray-600'
+                                    ? 'text-primary-500'
+                                    : 'text-gray-600'
                                     }`} />
                             </div>
                             <span className="ml-3">Location</span>
@@ -967,17 +988,17 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setShowMetricsPicker(false)
                             }}
                             className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${selectedBeneficiaryGroups.length > 0
-                                    ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
-                                    : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                                ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
+                                : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
                                 }`}
                         >
                             <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedBeneficiaryGroups.length > 0
-                                    ? 'bg-primary-100 border-primary-500'
-                                    : 'bg-gray-100 border-gray-200'
+                                ? 'bg-primary-100 border-primary-500'
+                                : 'bg-gray-100 border-gray-200'
                                 }`}>
                                 <Users className={`w-5 h-5 ${selectedBeneficiaryGroups.length > 0
-                                        ? 'text-primary-500'
-                                        : 'text-gray-600'
+                                    ? 'text-primary-500'
+                                    : 'text-gray-600'
                                     }`} />
                             </div>
                             <span className="ml-3">Beneficiaries</span>
@@ -1063,8 +1084,31 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     )}
                 </div>
 
-                {/* Right side: Settings and User Profile */}
+                {/* Right side: Storage, Settings and User Profile */}
                 <div className="flex items-center gap-3">
+                    {/* Storage Bar */}
+                    {storageUsage && (
+                        <Link
+                            to="/account"
+                            className="hidden sm:flex items-center gap-2 px-3 h-10 bg-white/80 hover:bg-white border border-gray-200 hover:border-gray-300 rounded-full transition-all duration-200 shadow-bubble-sm"
+                            title={`${storageUsage.used_gb >= 1 ? storageUsage.used_gb.toFixed(2) + ' GB' : ((storageUsage.storage_used_bytes || 0) / (1024 * 1024)).toFixed(1) + ' MB'} / ${storageUsage.placeholder_max_gb} GB`}
+                        >
+                            <HardDrive className="w-4 h-4 text-gray-500" />
+                            <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-blue-500 rounded-full"
+                                    style={{ width: `${Math.max(Math.min(storageUsage.used_percentage, 100), storageUsage.storage_used_bytes > 0 ? 2 : 0)}%` }}
+                                />
+                            </div>
+                            <span className="text-xs text-gray-500">
+                                {storageUsage.used_gb >= 1
+                                    ? `${storageUsage.used_gb.toFixed(1)}GB`
+                                    : `${((storageUsage.storage_used_bytes || 0) / (1024 * 1024)).toFixed(0)}MB`
+                                }
+                            </span>
+                        </Link>
+                    )}
+
                     {/* Settings Button - Circle Icon */}
                     <Link
                         to="/account"

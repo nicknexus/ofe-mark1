@@ -189,7 +189,10 @@ export default function EasyEvidenceModal({
                     // Link to the specific impact claim
                     kpi_update_ids: [impactClaim.id],
                     initiative_id: initiativeId,
-                    file_url: uploadResult.file_url
+                    file_url: uploadResult.file_url,
+                    // Pass file URLs and sizes as arrays for proper storage tracking
+                    file_urls: [uploadResult.file_url],
+                    file_sizes: [uploadResult.size]
                 }
 
                 await onSubmit(evidenceData)

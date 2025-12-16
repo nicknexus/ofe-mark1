@@ -1,6 +1,8 @@
 import { Router, Response } from 'express'
 import { upload, uploadToSupabase } from '../utils/fileUpload'
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth'
+import { StorageService } from '../services/storageService'
+import { compressImage, isCompressibleImage } from '../utils/imageCompression'
 
 const router = Router()
 
@@ -17,16 +19,52 @@ router.post('/file', authenticateUser, upload.single('file'), async (req: Authen
             return
         }
 
-        // Upload to Supabase Storage
+        // Phase 1: No limit checks - just upload
+        // TODO Phase 2: Check storage limit before upload
+        // const canUpload = await StorageService.checkStorageLimit(req.user.id, req.file.size)
+        // if (!canUpload) {
+        //     res.status(413).json({ error: 'Storage limit exceeded', code: 'STORAGE_LIMIT_EXCEEDED' })
+        //     return
+        // }
+
+        // Compress images before upload (invisible to user)
+        // Only affects image/* MIME types, PDFs/videos/docs pass through unchanged
+        let finalBuffer = req.file.buffer
+        let finalMimetype = req.file.mimetype
+        let finalSize = req.file.size
+
+        if (isCompressibleImage(req.file.mimetype)) {
+            const compressionResult = await compressImage(
+                req.file.buffer,
+                req.file.mimetype,
+                req.file.size
+            )
+            finalBuffer = compressionResult.buffer
+            finalMimetype = compressionResult.mimetype
+            finalSize = compressionResult.size
+            
+            // Update file object for uploadToSupabase
+            req.file.buffer = finalBuffer
+            req.file.mimetype = finalMimetype
+            req.file.size = finalSize
+        }
+
+        // Upload to Supabase Storage (uses potentially compressed buffer)
         const fileUrl = await uploadToSupabase(req.file, req.user.id)
+
+        // Track storage usage using FINAL size (compressed if applicable)
+        const organizationId = await StorageService.getOrganizationIdForUser(req.user.id)
+        if (organizationId) {
+            await StorageService.incrementStorage(organizationId, finalSize)
+        }
 
         res.json({
             success: true,
             file_url: fileUrl,
             filename: req.file.originalname,
             originalname: req.file.originalname,
-            size: req.file.size,
-            mimetype: req.file.mimetype
+            size: finalSize, // Return compressed size
+            mimetype: finalMimetype
         })
     } catch (error) {
         console.error('File upload error:', error)

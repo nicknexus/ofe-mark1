@@ -403,7 +403,7 @@ class ApiService {
     }
 
     // Evidence endpoints
-    async uploadFile(file: File): Promise<{ file_url: string }> {
+    async uploadFile(file: File): Promise<{ file_url: string; size: number }> {
         const { data: { session } } = await supabase.auth.getSession()
 
         if (!session) {
@@ -807,6 +807,18 @@ class ApiService {
             method: 'POST',
             body: JSON.stringify(data)
         })
+    }
+
+    // Storage - Phase 1: Tracking Only
+    // TODO Phase 2: Add upgrade flows when limits are enforced
+    async getStorageUsage(): Promise<{
+        storage_used_bytes: number
+        used_gb: number
+        used_percentage: number
+        placeholder_max_bytes: number
+        placeholder_max_gb: number
+    }> {
+        return this.request('/storage/usage')
     }
 }
 

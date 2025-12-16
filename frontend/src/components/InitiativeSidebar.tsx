@@ -11,9 +11,18 @@ import {
     FileText,
     Settings,
     LogOut,
-    User as UserIcon
+    User as UserIcon,
+    HardDrive
 } from 'lucide-react'
 import { User } from '../types'
+import { apiService } from '../services/api'
+
+interface StorageUsage {
+    storage_used_bytes: number
+    used_gb: number
+    used_percentage: number
+    placeholder_max_gb: number
+}
 
 interface InitiativeSidebarProps {
     activeTab: string
@@ -36,6 +45,7 @@ export default function InitiativeSidebar({
 }: InitiativeSidebarProps) {
     const navigate = useNavigate()
     const [settingsOpen, setSettingsOpen] = useState(false)
+    const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null)
     const settingsRef = useRef<HTMLDivElement>(null)
 
     // Close dropdown when clicking outside
@@ -50,6 +60,18 @@ export default function InitiativeSidebar({
         return () => {
             document.removeEventListener('mousedown', handleClickOutside)
         }
+    }, [])
+
+    useEffect(() => {
+        const loadStorage = async () => {
+            try {
+                const usage = await apiService.getStorageUsage()
+                setStorageUsage(usage)
+            } catch (error) {
+                console.error('Failed to load storage:', error)
+            }
+        }
+        loadStorage()
     }, [])
     const tabs = [
         {
@@ -161,45 +183,66 @@ export default function InitiativeSidebar({
 
             {/* Footer */}
             <div className="p-3 border-t border-gray-100 space-y-2">
-                {/* Settings Gear Icon */}
-                <div className="relative" ref={settingsRef}>
-                    <button
-                        onClick={() => setSettingsOpen(!settingsOpen)}
-                        className="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200 text-gray-600 hover:bg-gray-50 hover:text-gray-800"
-                    >
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100">
-                            <Settings className="w-4 h-4 text-gray-400" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm">Settings</div>
-                        </div>
-                    </button>
-
-                    {/* Dropdown Menu */}
-                    {settingsOpen && (
-                        <div className="absolute bottom-full left-0 mb-2 w-full bg-white rounded-xl shadow-bubble-lg border border-gray-100 overflow-hidden">
-                            <button
-                                onClick={() => {
-                                    navigate('/account')
-                                    setSettingsOpen(false)
-                                }}
-                                className="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                            >
-                                <UserIcon className="w-4 h-4" />
-                                <span>Account</span>
-                            </button>
-                            <button
-                                onClick={() => {
-                                    onSignOut()
-                                    setSettingsOpen(false)
-                                }}
-                                className="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-t border-gray-100"
-                            >
-                                <LogOut className="w-4 h-4" />
-                                <span>Sign Out</span>
-                            </button>
-                        </div>
+                {/* Storage Bar + Settings Row */}
+                <div className="flex items-center gap-2">
+                    {/* Storage Bar */}
+                    {storageUsage && (
+                        <Link
+                            to="/account"
+                            className="flex-1 flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                            title={`${storageUsage.used_gb >= 1 ? storageUsage.used_gb.toFixed(2) + ' GB' : ((storageUsage.storage_used_bytes || 0) / (1024 * 1024)).toFixed(1) + ' MB'} / ${storageUsage.placeholder_max_gb} GB`}
+                        >
+                            <HardDrive className="w-4 h-4 text-gray-400" />
+                            <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-blue-500 rounded-full"
+                                    style={{ width: `${Math.max(Math.min(storageUsage.used_percentage, 100), storageUsage.storage_used_bytes > 0 ? 2 : 0)}%` }}
+                                />
+                            </div>
+                            <span className="text-xs text-gray-500">
+                                {storageUsage.used_gb >= 1 
+                                    ? `${storageUsage.used_gb.toFixed(1)}GB`
+                                    : `${((storageUsage.storage_used_bytes || 0) / (1024 * 1024)).toFixed(0)}MB`
+                                }
+                            </span>
+                        </Link>
                     )}
+
+                    {/* Settings Gear Icon */}
+                    <div className="relative" ref={settingsRef}>
+                        <button
+                            onClick={() => setSettingsOpen(!settingsOpen)}
+                            className="w-9 h-9 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
+                        >
+                            <Settings className="w-4 h-4 text-gray-500" />
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {settingsOpen && (
+                            <div className="absolute bottom-full right-0 mb-2 w-40 bg-white rounded-xl shadow-bubble-lg border border-gray-100 overflow-hidden">
+                                <button
+                                    onClick={() => {
+                                        navigate('/account')
+                                        setSettingsOpen(false)
+                                    }}
+                                    className="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                >
+                                    <UserIcon className="w-4 h-4" />
+                                    <span>Account</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        onSignOut()
+                                        setSettingsOpen(false)
+                                    }}
+                                    className="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-t border-gray-100"
+                                >
+                                    <LogOut className="w-4 h-4" />
+                                    <span>Sign Out</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

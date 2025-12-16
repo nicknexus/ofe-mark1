@@ -107,6 +107,7 @@ export interface Evidence {
     type: 'visual_proof' | 'documentation' | 'testimony' | 'financials';
     file_url?: string;
     file_urls?: string[]; // Array of file URLs for multiple files support
+    file_sizes?: number[]; // File sizes in bytes (parallel to file_urls) for storage tracking
     file_type?: string;
     date_represented: string;
     date_range_start?: string;
