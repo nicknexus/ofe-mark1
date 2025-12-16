@@ -21,6 +21,10 @@
         "openai": "^6.9.0",
         "sharp": "^0.33.5"
     },
+    "optionalDependencies": {
+        "@img/sharp-linux-x64": "^0.33.5",
+        "@img/sharp-linuxmusl-x64": "^0.33.5"
+    },
     "devDependencies": {
         "@types/compression": "^1.7.5",
         "@types/cors": "^2.8.17",
