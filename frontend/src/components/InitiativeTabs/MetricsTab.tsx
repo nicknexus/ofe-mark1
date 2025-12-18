@@ -2,6 +2,8 @@ import React from 'react'
 import { BarChart3, Plus, Target, Upload } from 'lucide-react'
 import { InitiativeDashboard } from '../../types'
 import ExpandableKPICard from '../ExpandableKPICard'
+import MobileMetricDetail from '../MobileMetricDetail'
+import DataPointPreviewModal from '../DataPointPreviewModal'
 
 // Color palette matching MetricsDashboard - for metrics past 12, default to site green
 const METRIC_COLOR_PALETTE = [
@@ -62,6 +64,9 @@ export default function MetricsTab({
     onRefresh,
     orderedKPIIds = []
 }: MetricsTabProps) {
+    const [selectedDataPoint, setSelectedDataPoint] = React.useState<any>(null)
+    const [isDataPointPreviewOpen, setIsDataPointPreviewOpen] = React.useState(false)
+
     if (!dashboard) return null
 
     const { initiative, kpis, stats } = dashboard
@@ -85,32 +90,131 @@ export default function MetricsTab({
         return kpis.findIndex(k => k.id === kpiId)
     }
 
-    // If a metric is expanded, render only that metric's detail view (not overlay)
+    // If a metric is expanded, render detail view
     if (expandedKpi) {
         const expandedKpiIndex = getOrderedIndex(expandedKpi.id!)
+        const kpiUpdatesForMetric = allKPIUpdates.filter(update => update.kpi_id === expandedKpi.id)
+        
         return (
-            <ExpandableKPICard
-                key={expandedKpi.id}
-                kpi={expandedKpi}
-                kpiTotal={kpiTotals[expandedKpi.id!] || 0}
-                isExpanded={true}
-                renderAsPage={true}
-                onToggleExpand={() => expandedKpi.id && onToggleKPIExpansion(expandedKpi.id)}
-                onAddUpdate={() => onAddUpdate(expandedKpi)}
-                onAddEvidence={() => onAddEvidence(expandedKpi)}
-                onEdit={() => onEditKPI(expandedKpi)}
-                onDelete={() => onDeleteKPI(expandedKpi)}
-                kpiUpdates={allKPIUpdates.filter(update => update.kpi_id === expandedKpi.id)}
-                initiativeId={initiativeId || initiative.id}
-                onRefresh={onRefresh}
-                metricColor={getMetricColor(expandedKpiIndex)}
-            />
+            <>
+                {/* Mobile: Simple Detail View */}
+                <div className="md:hidden">
+                    <MobileMetricDetail
+                        kpi={expandedKpi}
+                        kpiTotal={kpiTotals[expandedKpi.id!] || 0}
+                        kpiUpdates={kpiUpdatesForMetric}
+                        onBack={() => expandedKpi.id && onToggleKPIExpansion(expandedKpi.id)}
+                        onAddUpdate={() => onAddUpdate(expandedKpi)}
+                        onDataPointClick={(update) => {
+                            setSelectedDataPoint(update)
+                            setIsDataPointPreviewOpen(true)
+                        }}
+                        initiativeId={initiativeId || initiative.id}
+                    />
+                </div>
+
+                {/* Desktop: Full Complex View */}
+                <div className="hidden md:block">
+                    <ExpandableKPICard
+                        key={expandedKpi.id}
+                        kpi={expandedKpi}
+                        kpiTotal={kpiTotals[expandedKpi.id!] || 0}
+                        isExpanded={true}
+                        renderAsPage={true}
+                        onToggleExpand={() => expandedKpi.id && onToggleKPIExpansion(expandedKpi.id)}
+                        onAddUpdate={() => onAddUpdate(expandedKpi)}
+                        onAddEvidence={() => onAddEvidence(expandedKpi)}
+                        onEdit={() => onEditKPI(expandedKpi)}
+                        onDelete={() => onDeleteKPI(expandedKpi)}
+                        kpiUpdates={kpiUpdatesForMetric}
+                        initiativeId={initiativeId || initiative.id}
+                        onRefresh={onRefresh}
+                        metricColor={getMetricColor(expandedKpiIndex)}
+                    />
+                </div>
+
+                {/* Data Point Preview Modal */}
+                {selectedDataPoint && (
+                    <DataPointPreviewModal
+                        isOpen={isDataPointPreviewOpen}
+                        onClose={() => {
+                            setIsDataPointPreviewOpen(false)
+                            setSelectedDataPoint(null)
+                        }}
+                        dataPoint={selectedDataPoint}
+                        kpi={expandedKpi}
+                        onEvidenceClick={() => {}}
+                    />
+                )}
+            </>
         )
     }
 
     return (
         <div className="h-screen overflow-hidden">
-            <div className="h-full w-full px-4 sm:px-6 py-6 space-y-6 overflow-y-auto">
+            {/* Mobile: Simple List View */}
+            <div className="md:hidden h-full w-full px-4 py-4 overflow-y-auto mobile-content-padding">
+                {kpis.length === 0 ? (
+                    /* Empty State */
+                    <div className="mobile-empty-state">
+                        <div className="mobile-empty-icon">
+                            <BarChart3 className="w-6 h-6 text-gray-400" />
+                        </div>
+                        <h3 className="mobile-empty-title">No Metrics Yet</h3>
+                        <p className="mobile-empty-text">Add your first metric to track impact</p>
+                        <button
+                            onClick={onAddKPI}
+                            className="mt-6 inline-flex items-center space-x-2 px-5 py-3 bg-primary-500 text-white rounded-2xl text-sm font-semibold shadow-lg active:scale-95 transition-transform"
+                        >
+                            <Plus className="w-5 h-5" />
+                            <span>Add Metric</span>
+                        </button>
+                    </div>
+                ) : (
+                    /* Mobile Metrics List */
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between mb-3">
+                            <h2 className="mobile-section-title mb-0">Your Metrics</h2>
+                            <button
+                                onClick={onAddKPI}
+                                className="p-2.5 bg-primary-500 text-white rounded-xl shadow-lg active:scale-95 transition-transform"
+                            >
+                                <Plus className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {filteredKpis.map((kpi) => {
+                            const total = kpiTotals[kpi.id!] || 0
+                            return kpi.id && (
+                                <div
+                                    key={kpi.id}
+                                    onClick={() => kpi.id && onToggleKPIExpansion(kpi.id)}
+                                    className="mobile-metric-card-clean"
+                                >
+                                    <div className="flex items-start justify-between mb-2">
+                                        <h3 className="mobile-metric-title flex-1">{kpi.title}</h3>
+                                        <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full ml-2">
+                                            {kpi.category}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-baseline gap-1 mb-1">
+                                        <span className="mobile-metric-number">{total.toLocaleString()}</span>
+                                        <span className="text-sm text-gray-500 font-medium">{kpi.unit_of_measurement}</span>
+                                    </div>
+                                    {kpi.target_value && (
+                                        <div className="text-xs text-gray-500">
+                                            Target: {kpi.target_value.toLocaleString()} {kpi.unit_of_measurement}
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
+            </div>
+
+            {/* Desktop: Original Complex View */}
+            <div className="hidden md:block h-full w-full px-4 sm:px-6 py-6 space-y-6 overflow-y-auto mobile-content-padding">
                 {kpis.length === 0 ? (
                     /* Empty State - Only show Add Metric button */
                     <div className="flex items-center justify-center min-h-[60vh]">

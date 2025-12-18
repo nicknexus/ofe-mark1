@@ -21,48 +21,62 @@ interface EvidencePreviewModalProps {
     onDataPointClick?: (dataPoint: any, kpi: any) => void
 }
 
-export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit, onDelete, onDataPointClick }: EvidencePreviewModalProps) {
+export default function EvidencePreviewModal({ isOpen, onClose, evidence: evidenceProp, onEdit, onDelete, onDataPointClick }: EvidencePreviewModalProps) {
+    const [evidence, setEvidence] = useState<Evidence | null>(null)
     const [linkedDataPoints, setLinkedDataPoints] = useState<any[]>([])
     const [loadingDataPoints, setLoadingDataPoints] = useState(false)
-    const [location, setLocation] = useState<Location | null>(null)
-    const [loadingLocation, setLoadingLocation] = useState(false)
+    const [locations, setLocations] = useState<Location[]>([])
+    const [loadingLocations, setLoadingLocations] = useState(false)
     const [dataPointLocations, setDataPointLocations] = useState<Record<string, Location>>({})
     const [imageLoading, setImageLoading] = useState(true)
     const [evidenceFiles, setEvidenceFiles] = useState<EvidenceFile[]>([])
     const [loadingFiles, setLoadingFiles] = useState(false)
     const [currentFileIndex, setCurrentFileIndex] = useState(0)
 
+    // Fetch full evidence data including location_ids when modal opens
     useEffect(() => {
-        if (isOpen && evidence?.id) {
+        if (isOpen && evidenceProp?.id) {
             setImageLoading(true)
             setCurrentFileIndex(0)
+            // Fetch fresh evidence data to ensure we have location_ids
+            apiService.getEvidenceItem(evidenceProp.id).then(fullEvidence => {
+                setEvidence(fullEvidence)
+            }).catch(() => {
+                // Fallback to prop if fetch fails
+                setEvidence(evidenceProp)
+            })
             loadLinkedDataPoints()
             loadEvidenceFiles()
-            if (evidence.location_id) {
-                loadLocation()
-            } else {
-                setLocation(null)
-            }
         } else if (!isOpen) {
             setImageLoading(true)
             setEvidenceFiles([])
             setCurrentFileIndex(0)
+            setLocations([])
+            setEvidence(null)
         }
-    }, [isOpen, evidence?.id, evidence?.location_id, evidence?.file_url])
+    }, [isOpen, evidenceProp?.id])
+
+    // Load locations when evidence data is available
+    useEffect(() => {
+        if (evidence) {
+            loadLocations()
+        }
+    }, [evidence?.location_ids, evidence?.location_id])
 
     const loadEvidenceFiles = async () => {
-        if (!evidence?.id) return
+        if (!evidenceProp?.id) return
+        const evidenceId = evidenceProp.id
         try {
             setLoadingFiles(true)
-            const files = await apiService.getEvidenceFiles(evidence.id)
+            const files = await apiService.getEvidenceFiles(evidenceId)
             if (files && files.length > 0) {
                 setEvidenceFiles(files)
-            } else if (evidence.file_url) {
+            } else if (evidenceProp.file_url) {
                 setEvidenceFiles([{
-                    id: evidence.id,
-                    file_url: evidence.file_url,
-                    file_name: evidence.file_url.split('/').pop() || 'file',
-                    file_type: evidence.file_type || 'unknown',
+                    id: evidenceId,
+                    file_url: evidenceProp.file_url,
+                    file_name: evidenceProp.file_url.split('/').pop() || 'file',
+                    file_type: evidenceProp.file_type || 'unknown',
                     display_order: 0
                 }])
             } else {
@@ -70,12 +84,12 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
             }
         } catch (error) {
             console.error('Failed to load evidence files:', error)
-            if (evidence.file_url) {
+            if (evidenceProp.file_url) {
                 setEvidenceFiles([{
-                    id: evidence.id,
-                    file_url: evidence.file_url,
-                    file_name: evidence.file_url.split('/').pop() || 'file',
-                    file_type: evidence.file_type || 'unknown',
+                    id: evidenceId,
+                    file_url: evidenceProp.file_url,
+                    file_name: evidenceProp.file_url.split('/').pop() || 'file',
+                    file_type: evidenceProp.file_type || 'unknown',
                     display_order: 0
                 }])
             }
@@ -108,10 +122,10 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
     }
 
     const loadLinkedDataPoints = async () => {
-        if (!evidence?.id) return
+        if (!evidenceProp?.id) return
         try {
             setLoadingDataPoints(true)
-            const dataPoints = await apiService.getDataPointsForEvidence(evidence.id)
+            const dataPoints = await apiService.getDataPointsForEvidence(evidenceProp.id)
             setLinkedDataPoints(dataPoints || [])
             
             const locationIds = dataPoints
@@ -142,21 +156,32 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
         }
     }
 
-    const loadLocation = async () => {
-        if (!evidence?.location_id) return
+    const loadLocations = async () => {
+        // Support both new location_ids array and legacy location_id
+        const locationIds = evidence?.location_ids || (evidence?.location_id ? [evidence.location_id] : [])
+        if (locationIds.length === 0) {
+            setLocations([])
+            return
+        }
         try {
-            setLoadingLocation(true)
-            const loc = await apiService.getLocation(evidence.location_id)
-            setLocation(loc)
+            setLoadingLocations(true)
+            const locationPromises = locationIds.map((id: string) =>
+                apiService.getLocation(id).catch(() => null)
+            )
+            const loadedLocations = await Promise.all(locationPromises)
+            setLocations(loadedLocations.filter(Boolean) as Location[])
         } catch (error) {
-            console.error('Failed to load location:', error)
-            setLocation(null)
+            console.error('Failed to load locations:', error)
+            setLocations([])
         } finally {
-            setLoadingLocation(false)
+            setLoadingLocations(false)
         }
     }
 
-    if (!isOpen || !evidence) return null
+    if (!isOpen || !evidenceProp) return null
+    
+    // Use fresh evidence data if loaded, otherwise fall back to prop
+    const displayEvidence = evidence || evidenceProp
 
     const getEvidenceIcon = (type: string) => {
         switch (type) {
@@ -168,8 +193,8 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
         }
     }
 
-    const typeInfo = getEvidenceTypeInfo(evidence.type)
-    const IconComponent = getEvidenceIcon(evidence.type)
+    const typeInfo = getEvidenceTypeInfo(displayEvidence.type)
+    const IconComponent = getEvidenceIcon(displayEvidence.type)
     const currentFile = evidenceFiles[currentFileIndex]
 
     const isImage = (fileUrl: string) => {
@@ -184,23 +209,23 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
 
     const isPDF = (fileUrl: string) => fileUrl && fileUrl.includes('.pdf')
 
-    const hasDateRange = evidence.date_range_start && evidence.date_range_end
+    const hasDateRange = displayEvidence.date_range_start && displayEvidence.date_range_end
     const displayDate = hasDateRange
-        ? `${formatDate(evidence.date_range_start!)} - ${formatDate(evidence.date_range_end!)}`
-        : formatDate(evidence.date_represented)
+        ? `${formatDate(displayEvidence.date_range_start!)} - ${formatDate(displayEvidence.date_range_end!)}`
+        : formatDate(displayEvidence.date_represented)
 
     return (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[70] animate-fade-in">
-            <div className="bubble-card max-w-4xl w-full max-h-[90vh] overflow-hidden animate-slide-up">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-0 md:p-4 z-[70] animate-fade-in">
+            <div className="bg-white md:bubble-card w-full h-full md:max-w-4xl md:w-full md:max-h-[90vh] md:h-auto overflow-hidden animate-slide-up md:rounded-2xl flex flex-col">
                 {/* Header - Evidence grey */}
-                <div className="flex items-center justify-between p-5 bg-gradient-to-r from-evidence-500 to-evidence-600">
+                <div className="flex items-center justify-between p-4 md:p-5 bg-gradient-to-r from-evidence-500 to-evidence-600 flex-shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
-                            <FileText className="w-5 h-5 text-white" />
+                        <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+                            <FileText className="w-4 h-4 md:w-5 md:h-5 text-white" />
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold text-white">Evidence</h2>
-                            <p className="text-sm text-white/80">{typeInfo.label}</p>
+                            <h2 className="text-base md:text-lg font-bold text-white">Evidence</h2>
+                            <p className="text-xs md:text-sm text-white/80">{typeInfo.label}</p>
                         </div>
                     </div>
                     <button
@@ -212,10 +237,10 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                 </div>
 
                 {/* Content */}
-                <div className="flex flex-col lg:flex-row max-h-[calc(90vh-140px)]">
-                    {/* Left Side - File Preview */}
+                <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-y-auto md:overflow-visible">
+                    {/* Left Side - File Preview - hidden on mobile */}
                     {evidenceFiles.length > 0 && (
-                        <div className="w-full lg:w-1/2 p-5 border-r border-gray-200 overflow-y-auto">
+                        <div className="hidden md:block w-full lg:w-1/2 p-5 border-r border-gray-200 overflow-y-auto">
                             <div className="sticky top-0 bg-white pb-3 mb-3 border-b border-gray-100">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
@@ -382,17 +407,17 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                     )}
 
                     {/* Right Side - Details */}
-                    <div className={`w-full ${evidenceFiles.length > 0 ? 'lg:w-1/2' : ''} p-5 overflow-y-auto`}>
+                    <div className={`w-full ${evidenceFiles.length > 0 ? 'lg:w-1/2' : ''} p-4 md:p-5 overflow-y-auto`}>
                         {/* Main Evidence Banner - Title, Type, Date, Location */}
                         <div className="bg-gradient-to-br from-evidence-50/80 to-evidence-50/40 rounded-2xl border border-evidence-100/60 overflow-hidden mb-4">
                             {/* Top Row - Title and Type */}
-                            <div className="p-5 pb-3">
-                                <div className="flex items-start justify-between gap-4">
+                            <div className="p-4 md:p-5 pb-3">
+                                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                                     <div className="flex-1 min-w-0">
                                         <p className="text-xs font-semibold text-evidence-600 mb-1.5 uppercase tracking-wider">Evidence Title</p>
-                                        <h3 className="text-xl font-bold text-gray-900 line-clamp-2">{evidence.title}</h3>
+                                        <h3 className="text-lg md:text-xl font-bold text-gray-900 line-clamp-2">{displayEvidence.title}</h3>
                                     </div>
-                                    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${typeInfo.color} flex-shrink-0`}>
+                                    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${typeInfo.color} self-start`}>
                                         <IconComponent className="w-4 h-4" />
                                         <span className="text-xs font-semibold">{typeInfo.label}</span>
                                     </div>
@@ -400,7 +425,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                             </div>
                             
                             {/* Bottom Row - Date and Location */}
-                            <div className="px-5 pb-4 pt-2 flex flex-wrap items-center gap-5 border-t border-evidence-100/40">
+                            <div className="px-4 md:px-5 pb-4 pt-2 flex flex-col md:flex-row md:flex-wrap md:items-center gap-3 md:gap-5 border-t border-evidence-100/40">
                                 {/* Date */}
                                 <div className="flex items-center gap-2.5">
                                     <div className="w-8 h-8 rounded-lg bg-white/80 flex items-center justify-center border border-evidence-200/40">
@@ -415,22 +440,26 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                 </div>
                                 
                                 {/* Divider */}
-                                {evidence.location_id && (
-                                    <div className="w-px h-10 bg-evidence-200/40"></div>
+                                {(locations.length > 0 || loadingLocations) && (
+                                    <div className="hidden md:block w-px h-10 bg-evidence-200/40"></div>
                                 )}
                                 
-                                {/* Location */}
-                                {evidence.location_id && (
+                                {/* Locations */}
+                                {(locations.length > 0 || loadingLocations) && (
                                     <div className="flex items-center gap-2.5">
                                         <div className="w-8 h-8 rounded-lg bg-white/80 flex items-center justify-center border border-evidence-200/40">
                                             <MapPin className="w-4 h-4 text-primary-600" />
                                         </div>
                                         <div>
-                                            <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Location</p>
-                                            {loadingLocation ? (
+                                            <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">
+                                                {locations.length > 1 ? 'Locations' : 'Location'}
+                                            </p>
+                                            {loadingLocations ? (
                                                 <div className="animate-pulse h-4 bg-gray-200 rounded w-20"></div>
-                                            ) : location ? (
-                                                <p className="text-sm font-semibold text-gray-800">{location.name}</p>
+                                            ) : locations.length > 0 ? (
+                                                <p className="text-sm font-semibold text-gray-800">
+                                                    {locations.map(loc => loc.name).join(', ')}
+                                                </p>
                                             ) : (
                                                 <p className="text-sm text-gray-400 italic">Not found</p>
                                             )}
@@ -441,7 +470,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                         </div>
 
                         {/* Description - Green accent */}
-                        {evidence.description && (
+                        {displayEvidence.description && (
                             <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
                                 <div className="flex items-start gap-3">
                                     <div className="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
@@ -449,7 +478,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-xs font-semibold text-primary-600 mb-1 uppercase tracking-wider">Description</p>
-                                        <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{evidence.description}</p>
+                                        <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{displayEvidence.description}</p>
                                     </div>
                                 </div>
                             </div>
@@ -582,13 +611,13 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                     </div>
                 </div>
 
-                {/* Footer Actions */}
-                <div className="flex items-center justify-between p-4 border-t border-gray-100 bg-gray-50/50">
-                    <div>
+                {/* Footer Actions - Mobile optimized */}
+                <div className="flex flex-col-reverse md:flex-row items-stretch md:items-center justify-between p-4 border-t border-gray-100 bg-gray-50/50 gap-3 md:gap-0 flex-shrink-0">
+                    <div className="hidden md:block">
                         {onDelete && (
                             <button
                                 onClick={() => {
-                                    onDelete(evidence)
+                                    onDelete(displayEvidence)
                                     onClose()
                                 }}
                                 className="flex items-center gap-2 px-4 py-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-colors text-sm font-medium"
@@ -598,25 +627,25 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence, onEdit
                             </button>
                         )}
                     </div>
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={onClose}
-                            className="btn-secondary py-2.5 px-5 text-sm"
-                        >
-                            Close
-                        </button>
+                    <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
                         {onEdit && (
                             <button
                                 onClick={() => {
-                                    onEdit(evidence)
+                                    onEdit(displayEvidence)
                                     onClose()
                                 }}
-                                className="flex items-center gap-2 py-2.5 px-5 text-sm bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
+                                className="flex items-center justify-center gap-2 py-3 md:py-2.5 px-5 text-sm bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25 order-first md:order-last"
                             >
                                 <Edit className="w-4 h-4" />
                                 <span>Edit Evidence</span>
                             </button>
                         )}
+                        <button
+                            onClick={onClose}
+                            className="btn-secondary py-3 md:py-2.5 px-5 text-sm text-center"
+                        >
+                            Close
+                        </button>
                     </div>
                 </div>
             </div>

@@ -112,7 +112,8 @@ export interface Evidence {
     date_represented: string;
     date_range_start?: string;
     date_range_end?: string;
-    location_id?: string;
+    location_id?: string; // Legacy single location (kept for backward compatibility)
+    location_ids?: string[]; // New: multiple locations support
     coordinates?: {
         lat: number;
         lng: number;

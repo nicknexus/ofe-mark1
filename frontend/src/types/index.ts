@@ -109,7 +109,8 @@ export interface Evidence {
     date_represented: string;
     date_range_start?: string;
     date_range_end?: string;
-    location_id?: string;
+    location_id?: string; // Legacy single location (kept for backward compatibility)
+    location_ids?: string[]; // New: multiple locations support
     coordinates?: {
         lat: number;
         lng: number;
@@ -229,7 +230,8 @@ export interface CreateEvidenceForm {
     date_represented: string;
     date_range_start?: string;
     date_range_end?: string;
-    location_id?: string;
+    location_id?: string; // Legacy single location (kept for backward compatibility)
+    location_ids?: string[]; // New: multiple locations support
     // Legacy: link evidence to KPIs (kept for backward compatibility)
     kpi_ids?: string[];
     // New: link evidence to specific KPI updates (data points)

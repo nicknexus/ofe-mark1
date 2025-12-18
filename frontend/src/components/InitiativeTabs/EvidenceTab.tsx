@@ -281,13 +281,13 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
     }
 
     return (
-        <div className="h-screen overflow-hidden flex flex-col">
+        <div className="h-screen overflow-hidden flex flex-col mobile-content-padding">
             {/* Header with Search and Add Button */}
             <div className="p-4 sm:p-6 border-b border-gray-100 bg-white shadow-bubble-sm">
                 <div className="flex items-center justify-between mb-4">
                     <div>
-                        <h2 className="text-xl font-semibold text-gray-800">Evidence</h2>
-                        <p className="text-sm text-gray-500">View and manage all evidence uploaded for this initiative</p>
+                        <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Evidence</h2>
+                        <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">View and manage all evidence uploaded for this initiative</p>
                     </div>
                     <button
                         onClick={() => {
@@ -295,15 +295,16 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                             setIsAddModalOpen(true)
                         }}
                         data-tutorial="add-evidence"
-                        className="flex items-center space-x-2 px-5 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25"
+                        className="flex items-center space-x-2 px-4 sm:px-5 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25 active:scale-95"
                     >
-                        <Plus className="w-4 h-4" />
-                        <span>Add Evidence</span>
+                        <Plus className="w-4 sm:w-4 h-4 sm:h-4" />
+                        <span className="hidden sm:inline">Add Evidence</span>
+                        <span className="sm:hidden">Add</span>
                     </button>
                 </div>
 
-                {/* Search Bar */}
-                <div className="relative mb-3">
+                {/* Search Bar - hidden on mobile */}
+                <div className="relative mb-3 hidden md:block">
                     <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                         type="text"
@@ -314,8 +315,8 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                     />
                 </div>
 
-                {/* Master Filters */}
-                <div className="flex flex-wrap items-center gap-2">
+                {/* Master Filters - hidden on mobile */}
+                <div className="flex-wrap items-center gap-2 hidden md:flex">
                     {/* Date Filter */}
                     <div className="relative">
                         <DateRangePicker
@@ -654,12 +655,12 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-evidence-400"></div>
                     </div>
                 ) : evidence.length === 0 ? (
-                    <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-12 text-center">
-                        <div className="icon-bubble mx-auto mb-4">
+                    <div className="mobile-empty-state md:bg-white md:rounded-2xl md:shadow-bubble md:border md:border-gray-100 md:p-12">
+                        <div className="mobile-empty-icon md:icon-bubble md:mx-auto md:mb-4">
                             <FileText className="w-6 h-6 text-gray-400" />
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-800 mb-2">No evidence found</h3>
-                        <p className="text-gray-500 text-sm mb-6">
+                        <h3 className="mobile-empty-title md:text-lg md:font-semibold md:text-gray-800 md:mb-2">No evidence found</h3>
+                        <p className="mobile-empty-text md:text-gray-500 md:text-sm md:mb-6">
                             {hasActiveFilters || searchQuery
                                 ? 'Try adjusting your filters or search query'
                                 : 'Add your first evidence to support your impact claims'}
@@ -670,7 +671,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                     setEditingEvidence(null)
                                     setIsAddModalOpen(true)
                                 }}
-                                className="px-5 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25"
+                                className="mt-6 px-5 py-3 bg-evidence-500 text-white rounded-2xl font-semibold text-sm shadow-lg active:scale-95 transition-transform"
                             >
                                 Add Evidence
                             </button>
@@ -764,7 +765,8 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                         </div>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    /* Grid view - mobile shows simplified cards */
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                         {evidence.map((ev) => {
                             const typeInfo = getEvidenceTypeInfo(ev.type)
                             const bgColor = typeInfo.color.split(' ')[0]
@@ -775,11 +777,11 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                             return (
                                 <div
                                     key={ev.id}
-                                    className="bg-white rounded-xl shadow-bubble border border-gray-100 overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer group"
+                                    className="bg-white rounded-xl md:rounded-xl shadow-sm md:shadow-bubble border border-gray-100 overflow-hidden md:hover:shadow-lg transition-all duration-200 cursor-pointer group active:scale-[0.98] md:active:scale-100"
                                     onClick={() => handleViewEvidence(ev)}
                                 >
-                                    {/* Preview Image/Icon */}
-                                    <div className="relative w-full aspect-square bg-gray-100 overflow-hidden">
+                                    {/* Preview Image/Icon - smaller on mobile */}
+                                    <div className="relative w-full aspect-video md:aspect-square bg-gray-100 overflow-hidden">
                                         {hasImagePreview && ev.file_url ? (
                                             <>
                                                 <img
@@ -808,42 +810,26 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                         </div>
                                     </div>
 
-                                    {/* Content */}
-                                    <div className="p-4">
-                                        <div className="flex items-start justify-between gap-2 mb-2">
-                                            <h3 className="font-semibold text-gray-800 text-sm line-clamp-2 flex-1">
-                                                {ev.title || 'Untitled Evidence'}
-                                            </h3>
-                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${typeInfo.color}`}>
+                                    {/* Content - Mobile optimized */}
+                                    <div className="p-3 flex flex-col gap-1.5">
+                                        {/* Title */}
+                                        <h3 className="font-semibold text-gray-800 text-sm leading-snug line-clamp-2">
+                                            {ev.title || 'Untitled Evidence'}
+                                        </h3>
+                                        
+                                        {/* Type Badge */}
+                                        <div>
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${typeInfo.color}`}>
                                                 {typeInfo.label}
                                             </span>
                                         </div>
                                         
-                                        {ev.description && (
-                                            <p className="text-xs text-gray-500 line-clamp-2 mb-2">
-                                                {ev.description}
-                                            </p>
-                                        )}
-
-                                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-                                            <div className="text-xs text-gray-500">
-                                                {ev.date_range_start && ev.date_range_end
-                                                    ? `${formatDate(ev.date_range_start)} - ${formatDate(ev.date_range_end)}`
-                                                    : formatDate(ev.date_represented)}
-                                            </div>
-                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        handleEditEvidence(ev)
-                                                    }}
-                                                    className="p-1.5 text-gray-400 hover:text-evidence-400 rounded-lg hover:bg-evidence-50 transition-all"
-                                                    title="Edit"
-                                                >
-                                                    <Edit className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        </div>
+                                        {/* Date */}
+                                        <p className="text-xs text-gray-500">
+                                            {ev.date_range_start && ev.date_range_end
+                                                ? `${formatDate(ev.date_range_start)} - ${formatDate(ev.date_range_end)}`
+                                                : formatDate(ev.date_represented)}
+                                        </p>
                                     </div>
                                 </div>
                             )

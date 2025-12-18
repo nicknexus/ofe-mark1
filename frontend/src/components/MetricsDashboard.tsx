@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { TrendingUp, Target, BarChart3, Calendar, FileText, Filter, ChevronDown, X, MapPin, ExternalLink, Plus, Users, GripVertical, Settings, HardDrive } from 'lucide-react'
+import { TrendingUp, Target, BarChart3, Calendar, FileText, Filter, ChevronDown, X, MapPin, ExternalLink, Plus, Users, GripVertical, Settings, Upload } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import {
     DndContext,
@@ -34,7 +34,6 @@ import DateRangePicker from './DateRangePicker'
 import { apiService } from '../services/api'
 import { Location, BeneficiaryGroup, User, Organization } from '../types'
 import { AuthService } from '../services/auth'
-import { useStorage } from '../context/StorageContext'
 import { getCategoryColor, parseLocalDate, isSameDay, compareDates, getLocalDateString, formatDate } from '../utils'
 import toast from 'react-hot-toast'
 
@@ -111,9 +110,11 @@ interface MetricsDashboardProps {
     user?: User | null
     organization?: Organization | null
     onOrderChange?: (orderedIds: string[]) => void
+    onAddImpactClaim?: () => void
+    onAddEvidence?: () => void
 }
 
-export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = [], initiativeId, onNavigateToLocations, onMetricCardClick, onAddKPI, onStoryClick, user, organization, onOrderChange }: MetricsDashboardProps) {
+export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = [], initiativeId, onNavigateToLocations, onMetricCardClick, onAddKPI, onStoryClick, user, organization, onOrderChange, onAddImpactClaim, onAddEvidence }: MetricsDashboardProps) {
     const [timeFrame, setTimeFrame] = useState<'all' | '1month' | '6months' | '1year' | '5years'>('all')
     const [isCumulative, setIsCumulative] = useState(true)
     const [visibleKPIs, setVisibleKPIs] = useState<Set<string>>(new Set())
@@ -206,7 +207,6 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     const [beneficiaryDropdownPosition, setBeneficiaryDropdownPosition] = useState({ top: 0, left: 0 })
     const [metricsDropdownPosition, setMetricsDropdownPosition] = useState({ top: 0, left: 0 })
     const [userMenuOpen, setUserMenuOpen] = useState(false)
-    const { storageUsage } = useStorage()
     const userMenuRef = useRef<HTMLDivElement>(null)
 
     // Close user menu when clicking outside
@@ -1066,31 +1066,30 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     )}
                 </div>
 
-                {/* Right side: Storage, Settings and User Profile */}
+                {/* Right side: Add Impact Claim, Add Evidence, Settings and User Profile */}
                 <div className="flex items-center gap-3">
-                    {/* Storage Bar */}
-                    {storageUsage && (
-                        <Link
-                            to="/account"
-                            className="hidden sm:flex items-center gap-2 px-3 h-10 bg-white/80 hover:bg-white border border-gray-200 hover:border-gray-300 rounded-full transition-all duration-200 shadow-bubble-sm"
-                            title={`${storageUsage.used_gb >= 1 ? storageUsage.used_gb.toFixed(2) + ' GB' : ((storageUsage.storage_used_bytes || 0) / (1024 * 1024)).toFixed(1) + ' MB'} / ${storageUsage.placeholder_max_gb} GB`}
+                    {/* Add Impact Claim Button */}
+                    {onAddImpactClaim && (
+                        <button
+                            onClick={onAddImpactClaim}
+                            className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25"
                         >
-                            <HardDrive className="w-4 h-4 text-gray-500" />
-                            <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-blue-500 rounded-full"
-                                    style={{ width: `${Math.max(Math.min(storageUsage.used_percentage, 100), storageUsage.storage_used_bytes > 0 ? 2 : 0)}%` }}
-                                />
-                            </div>
-                            <span className="text-xs text-gray-500">
-                                {storageUsage.used_gb >= 1
-                                    ? `${storageUsage.used_gb.toFixed(1)}GB`
-                                    : `${((storageUsage.storage_used_bytes || 0) / (1024 * 1024)).toFixed(0)}MB`
-                                }
-                            </span>
-                        </Link>
+                            <Plus className="w-4 h-4" />
+                            <span className="hidden sm:inline">Add Impact Claim</span>
+                            <span className="sm:hidden">Add Claim</span>
+                        </button>
                     )}
-
+                    {/* Add Evidence Button */}
+                    {onAddEvidence && (
+                        <button
+                            onClick={onAddEvidence}
+                            className="flex items-center space-x-2 px-4 py-2 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25"
+                        >
+                            <Upload className="w-4 h-4" />
+                            <span className="hidden sm:inline">Add Evidence</span>
+                            <span className="sm:hidden">Add</span>
+                        </button>
+                    )}
                     {/* Settings Button - Circle Icon */}
                     <Link
                         to="/account"
@@ -1395,7 +1394,9 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     {/* Impact Claims - inline minimal */}
                     <div className="flex-1 bg-white rounded-xl shadow-bubble-sm border border-gray-100 impact-border px-3 py-1.5 flex items-center justify-between">
                         <div className="flex items-center space-x-2">
-                            <BarChart3 className="w-3.5 h-3.5 text-impact-400" />
+                            <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
+                                <BarChart3 className="w-4 h-4 text-primary-500" />
+                            </div>
                             <span className="text-[11px] font-medium text-gray-600">Impact Claims</span>
                         </div>
                         <span className="text-sm font-semibold text-primary-500">{filteredUpdates.length.toLocaleString()}</span>
@@ -1423,8 +1424,8 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.18)] border border-gray-100 p-4 impact-border">
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center space-x-2">
-                                <div className="w-8 h-8 rounded-lg bg-impact-50 flex items-center justify-center">
-                                    <BarChart3 className="w-4 h-4 text-impact-400" />
+                                <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
+                                    <BarChart3 className="w-4 h-4 text-primary-500" />
                                 </div>
                                 <h4 className="text-xs font-medium text-gray-600">Impact Claims</h4>
                             </div>

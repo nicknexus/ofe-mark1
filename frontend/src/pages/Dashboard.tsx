@@ -235,11 +235,16 @@ export default function Dashboard() {
     return (
         <>
             <div className="h-screen overflow-hidden pt-24 pb-6 px-4 sm:px-6 flex flex-col">
+                {/* Mobile Header - only visible on mobile */}
+                <div className="mobile-only mb-4 -mt-8">
+                    <h1 className="text-xl font-semibold text-gray-800">Your Initiatives</h1>
+                </div>
+
                 {/* Two Column Layout - fills remaining height */}
                 <div className="flex-1 min-h-0">
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-                        {/* Initiatives Module - Takes 2 columns */}
-                        <div className="lg:col-span-2 bg-white rounded-2xl shadow-bubble border border-gray-100 overflow-hidden flex flex-col">
+                        {/* Initiatives Module - Takes 2 columns on desktop, full width on mobile */}
+                        <div className="col-span-1 lg:col-span-2 bg-white rounded-2xl shadow-bubble border border-gray-100 overflow-hidden flex flex-col">
                             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
                                 <h2 className="text-lg font-semibold text-gray-800">Your Initiatives</h2>
                                 <div className="flex items-center gap-2">
@@ -344,8 +349,8 @@ export default function Dashboard() {
                             </div>
                         </div>
 
-                        {/* Locations Map Module */}
-                        <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 overflow-hidden flex flex-col">
+                        {/* Locations Map Module - hidden on mobile */}
+                        <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 overflow-hidden flex flex-col hidden md:flex">
                             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
                                 <div className="flex items-center gap-2">
                                     <MapPin className="w-5 h-5 text-primary-500" />

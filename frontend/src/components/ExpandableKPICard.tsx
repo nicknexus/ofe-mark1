@@ -146,11 +146,12 @@ export default function ExpandableKPICard({
     }
 
     // Load evidence for all cards (needed for evidence type percentages in collapsed view)
+    // Also reload when kpiUpdates changes (e.g., new impact claim created that may have auto-linked evidence)
     useEffect(() => {
         if (kpi.id && initiativeId) {
             loadEvidence()
         }
-    }, [kpi.id, initiativeId])
+    }, [kpi.id, initiativeId, kpiUpdates.length])
 
     // Load update locations when expanded
     useEffect(() => {
@@ -387,7 +388,10 @@ export default function ExpandableKPICard({
             ? parseLocalDate(claim.date_range_end)
             : parseLocalDate(claim.date_represented)
 
-        const claimDays = Math.round((claimEnd.getTime() - claimStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+        // Count days using UTC noon to avoid DST issues
+        const startUTC = Date.UTC(claimStart.getFullYear(), claimStart.getMonth(), claimStart.getDate(), 12, 0, 0)
+        const endUTC = Date.UTC(claimEnd.getFullYear(), claimEnd.getMonth(), claimEnd.getDate(), 12, 0, 0)
+        const claimDays = Math.round((endUTC - startUTC) / (1000 * 60 * 60 * 24)) + 1
 
         // Collect all covered days from evidence
         const coveredDays = new Set<string>()
@@ -955,7 +959,11 @@ export default function ExpandableKPICard({
                                                     <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25"><Plus className="w-4 h-4" /><span>Add Impact Claim</span></button>
                                                 </div>
                                                 <div className="flex-1 overflow-y-auto space-y-1 pr-1 min-h-0">
-                                                    {kpiUpdates.map((update, index) => (
+                                                    {[...kpiUpdates].sort((a, b) => {
+                                                        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+                                                        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+                                                        return dateB - dateA
+                                                    }).map((update, index) => (
                                                         <div key={update.id || index} className="border border-gray-100/80 rounded-lg bg-white/60 hover:bg-primary-50/50 hover:border-primary-200 cursor-pointer transition-all duration-200 p-2" onClick={() => handleDataPointClick(update)}>
                                                             <div className="flex items-center justify-between">
                                                                 <div className="min-w-0 flex-1">
@@ -1520,7 +1528,11 @@ export default function ExpandableKPICard({
                                                     </button>
                                                 </div>
                                                 <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
-                                                    {kpiUpdates.map((update, index) => (
+                                                    {[...kpiUpdates].sort((a, b) => {
+                                                        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+                                                        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+                                                        return dateB - dateA
+                                                    }).map((update, index) => (
                                                         <div key={update.id || index} className="border border-gray-100/80 rounded-xl bg-white/60 hover:bg-primary-50/50 hover:border-primary-200 cursor-pointer transition-all duration-200 p-2.5" onClick={() => handleDataPointClick(update)}>
                                                             <div className="flex items-center justify-between">
                                                                 <div className="min-w-0 flex-1">
@@ -1900,7 +1912,11 @@ export default function ExpandableKPICard({
                                                     </div>
                                                 </div>
                                                 <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
-                                                    {kpiUpdates.map((update, index) => {
+                                                    {[...kpiUpdates].sort((a, b) => {
+                                                        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+                                                        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+                                                        return dateB - dateA
+                                                    }).map((update, index) => {
                                                         const hasDateRange = update.date_range_start && update.date_range_end
                                                         const displayDate = hasDateRange
                                                             ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}`

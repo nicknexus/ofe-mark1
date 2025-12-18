@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { FileText, Calendar, BarChart3, MapPin, Users, Sparkles, Download, Loader2, X, ChevronLeft, ChevronRight, Check, BookOpen, Plus } from 'lucide-react'
+import { FileText, Calendar, BarChart3, MapPin, Users, Sparkles, Download, Loader2, X, ChevronLeft, ChevronRight, Check, BookOpen, Plus, Pencil, Save } from 'lucide-react'
 import { apiService } from '../../services/api'
 import { KPI, Location, BeneficiaryGroup, Story, InitiativeDashboard } from '../../types'
 import DateRangePicker from '../DateRangePicker'
@@ -95,6 +95,13 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
     const [showLocationPicker, setShowLocationPicker] = useState(false)
     const [showBeneficiaryPicker, setShowBeneficiaryPicker] = useState(false)
     const [showDashboard, setShowDashboard] = useState(true)
+    const [isEditingReport, setIsEditingReport] = useState(false)
+    
+    // Editable text state (separate from source data so we can edit without losing original)
+    const [editableOverview, setEditableOverview] = useState<string>('')
+    const [editableBeneficiaryText, setEditableBeneficiaryText] = useState<string>('')
+    const [editableStoryTitle, setEditableStoryTitle] = useState<string>('')
+    const [editableStoryDescription, setEditableStoryDescription] = useState<string>('')
 
     // Step wizard state
     const [currentStep, setCurrentStep] = useState(1)
@@ -125,9 +132,18 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
             if (saved) {
                 const parsed = JSON.parse(saved)
                 if (parsed.reportText) setReportText(parsed.reportText)
-                if (parsed.reportDashboardData) setReportDashboardData(parsed.reportDashboardData)
+                if (parsed.reportDashboardData) {
+                    setReportDashboardData(parsed.reportDashboardData)
+                    // Initialize editable fields from saved data
+                    setEditableOverview(parsed.editableOverview ?? parsed.reportDashboardData.overviewSummary ?? '')
+                    setEditableBeneficiaryText(parsed.editableBeneficiaryText ?? parsed.reportDashboardData.beneficiaryText ?? '')
+                }
                 if (parsed.reportData) setReportData(parsed.reportData)
-                if (parsed.selectedStory) setSelectedStory(parsed.selectedStory)
+                if (parsed.selectedStory) {
+                    setSelectedStory(parsed.selectedStory)
+                    setEditableStoryTitle(parsed.editableStoryTitle ?? parsed.selectedStory.title ?? '')
+                    setEditableStoryDescription(parsed.editableStoryDescription ?? parsed.selectedStory.description ?? '')
+                }
                 if (parsed.dateRange) setDateRange(parsed.dateRange)
                 if (typeof parsed.showDashboard === 'boolean') setShowDashboard(parsed.showDashboard)
             } else {
@@ -137,6 +153,10 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                 setReportData(null)
                 setSelectedStory(null)
                 setShowDashboard(true)
+                setEditableOverview('')
+                setEditableBeneficiaryText('')
+                setEditableStoryTitle('')
+                setEditableStoryDescription('')
             }
         } catch (error) {
             console.error('Failed to load saved report:', error)
@@ -146,6 +166,10 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
             setReportData(null)
             setSelectedStory(null)
             setShowDashboard(true)
+            setEditableOverview('')
+            setEditableBeneficiaryText('')
+            setEditableStoryTitle('')
+            setEditableStoryDescription('')
         }
     }, [initiativeId, storageKey])
 
@@ -159,14 +183,18 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                     reportData,
                     selectedStory,
                     dateRange,
-                    showDashboard
+                    showDashboard,
+                    editableOverview,
+                    editableBeneficiaryText,
+                    editableStoryTitle,
+                    editableStoryDescription
                 }
                 localStorage.setItem(storageKey, JSON.stringify(dataToSave))
             } catch (error) {
                 console.error('Failed to save report to localStorage:', error)
             }
         }
-    }, [reportText, reportDashboardData, reportData, selectedStory, dateRange, showDashboard, storageKey])
+    }, [reportText, reportDashboardData, reportData, selectedStory, dateRange, showDashboard, storageKey, editableOverview, editableBeneficiaryText, editableStoryTitle, editableStoryDescription])
 
     // Load filter options
     useEffect(() => {
@@ -529,6 +557,14 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                 mapImage,
                 hasBeneficiaryGroups: selectedBeneficiaryGroupIds.length > 0
             })
+            
+            // Initialize editable fields
+            setEditableOverview(overviewSummary || 'No overview available')
+            setEditableBeneficiaryText(beneficiaryText || 'No beneficiary information available')
+            if (selectedStory) {
+                setEditableStoryTitle(selectedStory.title)
+                setEditableStoryDescription(selectedStory.description || '')
+            }
 
             // Show dashboard when report is generated
             setShowDashboard(true)
@@ -657,6 +693,11 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
         setSelectedBeneficiaryGroupIds([])
         setCurrentStep(1)
         setShowDashboard(true)
+        setIsEditingReport(false)
+        setEditableOverview('')
+        setEditableBeneficiaryText('')
+        setEditableStoryTitle('')
+        setEditableStoryDescription('')
 
         // Clear localStorage
         try {
@@ -724,6 +765,23 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-base font-semibold text-gray-800">Report Dashboard</h2>
                                 <div className="flex items-center gap-2">
+                                    {isEditingReport ? (
+                                        <button
+                                            onClick={() => setIsEditingReport(false)}
+                                            className="px-4 py-2 bg-primary-500 text-white rounded-2xl hover:bg-primary-600 flex items-center space-x-2 text-sm font-medium transition-all duration-200 shadow-bubble-sm"
+                                        >
+                                            <Save className="w-4 h-4" />
+                                            <span>Save Changes</span>
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => setIsEditingReport(true)}
+                                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-2xl hover:bg-gray-200 flex items-center space-x-2 text-sm font-medium transition-all duration-200"
+                                        >
+                                            <Pencil className="w-4 h-4" />
+                                            <span>Edit Text</span>
+                                        </button>
+                                    )}
                                     <button
                                         onClick={async () => {
                                             try {
@@ -746,7 +804,12 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                                 toast.error('Failed to download PDF', { id: 'pdf-download' })
                                             }
                                         }}
-                                        className="px-4 py-2 bg-primary-500 text-white rounded-2xl hover:bg-primary-600 flex items-center space-x-2 text-sm font-medium transition-all duration-200 shadow-bubble-sm"
+                                        disabled={isEditingReport}
+                                        className={`px-4 py-2 rounded-2xl flex items-center space-x-2 text-sm font-medium transition-all duration-200 shadow-bubble-sm ${
+                                            isEditingReport 
+                                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+                                                : 'bg-primary-500 text-white hover:bg-primary-600'
+                                        }`}
                                     >
                                         <Download className="w-4 h-4" />
                                         <span>Download as PDF</span>
@@ -777,15 +840,24 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                 {dashboard && (
                                     <ReportDashboard
                                         dashboard={dashboard}
-                                        overviewSummary={reportDashboardData.overviewSummary}
+                                        overviewSummary={editableOverview || reportDashboardData.overviewSummary}
                                         totals={reportData.totals}
-                                        beneficiaryText={reportDashboardData.beneficiaryText}
+                                        beneficiaryText={editableBeneficiaryText || reportDashboardData.beneficiaryText}
                                         hasBeneficiaryGroups={reportDashboardData.hasBeneficiaryGroups}
-                                        selectedStory={selectedStory || undefined}
+                                        selectedStory={selectedStory ? {
+                                            ...selectedStory,
+                                            title: editableStoryTitle || selectedStory.title,
+                                            description: editableStoryDescription || selectedStory.description
+                                        } : undefined}
                                         locations={reportData.locations}
                                         dateStart={dateRange.startDate || dateRange.singleDate}
                                         dateEnd={dateRange.endDate || dateRange.singleDate}
                                         mapImage={reportDashboardData.mapImage}
+                                        isEditing={isEditingReport}
+                                        onOverviewChange={setEditableOverview}
+                                        onBeneficiaryTextChange={setEditableBeneficiaryText}
+                                        onStoryTitleChange={setEditableStoryTitle}
+                                        onStoryDescriptionChange={setEditableStoryDescription}
                                     />
                                 )}
                             </div>
@@ -991,6 +1063,21 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                             )}
                                         </div>
                                     </div>
+
+                                    {/* Beneficiary Group Scoping Disclaimer */}
+                                    {selectedBeneficiaryGroupIds.length > 0 ? (
+                                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-2">
+                                            <p className="text-sm text-amber-800">
+                                                <strong>Scoped Report:</strong> The report will only include metrics and data associated with the selected beneficiary group{selectedBeneficiaryGroupIds.length > 1 ? 's' : ''}. All totals will reflect only the impact for {selectedBeneficiaryGroupIds.length === 1 ? 'this group' : 'these groups'}.
+                                            </p>
+                                        </div>
+                                    ) : beneficiaryGroups.length > 0 && (
+                                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-2">
+                                            <p className="text-sm text-gray-600">
+                                                <strong>Full Report:</strong> No beneficiary groups selected — the report will include all metrics across your initiative based on the other filters you choose.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -1241,35 +1328,6 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                     </div>
                 )}
 
-                {/* Show dashboard link if hidden but report exists */}
-                {reportText && reportDashboardData && !showDashboard && (
-                    <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6 text-center">
-                        <p className="text-gray-600 mb-4">
-                            You have a previously generated report.
-                        </p>
-                        <div className="flex items-center justify-center gap-4">
-                            <button
-                                onClick={() => {
-                                    setShowDashboard(true)
-                                    try {
-                                        const saved = localStorage.getItem(storageKey)
-                                        if (saved) {
-                                            const parsed = JSON.parse(saved)
-                                            parsed.showDashboard = true
-                                            localStorage.setItem(storageKey, JSON.stringify(parsed))
-                                        }
-                                    } catch (error) {
-                                        console.error('Failed to update localStorage:', error)
-                                    }
-                                }}
-                                className="px-6 py-3 bg-primary-500 text-white rounded-2xl hover:bg-primary-600 font-semibold transition-all duration-200 shadow-bubble-sm"
-                            >
-                                Show Report Dashboard
-                            </button>
-                            <NewReportButton />
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     )

@@ -12,7 +12,7 @@ interface BeneficiariesTabProps {
 export default function BeneficiariesTab({ initiativeId, onRefresh, onStoryClick, onMetricClick }: BeneficiariesTabProps) {
     return (
         <div className="h-screen overflow-hidden">
-            <div className="h-full w-full px-4 sm:px-6 py-6 space-y-6 overflow-y-auto">
+            <div className="h-full w-full px-4 sm:px-6 py-6 space-y-6 overflow-y-auto mobile-content-padding">
                 <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
                     <BeneficiaryManager
                         initiativeId={initiativeId}

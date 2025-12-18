@@ -11,11 +11,9 @@ import {
     FileText,
     Settings,
     LogOut,
-    User as UserIcon,
-    HardDrive
+    User as UserIcon
 } from 'lucide-react'
 import { User } from '../types'
-import { useStorage } from '../context/StorageContext'
 
 interface InitiativeSidebarProps {
     activeTab: string
@@ -38,7 +36,6 @@ export default function InitiativeSidebar({
 }: InitiativeSidebarProps) {
     const navigate = useNavigate()
     const [settingsOpen, setSettingsOpen] = useState(false)
-    const { storageUsage } = useStorage()
     const settingsRef = useRef<HTMLDivElement>(null)
 
     // Close dropdown when clicking outside
@@ -107,7 +104,7 @@ export default function InitiativeSidebar({
     ]
 
     return (
-        <div className="fixed left-0 top-0 w-56 h-screen bg-white border-r border-gray-100 shadow-bubble-sm flex flex-col z-30">
+        <div className="fixed left-0 top-0 w-56 h-screen bg-white border-r border-gray-100 shadow-bubble-sm flex flex-col z-30 desktop-sidebar">
             {/* Header */}
             <div className="p-4 border-b border-gray-100">
                 <div className="flex items-center space-x-2 mb-3">
@@ -163,33 +160,9 @@ export default function InitiativeSidebar({
             </div>
 
             {/* Footer */}
-            <div className="p-3 border-t border-gray-100 space-y-2">
-                {/* Storage Bar + Settings Row */}
-                <div className="flex items-center gap-2">
-                    {/* Storage Bar */}
-                    {storageUsage && (
-                        <Link
-                            to="/account"
-                            className="flex-1 flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-                            title={`${storageUsage.used_gb >= 1 ? storageUsage.used_gb.toFixed(2) + ' GB' : ((storageUsage.storage_used_bytes || 0) / (1024 * 1024)).toFixed(1) + ' MB'} / ${storageUsage.placeholder_max_gb} GB`}
-                        >
-                            <HardDrive className="w-4 h-4 text-gray-400" />
-                            <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                <div 
-                                    className="h-full bg-blue-500 rounded-full"
-                                    style={{ width: `${Math.max(Math.min(storageUsage.used_percentage, 100), storageUsage.storage_used_bytes > 0 ? 2 : 0)}%` }}
-                                />
-                            </div>
-                            <span className="text-xs text-gray-500">
-                                {storageUsage.used_gb >= 1 
-                                    ? `${storageUsage.used_gb.toFixed(1)}GB`
-                                    : `${((storageUsage.storage_used_bytes || 0) / (1024 * 1024)).toFixed(0)}MB`
-                                }
-                            </span>
-                        </Link>
-                    )}
-
-                    {/* Settings Gear Icon */}
+            <div className="p-3 border-t border-gray-100">
+                {/* Settings Gear Icon */}
+                <div className="flex justify-center">
                     <div className="relative" ref={settingsRef}>
                         <button
                             onClick={() => setSettingsOpen(!settingsOpen)}

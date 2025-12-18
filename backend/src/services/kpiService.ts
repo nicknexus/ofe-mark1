@@ -231,7 +231,158 @@ export class KPIService {
             if (linkError) throw new Error(`Failed to link data point to beneficiary groups: ${linkError.message}`)
         }
 
+        // Auto-link existing evidence that matches this impact claim
+        await this.autoLinkEvidenceToUpdate(data, userId)
+
         return data;
+    }
+
+    // Helper: Check if two date ranges overlap
+    private static datesOverlap(
+        date1Start: string,
+        date1End: string | null,
+        date2Start: string,
+        date2End: string | null
+    ): boolean {
+        // Normalize to ranges (single dates become same-day ranges)
+        const start1 = date1Start
+        const end1 = date1End || date1Start
+        const start2 = date2Start
+        const end2 = date2End || date2Start
+
+        // Two ranges overlap if one starts before the other ends
+        return start1 <= end2 && start2 <= end1
+    }
+
+    // Auto-link existing evidence to a newly created impact claim
+    private static async autoLinkEvidenceToUpdate(update: KPIUpdate, userId: string): Promise<void> {
+        try {
+            // Get all evidence linked to this KPI via evidence_kpis
+            const { data: evidenceKpiLinks } = await supabase
+                .from('evidence_kpis')
+                .select(`
+                    evidence_id,
+                    evidence(
+                        id,
+                        date_represented,
+                        date_range_start,
+                        date_range_end,
+                        user_id
+                    )
+                `)
+                .eq('kpi_id', update.kpi_id)
+
+            if (!evidenceKpiLinks || evidenceKpiLinks.length === 0) return
+
+            // Get all evidence IDs that are linked to this KPI
+            const evidenceIds = evidenceKpiLinks
+                .map((link: any) => link.evidence_id)
+                .filter(Boolean)
+
+            if (evidenceIds.length === 0) return
+
+            // Get evidence_locations for these evidence items to check location match
+            const { data: evidenceLocations } = await supabase
+                .from('evidence_locations')
+                .select('evidence_id, location_id')
+                .in('evidence_id', evidenceIds)
+
+            // Also check legacy location_id on evidence table for backward compatibility
+            const { data: evidenceWithLegacyLocation } = await supabase
+                .from('evidence')
+                .select('id, location_id')
+                .in('id', evidenceIds)
+                .not('location_id', 'is', null)
+
+            // Build a map of evidence_id -> location_ids (combining junction table and legacy)
+            const evidenceLocationMap: Record<string, string[]> = {}
+            
+            // Add from junction table
+            for (const el of (evidenceLocations || [])) {
+                if (!evidenceLocationMap[el.evidence_id]) {
+                    evidenceLocationMap[el.evidence_id] = []
+                }
+                evidenceLocationMap[el.evidence_id].push(el.location_id)
+            }
+            
+            // Add legacy location_id
+            for (const ev of (evidenceWithLegacyLocation || [])) {
+                if (ev.location_id) {
+                    if (!evidenceLocationMap[ev.id]) {
+                        evidenceLocationMap[ev.id] = []
+                    }
+                    if (!evidenceLocationMap[ev.id].includes(ev.location_id)) {
+                        evidenceLocationMap[ev.id].push(ev.location_id)
+                    }
+                }
+            }
+
+            // Find evidence that matches both date and location
+            const matchingEvidenceIds: string[] = []
+            const updateDateStart = update.date_range_start || update.date_represented
+            const updateDateEnd = update.date_range_end || null
+
+            for (const link of evidenceKpiLinks) {
+                const evidence = link.evidence as any
+                if (!evidence || evidence.user_id !== userId) continue
+
+                // Check date overlap
+                const evidenceDateStart = evidence.date_range_start || evidence.date_represented
+                const evidenceDateEnd = evidence.date_range_end || null
+
+                if (!this.datesOverlap(updateDateStart, updateDateEnd, evidenceDateStart, evidenceDateEnd)) {
+                    continue
+                }
+
+                // Check location match - evidence must have at least one matching location
+                const evidenceLocIds = evidenceLocationMap[evidence.id] || []
+                if (evidenceLocIds.length === 0) {
+                    // No locations on evidence - skip (shouldn't happen with new flow but just in case)
+                    continue
+                }
+
+                if (!evidenceLocIds.includes(update.location_id!)) {
+                    // None of the evidence's locations match the impact claim's location
+                    continue
+                }
+
+                // Both date and location match!
+                matchingEvidenceIds.push(evidence.id)
+            }
+
+            if (matchingEvidenceIds.length === 0) return
+
+            // Check which links already exist (shouldn't be any for new update, but be safe)
+            const { data: existingLinks } = await supabase
+                .from('evidence_kpi_updates')
+                .select('evidence_id')
+                .eq('kpi_update_id', update.id)
+
+            const existingEvidenceIds = new Set((existingLinks || []).map((l: any) => l.evidence_id))
+            const newLinks = matchingEvidenceIds
+                .filter(evidenceId => !existingEvidenceIds.has(evidenceId))
+                .map(evidenceId => ({
+                    evidence_id: evidenceId,
+                    kpi_update_id: update.id,
+                    user_id: userId
+                }))
+
+            if (newLinks.length > 0) {
+                const { error: linkError } = await supabase
+                    .from('evidence_kpi_updates')
+                    .insert(newLinks)
+
+                if (linkError) {
+                    console.error('Failed to auto-link evidence to impact claim:', linkError)
+                    // Don't throw - auto-linking is a convenience, not critical
+                } else {
+                    console.log(`Auto-linked ${newLinks.length} evidence item(s) to new impact claim ${update.id}`)
+                }
+            }
+        } catch (error) {
+            console.error('Error in autoLinkEvidenceToUpdate:', error)
+            // Don't throw - auto-linking failure shouldn't break impact claim creation
+        }
     }
 
     static async getUpdates(kpiId: string, userId: string): Promise<KPIUpdate[]> {
@@ -240,7 +391,7 @@ export class KPIService {
             .select('*')
             .eq('kpi_id', kpiId)
             .eq('user_id', userId)
-            .order('date_represented', { ascending: false });
+            .order('created_at', { ascending: false });
 
         if (error) throw new Error(`Failed to fetch KPI updates: ${error.message}`);
         return data || [];
@@ -285,6 +436,18 @@ export class KPIService {
                 if (linkError) throw new Error(`Failed to update beneficiary links for data point: ${linkError.message}`)
             }
         }
+
+        // Re-run auto-link if date or location changed (might match new evidence)
+        const dateOrLocationChanged = 
+            'date_represented' in updateData || 
+            'date_range_start' in updateData || 
+            'date_range_end' in updateData || 
+            'location_id' in updateData
+
+        if (dateOrLocationChanged) {
+            await this.autoLinkEvidenceToUpdate(data, userId)
+        }
+
         return data;
     }
 

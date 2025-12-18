@@ -219,8 +219,8 @@ export default function EasyEvidenceModal({
                     date_represented: impactClaim.date_range_end || impactClaim.date_represented,
                     date_range_start: impactClaim.date_range_start,
                     date_range_end: impactClaim.date_range_end,
-                    // Use impact claim's location if available
-                    location_id: impactClaim.location_id,
+                    // Use impact claim's location if available (as array for multi-location support)
+                    location_ids: impactClaim.location_id ? [impactClaim.location_id] : undefined,
                     // Link to the KPI
                     kpi_ids: [kpi.id],
                     // Link to the specific impact claim
@@ -267,50 +267,50 @@ export default function EasyEvidenceModal({
     ]
 
     return (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center p-4 z-[80]">
-            <div className="bg-white/95 backdrop-blur-xl border border-white/60 rounded-3xl w-full max-w-4xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] min-h-[75vh] max-h-[95vh] overflow-hidden flex flex-col transition-all duration-300">
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center p-0 md:p-4 z-[80]">
+            <div className="bg-white md:bg-white/95 md:backdrop-blur-xl md:border md:border-white/60 md:rounded-3xl w-full h-full md:w-full md:max-w-4xl md:h-auto md:min-h-[75vh] md:max-h-[95vh] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] overflow-hidden flex flex-col transition-all duration-300">
                 {/* Header */}
-                <div className="flex items-center justify-between p-5 bg-gradient-to-r from-evidence-500 to-evidence-600 flex-shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
-                            <Upload className="w-5 h-5 text-white" />
+                <div className="flex items-center justify-between p-4 md:p-5 bg-gradient-to-r from-evidence-500 to-evidence-600 flex-shrink-0">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 flex-shrink-0">
+                            <Upload className="w-4 h-4 md:w-5 md:h-5 text-white" />
                         </div>
-                        <div>
-                            <h2 className="text-lg font-bold text-white">Add Evidence for Claim</h2>
-                            <p className="text-sm text-white/80">
-                                Upload evidence to verify this impact claim
+                        <div className="min-w-0">
+                            <h2 className="text-base md:text-lg font-bold text-white">Add Evidence</h2>
+                            <p className="text-xs md:text-sm text-white/80 truncate">
+                                Upload evidence for this claim
                             </p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+                        className="p-2 hover:bg-white/20 rounded-xl transition-colors flex-shrink-0"
                     >
                         <X className="w-5 h-5 text-white" />
                     </button>
                 </div>
 
                 {/* Impact Claim Summary */}
-                <div className="px-5 py-5 bg-gradient-to-r from-primary-50 to-primary-100/50 border-b border-primary-200/40 flex-shrink-0">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
+                <div className="px-4 md:px-5 py-4 md:py-5 bg-gradient-to-r from-primary-50 to-primary-100/50 border-b border-primary-200/40 flex-shrink-0">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
                             <div className="flex items-center gap-2">
                                 <div className="w-2.5 h-2.5 rounded-full bg-primary-500"></div>
-                                <span className="text-sm font-semibold text-primary-600 uppercase tracking-wide">
+                                <span className="text-xs md:text-sm font-semibold text-primary-600 uppercase tracking-wide">
                                     Supporting
                                 </span>
                             </div>
-                            <span className="text-2xl font-bold text-primary-700">
+                            <span className="text-xl md:text-2xl font-bold text-primary-700">
                                 {impactClaim.value?.toLocaleString()} {kpi.unit_of_measurement}
                             </span>
-                            <div className="flex items-center gap-4 text-sm text-gray-600">
+                            <div className="flex flex-wrap items-center gap-3 md:gap-4 text-xs md:text-sm text-gray-600">
                                 <div className="flex items-center gap-1.5">
-                                    <Calendar className="w-4 h-4 text-primary-500" />
+                                    <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary-500" />
                                     <span>{getDateDisplay()}</span>
                                 </div>
                                 {impactClaim.location_id && (
                                     <div className="flex items-center gap-1.5">
-                                        <MapPin className="w-4 h-4 text-primary-500" />
+                                        <MapPin className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary-500" />
                                         {loadingLocation ? (
                                             <span className="text-gray-400">...</span>
                                         ) : location ? (

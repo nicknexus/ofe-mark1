@@ -186,7 +186,11 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
     return (
         <div className="space-y-3 max-h-[calc(100vh-480px)] min-h-[200px] overflow-y-auto pr-2 scrollbar-thin">
             {dataPointsWithEvidence
-                .sort((a, b) => new Date(b.date_represented).getTime() - new Date(a.date_represented).getTime())
+                .sort((a, b) => {
+                    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+                    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+                    return dateB - dateA
+                })
                 .map((dataPoint) => {
                     const isExpanded = expandedPoints.includes(dataPoint.id!)
                     return (

@@ -97,33 +97,39 @@ export default function DataPointPreviewModal({
             ? parseLocalDate(dataPoint.date_range_end)
             : parseLocalDate(dataPoint.date_represented)
 
-        const claimDays = Math.ceil((claimEnd.getTime() - claimStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+        // Count days using UTC noon to avoid DST issues
+        const startUTC = Date.UTC(claimStart.getFullYear(), claimStart.getMonth(), claimStart.getDate(), 12, 0, 0)
+        const endUTC = Date.UTC(claimEnd.getFullYear(), claimEnd.getMonth(), claimEnd.getDate(), 12, 0, 0)
+        const claimDays = Math.round((endUTC - startUTC) / (1000 * 60 * 60 * 24)) + 1
         if (claimDays <= 0) return 0
 
         const coveredDays = new Set<string>()
 
         linkedEvidence.forEach((ev: any) => {
-            const evStart = ev.date_range_start
-                ? parseLocalDate(ev.date_range_start)
-                : ev.date_captured
-                    ? parseLocalDate(ev.date_captured)
-                    : null
-            const evEnd = ev.date_range_end
-                ? parseLocalDate(ev.date_range_end)
-                : ev.date_captured
-                    ? parseLocalDate(ev.date_captured)
-                    : null
+            if (ev.date_range_start && ev.date_range_end) {
+                // Evidence has date range
+                const evStart = parseLocalDate(ev.date_range_start)
+                const evEnd = parseLocalDate(ev.date_range_end)
 
-            if (!evStart || !evEnd) return
+                const overlapStart = new Date(Math.max(evStart.getTime(), claimStart.getTime()))
+                const overlapEnd = new Date(Math.min(evEnd.getTime(), claimEnd.getTime()))
 
-            const overlapStart = new Date(Math.max(evStart.getTime(), claimStart.getTime()))
-            const overlapEnd = new Date(Math.min(evEnd.getTime(), claimEnd.getTime()))
-
-            if (overlapStart <= overlapEnd) {
-                const current = new Date(overlapStart)
-                while (current <= overlapEnd) {
-                    coveredDays.add(current.toISOString().split('T')[0])
-                    current.setDate(current.getDate() + 1)
+                if (overlapStart <= overlapEnd) {
+                    const current = new Date(overlapStart)
+                    while (current <= overlapEnd) {
+                        // Use local date string to avoid timezone issues
+                        const year = current.getFullYear()
+                        const month = String(current.getMonth() + 1).padStart(2, '0')
+                        const day = String(current.getDate()).padStart(2, '0')
+                        coveredDays.add(`${year}-${month}-${day}`)
+                        current.setDate(current.getDate() + 1)
+                    }
+                }
+            } else if (ev.date_represented) {
+                // Evidence has single date
+                const evDate = parseLocalDate(ev.date_represented)
+                if (evDate >= claimStart && evDate <= claimEnd) {
+                    coveredDays.add(ev.date_represented.split('T')[0])
                 }
             }
         })
@@ -238,17 +244,17 @@ export default function DataPointPreviewModal({
     })
 
     return (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[70] animate-fade-in">
-            <div className="bubble-card max-w-4xl w-full max-h-[90vh] overflow-hidden animate-slide-up">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-0 md:p-4 z-[70] animate-fade-in">
+            <div className="bg-white md:bubble-card w-full h-full md:max-w-4xl md:w-full md:max-h-[90vh] md:h-auto overflow-hidden animate-slide-up md:rounded-2xl">
                 {/* Header */}
-                <div className="flex items-center justify-between p-5 border-b border-gray-100">
+                <div className="flex items-center justify-between p-4 md:p-5 border-b border-gray-100">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center">
-                            <BarChart3 className="w-5 h-5 text-primary-600" />
+                        <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-primary-100 flex items-center justify-center">
+                            <BarChart3 className="w-4 h-4 md:w-5 md:h-5 text-primary-600" />
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold text-gray-900">Impact Claim</h2>
-                            <p className="text-sm text-gray-500">{kpi.title}</p>
+                            <h2 className="text-base md:text-lg font-bold text-gray-900">Impact Claim</h2>
+                            <p className="text-xs md:text-sm text-gray-500 line-clamp-1">{kpi.title}</p>
                         </div>
                     </div>
                     <button
@@ -260,26 +266,26 @@ export default function DataPointPreviewModal({
                 </div>
 
                 {/* Content */}
-                <div className="p-5 overflow-y-auto max-h-[calc(90vh-180px)] space-y-4">
+                <div className="p-4 md:p-5 overflow-y-auto h-[calc(100vh-180px)] md:max-h-[calc(90vh-180px)] space-y-4">
 
                     {/* Main Claim Banner - Value, Support, Date, Location */}
                     <div className="bg-gradient-to-br from-primary-50/80 to-primary-50/40 rounded-2xl border border-primary-100/60 overflow-hidden">
                         {/* Top Row - Claimed Value and Support Status */}
-                        <div className="p-6 pb-4">
-                            <div className="flex items-start justify-between">
+                        <div className="p-4 md:p-6 pb-4">
+                            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                                 <div>
                                     <p className="text-xs font-semibold text-primary-600 mb-1 uppercase tracking-wider">Claimed Value</p>
                                     <div className="flex items-baseline gap-2">
-                                        <span className="text-4xl font-bold text-gray-900">
+                                        <span className="text-3xl md:text-4xl font-bold text-gray-900">
                                             {dataPoint.value?.toLocaleString()}
                                         </span>
-                                        <span className="text-lg text-gray-500 font-medium">
+                                        <span className="text-base md:text-lg text-gray-500 font-medium">
                                             {kpi.unit_of_measurement || ''}
                                         </span>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <div className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold ${supportPercentage === 100
+                                <div className="md:text-right">
+                                    <div className={`inline-flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-xl text-sm font-bold ${supportPercentage === 100
                                         ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/25'
                                         : supportPercentage > 0
                                             ? 'bg-yellow-400 text-yellow-900 shadow-lg shadow-yellow-400/25'
@@ -297,7 +303,7 @@ export default function DataPointPreviewModal({
                         </div>
 
                         {/* Bottom Row - Date and Location */}
-                        <div className="px-6 pb-5 pt-2 flex flex-wrap items-center gap-6 border-t border-primary-100/40">
+                        <div className="px-4 md:px-6 pb-5 pt-2 flex flex-col md:flex-row md:flex-wrap md:items-center gap-3 md:gap-6 border-t border-primary-100/40">
                             {/* Date */}
                             <div className="flex items-center gap-2.5">
                                 <div className="w-8 h-8 rounded-lg bg-white/80 flex items-center justify-center border border-primary-200/40">
@@ -406,8 +412,8 @@ export default function DataPointPreviewModal({
                             </div>
                         </div>
 
-                        {/* Evidence Type Stats - 4 columns */}
-                        <div className="p-4 border-b border-gray-100">
+                        {/* Evidence Type Stats - 2 cols on mobile, 4 on desktop */}
+                        <div className="p-4 border-b border-gray-100 hidden md:block">
                             <div className="grid grid-cols-4 gap-3">
                                 {evidenceTypeStats.map(({ type, count, percentage, typeInfo, IconComponent, colors }) => (
                                     <div
@@ -503,9 +509,9 @@ export default function DataPointPreviewModal({
                     </div>
                 </div>
 
-                {/* Footer Actions */}
-                <div className="flex items-center justify-between p-4 border-t border-gray-100 bg-gray-50/50">
-                    <div>
+                {/* Footer Actions - Mobile optimized */}
+                <div className="flex flex-col-reverse md:flex-row items-stretch md:items-center justify-between p-4 border-t border-gray-100 bg-gray-50/50 gap-3 md:gap-0">
+                    <div className="hidden md:block">
                         {onDelete && (
                             <button
                                 onClick={() => {
@@ -519,25 +525,25 @@ export default function DataPointPreviewModal({
                             </button>
                         )}
                     </div>
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={onClose}
-                            className="btn-secondary py-2.5 px-5 text-sm"
-                        >
-                            Close
-                        </button>
+                    <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
                         {onEdit && (
                             <button
                                 onClick={() => {
                                     onEdit(dataPoint)
                                     onClose()
                                 }}
-                                className="btn-primary flex items-center gap-2 py-2.5 px-5 text-sm"
+                                className="btn-primary flex items-center justify-center gap-2 py-3 md:py-2.5 px-5 text-sm order-first md:order-last"
                             >
                                 <Edit className="w-4 h-4" />
                                 <span>Edit Claim</span>
                             </button>
                         )}
+                        <button
+                            onClick={onClose}
+                            className="btn-secondary py-3 md:py-2.5 px-5 text-sm text-center"
+                        >
+                            Close
+                        </button>
                     </div>
                 </div>
             </div>

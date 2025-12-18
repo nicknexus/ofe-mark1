@@ -35,6 +35,12 @@ interface ReportDashboardProps {
     dateStart?: string
     dateEnd?: string
     mapImage?: string | null
+    // Edit mode props
+    isEditing?: boolean
+    onOverviewChange?: (text: string) => void
+    onBeneficiaryTextChange?: (text: string) => void
+    onStoryTitleChange?: (text: string) => void
+    onStoryDescriptionChange?: (text: string) => void
 }
 
 export default function ReportDashboard({
@@ -47,7 +53,12 @@ export default function ReportDashboard({
     locations,
     dateStart,
     dateEnd,
-    mapImage
+    mapImage,
+    isEditing = false,
+    onOverviewChange,
+    onBeneficiaryTextChange,
+    onStoryTitleChange,
+    onStoryDescriptionChange
 }: ReportDashboardProps) {
     const formatDate = (dateStr?: string): string => {
         if (!dateStr) return ''
@@ -233,20 +244,38 @@ export default function ReportDashboard({
                                             )}
                                             <span>{selectedStory.date_represented}</span>
                                         </div>
-                                        <h3
-                                            className="font-bold mb-2"
-                                            style={{ fontSize: '16px', color: '#608341' }}
-                                        >
-                                            {selectedStory.title}
-                                        </h3>
-                                        {selectedStory.description && (
+                                        {isEditing ? (
+                                            <input
+                                                type="text"
+                                                value={selectedStory.title}
+                                                onChange={(e) => onStoryTitleChange?.(e.target.value)}
+                                                className="font-bold mb-2 w-full border border-primary-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                style={{ fontSize: '16px', color: '#608341' }}
+                                            />
+                                        ) : (
+                                            <h3
+                                                className="font-bold mb-2"
+                                                style={{ fontSize: '16px', color: '#608341' }}
+                                            >
+                                                {selectedStory.title}
+                                            </h3>
+                                        )}
+                                        {isEditing ? (
+                                            <textarea
+                                                value={selectedStory.description || ''}
+                                                onChange={(e) => onStoryDescriptionChange?.(e.target.value)}
+                                                className="w-full leading-relaxed resize-none border border-primary-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1"
+                                                style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4', minHeight: '100px' }}
+                                                placeholder="Story description..."
+                                            />
+                                        ) : selectedStory.description ? (
                                             <p
                                                 className="leading-relaxed"
                                                 style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4', marginBottom: 'auto' }}
                                             >
                                                 {selectedStory.description}
                                             </p>
-                                        )}
+                                        ) : null}
                                     </div>
                                 </div>
                             </div>
@@ -334,12 +363,21 @@ export default function ReportDashboard({
                                             Overview Summary
                                         </h2>
                                     </div>
-                                    <p
-                                        className="leading-relaxed"
-                                        style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4' }}
-                                    >
-                                        {overviewSummary}
-                                    </p>
+                                    {isEditing ? (
+                                        <textarea
+                                            value={overviewSummary}
+                                            onChange={(e) => onOverviewChange?.(e.target.value)}
+                                            className="w-full leading-relaxed resize-none border border-primary-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4', minHeight: '60px' }}
+                                        />
+                                    ) : (
+                                        <p
+                                            className="leading-relaxed"
+                                            style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4' }}
+                                        >
+                                            {overviewSummary}
+                                        </p>
+                                    )}
                                 </div>
 
                                 {/* Beneficiaries Section - Full width, same as overview summary */}
@@ -361,12 +399,21 @@ export default function ReportDashboard({
                                                 Beneficiary Breakdown
                                             </h2>
                                         </div>
-                                        <p
-                                            className="leading-relaxed"
-                                            style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4' }}
-                                        >
-                                            {beneficiaryText}
-                                        </p>
+                                        {isEditing ? (
+                                            <textarea
+                                                value={beneficiaryText}
+                                                onChange={(e) => onBeneficiaryTextChange?.(e.target.value)}
+                                                className="w-full leading-relaxed resize-none border border-primary-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4', minHeight: '60px' }}
+                                            />
+                                        ) : (
+                                            <p
+                                                className="leading-relaxed"
+                                                style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4' }}
+                                            >
+                                                {beneficiaryText}
+                                            </p>
+                                        )}
                                     </div>
                                 )}
 
@@ -604,12 +651,21 @@ export default function ReportDashboard({
                                             Overview Summary
                                         </h2>
                                     </div>
-                                    <p
-                                        className="leading-relaxed"
-                                        style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4' }}
-                                    >
-                                        {overviewSummary}
-                                    </p>
+                                    {isEditing ? (
+                                        <textarea
+                                            value={overviewSummary}
+                                            onChange={(e) => onOverviewChange?.(e.target.value)}
+                                            className="w-full leading-relaxed resize-none border border-primary-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4', minHeight: '60px' }}
+                                        />
+                                    ) : (
+                                        <p
+                                            className="leading-relaxed"
+                                            style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4' }}
+                                        >
+                                            {overviewSummary}
+                                        </p>
+                                    )}
                                 </div>
 
                                 {/* Beneficiaries Section */}
@@ -631,12 +687,21 @@ export default function ReportDashboard({
                                                 Beneficiary Breakdown
                                             </h2>
                                         </div>
-                                        <p
-                                            className="leading-relaxed"
-                                            style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4' }}
-                                        >
-                                            {beneficiaryText}
-                                        </p>
+                                        {isEditing ? (
+                                            <textarea
+                                                value={beneficiaryText}
+                                                onChange={(e) => onBeneficiaryTextChange?.(e.target.value)}
+                                                className="w-full leading-relaxed resize-none border border-primary-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4', minHeight: '60px' }}
+                                            />
+                                        ) : (
+                                            <p
+                                                className="leading-relaxed"
+                                                style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4' }}
+                                            >
+                                                {beneficiaryText}
+                                            </p>
+                                        )}
                                     </div>
                                 )}
 

@@ -1,35 +1,28 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { X, Calendar, Hash, MapPin, FileText, Users, Plus, ChevronLeft, ChevronRight, Check, Loader2 } from 'lucide-react'
-import { CreateKPIUpdateForm, BeneficiaryGroup, Location } from '../types'
+import { X, Calendar, Hash, MapPin, FileText, Users, Plus, ChevronLeft, ChevronRight, Check, Loader2, BarChart3 } from 'lucide-react'
+import { CreateKPIUpdateForm, BeneficiaryGroup, Location, KPI } from '../types'
 import { apiService } from '../services/api'
 import LocationModal from './LocationModal'
 import DateRangePicker from './DateRangePicker'
-import { getLocalDateString } from '../utils'
+import { getLocalDateString, getCategoryColor } from '../utils'
 import toast from 'react-hot-toast'
 
-interface AddKPIUpdateModalProps {
+interface AddKPIUpdateModalWithMetricSelectionProps {
     isOpen: boolean
     onClose: () => void
-    onSubmit: (data: CreateKPIUpdateForm) => Promise<void>
-    kpiTitle: string
-    kpiId: string
-    metricType: 'number' | 'percentage'
-    unitOfMeasurement: string
+    onSubmit: (data: CreateKPIUpdateForm, kpiId: string) => Promise<void>
+    availableKPIs: KPI[]
     initiativeId?: string
-    editData?: any // Optional prop for editing existing KPI update
 }
 
-export default function AddKPIUpdateModal({
+export default function AddKPIUpdateModalWithMetricSelection({
     isOpen,
     onClose,
     onSubmit,
-    kpiTitle,
-    kpiId,
-    metricType,
-    unitOfMeasurement,
-    initiativeId,
-    editData
-}: AddKPIUpdateModalProps) {
+    availableKPIs,
+    initiativeId
+}: AddKPIUpdateModalWithMetricSelectionProps) {
+    const [selectedKPI, setSelectedKPI] = useState<KPI | null>(null)
     const [formData, setFormData] = useState<CreateKPIUpdateForm>({
         value: 0,
         date_represented: getLocalDateString(new Date()),
@@ -50,13 +43,14 @@ export default function AddKPIUpdateModal({
     const [selectedLocationId, setSelectedLocationId] = useState<string>('')
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
-    const totalSteps = 3
+    const totalSteps = 4
     const formContentRef = useRef<HTMLFormElement>(null)
 
     // Reset step when modal opens/closes
     useEffect(() => {
         if (isOpen) {
             setCurrentStep(1)
+            setSelectedKPI(null)
         }
     }, [isOpen])
 
@@ -67,9 +61,9 @@ export default function AddKPIUpdateModal({
         }
     }, [currentStep])
 
-    // Load data when modal opens
+    // Load data when modal opens and KPI is selected
     useEffect(() => {
-        if (isOpen) {
+        if (isOpen && selectedKPI) {
             // Load beneficiary groups
             apiService
                 .getBeneficiaryGroups(initiativeId)
@@ -84,54 +78,25 @@ export default function AddKPIUpdateModal({
                     .catch(() => setLocations([]))
             }
 
-            // If editing, load existing data
-            if (editData) {
-                const initialDateValue = editData.date_range_start && editData.date_range_end
-                    ? { startDate: editData.date_range_start, endDate: editData.date_range_end }
-                    : editData.date_represented
-                        ? { singleDate: editData.date_represented }
-                        : {}
-                
-                setFormData({
-                    value: editData.value || 0,
-                    date_represented: editData.date_represented || getLocalDateString(new Date()),
-                    date_range_start: editData.date_range_start,
-                    date_range_end: editData.date_range_end,
-                    note: editData.note || '',
-                    label: editData.label || ''
-                })
-                setDatePickerValue(initialDateValue)
-                setSelectedLocationId(editData.location_id || '')
-
-                // Load beneficiary groups for this update
-                if (editData.id) {
-                    apiService
-                        .getBeneficiaryGroupsForUpdate(editData.id)
-                        .then((groups: any) => {
-                            const groupArray = Array.isArray(groups) ? groups : []
-                            setSelectedGroupIds(groupArray.map((g: any) => g.id))
-                        })
-                        .catch(() => setSelectedGroupIds([]))
-                }
-            } else {
-                // Reset form for new update
-                setFormData({
-                    value: 0,
-                    date_represented: getLocalDateString(new Date()),
-                    date_range_start: undefined,
-                    date_range_end: undefined,
-                    note: '',
-                    label: ''
-                })
-                setDatePickerValue({})
-                setSelectedGroupIds([])
-                setSelectedLocationId('')
-            }
+            // Reset form for new update
+            setFormData({
+                value: 0,
+                date_represented: getLocalDateString(new Date()),
+                date_range_start: undefined,
+                date_range_end: undefined,
+                note: '',
+                label: ''
+            })
+            setDatePickerValue({})
+            setSelectedGroupIds([])
+            setSelectedLocationId('')
         }
-    }, [isOpen, initiativeId, editData])
+    }, [isOpen, initiativeId, selectedKPI])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (!selectedKPI) return
+        
         setLoading(true)
 
         try {
@@ -178,21 +143,21 @@ export default function AddKPIUpdateModal({
                 ...submitData,
                 beneficiary_group_ids: selectedGroupIds,
                 location_id: selectedLocationId
+            }, selectedKPI.id!)
+            
+            // Reset form
+            setFormData({
+                value: 0,
+                date_represented: getLocalDateString(new Date()),
+                date_range_start: undefined,
+                date_range_end: undefined,
+                note: '',
+                label: ''
             })
-            // Only reset if creating new (not editing)
-            if (!editData) {
-                setFormData({
-                    value: 0,
-                    date_represented: getLocalDateString(new Date()),
-                    date_range_start: undefined,
-                    date_range_end: undefined,
-                    note: '',
-                    label: ''
-                })
-                setDatePickerValue({})
-                setSelectedGroupIds([])
-                setSelectedLocationId('')
-            }
+            setDatePickerValue({})
+            setSelectedGroupIds([])
+            setSelectedLocationId('')
+            setSelectedKPI(null)
             onClose()
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to save update'
@@ -227,10 +192,12 @@ export default function AddKPIUpdateModal({
     const canProceedToNextStep = () => {
         switch (currentStep) {
             case 1:
-                return formData.value > 0
+                return selectedKPI !== null
             case 2:
-                return !!(datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate)) && !!selectedLocationId
+                return formData.value > 0
             case 3:
+                return !!(datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate)) && !!selectedLocationId
+            case 4:
                 return !!formData.label?.trim() // Label is required
             default:
                 return false
@@ -250,12 +217,17 @@ export default function AddKPIUpdateModal({
     }
 
     const steps = [
-        { number: 1, title: 'Value' },
-        { number: 2, title: 'Date & Location' },
-        { number: 3, title: 'Details' }
+        { number: 1, title: 'Select Metric' },
+        { number: 2, title: 'Value' },
+        { number: 3, title: 'Date & Location' },
+        { number: 4, title: 'Details' }
     ]
 
     if (!isOpen) return null
+
+    const metricType = selectedKPI?.metric_type || 'number'
+    const unitOfMeasurement = selectedKPI?.unit_of_measurement || ''
+    const kpiTitle = selectedKPI?.title || ''
 
     return (
         <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-0 md:p-4 z-[60] animate-fade-in">
@@ -270,9 +242,9 @@ export default function AddKPIUpdateModal({
                         </div>
                         <div className="min-w-0">
                             <h2 className="text-base md:text-xl font-semibold text-gray-800">
-                                {editData ? 'Edit Impact Claim' : 'Add Impact Claim'}
+                                Add Impact Claim
                             </h2>
-                            <p className="text-xs md:text-sm text-gray-500 mt-0.5 truncate">{kpiTitle}</p>
+                            <p className="text-xs md:text-sm text-gray-500 mt-0.5 truncate">{selectedKPI ? kpiTitle : 'Select a metric to get started'}</p>
                         </div>
                     </div>
                     <button
@@ -337,8 +309,72 @@ export default function AddKPIUpdateModal({
                 {/* Form Content */}
                 <form ref={formContentRef} onSubmit={(e) => { e.preventDefault(); if (currentStep === totalSteps) handleSubmit(e); }} className="flex-1 overflow-y-auto">
                     <div className="p-8 min-h-[400px]">
-                        {/* Step 1: Value */}
+                        {/* Step 1: Select Metric */}
                         {currentStep === 1 && (
+                            <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
+                                <div className="text-center mb-8">
+                                    <h3 className="text-2xl font-semibold text-gray-900 mb-2">Select a Metric</h3>
+                                    <p className="text-gray-600">Choose which metric you want to add an impact claim for</p>
+                                </div>
+                                
+                                <div className="space-y-3">
+                                    {availableKPIs.length === 0 ? (
+                                        <div className="bg-gray-50 rounded-xl p-8 border-2 border-dashed border-gray-300 text-center">
+                                            <BarChart3 className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                                            <p className="text-sm text-gray-500">No metrics available. Create a metric first.</p>
+                                        </div>
+                                    ) : (
+                                        availableKPIs.map((kpi) => {
+                                            const isSelected = selectedKPI?.id === kpi.id
+                                            const categoryColor = getCategoryColor(kpi.category)
+                                            
+                                            return (
+                                                <button
+                                                    key={kpi.id}
+                                                    type="button"
+                                                    onClick={() => setSelectedKPI(kpi)}
+                                                    className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 ${
+                                                        isSelected
+                                                            ? 'border-primary-500 bg-primary-50 shadow-lg shadow-primary-500/20'
+                                                            : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-primary-500' : 'bg-gray-100'}`}>
+                                                                <BarChart3 className={`w-5 h-5 ${isSelected ? 'text-white' : 'text-gray-600'}`} />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="font-semibold text-gray-900 truncate">{kpi.title}</div>
+                                                                {kpi.description && (
+                                                                    <div className="text-sm text-gray-500 truncate mt-0.5">{kpi.description}</div>
+                                                                )}
+                                                                <div className="flex items-center gap-2 mt-1">
+                                                                    <span className={`text-xs px-2 py-0.5 rounded-full ${categoryColor}`}>
+                                                                        {kpi.category}
+                                                                    </span>
+                                                                    <span className="text-xs text-gray-500">
+                                                                        {kpi.metric_type === 'percentage' ? '%' : kpi.unit_of_measurement}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        {isSelected && (
+                                                            <div className="ml-3 flex-shrink-0">
+                                                                <Check className="w-5 h-5 text-primary-500" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            )
+                                        })
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Step 2: Value */}
+                        {currentStep === 2 && selectedKPI && (
                             <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
                                 <div className="text-center mb-8">
                                     <h3 className="text-2xl font-semibold text-gray-900 mb-2">{kpiTitle}</h3>
@@ -403,8 +439,8 @@ export default function AddKPIUpdateModal({
                             </div>
                         )}
 
-                        {/* Step 2: Date & Location */}
-                        {currentStep === 2 && (
+                        {/* Step 3: Date & Location */}
+                        {currentStep === 3 && selectedKPI && (
                             <div className="space-y-8 animate-fade-in max-w-2xl mx-auto">
                                 <div className="text-center mb-6">
                                     <h3 className="text-2xl font-semibold text-gray-900 mb-2">When & Where</h3>
@@ -516,8 +552,8 @@ export default function AddKPIUpdateModal({
                             </div>
                         )}
 
-                        {/* Step 3: Title & Description */}
-                        {currentStep === 3 && (
+                        {/* Step 4: Title & Description */}
+                        {currentStep === 4 && selectedKPI && (
                             <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
                                 <div className="text-center mb-6">
                                     <h3 className="text-2xl font-semibold text-gray-900 mb-2">Add Details</h3>
@@ -615,11 +651,11 @@ export default function AddKPIUpdateModal({
                                     {loading ? (
                                         <>
                                             <Loader2 className="w-5 h-5 animate-spin" />
-                                            <span>{editData ? 'Updating...' : 'Adding...'}</span>
+                                            <span>Adding...</span>
                                         </>
                                     ) : (
                                         <>
-                                            <span>{editData ? 'Update Impact Claim' : 'Add Impact Claim'}</span>
+                                            <span>Add Impact Claim</span>
                                             <Check className="w-5 h-5" />
                                         </>
                                     )}
@@ -653,4 +689,7 @@ export default function AddKPIUpdateModal({
             </div>
         </div>
     )
-} 
+}
+
+
+

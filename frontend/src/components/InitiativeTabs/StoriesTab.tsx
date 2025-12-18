@@ -185,7 +185,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
 
     return (
         <div className="h-screen overflow-hidden">
-            <div className="h-full w-full px-4 sm:px-6 py-6 overflow-y-auto">
+            <div className="h-full w-full px-4 sm:px-6 py-6 overflow-y-auto mobile-content-padding">
                 <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 overflow-hidden">
                     {/* Header with Search and Add Button */}
                     <div className="p-6 border-b border-gray-100">

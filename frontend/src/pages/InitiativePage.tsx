@@ -25,6 +25,7 @@ import { formatDate, getEvidenceColor, getCategoryColor, getEvidenceTypeInfo, ge
 import { AuthService } from '../services/auth'
 import CreateKPIModal from '../components/CreateKPIModal'
 import AddKPIUpdateModal from '../components/AddKPIUpdateModal'
+import AddKPIUpdateModalWithMetricSelection from '../components/AddKPIUpdateModalWithMetricSelection'
 import AddEvidenceModal from '../components/AddEvidenceModal'
 import InitiativeCharts from '../components/InitiativeCharts'
 import BeneficiaryManager from '../components/BeneficiaryManager'
@@ -38,6 +39,7 @@ import LocationTab from '../components/InitiativeTabs/LocationTab'
 import BeneficiariesTab from '../components/InitiativeTabs/BeneficiariesTab'
 import StoriesTab from '../components/InitiativeTabs/StoriesTab'
 import ReportTab from '../components/InitiativeTabs/ReportTab'
+import MobileBottomNav from '../components/MobileBottomNav'
 import toast from 'react-hot-toast'
 import { useTutorial } from '../context/TutorialContext'
 
@@ -64,6 +66,7 @@ export default function InitiativePage() {
     // Modal states
     const [isKPIModalOpen, setIsKPIModalOpen] = useState(false)
     const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
+    const [isImpactClaimModalWithSelectionOpen, setIsImpactClaimModalWithSelectionOpen] = useState(false)
     const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false)
     const [isEditKPIModalOpen, setIsEditKPIModalOpen] = useState(false)
     const [deleteConfirmKPI, setDeleteConfirmKPI] = useState<any>(null)
@@ -302,6 +305,25 @@ export default function InitiativePage() {
         }
     }
 
+    const handleAddKPIUpdateWithMetricSelection = async (updateData: CreateKPIUpdateForm, kpiId: string) => {
+        try {
+            const newUpdate = await apiService.createKPIUpdate(kpiId, updateData)
+            toast.success('Impact claim added successfully!')
+
+            // Explicitly clear the dashboard cache to ensure fresh data
+            apiService.clearCache(`/initiatives/${id}/dashboard`)
+
+            // Only reload if not currently loading
+            if (!isLoadingDashboard) {
+                loadDashboard() // Refresh the dashboard
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to add impact claim'
+            toast.error(message)
+            throw error
+        }
+    }
+
     const handleAddEvidence = async (evidenceData: CreateEvidenceForm) => {
         try {
             await apiService.createEvidence(evidenceData)
@@ -438,6 +460,11 @@ export default function InitiativePage() {
                             user={user}
                             organization={organization}
                             onOrderChange={setOrderedKPIIds}
+                            onAddImpactClaim={() => setIsImpactClaimModalWithSelectionOpen(true)}
+                            onAddEvidence={() => {
+                                setSelectedKPI(null)
+                                setIsEvidenceModalOpen(true)
+                            }}
                         />
                     </div>
                 )}
@@ -541,7 +568,7 @@ export default function InitiativePage() {
 
     return (
         <div className="relative">
-            {/* Fixed Sidebar */}
+            {/* Fixed Sidebar - hidden on mobile via CSS */}
             <InitiativeSidebar
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
@@ -552,10 +579,31 @@ export default function InitiativePage() {
                 onSignOut={handleSignOut}
             />
 
-            {/* Main Content with left margin for sidebar */}
-            <div className="ml-56">
+            {/* Mobile Header - visible only on mobile */}
+            <div className="mobile-only fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between shadow-sm">
+                <div className="flex items-center space-x-3 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                        <img src="/Nexuslogo.png" alt="Logo" className="w-5 h-5 object-contain" />
+                    </div>
+                    <div className="min-w-0">
+                        <h1 className="text-sm font-semibold text-gray-800 truncate">
+                            {dashboard.initiative.title}
+                        </h1>
+                        <p className="text-xs text-gray-400">Initiative</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Main Content with left margin for sidebar on desktop */}
+            <div className="ml-56 desktop-main-offset pt-14 md:pt-0">
                 {renderActiveTab()}
             </div>
+
+            {/* Mobile Bottom Navigation - hidden on desktop */}
+            <MobileBottomNav
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
+            />
 
             {/* Modals */}
             <CreateKPIModal
@@ -577,6 +625,16 @@ export default function InitiativePage() {
                     kpiId={selectedKPI.id}
                     metricType={selectedKPI.metric_type}
                     unitOfMeasurement={selectedKPI.unit_of_measurement}
+                    initiativeId={id!}
+                />
+            )}
+
+            {dashboard && (
+                <AddKPIUpdateModalWithMetricSelection
+                    isOpen={isImpactClaimModalWithSelectionOpen}
+                    onClose={() => setIsImpactClaimModalWithSelectionOpen(false)}
+                    onSubmit={handleAddKPIUpdateWithMetricSelection}
+                    availableKPIs={dashboard.kpis}
                     initiativeId={id!}
                 />
             )}

@@ -54,7 +54,7 @@ export default function AddEvidenceModal({
     const [kpiDataSummaries, setKpiDataSummaries] = useState<any[]>([])
     const [selectedUpdateIds, setSelectedUpdateIds] = useState<string[]>([])
     const [locations, setLocations] = useState<Location[]>([])
-    const [selectedLocationId, setSelectedLocationId] = useState<string>('')
+    const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([])
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
     const [hasChangedDataPoints, setHasChangedDataPoints] = useState(false)
     const [hasChangedKPIs, setHasChangedKPIs] = useState(false)
@@ -128,7 +128,12 @@ export default function AddEvidenceModal({
                             ? { singleDate: fullEvidence.date_represented || editData.date_represented }
                             : {}
                     setDatePickerValue(initialDateValue)
-                    setSelectedLocationId(fullEvidence.location_id || editData.location_id || '')
+                    // Support both new location_ids array and legacy location_id
+                    const locationIds = fullEvidence.location_ids || 
+                        (fullEvidence.location_id ? [fullEvidence.location_id] : []) ||
+                        editData.location_ids ||
+                        (editData.location_id ? [editData.location_id] : [])
+                    setSelectedLocationIds(locationIds)
 
                     // Store initial KPI IDs to track changes
                     setInitialKpiIds(kpiIds)
@@ -159,7 +164,7 @@ export default function AddEvidenceModal({
                             ? { singleDate: editData.date_represented }
                             : {}
                     setDatePickerValue(initialDateValue)
-                    setSelectedLocationId(editData.location_id || '')
+                    setSelectedLocationIds(editData.location_ids || (editData.location_id ? [editData.location_id] : []))
                     setInitialKpiIds(kpiIds)
                     setHasChangedKPIs(false)
                     setSelectedUpdateIds([])
@@ -206,7 +211,7 @@ export default function AddEvidenceModal({
         }, 300) // 300ms debounce
 
         return () => clearTimeout(timeoutId)
-    }, [datePickerValue, formData.kpi_ids, selectedLocationId])
+    }, [datePickerValue, formData.kpi_ids, selectedLocationIds])
 
     const fetchMatchingImpactClaims = async () => {
         if (isFetchingMatches) return // Prevent concurrent calls
@@ -219,8 +224,8 @@ export default function AddEvidenceModal({
             for (const kpiId of formData.kpi_ids || []) {
                 const updates = await apiService.getKPIUpdates(kpiId)
                 const matchingUpdates = updates.filter(update => {
-                    // Filter by location if one is selected
-                    if (selectedLocationId && update.location_id !== selectedLocationId) {
+                    // Filter by location if any are selected - show if claim matches ANY selected location
+                    if (selectedLocationIds.length > 0 && !selectedLocationIds.includes(update.location_id || '')) {
                         return false
                     }
 
@@ -361,9 +366,9 @@ export default function AddEvidenceModal({
                 throw new Error('Please select a date')
             }
 
-            // Validate location is selected
-            if (!selectedLocationId) {
-                throw new Error('Please select a location')
+            // Validate at least one location is selected
+            if (selectedLocationIds.length === 0) {
+                throw new Error('Please select at least one location')
             }
 
             // Include selected impact claims for precise linking
@@ -377,7 +382,7 @@ export default function AddEvidenceModal({
                 submitData.kpi_ids = formData.kpi_ids
             }
 
-            submitData.location_id = selectedLocationId
+            submitData.location_ids = selectedLocationIds
 
             setUploadProgress(editData ? 'Updating evidence record...' : 'Creating evidence record...')
             await onSubmit(submitData)
@@ -493,7 +498,7 @@ export default function AddEvidenceModal({
             case 1:
                 return !!formData.type
             case 2:
-                return !!(datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate)) && !!selectedLocationId
+                return !!(datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate)) && selectedLocationIds.length > 0
             case 3:
                 return !!(formData.kpi_ids && formData.kpi_ids.length > 0)
             case 4:
@@ -528,34 +533,48 @@ export default function AddEvidenceModal({
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[60] animate-fade-in">
-            <div className="bg-white/70 backdrop-blur-2xl rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] border border-white/60 transform transition-all duration-200 ease-out animate-slide-up-fast flex flex-col">
+        <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-0 md:p-4 z-[60] animate-fade-in">
+            <div className="bg-white md:bg-white/70 md:backdrop-blur-2xl md:rounded-3xl w-full h-full md:max-w-4xl md:w-full md:max-h-[90vh] md:h-auto overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] md:border md:border-white/60 transform transition-all duration-200 ease-out animate-slide-up-fast flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-evidence-200/40 bg-gradient-to-r from-evidence-100/50 to-evidence-50/30 backdrop-blur-xl">
-                    <div className="flex items-center space-x-3 flex-1">
-                        <div className="w-11 h-11 rounded-xl bg-evidence-500/15 backdrop-blur-sm flex items-center justify-center border border-evidence-300/30">
-                            <FileText className="w-6 h-6 text-evidence-500" />
+                <div className="flex items-center justify-between p-4 md:p-6 border-b border-evidence-200/40 bg-gradient-to-r from-evidence-100/50 to-evidence-50/30 backdrop-blur-xl">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                        <div className="w-9 h-9 md:w-11 md:h-11 rounded-xl bg-evidence-500/15 backdrop-blur-sm flex items-center justify-center border border-evidence-300/30 flex-shrink-0">
+                            <FileText className="w-5 h-5 md:w-6 md:h-6 text-evidence-500" />
                         </div>
-                        <div>
-                            <h2 className="text-xl font-semibold text-gray-800">
+                        <div className="min-w-0">
+                            <h2 className="text-base md:text-xl font-semibold text-gray-800">
                                 {editData ? 'Edit Evidence' : 'Upload Evidence'}
                             </h2>
-                            <p className="text-sm text-gray-500 mt-0.5">
-                                {editData ? 'Update your evidence information' : 'Add supporting evidence for your impact claims'}
+                            <p className="text-xs md:text-sm text-gray-500 mt-0.5 line-clamp-1">
+                                {editData ? 'Update your evidence' : 'Add supporting evidence'}
                             </p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 p-2 rounded-xl hover:bg-white/60 transition-all duration-200 ml-4"
+                        className="text-gray-400 hover:text-gray-600 p-2 rounded-xl hover:bg-white/60 transition-all duration-200 ml-2 md:ml-4 flex-shrink-0"
                     >
                         <X className="w-5 h-5" />
                     </button>
                 </div>
 
-                {/* Progress Steps Indicator */}
-                <div className="px-6 py-4 border-b border-evidence-100/40 bg-white/30 backdrop-blur-xl">
-                    <div className="flex items-center justify-center">
+                {/* Progress Steps Indicator - Simplified on mobile */}
+                <div className="px-4 md:px-6 py-3 md:py-4 border-b border-evidence-100/40 bg-white/30 backdrop-blur-xl">
+                    {/* Mobile: Simple progress bar */}
+                    <div className="md:hidden">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-medium text-gray-600">Step {currentStep} of {totalSteps}</span>
+                            <span className="text-xs font-medium text-evidence-600">{steps[currentStep - 1]?.title}</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                                className="bg-evidence-500 h-2 rounded-full transition-all duration-300" 
+                                style={{ width: `${(currentStep / totalSteps) * 100}%` }}
+                            />
+                        </div>
+                    </div>
+                    {/* Desktop: Full step indicator */}
+                    <div className="hidden md:flex items-center justify-center">
                         {steps.map((step, index) => (
                             <React.Fragment key={step.number}>
                                 <div className="flex flex-col items-center">
@@ -669,31 +688,71 @@ export default function AddEvidenceModal({
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-900 mb-3">
                                             <MapPin className="w-5 h-5 inline mr-2 text-primary-500" />
-                                            Location <span className="text-red-500">*</span>
+                                            Locations <span className="text-red-500">*</span>
+                                            <span className="ml-2 text-xs font-normal text-gray-500">
+                                                ({selectedLocationIds.length} selected)
+                                            </span>
                                         </label>
-                                        <div className="flex gap-3">
-                                            <select
-                                                value={selectedLocationId}
-                                                onChange={(e) => setSelectedLocationId(e.target.value)}
-                                                className="input-field flex-1 text-base py-3"
-                                                required
-                                            >
-                                                <option value="">Select a location...</option>
-                                                {locations.map((location) => (
-                                                    <option key={location.id} value={location.id}>
-                                                        {location.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsLocationModalOpen(true)}
-                                                className="px-4 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700 flex items-center gap-2 transition-colors"
-                                                title="Add new location"
-                                            >
-                                                <Plus className="w-5 h-5" />
-                                                <span>New</span>
-                                            </button>
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-xs text-gray-500">Select all locations where this evidence applies</p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsLocationModalOpen(true)}
+                                                    className="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-xs font-medium text-gray-700 flex items-center gap-1 transition-colors"
+                                                    title="Add new location"
+                                                >
+                                                    <Plus className="w-4 h-4" />
+                                                    <span>New Location</span>
+                                                </button>
+                                            </div>
+                                            {locations.length === 0 ? (
+                                                <div className="text-center py-6 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
+                                                    <p className="text-gray-500 text-sm">No locations available.</p>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsLocationModalOpen(true)}
+                                                        className="mt-2 text-sm text-primary-500 hover:text-primary-600 font-medium"
+                                                    >
+                                                        Create your first location
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-xl p-3 bg-gray-50">
+                                                    {locations.map((location) => {
+                                                        const isChecked = selectedLocationIds.includes(location.id!)
+                                                        return (
+                                                            <label
+                                                                key={location.id}
+                                                                className={`flex items-center p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                                                                    isChecked
+                                                                        ? 'bg-primary-50 border-primary-300'
+                                                                        : 'bg-white border-gray-200 hover:border-primary-300'
+                                                                }`}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isChecked}
+                                                                    onChange={() => {
+                                                                        setSelectedLocationIds(prev =>
+                                                                            isChecked
+                                                                                ? prev.filter(id => id !== location.id)
+                                                                                : [...prev, location.id!]
+                                                                        )
+                                                                    }}
+                                                                    className="mr-3 w-4 h-4 text-primary-500 rounded border-gray-300 focus:ring-primary-500"
+                                                                />
+                                                                <div className="flex-1">
+                                                                    <span className="font-medium text-gray-900">{location.name}</span>
+                                                                    {location.description && (
+                                                                        <p className="text-xs text-gray-500 mt-0.5">{location.description}</p>
+                                                                    )}
+                                                                </div>
+                                                            </label>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -801,7 +860,11 @@ export default function AddEvidenceModal({
                                     <h3 className="text-2xl font-semibold text-gray-900 mb-2">Impact Claims</h3>
                                     <p className="text-gray-600">
                                         Review and confirm the impact claims this evidence supports
-                                        {selectedLocationId && ` at ${locations.find(loc => loc.id === selectedLocationId)?.name || 'selected location'}`}
+                                        {selectedLocationIds.length > 0 && (
+                                            selectedLocationIds.length === 1
+                                                ? ` at ${locations.find(loc => loc.id === selectedLocationIds[0])?.name || 'selected location'}`
+                                                : ` at ${selectedLocationIds.length} locations`
+                                        )}
                                     </p>
                     </div>
 
@@ -1233,7 +1296,8 @@ export default function AddEvidenceModal({
                         try {
                             const newLocation = await apiService.createLocation(locationData)
                             setLocations([...locations, newLocation])
-                            setSelectedLocationId(newLocation.id!)
+                            // Auto-select the newly created location
+                            setSelectedLocationIds(prev => [...prev, newLocation.id!])
                             setIsLocationModalOpen(false)
                             toast.success('Location created successfully!')
                         } catch (error) {

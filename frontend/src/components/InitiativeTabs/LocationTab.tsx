@@ -27,13 +27,14 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 
 // Sortable Location Card Component
-function SortableLocationCard({ 
-    location, 
-    selectedLocationId, 
-    onListItemClick, 
-    onEditClick, 
+function SortableLocationCard({
+    location,
+    selectedLocationId,
+    onListItemClick,
+    onEditClick,
     onDeleteClick,
-    locationCardRefs 
+    locationCardRefs,
+    country
 }: {
     location: Location
     selectedLocationId: string | null
@@ -41,6 +42,7 @@ function SortableLocationCard({
     onEditClick: (location: Location, e: React.MouseEvent) => void
     onDeleteClick: (e: React.MouseEvent) => void
     locationCardRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>
+    country?: string | null
 }) {
     const {
         attributes,
@@ -67,11 +69,10 @@ function SortableLocationCard({
             }}
             style={style}
             onClick={() => onListItemClick(location)}
-            className={`p-3 rounded-xl border cursor-pointer transition-all duration-200 relative group ${
-                selectedLocationId === location.id
-                    ? 'border-primary-300 bg-primary-50 shadow-bubble-sm'
-                    : 'border-gray-100 hover:border-gray-200 bg-white shadow-bubble-sm hover:shadow-bubble'
-            }`}
+            className={`p-3 rounded-xl border cursor-pointer transition-all duration-200 relative group ${selectedLocationId === location.id
+                ? 'border-primary-300 bg-primary-50 shadow-bubble-sm'
+                : 'border-gray-100 hover:border-gray-200 bg-white shadow-bubble-sm hover:shadow-bubble'
+                }`}
         >
             {/* Drag Handle - Top Right Corner */}
             <div
@@ -84,7 +85,12 @@ function SortableLocationCard({
                 <GripVertical className="w-3 h-3 text-gray-400" />
             </div>
             <div className="flex items-start justify-between mb-1.5">
-                <h3 className="font-medium text-gray-800 text-sm pr-8">{location.name}</h3>
+                <div className="flex-1 pr-8">
+                    <h3 className="font-medium text-gray-800 text-sm">{location.name}</h3>
+                    {country && (
+                        <p className="text-xs text-gray-500 mt-0.5">{country}</p>
+                    )}
+                </div>
                 <div className="flex items-center space-x-1">
                     <button
                         onClick={(e) => {
@@ -136,6 +142,7 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
     const [mapClickCoordinates, setMapClickCoordinates] = useState<[number, number] | null>(null)
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
     const locationCardRefs = useRef<Record<string, HTMLDivElement | null>>({})
+    const [locationCountries, setLocationCountries] = useState<Record<string, string>>({})
 
     // Initialize ordered locations from state, sorted by display_order
     useEffect(() => {
@@ -206,12 +213,46 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
         }
     }, [selectedLocation])
 
+    const fetchCountryForLocation = async (location: Location): Promise<string | null> => {
+        try {
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.latitude}&lon=${location.longitude}&addressdetails=1`,
+                {
+                    headers: {
+                        'User-Agent': 'OFE App',
+                    },
+                }
+            )
+            const data = await response.json()
+            return data.address?.country || null
+        } catch (error) {
+            console.error('Reverse geocoding error:', error)
+            return null
+        }
+    }
+
     const loadLocations = async () => {
         if (!initiativeId) return
         try {
             setLoading(true)
             const data = await apiService.getLocations(initiativeId)
             setLocations(data)
+
+            // Fetch countries for all locations
+            const countryPromises = data.map(async (location) => {
+                if (!location.id) return null
+                const country = await fetchCountryForLocation(location)
+                return { locationId: location.id, country }
+            })
+
+            const countryResults = await Promise.all(countryPromises)
+            const countriesMap: Record<string, string> = {}
+            countryResults.forEach((result) => {
+                if (result && result.country) {
+                    countriesMap[result.locationId] = result.country
+                }
+            })
+            setLocationCountries(countriesMap)
         } catch (error) {
             toast.error('Failed to load locations')
             console.error(error)
@@ -316,35 +357,36 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
     }
 
     return (
-        <div className="h-screen overflow-hidden">
+        <div className="h-screen overflow-hidden mobile-content-padding">
             <div className="h-full flex flex-col">
                 {/* Header */}
                 <div className="bg-white border-b border-gray-100 shadow-bubble-sm p-4 flex-shrink-0">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
-                            <div className="icon-bubble">
+                            <div className="icon-bubble hidden sm:flex">
                                 <MapPin className="w-5 h-5 text-primary-500" />
                             </div>
                             <div>
-                                <h1 className="text-xl font-semibold text-gray-800">Locations</h1>
-                                <p className="text-sm text-gray-500">Manage geographic locations for your initiative</p>
+                                <h1 className="text-lg sm:text-xl font-semibold text-gray-800">Locations</h1>
+                                <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">Manage geographic locations for your initiative</p>
                             </div>
                         </div>
                         <button
                             onClick={handleAddClick}
                             data-tutorial="add-location"
-                            className="inline-flex items-center space-x-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl text-sm font-medium transition-all duration-200 shadow-bubble-sm"
+                            className="inline-flex items-center space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl sm:rounded-2xl text-sm font-medium transition-all duration-200 shadow-bubble-sm"
                         >
                             <Plus className="w-4 h-4" />
-                            <span>Add Location</span>
+                            <span className="hidden sm:inline">Add Location</span>
+                            <span className="sm:hidden">Add</span>
                         </button>
                     </div>
                 </div>
 
                 {/* Main Content */}
                 <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 p-4 overflow-hidden min-h-0">
-                    {/* Map - 2/3 width */}
-                    <div className="lg:col-span-2 bg-white rounded-2xl shadow-bubble border border-gray-100 p-3 overflow-hidden flex flex-col min-h-0 h-full">
+                    {/* Map - 2/3 width - hidden on mobile */}
+                    <div className="lg:col-span-2 bg-white rounded-2xl shadow-bubble border border-gray-100 p-3 overflow-hidden flex-col min-h-0 h-full hidden md:flex">
                         <LocationMap
                             locations={orderedLocations}
                             onLocationClick={handleLocationClick}
@@ -362,13 +404,14 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
                         />
                     </div>
 
-                    {/* Location List - 1/3 width */}
-                    <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-4 overflow-hidden flex flex-col min-h-0 h-full">
+                    {/* Location List - 1/3 width on desktop, full width on mobile */}
+                    <div className="col-span-1 lg:col-span-1 bg-white rounded-2xl shadow-bubble border border-gray-100 p-4 overflow-hidden flex flex-col min-h-0 h-full">
                         <div className="mb-3 flex-shrink-0">
                             <h2 className="text-base font-semibold text-gray-800 mb-0.5">
                                 All Locations ({orderedLocations.length})
                             </h2>
-                            <p className="text-xs text-gray-400">Click a location to view details • Edit button opens editor</p>
+                            <p className="text-xs text-gray-400 hidden sm:block">Click a location to view details • Edit button opens editor</p>
+                            <p className="text-xs text-gray-400 sm:hidden">Tap a location for details</p>
                         </div>
 
                         <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
@@ -407,6 +450,7 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
                                                     setDeleteConfirmId(location.id!)
                                                 }}
                                                 locationCardRefs={locationCardRefs}
+                                                country={location.id ? locationCountries[location.id] : null}
                                             />
                                         ))}
                                     </SortableContext>

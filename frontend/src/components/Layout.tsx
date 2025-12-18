@@ -5,13 +5,11 @@ import {
     Settings,
     Menu,
     X,
-    ChevronDown,
-    HardDrive
+    ChevronDown
 } from 'lucide-react'
 import { AuthService } from '../services/auth'
 import { apiService } from '../services/api'
 import { User, Organization } from '../types'
-import { useStorage } from '../context/StorageContext'
 import toast from 'react-hot-toast'
 
 interface LayoutProps {
@@ -25,7 +23,6 @@ export default function Layout({ user, children }: LayoutProps) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const [userMenuOpen, setUserMenuOpen] = useState(false)
     const [organization, setOrganization] = useState<Organization | null>(null)
-    const { storageUsage } = useStorage()
     const userMenuRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
@@ -112,31 +109,8 @@ export default function Layout({ user, children }: LayoutProps) {
                             <span className="text-sm text-gray-500">Dashboard</span>
                         </div>
 
-                        {/* Right side: Storage, Tutorial, Settings, User Profile */}
+                        {/* Right side: Tutorial, Settings, User Profile */}
                         <div className="flex items-center gap-3">
-                            {/* Storage Bar */}
-                            {storageUsage && (
-                                <Link
-                                    to="/account"
-                                    className="hidden sm:flex items-center gap-2 px-3 h-10 bg-white/80 hover:bg-white border border-gray-200 hover:border-gray-300 rounded-full transition-all duration-200 shadow-bubble-sm"
-                                    title={`${storageUsage.used_gb >= 1 ? storageUsage.used_gb.toFixed(2) + ' GB' : ((storageUsage.storage_used_bytes || 0) / (1024 * 1024)).toFixed(1) + ' MB'} / ${storageUsage.placeholder_max_gb} GB`}
-                                >
-                                    <HardDrive className="w-4 h-4 text-gray-500" />
-                                    <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                        <div 
-                                            className="h-full bg-blue-500 rounded-full"
-                                            style={{ width: `${Math.max(Math.min(storageUsage.used_percentage, 100), storageUsage.storage_used_bytes > 0 ? 2 : 0)}%` }}
-                                        />
-                                    </div>
-                                    <span className="text-xs text-gray-500">
-                                        {storageUsage.used_gb >= 1 
-                                            ? `${storageUsage.used_gb.toFixed(1)}GB`
-                                            : `${((storageUsage.storage_used_bytes || 0) / (1024 * 1024)).toFixed(0)}MB`
-                                        }
-                                    </span>
-                                </Link>
-                            )}
-
                             {/* Tutorial Button - Circle Icon */}
                             <button
                                 onClick={handleTutorialClick}

@@ -6,7 +6,7 @@ import { StorageService } from './storageService'
 export class EvidenceService {
     static async create(evidence: Evidence, userId: string): Promise<Evidence> {
         // Extract linkage fields and file_urls/file_sizes before inserting into evidence table
-        const { kpi_ids, kpi_update_ids, file_urls, file_sizes, ...evidenceData } = evidence;
+        const { kpi_ids, kpi_update_ids, file_urls, file_sizes, location_ids, ...evidenceData } = evidence;
 
         const { data, error } = await supabase
             .from('evidence')
@@ -15,6 +15,24 @@ export class EvidenceService {
             .single();
 
         if (error) throw new Error(`Failed to create evidence: ${error.message}`);
+
+        // Insert multiple locations into evidence_locations junction table if provided
+        if (location_ids && location_ids.length > 0) {
+            const locationLinks = location_ids.map(locationId => ({
+                evidence_id: data.id,
+                location_id: locationId,
+                user_id: userId
+            }));
+
+            const { error: locationError } = await supabase
+                .from('evidence_locations')
+                .insert(locationLinks);
+
+            if (locationError) {
+                console.error('Failed to insert evidence locations:', locationError);
+                // Don't throw - evidence is created, location links are optional
+            }
+        }
 
         // Insert multiple files into evidence_files table if provided
         if (file_urls && file_urls.length > 0) {
@@ -90,6 +108,7 @@ export class EvidenceService {
                     *,
                     evidence_kpis!inner(kpi_id),
                     evidence_kpi_updates(kpi_update_id),
+                    evidence_locations(location_id),
                     initiatives(title)
                 `)
                 .eq('evidence_kpis.kpi_id', kpiId);
@@ -101,6 +120,7 @@ export class EvidenceService {
                     *,
                     evidence_kpis(kpi_id),
                     evidence_kpi_updates(kpi_update_id),
+                    evidence_locations(location_id),
                     initiatives(title)
                 `);
         }
@@ -113,12 +133,14 @@ export class EvidenceService {
 
         if (error) throw new Error(`Failed to fetch evidence: ${error.message}`);
         
-        // Transform the data to include kpi_update_ids as a flat array
+        // Transform the data to include kpi_update_ids and location_ids as flat arrays
         const transformedData = (data || []).map((item: any) => {
             const kpi_update_ids = item.evidence_kpi_updates?.map((link: any) => link.kpi_update_id).filter(Boolean) || [];
+            const location_ids = item.evidence_locations?.map((link: any) => link.location_id).filter(Boolean) || [];
             return {
                 ...item,
-                kpi_update_ids
+                kpi_update_ids,
+                location_ids
             };
         });
         
@@ -126,13 +148,14 @@ export class EvidenceService {
     }
 
     static async getById(id: string): Promise<Evidence | null> {
-        // Include linked data points for new model
+        // Include linked data points and locations for new model
         const { data, error } = await supabase
             .from('evidence')
             .select(`
                 *,
                 evidence_kpis(kpi_id),
                 evidence_kpi_updates(kpi_update_id),
+                evidence_locations(location_id),
                 initiatives(title)
             `)
             .eq('id', id)
@@ -142,12 +165,20 @@ export class EvidenceService {
             if (error.code === 'PGRST116') return null;
             throw new Error(`Failed to fetch evidence: ${error.message}`);
         }
+        
+        // Transform to include kpi_ids, kpi_update_ids, and location_ids as flat arrays
+        if (data) {
+            const kpi_ids = data.evidence_kpis?.map((link: any) => link.kpi_id).filter(Boolean) || [];
+            const kpi_update_ids = data.evidence_kpi_updates?.map((link: any) => link.kpi_update_id).filter(Boolean) || [];
+            const location_ids = data.evidence_locations?.map((link: any) => link.location_id).filter(Boolean) || [];
+            return { ...data, kpi_ids, kpi_update_ids, location_ids };
+        }
         return data;
     }
 
     static async update(id: string, evidence: Partial<Evidence>, userId: string): Promise<Evidence> {
         // Extract linkage fields for separate handling
-        const { kpi_ids, kpi_update_ids, ...evidenceData } = evidence;
+        const { kpi_ids, kpi_update_ids, location_ids, ...evidenceData } = evidence;
 
         // Get existing evidence to check if file_url is changing
         const { data: existingEvidence } = await supabase
@@ -219,6 +250,29 @@ export class EvidenceService {
             }
         }
 
+        // Update location links if provided
+        if (location_ids !== undefined) {
+            // Delete existing location links
+            await supabase
+                .from('evidence_locations')
+                .delete()
+                .eq('evidence_id', id);
+
+            if (location_ids.length > 0) {
+                const locationLinks = location_ids.map(locationId => ({
+                    evidence_id: id,
+                    location_id: locationId,
+                    user_id: userId
+                }));
+
+                const { error: locationError } = await supabase
+                    .from('evidence_locations')
+                    .insert(locationLinks);
+
+                if (locationError) throw new Error(`Failed to update evidence location links: ${locationError.message}`);
+            }
+        }
+
         return data;
     }
 
@@ -264,6 +318,12 @@ export class EvidenceService {
             .eq('evidence_id', id);
 
         if (linkError2) throw new Error(`Failed to delete evidence data point links: ${linkError2.message}`);
+
+        // Delete evidence_locations records
+        await supabase
+            .from('evidence_locations')
+            .delete()
+            .eq('evidence_id', id);
 
         // Delete evidence_files records (cascade should handle this but be explicit)
         await supabase
