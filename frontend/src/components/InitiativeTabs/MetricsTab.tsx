@@ -94,7 +94,7 @@ export default function MetricsTab({
     if (expandedKpi) {
         const expandedKpiIndex = getOrderedIndex(expandedKpi.id!)
         const kpiUpdatesForMetric = allKPIUpdates.filter(update => update.kpi_id === expandedKpi.id)
-        
+
         return (
             <>
                 {/* Mobile: Simple Detail View */}
@@ -109,7 +109,7 @@ export default function MetricsTab({
                             setSelectedDataPoint(update)
                             setIsDataPointPreviewOpen(true)
                         }}
-                        initiativeId={initiativeId || initiative.id}
+                        initiativeId={initiativeId || initiative.id || ''}
                     />
                 </div>
 
@@ -127,7 +127,7 @@ export default function MetricsTab({
                         onEdit={() => onEditKPI(expandedKpi)}
                         onDelete={() => onDeleteKPI(expandedKpi)}
                         kpiUpdates={kpiUpdatesForMetric}
-                        initiativeId={initiativeId || initiative.id}
+                        initiativeId={initiativeId || initiative.id || ''}
                         onRefresh={onRefresh}
                         metricColor={getMetricColor(expandedKpiIndex)}
                     />
@@ -143,7 +143,7 @@ export default function MetricsTab({
                         }}
                         dataPoint={selectedDataPoint}
                         kpi={expandedKpi}
-                        onEvidenceClick={() => {}}
+                        onEvidenceClick={() => { }}
                     />
                 )}
             </>
@@ -201,11 +201,6 @@ export default function MetricsTab({
                                         <span className="mobile-metric-number">{total.toLocaleString()}</span>
                                         <span className="text-sm text-gray-500 font-medium">{kpi.unit_of_measurement}</span>
                                     </div>
-                                    {kpi.target_value && (
-                                        <div className="text-xs text-gray-500">
-                                            Target: {kpi.target_value.toLocaleString()} {kpi.unit_of_measurement}
-                                        </div>
-                                    )}
                                 </div>
                             )
                         })}
@@ -329,7 +324,7 @@ export default function MetricsTab({
                                                 onEdit={() => onEditKPI(kpi)}
                                                 onDelete={() => onDeleteKPI(kpi)}
                                                 kpiUpdates={allKPIUpdates.filter(update => update.kpi_id === kpi.id)}
-                                                initiativeId={initiativeId || initiative.id}
+                                                initiativeId={initiativeId || initiative.id || ''}
                                                 onRefresh={onRefresh}
                                                 metricColor={getMetricColor(kpiIndex)}
                                             />
