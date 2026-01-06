@@ -209,4 +209,24 @@ export interface User {
     email: string;
     name?: string;
     organization?: string;
+}
+
+export interface Subscription {
+    id: string;
+    user_id: string;
+    organization_id?: string;
+    status: 'none' | 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
+    plan_tier?: 'starter' | 'professional' | 'enterprise' | null;
+    billing_interval?: 'monthly' | 'yearly' | 'lifetime' | null;
+    trial_started_at?: string;
+    trial_ends_at?: string;
+    stripe_customer_id?: string;
+    stripe_subscription_id?: string;
+    stripe_price_id?: string;
+    current_period_start?: string;
+    current_period_end?: string;
+    cancel_at_period_end?: boolean;
+    cancelled_at?: string;
+    created_at: string;
+    updated_at: string;
 } 

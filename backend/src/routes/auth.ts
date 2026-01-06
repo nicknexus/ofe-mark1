@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { supabase } from '../utils/supabase';
 import { OrganizationService } from '../services/organizationService';
+import { SubscriptionService } from '../services/subscriptionService';
 
 const router = Router();
 
@@ -60,6 +61,14 @@ router.post('/signup', async (req, res) => {
                 error: `Failed to create organization: ${orgError instanceof Error ? orgError.message : 'Unknown error'}` 
             });
             return;
+        }
+
+        // Create subscription record with status 'none' (user needs to activate trial)
+        try {
+            await SubscriptionService.getOrCreate(authData.user.id, organization.id);
+        } catch (subError) {
+            console.error('Failed to create subscription record:', subError);
+            // Non-fatal - subscription can be created later when user accesses the app
         }
 
         // Sign the user in immediately (email confirmation is disabled, so this should work)

@@ -20,6 +20,7 @@ import reportRoutes from './routes/reports';
 import donorRoutes from './routes/donors';
 import donorCreditRoutes from './routes/donorCredits';
 import storageRoutes from './routes/storage';
+import subscriptionRoutes from './routes/subscription';
 import { processStorageCleanupQueue } from './services/storageCleanupService';
 import { authenticateUser, AuthenticatedRequest } from './middleware/auth';
 
@@ -151,6 +152,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/donors', donorRoutes);
 app.use('/api/donor-credits', donorCreditRoutes);
 app.use('/api/storage', storageRoutes);
+app.use('/api/subscription', subscriptionRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

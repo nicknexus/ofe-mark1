@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, User as UserIcon, Mail, Building2, Save, HardDrive, Info } from 'lucide-react'
+import { ArrowLeft, User as UserIcon, Mail, Building2, Save, HardDrive, Info, Clock, CreditCard, Calendar, Sparkles } from 'lucide-react'
 import { AuthService } from '../services/auth'
 import { apiService } from '../services/api'
-import { User } from '../types'
+import { User, SubscriptionStatus } from '../types'
 import toast from 'react-hot-toast'
 
 interface StorageUsage {
@@ -14,7 +14,11 @@ interface StorageUsage {
     placeholder_max_gb: number
 }
 
-export default function AccountPage() {
+interface Props {
+    subscriptionStatus?: SubscriptionStatus | null
+}
+
+export default function AccountPage({ subscriptionStatus }: Props) {
     const navigate = useNavigate()
     const [user, setUser] = useState<User | null>(null)
     const [loading, setLoading] = useState(true)
@@ -107,6 +111,131 @@ export default function AccountPage() {
                 </button>
                 <h1 className="text-xl font-semibold text-gray-900">Account Settings</h1>
             </div>
+
+            {/* Subscription Card - Full Width */}
+            {subscriptionStatus && (
+                <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6 w-full max-w-4xl mb-5">
+                    <div className="flex items-center gap-3 mb-5">
+                        <div className="p-2 bg-primary-50 rounded-xl">
+                            <CreditCard className="w-5 h-5 text-primary-600" />
+                        </div>
+                        <h2 className="text-lg font-semibold text-gray-800">Subscription</h2>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {/* Status */}
+                        <div className="space-y-1">
+                            <div className="text-sm text-gray-500 flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5" />
+                                Status
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium ${
+                                    subscriptionStatus.subscription.status === 'trial' 
+                                        ? 'bg-primary-100 text-primary-700'
+                                        : subscriptionStatus.subscription.status === 'active'
+                                        ? 'bg-green-100 text-green-700'
+                                        : 'bg-gray-100 text-gray-700'
+                                }`}>
+                                    {subscriptionStatus.subscription.status === 'trial' ? 'Free Trial' :
+                                     subscriptionStatus.subscription.status === 'active' ? 'Active' :
+                                     subscriptionStatus.subscription.status.charAt(0).toUpperCase() + subscriptionStatus.subscription.status.slice(1)}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Trial/Subscription End Date */}
+                        {subscriptionStatus.subscription.status === 'trial' && subscriptionStatus.subscription.trial_ends_at && (
+                            <div className="space-y-1">
+                                <div className="text-sm text-gray-500 flex items-center gap-1.5">
+                                    <Calendar className="w-3.5 h-3.5" />
+                                    Trial Ends
+                                </div>
+                                <div className="text-base font-medium text-gray-900">
+                                    {new Date(subscriptionStatus.subscription.trial_ends_at).toLocaleDateString('en-US', {
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric'
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {subscriptionStatus.subscription.status === 'active' && subscriptionStatus.subscription.current_period_end && (
+                            <div className="space-y-1">
+                                <div className="text-sm text-gray-500 flex items-center gap-1.5">
+                                    <Calendar className="w-3.5 h-3.5" />
+                                    Next Billing
+                                </div>
+                                <div className="text-base font-medium text-gray-900">
+                                    {new Date(subscriptionStatus.subscription.current_period_end).toLocaleDateString('en-US', {
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric'
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Days Remaining */}
+                        {subscriptionStatus.subscription.status === 'trial' && subscriptionStatus.remainingTrialDays !== null && (
+                            <div className="space-y-1">
+                                <div className="text-sm text-gray-500 flex items-center gap-1.5">
+                                    <Clock className="w-3.5 h-3.5" />
+                                    Time Remaining
+                                </div>
+                                <div className={`text-base font-medium ${
+                                    subscriptionStatus.remainingTrialDays <= 3 ? 'text-red-600' :
+                                    subscriptionStatus.remainingTrialDays <= 7 ? 'text-amber-600' :
+                                    'text-gray-900'
+                                }`}>
+                                    {subscriptionStatus.remainingTrialDays === 0 ? 'Ends today' :
+                                     subscriptionStatus.remainingTrialDays === 1 ? '1 day left' :
+                                     `${subscriptionStatus.remainingTrialDays} days left`}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Plan Tier (if active subscription) */}
+                        {subscriptionStatus.subscription.plan_tier && (
+                            <div className="space-y-1">
+                                <div className="text-sm text-gray-500">Plan</div>
+                                <div className="text-base font-medium text-gray-900 capitalize">
+                                    {subscriptionStatus.subscription.plan_tier}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Billing Interval (if active subscription) */}
+                        {subscriptionStatus.subscription.billing_interval && (
+                            <div className="space-y-1">
+                                <div className="text-sm text-gray-500">Billing</div>
+                                <div className="text-base font-medium text-gray-900 capitalize">
+                                    {subscriptionStatus.subscription.billing_interval}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Upgrade CTA for trial users */}
+                    {subscriptionStatus.subscription.status === 'trial' && (
+                        <div className="mt-6 pt-5 border-t border-gray-100">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-900">Ready to upgrade?</p>
+                                    <p className="text-xs text-gray-500 mt-0.5">Get full access with a paid subscription</p>
+                                </div>
+                                <button
+                                    onClick={() => alert('Subscription coming soon! Contact support@nexusimpacts.com for early access.')}
+                                    className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-colors"
+                                >
+                                    Upgrade Now
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Two Column Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 w-full max-w-4xl">

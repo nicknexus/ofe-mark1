@@ -47,3 +47,5 @@ ON CONFLICT (evidence_id, location_id) DO NOTHING;
 -- It can be removed in a future migration after verifying the junction table works correctly
 
 
+
+
