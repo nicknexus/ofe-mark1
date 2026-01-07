@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { 
     Plus, 
     FileText, 
@@ -16,7 +16,9 @@ import {
     Edit,
     Trash2,
     Download,
-    ExternalLink
+    ExternalLink,
+    Filter,
+    ChevronDown
 } from 'lucide-react'
 import { apiService } from '../../services/api'
 import { Evidence, Location, KPI } from '../../types'
@@ -36,10 +38,28 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh }: MobileEvi
     const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null)
     const [showPreview, setShowPreview] = useState(false)
     const [editingEvidence, setEditingEvidence] = useState<Evidence | null>(null)
+    
+    // Filter state
+    const [showFilters, setShowFilters] = useState(false)
+    const [locations, setLocations] = useState<Location[]>([])
+    const [filterType, setFilterType] = useState<string>('all')
+    const [filterLocation, setFilterLocation] = useState<string>('all')
+    const [filterDateStart, setFilterDateStart] = useState<string>('')
+    const [filterDateEnd, setFilterDateEnd] = useState<string>('')
 
     useEffect(() => {
         loadEvidence()
+        loadLocations()
     }, [initiativeId])
+    
+    const loadLocations = async () => {
+        try {
+            const locs = await apiService.getLocations(initiativeId)
+            setLocations(locs || [])
+        } catch (error) {
+            console.error('Error loading locations:', error)
+        }
+    }
 
     // Lock body scroll when preview is open
     useEffect(() => {
@@ -127,22 +147,171 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh }: MobileEvi
         )
     }
 
+    // Filter evidence
+    const filteredEvidence = useMemo(() => {
+        return evidence.filter(ev => {
+            // Type filter
+            if (filterType !== 'all' && ev.type !== filterType) return false
+            
+            // Location filter
+            if (filterLocation !== 'all') {
+                const evLocationIds = ev.location_ids || (ev.location_id ? [ev.location_id] : [])
+                if (!evLocationIds.includes(filterLocation)) return false
+            }
+            
+            // Date filter
+            if (filterDateStart || filterDateEnd) {
+                const evDate = ev.date_represented ? new Date(ev.date_represented) : null
+                if (!evDate) return false
+                
+                if (filterDateStart) {
+                    const startDate = new Date(filterDateStart)
+                    if (evDate < startDate) return false
+                }
+                if (filterDateEnd) {
+                    const endDate = new Date(filterDateEnd)
+                    endDate.setHours(23, 59, 59, 999) // Include the entire end day
+                    if (evDate > endDate) return false
+                }
+            }
+            
+            return true
+        })
+    }, [evidence, filterType, filterLocation, filterDateStart, filterDateEnd])
+
+    const hasActiveFilters = filterType !== 'all' || filterLocation !== 'all' || filterDateStart || filterDateEnd
+    
+    const clearFilters = () => {
+        setFilterType('all')
+        setFilterLocation('all')
+        setFilterDateStart('')
+        setFilterDateEnd('')
+    }
+
     return (
         <div className="p-4">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
                 <div>
                     <h1 className="text-xl font-bold text-gray-900">Evidence</h1>
-                    <p className="text-sm text-gray-500">{evidence.length} items</p>
+                    <p className="text-sm text-gray-500">
+                        {hasActiveFilters ? `${filteredEvidence.length} of ${evidence.length}` : `${evidence.length}`} items
+                    </p>
                 </div>
-                <button
-                    onClick={() => setShowUploadFlow(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-evidence-500 text-white rounded-xl font-semibold text-sm shadow-lg shadow-evidence-500/25 active:scale-[0.98]"
-                >
-                    <Plus className="w-4 h-4" />
-                    Add
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                            hasActiveFilters 
+                                ? 'bg-evidence-100 text-evidence-700' 
+                                : 'bg-gray-100 text-gray-600'
+                        }`}
+                    >
+                        <Filter className="w-4 h-4" />
+                        {hasActiveFilters && <span className="w-1.5 h-1.5 rounded-full bg-evidence-500"></span>}
+                    </button>
+                    <button
+                        onClick={() => setShowUploadFlow(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-evidence-500 text-white rounded-xl font-semibold text-sm shadow-lg shadow-evidence-500/25 active:scale-[0.98]"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Add
+                    </button>
+                </div>
             </div>
+
+            {/* Filters Panel */}
+            {showFilters && (
+                <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                        <span className="font-semibold text-gray-800">Filters</span>
+                        {hasActiveFilters && (
+                            <button 
+                                onClick={clearFilters}
+                                className="text-xs text-evidence-600 font-medium"
+                            >
+                                Clear all
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Type Filter */}
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Type</label>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                onClick={() => setFilterType('all')}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                    filterType === 'all' 
+                                        ? 'bg-evidence-500 text-white' 
+                                        : 'bg-gray-100 text-gray-600'
+                                }`}
+                            >
+                                All
+                            </button>
+                            {evidenceTypes.map(type => (
+                                <button
+                                    key={type.value}
+                                    onClick={() => setFilterType(type.value)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                                        filterType === type.value 
+                                            ? 'bg-evidence-500 text-white' 
+                                            : 'bg-gray-100 text-gray-600'
+                                    }`}
+                                >
+                                    <type.icon className="w-3 h-3" />
+                                    {type.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Location Filter */}
+                    {locations.length > 0 && (
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Location</label>
+                            <div className="relative">
+                                <select
+                                    value={filterLocation}
+                                    onChange={(e) => setFilterLocation(e.target.value)}
+                                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm appearance-none pr-8"
+                                >
+                                    <option value="all">All locations</option>
+                                    {locations.map(loc => (
+                                        <option key={loc.id} value={loc.id}>{loc.name}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Date Filter */}
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Date Range</label>
+                        <div className="flex gap-2">
+                            <div className="flex-1">
+                                <input
+                                    type="date"
+                                    value={filterDateStart}
+                                    onChange={(e) => setFilterDateStart(e.target.value)}
+                                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm"
+                                    placeholder="From"
+                                />
+                            </div>
+                            <div className="flex-1">
+                                <input
+                                    type="date"
+                                    value={filterDateEnd}
+                                    onChange={(e) => setFilterDateEnd(e.target.value)}
+                                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm"
+                                    placeholder="To"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Evidence List */}
             {loading ? (
@@ -165,9 +334,25 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh }: MobileEvi
                         Add Evidence
                     </button>
                 </div>
+            ) : filteredEvidence.length === 0 ? (
+                <div className="text-center py-12 bg-white rounded-2xl border border-gray-100">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Filter className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">No Matches</h3>
+                    <p className="text-gray-500 text-sm px-6 mb-6">
+                        No evidence matches your current filters.
+                    </p>
+                    <button
+                        onClick={clearFilters}
+                        className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium text-sm"
+                    >
+                        Clear Filters
+                    </button>
+                </div>
             ) : (
                 <div className="grid grid-cols-2 gap-3">
-                    {evidence.map((ev) => {
+                    {filteredEvidence.map((ev) => {
                         const typeInfo = getEvidenceTypeInfo(ev.type)
                         const bgColor = typeInfo.color.split(' ')[0]
                         const TypeIcon = evidenceTypes.find(t => t.value === ev.type)?.icon || FileText
