@@ -1028,6 +1028,8 @@ interface EditFlowProps {
     onSuccess: () => void
 }
 
+type EvidenceType = 'visual_proof' | 'documentation' | 'testimony' | 'financials'
+
 function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: EditFlowProps) {
     const [loading, setLoading] = useState(false)
     const [locations, setLocations] = useState<Location[]>([])
@@ -1036,7 +1038,7 @@ function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: 
 
     // Initialize form with existing evidence data
     const [formData, setFormData] = useState({
-        type: evidence.type || 'visual_proof',
+        type: (evidence.type || 'visual_proof') as EvidenceType,
         title: evidence.title || '',
         description: evidence.description || '',
         file: null as File | null,
@@ -1050,7 +1052,7 @@ function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: 
         selectedKpiIds: evidence.kpi_ids || []
     })
 
-    const evidenceTypes = [
+    const evidenceTypes: { value: EvidenceType; label: string; icon: typeof Camera; description: string }[] = [
         { value: 'visual_proof', label: 'Photo/Video', icon: Camera, description: 'Visual evidence' },
         { value: 'documentation', label: 'Document', icon: FileText, description: 'Reports, forms' },
         { value: 'testimony', label: 'Testimony', icon: MessageSquare, description: 'Quotes, feedback' },
