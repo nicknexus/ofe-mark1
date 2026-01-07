@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { Target, Mail, Lock, User } from 'lucide-react'
 import { AuthService } from '../services/auth'
 import toast from 'react-hot-toast'
 
@@ -9,6 +8,7 @@ export default function AuthPage() {
     const [formData, setFormData] = useState({
         email: '',
         password: '',
+        confirmPassword: '',
         name: '',
         organization: ''
     })
@@ -19,6 +19,12 @@ export default function AuthPage() {
 
         try {
             if (isSignUp) {
+                if (formData.password !== formData.confirmPassword) {
+                    toast.error('Passwords do not match')
+                    setLoading(false)
+                    return
+                }
+
                 if (!formData.organization || formData.organization.trim() === '') {
                     toast.error('Organization name is required')
                     setLoading(false)
@@ -57,15 +63,17 @@ export default function AuthPage() {
                 {/* Header */}
                 <div className="text-center">
                     <div className="flex justify-center">
-                        <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary-500 rounded-xl flex items-center justify-center">
-                            <Target className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-                        </div>
+                        <img 
+                            src="/Nexuslogo.png" 
+                            alt="Nexus Logo" 
+                            className="h-16 sm:h-20 w-auto"
+                        />
                     </div>
                     <h1 className="mt-4 sm:mt-6 text-2xl sm:text-3xl font-bold text-gray-900">
-                        Opportunity of Evidence
+                        Nexus Impacts AI
                     </h1>
                     <p className="mt-2 text-sm text-gray-600 px-2">
-                        Expert-level system for charity impact tracking
+                        AI-powered impact tracking for nonprofits
                     </p>
                 </div>
 
@@ -138,6 +146,23 @@ export default function AuthPage() {
                                 required
                             />
                         </div>
+
+                        {isSignUp && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Confirm Password
+                                </label>
+                                <input
+                                    type="password"
+                                    name="confirmPassword"
+                                    value={formData.confirmPassword}
+                                    onChange={handleInputChange}
+                                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                                    placeholder="Confirm your password"
+                                    required
+                                />
+                            </div>
+                        )}
 
                         {isSignUp && (
                             <div>

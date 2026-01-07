@@ -8,6 +8,7 @@ import { TutorialProvider } from './context/TutorialContext'
 import { StorageProvider } from './context/StorageContext'
 import InteractiveTutorial from './components/InteractiveTutorial'
 import TrialBanner from './components/TrialBanner'
+import MobileApp from './components/MobileApp'
 
 // Pages
 import HomePage from './pages/HomePage'
@@ -20,12 +21,34 @@ import TrialActivationPage from './pages/TrialActivationPage'
 import SubscriptionExpiredPage from './pages/SubscriptionExpiredPage'
 import Layout from './components/Layout'
 
+// Hook to detect mobile
+function useIsMobile() {
+    const [isMobile, setIsMobile] = useState(() => {
+        // Initialize with actual value to prevent flash
+        if (typeof window !== 'undefined') {
+            return window.innerWidth < 768
+        }
+        return false
+    })
+
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth < 768)
+        }
+        window.addEventListener('resize', checkMobile)
+        return () => window.removeEventListener('resize', checkMobile)
+    }, [])
+
+    return isMobile
+}
+
 function App() {
     const [user, setUser] = useState<User | null>(null)
     const [loading, setLoading] = useState(true)
     const [showAuth, setShowAuth] = useState(false)
     const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null)
     const [checkingSubscription, setCheckingSubscription] = useState(false)
+    const isMobile = useIsMobile()
 
     useEffect(() => {
         // Get initial user
@@ -166,6 +189,29 @@ function App() {
         // User has access - show the app
         const isOnTrial = subscriptionStatus.subscription.status === 'trial'
         
+        // Show mobile app for mobile users
+        if (isMobile) {
+            return (
+                <Router>
+                    <div className="min-h-screen" style={{ backgroundColor: '#F9FAFB' }}>
+                        <StorageProvider>
+                            {/* Show trial banner if on trial */}
+                            {isOnTrial && (
+                                <TrialBanner 
+                                    remainingDays={subscriptionStatus.remainingTrialDays} 
+                                />
+                            )}
+                            <div className={isOnTrial ? 'pt-10' : ''}>
+                                <MobileApp user={user} subscriptionStatus={subscriptionStatus} />
+                            </div>
+                        </StorageProvider>
+                        <Toaster position="top-center" />
+                    </div>
+                </Router>
+            )
+        }
+
+        // Desktop app
         return (
             <Router>
                 <StorageProvider>
