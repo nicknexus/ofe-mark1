@@ -116,38 +116,7 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh }: MobileEvi
         { value: 'financials', label: 'Financial', icon: DollarSign }
     ]
 
-    // Show upload flow for new evidence
-    if (showUploadFlow) {
-        return (
-            <MobileEvidenceUploadFlow
-                initiativeId={initiativeId}
-                onClose={() => setShowUploadFlow(false)}
-                onSuccess={() => {
-                    setShowUploadFlow(false)
-                    loadEvidence()
-                    onRefresh?.()
-                }}
-            />
-        )
-    }
-
-    // Show edit flow
-    if (editingEvidence) {
-        return (
-            <MobileEvidenceEditFlow
-                initiativeId={initiativeId}
-                evidence={editingEvidence}
-                onClose={() => setEditingEvidence(null)}
-                onSuccess={() => {
-                    setEditingEvidence(null)
-                    loadEvidence()
-                    onRefresh?.()
-                }}
-            />
-        )
-    }
-
-    // Filter evidence
+    // Filter evidence - must be before conditional returns (hooks rule)
     const filteredEvidence = useMemo(() => {
         return evidence.filter(ev => {
             // Type filter
@@ -186,6 +155,37 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh }: MobileEvi
         setFilterLocation('all')
         setFilterDateStart('')
         setFilterDateEnd('')
+    }
+
+    // Show upload flow for new evidence
+    if (showUploadFlow) {
+        return (
+            <MobileEvidenceUploadFlow
+                initiativeId={initiativeId}
+                onClose={() => setShowUploadFlow(false)}
+                onSuccess={() => {
+                    setShowUploadFlow(false)
+                    loadEvidence()
+                    onRefresh?.()
+                }}
+            />
+        )
+    }
+
+    // Show edit flow
+    if (editingEvidence) {
+        return (
+            <MobileEvidenceEditFlow
+                initiativeId={initiativeId}
+                evidence={editingEvidence}
+                onClose={() => setEditingEvidence(null)}
+                onSuccess={() => {
+                    setEditingEvidence(null)
+                    loadEvidence()
+                    onRefresh?.()
+                }}
+            />
+        )
     }
 
     return (
