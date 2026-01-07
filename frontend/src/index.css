@@ -6,6 +6,9 @@
     html {
         scroll-behavior: smooth;
         color: #465360; /* Default text color for entire app */
+        /* Prevent zooming on mobile */
+        touch-action: manipulation;
+        -webkit-text-size-adjust: 100%;
     }
 
     body {
@@ -18,6 +21,17 @@
         min-height: 100vh;
         background: #F8F9FB;
         color: #465360; /* Ensure body uses custom grey */
+        /* Prevent pull-to-refresh and overscroll */
+        overscroll-behavior: none;
+    }
+
+    /* Prevent iOS Safari auto-zoom on input focus (needs 16px minimum) */
+    @media screen and (max-width: 767px) {
+        input,
+        textarea,
+        select {
+            font-size: 16px !important;
+        }
     }
 
     /* Override all very dark text colors with custom grey */
