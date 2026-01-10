@@ -211,7 +211,7 @@ function App() {
         }
 
         // User has access - show the app
-        const isOnTrial = subscriptionStatus.subscription.status === 'trial' && subscriptionStatus.remainingTrialDays > 0
+        const isOnTrial = subscriptionStatus.subscription.status === 'trial' && (subscriptionStatus.remainingTrialDays ?? 0) > 0
         const bannerDismissed = localStorage.getItem('nexus-trial-banner-dismissed') === 'true'
         const showTrialBanner = isOnTrial && !bannerDismissed
         
