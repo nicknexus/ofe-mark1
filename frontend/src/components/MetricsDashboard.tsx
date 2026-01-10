@@ -753,10 +753,10 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     return (
         <div className="h-full flex flex-col overflow-hidden px-4 pt-4 pb-4 space-y-4">
             {/* Master Filter Bar */}
-            <div className="bg-transparent p-3 flex items-center justify-between flex-wrap gap-2 flex-shrink-0">
-                <div className="flex items-center space-x-2 flex-wrap flex-1">
+            <div className="bg-transparent p-3 flex items-center justify-between gap-2 flex-shrink-0">
+                <div className="flex items-center space-x-2 flex-1 min-w-0">
                     {/* Date Filter */}
-                    <div className="relative">
+                    <div className="relative shrink-0">
                         <DateRangePicker
                             value={datePickerValue}
                             onChange={setDatePickerValue}
@@ -767,7 +767,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     </div>
 
                     {/* Metrics Filter */}
-                    <div className="relative">
+                    <div className="relative shrink-0">
                         <button
                             ref={metricsButtonRef}
                             onClick={(e) => {
@@ -780,12 +780,12 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setShowLocationPicker(false)
                                 setShowBeneficiaryPicker(false)
                             }}
-                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
+                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm whitespace-nowrap shrink-0 ${visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
                                 ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
                                 : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
                                 }`}
                         >
-                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
+                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center shrink-0 ${visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
                                 ? 'bg-primary-100 border-primary-500'
                                 : 'bg-gray-100 border-gray-200'
                                 }`}>
@@ -861,7 +861,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     </div>
 
                     {/* Location Filter */}
-                    <div className="relative">
+                    <div className="relative shrink-0">
                         <button
                             ref={locationButtonRef}
                             onClick={(e) => {
@@ -874,12 +874,12 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setShowMetricsPicker(false)
                                 setShowBeneficiaryPicker(false)
                             }}
-                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${selectedLocations.length > 0
+                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm whitespace-nowrap shrink-0 ${selectedLocations.length > 0
                                 ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
                                 : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
                                 }`}
                         >
-                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedLocations.length > 0
+                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center shrink-0 ${selectedLocations.length > 0
                                 ? 'bg-primary-100 border-primary-500'
                                 : 'bg-gray-100 border-gray-200'
                                 }`}>
@@ -956,7 +956,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     </div>
 
                     {/* Beneficiary Groups Filter */}
-                    <div className="relative">
+                    <div className="relative shrink-0">
                         <button
                             ref={beneficiaryButtonRef}
                             onClick={(e) => {
@@ -969,12 +969,12 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setShowLocationPicker(false)
                                 setShowMetricsPicker(false)
                             }}
-                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${selectedBeneficiaryGroups.length > 0
+                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm whitespace-nowrap shrink-0 ${selectedBeneficiaryGroups.length > 0
                                 ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
                                 : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
                                 }`}
                         >
-                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedBeneficiaryGroups.length > 0
+                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center shrink-0 ${selectedBeneficiaryGroups.length > 0
                                 ? 'bg-primary-100 border-primary-500'
                                 : 'bg-gray-100 border-gray-200'
                                 }`}>
@@ -983,7 +983,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                     : 'text-gray-600'
                                     }`} />
                             </div>
-                            <span className="ml-3">Beneficiaries</span>
+                            <span className="ml-3">Groups</span>
                             {selectedBeneficiaryGroups.length > 0 && (
                                 <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
                                     {selectedBeneficiaryGroups.length}
@@ -1067,7 +1067,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                 </div>
 
                 {/* Right side: Add Impact Claim, Add Evidence, Settings and User Profile */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0">
                     {/* Add Impact Claim Button */}
                     {onAddImpactClaim && (
                         <button
@@ -1075,8 +1075,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25"
                         >
                             <Plus className="w-4 h-4" />
-                            <span className="hidden sm:inline">Add Impact Claim</span>
-                            <span className="sm:hidden">Add Claim</span>
+                            <span>Add Claim</span>
                         </button>
                     )}
                     {/* Add Evidence Button */}
@@ -1086,8 +1085,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             className="flex items-center space-x-2 px-4 py-2 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25"
                         >
                             <Upload className="w-4 h-4" />
-                            <span className="hidden sm:inline">Add Evidence</span>
-                            <span className="sm:hidden">Add</span>
+                            <span>Evidence</span>
                         </button>
                     )}
                     {/* Settings Button - Circle Icon */}

@@ -1,6 +1,8 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { AlertCircle, CreditCard, LogOut, Clock, ArrowRight } from 'lucide-react'
 import { AuthService } from '../services/auth'
+import { SubscriptionService } from '../services/subscription'
+import toast from 'react-hot-toast'
 
 interface Props {
     reason: string
@@ -8,15 +10,27 @@ interface Props {
 }
 
 export default function SubscriptionExpiredPage({ reason }: Props) {
+    const [subscribing, setSubscribing] = useState(false)
+
     const handleSignOut = async () => {
         await AuthService.signOut()
         window.location.reload()
     }
 
-    const handleSubscribe = () => {
-        // Future: Navigate to Stripe checkout
-        // For now, show a message
-        alert('Subscription coming soon! Contact support@nexusimpacts.com for early access.')
+    const handleSubscribe = async () => {
+        setSubscribing(true)
+        try {
+            const { url } = await SubscriptionService.createCheckoutSession()
+            if (url) {
+                window.location.href = url
+            } else {
+                toast.error('Failed to create checkout session')
+            }
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Failed to start checkout')
+        } finally {
+            setSubscribing(false)
+        }
     }
 
     const getMessage = () => {
@@ -86,23 +100,23 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
 
                     {/* What you're missing */}
                     <div className="bg-gray-50 rounded-xl p-5 mb-6 text-left">
-                        <h3 className="font-medium text-gray-700 mb-3">What you'll get with a subscription:</h3>
+                        <h3 className="font-medium text-gray-700 mb-3">Starter Plan - $2/day (billed $56 every 4 weeks)</h3>
                         <ul className="space-y-2 text-sm text-gray-600">
                             <li className="flex items-center gap-2">
                                 <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
-                                Unlimited initiatives & KPIs
+                                2 initiatives included
                             </li>
                             <li className="flex items-center gap-2">
                                 <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
-                                Full evidence management
+                                Full KPI tracking & analytics
+                            </li>
+                            <li className="flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
+                                Evidence management
                             </li>
                             <li className="flex items-center gap-2">
                                 <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
                                 Public impact reports
-                            </li>
-                            <li className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
-                                Priority support
                             </li>
                         </ul>
                     </div>
@@ -111,11 +125,21 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
                     <div className="space-y-3">
                         <button
                             onClick={handleSubscribe}
-                            className="w-full bg-primary-500 text-white py-3.5 px-6 rounded-xl hover:bg-primary-600 transition-all font-medium flex items-center justify-center gap-2 shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40"
+                            disabled={subscribing}
+                            className="w-full bg-primary-500 text-white py-3.5 px-6 rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium flex items-center justify-center gap-2 shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40"
                         >
-                            <CreditCard className="w-5 h-5" />
-                            Subscribe Now
-                            <ArrowRight className="w-5 h-5" />
+                            {subscribing ? (
+                                <>
+                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    Loading...
+                                </>
+                            ) : (
+                                <>
+                                    <CreditCard className="w-5 h-5" />
+                                    Subscribe Now - $2/day
+                                    <ArrowRight className="w-5 h-5" />
+                                </>
+                            )}
                         </button>
 
                         <button

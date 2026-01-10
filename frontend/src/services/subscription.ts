@@ -108,5 +108,69 @@ export class SubscriptionService {
         
         return response.json()
     }
+
+    /**
+     * Create a Stripe checkout session for subscription
+     */
+    static async createCheckoutSession(): Promise<{
+        sessionId: string
+        url: string
+    }> {
+        const headers = await getAuthHeaders()
+        
+        const response = await fetch(`${API_BASE_URL}/api/subscription/create-checkout-session`, {
+            method: 'POST',
+            headers
+        })
+        
+        if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Failed to create checkout session')
+        }
+        
+        return response.json()
+    }
+
+    /**
+     * Get initiatives usage (current count vs limit)
+     */
+    static async getInitiativesUsage(): Promise<{
+        current: number
+        limit: number | null
+        canCreate: boolean
+    }> {
+        const headers = await getAuthHeaders()
+        
+        const response = await fetch(`${API_BASE_URL}/api/subscription/initiatives-usage`, {
+            method: 'GET',
+            headers
+        })
+        
+        if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Failed to get initiatives usage')
+        }
+        
+        return response.json()
+    }
+
+    /**
+     * Create a Stripe customer portal session for managing subscription
+     */
+    static async createPortalSession(): Promise<{ url: string }> {
+        const headers = await getAuthHeaders()
+        
+        const response = await fetch(`${API_BASE_URL}/api/subscription/create-portal-session`, {
+            method: 'POST',
+            headers
+        })
+        
+        if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Failed to create portal session')
+        }
+        
+        return response.json()
+    }
 }
 

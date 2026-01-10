@@ -227,6 +227,7 @@ export interface Subscription {
     current_period_end?: string;
     cancel_at_period_end?: boolean;
     cancelled_at?: string;
+    initiatives_limit?: number | null;
     created_at: string;
     updated_at: string;
 } 

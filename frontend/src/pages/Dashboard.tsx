@@ -5,7 +5,10 @@ import {
     MapPin,
     Edit,
     Trash2,
-    GraduationCap
+    GraduationCap,
+    Zap,
+    X,
+    ArrowRight
 } from 'lucide-react'
 import { apiService } from '../services/api'
 import { Initiative, LoadingState, CreateInitiativeForm, KPI, Organization, Location } from '../types'
@@ -29,6 +32,8 @@ export default function Dashboard() {
     const [showEditModal, setShowEditModal] = useState(false)
     const [deleteConfirmInitiative, setDeleteConfirmInitiative] = useState<Initiative | null>(null)
     const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null)
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+    const [upgradeUsage, setUpgradeUsage] = useState<{ current: number; limit: number } | null>(null)
 
     // Add loading cache to prevent duplicate requests
     const [isLoadingData, setIsLoadingData] = useState(false)
@@ -150,7 +155,14 @@ export default function Dashboard() {
                 // Navigate to the new initiative
                 navigate(`/initiatives/${newInitiative.id}`)
             }
-        } catch (error) {
+        } catch (error: any) {
+            // Check if it's an initiative limit error
+            if (error?.code === 'INITIATIVE_LIMIT_REACHED' || error?.message?.includes('Initiative limit reached')) {
+                setUpgradeUsage(error.usage || { current: initiatives.length, limit: 2 })
+                setShowUpgradeModal(true)
+                setShowCreateModal(false)
+                return // Don't throw, we're handling it with UI
+            }
             const message = error instanceof Error ? error.message : 'Failed to create initiative'
             toast.error(message)
             throw error
@@ -427,6 +439,74 @@ export default function Dashboard() {
                             >
                                 Delete Initiative
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Upgrade Modal - Initiative Limit Reached */}
+            {showUpgradeModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60] animate-fade-in">
+                    <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] transform transition-all duration-200 ease-out animate-slide-up-fast">
+                        {/* Header */}
+                        <div className="relative bg-gradient-to-br from-amber-50 to-orange-50 p-6 text-center border-b border-amber-100">
+                            <button
+                                onClick={() => setShowUpgradeModal(false)}
+                                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-white/50 transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                            <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-amber-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Zap className="w-8 h-8 text-amber-600" />
+                            </div>
+                            <h2 className="text-xl font-bold text-gray-900 mb-1">Initiative Limit Reached</h2>
+                            <p className="text-gray-600 text-sm">
+                                You're using {upgradeUsage?.current || initiatives.length} of {upgradeUsage?.limit || 2} initiatives
+                            </p>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-6">
+                            <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-5 mb-6 border border-amber-100">
+                                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                                    <span className="text-amber-600">⚡</span>
+                                    Initiative Limit Reached
+                                </h3>
+                                <div className="space-y-2 text-sm text-gray-700">
+                                    <p className="flex items-start gap-2">
+                                        <span className="text-amber-500 mt-0.5">•</span>
+                                        <span>You've used all {upgradeUsage?.limit || 2} initiatives in your plan</span>
+                                    </p>
+                                    <p className="flex items-start gap-2">
+                                        <span className="text-amber-500 mt-0.5">•</span>
+                                        <span><strong>+$1/day</strong> per additional initiative (coming soon)</span>
+                                    </p>
+                                    <p className="flex items-start gap-2">
+                                        <span className="text-amber-500 mt-0.5">•</span>
+                                        <span>Delete an existing initiative to create a new one</span>
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    onClick={() => {
+                                        setShowUpgradeModal(false)
+                                        navigate('/account')
+                                    }}
+                                    className="w-full bg-emerald-500 text-white py-3 px-6 rounded-xl hover:bg-emerald-600 transition-all font-medium flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40"
+                                >
+                                    Manage Subscription
+                                    <ArrowRight className="w-5 h-5" />
+                                </button>
+                                <button
+                                    onClick={() => setShowUpgradeModal(false)}
+                                    className="w-full py-2.5 px-4 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-all"
+                                >
+                                    Maybe Later
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

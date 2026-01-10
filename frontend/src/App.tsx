@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthService } from './services/auth'
@@ -49,6 +49,7 @@ function App() {
     const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null)
     const [checkingSubscription, setCheckingSubscription] = useState(false)
     const isMobile = useIsMobile()
+    const checkedUserIdRef = useRef<string | null>(null)
 
     useEffect(() => {
         // Get initial user
@@ -70,12 +71,17 @@ function App() {
         }
     }, [])
 
-    // Check subscription when user changes
+    // Check subscription when user changes (only once per user)
     useEffect(() => {
         if (user) {
-            checkSubscription()
+            // Only do a blocking check if this is a new user we haven't checked yet
+            if (checkedUserIdRef.current !== user.id) {
+                checkedUserIdRef.current = user.id
+                checkSubscription(true) // blocking check
+            }
         } else {
             setSubscriptionStatus(null)
+            checkedUserIdRef.current = null
         }
     }, [user])
 
@@ -90,10 +96,13 @@ function App() {
         }
     }
 
-    const checkSubscription = async () => {
+    const checkSubscription = async (showLoader = false) => {
         if (!user) return
 
-        setCheckingSubscription(true)
+        // Only show blocking loader on initial check
+        if (showLoader) {
+            setCheckingSubscription(true)
+        }
         try {
             const status = await SubscriptionService.getStatus()
             setSubscriptionStatus(status)
@@ -114,7 +123,9 @@ function App() {
                 remainingTrialDays: null
             })
         } finally {
-            setCheckingSubscription(false)
+            if (showLoader) {
+                setCheckingSubscription(false)
+            }
         }
     }
 
@@ -123,8 +134,8 @@ function App() {
     }
 
     const handleTrialStarted = () => {
-        // Re-check subscription after trial is started
-        checkSubscription()
+        // Re-check subscription after trial is started (show loader since user expects it)
+        checkSubscription(true)
     }
 
     // Loading state
@@ -151,8 +162,21 @@ function App() {
 
     // User is logged in - check subscription status
     if (user) {
-        // Still checking subscription
-        if (checkingSubscription || subscriptionStatus === null) {
+        // Only show blocking loader on initial subscription check
+        if (checkingSubscription && subscriptionStatus === null) {
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+                        <p className="mt-4 text-gray-600">Checking subscription...</p>
+                    </div>
+                </div>
+            )
+        }
+        
+        // If we have no subscription status yet and not checking, something's wrong - trigger check
+        if (subscriptionStatus === null) {
+            checkSubscription(true)
             return (
                 <div className="min-h-screen flex items-center justify-center bg-gray-50">
                     <div className="text-center">
@@ -187,7 +211,9 @@ function App() {
         }
 
         // User has access - show the app
-        const isOnTrial = subscriptionStatus.subscription.status === 'trial'
+        const isOnTrial = subscriptionStatus.subscription.status === 'trial' && subscriptionStatus.remainingTrialDays > 0
+        const bannerDismissed = localStorage.getItem('nexus-trial-banner-dismissed') === 'true'
+        const showTrialBanner = isOnTrial && !bannerDismissed
         
         // Show mobile app for mobile users
         if (isMobile) {
@@ -195,15 +221,13 @@ function App() {
                 <Router>
                     <div className="min-h-screen" style={{ backgroundColor: '#F9FAFB' }}>
                         <StorageProvider>
-                            {/* Show trial banner if on trial */}
-                            {isOnTrial && (
+                            {/* Show trial banner if on trial and not dismissed */}
+                            {showTrialBanner && (
                                 <TrialBanner 
                                     remainingDays={subscriptionStatus.remainingTrialDays} 
                                 />
                             )}
-                            <div className={isOnTrial ? 'pt-10' : ''}>
-                                <MobileApp user={user} subscriptionStatus={subscriptionStatus} />
-                            </div>
+                            <MobileApp user={user} subscriptionStatus={subscriptionStatus} />
                         </StorageProvider>
                         <Toaster position="top-center" />
                     </div>
@@ -216,32 +240,29 @@ function App() {
             <Router>
                 <StorageProvider>
                     <TutorialProvider>
-                        {/* Show trial banner if on trial */}
-                        {isOnTrial && (
+                        {/* Show trial banner if on trial and not dismissed */}
+                        {showTrialBanner && (
                             <TrialBanner 
                                 remainingDays={subscriptionStatus.remainingTrialDays} 
                             />
                         )}
                         
-                        {/* Add top padding when banner is showing */}
-                        <div className={isOnTrial ? 'pt-10' : ''}>
-                            <Routes>
-                                {/* Public routes - accessible without auth */}
-                                <Route path="/org/:slug" element={<PublicOrganizationPage />} />
-                                
-                                {/* Authenticated routes */}
-                                <Route path="/*" element={
-                                    <Layout user={user}>
-                                        <Routes>
-                                            <Route index element={<Dashboard />} />
-                                            <Route path="initiatives/:id" element={<InitiativePage />} />
-                                            <Route path="initiatives/:id/metrics/:kpiId" element={<InitiativePage />} />
-                                            <Route path="account" element={<AccountPage subscriptionStatus={subscriptionStatus} />} />
-                                        </Routes>
-                                    </Layout>
-                                } />
-                            </Routes>
-                        </div>
+                        <Routes>
+                            {/* Public routes - accessible without auth */}
+                            <Route path="/org/:slug" element={<PublicOrganizationPage />} />
+                            
+                            {/* Authenticated routes */}
+                            <Route path="/*" element={
+                                <Layout user={user}>
+                                    <Routes>
+                                        <Route index element={<Dashboard />} />
+                                        <Route path="initiatives/:id" element={<InitiativePage />} />
+                                        <Route path="initiatives/:id/metrics/:kpiId" element={<InitiativePage />} />
+                                        <Route path="account" element={<AccountPage subscriptionStatus={subscriptionStatus} />} />
+                                    </Routes>
+                                </Layout>
+                            } />
+                        </Routes>
                         <InteractiveTutorial />
                     </TutorialProvider>
                 </StorageProvider>

@@ -1,6 +1,8 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { SubscriptionService } from '../services/subscriptionService';
+import { stripe, STRIPE_CONFIG, PLAN_LIMITS } from '../utils/stripe';
+import { supabase } from '../utils/supabase';
 
 const router = Router();
 
@@ -184,6 +186,263 @@ function getFeaturesByPlan(
             ];
     }
 }
+
+/**
+ * POST /api/subscription/create-checkout-session
+ * Create a Stripe checkout session for the starter plan
+ */
+router.post('/create-checkout-session', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        if (!stripe) {
+            res.status(503).json({ error: 'Payment system not configured' });
+            return;
+        }
+
+        const userId = req.user!.id;
+        const userEmail = req.user!.email;
+
+        // Get or create subscription to get/create stripe customer
+        let subscription = await SubscriptionService.getOrCreate(userId);
+        
+        let customerId = subscription.stripe_customer_id;
+        
+        // Create Stripe customer if doesn't exist
+        if (!customerId) {
+            const customer = await stripe.customers.create({
+                email: userEmail,
+                metadata: {
+                    user_id: userId,
+                }
+            });
+            customerId = customer.id;
+            
+            // Save customer ID
+            await supabase
+                .from('subscriptions')
+                .update({ stripe_customer_id: customerId })
+                .eq('user_id', userId);
+        }
+
+        // Create checkout session
+        const session = await stripe.checkout.sessions.create({
+            customer: customerId,
+            payment_method_types: ['card'],
+            line_items: [
+                {
+                    price: STRIPE_CONFIG.STARTER_PRICE_ID,
+                    quantity: 1,
+                },
+            ],
+            mode: 'subscription',
+            success_url: `${STRIPE_CONFIG.SUCCESS_URL}?checkout=success`,
+            cancel_url: `${STRIPE_CONFIG.CANCEL_URL}?checkout=cancelled`,
+            metadata: {
+                user_id: userId,
+            },
+            subscription_data: {
+                metadata: {
+                    user_id: userId,
+                }
+            }
+        });
+
+        res.json({ 
+            sessionId: session.id,
+            url: session.url 
+        });
+    } catch (error) {
+        console.error('Error creating checkout session:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * POST /api/subscription/webhook
+ * Handle Stripe webhook events
+ * Note: This needs raw body - handled specially in index.ts
+ */
+router.post('/webhook', async (req: Request, res: Response) => {
+    if (!stripe) {
+        res.status(503).json({ error: 'Payment system not configured' });
+        return;
+    }
+
+    const sig = req.headers['stripe-signature'] as string;
+    
+    let event;
+    
+    try {
+        // req.body should be raw buffer for webhook verification
+        event = stripe.webhooks.constructEvent(
+            req.body,
+            sig,
+            STRIPE_CONFIG.WEBHOOK_SECRET
+        );
+    } catch (err) {
+        console.error('Webhook signature verification failed:', err);
+        res.status(400).send(`Webhook Error: ${(err as Error).message}`);
+        return;
+    }
+
+    // Handle the event
+    try {
+        switch (event.type) {
+            case 'checkout.session.completed': {
+                const session = event.data.object as any;
+                const userId = session.metadata?.user_id;
+                
+                if (userId && session.subscription) {
+                    // Get subscription details from Stripe
+                    const stripeSubscription = await stripe.subscriptions.retrieve(
+                        session.subscription as string
+                    ) as any;
+                    
+                    const periodStart = stripeSubscription.current_period_start 
+                        ? new Date(stripeSubscription.current_period_start * 1000).toISOString()
+                        : new Date().toISOString();
+                    const periodEnd = stripeSubscription.current_period_end
+                        ? new Date(stripeSubscription.current_period_end * 1000).toISOString()
+                        : new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(); // 28 days from now
+                    
+                    await SubscriptionService.updateFromStripe(userId, {
+                        stripe_subscription_id: stripeSubscription.id,
+                        stripe_price_id: STRIPE_CONFIG.STARTER_PRICE_ID,
+                        status: 'active',
+                        plan_tier: 'starter',
+                        billing_interval: 'monthly', // 4 weeks treated as monthly
+                        current_period_start: periodStart,
+                        current_period_end: periodEnd,
+                    });
+
+                    // Set initiative limit for starter plan
+                    await supabase
+                        .from('subscriptions')
+                        .update({ initiatives_limit: PLAN_LIMITS.starter.initiatives_limit })
+                        .eq('user_id', userId);
+                        
+                    console.log(`✅ Subscription activated for user ${userId}`);
+                }
+                break;
+            }
+
+            case 'customer.subscription.updated': {
+                const subscription = event.data.object as any;
+                const userId = subscription.metadata?.user_id;
+                
+                if (userId) {
+                    const status = subscription.status === 'active' ? 'active' 
+                        : subscription.status === 'past_due' ? 'past_due'
+                        : subscription.status === 'canceled' ? 'cancelled'
+                        : 'active';
+
+                    const periodStart = subscription.current_period_start 
+                        ? new Date(subscription.current_period_start * 1000).toISOString()
+                        : undefined;
+                    const periodEnd = subscription.current_period_end
+                        ? new Date(subscription.current_period_end * 1000).toISOString()
+                        : undefined;
+
+                    await SubscriptionService.updateFromStripe(userId, {
+                        status,
+                        ...(periodStart && { current_period_start: periodStart }),
+                        ...(periodEnd && { current_period_end: periodEnd }),
+                        cancel_at_period_end: subscription.cancel_at_period_end,
+                    });
+                    
+                    console.log(`✅ Subscription updated for user ${userId}: ${status}`);
+                }
+                break;
+            }
+
+            case 'customer.subscription.deleted': {
+                const subscription = event.data.object as any;
+                const userId = subscription.metadata?.user_id;
+                
+                if (userId) {
+                    await SubscriptionService.updateFromStripe(userId, {
+                        status: 'cancelled',
+                        cancelled_at: new Date().toISOString(),
+                    });
+                    
+                    console.log(`✅ Subscription cancelled for user ${userId}`);
+                }
+                break;
+            }
+
+            case 'invoice.payment_failed': {
+                const invoice = event.data.object as any;
+                const subscriptionId = invoice.subscription as string;
+                
+                if (subscriptionId) {
+                    const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId) as any;
+                    const userId = stripeSubscription.metadata?.user_id;
+                    
+                    if (userId) {
+                        await SubscriptionService.updateFromStripe(userId, {
+                            status: 'past_due',
+                        });
+                        
+                        console.log(`⚠️ Payment failed for user ${userId}`);
+                    }
+                }
+                break;
+            }
+
+            default:
+                console.log(`Unhandled event type: ${event.type}`);
+        }
+
+        res.json({ received: true });
+    } catch (error) {
+        console.error('Error handling webhook:', error);
+        res.status(500).json({ error: 'Webhook handler failed' });
+    }
+});
+
+/**
+ * GET /api/subscription/initiatives-usage
+ * Get current initiatives count vs limit
+ */
+router.get('/initiatives-usage', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const userId = req.user!.id;
+        const usage = await SubscriptionService.getInitiativesUsage(userId);
+        res.json(usage);
+    } catch (error) {
+        console.error('Error getting initiatives usage:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * POST /api/subscription/create-portal-session
+ * Create Stripe customer portal session for managing subscription
+ */
+router.post('/create-portal-session', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        if (!stripe) {
+            res.status(503).json({ error: 'Payment system not configured' });
+            return;
+        }
+
+        const subscription = await SubscriptionService.getOrCreate(req.user!.id);
+        
+        if (!subscription.stripe_customer_id) {
+            res.status(400).json({ error: 'No billing account found' });
+            return;
+        }
+
+        const session = await stripe.billingPortal.sessions.create({
+            customer: subscription.stripe_customer_id,
+            return_url: STRIPE_CONFIG.SUCCESS_URL,
+        });
+
+        res.json({ url: session.url });
+    } catch (error) {
+        console.error('Error creating portal session:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
 
 export default router;
 

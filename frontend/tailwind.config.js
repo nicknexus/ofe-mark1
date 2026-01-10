@@ -75,9 +75,24 @@ export default {
                 // Off-white page background
                 page: '#F0F1F4',
                 offWhite: '#F4F5F7',
+                // Landing page specific colors (prefixed to avoid conflicts)
+                'lp-border': "#e5e7eb",
+                'lp-background': "#ffffff",
+                'lp-foreground': "#465360",
+                'lp-muted': "#f5f5f5",
+                'lp-muted-foreground': "#6b7280",
+                'lp-accent': "#c0dfa1",
+                'lp-accent-foreground': "#465360",
+                'lp-sage': {
+                    DEFAULT: "#c0dfa1",
+                    light: "#e8f3df",
+                    dark: "#90b171",
+                },
             },
             fontFamily: {
                 sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+                newsreader: ['Newsreader', 'serif'],
+                figtree: ['Figtree', 'system-ui', 'sans-serif'],
             },
             boxShadow: {
                 // Soft floating card shadows
@@ -86,6 +101,10 @@ export default {
                 'bubble-sm': '0 2px 10px rgba(0, 0, 0, 0.05)',
                 'bubble-lg': '0 10px 40px rgba(0, 0, 0, 0.08)',
                 'icon-bubble': 'inset 0 1px 4px rgba(0, 0, 0, 0.05)',
+                // Landing page shadows
+                'glass': '0 3px 10px 0 rgba(70, 83, 96, 0.03)',
+                'glass-lg': '0 6px 16px 0 rgba(70, 83, 96, 0.045)',
+                'sage': '0 3px 10px 0 rgba(192, 223, 161, 0.115)',
             },
             borderRadius: {
                 '2xl': '1rem',
@@ -97,6 +116,8 @@ export default {
                 'slide-up': 'slideUpFadeIn 0.2s ease-out',
                 'slide-up-fast': 'slideUpFadeInFast 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
                 'pulse-soft': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                "accordion-down": "accordion-down 0.2s ease-out",
+                "accordion-up": "accordion-up 0.2s ease-out",
             },
             keyframes: {
                 fadeIn: {
@@ -118,11 +139,20 @@ export default {
                 slideUp: {
                     '0%': { transform: 'translateY(10px)', opacity: '0' },
                     '100%': { transform: 'translateY(0)', opacity: '1' },
-                }
+                },
+                "accordion-down": {
+                    from: { height: "0" },
+                    to: { height: "var(--radix-accordion-content-height)" },
+                },
+                "accordion-up": {
+                    from: { height: "var(--radix-accordion-content-height)" },
+                    to: { height: "0" },
+                },
             }
         },
     },
     plugins: [
         require('@tailwindcss/forms'),
+        require('tailwindcss-animate'),
     ],
 } 

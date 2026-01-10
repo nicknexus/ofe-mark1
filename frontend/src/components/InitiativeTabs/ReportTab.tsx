@@ -874,37 +874,37 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                 {(!reportText || !reportDashboardData || !showDashboard) && (
                     <div className="bg-white/70 backdrop-blur-2xl rounded-3xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.15)] border border-white/60 overflow-hidden">
                         {/* Header */}
-                        <div className="flex items-center justify-between p-6 border-b border-primary-200/40 bg-gradient-to-r from-primary-100/50 to-primary-50/30 backdrop-blur-xl">
-                            <div className="flex items-center space-x-3 flex-1">
-                                <div className="w-11 h-11 rounded-xl bg-primary-500/15 backdrop-blur-sm flex items-center justify-center border border-primary-300/30">
-                                    <Sparkles className="w-6 h-6 text-primary-500" />
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-primary-200/40 bg-gradient-to-r from-primary-100/50 to-primary-50/30 backdrop-blur-xl">
+                            <div className="flex items-center space-x-2.5 flex-1">
+                                <div className="w-9 h-9 rounded-lg bg-primary-500/15 backdrop-blur-sm flex items-center justify-center border border-primary-300/30">
+                                    <Sparkles className="w-5 h-5 text-primary-500" />
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-semibold text-gray-800">AI Report Generator</h2>
-                                    <p className="text-sm text-gray-500 mt-0.5">Generate professional impact reports powered by AI</p>
+                                    <h2 className="text-lg font-semibold text-gray-800">AI Report Generator</h2>
+                                    <p className="text-xs text-gray-500">Generate professional impact reports powered by AI</p>
                                 </div>
                             </div>
                         </div>
 
                         {/* Progress Steps Indicator */}
-                        <div className="px-6 py-4 border-b border-primary-100/40 bg-white/30 backdrop-blur-xl">
+                        <div className="px-5 py-2.5 border-b border-primary-100/40 bg-white/30 backdrop-blur-xl">
                             <div className="flex items-center justify-center">
                                 {steps.map((step, index) => (
                                     <React.Fragment key={step.number}>
                                         <div className="flex flex-col items-center">
-                                            <div className={`flex items-center justify-center w-10 h-10 rounded-xl border-2 transition-all duration-200 ${currentStep > step.number
-                                                ? 'bg-primary-500 border-primary-500 text-white shadow-lg shadow-primary-500/30'
+                                            <div className={`flex items-center justify-center w-8 h-8 rounded-lg border-2 transition-all duration-200 ${currentStep > step.number
+                                                ? 'bg-primary-500 border-primary-500 text-white shadow-md shadow-primary-500/30'
                                                 : currentStep === step.number
-                                                    ? 'bg-primary-500 border-primary-500 text-white ring-4 ring-primary-200/50 shadow-lg shadow-primary-500/30'
+                                                    ? 'bg-primary-500 border-primary-500 text-white ring-2 ring-primary-200/50 shadow-md shadow-primary-500/30'
                                                     : 'bg-white/50 backdrop-blur-sm border-gray-200/60 text-gray-400'
                                                 }`}>
                                                 {currentStep > step.number ? (
-                                                    <Check className="w-5 h-5" />
+                                                    <Check className="w-4 h-4" />
                                                 ) : (
-                                                    <step.icon className="w-5 h-5" />
+                                                    <step.icon className="w-4 h-4" />
                                                 )}
                                             </div>
-                                            <div className="mt-2 text-center">
+                                            <div className="mt-1 text-center">
                                                 <div className={`text-xs font-medium whitespace-nowrap ${currentStep >= step.number ? 'text-gray-700' : 'text-gray-400'
                                                     }`}>
                                                     {step.title}
@@ -912,8 +912,8 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                             </div>
                                         </div>
                                         {index < steps.length - 1 && (
-                                            <div className={`flex-1 h-0.5 mx-4 rounded-full transition-all duration-200 ${currentStep > step.number ? 'bg-primary-500' : 'bg-gray-200/60'
-                                                }`} style={{ maxWidth: '120px' }} />
+                                            <div className={`flex-1 h-0.5 mx-3 rounded-full transition-all duration-200 ${currentStep > step.number ? 'bg-primary-500' : 'bg-gray-200/60'
+                                                }`} style={{ maxWidth: '80px' }} />
                                         )}
                                     </React.Fragment>
                                 ))}
@@ -921,20 +921,20 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                         </div>
 
                         {/* Step Content */}
-                        <div ref={formContentRef} className="p-8 min-h-[400px] max-h-[60vh] overflow-y-auto">
+                        <div ref={formContentRef} className="p-5 min-h-[440px] max-h-[70vh] overflow-y-auto">
                             {/* Step 1: Filters */}
                             {currentStep === 1 && (
-                                <div className="space-y-6 animate-fade-in max-w-3xl mx-auto">
-                                    <div className="text-center mb-8">
-                                        <h3 className="text-2xl font-semibold text-gray-900 mb-2">Select Report Filters</h3>
-                                        <p className="text-gray-600">Choose the data you want to include in your report</p>
+                                <div className="space-y-4 animate-fade-in max-w-3xl mx-auto">
+                                    <div className="text-center mb-4">
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-1">Select Report Filters</h3>
+                                        <p className="text-sm text-gray-600">Choose the data you want to include in your report</p>
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {/* Date Range */}
                                         <div>
-                                            <label className="block text-sm font-semibold text-gray-900 mb-3">
-                                                <Calendar className="w-5 h-5 inline mr-2 text-primary-600" />
+                                            <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                                <Calendar className="w-4 h-4 inline mr-1.5 text-primary-600" />
                                                 Date Range
                                             </label>
                                             <DateRangePicker
@@ -945,13 +945,13 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
                                         {/* KPI Multi-Select */}
                                         <div className="relative" ref={kpiPickerRef}>
-                                            <label className="block text-sm font-semibold text-gray-900 mb-3">
-                                                <BarChart3 className="w-5 h-5 inline mr-2 text-primary-600" />
+                                            <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                                <BarChart3 className="w-4 h-4 inline mr-1.5 text-primary-600" />
                                                 Metrics ({selectedKPIIds.length} selected)
                                             </label>
                                             <button
                                                 onClick={() => setShowKPIPicker(!showKPIPicker)}
-                                                className="w-full px-4 py-3 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm shadow-bubble-sm transition-all"
+                                                className="w-full px-3 py-2.5 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm shadow-bubble-sm transition-all"
                                             >
                                                 {selectedKPIIds.length === 0
                                                     ? 'All metrics (default)'
@@ -985,13 +985,13 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
                                         {/* Location Multi-Select */}
                                         <div className="relative" ref={locationPickerRef}>
-                                            <label className="block text-sm font-semibold text-gray-900 mb-3">
-                                                <MapPin className="w-5 h-5 inline mr-2 text-primary-600" />
+                                            <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                                <MapPin className="w-4 h-4 inline mr-1.5 text-primary-600" />
                                                 Locations ({selectedLocationIds.length} selected)
                                             </label>
                                             <button
                                                 onClick={() => setShowLocationPicker(!showLocationPicker)}
-                                                className="w-full px-4 py-3 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm shadow-bubble-sm transition-all"
+                                                className="w-full px-3 py-2.5 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm shadow-bubble-sm transition-all"
                                             >
                                                 {selectedLocationIds.length === 0
                                                     ? 'All locations (default)'
@@ -1025,13 +1025,13 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
                                         {/* Beneficiary Group Multi-Select */}
                                         <div className="relative" ref={beneficiaryPickerRef}>
-                                            <label className="block text-sm font-semibold text-gray-900 mb-3">
-                                                <Users className="w-5 h-5 inline mr-2 text-primary-600" />
+                                            <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                                <Users className="w-4 h-4 inline mr-1.5 text-primary-600" />
                                                 Beneficiary Groups ({selectedBeneficiaryGroupIds.length} selected)
                                             </label>
                                             <button
                                                 onClick={() => setShowBeneficiaryPicker(!showBeneficiaryPicker)}
-                                                className="w-full px-4 py-3 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm shadow-bubble-sm transition-all"
+                                                className="w-full px-3 py-2.5 text-left bg-white border-2 border-gray-200 rounded-xl hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm shadow-bubble-sm transition-all"
                                             >
                                                 {selectedBeneficiaryGroupIds.length === 0
                                                     ? 'All groups (default)'
@@ -1066,15 +1066,15 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
                                     {/* Beneficiary Group Scoping Disclaimer */}
                                     {selectedBeneficiaryGroupIds.length > 0 ? (
-                                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-2">
-                                            <p className="text-sm text-amber-800">
-                                                <strong>Scoped Report:</strong> The report will only include metrics and data associated with the selected beneficiary group{selectedBeneficiaryGroupIds.length > 1 ? 's' : ''}. All totals will reflect only the impact for {selectedBeneficiaryGroupIds.length === 1 ? 'this group' : 'these groups'}.
+                                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-1">
+                                            <p className="text-xs text-amber-800">
+                                                <strong>Scoped Report:</strong> Only includes data for selected beneficiary group{selectedBeneficiaryGroupIds.length > 1 ? 's' : ''}.
                                             </p>
                                         </div>
                                     ) : beneficiaryGroups.length > 0 && (
-                                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-2">
-                                            <p className="text-sm text-gray-600">
-                                                <strong>Full Report:</strong> No beneficiary groups selected — the report will include all metrics across your initiative based on the other filters you choose.
+                                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mt-1">
+                                            <p className="text-xs text-gray-600">
+                                                <strong>Full Report:</strong> Includes all metrics across your initiative.
                                             </p>
                                         </div>
                                     )}
@@ -1083,10 +1083,10 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
                             {/* Step 2: Review Data */}
                             {currentStep === 2 && (
-                                <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
-                                    <div className="text-center mb-8">
-                                        <h3 className="text-2xl font-semibold text-gray-900 mb-2">Review Your Data</h3>
-                                        <p className="text-gray-600">Here's a summary of the data that will be included in your report</p>
+                                <div className="space-y-4 animate-fade-in max-w-4xl mx-auto">
+                                    <div className="text-center mb-4">
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-1">Review Your Data</h3>
+                                        <p className="text-sm text-gray-600">Summary of data included in your report</p>
                                     </div>
 
                                     {loadingData ? (
@@ -1095,20 +1095,20 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                             <span className="ml-3 text-gray-600">Loading data...</span>
                                         </div>
                                     ) : reportData ? (
-                                        <div className="space-y-6">
+                                        <div className="space-y-4">
                                             {/* Metrics Summary */}
                                             {reportData.totals.length > 0 && (
-                                                <div className="bg-gray-50 rounded-xl border-2 border-gray-200 p-6">
-                                                    <h4 className="font-semibold text-gray-800 mb-4 flex items-center">
-                                                        <BarChart3 className="w-5 h-5 mr-2 text-primary-600" />
-                                                        Metrics Summary ({reportData.totals.length})
+                                                <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                                                    <h4 className="font-semibold text-gray-800 mb-3 flex items-center text-sm">
+                                                        <BarChart3 className="w-4 h-4 mr-1.5 text-primary-600" />
+                                                        Metrics ({reportData.totals.length})
                                                     </h4>
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                                                         {reportData.totals.map(total => (
-                                                            <div key={total.kpi_id} className="p-4 bg-white rounded-xl border border-gray-100 shadow-sm">
-                                                                <h5 className="font-medium text-gray-700 text-sm truncate">{total.kpi_title}</h5>
-                                                                <p className="text-2xl font-bold text-evidence-500 mt-2">
-                                                                    {total.total_value} <span className="text-sm font-normal text-gray-500">{total.unit_of_measurement}</span>
+                                                            <div key={total.kpi_id} className="p-2.5 bg-white rounded-lg border border-gray-100 shadow-sm">
+                                                                <h5 className="font-medium text-gray-700 text-xs truncate">{total.kpi_title}</h5>
+                                                                <p className="text-lg font-bold text-evidence-500 mt-1">
+                                                                    {total.total_value} <span className="text-xs font-normal text-gray-500">{total.unit_of_measurement}</span>
                                                                 </p>
                                                             </div>
                                                         ))}
@@ -1118,14 +1118,14 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
                                             {/* Locations */}
                                             {reportData.locations.length > 0 && (
-                                                <div className="bg-gray-50 rounded-xl border-2 border-gray-200 p-6">
-                                                    <h4 className="font-semibold text-gray-800 mb-4 flex items-center">
-                                                        <MapPin className="w-5 h-5 mr-2 text-primary-600" />
+                                                <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                                                    <h4 className="font-semibold text-gray-800 mb-2 flex items-center text-sm">
+                                                        <MapPin className="w-4 h-4 mr-1.5 text-primary-600" />
                                                         Locations ({reportData.locations.length})
                                                     </h4>
-                                                    <div className="flex flex-wrap gap-2">
+                                                    <div className="flex flex-wrap gap-1.5">
                                                         {reportData.locations.map(location => (
-                                                            <span key={location.id} className="px-3 py-1.5 bg-white rounded-full border border-gray-200 text-sm font-medium text-gray-700">
+                                                            <span key={location.id} className="px-2.5 py-1 bg-white rounded-full border border-gray-200 text-xs font-medium text-gray-700">
                                                                 {location.name}
                                                             </span>
                                                         ))}
@@ -1152,45 +1152,45 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
                             {/* Step 3: Add Story */}
                             {currentStep === 3 && (
-                                <div className="space-y-6 animate-fade-in max-w-3xl mx-auto">
-                                    <div className="text-center mb-8">
-                                        <h3 className="text-2xl font-semibold text-gray-900 mb-2">Add a Story (Optional)</h3>
-                                        <p className="text-gray-600">Select a story to anchor your report narrative, or skip to generate without one</p>
+                                <div className="space-y-4 animate-fade-in max-w-3xl mx-auto">
+                                    <div className="text-center mb-4">
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-1">Add a Story (Optional)</h3>
+                                        <p className="text-sm text-gray-600">Select a story to anchor your report, or skip</p>
                                     </div>
 
                                     {reportData?.stories && reportData.stories.length > 0 ? (
-                                        <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                                        <div className="space-y-2 max-h-[250px] overflow-y-auto">
                                             {reportData.stories.map(story => (
                                                 <div
                                                     key={story.id}
                                                     onClick={() => setSelectedStory(selectedStory?.id === story.id ? null : story)}
-                                                    className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 ${selectedStory?.id === story.id
-                                                        ? 'border-primary-400 bg-primary-50 shadow-lg shadow-primary-500/10'
+                                                    className={`p-3 border-2 rounded-lg cursor-pointer transition-all duration-200 ${selectedStory?.id === story.id
+                                                        ? 'border-primary-400 bg-primary-50 shadow-md shadow-primary-500/10'
                                                         : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
                                                         }`}
                                                 >
                                                     <div className="flex items-start justify-between">
                                                         <div className="flex-1">
-                                                            <h4 className="font-semibold text-gray-800">{story.title}</h4>
+                                                            <h4 className="font-semibold text-gray-800 text-sm">{story.title}</h4>
                                                             {story.description && (
-                                                                <p className="text-sm text-gray-500 mt-1 line-clamp-2">{story.description}</p>
+                                                                <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{story.description}</p>
                                                             )}
-                                                            <div className="flex items-center space-x-4 mt-2 text-xs text-gray-400">
+                                                            <div className="flex items-center space-x-3 mt-1.5 text-xs text-gray-400">
                                                                 {story.location_name && (
                                                                     <span className="flex items-center">
-                                                                        <MapPin className="w-3 h-3 mr-1" />
+                                                                        <MapPin className="w-3 h-3 mr-0.5" />
                                                                         {story.location_name}
                                                                     </span>
                                                                 )}
                                                                 <span className="flex items-center">
-                                                                    <Calendar className="w-3 h-3 mr-1" />
+                                                                    <Calendar className="w-3 h-3 mr-0.5" />
                                                                     {story.date_represented}
                                                                 </span>
                                                             </div>
                                                         </div>
                                                         {selectedStory?.id === story.id && (
-                                                            <div className="w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center ml-3">
-                                                                <Check className="w-4 h-4 text-white" />
+                                                            <div className="w-5 h-5 bg-primary-500 rounded-full flex items-center justify-center ml-2">
+                                                                <Check className="w-3 h-3 text-white" />
                                                             </div>
                                                         )}
                                                     </div>
@@ -1223,45 +1223,45 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
                             {/* Step 4: Generate */}
                             {currentStep === 4 && (
-                                <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
-                                    <div className="text-center mb-8">
-                                        <h3 className="text-2xl font-semibold text-gray-900 mb-2">Ready to Generate</h3>
-                                        <p className="text-gray-600">Review your selections and generate your AI-powered impact report</p>
+                                <div className="space-y-4 animate-fade-in max-w-2xl mx-auto">
+                                    <div className="text-center mb-4">
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-1">Ready to Generate</h3>
+                                        <p className="text-sm text-gray-600">Review and generate your AI-powered report</p>
                                     </div>
 
                                     {/* Summary */}
-                                    <div className="bg-gray-50 rounded-xl border-2 border-gray-200 p-6 space-y-4">
-                                        <h4 className="font-semibold text-gray-800">Report Summary</h4>
+                                    <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-3">
+                                        <h4 className="font-semibold text-gray-800 text-sm">Report Summary</h4>
 
-                                        <div className="grid grid-cols-2 gap-4 text-sm">
-                                            <div className="bg-white rounded-lg p-3 border border-gray-100">
-                                                <span className="text-gray-500">Metrics</span>
-                                                <p className="font-semibold text-gray-800">{reportData?.totals.length || 0} included</p>
+                                        <div className="grid grid-cols-2 gap-2 text-sm">
+                                            <div className="bg-white rounded-lg p-2.5 border border-gray-100">
+                                                <span className="text-xs text-gray-500">Metrics</span>
+                                                <p className="font-semibold text-gray-800">{reportData?.totals.length || 0}</p>
                                             </div>
-                                            <div className="bg-white rounded-lg p-3 border border-gray-100">
-                                                <span className="text-gray-500">Locations</span>
-                                                <p className="font-semibold text-gray-800">{reportData?.locations.length || 0} included</p>
+                                            <div className="bg-white rounded-lg p-2.5 border border-gray-100">
+                                                <span className="text-xs text-gray-500">Locations</span>
+                                                <p className="font-semibold text-gray-800">{reportData?.locations.length || 0}</p>
                                             </div>
-                                            <div className="bg-white rounded-lg p-3 border border-gray-100">
-                                                <span className="text-gray-500">Date Range</span>
-                                                <p className="font-semibold text-gray-800">
+                                            <div className="bg-white rounded-lg p-2.5 border border-gray-100">
+                                                <span className="text-xs text-gray-500">Date Range</span>
+                                                <p className="font-semibold text-gray-800 text-xs">
                                                     {dateRange.startDate && dateRange.endDate
                                                         ? `${dateRange.startDate} - ${dateRange.endDate}`
                                                         : dateRange.singleDate || 'All dates'
                                                     }
                                                 </p>
                                             </div>
-                                            <div className="bg-white rounded-lg p-3 border border-gray-100">
-                                                <span className="text-gray-500">Featured Story</span>
-                                                <p className="font-semibold text-gray-800 truncate">{selectedStory?.title || 'None'}</p>
+                                            <div className="bg-white rounded-lg p-2.5 border border-gray-100">
+                                                <span className="text-xs text-gray-500">Story</span>
+                                                <p className="font-semibold text-gray-800 text-xs truncate">{selectedStory?.title || 'None'}</p>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="bg-primary-50 border-2 border-primary-200 rounded-xl p-5 text-center">
-                                        <Sparkles className="w-10 h-10 text-primary-500 mx-auto mb-3" />
-                                        <p className="text-sm text-primary-800 leading-relaxed">
-                                            Our AI will analyze your data and generate a professional impact report with insights, metrics visualization, and narrative content.
+                                    <div className="bg-primary-50 border border-primary-200 rounded-xl p-4 text-center">
+                                        <Sparkles className="w-8 h-8 text-primary-500 mx-auto mb-2" />
+                                        <p className="text-xs text-primary-800 leading-relaxed">
+                                            AI will analyze your data and generate a professional impact report.
                                         </p>
                                     </div>
                                 </div>
@@ -1269,36 +1269,36 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                         </div>
 
                         {/* Navigation Footer */}
-                        <div className="border-t border-primary-100/40 p-6 bg-white/30 backdrop-blur-xl">
+                        <div className="border-t border-primary-100/40 px-5 py-3 bg-white/30 backdrop-blur-xl">
                             <div className="flex items-center justify-between max-w-3xl mx-auto">
                                 <button
                                     type="button"
                                     onClick={handleBack}
                                     disabled={currentStep === 1}
-                                    className={`flex items-center space-x-2 px-5 py-3 text-gray-600 bg-white/50 backdrop-blur-sm border border-gray-200/60 rounded-xl font-medium transition-all duration-200 ${currentStep === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/70'
+                                    className={`flex items-center space-x-1.5 px-4 py-2 text-gray-600 bg-white/50 backdrop-blur-sm border border-gray-200/60 rounded-lg font-medium text-sm transition-all duration-200 ${currentStep === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/70'
                                         }`}
                                 >
-                                    <ChevronLeft className="w-5 h-5" />
+                                    <ChevronLeft className="w-4 h-4" />
                                     <span>Back</span>
                                 </button>
 
-                                <div className="flex items-center space-x-3">
+                                <div className="flex items-center space-x-2">
                                     {currentStep < totalSteps ? (
                                         <button
                                             type="button"
                                             onClick={handleNext}
                                             disabled={loadingData || !canProceedToNextStep()}
-                                            className="flex items-center space-x-2 px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-200 shadow-lg shadow-primary-500/30 hover:shadow-xl hover:shadow-primary-500/40"
+                                            className="flex items-center space-x-1.5 px-5 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm transition-all duration-200 shadow-md shadow-primary-500/30"
                                         >
                                             {loadingData ? (
                                                 <>
-                                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
                                                     <span>Loading...</span>
                                                 </>
                                             ) : (
                                                 <>
                                                     <span>{currentStep === 1 ? 'Apply & Continue' : 'Next'}</span>
-                                                    <ChevronRight className="w-5 h-5" />
+                                                    <ChevronRight className="w-4 h-4" />
                                                 </>
                                             )}
                                         </button>
@@ -1307,16 +1307,16 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                             type="button"
                                             onClick={handleGenerateReport}
                                             disabled={loadingReport || !reportData}
-                                            className="flex items-center space-x-2 px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-200 shadow-lg shadow-primary-500/30 hover:shadow-xl hover:shadow-primary-500/40"
+                                            className="flex items-center space-x-1.5 px-5 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm transition-all duration-200 shadow-md shadow-primary-500/30"
                                         >
                                             {loadingReport ? (
                                                 <>
-                                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
                                                     <span>Generating...</span>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <Sparkles className="w-5 h-5" />
+                                                    <Sparkles className="w-4 h-4" />
                                                     <span>Generate Report</span>
                                                 </>
                                             )}

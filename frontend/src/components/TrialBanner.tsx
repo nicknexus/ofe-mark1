@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Clock, ArrowRight, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -17,20 +17,6 @@ export default function TrialBanner({ remainingDays, onUpgradeClick }: Props) {
     })
     const navigate = useNavigate()
 
-    // Only show again if days remaining hits critical threshold (3 days or less)
-    useEffect(() => {
-        if (remainingDays !== null && remainingDays <= 3) {
-            // Reset dismissed state when it becomes critical
-            const wasDismissedBefore = localStorage.getItem(BANNER_DISMISSED_KEY) === 'true'
-            const criticalShown = localStorage.getItem('nexus-trial-critical-shown') === 'true'
-            
-            if (wasDismissedBefore && !criticalShown) {
-                localStorage.removeItem(BANNER_DISMISSED_KEY)
-                localStorage.setItem('nexus-trial-critical-shown', 'true')
-                setDismissed(false)
-            }
-        }
-    }, [remainingDays])
 
     if (remainingDays === null || dismissed) return null
 
@@ -88,18 +74,16 @@ export default function TrialBanner({ remainingDays, onUpgradeClick }: Props) {
                         <ArrowRight className="w-4 h-4" />
                     </button>
                     
-                    {!isUrgent && (
-                        <button 
-                            onClick={() => {
-                                localStorage.setItem(BANNER_DISMISSED_KEY, 'true')
-                                setDismissed(true)
-                            }}
-                            className="text-white/70 hover:text-white p-1 rounded transition-colors cursor-pointer"
-                            aria-label="Dismiss"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
-                    )}
+                    <button 
+                        onClick={() => {
+                            localStorage.setItem(BANNER_DISMISSED_KEY, 'true')
+                            setDismissed(true)
+                        }}
+                        className="text-white/70 hover:text-white p-1 rounded transition-colors cursor-pointer"
+                        aria-label="Dismiss"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
                 </div>
             </div>
         </div>

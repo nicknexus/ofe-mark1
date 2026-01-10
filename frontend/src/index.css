@@ -1,6 +1,43 @@
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:wght@200;300;400&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Landing page CSS variables - scoped to landing page only */
+.landing-page {
+    --background: 0 0% 100%;
+    --foreground: 213 13% 33%;
+    --card: 0 0% 100%;
+    --card-foreground: 213 13% 33%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 213 13% 33%;
+    --primary: 213 13% 33%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 92 48% 75%;
+    --secondary-foreground: 213 13% 33%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 213 10% 50%;
+    --accent: 92 48% 75%;
+    --accent-foreground: 213 13% 33%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 210 20% 90%;
+    --input: 210 20% 90%;
+    --ring: 92 48% 75%;
+    --radius: 1rem;
+    /* Custom tokens */
+    --sage: 92 48% 75%;
+    --sage-light: 92 48% 90%;
+    --sage-dark: 92 40% 55%;
+    --slate: 213 13% 33%;
+    --slate-light: 213 13% 50%;
+    /* Glass effect */
+    --glass-bg: 0 0% 100% / 0.7;
+    --glass-border: 0 0% 100% / 0.3;
+    --glass-shadow: 213 13% 33% / 0.08;
+}
 
 @layer base {
     html {
@@ -1137,4 +1174,248 @@ body.location-modal-open .leaflet-pane {
     .mobile-flex {
         display: flex !important;
     }
+}
+
+/* ========================================
+   LANDING PAGE STYLES
+   ======================================== */
+
+/* Landing page specific body styles */
+.landing-page {
+    font-family: 'Figtree', sans-serif;
+    background: #ffffff;
+    color: #465360;
+}
+
+/* Landing page color utilities - scoped to .landing-page */
+.landing-page .bg-background { background-color: #ffffff; }
+.landing-page .bg-foreground { background-color: #465360; }
+.landing-page .bg-muted { background-color: #f5f5f5; }
+.landing-page .bg-muted\/30 { background-color: rgba(245, 245, 245, 0.3); }
+.landing-page .bg-accent { background-color: #c0dfa1; }
+.landing-page .bg-accent\/10 { background-color: rgba(192, 223, 161, 0.1); }
+.landing-page .bg-accent\/15 { background-color: rgba(192, 223, 161, 0.15); }
+.landing-page .bg-accent\/20 { background-color: rgba(192, 223, 161, 0.2); }
+.landing-page .bg-accent\/30 { background-color: rgba(192, 223, 161, 0.3); }
+.landing-page .bg-accent\/50 { background-color: rgba(192, 223, 161, 0.5); }
+.landing-page .text-foreground { color: #465360; }
+.landing-page .text-muted-foreground { color: #6b7280; }
+.landing-page .text-accent { color: #c0dfa1; }
+.landing-page .text-accent-foreground { color: #465360; }
+.landing-page .border-border { border-color: #e5e7eb; }
+.landing-page .border-border\/30 { border-color: rgba(229, 231, 235, 0.3); }
+.landing-page .border-border\/50 { border-color: rgba(229, 231, 235, 0.5); }
+.landing-page .border-accent { border-color: #c0dfa1; }
+.landing-page .border-accent\/20 { border-color: rgba(192, 223, 161, 0.2); }
+.landing-page .border-accent\/30 { border-color: rgba(192, 223, 161, 0.3); }
+.landing-page .border-accent\/50 { border-color: rgba(192, 223, 161, 0.5); }
+.landing-page .from-background { --tw-gradient-from: #ffffff; }
+.landing-page .to-background { --tw-gradient-to: #ffffff; }
+.landing-page .from-foreground { --tw-gradient-from: #465360; }
+.landing-page .to-foreground { --tw-gradient-to: #465360; }
+.landing-page .via-muted\/30 { --tw-gradient-stops: var(--tw-gradient-from), rgba(245, 245, 245, 0.3), var(--tw-gradient-to); }
+.landing-page .via-sage-light\/10 { --tw-gradient-stops: var(--tw-gradient-from), rgba(232, 243, 223, 0.1), var(--tw-gradient-to); }
+.landing-page .via-slate-light { --tw-gradient-stops: var(--tw-gradient-from), #6b7280, var(--tw-gradient-to); }
+.landing-page .from-accent { --tw-gradient-from: #c0dfa1; }
+.landing-page .from-accent\/20 { --tw-gradient-from: rgba(192, 223, 161, 0.2); }
+.landing-page .to-accent { --tw-gradient-to: #c0dfa1; }
+.landing-page .to-accent\/10 { --tw-gradient-to: rgba(192, 223, 161, 0.1); }
+.landing-page .to-accent\/50 { --tw-gradient-to: rgba(192, 223, 161, 0.5); }
+.landing-page .bg-sage-light { background-color: #e8f3df; }
+.landing-page .bg-sage-light\/10 { background-color: rgba(232, 243, 223, 0.1); }
+.landing-page .bg-sage-light\/20 { background-color: rgba(232, 243, 223, 0.2); }
+.landing-page .bg-sage-light\/40 { background-color: rgba(232, 243, 223, 0.4); }
+.landing-page .from-sage-light { --tw-gradient-from: #e8f3df; }
+.landing-page .to-sage-light { --tw-gradient-to: #e8f3df; }
+.landing-page .ring-accent { --tw-ring-color: #c0dfa1; }
+.landing-page .ring-accent\/50 { --tw-ring-color: rgba(192, 223, 161, 0.5); }
+
+/* Glass components for landing page - scoped */
+.landing-page .glass {
+    @apply bg-white/70 backdrop-blur-xl border-2 border-white/70 shadow-md;
+}
+
+.landing-page .glass-card {
+    @apply bg-white/60 backdrop-blur-2xl border-2 border-white/80 shadow-lg rounded-2xl;
+}
+
+.landing-page .glass-subtle {
+    @apply bg-white/40 backdrop-blur-md border border-white/20;
+}
+
+.landing-page .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(to right, #465360, #6b7280, #465360);
+}
+
+.landing-page .btn-sage {
+    @apply font-semibold px-8 py-4 rounded-xl transition-all duration-300;
+    background: #c0dfa1;
+    color: #465360;
+}
+
+.landing-page .btn-sage:hover {
+    background: rgba(192, 223, 161, 0.9);
+    transform: translateY(-2px);
+    box-shadow: 0 3px 10px 0 rgba(192, 223, 161, 0.115);
+}
+
+/* Landing page animations */
+@keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-20px); }
+}
+
+@keyframes pulse-soft-landing {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+@keyframes spin-slow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes morph {
+    0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+    50% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
+}
+
+@keyframes gradient-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+@keyframes scale-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+@keyframes fade-up-landing {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in-scale-landing {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slide-in-left {
+    from { opacity: 0; transform: translateX(-50px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-in-right {
+    from { opacity: 0; transform: translateX(50px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-float {
+    animation: float 6s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+    animation: float 6s ease-in-out 2s infinite;
+}
+
+.animate-float-slow {
+    animation: float 8s ease-in-out infinite;
+}
+
+.animate-pulse-soft-landing {
+    animation: pulse-soft-landing 4s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+    animation: spin-slow 20s linear infinite;
+}
+
+.animate-spin-slower {
+    animation: spin-slow 30s linear infinite reverse;
+}
+
+.animate-morph {
+    animation: morph 8s ease-in-out infinite;
+}
+
+.animate-gradient {
+    animation: gradient-shift 6s ease infinite;
+    background-size: 200% 200%;
+}
+
+.animate-scale-pulse {
+    animation: scale-pulse 3s ease-in-out infinite;
+}
+
+.fade-up {
+    animation: fade-up-landing 0.8s ease-out forwards;
+}
+
+.fade-up-delay-1 {
+    animation: fade-up-landing 0.8s ease-out 0.1s forwards;
+    opacity: 0;
+}
+
+.fade-up-delay-2 {
+    animation: fade-up-landing 0.8s ease-out 0.2s forwards;
+    opacity: 0;
+}
+
+.fade-up-delay-3 {
+    animation: fade-up-landing 0.8s ease-out 0.3s forwards;
+    opacity: 0;
+}
+
+.fade-up-delay-4 {
+    animation: fade-up-landing 0.8s ease-out 0.4s forwards;
+    opacity: 0;
+}
+
+.fade-in-scale {
+    animation: fade-in-scale-landing 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+}
+
+.fade-in-scale-delay-1 {
+    animation: fade-in-scale-landing 1s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
+    opacity: 0;
+}
+
+.fade-in-scale-delay-2 {
+    animation: fade-in-scale-landing 1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards;
+    opacity: 0;
+}
+
+.slide-in-left {
+    animation: slide-in-left 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+}
+
+.slide-in-right {
+    animation: slide-in-right 1s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
+    opacity: 0;
+}
+
+/* Landing page shadow utilities */
+.shadow-glass {
+    box-shadow: 0 3px 10px 0 rgba(70, 83, 96, 0.03);
+}
+
+.shadow-glass-lg {
+    box-shadow: 0 6px 16px 0 rgba(70, 83, 96, 0.045);
+}
+
+.shadow-sage {
+    box-shadow: 0 3px 10px 0 rgba(192, 223, 161, 0.115);
+}
+
+/* Font utilities for landing page */
+.font-newsreader {
+    font-family: 'Newsreader', serif;
+}
+
+.font-figtree {
+    font-family: 'Figtree', sans-serif;
 }

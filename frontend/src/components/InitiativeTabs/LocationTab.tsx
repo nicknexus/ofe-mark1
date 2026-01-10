@@ -231,28 +231,32 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
         }
     }
 
+    // Fire-and-forget country fetching (runs independently)
+    const fetchCountriesInBackground = (locations: Location[]) => {
+        ;(async () => {
+            for (const location of locations) {
+                if (!location.id) continue
+                // Skip if we already have this country cached
+                if (locationCountries[location.id]) continue
+                
+                const country = await fetchCountryForLocation(location)
+                if (country) {
+                    setLocationCountries((prev) => ({ ...prev, [location.id!]: country }))
+                }
+                // Small delay to respect Nominatim rate limits
+                await new Promise((r) => setTimeout(r, 200))
+            }
+        })()
+    }
+
     const loadLocations = async () => {
         if (!initiativeId) return
         try {
             setLoading(true)
             const data = await apiService.getLocations(initiativeId)
             setLocations(data)
-
-            // Fetch countries for all locations
-            const countryPromises = data.map(async (location) => {
-                if (!location.id) return null
-                const country = await fetchCountryForLocation(location)
-                return { locationId: location.id, country }
-            })
-
-            const countryResults = await Promise.all(countryPromises)
-            const countriesMap: Record<string, string> = {}
-            countryResults.forEach((result) => {
-                if (result && result.country) {
-                    countriesMap[result.locationId] = result.country
-                }
-            })
-            setLocationCountries(countriesMap)
+            // Kick off background country fetch (non-blocking)
+            fetchCountriesInBackground(data)
         } catch (error) {
             toast.error('Failed to load locations')
             console.error(error)

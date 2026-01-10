@@ -16,6 +16,7 @@ export interface Subscription {
     current_period_end?: string;
     cancel_at_period_end?: boolean;
     cancelled_at?: string;
+    initiatives_limit?: number | null;
     created_at: string;
     updated_at: string;
 }
@@ -281,7 +282,49 @@ export class SubscriptionService {
     }
 
     /**
-     * Future: Update subscription from Stripe webhook data
+     * Get initiatives usage (current count vs limit)
+     */
+    static async getInitiativesUsage(userId: string): Promise<{
+        current: number;
+        limit: number | null;
+        canCreate: boolean;
+    }> {
+        // Get subscription to check limit
+        const subscription = await this.getOrCreate(userId);
+        
+        // Get current initiatives count for this user's organization
+        const { count, error } = await supabase
+            .from('initiatives')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId);
+
+        if (error) {
+            throw new Error(`Failed to count initiatives: ${error.message}`);
+        }
+
+        const currentCount = count || 0;
+        const limit = subscription.initiatives_limit ?? null;
+        
+        // Can create if no limit (null/undefined = unlimited) or under limit
+        const canCreate = limit === null || currentCount < limit;
+
+        return {
+            current: currentCount,
+            limit,
+            canCreate
+        };
+    }
+
+    /**
+     * Check if user can create a new initiative
+     */
+    static async canCreateInitiative(userId: string): Promise<boolean> {
+        const usage = await this.getInitiativesUsage(userId);
+        return usage.canCreate;
+    }
+
+    /**
+     * Update subscription from Stripe webhook data
      */
     static async updateFromStripe(
         userId: string,

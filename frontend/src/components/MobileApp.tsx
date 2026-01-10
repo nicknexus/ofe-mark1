@@ -161,6 +161,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
                         onEnterInitiative={handleEnterInitiative}
                         onRefresh={loadInitiatives}
                         loading={loading}
+                        onNavigateToAccount={() => setView('account')}
                     />
                 )}
                 {view === 'account' && (

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Plus, ChevronRight, Edit, Trash2 } from 'lucide-react'
+import { Plus, ChevronRight, Edit, Trash2, X, Zap, ArrowRight } from 'lucide-react'
 import { Initiative, CreateInitiativeForm } from '../../types'
 import { apiService } from '../../services/api'
 import CreateInitiativeModal from '../CreateInitiativeModal'
@@ -10,18 +10,22 @@ interface MobileDashboardProps {
     onEnterInitiative: (initiative: Initiative) => void
     onRefresh: () => void
     loading: boolean
+    onNavigateToAccount?: () => void
 }
 
 export default function MobileDashboard({
     initiatives,
     onEnterInitiative,
     onRefresh,
-    loading
+    loading,
+    onNavigateToAccount
 }: MobileDashboardProps) {
     const [showCreateModal, setShowCreateModal] = useState(false)
     const [showEditModal, setShowEditModal] = useState(false)
     const [editingInitiative, setEditingInitiative] = useState<Initiative | null>(null)
     const [deleteConfirmInitiative, setDeleteConfirmInitiative] = useState<Initiative | null>(null)
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+    const [upgradeUsage, setUpgradeUsage] = useState<{ current: number; limit: number } | null>(null)
 
     const handleCreateInitiative = async (formData: CreateInitiativeForm) => {
         try {
@@ -32,7 +36,14 @@ export default function MobileDashboard({
                 // Enter the newly created initiative
                 onEnterInitiative(newInitiative)
             }
-        } catch (error) {
+        } catch (error: any) {
+            // Check if it's an initiative limit error
+            if (error?.code === 'INITIATIVE_LIMIT_REACHED' || error?.message?.includes('Initiative limit reached')) {
+                setUpgradeUsage(error.usage || { current: initiatives.length, limit: 2 })
+                setShowUpgradeModal(true)
+                setShowCreateModal(false)
+                return
+            }
             const message = error instanceof Error ? error.message : 'Failed to create initiative'
             toast.error(message)
             throw error
@@ -220,6 +231,64 @@ export default function MobileDashboard({
                             >
                                 Delete
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Upgrade Modal - Initiative Limit Reached */}
+            {showUpgradeModal && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[100]">
+                    <div className="bg-white rounded-2xl max-w-sm w-full overflow-hidden">
+                        {/* Header */}
+                        <div className="relative bg-gradient-to-br from-amber-50 to-orange-50 p-5 text-center border-b border-amber-100">
+                            <button
+                                onClick={() => setShowUpgradeModal(false)}
+                                className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 p-1.5 rounded-lg"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                            <div className="w-14 h-14 bg-gradient-to-br from-amber-100 to-amber-200 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <Zap className="w-7 h-7 text-amber-600" />
+                            </div>
+                            <h2 className="text-lg font-bold text-gray-900 mb-1">Initiative Limit Reached</h2>
+                            <p className="text-gray-600 text-sm">
+                                {upgradeUsage?.current || initiatives.length}/{upgradeUsage?.limit || 2} initiatives used
+                            </p>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-5">
+                            <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 mb-5 border border-amber-100">
+                                <h3 className="font-semibold text-gray-900 mb-2 text-sm">
+                                    ⚡ Initiative Limit Reached
+                                </h3>
+                                <div className="space-y-1.5 text-xs text-gray-700">
+                                    <p>• You've used all {upgradeUsage?.limit || 2} initiatives</p>
+                                    <p>• <strong>+$1/day</strong> per additional (coming soon)</p>
+                                    <p>• Delete an initiative to create a new one</p>
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex flex-col gap-2">
+                                <button
+                                    onClick={() => {
+                                        setShowUpgradeModal(false)
+                                        onNavigateToAccount?.()
+                                    }}
+                                    className="w-full bg-emerald-500 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 text-sm"
+                                >
+                                    Manage Subscription
+                                    <ArrowRight className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => setShowUpgradeModal(false)}
+                                    className="w-full py-2.5 px-4 text-sm text-gray-600 hover:bg-gray-100 rounded-xl"
+                                >
+                                    Maybe Later
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

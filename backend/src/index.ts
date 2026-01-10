@@ -80,6 +80,11 @@ if (process.env.NODE_ENV === 'production') {
 
 // Body parsing middleware
 app.use(compression());
+
+// Stripe webhook needs raw body - must come BEFORE json parsing
+app.use('/api/subscription/webhook', express.raw({ type: 'application/json' }));
+
+// JSON parsing for all other routes
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -116,6 +121,10 @@ app.get('/health', (req, res) => {
             url: !!process.env.SUPABASE_URL,
             anon_key: !!process.env.SUPABASE_ANON_KEY,
             service_key: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+        },
+        stripe: {
+            configured: !!process.env.STRIPE_SECRET_KEY,
+            webhook_secret: !!process.env.STRIPE_WEBHOOK_SECRET
         }
     });
 });

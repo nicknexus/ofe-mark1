@@ -266,7 +266,7 @@ export default function DateRangePicker({
                 onClick={handleToggle}
                 className={`flex items-center pl-0 pr-4 h-10 bg-white hover:bg-gray-50 text-gray-700 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border border-gray-200 border-l-0 shadow-bubble-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${className}`}
             >
-                <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
                     <Calendar className="w-5 h-5 text-gray-600" />
                 </div>
                 <span className={`ml-3 ${value ? 'text-gray-900' : 'text-gray-500'}`}>{getDisplayText()}</span>

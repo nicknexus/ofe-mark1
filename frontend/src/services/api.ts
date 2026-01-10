@@ -177,12 +177,17 @@ class ApiService {
                         const error = JSON.parse(responseText)
                         errorMessage = error.message || error.error || `HTTP ${response.status}`
                         
-                        // Preserve error code for specific handling
+                        // Preserve error code and additional data for specific handling
                         const errorWithCode = new Error(errorMessage) as any
                         errorWithCode.code = error.code
                         errorWithCode.status = response.status
+                        errorWithCode.usage = error.usage // For initiative limit errors
                         throw errorWithCode
                     } catch (parseError: any) {
+                        // If it's our custom error, re-throw it
+                        if (parseError.code || parseError.usage) {
+                            throw parseError
+                        }
                         // If JSON parsing fails, fall through to status-based handling
                     }
                 }

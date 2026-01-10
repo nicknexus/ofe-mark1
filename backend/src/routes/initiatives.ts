@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { InitiativeService } from '../services/initiativeService';
 import { KPIService } from '../services/kpiService';
 import { EvidenceService } from '../services/evidenceService';
+import { SubscriptionService } from '../services/subscriptionService';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 
 const router = Router();
@@ -19,6 +20,17 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
 // Create initiative
 router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
+        // Check initiative limit
+        const usage = await SubscriptionService.getInitiativesUsage(req.user!.id);
+        if (!usage.canCreate) {
+            res.status(403).json({ 
+                error: `Initiative limit reached (${usage.current}/${usage.limit}). Upgrade your plan to create more initiatives.`,
+                code: 'INITIATIVE_LIMIT_REACHED',
+                usage
+            });
+            return;
+        }
+
         const initiative = await InitiativeService.create(req.body, req.user!.id);
         res.status(201).json(initiative);
     } catch (error) {

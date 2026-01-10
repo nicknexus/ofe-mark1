@@ -10,10 +10,14 @@ import {
     Sparkles,
     Save,
     HardDrive,
-    Info
+    Info,
+    Settings,
+    ExternalLink,
+    Zap
 } from 'lucide-react'
 import { AuthService } from '../../services/auth'
 import { apiService } from '../../services/api'
+import { SubscriptionService } from '../../services/subscription'
 import { User, SubscriptionStatus, Organization } from '../../types'
 import toast from 'react-hot-toast'
 
@@ -36,6 +40,9 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
     const [organization, setOrganization] = useState<Organization | null>(null)
     const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null)
     const [storageLoading, setStorageLoading] = useState(true)
+    const [initiativesUsage, setInitiativesUsage] = useState<{ current: number; limit: number | null } | null>(null)
+    const [managingSubscription, setManagingSubscription] = useState(false)
+    const [upgrading, setUpgrading] = useState(false)
 
     useEffect(() => {
         // Load organization
@@ -51,7 +58,46 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
         }).finally(() => {
             setStorageLoading(false)
         })
+
+        // Load initiatives usage
+        SubscriptionService.getInitiativesUsage().then(usage => {
+            setInitiativesUsage(usage)
+        }).catch(err => {
+            console.error('Error loading initiatives usage:', err)
+        })
     }, [])
+
+    const handleManageSubscription = async () => {
+        setManagingSubscription(true)
+        try {
+            const { url } = await SubscriptionService.createPortalSession()
+            if (url) {
+                window.location.href = url
+            } else {
+                toast.error('Failed to open subscription management')
+            }
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Failed to open subscription management')
+        } finally {
+            setManagingSubscription(false)
+        }
+    }
+
+    const handleUpgrade = async () => {
+        setUpgrading(true)
+        try {
+            const { url } = await SubscriptionService.createCheckoutSession()
+            if (url) {
+                window.location.href = url
+            } else {
+                toast.error('Failed to start checkout')
+            }
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Failed to start checkout')
+        } finally {
+            setUpgrading(false)
+        }
+    }
 
     const handleSave = async () => {
         setSaving(true)
@@ -92,11 +138,30 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
             {/* Subscription Card */}
             {subscriptionStatus && (
                 <div className="bg-white rounded-2xl border border-gray-100 p-4">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center">
-                            <CreditCard className="w-5 h-5 text-primary-600" />
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center">
+                                <CreditCard className="w-5 h-5 text-primary-600" />
+                            </div>
+                            <h2 className="font-semibold text-gray-800">Subscription</h2>
                         </div>
-                        <h2 className="font-semibold text-gray-800">Subscription</h2>
+                        {/* Manage Button for active subscribers */}
+                        {subscriptionStatus.subscription.status === 'active' && subscriptionStatus.subscription.stripe_customer_id && (
+                            <button
+                                onClick={handleManageSubscription}
+                                disabled={managingSubscription}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg"
+                            >
+                                {managingSubscription ? (
+                                    <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                    <>
+                                        <Settings className="w-3 h-3" />
+                                        Manage
+                                    </>
+                                )}
+                            </button>
+                        )}
                     </div>
 
                     <div className="space-y-3">
@@ -119,6 +184,34 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
                             </span>
                         </div>
 
+                        {/* Plan */}
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-500">Plan</span>
+                            <span className="text-sm font-medium text-gray-900 capitalize">
+                                {subscriptionStatus.subscription.status === 'trial' ? 'Trial' :
+                                 subscriptionStatus.subscription.plan_tier || 'Starter'}
+                            </span>
+                        </div>
+
+                        {/* Initiatives Usage */}
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-500 flex items-center gap-1.5">
+                                <Zap className="w-3.5 h-3.5" />
+                                Initiatives
+                            </span>
+                            <span className={`text-sm font-medium ${
+                                initiativesUsage && initiativesUsage.limit !== null && initiativesUsage.current >= initiativesUsage.limit 
+                                    ? 'text-amber-600' 
+                                    : 'text-gray-900'
+                            }`}>
+                                {initiativesUsage ? (
+                                    initiativesUsage.limit === null 
+                                        ? `${initiativesUsage.current} (unlimited)`
+                                        : `${initiativesUsage.current}/${initiativesUsage.limit}`
+                                ) : '...'}
+                            </span>
+                        </div>
+
                         {/* Trial End */}
                         {subscriptionStatus.subscription.status === 'trial' && subscriptionStatus.subscription.trial_ends_at && (
                             <div className="flex items-center justify-between">
@@ -132,7 +225,20 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
                             </div>
                         )}
 
-                        {/* Days Remaining */}
+                        {/* Next Billing */}
+                        {subscriptionStatus.subscription.status === 'active' && subscriptionStatus.subscription.current_period_end && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-500 flex items-center gap-1.5">
+                                    <Calendar className="w-3.5 h-3.5" />
+                                    Next Billing
+                                </span>
+                                <span className="text-sm font-medium text-gray-900">
+                                    {new Date(subscriptionStatus.subscription.current_period_end).toLocaleDateString()}
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Days Remaining for trial */}
                         {subscriptionStatus.subscription.status === 'trial' && subscriptionStatus.remainingTrialDays !== null && (
                             <div className="flex items-center justify-between">
                                 <span className="text-sm text-gray-500 flex items-center gap-1.5">
@@ -150,6 +256,41 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
                             </div>
                         )}
                     </div>
+
+                    {/* Upgrade CTA for trial */}
+                    {subscriptionStatus.subscription.status === 'trial' && (
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                            <button
+                                onClick={handleUpgrade}
+                                disabled={upgrading}
+                                className="w-full py-3 bg-primary-500 text-white rounded-xl font-medium text-sm flex items-center justify-center gap-2"
+                            >
+                                {upgrading ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        Loading...
+                                    </>
+                                ) : (
+                                    'Subscribe Now - $2/day'
+                                )}
+                            </button>
+                            <p className="text-xs text-gray-500 text-center mt-2">Billed $56 every 4 weeks</p>
+                        </div>
+                    )}
+
+                    {/* Add More Initiatives for active subscribers at limit */}
+                    {subscriptionStatus.subscription.status === 'active' && initiativesUsage && initiativesUsage.limit !== null && initiativesUsage.current >= initiativesUsage.limit && (
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                            <button
+                                disabled
+                                className="w-full py-3 bg-gray-300 text-white rounded-xl font-medium text-sm flex items-center justify-center gap-2 cursor-not-allowed"
+                            >
+                                <Zap className="w-4 h-4" />
+                                Add More Initiatives
+                            </button>
+                            <p className="text-xs text-gray-500 text-center mt-2">+$1/day per additional initiative • Coming soon</p>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -278,4 +419,5 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
         </div>
     )
 }
+
 

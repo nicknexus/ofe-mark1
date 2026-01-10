@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, User as UserIcon, Mail, Building2, Save, HardDrive, Info, Clock, CreditCard, Calendar, Sparkles } from 'lucide-react'
+import { ArrowLeft, User as UserIcon, Mail, Building2, Save, HardDrive, Info, Clock, CreditCard, Calendar, Sparkles, ExternalLink, Settings, Zap } from 'lucide-react'
 import { AuthService } from '../services/auth'
 import { apiService } from '../services/api'
+import { SubscriptionService } from '../services/subscription'
 import { User, SubscriptionStatus } from '../types'
 import toast from 'react-hot-toast'
 
@@ -29,6 +30,9 @@ export default function AccountPage({ subscriptionStatus }: Props) {
         name: '',
         email: ''
     })
+    const [initiativesUsage, setInitiativesUsage] = useState<{ current: number; limit: number | null } | null>(null)
+    const [managingSubscription, setManagingSubscription] = useState(false)
+    const [upgrading, setUpgrading] = useState(false)
 
     useEffect(() => {
         const loadUser = async () => {
@@ -64,6 +68,50 @@ export default function AccountPage({ subscriptionStatus }: Props) {
         }
         loadStorageUsage()
     }, [])
+
+    useEffect(() => {
+        const loadInitiativesUsage = async () => {
+            try {
+                const usage = await SubscriptionService.getInitiativesUsage()
+                setInitiativesUsage(usage)
+            } catch (error) {
+                console.error('Error loading initiatives usage:', error)
+            }
+        }
+        loadInitiativesUsage()
+    }, [])
+
+    const handleManageSubscription = async () => {
+        setManagingSubscription(true)
+        try {
+            const { url } = await SubscriptionService.createPortalSession()
+            if (url) {
+                window.location.href = url
+            } else {
+                toast.error('Failed to open subscription management')
+            }
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Failed to open subscription management')
+        } finally {
+            setManagingSubscription(false)
+        }
+    }
+
+    const handleUpgrade = async () => {
+        setUpgrading(true)
+        try {
+            const { url } = await SubscriptionService.createCheckoutSession()
+            if (url) {
+                window.location.href = url
+            } else {
+                toast.error('Failed to start checkout')
+            }
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Failed to start checkout')
+        } finally {
+            setUpgrading(false)
+        }
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -115,14 +163,37 @@ export default function AccountPage({ subscriptionStatus }: Props) {
             {/* Subscription Card - Full Width */}
             {subscriptionStatus && (
                 <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6 w-full max-w-4xl mb-5">
-                    <div className="flex items-center gap-3 mb-5">
-                        <div className="p-2 bg-primary-50 rounded-xl">
-                            <CreditCard className="w-5 h-5 text-primary-600" />
+                    <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-primary-50 rounded-xl">
+                                <CreditCard className="w-5 h-5 text-primary-600" />
+                            </div>
+                            <h2 className="text-lg font-semibold text-gray-800">Subscription</h2>
                         </div>
-                        <h2 className="text-lg font-semibold text-gray-800">Subscription</h2>
+                        {/* Manage Subscription Button - for active subscribers */}
+                        {subscriptionStatus.subscription.status === 'active' && subscriptionStatus.subscription.stripe_customer_id && (
+                            <button
+                                onClick={handleManageSubscription}
+                                disabled={managingSubscription}
+                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors disabled:opacity-50"
+                            >
+                                {managingSubscription ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                                        Loading...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Settings className="w-4 h-4" />
+                                        Manage Subscription
+                                        <ExternalLink className="w-3 h-3" />
+                                    </>
+                                )}
+                            </button>
+                        )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         {/* Status */}
                         <div className="space-y-1">
                             <div className="text-sm text-gray-500 flex items-center gap-1.5">
@@ -144,6 +215,42 @@ export default function AccountPage({ subscriptionStatus }: Props) {
                             </div>
                         </div>
 
+                        {/* Plan Tier */}
+                        <div className="space-y-1">
+                            <div className="text-sm text-gray-500">Plan</div>
+                            <div className="text-base font-medium text-gray-900 capitalize">
+                                {subscriptionStatus.subscription.status === 'trial' ? 'Trial (Full Access)' :
+                                 subscriptionStatus.subscription.plan_tier || 'Starter'}
+                            </div>
+                            {subscriptionStatus.subscription.status === 'active' && (
+                                <div className="text-xs text-gray-500">$2/day • Billed every 4 weeks</div>
+                            )}
+                        </div>
+
+                        {/* Initiatives Usage */}
+                        <div className="space-y-1">
+                            <div className="text-sm text-gray-500 flex items-center gap-1.5">
+                                <Zap className="w-3.5 h-3.5" />
+                                Initiatives
+                            </div>
+                            <div className="text-base font-medium text-gray-900">
+                                {initiativesUsage ? (
+                                    initiativesUsage.limit === null ? (
+                                        <span>{initiativesUsage.current} <span className="text-gray-500 text-sm font-normal">(unlimited)</span></span>
+                                    ) : (
+                                        <span className={initiativesUsage.current >= initiativesUsage.limit ? 'text-amber-600' : ''}>
+                                            {initiativesUsage.current} / {initiativesUsage.limit}
+                                        </span>
+                                    )
+                                ) : (
+                                    <span className="text-gray-400">Loading...</span>
+                                )}
+                            </div>
+                            {initiativesUsage && initiativesUsage.limit !== null && initiativesUsage.current >= initiativesUsage.limit && (
+                                <div className="text-xs text-amber-600">Limit reached</div>
+                            )}
+                        </div>
+
                         {/* Trial/Subscription End Date */}
                         {subscriptionStatus.subscription.status === 'trial' && subscriptionStatus.subscription.trial_ends_at && (
                             <div className="space-y-1">
@@ -153,11 +260,22 @@ export default function AccountPage({ subscriptionStatus }: Props) {
                                 </div>
                                 <div className="text-base font-medium text-gray-900">
                                     {new Date(subscriptionStatus.subscription.trial_ends_at).toLocaleDateString('en-US', {
-                                        year: 'numeric',
-                                        month: 'long',
-                                        day: 'numeric'
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric'
                                     })}
                                 </div>
+                                {subscriptionStatus.remainingTrialDays !== null && (
+                                    <div className={`text-xs ${
+                                        subscriptionStatus.remainingTrialDays <= 3 ? 'text-red-600' :
+                                        subscriptionStatus.remainingTrialDays <= 7 ? 'text-amber-600' :
+                                        'text-gray-500'
+                                    }`}>
+                                        {subscriptionStatus.remainingTrialDays === 0 ? 'Ends today' :
+                                         subscriptionStatus.remainingTrialDays === 1 ? '1 day left' :
+                                         `${subscriptionStatus.remainingTrialDays} days left`}
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -169,49 +287,10 @@ export default function AccountPage({ subscriptionStatus }: Props) {
                                 </div>
                                 <div className="text-base font-medium text-gray-900">
                                     {new Date(subscriptionStatus.subscription.current_period_end).toLocaleDateString('en-US', {
-                                        year: 'numeric',
-                                        month: 'long',
-                                        day: 'numeric'
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric'
                                     })}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Days Remaining */}
-                        {subscriptionStatus.subscription.status === 'trial' && subscriptionStatus.remainingTrialDays !== null && (
-                            <div className="space-y-1">
-                                <div className="text-sm text-gray-500 flex items-center gap-1.5">
-                                    <Clock className="w-3.5 h-3.5" />
-                                    Time Remaining
-                                </div>
-                                <div className={`text-base font-medium ${
-                                    subscriptionStatus.remainingTrialDays <= 3 ? 'text-red-600' :
-                                    subscriptionStatus.remainingTrialDays <= 7 ? 'text-amber-600' :
-                                    'text-gray-900'
-                                }`}>
-                                    {subscriptionStatus.remainingTrialDays === 0 ? 'Ends today' :
-                                     subscriptionStatus.remainingTrialDays === 1 ? '1 day left' :
-                                     `${subscriptionStatus.remainingTrialDays} days left`}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Plan Tier (if active subscription) */}
-                        {subscriptionStatus.subscription.plan_tier && (
-                            <div className="space-y-1">
-                                <div className="text-sm text-gray-500">Plan</div>
-                                <div className="text-base font-medium text-gray-900 capitalize">
-                                    {subscriptionStatus.subscription.plan_tier}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Billing Interval (if active subscription) */}
-                        {subscriptionStatus.subscription.billing_interval && (
-                            <div className="space-y-1">
-                                <div className="text-sm text-gray-500">Billing</div>
-                                <div className="text-base font-medium text-gray-900 capitalize">
-                                    {subscriptionStatus.subscription.billing_interval}
                                 </div>
                             </div>
                         )}
@@ -222,14 +301,41 @@ export default function AccountPage({ subscriptionStatus }: Props) {
                         <div className="mt-6 pt-5 border-t border-gray-100">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm font-medium text-gray-900">Ready to upgrade?</p>
-                                    <p className="text-xs text-gray-500 mt-0.5">Get full access with a paid subscription</p>
+                                    <p className="text-sm font-medium text-gray-900">Ready to subscribe?</p>
+                                    <p className="text-xs text-gray-500 mt-0.5">$2/day for 2 initiatives • Billed $56 every 4 weeks</p>
                                 </div>
                                 <button
-                                    onClick={() => alert('Subscription coming soon! Contact support@nexusimpacts.com for early access.')}
-                                    className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-colors"
+                                    onClick={handleUpgrade}
+                                    disabled={upgrading}
+                                    className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2"
                                 >
-                                    Upgrade Now
+                                    {upgrading ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                            Loading...
+                                        </>
+                                    ) : (
+                                        'Subscribe Now'
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Add More Initiatives - for active subscribers at limit */}
+                    {subscriptionStatus.subscription.status === 'active' && initiativesUsage && initiativesUsage.limit !== null && initiativesUsage.current >= initiativesUsage.limit && (
+                        <div className="mt-6 pt-5 border-t border-gray-100">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-900">Need more initiatives?</p>
+                                    <p className="text-xs text-gray-500 mt-0.5">+$1/day per additional initiative • Coming soon</p>
+                                </div>
+                                <button
+                                    disabled
+                                    className="px-4 py-2 text-sm font-medium text-white bg-gray-300 rounded-xl cursor-not-allowed flex items-center gap-2"
+                                >
+                                    <Zap className="w-4 h-4" />
+                                    Add Initiatives
                                 </button>
                             </div>
                         </div>
