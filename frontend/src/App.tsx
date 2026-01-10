@@ -45,7 +45,6 @@ function useIsMobile() {
 function App() {
     const [user, setUser] = useState<User | null>(null)
     const [loading, setLoading] = useState(true)
-    const [showAuth, setShowAuth] = useState(false)
     const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null)
     const [checkingSubscription, setCheckingSubscription] = useState(false)
     const isMobile = useIsMobile()
@@ -58,9 +57,7 @@ function App() {
         // Listen for auth changes
         const { data: authListener } = AuthService.onAuthStateChange((user) => {
             setUser(user)
-            if (user) {
-                setShowAuth(false)
-            } else {
+            if (!user) {
                 // User logged out - clear subscription status
                 setSubscriptionStatus(null)
             }
@@ -129,10 +126,6 @@ function App() {
         }
     }
 
-    const handleGetStarted = () => {
-        setShowAuth(true)
-    }
-
     const handleTrialStarted = () => {
         // Re-check subscription after trial is started (show loader since user expects it)
         checkSubscription(true)
@@ -147,16 +140,6 @@ function App() {
                     <p className="mt-4 text-gray-600">Loading...</p>
                 </div>
             </div>
-        )
-    }
-
-    // Show auth page when explicitly requested
-    if (showAuth && !user) {
-        return (
-            <>
-                <AuthPage />
-                <Toaster position="top-right" />
-            </>
         )
     }
 
@@ -278,8 +261,11 @@ function App() {
                 {/* Public routes - accessible without auth */}
                 <Route path="/org/:slug" element={<PublicOrganizationPage />} />
                 
+                {/* Login/Auth page */}
+                <Route path="/login" element={<AuthPage />} />
+                
                 {/* Homepage for non-authenticated users */}
-                <Route path="/*" element={<HomePage onGetStarted={handleGetStarted} />} />
+                <Route path="/*" element={<HomePage />} />
             </Routes>
             <Toaster position="top-right" />
         </Router>

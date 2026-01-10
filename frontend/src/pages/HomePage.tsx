@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LandingNavbar, HeroSection } from '../components/landing';
 
 // Lazy load below-the-fold sections for faster initial load
@@ -9,10 +10,6 @@ const CTASection = lazy(() => import('../components/landing/CTASection'));
 const PricingSection = lazy(() => import('../components/landing/PricingSection'));
 const Footer = lazy(() => import('../components/landing/Footer'));
 
-interface HomePageProps {
-  onGetStarted: () => void;
-}
-
 // Simple loading placeholder
 const SectionLoader = () => (
   <div className="py-20 flex items-center justify-center">
@@ -20,11 +17,14 @@ const SectionLoader = () => (
   </div>
 );
 
-export default function HomePage({ onGetStarted }: HomePageProps) {
+export default function HomePage() {
+  const navigate = useNavigate();
+  const handleGetStarted = () => navigate('/login');
+  
   return (
     <main className="min-h-screen bg-background font-figtree landing-page">
-      <LandingNavbar onGetStarted={onGetStarted} />
-      <HeroSection onGetStarted={onGetStarted} />
+      <LandingNavbar onGetStarted={handleGetStarted} />
+      <HeroSection onGetStarted={handleGetStarted} />
       <Suspense fallback={<SectionLoader />}>
         <FeaturesSection />
       </Suspense>
@@ -35,7 +35,7 @@ export default function HomePage({ onGetStarted }: HomePageProps) {
         <TestimonialsSection />
       </Suspense>
       <Suspense fallback={<SectionLoader />}>
-        <CTASection onGetStarted={onGetStarted} />
+        <CTASection onGetStarted={handleGetStarted} />
       </Suspense>
       <Suspense fallback={<SectionLoader />}>
         <PricingSection />
