@@ -1,5 +1,5 @@
 import { Button } from "../ui/button";
-import { ArrowRight, Play, TrendingUp, ArrowUpRight, ArrowUpCircle } from "lucide-react";
+import { ArrowRight, Play, TrendingUp, ArrowUpRight, Users, Heart, DollarSign } from "lucide-react";
 import { Suspense, lazy } from "react";
 
 // Lazy load the heavy globe component
@@ -62,31 +62,40 @@ const HeroSection = ({ onGetStarted }: HeroSectionProps) => {
             </div>
             
             {/* Social proof with icons */}
-            <div className="flex flex-wrap items-center gap-8 mt-12 justify-center lg:justify-start fade-in-scale-delay-2">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
-                  <ArrowUpRight className="w-5 h-5 text-accent-foreground" />
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-6 sm:gap-8 mt-12 justify-center lg:justify-start fade-in-scale-delay-2">
+              <div className="flex items-center justify-center sm:justify-start gap-3 w-full max-w-[280px] mx-auto sm:max-w-none sm:mx-0 sm:w-auto border border-border/50 sm:border-0 rounded-xl p-3 sm:p-0">
+                <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center flex-shrink-0">
+                  <Users className="w-5 h-5 text-accent-foreground" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold text-foreground">23%</p>
+                <div className="min-w-[120px] text-center sm:text-left">
+                  <p className="text-2xl font-bold text-foreground flex items-center justify-center sm:justify-start gap-1">
+                    23%
+                    <ArrowUpRight className="w-4 h-4 text-accent" />
+                  </p>
                   <p className="text-xs text-muted-foreground">More Donors</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
-                  <ArrowUpCircle className="w-5 h-5 text-accent-foreground" />
+              <div className="flex items-center justify-center sm:justify-start gap-3 w-full max-w-[280px] mx-auto sm:max-w-none sm:mx-0 sm:w-auto border border-border/50 sm:border-0 rounded-xl p-3 sm:p-0">
+                <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center flex-shrink-0">
+                  <Heart className="w-5 h-5 text-accent-foreground" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold text-foreground">36%</p>
+                <div className="min-w-[120px] text-center sm:text-left">
+                  <p className="text-2xl font-bold text-foreground flex items-center justify-center sm:justify-start gap-1">
+                    36%
+                    <ArrowUpRight className="w-4 h-4 text-accent" />
+                  </p>
                   <p className="text-xs text-muted-foreground">Donor Retention</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-accent-foreground" />
+              <div className="flex items-center justify-center sm:justify-start gap-3 w-full max-w-[280px] mx-auto sm:max-w-none sm:mx-0 sm:w-auto border border-border/50 sm:border-0 rounded-xl p-3 sm:p-0">
+                <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center flex-shrink-0">
+                  <DollarSign className="w-5 h-5 text-accent-foreground" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold text-foreground">22%</p>
+                <div className="min-w-[120px] text-center sm:text-left">
+                  <p className="text-2xl font-bold text-foreground flex items-center justify-center sm:justify-start gap-1">
+                    22%
+                    <ArrowUpRight className="w-4 h-4 text-accent" />
+                  </p>
                   <p className="text-xs text-muted-foreground">Larger Donations</p>
                 </div>
               </div>
@@ -147,14 +156,6 @@ const HeroSection = ({ onGetStarted }: HeroSectionProps) => {
               </div>
             </div>
           </div>
-        </div>
-      </div>
-      
-      {/* Bottom scroll indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 opacity-60 animate-pulse-soft-landing">
-        <span className="text-xs text-muted-foreground">Scroll to explore</span>
-        <div className="w-6 h-10 rounded-full border-2 border-muted-foreground/30 flex items-start justify-center p-1">
-          <div className="w-1.5 h-3 bg-muted-foreground/50 rounded-full animate-bounce" />
         </div>
       </div>
     </section>

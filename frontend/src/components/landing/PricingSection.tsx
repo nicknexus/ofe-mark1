@@ -1,6 +1,11 @@
 import { Check } from "lucide-react";
+import { Button } from "../ui/button";
 
-const PricingSection = () => {
+interface PricingSectionProps {
+  onGetStarted?: () => void;
+}
+
+const PricingSection = ({ onGetStarted }: PricingSectionProps) => {
   const features = [
     "10 Logins",
     "Unlimited AI Reports",
@@ -46,6 +51,14 @@ const PricingSection = () => {
               Contact us for more storage or logins.
             </p>
           </div>
+
+          {onGetStarted && (
+            <div className="mt-8">
+              <Button variant="sage" size="lg" onClick={onGetStarted} className="w-full">
+                Sign up
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </section>

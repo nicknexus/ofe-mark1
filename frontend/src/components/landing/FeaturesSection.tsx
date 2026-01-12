@@ -1,4 +1,5 @@
 import { Eye, Heart, BarChart3, Clock } from "lucide-react";
+import { Button } from "../ui/button";
 
 const features = [
   {
@@ -23,7 +24,11 @@ const features = [
   },
 ];
 
-const FeaturesSection = () => {
+interface FeaturesSectionProps {
+  onGetStarted?: () => void;
+}
+
+const FeaturesSection = ({ onGetStarted }: FeaturesSectionProps) => {
   return (
     <section id="features" className="py-20 md:py-28 relative">
       <div className="absolute inset-0 bg-gradient-to-b from-background via-muted/30 to-background" />
@@ -44,7 +49,7 @@ const FeaturesSection = () => {
           </p>
         </div>
         
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           {features.map((feature, index) => (
             <div 
               key={feature.title}
@@ -59,6 +64,14 @@ const FeaturesSection = () => {
             </div>
           ))}
         </div>
+
+        {onGetStarted && (
+          <div className="flex justify-center">
+            <Button variant="sage" size="lg" onClick={onGetStarted}>
+              Start now
+            </Button>
+          </div>
+        )}
       </div>
     </section>
   );

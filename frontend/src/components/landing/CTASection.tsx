@@ -7,7 +7,7 @@ interface CTASectionProps {
 
 const CTASection = ({ onGetStarted }: CTASectionProps) => {
   return (
-    <section className="py-20 md:py-28 relative overflow-hidden">
+    <section className="pt-8 pb-20 md:pt-12 md:pb-28 relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-accent/20 via-background to-accent/10" />
       
       {/* Decorative elements */}

@@ -5,7 +5,7 @@ import { LandingNavbar, HeroSection } from '../components/landing';
 // Lazy load below-the-fold sections for faster initial load
 const FeaturesSection = lazy(() => import('../components/landing/FeaturesSection'));
 const HowItWorksSection = lazy(() => import('../components/landing/HowItWorksSection'));
-const TestimonialsSection = lazy(() => import('../components/landing/TestimonialsSection'));
+// const TestimonialsSection = lazy(() => import('../components/landing/TestimonialsSection'));
 const CTASection = lazy(() => import('../components/landing/CTASection'));
 const PricingSection = lazy(() => import('../components/landing/PricingSection'));
 const Footer = lazy(() => import('../components/landing/Footer'));
@@ -26,19 +26,19 @@ export default function HomePage() {
       <LandingNavbar onGetStarted={handleGetStarted} />
       <HeroSection onGetStarted={handleGetStarted} />
       <Suspense fallback={<SectionLoader />}>
-        <FeaturesSection />
+        <FeaturesSection onGetStarted={handleGetStarted} />
       </Suspense>
       <Suspense fallback={<SectionLoader />}>
         <HowItWorksSection />
       </Suspense>
-      <Suspense fallback={<SectionLoader />}>
+      {/* <Suspense fallback={<SectionLoader />}>
         <TestimonialsSection />
-      </Suspense>
+      </Suspense> */}
       <Suspense fallback={<SectionLoader />}>
         <CTASection onGetStarted={handleGetStarted} />
       </Suspense>
       <Suspense fallback={<SectionLoader />}>
-        <PricingSection />
+        <PricingSection onGetStarted={handleGetStarted} />
       </Suspense>
       <Suspense fallback={<SectionLoader />}>
         <Footer />

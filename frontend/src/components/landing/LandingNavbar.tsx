@@ -11,35 +11,35 @@ interface LandingNavbarProps {
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const LandingNavbar = ({ onGetStarted }: LandingNavbarProps) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Organization[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [showResults, setShowResults] = useState(false);
+  // const [searchQuery, setSearchQuery] = useState('');
+  // const [searchResults, setSearchResults] = useState<Organization[]>([]);
+  // const [isSearching, setIsSearching] = useState(false);
+  // const [showResults, setShowResults] = useState(false);
 
   // Search
-  useEffect(() => {
-    if (searchQuery.trim().length >= 2) {
-      setIsSearching(true);
-      const timeoutId = setTimeout(async () => {
-        try {
-          const response = await fetch(`${API_URL}/api/organizations/public/search?q=${encodeURIComponent(searchQuery)}`);
-          if (response.ok) {
-            const data = await response.json();
-            setSearchResults(data);
-            setShowResults(true);
-          }
-        } catch (err) {
-          console.error(err);
-        } finally {
-          setIsSearching(false);
-        }
-      }, 300);
-      return () => clearTimeout(timeoutId);
-    } else {
-      setSearchResults([]);
-      setShowResults(false);
-    }
-  }, [searchQuery]);
+  // useEffect(() => {
+  //   if (searchQuery.trim().length >= 2) {
+  //     setIsSearching(true);
+  //     const timeoutId = setTimeout(async () => {
+  //       try {
+  //         const response = await fetch(`${API_URL}/api/organizations/public/search?q=${encodeURIComponent(searchQuery)}`);
+  //         if (response.ok) {
+  //           const data = await response.json();
+  //           setSearchResults(data);
+  //           setShowResults(true);
+  //         }
+  //       } catch (err) {
+  //         console.error(err);
+  //       } finally {
+  //         setIsSearching(false);
+  //       }
+  //     }, 300);
+  //     return () => clearTimeout(timeoutId);
+  //   } else {
+  //     setSearchResults([]);
+  //     setShowResults(false);
+  //   }
+  // }, [searchQuery]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4">
@@ -53,7 +53,7 @@ const LandingNavbar = ({ onGetStarted }: LandingNavbarProps) => {
           </a>
           
           {/* Search */}
-          <div className="relative w-full max-w-xs mx-4 hidden xl:block">
+          {/* <div className="relative w-full max-w-xs mx-4 hidden xl:block">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <input
               type="text"
@@ -93,7 +93,7 @@ const LandingNavbar = ({ onGetStarted }: LandingNavbarProps) => {
                 No organizations found
               </div>
             )}
-          </div>
+          </div> */}
           
           <div className="hidden lg:flex items-center gap-6">
             <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors duration-200 whitespace-nowrap text-sm">Features</a>

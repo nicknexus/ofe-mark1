@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { LineChart, Sparkles, ArrowRight, Check, Image, FileText, Camera } from "lucide-react";
 import { Confetti } from "phosphor-react";
 
@@ -35,6 +35,14 @@ const steps = [
 // Mock phone UI for each step
 const PhoneVisual = ({ step, isActive }: { step: typeof steps[0]; isActive: boolean }) => {
   const Icon = step.icon;
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  useEffect(() => {
+    if (textareaRef.current && step.visual === "donate") {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [step.visual]);
   
   return (
     <div className={`relative transition-all duration-700 ${isActive ? 'scale-100 opacity-100' : 'scale-95 opacity-50'}`}>
@@ -80,35 +88,36 @@ const PhoneVisual = ({ step, isActive }: { step: typeof steps[0]; isActive: bool
                   </div>
                   <span className="font-semibold text-foreground">Create Story</span>
                 </div>
-                <div className="glass-card p-3 rounded-xl">
+                <div className="bg-white/60 backdrop-blur-2xl p-3 rounded-xl shadow-lg overflow-hidden">
                   <input 
                     type="text" 
                     placeholder="Story title..." 
-                    className="w-full bg-transparent text-sm font-medium text-foreground placeholder:text-muted-foreground outline-none"
+                    className="w-full bg-transparent text-xs font-medium text-foreground placeholder:text-muted-foreground outline-none border-0 focus:border-0 focus:ring-0"
                     defaultValue="Clean water reaches village"
                     readOnly
+                    style={{ maxWidth: '100%', boxSizing: 'border-box' }}
                   />
                 </div>
-                <div className="glass-card p-3 rounded-xl min-h-[120px]">
+                <div className="bg-white/60 backdrop-blur-2xl p-3 rounded-xl shadow-lg">
                   <textarea 
+                    ref={textareaRef}
                     placeholder="Share your impact story..." 
-                    className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none resize-none"
+                    className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none resize-none border-0 focus:border-0 focus:ring-0"
                     defaultValue="Today we delivered clean water to 50 families in Kenya. The joy on their faces was incredible..."
-                    rows={4}
                     readOnly
                   />
                 </div>
                 <div className="flex items-center gap-2">
-                  <button className="flex-1 glass-card p-3 rounded-xl flex items-center justify-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <button className="flex-1 glass-card p-3 rounded-xl flex items-center justify-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors border-0">
                     <Camera className="w-4 h-4" />
                     <span>Add Photo</span>
                   </button>
-                  <button className="flex-1 glass-card p-3 rounded-xl flex items-center justify-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <button className="flex-1 glass-card p-3 rounded-xl flex items-center justify-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors border-0">
                     <FileText className="w-4 h-4" />
                     <span>Evidence</span>
                   </button>
                 </div>
-                <button className={`w-full py-3 rounded-xl bg-gradient-to-r ${step.color} text-white font-semibold text-sm shadow-md border-2 border-white/35`}>
+                <button className={`w-full py-3 rounded-xl bg-gradient-to-r ${step.color} text-white font-semibold text-sm shadow-md`}>
                   Publish Story
                 </button>
               </div>
@@ -197,7 +206,15 @@ const HowItWorksSection = () => {
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-newsreader font-extralight text-foreground mb-6">
             Three steps to{" "}
             <span className="bg-gradient-to-r from-foreground via-slate-light to-foreground bg-clip-text text-transparent">
-              share your impact
+              share your{" "}
+            </span>
+            <span className="relative inline-block">
+              <span className="bg-gradient-to-r from-foreground via-slate-light to-foreground bg-clip-text text-transparent">
+                impact
+              </span>
+              <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 12" fill="none">
+                <path d="M2 8C50 2 150 2 198 8" stroke="#c0dfa1" strokeWidth="4" strokeLinecap="round" className="animate-pulse-soft-landing"/>
+              </svg>
             </span>
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -260,7 +277,7 @@ const HowItWorksSection = () => {
           </div>
           
           {/* Phone mockup */}
-          <div className="flex justify-center order-1 lg:order-2">
+          <div className="hidden lg:flex justify-center order-1 lg:order-2">
             <div className="relative">
               {/* Glow behind phone */}
               <div className={`absolute inset-0 bg-gradient-to-br ${steps[activeStep].color} opacity-20 blur-3xl rounded-full scale-150`} />
