@@ -23,6 +23,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
     const [locations, setLocations] = useState<Location[]>([])
     const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
     const [availableKPIs, setAvailableKPIs] = useState<any[]>([])
+    const [evidenceLocationMap, setEvidenceLocationMap] = useState<Record<string, string[]>>({})
     const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null)
     const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
     const [editingEvidence, setEditingEvidence] = useState<Evidence | null>(null)
@@ -159,6 +160,33 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
             }
 
             setEvidence(filtered)
+
+            // Fetch locations from linked impact claims for evidence that doesn't have direct location_ids
+            const locationMap: Record<string, string[]> = {}
+            await Promise.all(
+                filtered.map(async (ev) => {
+                    if (!ev.id) return
+                    // First use direct location_ids if available
+                    const directLocationIds = ev.location_ids || (ev.location_id ? [ev.location_id] : [])
+                    if (directLocationIds.length > 0) {
+                        locationMap[ev.id] = directLocationIds
+                        return
+                    }
+                    // Otherwise, fetch from linked data points
+                    try {
+                        const dataPoints = await apiService.getDataPointsForEvidence(ev.id)
+                        const dpLocationIds = dataPoints
+                            ?.filter((dp: any) => dp.location_id)
+                            .map((dp: any) => dp.location_id) || []
+                        if (dpLocationIds.length > 0) {
+                            locationMap[ev.id] = [...new Set(dpLocationIds)] // dedupe
+                        }
+                    } catch (err) {
+                        // Ignore errors for individual items
+                    }
+                })
+            )
+            setEvidenceLocationMap(locationMap)
         } catch (error) {
             console.error('Error loading evidence:', error)
             toast.error('Failed to load evidence')
@@ -682,9 +710,10 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                         {/* Header Row */}
                         <div className="px-6 py-3 bg-gray-50/50 border-b border-gray-100 grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wide">
                             <div className="col-span-1"></div>
-                            <div className="col-span-4">Name</div>
+                            <div className="col-span-3">Name</div>
                             <div className="col-span-2">Type</div>
-                            <div className="col-span-3">Date</div>
+                            <div className="col-span-2">Date</div>
+                            <div className="col-span-2">Location</div>
                             <div className="col-span-2"></div>
                         </div>
 
@@ -711,7 +740,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                         </div>
 
                                         {/* Name */}
-                                        <div className="col-span-4 min-w-0">
+                                        <div className="col-span-3 min-w-0">
                                             <div className="font-medium text-gray-800 truncate">
                                                 {ev.title || 'Untitled Evidence'}
                                             </div>
@@ -730,10 +759,23 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                         </div>
 
                                         {/* Date */}
-                                        <div className="col-span-3 text-xs text-gray-500 whitespace-nowrap">
+                                        <div className="col-span-2 text-xs text-gray-500 whitespace-nowrap">
                                             {ev.date_range_start && ev.date_range_end
                                                 ? `${formatDate(ev.date_range_start)} - ${formatDate(ev.date_range_end)}`
                                                 : formatDate(ev.date_represented)}
+                                        </div>
+
+                                        {/* Location */}
+                                        <div className="col-span-2 text-xs text-gray-500 truncate">
+                                            {(() => {
+                                                // Use the pre-fetched location map (includes both direct and impact claim locations)
+                                                const locationIds = ev.id ? evidenceLocationMap[ev.id] || [] : []
+                                                if (locationIds.length === 0) return '—'
+                                                const locationNames = locationIds
+                                                    .map(id => locations.find(l => l.id === id)?.name)
+                                                    .filter(Boolean)
+                                                return locationNames.length > 0 ? locationNames.join(', ') : '—'
+                                            })()}
                                         </div>
 
                                         {/* Actions */}

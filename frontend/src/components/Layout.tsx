@@ -99,14 +99,13 @@ export default function Layout({ user, children }: LayoutProps) {
                             </Link>
                         </div>
 
-                        {/* Center: Organization Name + Dashboard */}
+                        {/* Center: Organization Name */}
                         <div className="hidden md:flex flex-col items-center justify-center absolute left-1/2 transform -translate-x-1/2">
                             {organization && (
                                 <h1 className="text-xl font-semibold text-gray-900">
                                     {organization.name}
                                 </h1>
                             )}
-                            <span className="text-sm text-gray-500">Dashboard</span>
                         </div>
 
                         {/* Right side: Tutorial, Settings, User Profile */}

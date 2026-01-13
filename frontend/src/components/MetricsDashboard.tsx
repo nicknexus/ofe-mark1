@@ -116,7 +116,7 @@ interface MetricsDashboardProps {
 
 export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = [], initiativeId, onNavigateToLocations, onMetricCardClick, onAddKPI, onStoryClick, user, organization, onOrderChange, onAddImpactClaim, onAddEvidence }: MetricsDashboardProps) {
     const [timeFrame, setTimeFrame] = useState<'all' | '1month' | '6months' | '1year' | '5years'>('all')
-    const [isCumulative, setIsCumulative] = useState(true)
+    const [isCumulative, setIsCumulative] = useState(false)
     const [visibleKPIs, setVisibleKPIs] = useState<Set<string>>(new Set())
     const [orderedKPIs, setOrderedKPIs] = useState<any[]>([])
 
@@ -1197,17 +1197,8 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             <h3 className="text-sm font-semibold text-gray-800">Metrics Over Time</h3>
                         </div>
                         <div className="flex items-center space-x-2">
-                            {/* Cumulative/Non-cumulative Toggle - Always visible to persist month-to-month view */}
+                            {/* Monthly/Cumulative Toggle */}
                             <div className="flex items-center bg-gray-50 rounded-xl p-0.5">
-                                <button
-                                    onClick={() => setIsCumulative(true)}
-                                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${isCumulative
-                                        ? 'bg-primary-500 text-white shadow-[0_2px_10px_rgba(192,223,161,0.3)]'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                        }`}
-                                >
-                                    Cumulative
-                                </button>
                                 <button
                                     onClick={() => setIsCumulative(false)}
                                     className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${!isCumulative
@@ -1216,6 +1207,15 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                         }`}
                                 >
                                     Monthly
+                                </button>
+                                <button
+                                    onClick={() => setIsCumulative(true)}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${isCumulative
+                                        ? 'bg-primary-500 text-white shadow-[0_2px_10px_rgba(192,223,161,0.3)]'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                >
+                                    Cumulative
                                 </button>
                             </div>
                             {/* Time Frame Filters */}

@@ -142,7 +142,6 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
     const [mapClickCoordinates, setMapClickCoordinates] = useState<[number, number] | null>(null)
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
     const locationCardRefs = useRef<Record<string, HTMLDivElement | null>>({})
-    const [locationCountries, setLocationCountries] = useState<Record<string, string>>({})
 
     // Initialize ordered locations from state, sorted by display_order
     useEffect(() => {
@@ -213,50 +212,12 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
         }
     }, [selectedLocation])
 
-    const fetchCountryForLocation = async (location: Location): Promise<string | null> => {
-        try {
-            const response = await fetch(
-                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.latitude}&lon=${location.longitude}&addressdetails=1`,
-                {
-                    headers: {
-                        'User-Agent': 'OFE App',
-                    },
-                }
-            )
-            const data = await response.json()
-            return data.address?.country || null
-        } catch (error) {
-            console.error('Reverse geocoding error:', error)
-            return null
-        }
-    }
-
-    // Fire-and-forget country fetching (runs independently)
-    const fetchCountriesInBackground = (locations: Location[]) => {
-        ;(async () => {
-            for (const location of locations) {
-                if (!location.id) continue
-                // Skip if we already have this country cached
-                if (locationCountries[location.id]) continue
-                
-                const country = await fetchCountryForLocation(location)
-                if (country) {
-                    setLocationCountries((prev) => ({ ...prev, [location.id!]: country }))
-                }
-                // Small delay to respect Nominatim rate limits
-                await new Promise((r) => setTimeout(r, 200))
-            }
-        })()
-    }
-
     const loadLocations = async () => {
         if (!initiativeId) return
         try {
             setLoading(true)
             const data = await apiService.getLocations(initiativeId)
             setLocations(data)
-            // Kick off background country fetch (non-blocking)
-            fetchCountriesInBackground(data)
         } catch (error) {
             toast.error('Failed to load locations')
             console.error(error)
@@ -454,7 +415,7 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
                                                     setDeleteConfirmId(location.id!)
                                                 }}
                                                 locationCardRefs={locationCardRefs}
-                                                country={location.id ? locationCountries[location.id] : null}
+                                                country={location.country}
                                             />
                                         ))}
                                     </SortableContext>

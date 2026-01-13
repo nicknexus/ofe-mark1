@@ -42,6 +42,7 @@ export default function LocationModal({
         latitude: '',
         longitude: '',
         address: '',
+        country: '',
     })
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -102,6 +103,7 @@ export default function LocationModal({
                     latitude: initialLocation.latitude.toString(),
                     longitude: initialLocation.longitude.toString(),
                     address: '',
+                    country: initialLocation.country || '',
                 })
             } else if (initialCoordinates) {
                 setFormData({
@@ -110,6 +112,7 @@ export default function LocationModal({
                     latitude: initialCoordinates[1].toFixed(6),
                     longitude: initialCoordinates[0].toFixed(6),
                     address: '',
+                    country: '',
                 })
             } else {
                 setFormData({
@@ -118,6 +121,7 @@ export default function LocationModal({
                     latitude: '',
                     longitude: '',
                     address: '',
+                    country: '',
                 })
             }
             setSearchQuery('')
@@ -156,6 +160,7 @@ export default function LocationModal({
             longitude: result.lon,
             name: formData.name || result.display_name.split(',')[0], // Use first part as name if not set
             address: result.display_name,
+            country: result.address?.country || '',
         })
         setSearchQuery(result.display_name)
         setSearchResults([])
@@ -186,12 +191,28 @@ export default function LocationModal({
 
         setLoading(true)
         try {
+            // If no country is set (manual coordinates or map click), try to reverse geocode
+            let country = formData.country
+            if (!country) {
+                try {
+                    const response = await fetch(
+                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+                        { headers: { 'User-Agent': 'OFE App' } }
+                    )
+                    const data = await response.json()
+                    country = data.address?.country || ''
+                } catch (err) {
+                    console.error('Reverse geocoding failed:', err)
+                }
+            }
+
             await onSubmit({
                 initiative_id: initiativeId,
                 name: formData.name.trim(),
                 description: formData.description.trim() || undefined,
                 latitude: lat,
                 longitude: lng,
+                country: country || undefined,
             })
             onClose()
         } catch (err) {

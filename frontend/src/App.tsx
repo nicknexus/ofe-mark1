@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthService } from './services/auth'
 import { SubscriptionService } from './services/subscription'
@@ -242,6 +242,7 @@ function App() {
                                         <Route path="initiatives/:id" element={<InitiativePage />} />
                                         <Route path="initiatives/:id/metrics/:kpiId" element={<InitiativePage />} />
                                         <Route path="account" element={<AccountPage subscriptionStatus={subscriptionStatus} />} />
+                                        <Route path="*" element={<Navigate to="/" replace />} />
                                     </Routes>
                                 </Layout>
                             } />

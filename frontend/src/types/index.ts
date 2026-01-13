@@ -58,6 +58,7 @@ export interface Location {
     description?: string;
     latitude: number;
     longitude: number;
+    country?: string;
     display_order?: number;
     created_at?: string;
     updated_at?: string;

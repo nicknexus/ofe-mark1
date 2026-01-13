@@ -61,6 +61,7 @@ export default function InitiativePage() {
 
     // Sidebar navigation state
     const [activeTab, setActiveTab] = useState('home')
+    const [previousTab, setPreviousTab] = useState<string | null>(null) // Track tab before viewing metric
     const [initialStoryId, setInitialStoryId] = useState<string | undefined>(undefined)
 
     // Modal states
@@ -138,7 +139,10 @@ export default function InitiativePage() {
     // Handle URL-based metric expansion
     useEffect(() => {
         if (kpiId && dashboard) {
-            // Auto-expand the metric from URL and switch to metrics tab
+            // Save current tab before switching to metrics (only if not already on metrics)
+            if (activeTab !== 'metrics') {
+                setPreviousTab(activeTab)
+            }
             setActiveTab('metrics')
             setExpandedKPIs(new Set([kpiId]))
         }
@@ -375,6 +379,11 @@ export default function InitiativePage() {
             // Closing the metric - navigate back to initiative
             navigate(`/initiatives/${id}`)
             setExpandedKPIs(new Set())
+            // Return to previous tab if we came from somewhere other than metrics
+            if (previousTab) {
+                setActiveTab(previousTab)
+                setPreviousTab(null)
+            }
         } else {
             // Opening a metric - navigate to metric URL
             navigate(`/initiatives/${id}/metrics/${kpiIdToToggle}`)
