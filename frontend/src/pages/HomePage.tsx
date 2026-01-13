@@ -8,6 +8,7 @@ const HowItWorksSection = lazy(() => import('../components/landing/HowItWorksSec
 // const TestimonialsSection = lazy(() => import('../components/landing/TestimonialsSection'));
 const CTASection = lazy(() => import('../components/landing/CTASection'));
 const PricingSection = lazy(() => import('../components/landing/PricingSection'));
+const ContactSection = lazy(() => import('../components/landing/ContactSection'));
 const Footer = lazy(() => import('../components/landing/Footer'));
 
 // Simple loading placeholder
@@ -39,6 +40,9 @@ export default function HomePage() {
       </Suspense>
       <Suspense fallback={<SectionLoader />}>
         <PricingSection onGetStarted={handleGetStarted} />
+      </Suspense>
+      <Suspense fallback={<SectionLoader />}>
+        <ContactSection />
       </Suspense>
       <Suspense fallback={<SectionLoader />}>
         <Footer />

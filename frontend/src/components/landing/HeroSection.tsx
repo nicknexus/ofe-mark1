@@ -46,7 +46,7 @@ const HeroSection = ({ onGetStarted }: HeroSectionProps) => {
             
             <p className="text-lg sm:text-xl text-muted-foreground max-w-lg mx-auto lg:mx-0 mb-10 fade-in-scale-delay-1 leading-relaxed">
               People give because they want to make a difference.<br />
-              When they can't see that difference, connection fades—and so does their support.
+              When they can't see that difference, connection fades, and so does their support.
             </p>
             
             {/* CTA buttons */}
@@ -55,10 +55,10 @@ const HeroSection = ({ onGetStarted }: HeroSectionProps) => {
                 Build Donor Trust
                 <ArrowRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
               </Button>
-              <Button variant="hero-outline" size="xl" className="group">
+              {/* <Button variant="hero-outline" size="xl" className="group">
                 <Play className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" />
                 Watch Story
-              </Button>
+              </Button> */}
             </div>
             
             {/* Social proof with icons */}
