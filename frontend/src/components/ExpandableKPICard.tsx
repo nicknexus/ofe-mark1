@@ -694,6 +694,9 @@ export default function ExpandableKPICard({
     const actualMaxValue = Math.max(...chartData.map(d =>
         typeof d.cumulative === 'number' && isFinite(d.cumulative) ? d.cumulative : 0
     ).filter(v => v > 0), 0)
+    
+    // Calculate total metric value
+    const totalMetricValue = kpiUpdates.reduce((sum, update) => sum + (update.value || 0), 0)
 
     // Generate ticks that include the actual max value
     const generateYTicks = () => {
@@ -821,11 +824,17 @@ export default function ExpandableKPICard({
                                 <button onClick={(e) => { e.stopPropagation(); onToggleExpand() }} className="p-2.5 hover:bg-red-50 rounded-xl transition-all duration-200 border border-gray-200">
                                     <X className="w-5 h-5 text-red-500" />
                                 </button>
-                                <div>
-                                    <h2 className="text-2xl font-bold text-gray-900">{kpi.title}</h2>
-                                    {kpi.description && (
-                                        <p className="text-sm text-gray-500 line-clamp-1 max-w-lg mt-1">{kpi.description}</p>
-                                    )}
+                                <div className="flex items-center gap-4">
+                                    <div>
+                                        <h2 className="text-2xl font-bold text-gray-900">{kpi.title}</h2>
+                                        {kpi.description && (
+                                            <p className="text-sm text-gray-500 line-clamp-1 max-w-lg mt-1">{kpi.description}</p>
+                                        )}
+                                    </div>
+                                    <div className="flex items-baseline gap-2 px-4 py-2 bg-primary-50 rounded-xl border border-primary-100">
+                                        <span className="text-3xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}</span>
+                                        {kpi.unit_of_measurement && <span className="text-sm text-primary-500">{kpi.unit_of_measurement}</span>}
+                                    </div>
                                 </div>
                             </div>
                             <div className="flex items-center space-x-2">
@@ -849,23 +858,6 @@ export default function ExpandableKPICard({
 
                     {/* Content - Fit to screen */}
                     <div className="flex-1 p-3 flex flex-col gap-2 max-w-[1800px] mx-auto overflow-hidden w-full min-h-0">
-                        {kpiUpdates.length === 0 ? (
-                            <div className="flex justify-center items-center py-12">
-                                <div className="bg-white/80 backdrop-blur-xl border border-primary-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200 max-w-md">
-                                    <div className="text-center">
-                                        <div className="w-20 h-20 mx-auto mb-5 bg-primary-100/80 rounded-2xl flex items-center justify-center">
-                                            <BarChart3 className="w-10 h-10 text-primary-500" />
-                                        </div>
-                                        <h5 className="text-xl font-bold text-gray-800 mb-2">Create Your First Impact Claim</h5>
-                                        <p className="text-sm text-gray-500 mb-6">Start tracking your impact by adding your first impact claim for this metric.</p>
-                                        <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25">
-                                            <Plus className="w-5 h-5" /><span>Add Impact Claim</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
                                 <div className="grid grid-cols-3 gap-2 flex-shrink-0">
                                     <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-2.5 shadow-soft-float">
                                         <div className="flex items-center space-x-2">
@@ -1020,18 +1012,17 @@ export default function ExpandableKPICard({
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-primary-300/60 rounded-xl p-4 shadow-soft-float flex-1">
+                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-primary-400 rounded-xl p-4 shadow-lg shadow-primary-200/50 flex-1 ring-2 ring-primary-200 ring-offset-2">
                                                 <div className="text-center">
                                                     <div className="w-10 h-10 mx-auto mb-2 bg-primary-100/80 rounded-lg flex items-center justify-center"><BarChart3 className="w-5 h-5 text-primary-500" /></div>
-                                                    <h5 className="text-sm font-semibold text-gray-800 mb-2">Impact Claims</h5>
-                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25"><Plus className="w-4 h-4" /><span>Add Impact Claim</span></button>
+                                                    <h5 className="text-sm font-semibold text-gray-800 mb-1">Impact Claims</h5>
+                                                    <p className="text-xs text-gray-500 mb-3">Start tracking your impact</p>
+                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25 animate-pulse"><Plus className="w-4 h-4" /><span>Add Impact Claim</span></button>
                                                 </div>
                                             </div>
                                         )}
                                     </div>
                                 </div>
-                            </>
-                        )}
                     </div>
                 </div>
 
@@ -1312,9 +1303,15 @@ export default function ExpandableKPICard({
                                 >
                                     <X className="w-5 h-5 text-red-500" />
                                 </button>
-                                <div>
-                                    <h2 className="text-xl font-bold text-gray-800">{kpi.title}</h2>
-                                    <p className="text-sm text-gray-500">{kpi.description}</p>
+                                <div className="flex items-center gap-3">
+                                    <div>
+                                        <h2 className="text-xl font-bold text-gray-800">{kpi.title}</h2>
+                                        <p className="text-sm text-gray-500">{kpi.description}</p>
+                                    </div>
+                                    <div className="flex items-baseline gap-1.5 px-3 py-1.5 bg-primary-50 rounded-xl border border-primary-100">
+                                        <span className="text-2xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}</span>
+                                        {kpi.unit_of_measurement && <span className="text-xs text-primary-500">{kpi.unit_of_measurement}</span>}
+                                    </div>
                                 </div>
                             </div>
                             <div className="flex items-center space-x-2">
@@ -1375,32 +1372,6 @@ export default function ExpandableKPICard({
 
                     {/* Content - Reuse the same content structure */}
                     <div className="p-4 space-y-4 max-w-[1600px] mx-auto">
-                        {/* Check if metric has no claims - show only impact claim container */}
-                        {kpiUpdates.length === 0 ? (
-                            /* Fresh Metric - Show only Add Impact Claim button */
-                            <div className="flex justify-center items-center py-12">
-                                <div className="bg-white/80 backdrop-blur-xl border border-primary-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200 max-w-md">
-                                    <div className="text-center">
-                                        <div className="w-20 h-20 mx-auto mb-5 bg-primary-100/80 rounded-2xl flex items-center justify-center">
-                                            <BarChart3 className="w-10 h-10 text-primary-500" />
-                                        </div>
-                                        <h5 className="text-xl font-bold text-gray-800 mb-2">Create Your First Impact Claim</h5>
-                                        <p className="text-sm text-gray-500 mb-6">Start tracking your impact by adding your first impact claim for this metric.</p>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                onAddUpdate()
-                                            }}
-                                            className="inline-flex items-center space-x-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25"
-                                        >
-                                            <Plus className="w-5 h-5" />
-                                            <span>Add Impact Claim</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
                                 {/* Stats Grid */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                     <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-2xl p-4 shadow-soft-float">
@@ -1591,11 +1562,12 @@ export default function ExpandableKPICard({
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-primary-300/60 rounded-2xl p-6 shadow-soft-float flex-1">
+                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-primary-400 rounded-2xl p-6 shadow-lg shadow-primary-200/50 flex-1 ring-2 ring-primary-200 ring-offset-2">
                                                 <div className="text-center">
                                                     <div className="w-14 h-14 mx-auto mb-3 bg-primary-100/80 rounded-xl flex items-center justify-center"><BarChart3 className="w-7 h-7 text-primary-500" /></div>
-                                                    <h5 className="text-base font-semibold text-gray-800 mb-2">Impact Claims</h5>
-                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25">
+                                                    <h5 className="text-base font-semibold text-gray-800 mb-1">Impact Claims</h5>
+                                                    <p className="text-sm text-gray-500 mb-3">Start tracking your impact</p>
+                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25 animate-pulse">
                                                         <Plus className="w-5 h-5" /><span>Add Impact Claim</span>
                                                     </button>
                                                 </div>
@@ -1603,8 +1575,6 @@ export default function ExpandableKPICard({
                                         )}
                                     </div>
                                 </div>
-                            </>
-                        )}
                     </div>
                 </div>
             ) : createPortal(
@@ -1622,9 +1592,15 @@ export default function ExpandableKPICard({
                                 >
                                     <X className="w-5 h-5 text-red-500" />
                                 </button>
-                                <div>
-                                    <h2 className="text-xl font-bold text-gray-800">{kpi.title}</h2>
-                                    <p className="text-sm text-gray-500">{kpi.description}</p>
+                                <div className="flex items-center gap-3">
+                                    <div>
+                                        <h2 className="text-xl font-bold text-gray-800">{kpi.title}</h2>
+                                        <p className="text-sm text-gray-500">{kpi.description}</p>
+                                    </div>
+                                    <div className="flex items-baseline gap-1.5 px-3 py-1.5 bg-primary-50 rounded-xl border border-primary-100">
+                                        <span className="text-2xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}</span>
+                                        {kpi.unit_of_measurement && <span className="text-xs text-primary-500">{kpi.unit_of_measurement}</span>}
+                                    </div>
                                 </div>
                             </div>
                             <div className="flex items-center space-x-2">
@@ -1685,32 +1661,6 @@ export default function ExpandableKPICard({
 
                     {/* Content */}
                     <div className="p-4 space-y-4 max-w-[1600px] mx-auto">
-                        {/* Check if metric has no claims - show only impact claim container */}
-                        {kpiUpdates.length === 0 ? (
-                            /* Fresh Metric - Show only Add Impact Claim button */
-                            <div className="flex justify-center items-center py-12">
-                                <div className="bg-white/80 backdrop-blur-xl border border-primary-200/60 rounded-2xl p-8 shadow-soft-float hover:shadow-soft-float-hover transition-all duration-200 max-w-md">
-                                    <div className="text-center">
-                                        <div className="w-20 h-20 mx-auto mb-5 bg-primary-100/80 rounded-2xl flex items-center justify-center">
-                                            <BarChart3 className="w-10 h-10 text-primary-500" />
-                                        </div>
-                                        <h5 className="text-xl font-bold text-gray-800 mb-2">Create Your First Impact Claim</h5>
-                                        <p className="text-sm text-gray-500 mb-6">Start tracking your impact by adding your first impact claim for this metric.</p>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                onAddUpdate()
-                                            }}
-                                            className="inline-flex items-center space-x-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25"
-                                        >
-                                            <Plus className="w-5 h-5" />
-                                            <span>Add Impact Claim</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
                                 {/* Stats Grid */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                     <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-2xl p-4 shadow-soft-float">
@@ -1998,19 +1948,19 @@ export default function ExpandableKPICard({
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-primary-300/60 rounded-2xl p-6 shadow-soft-float flex-1">
+                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-primary-400 rounded-2xl p-6 shadow-lg shadow-primary-200/50 flex-1 ring-2 ring-primary-200 ring-offset-2">
                                                 <div className="text-center">
                                                     <div className="w-14 h-14 mx-auto mb-3 bg-primary-100/80 rounded-xl flex items-center justify-center">
                                                         <BarChart3 className="w-7 h-7 text-primary-500" />
                                                     </div>
-                                                    <h5 className="text-base font-semibold text-gray-800 mb-2">Impact Claims</h5>
-                                                    <p className="text-sm text-gray-500 mb-4">You haven't added any of this type, add it here!</p>
+                                                    <h5 className="text-base font-semibold text-gray-800 mb-1">Impact Claims</h5>
+                                                    <p className="text-sm text-gray-500 mb-3">Start tracking your impact</p>
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation()
                                                             onAddUpdate()
                                                         }}
-                                                        className="inline-flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25"
+                                                        className="inline-flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25 animate-pulse"
                                                     >
                                                         <Plus className="w-5 h-5" />
                                                         <span>Add Impact Claim</span>
@@ -2020,8 +1970,6 @@ export default function ExpandableKPICard({
                                         )}
                                     </div>
                                 </div>
-                            </>
-                        )}
                     </div>
                 </div>,
                 document.body
