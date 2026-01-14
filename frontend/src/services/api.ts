@@ -409,7 +409,7 @@ class ApiService {
         return this.request<any[]>(`/evidence/${evidenceId}/files`)
     }
 
-    // Evidence endpoints
+    // Evidence endpoints - Direct upload to Supabase (bypasses Vercel size limits)
     async uploadFile(file: File): Promise<{ file_url: string; size: number }> {
         const { data: { session } } = await supabase.auth.getSession()
 
@@ -417,28 +417,81 @@ class ApiService {
             throw new Error('No authenticated session')
         }
 
-        const formData = new FormData()
-        formData.append('file', file)
+        try {
+            // Step 1: Get signed upload URL from backend
+            const signedUrlResponse = await fetch(`${API_BASE_URL}/api/upload/signed-url`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    filename: file.name,
+                    contentType: file.type
+                })
+            })
 
-        const response = await fetch(`${API_BASE_URL}/api/upload/file`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${session.access_token}`
-            },
-            body: formData
-        })
+            if (!signedUrlResponse.ok) {
+                const errorData = await signedUrlResponse.json()
+                throw new Error(errorData.error || 'Failed to get upload URL')
+            }
 
-        if (!response.ok) {
-            const errorData = await response.json()
-            throw new Error(errorData.error || 'File upload failed')
+            const { signedUrl, filePath, publicUrl } = await signedUrlResponse.json()
+
+            // Step 2: Upload directly to Supabase Storage (bypasses Vercel!)
+            const uploadResponse = await fetch(signedUrl, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': file.type
+                },
+                body: file
+            })
+
+            if (!uploadResponse.ok) {
+                throw new Error('Direct upload to storage failed')
+            }
+
+            // Step 3: Confirm upload with backend (for storage tracking)
+            await fetch(`${API_BASE_URL}/api/upload/confirm`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    filePath,
+                    fileSize: file.size
+                })
+            })
+
+            // Trigger storage refresh after successful upload
+            window.dispatchEvent(new Event('storage-updated'))
+
+            return { file_url: publicUrl, size: file.size }
+        } catch (error) {
+            // Fallback: try the old endpoint for small files (backwards compatibility)
+            console.warn('Direct upload failed, trying fallback:', error)
+            
+            const formData = new FormData()
+            formData.append('file', file)
+
+            const response = await fetch(`${API_BASE_URL}/api/upload/file`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`
+                },
+                body: formData
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json()
+                throw new Error(errorData.error || 'File upload failed')
+            }
+
+            const result = await response.json()
+            window.dispatchEvent(new Event('storage-updated'))
+            return result
         }
-
-        const result = await response.json()
-        
-        // Trigger storage refresh after successful upload
-        window.dispatchEvent(new Event('storage-updated'))
-        
-        return result
     }
 
     async createEvidence(evidence: CreateEvidenceForm): Promise<Evidence> {

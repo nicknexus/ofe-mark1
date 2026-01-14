@@ -3,8 +3,89 @@ import { upload, uploadToSupabase } from '../utils/fileUpload'
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth'
 import { StorageService } from '../services/storageService'
 import { compressImage, isCompressibleImage } from '../utils/imageCompression'
+import { supabase } from '../utils/supabase'
+import path from 'path'
 
 const router = Router()
+
+// Generate signed URL for direct upload to Supabase (bypasses Vercel size limits)
+router.post('/signed-url', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        if (!req.user?.id) {
+            res.status(401).json({ error: 'User not authenticated' })
+            return
+        }
+
+        const { filename, contentType } = req.body
+        if (!filename || !contentType) {
+            res.status(400).json({ error: 'filename and contentType are required' })
+            return
+        }
+
+        // Generate unique filename
+        const timestamp = Date.now()
+        const randomId = Math.round(Math.random() * 1E9)
+        const ext = path.extname(filename)
+        const baseName = path.basename(filename, ext).replace(/[^a-zA-Z0-9]/g, '_')
+        const uniqueFilename = `${timestamp}-${randomId}-${baseName}${ext}`
+        const filePath = `evidence/${req.user.id}/${uniqueFilename}`
+
+        // Create signed upload URL (valid for 2 minutes)
+        const { data, error } = await supabase.storage
+            .from('evidence-files')
+            .createSignedUploadUrl(filePath)
+
+        if (error) {
+            console.error('Failed to create signed URL:', error)
+            res.status(500).json({ error: 'Failed to create upload URL' })
+            return
+        }
+
+        // Get the public URL that the file will have after upload
+        const { data: urlData } = supabase.storage
+            .from('evidence-files')
+            .getPublicUrl(filePath)
+
+        res.json({
+            signedUrl: data.signedUrl,
+            token: data.token,
+            filePath,
+            publicUrl: urlData.publicUrl
+        })
+    } catch (error) {
+        console.error('Signed URL error:', error)
+        res.status(500).json({ error: 'Failed to generate upload URL' })
+    }
+})
+
+// Confirm upload completed and track storage
+router.post('/confirm', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        if (!req.user?.id) {
+            res.status(401).json({ error: 'User not authenticated' })
+            return
+        }
+
+        const { filePath, fileSize } = req.body
+        if (!filePath || !fileSize) {
+            res.status(400).json({ error: 'filePath and fileSize are required' })
+            return
+        }
+
+        // Track storage usage
+        const organizationId = await StorageService.getOrganizationIdForUser(req.user.id)
+        if (organizationId) {
+            await StorageService.incrementStorage(organizationId, fileSize)
+        }
+
+        console.log(`[Upload] ✅ Direct upload confirmed: ${filePath} (${fileSize} bytes)`)
+
+        res.json({ success: true })
+    } catch (error) {
+        console.error('Confirm upload error:', error)
+        res.status(500).json({ error: 'Failed to confirm upload' })
+    }
+})
 
 // File upload endpoint
 router.post('/file', authenticateUser, upload.single('file'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
