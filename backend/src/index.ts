@@ -34,7 +34,9 @@ const allowedOrigins = [
     'http://localhost:3000',
     'http://localhost:5173',
     'https://app.nexusimpacts.com',
-    'https://nexusimpacts.com'
+    'https://nexusimpacts.com',
+    'https://nexusimpacts.ai',
+    'https://www.nexusimpacts.ai'
 ];
 
 app.use((req, res, next) => {
