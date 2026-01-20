@@ -27,9 +27,9 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80] animate-fade-in">
-            <div className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] transform transition-all duration-200 ease-out animate-slide-up-fast">
+            <div className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] transform transition-all duration-200 ease-out animate-slide-up-fast">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50 flex-shrink-0">
                     <h2 className="text-2xl font-semibold text-gray-900">{story.title}</h2>
                     <button
                         onClick={onClose}
@@ -40,7 +40,7 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
                 </div>
 
                 {/* Content */}
-                <div className="overflow-y-auto max-h-[calc(90vh-140px)]">
+                <div className="overflow-y-auto flex-1 min-h-0">
                     <div className="p-6 space-y-6">
                         {/* Media Section */}
                         {story.media_type === 'text' ? (
@@ -151,7 +151,7 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
                 </div>
 
                 {/* Footer with Actions */}
-                <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+                <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50 flex-shrink-0">
                     <button
                         onClick={onClose}
                         className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"

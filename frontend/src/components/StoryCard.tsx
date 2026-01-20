@@ -85,20 +85,22 @@ export default function StoryCard({ story, onView }: StoryCardProps) {
                     {/* Description: 2–3 lines with fade; read more absolute so it doesn't change height */}
                     <div className="relative mt-1 h-[48px] overflow-hidden">
                         {story.description ? (
-                            <p className="text-xs text-gray-600 leading-snug line-clamp-3">
+                            <p className="text-xs text-gray-600 leading-snug line-clamp-3 pr-1">
                                 {story.description}
                             </p>
                         ) : (
                             <div className="h-full" />
                         )}
-                        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-gradient-to-t from-white to-transparent" />
                         {showReadMore && (
-                            <span
-                                className="absolute right-0 bottom-0 mb-0.5 text-[11px] font-medium text-blue-600 underline cursor-pointer"
-                                onClick={(e) => { e.stopPropagation(); onView(story) }}
-                            >
-                                Read more
-                            </span>
+                            <>
+                                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-white via-white/90 to-transparent" />
+                                <span
+                                    className="absolute right-0 bottom-0 text-[11px] font-medium text-blue-600 bg-white pl-2 pr-0.5 py-0.5 cursor-pointer hover:text-blue-700"
+                                    onClick={(e) => { e.stopPropagation(); onView(story) }}
+                                >
+                                    Read more
+                                </span>
+                            </>
                         )}
                     </div>
 
