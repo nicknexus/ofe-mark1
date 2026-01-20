@@ -99,17 +99,37 @@ export class LocationService {
         return data || [];
     }
 
-    // Get evidence linked to a location
+    // Get evidence linked to a location (via evidence_locations junction table)
     static async getEvidenceByLocation(locationId: string, userId: string): Promise<any[]> {
-        const { data, error } = await supabase
-            .from('evidence')
-            .select('*')
-            .eq('location_id', locationId)
-            .eq('user_id', userId)
-            .order('date_represented', { ascending: false });
+        // Query through the junction table to find all evidence linked to this location
+        const { data: junctionData, error: junctionError } = await supabase
+            .from('evidence_locations')
+            .select(`
+                evidence_id,
+                evidence(
+                    id, title, description, type, file_url, file_type,
+                    date_represented, date_range_start, date_range_end,
+                    created_at, updated_at, user_id, initiative_id
+                )
+            `)
+            .eq('location_id', locationId);
 
-        if (error) throw new Error(`Failed to fetch evidence for location: ${error.message}`);
-        return data || [];
+        if (junctionError) throw new Error(`Failed to fetch evidence for location: ${junctionError.message}`);
+
+        // Extract evidence items, filter by user_id, and deduplicate
+        const evidenceItems = (junctionData || [])
+            .map((item: any) => item.evidence)
+            .filter(Boolean)
+            .filter((ev: any) => ev.user_id === userId);
+
+        // Sort by date_represented descending
+        evidenceItems.sort((a: any, b: any) => {
+            const dateA = a.date_represented ? new Date(a.date_represented).getTime() : 0;
+            const dateB = b.date_represented ? new Date(b.date_represented).getTime() : 0;
+            return dateB - dateA;
+        });
+
+        return evidenceItems;
     }
 }
 
