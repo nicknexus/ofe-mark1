@@ -1,5 +1,6 @@
 import express from 'express'
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth'
+import { requireOwnerPermission } from '../middleware/teamPermissions'
 import { DonorCreditService } from '../services/donorCreditService'
 
 const router = express.Router()
@@ -49,8 +50,8 @@ router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     }
 })
 
-// Delete credit
-router.delete('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
+// Delete credit (owner only)
+router.delete('/:id', authenticateUser, requireOwnerPermission, async (req: AuthenticatedRequest, res) => {
     try {
         await DonorCreditService.delete(req.params.id, req.user!.id)
         res.status(204).send()

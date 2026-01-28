@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { OrganizationService } from '../services/organizationService';
+import { SubscriptionService } from '../services/subscriptionService';
+import { TeamService } from '../services/teamService';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { supabase } from '../utils/supabase';
 import { KPIService } from '../services/kpiService';
@@ -76,6 +78,54 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
         const organizations = await OrganizationService.getUserOrganizations(req.user!.id);
         res.json(organizations);
     } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// Create organization for existing user (for users who signed up without one)
+router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const { name } = req.body;
+        const userId = req.user!.id;
+
+        if (!name || name.trim() === '') {
+            res.status(400).json({ error: 'Organization name is required' });
+            return;
+        }
+
+        // Check if user already owns an organization
+        const existingOrg = await TeamService.getUserOwnedOrganization(userId);
+        if (existingOrg) {
+            res.status(400).json({ error: 'You already have an organization' });
+            return;
+        }
+
+        // Create the organization
+        const organization = await OrganizationService.findOrCreate(name.trim(), userId);
+        if (!organization) {
+            res.status(500).json({ error: 'Failed to create organization' });
+            return;
+        }
+
+        // Create subscription record with status 'none' (user needs to activate trial)
+        try {
+            await SubscriptionService.getOrCreate(userId, organization.id);
+        } catch (subError) {
+            console.error('Failed to create subscription record:', subError);
+            // Non-fatal
+        }
+
+        // Update user metadata to include organization
+        await supabase.auth.admin.updateUserById(userId, {
+            user_metadata: { organization: name.trim() }
+        });
+
+        res.status(201).json({
+            organization,
+            message: 'Organization created successfully!'
+        });
+    } catch (error) {
+        console.error('Create organization error:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });

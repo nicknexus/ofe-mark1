@@ -1,8 +1,55 @@
 import { supabase } from '../utils/supabase';
 import { Initiative } from '../types';
 import { OrganizationService } from './organizationService';
+import { TeamService } from './teamService';
 
 export class InitiativeService {
+    /**
+     * Get the organization ID for a user, with optional override
+     * @param userId - The user's ID
+     * @param requestedOrgId - Optional: specific org ID requested by the user
+     */
+    static async getEffectiveOrganizationId(userId: string, requestedOrgId?: string): Promise<string | null> {
+        // If a specific org is requested, verify user has access to it
+        if (requestedOrgId) {
+            // Check if user owns this org
+            const ownedOrg = await TeamService.getUserOwnedOrganization(userId);
+            if (ownedOrg && ownedOrg.id === requestedOrgId) {
+                return requestedOrgId;
+            }
+
+            // Check if user is a team member of this org
+            const membership = await TeamService.getUserTeamMembership(userId);
+            if (membership && membership.organization_id === requestedOrgId) {
+                return requestedOrgId;
+            }
+
+            // User doesn't have access to requested org - fall through to default
+        }
+
+        // Default behavior: check team membership first
+        const membership = await TeamService.getUserTeamMembership(userId);
+        if (membership) {
+            return membership.organization_id;
+        }
+
+        // If not a team member, check if user owns an organization
+        const ownedOrg = await TeamService.getUserOwnedOrganization(userId);
+        if (ownedOrg) {
+            return ownedOrg.id;
+        }
+
+        // User has no organization context
+        return null;
+    }
+
+    /**
+     * Check if user is a shared member (part of a team they don't own)
+     */
+    static async isSharedMember(userId: string): Promise<boolean> {
+        const membership = await TeamService.getUserTeamMembership(userId);
+        return !!membership;
+    }
     // Generate slug from initiative title
     static generateSlug(title: string): string {
         return title
@@ -15,21 +62,27 @@ export class InitiativeService {
     }
 
     static async create(initiative: Initiative, userId: string): Promise<Initiative> {
-        // Get user's organization (create if doesn't exist)
-        let userOrg = await OrganizationService.getUserOrganizations(userId);
-        if (!userOrg || userOrg.length === 0) {
+        // Check if user is a shared member - they cannot create new initiatives
+        const isShared = await this.isSharedMember(userId);
+        if (isShared) {
+            throw new Error('Team members cannot create new initiatives. Contact your organization owner.');
+        }
+
+        // Get the effective organization ID (owned org or team membership)
+        let organizationId: string | null = await this.getEffectiveOrganizationId(userId);
+        
+        if (!organizationId) {
             // User doesn't have an org - create one with default name
             // Use a timestamp-based name to ensure uniqueness
             const orgName = `Organization ${Date.now()}`;
             await OrganizationService.findOrCreate(orgName, userId);
-            userOrg = await OrganizationService.getUserOrganizations(userId);
+            const userOrg = await OrganizationService.getUserOrganizations(userId);
+            
+            if (!userOrg || userOrg.length === 0 || !userOrg[0].id) {
+                throw new Error('Failed to get or create organization');
+            }
+            organizationId = userOrg[0].id;
         }
-
-        if (!userOrg || userOrg.length === 0) {
-            throw new Error('Failed to get or create organization');
-        }
-
-        const organizationId = userOrg[0].id;
 
         // Generate slug from title
         let baseSlug = this.generateSlug(initiative.title);
@@ -103,11 +156,20 @@ export class InitiativeService {
         return data;
     }
 
-    static async getAll(userId: string): Promise<Initiative[]> {
+    static async getAll(userId: string, requestedOrgId?: string): Promise<Initiative[]> {
+        // Get the effective organization ID (owned org or team membership)
+        const organizationId = await this.getEffectiveOrganizationId(userId, requestedOrgId);
+        
+        if (!organizationId) {
+            // User has no organization context - return empty
+            return [];
+        }
+
+        // Fetch all initiatives for the organization
         const { data, error } = await supabase
             .from('initiatives')
             .select('*')
-            .eq('user_id', userId)
+            .eq('organization_id', organizationId)
             .order('created_at', { ascending: false });
 
         if (error) throw new Error(`Failed to fetch initiatives: ${error.message}`);
@@ -115,11 +177,18 @@ export class InitiativeService {
     }
 
     static async getById(id: string, userId: string): Promise<Initiative | null> {
+        // Get the effective organization ID (owned org or team membership)
+        const organizationId = await this.getEffectiveOrganizationId(userId);
+        
+        if (!organizationId) {
+            return null;
+        }
+
         const { data, error } = await supabase
             .from('initiatives')
             .select('*')
             .eq('id', id)
-            .eq('user_id', userId)
+            .eq('organization_id', organizationId)
             .single();
 
         if (error) {
@@ -130,6 +199,12 @@ export class InitiativeService {
     }
 
     static async update(id: string, updates: Partial<Initiative>, userId: string): Promise<Initiative> {
+        // Get the effective organization ID
+        const organizationId = await this.getEffectiveOrganizationId(userId);
+        if (!organizationId) {
+            throw new Error('No organization context');
+        }
+
         // If title is being updated, regenerate slug
         if (updates.title) {
             let baseSlug = this.generateSlug(updates.title);
@@ -161,7 +236,7 @@ export class InitiativeService {
             .from('initiatives')
             .update(updates)
             .eq('id', id)
-            .eq('user_id', userId)
+            .eq('organization_id', organizationId)
             .select()
             .single();
 
@@ -170,11 +245,23 @@ export class InitiativeService {
     }
 
     static async delete(id: string, userId: string): Promise<void> {
+        // Check if user is a shared member (not allowed to delete)
+        const isShared = await this.isSharedMember(userId);
+        if (isShared) {
+            throw new Error('Shared members cannot delete initiatives. Contact your organization owner.');
+        }
+
+        // Get the effective organization ID
+        const organizationId = await this.getEffectiveOrganizationId(userId);
+        if (!organizationId) {
+            throw new Error('No organization context');
+        }
+
         const { error } = await supabase
             .from('initiatives')
             .delete()
             .eq('id', id)
-            .eq('user_id', userId);
+            .eq('organization_id', organizationId);
 
         if (error) throw new Error(`Failed to delete initiative: ${error.message}`);
     }

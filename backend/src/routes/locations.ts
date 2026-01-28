@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { LocationService } from '../services/locationService';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
+import { requireOwnerPermission } from '../middleware/teamPermissions';
 import { supabase } from '../utils/supabase';
 
 const router = Router();
@@ -50,8 +51,8 @@ router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     }
 });
 
-// Delete location
-router.delete('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
+// Delete location (owner only)
+router.delete('/:id', authenticateUser, requireOwnerPermission, async (req: AuthenticatedRequest, res) => {
     try {
         await LocationService.delete(req.params.id, req.user!.id);
         res.status(204).send();

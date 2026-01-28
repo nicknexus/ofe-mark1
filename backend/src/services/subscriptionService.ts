@@ -1,4 +1,5 @@
 import { supabase } from '../utils/supabase';
+import { TeamService } from './teamService';
 
 export interface Subscription {
     id: string;
@@ -25,6 +26,8 @@ export interface SubscriptionAccessResult {
     hasAccess: boolean;
     reason: string;
     subscription: Subscription;
+    isInherited?: boolean;
+    inheritedFromOrgId?: string;
 }
 
 const TRIAL_DURATION_DAYS = 30;
@@ -130,10 +133,12 @@ export class SubscriptionService {
 
     /**
      * Check if user has active access to the app
+     * Checks own subscription first, then inherited access from team membership
      */
     static async hasAccess(userId: string): Promise<SubscriptionAccessResult> {
         const subscription = await this.getOrCreate(userId);
 
+        // First check user's own subscription
         switch (subscription.status) {
             case 'trial':
                 if (subscription.trial_ends_at && new Date(subscription.trial_ends_at) > new Date()) {
@@ -141,7 +146,8 @@ export class SubscriptionService {
                 }
                 // Trial expired - update status
                 const expiredSub = await this.updateStatus(userId, 'expired');
-                return { hasAccess: false, reason: 'trial_expired', subscription: expiredSub };
+                // Don't return yet - check inherited access
+                break;
 
             case 'active':
                 // Check if still in paid period
@@ -152,22 +158,97 @@ export class SubscriptionService {
                 return { hasAccess: true, reason: 'subscription_active', subscription };
 
             case 'past_due':
-                // Could implement grace period here
-                return { hasAccess: false, reason: 'payment_past_due', subscription };
+                // Could implement grace period here - but check inherited access first
+                break;
 
             case 'cancelled':
                 // Check if still in paid period (user cancelled but period hasn't ended)
                 if (subscription.current_period_end && new Date(subscription.current_period_end) > new Date()) {
                     return { hasAccess: true, reason: 'subscription_active_until_period_end', subscription };
                 }
-                return { hasAccess: false, reason: 'subscription_cancelled', subscription };
+                // Check inherited access
+                break;
 
             case 'none':
-                return { hasAccess: false, reason: 'no_subscription', subscription };
-
             case 'expired':
             default:
-                return { hasAccess: false, reason: 'expired', subscription };
+                // Check inherited access
+                break;
+        }
+
+        // Check for inherited access from team membership
+        const inheritedAccess = await this.checkInheritedAccess(userId);
+        if (inheritedAccess.hasAccess) {
+            return {
+                hasAccess: true,
+                reason: 'inherited_access',
+                subscription,
+                isInherited: true,
+                inheritedFromOrgId: inheritedAccess.organizationId
+            };
+        }
+
+        // No access - return appropriate reason based on subscription status
+        switch (subscription.status) {
+            case 'trial':
+            case 'expired':
+                return { hasAccess: false, reason: 'trial_expired', subscription };
+            case 'past_due':
+                return { hasAccess: false, reason: 'payment_past_due', subscription };
+            case 'cancelled':
+                return { hasAccess: false, reason: 'subscription_cancelled', subscription };
+            case 'none':
+            default:
+                return { hasAccess: false, reason: 'no_subscription', subscription };
+        }
+    }
+
+    /**
+     * Check if user has inherited access via team membership
+     */
+    static async checkInheritedAccess(userId: string): Promise<{ hasAccess: boolean; organizationId?: string }> {
+        // Check if user is a team member
+        const membership = await TeamService.getUserTeamMembership(userId);
+        if (!membership) {
+            return { hasAccess: false };
+        }
+
+        // Get organization owner's user ID
+        const ownerId = await TeamService.getOrganizationOwnerId(membership.organization_id);
+        if (!ownerId) {
+            return { hasAccess: false };
+        }
+
+        // Check owner's subscription
+        const ownerSubscription = await this.getByUserId(ownerId);
+        if (!ownerSubscription) {
+            return { hasAccess: false };
+        }
+
+        // Check if owner has active access
+        switch (ownerSubscription.status) {
+            case 'trial':
+                if (ownerSubscription.trial_ends_at && new Date(ownerSubscription.trial_ends_at) > new Date()) {
+                    return { hasAccess: true, organizationId: membership.organization_id };
+                }
+                return { hasAccess: false };
+
+            case 'active':
+                if (ownerSubscription.current_period_end && new Date(ownerSubscription.current_period_end) > new Date()) {
+                    return { hasAccess: true, organizationId: membership.organization_id };
+                }
+                // Period might be ongoing (handled by webhooks)
+                return { hasAccess: true, organizationId: membership.organization_id };
+
+            case 'cancelled':
+                // Still active until period end
+                if (ownerSubscription.current_period_end && new Date(ownerSubscription.current_period_end) > new Date()) {
+                    return { hasAccess: true, organizationId: membership.organization_id };
+                }
+                return { hasAccess: false };
+
+            default:
+                return { hasAccess: false };
         }
     }
 

@@ -21,6 +21,7 @@ import donorRoutes from './routes/donors';
 import donorCreditRoutes from './routes/donorCredits';
 import storageRoutes from './routes/storage';
 import subscriptionRoutes from './routes/subscription';
+import teamRoutes from './routes/team';
 import { processStorageCleanupQueue } from './services/storageCleanupService';
 import { authenticateUser, AuthenticatedRequest } from './middleware/auth';
 
@@ -47,7 +48,7 @@ app.use((req, res, next) => {
         res.setHeader('Access-Control-Allow-Origin', '*');
     }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, X-Organization-Id');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Max-Age', '86400');
     
@@ -68,7 +69,8 @@ app.use(helmet({
 // Also use cors middleware as backup
 app.use(cors({
     origin: true,
-    credentials: true
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-Organization-Id']
 }));
 
 // Rate limiting - disabled in development to avoid hitting limits during hot reloading
@@ -164,6 +166,7 @@ app.use('/api/donors', donorRoutes);
 app.use('/api/donor-credits', donorCreditRoutes);
 app.use('/api/storage', storageRoutes);
 app.use('/api/subscription', subscriptionRoutes);
+app.use('/api/team', teamRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

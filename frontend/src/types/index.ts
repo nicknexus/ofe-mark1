@@ -203,6 +203,8 @@ export interface SubscriptionStatus {
     reason: string;
     subscription: Subscription;
     remainingTrialDays: number | null;
+    isInherited?: boolean;
+    inheritedFromOrgId?: string;
 }
 
 export interface InitiativeDashboard {

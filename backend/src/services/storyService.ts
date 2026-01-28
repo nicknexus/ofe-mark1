@@ -13,6 +13,7 @@ export class StoryService {
             search?: string
         }
     ): Promise<Story[]> {
+        // Fetch all stories for the initiative (access controlled at route level)
         let query = supabase
             .from('stories')
             .select(`
@@ -22,7 +23,6 @@ export class StoryService {
                     beneficiary_groups(id, name, description, location_id)
                 )
             `)
-            .eq('user_id', userId)
             .eq('initiative_id', initiativeId)
             .order('date_represented', { ascending: false })
             .order('created_at', { ascending: false })

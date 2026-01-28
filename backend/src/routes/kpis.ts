@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { KPIService } from '../services/kpiService';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
+import { requireOwnerPermission } from '../middleware/teamPermissions';
 
 const router = Router();
 
@@ -60,8 +61,8 @@ router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     }
 });
 
-// Delete KPI
-router.delete('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
+// Delete KPI (owner only)
+router.delete('/:id', authenticateUser, requireOwnerPermission, async (req: AuthenticatedRequest, res) => {
     try {
         await KPIService.delete(req.params.id, req.user!.id);
         res.status(204).send();
@@ -103,8 +104,8 @@ router.put('/updates/:updateId', authenticateUser, async (req: AuthenticatedRequ
     }
 });
 
-// Delete KPI update
-router.delete('/updates/:updateId', authenticateUser, async (req: AuthenticatedRequest, res) => {
+// Delete KPI update (owner only)
+router.delete('/updates/:updateId', authenticateUser, requireOwnerPermission, async (req: AuthenticatedRequest, res) => {
     try {
         await KPIService.deleteUpdate(req.params.updateId, req.user!.id);
         res.status(204).send();

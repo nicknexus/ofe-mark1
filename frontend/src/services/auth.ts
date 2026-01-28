@@ -5,11 +5,7 @@ import { apiService } from './api'
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 export class AuthService {
-    static async signUp(email: string, password: string, name: string, organizationName: string) {
-        if (!organizationName || organizationName.trim() === '') {
-            throw new Error('Organization name is required')
-        }
-
+    static async signUp(email: string, password: string, name: string, organizationName?: string) {
         // Clear cache before signup to prevent showing old user's data
         apiService.clearCache()
 
@@ -23,7 +19,7 @@ export class AuthService {
                 email,
                 password,
                 name,
-                organizationName
+                organizationName: organizationName || undefined // Only send if provided
             })
         })
 

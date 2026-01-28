@@ -5,18 +5,14 @@ import { SubscriptionService } from '../services/subscriptionService';
 
 const router = Router();
 
-// Signup endpoint - creates user and organization
+// Signup endpoint - creates user and optionally an organization
+// Organization is optional for users signing up from invite links
 router.post('/signup', async (req, res) => {
     try {
         const { email, password, name, organizationName } = req.body;
 
         if (!email || !password) {
             res.status(400).json({ error: 'Email and password are required' });
-            return;
-        }
-
-        if (!organizationName) {
-            res.status(400).json({ error: 'Organization name is required' });
             return;
         }
 
@@ -27,7 +23,7 @@ router.post('/signup', async (req, res) => {
             options: {
                 data: {
                     name: name || '',
-                    organization: organizationName
+                    organization: organizationName || '' // May be empty for invited users
                 }
             }
         });
@@ -42,34 +38,37 @@ router.post('/signup', async (req, res) => {
             return;
         }
 
-        // Create organization - fail signup if this fails
+        // Only create organization if organizationName was provided
         let organization = null;
-        try {
-            organization = await OrganizationService.findOrCreate(organizationName, authData.user.id);
-            if (!organization) {
-                throw new Error('Failed to create organization');
-            }
-        } catch (orgError) {
-            console.error('Failed to create organization:', orgError);
-            // Delete the user if organization creation fails
+        if (organizationName && organizationName.trim() !== '') {
             try {
-                await supabase.auth.admin.deleteUser(authData.user.id);
-            } catch (deleteError) {
-                console.error('Failed to cleanup user after org creation failure:', deleteError);
+                organization = await OrganizationService.findOrCreate(organizationName, authData.user.id);
+                if (!organization) {
+                    throw new Error('Failed to create organization');
+                }
+            } catch (orgError) {
+                console.error('Failed to create organization:', orgError);
+                // Delete the user if organization creation fails
+                try {
+                    await supabase.auth.admin.deleteUser(authData.user.id);
+                } catch (deleteError) {
+                    console.error('Failed to cleanup user after org creation failure:', deleteError);
+                }
+                res.status(500).json({ 
+                    error: `Failed to create organization: ${orgError instanceof Error ? orgError.message : 'Unknown error'}` 
+                });
+                return;
             }
-            res.status(500).json({ 
-                error: `Failed to create organization: ${orgError instanceof Error ? orgError.message : 'Unknown error'}` 
-            });
-            return;
-        }
 
-        // Create subscription record with status 'none' (user needs to activate trial)
-        try {
-            await SubscriptionService.getOrCreate(authData.user.id, organization.id);
-        } catch (subError) {
-            console.error('Failed to create subscription record:', subError);
-            // Non-fatal - subscription can be created later when user accesses the app
+            // Create subscription record only if we created an organization
+            try {
+                await SubscriptionService.getOrCreate(authData.user.id, organization.id);
+            } catch (subError) {
+                console.error('Failed to create subscription record:', subError);
+                // Non-fatal - subscription can be created later when user accesses the app
+            }
         }
+        // Note: Users without an organization will get access through team_members when they accept invite
 
         // Sign the user in immediately (email confirmation is disabled, so this should work)
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
@@ -91,7 +90,7 @@ router.post('/signup', async (req, res) => {
 
         res.status(201).json({
             user: signInData.user,
-            organization,
+            organization, // May be null for invited users
             session: signInData.session,
             message: 'Account created successfully!'
         });

@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth'
+import { requireOwnerPermission } from '../middleware/teamPermissions'
 import { BeneficiaryService } from '../services/beneficiaryService'
 import { supabase } from '../utils/supabase'
 
@@ -36,8 +37,8 @@ router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     }
 })
 
-// Delete
-router.delete('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
+// Delete (owner only)
+router.delete('/:id', authenticateUser, requireOwnerPermission, async (req: AuthenticatedRequest, res) => {
     try {
         await BeneficiaryService.delete(req.params.id, req.user!.id)
         res.status(204).send()

@@ -1,8 +1,17 @@
 import { supabase } from '../utils/supabase';
 import { KPI, KPIUpdate, KPIWithEvidence } from '../types';
+import { InitiativeService } from './initiativeService';
 
 export class KPIService {
     static async create(kpi: KPI, userId: string): Promise<KPI> {
+        // Verify user has access to the initiative
+        if (kpi.initiative_id) {
+            const initiative = await InitiativeService.getById(kpi.initiative_id, userId);
+            if (!initiative) {
+                throw new Error('Initiative not found or access denied');
+            }
+        }
+
         // Get max display_order for this initiative to set the new item at the end
         let maxOrder = 0
         if (kpi.initiative_id) {
@@ -10,7 +19,6 @@ export class KPIService {
                 .from('kpis')
                 .select('display_order')
                 .eq('initiative_id', kpi.initiative_id)
-                .eq('user_id', userId)
                 .order('display_order', { ascending: false })
                 .limit(1)
             
@@ -30,35 +38,70 @@ export class KPIService {
     }
 
     static async getAll(userId: string, initiativeId?: string): Promise<KPI[]> {
-        let query = supabase
-            .from('kpis')
-            .select('*')
-            .eq('user_id', userId);
-
+        // If initiative_id provided, fetch directly (access controlled at route level)
         if (initiativeId) {
-            query = query.eq('initiative_id', initiativeId);
+            const { data, error } = await supabase
+                .from('kpis')
+                .select('*')
+                .eq('initiative_id', initiativeId)
+                .order('display_order', { ascending: true })
+                .order('created_at', { ascending: false });
+
+            if (error) throw new Error(`Failed to fetch KPIs: ${error.message}`);
+            return data || [];
         }
 
-        const { data, error } = await query.order('display_order', { ascending: true }).order('created_at', { ascending: false });
+        // No initiative specified - get all KPIs for user's accessible initiatives
+        const initiatives = await InitiativeService.getAll(userId);
+        if (initiatives.length === 0) {
+            return [];
+        }
+
+        const initiativeIds = initiatives.map(i => i.id);
+        const { data, error } = await supabase
+            .from('kpis')
+            .select('*')
+            .in('initiative_id', initiativeIds)
+            .order('display_order', { ascending: true })
+            .order('created_at', { ascending: false });
 
         if (error) throw new Error(`Failed to fetch KPIs: ${error.message}`);
         return data || [];
     }
 
     static async getWithEvidence(userId: string, initiativeId?: string): Promise<KPIWithEvidence[]> {
-        let query = supabase
-            .from('kpis')
-            .select(`
-        *,
-        kpi_updates(id, value, date_represented, created_at, location_id),
-        evidence_kpis(
-            evidence(id, type, date_represented, date_range_start, date_range_end)
-        )
-      `)
-            .eq('user_id', userId);
+        let query;
 
+        // If initiative_id provided, fetch directly (access controlled at route level)
         if (initiativeId) {
-            query = query.eq('initiative_id', initiativeId);
+            query = supabase
+                .from('kpis')
+                .select(`
+                    *,
+                    kpi_updates(id, value, date_represented, created_at, location_id),
+                    evidence_kpis(
+                        evidence(id, type, date_represented, date_range_start, date_range_end)
+                    )
+                `)
+                .eq('initiative_id', initiativeId);
+        } else {
+            // No initiative specified - get all for user's accessible initiatives
+            const initiatives = await InitiativeService.getAll(userId);
+            if (initiatives.length === 0) {
+                return [];
+            }
+
+            const initiativeIds = initiatives.map(i => i.id);
+            query = supabase
+                .from('kpis')
+                .select(`
+                    *,
+                    kpi_updates(id, value, date_represented, created_at, location_id),
+                    evidence_kpis(
+                        evidence(id, type, date_represented, date_range_start, date_range_end)
+                    )
+                `)
+                .in('initiative_id', initiativeIds);
         }
 
         const { data, error } = await query.order('display_order', { ascending: true }).order('created_at', { ascending: false });
@@ -161,26 +204,36 @@ export class KPIService {
     }
 
     static async getById(id: string, userId: string): Promise<KPI | null> {
-        const { data, error } = await supabase
+        // Get the KPI first
+        const { data: kpi, error } = await supabase
             .from('kpis')
             .select('*')
             .eq('id', id)
-            .eq('user_id', userId)
             .single();
 
         if (error) {
             if (error.code === 'PGRST116') return null;
             throw new Error(`Failed to fetch KPI: ${error.message}`);
         }
-        return data;
+
+        // Verify user has access to the initiative this KPI belongs to
+        if (kpi?.initiative_id) {
+            const initiative = await InitiativeService.getById(kpi.initiative_id, userId);
+            if (!initiative) return null; // No access
+        }
+
+        return kpi;
     }
 
     static async update(id: string, updates: Partial<KPI>, userId: string): Promise<KPI> {
+        // Verify user has access to this KPI
+        const kpi = await this.getById(id, userId);
+        if (!kpi) throw new Error('KPI not found or access denied');
+
         const { data, error } = await supabase
             .from('kpis')
             .update(updates)
             .eq('id', id)
-            .eq('user_id', userId)
             .select()
             .single();
 
@@ -189,11 +242,20 @@ export class KPIService {
     }
 
     static async delete(id: string, userId: string): Promise<void> {
+        // Check if user is a shared member (not allowed to delete)
+        const isShared = await InitiativeService.isSharedMember(userId);
+        if (isShared) {
+            throw new Error('Shared members cannot delete KPIs. Contact your organization owner.');
+        }
+
+        // Verify user has access to this KPI
+        const kpi = await this.getById(id, userId);
+        if (!kpi) throw new Error('KPI not found or access denied');
+
         const { error } = await supabase
             .from('kpis')
             .delete()
-            .eq('id', id)
-            .eq('user_id', userId);
+            .eq('id', id);
 
         if (error) throw new Error(`Failed to delete KPI: ${error.message}`);
     }
@@ -386,11 +448,11 @@ export class KPIService {
     }
 
     static async getUpdates(kpiId: string, userId: string): Promise<KPIUpdate[]> {
+        // Fetch directly (access controlled at route level)
         const { data, error } = await supabase
             .from('kpi_updates')
             .select('*')
             .eq('kpi_id', kpiId)
-            .eq('user_id', userId)
             .order('created_at', { ascending: false });
 
         if (error) throw new Error(`Failed to fetch KPI updates: ${error.message}`);
@@ -405,11 +467,23 @@ export class KPIService {
             throw new Error('Location is required for impact claims')
         }
 
+        // Get the update first to verify access
+        const { data: existingUpdate } = await supabase
+            .from('kpi_updates')
+            .select('kpi_id')
+            .eq('id', id)
+            .single();
+
+        if (!existingUpdate) throw new Error('KPI update not found');
+
+        // Verify user has access to the KPI
+        const kpi = await this.getById(existingUpdate.kpi_id, userId);
+        if (!kpi) throw new Error('Access denied');
+
         const { data, error } = await supabase
             .from('kpi_updates')
             .update(updateData)
             .eq('id', id)
-            .eq('user_id', userId)
             .select()
             .single();
 
@@ -452,23 +526,40 @@ export class KPIService {
     }
 
     static async deleteUpdate(id: string, userId: string): Promise<void> {
+        // Check if user is a shared member (not allowed to delete)
+        const isShared = await InitiativeService.isSharedMember(userId);
+        if (isShared) {
+            throw new Error('Shared members cannot delete data points. Contact your organization owner.');
+        }
+
+        // Get the update first to verify access
+        const { data: existingUpdate } = await supabase
+            .from('kpi_updates')
+            .select('kpi_id')
+            .eq('id', id)
+            .single();
+
+        if (!existingUpdate) throw new Error('KPI update not found');
+
+        // Verify user has access to the KPI
+        const kpi = await this.getById(existingUpdate.kpi_id, userId);
+        if (!kpi) throw new Error('Access denied');
+
         const { error } = await supabase
             .from('kpi_updates')
             .delete()
-            .eq('id', id)
-            .eq('user_id', userId);
+            .eq('id', id);
 
         if (error) throw new Error(`Failed to delete KPI update: ${error.message}`);
     }
 
     // Get evidence grouped by dates for a specific KPI
     static async getEvidenceByDates(kpiId: string, userId: string) {
-        // Get KPI updates for this KPI
+        // Get KPI updates for this KPI (access controlled at route level)
         const { data: updates, error: updatesError } = await supabase
             .from('kpi_updates')
             .select('*')
             .eq('kpi_id', kpiId)
-            .eq('user_id', userId)
             .order('date_represented', { ascending: false });
 
         if (updatesError) throw new Error(`Failed to fetch KPI updates: ${updatesError.message}`);

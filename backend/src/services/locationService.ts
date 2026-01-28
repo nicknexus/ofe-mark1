@@ -1,5 +1,6 @@
 import { supabase } from '../utils/supabase';
 import { Location } from '../types';
+import { InitiativeService } from './initiativeService';
 
 export class LocationService {
     static async create(location: Location, userId: string): Promise<Location> {
@@ -10,7 +11,6 @@ export class LocationService {
                 .from('locations')
                 .select('display_order')
                 .eq('initiative_id', location.initiative_id)
-                .eq('user_id', userId)
                 .order('display_order', { ascending: false })
                 .limit(1)
             
@@ -30,16 +30,32 @@ export class LocationService {
     }
 
     static async getAll(userId: string, initiativeId?: string): Promise<Location[]> {
-        let query = supabase
-            .from('locations')
-            .select('*')
-            .eq('user_id', userId);
-
+        // If initiative_id provided, fetch directly (access controlled at route level)
         if (initiativeId) {
-            query = query.eq('initiative_id', initiativeId);
+            const { data, error } = await supabase
+                .from('locations')
+                .select('*')
+                .eq('initiative_id', initiativeId)
+                .order('display_order', { ascending: true })
+                .order('created_at', { ascending: false });
+
+            if (error) throw new Error(`Failed to fetch locations: ${error.message}`);
+            return data || [];
         }
 
-        const { data, error } = await query.order('display_order', { ascending: true }).order('created_at', { ascending: false });
+        // No initiative - get all for user's accessible initiatives
+        const initiatives = await InitiativeService.getAll(userId);
+        if (initiatives.length === 0) {
+            return [];
+        }
+
+        const initiativeIds = initiatives.map(i => i.id);
+        const { data, error } = await supabase
+            .from('locations')
+            .select('*')
+            .in('initiative_id', initiativeIds)
+            .order('display_order', { ascending: true })
+            .order('created_at', { ascending: false });
 
         if (error) throw new Error(`Failed to fetch locations: ${error.message}`);
         return data || [];

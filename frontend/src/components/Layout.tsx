@@ -5,10 +5,14 @@ import {
     Settings,
     Menu,
     X,
-    ChevronDown
+    ChevronDown,
+    Building2,
+    Users,
+    Check
 } from 'lucide-react'
 import { AuthService } from '../services/auth'
 import { apiService } from '../services/api'
+import { useTeam } from '../context/TeamContext'
 import { User, Organization } from '../types'
 import toast from 'react-hot-toast'
 
@@ -22,8 +26,18 @@ export default function Layout({ user, children }: LayoutProps) {
     const navigate = useNavigate()
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const [userMenuOpen, setUserMenuOpen] = useState(false)
+    const [orgMenuOpen, setOrgMenuOpen] = useState(false)
     const [organization, setOrganization] = useState<Organization | null>(null)
     const userMenuRef = useRef<HTMLDivElement>(null)
+    const orgMenuRef = useRef<HTMLDivElement>(null)
+    
+    const { 
+        accessibleOrganizations, 
+        activeOrganization, 
+        switchOrganization, 
+        hasMultipleOrgs,
+        isSharedMember 
+    } = useTeam()
 
     useEffect(() => {
         const loadOrganization = async () => {
@@ -38,6 +52,21 @@ export default function Layout({ user, children }: LayoutProps) {
         }
         loadOrganization()
     }, [])
+    
+    // Close org menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (orgMenuRef.current && !orgMenuRef.current.contains(event.target as Node)) {
+                setOrgMenuOpen(false)
+            }
+        }
+        if (orgMenuOpen) {
+            document.addEventListener('mousedown', handleClickOutside)
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside)
+        }
+    }, [orgMenuOpen])
 
     // Close user menu when clicking outside
     useEffect(() => {
@@ -99,12 +128,88 @@ export default function Layout({ user, children }: LayoutProps) {
                             </Link>
                         </div>
 
-                        {/* Center: Organization Name */}
-                        <div className="hidden md:flex flex-col items-center justify-center absolute left-1/2 transform -translate-x-1/2">
-                            {organization && (
-                                <h1 className="text-xl font-semibold text-gray-900">
-                                    {organization.name}
-                                </h1>
+                        {/* Center: Organization Switcher */}
+                        <div className="hidden md:flex flex-col items-center justify-center absolute left-1/2 transform -translate-x-1/2" ref={orgMenuRef}>
+                            {hasMultipleOrgs ? (
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setOrgMenuOpen(!orgMenuOpen)}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 ${
+                                            isSharedMember 
+                                                ? 'bg-purple-50 border border-purple-200 hover:bg-purple-100' 
+                                                : 'bg-white/80 border border-gray-200 hover:bg-white'
+                                        }`}
+                                    >
+                                        {isSharedMember ? (
+                                            <Users className="w-4 h-4 text-purple-600" />
+                                        ) : (
+                                            <Building2 className="w-4 h-4 text-gray-600" />
+                                        )}
+                                        <span className={`text-sm font-medium ${isSharedMember ? 'text-purple-800' : 'text-gray-900'}`}>
+                                            {activeOrganization?.name || 'Select Organization'}
+                                        </span>
+                                        {isSharedMember && (
+                                            <span className="text-xs bg-purple-200 text-purple-700 px-1.5 py-0.5 rounded-full">
+                                                Team
+                                            </span>
+                                        )}
+                                        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${orgMenuOpen ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    
+                                    {/* Org Dropdown */}
+                                    {orgMenuOpen && (
+                                        <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 w-64 bg-white rounded-xl shadow-bubble-lg border border-gray-200 overflow-hidden z-50">
+                                            <div className="p-2">
+                                                <p className="px-3 py-1.5 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                                    Switch Organization
+                                                </p>
+                                                {accessibleOrganizations.map((org) => (
+                                                    <button
+                                                        key={org.id}
+                                                        onClick={() => {
+                                                            switchOrganization(org.id)
+                                                            setOrgMenuOpen(false)
+                                                        }}
+                                                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                                                            org.id === activeOrganization?.id
+                                                                ? 'bg-primary-50 text-primary-700'
+                                                                : 'hover:bg-gray-50 text-gray-700'
+                                                        }`}
+                                                    >
+                                                        {org.role === 'member' ? (
+                                                            <Users className="w-4 h-4 text-purple-500" />
+                                                        ) : (
+                                                            <Building2 className="w-4 h-4 text-gray-500" />
+                                                        )}
+                                                        <div className="flex-1 text-left">
+                                                            <div className="text-sm font-medium">{org.name}</div>
+                                                            <div className="text-xs text-gray-400">
+                                                                {org.role === 'owner' ? 'Your organization' : 'Team member'}
+                                                            </div>
+                                                        </div>
+                                                        {org.id === activeOrganization?.id && (
+                                                            <Check className="w-4 h-4 text-primary-500" />
+                                                        )}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className={`flex items-center gap-2 px-4 py-2 rounded-xl ${
+                                    isSharedMember ? 'bg-purple-50 border border-purple-200' : ''
+                                }`}>
+                                    {isSharedMember && <Users className="w-4 h-4 text-purple-600" />}
+                                    <h1 className={`text-lg font-semibold ${isSharedMember ? 'text-purple-800' : 'text-gray-900'}`}>
+                                        {activeOrganization?.name || organization?.name}
+                                    </h1>
+                                    {isSharedMember && (
+                                        <span className="text-xs bg-purple-200 text-purple-700 px-1.5 py-0.5 rounded-full">
+                                            Team
+                                        </span>
+                                    )}
+                                </div>
                             )}
                         </div>
 

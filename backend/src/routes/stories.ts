@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth'
 import { StoryService } from '../services/storyService'
+import { requireImpactClaimsPermission, requireOwnerPermission } from '../middleware/teamPermissions'
 
 const router = Router()
 
@@ -52,8 +53,8 @@ router.get('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     }
 })
 
-// Create story
-router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
+// Create story (requires impact claims permission)
+router.post('/', authenticateUser, requireImpactClaimsPermission, async (req: AuthenticatedRequest, res) => {
     try {
         const story = await StoryService.create(req.body, req.user!.id)
         res.status(201).json(story)
@@ -72,8 +73,8 @@ router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     }
 })
 
-// Delete story
-router.delete('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
+// Delete story (owner only)
+router.delete('/:id', authenticateUser, requireOwnerPermission, async (req: AuthenticatedRequest, res) => {
     try {
         await StoryService.delete(req.params.id, req.user!.id)
         res.status(204).send()

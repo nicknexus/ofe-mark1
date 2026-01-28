@@ -3,10 +3,10 @@ import { Donor } from '../types'
 
 export class DonorService {
     static async getAll(userId: string, initiativeId: string): Promise<Donor[]> {
+        // Fetch directly (access controlled at route level)
         const { data, error } = await supabase
             .from('donors')
             .select('*')
-            .eq('user_id', userId)
             .eq('initiative_id', initiativeId)
             .order('created_at', { ascending: false })
 

@@ -1,20 +1,38 @@
 import { supabase } from '../utils/supabase'
 import { BeneficiaryGroup } from '../types'
+import { InitiativeService } from './initiativeService'
 
 export class BeneficiaryService {
     static async getAll(userId: string, initiativeId?: string): Promise<BeneficiaryGroup[]> {
-        let query = supabase
+        // If initiative_id provided, fetch directly (access controlled at route level)
+        if (initiativeId) {
+            const { data, error } = await supabase
+                .from('beneficiary_groups')
+                .select('*')
+                .eq('initiative_id', initiativeId)
+                .order('display_order', { ascending: true })
+                .order('created_at', { ascending: false });
+
+            if (error) throw new Error(`Failed to fetch beneficiary groups: ${error.message}`);
+            return data || [];
+        }
+
+        // No initiative - get all for user's accessible initiatives
+        const initiatives = await InitiativeService.getAll(userId);
+        if (initiatives.length === 0) {
+            return [];
+        }
+
+        const initiativeIds = initiatives.map(i => i.id);
+        const { data, error } = await supabase
             .from('beneficiary_groups')
             .select('*')
-            .eq('user_id', userId)
+            .in('initiative_id', initiativeIds)
             .order('display_order', { ascending: true })
-            .order('created_at', { ascending: false })
+            .order('created_at', { ascending: false });
 
-        if (initiativeId) query = query.eq('initiative_id', initiativeId)
-
-        const { data, error } = await query
-        if (error) throw new Error(`Failed to fetch beneficiary groups: ${error.message}`)
-        return data || []
+        if (error) throw new Error(`Failed to fetch beneficiary groups: ${error.message}`);
+        return data || [];
     }
 
     static async create(group: BeneficiaryGroup, userId: string): Promise<BeneficiaryGroup> {

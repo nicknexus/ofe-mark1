@@ -52,10 +52,18 @@ class ApiService {
             throw new Error('No authenticated session')
         }
 
-        return {
+        const headers: Record<string, string> = {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`
         }
+
+        // Include active organization ID if set
+        const activeOrgId = localStorage.getItem('nexus-active-org-id')
+        if (activeOrgId) {
+            headers['X-Organization-Id'] = activeOrgId
+        }
+
+        return headers
     }
 
     private async getCacheKey(endpoint: string, options: RequestInit = {}): Promise<string> {
@@ -593,6 +601,13 @@ class ApiService {
 
     async getOrganization(id: string): Promise<Organization> {
         return this.request<Organization>(`/organizations/${id}`)
+    }
+
+    async createOrganization(name: string): Promise<{ organization: Organization; message: string }> {
+        return this.request<{ organization: Organization; message: string }>('/organizations', {
+            method: 'POST',
+            body: JSON.stringify({ name })
+        })
     }
 
     async updateOrganization(id: string, data: Partial<Organization>): Promise<Organization> {

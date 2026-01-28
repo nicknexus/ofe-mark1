@@ -1,7 +1,8 @@
-import React, { useState } from 'react'
-import { AlertCircle, CreditCard, LogOut, Clock, ArrowRight } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { AlertCircle, CreditCard, LogOut, Clock, ArrowRight, Users, Mail } from 'lucide-react'
 import { AuthService } from '../services/auth'
 import { SubscriptionService } from '../services/subscription'
+import { TeamService } from '../services/team'
 import toast from 'react-hot-toast'
 
 interface Props {
@@ -11,6 +12,22 @@ interface Props {
 
 export default function SubscriptionExpiredPage({ reason }: Props) {
     const [subscribing, setSubscribing] = useState(false)
+    const [isSharedMember, setIsSharedMember] = useState(false)
+    const [checkingPermissions, setCheckingPermissions] = useState(true)
+
+    useEffect(() => {
+        const checkPermissions = async () => {
+            try {
+                const permissions = await TeamService.getPermissions()
+                setIsSharedMember(permissions.isSharedMember)
+            } catch (error) {
+                console.error('Error checking permissions:', error)
+            } finally {
+                setCheckingPermissions(false)
+            }
+        }
+        checkPermissions()
+    }, [])
 
     const handleSignOut = async () => {
         await AuthService.signOut()
@@ -34,6 +51,15 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
     }
 
     const getMessage = () => {
+        // For shared members, show different message
+        if (isSharedMember) {
+            return {
+                title: 'Organization Access Unavailable',
+                subtitle: 'The organization subscription is no longer active',
+                icon: Users
+            }
+        }
+
         switch (reason) {
             case 'trial_expired':
                 return {
@@ -68,6 +94,17 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
         }
     }
 
+    if (checkingPermissions) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+                    <p className="mt-4 text-gray-600">Loading...</p>
+                </div>
+            </div>
+        )
+    }
+
     const { title, subtitle, icon: Icon } = getMessage()
 
     return (
@@ -98,63 +135,97 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
                         {subtitle}
                     </p>
 
-                    {/* What you're missing */}
-                    <div className="bg-gray-50 rounded-xl p-5 mb-6 text-left">
-                        <h3 className="font-medium text-gray-700 mb-3">Starter Plan - $2/day (billed $56 every 4 weeks)</h3>
-                        <ul className="space-y-2 text-sm text-gray-600">
-                            <li className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
-                                2 initiatives included
-                            </li>
-                            <li className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
-                                Full KPI tracking & analytics
-                            </li>
-                            <li className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
-                                Evidence management
-                            </li>
-                            <li className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
-                                Public impact reports
-                            </li>
-                        </ul>
-                    </div>
+                    {/* Content varies based on whether user is shared member or owner */}
+                    {isSharedMember ? (
+                        <>
+                            {/* Shared member - contact owner message */}
+                            <div className="bg-purple-50 rounded-xl p-5 mb-6 text-left">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Mail className="w-5 h-5 text-purple-600" />
+                                    <h3 className="font-medium text-purple-800">Contact Your Organization Owner</h3>
+                                </div>
+                                <p className="text-sm text-purple-700">
+                                    Your access is managed by your organization owner. Please contact them to restore access to the organization's data.
+                                </p>
+                            </div>
 
-                    {/* Action Buttons */}
-                    <div className="space-y-3">
-                        <button
-                            onClick={handleSubscribe}
-                            disabled={subscribing}
-                            className="w-full bg-primary-500 text-white py-3.5 px-6 rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium flex items-center justify-center gap-2 shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40"
-                        >
-                            {subscribing ? (
-                                <>
-                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                    Loading...
-                                </>
-                            ) : (
-                                <>
-                                    <CreditCard className="w-5 h-5" />
-                                    Subscribe Now - $2/day
-                                    <ArrowRight className="w-5 h-5" />
-                                </>
-                            )}
-                        </button>
+                            {/* Action Buttons for shared member */}
+                            <div className="space-y-3">
+                                <button
+                                    onClick={handleSignOut}
+                                    className="w-full bg-gray-100 text-gray-700 py-3 px-6 rounded-xl hover:bg-gray-200 transition-all font-medium flex items-center justify-center gap-2"
+                                >
+                                    <LogOut className="w-5 h-5" />
+                                    Sign Out
+                                </button>
+                            </div>
 
-                        <button
-                            onClick={handleSignOut}
-                            className="w-full bg-gray-100 text-gray-700 py-3 px-6 rounded-xl hover:bg-gray-200 transition-all font-medium flex items-center justify-center gap-2"
-                        >
-                            <LogOut className="w-5 h-5" />
-                            Sign Out
-                        </button>
-                    </div>
+                            {/* Help text for shared member */}
+                            <p className="mt-6 text-xs text-gray-500">
+                                Once your organization owner renews their subscription, you'll automatically regain access.
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            {/* Owner - show subscription options */}
+                            <div className="bg-gray-50 rounded-xl p-5 mb-6 text-left">
+                                <h3 className="font-medium text-gray-700 mb-3">Starter Plan - $2/day (billed $56 every 4 weeks)</h3>
+                                <ul className="space-y-2 text-sm text-gray-600">
+                                    <li className="flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
+                                        2 initiatives included
+                                    </li>
+                                    <li className="flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
+                                        Full KPI tracking & analytics
+                                    </li>
+                                    <li className="flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
+                                        Evidence management
+                                    </li>
+                                    <li className="flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
+                                        Public impact reports
+                                    </li>
+                                </ul>
+                            </div>
 
-                    {/* Help text */}
-                    <p className="mt-6 text-xs text-gray-500">
-                        Your data is safely stored. Subscribe anytime to pick up where you left off.
-                    </p>
+                            {/* Action Buttons for owner */}
+                            <div className="space-y-3">
+                                <button
+                                    onClick={handleSubscribe}
+                                    disabled={subscribing}
+                                    className="w-full bg-primary-500 text-white py-3.5 px-6 rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium flex items-center justify-center gap-2 shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40"
+                                >
+                                    {subscribing ? (
+                                        <>
+                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                            Loading...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CreditCard className="w-5 h-5" />
+                                            Subscribe Now - $2/day
+                                            <ArrowRight className="w-5 h-5" />
+                                        </>
+                                    )}
+                                </button>
+
+                                <button
+                                    onClick={handleSignOut}
+                                    className="w-full bg-gray-100 text-gray-700 py-3 px-6 rounded-xl hover:bg-gray-200 transition-all font-medium flex items-center justify-center gap-2"
+                                >
+                                    <LogOut className="w-5 h-5" />
+                                    Sign Out
+                                </button>
+                            </div>
+
+                            {/* Help text for owner */}
+                            <p className="mt-6 text-xs text-gray-500">
+                                Your data is safely stored. Subscribe anytime to pick up where you left off.
+                            </p>
+                        </>
+                    )}
                 </div>
 
                 {/* Footer */}

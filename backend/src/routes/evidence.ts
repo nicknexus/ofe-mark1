@@ -1,6 +1,7 @@
 import express from 'express';
 import { AuthenticatedRequest, authenticateUser } from '../middleware/auth';
 import { EvidenceService } from '../services/evidenceService';
+import { requireOwnerPermission } from '../middleware/teamPermissions';
 
 const router = express.Router();
 
@@ -101,8 +102,8 @@ router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     }
 });
 
-// Delete evidence
-router.delete('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
+// Delete evidence (owner only)
+router.delete('/:id', authenticateUser, requireOwnerPermission, async (req: AuthenticatedRequest, res) => {
     try {
         await EvidenceService.delete(req.params.id, req.user!.id);
         res.status(204).send();

@@ -3,9 +3,11 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast'
 import { AuthService } from './services/auth'
 import { SubscriptionService } from './services/subscription'
+import { TeamService, PendingInviteCheck } from './services/team'
 import { User, SubscriptionStatus } from './types'
 import { TutorialProvider } from './context/TutorialContext'
 import { StorageProvider } from './context/StorageContext'
+import { TeamProvider } from './context/TeamContext'
 import InteractiveTutorial from './components/InteractiveTutorial'
 import TrialBanner from './components/TrialBanner'
 import MobileApp from './components/MobileApp'
@@ -19,6 +21,8 @@ import AccountPage from './pages/AccountPage'
 import PublicOrganizationPage from './pages/PublicOrganizationPage'
 import TrialActivationPage from './pages/TrialActivationPage'
 import SubscriptionExpiredPage from './pages/SubscriptionExpiredPage'
+import TeamSettingsPage from './pages/TeamSettingsPage'
+import InviteAcceptPage from './pages/InviteAcceptPage'
 import Layout from './components/Layout'
 
 // Hook to detect mobile
@@ -47,6 +51,8 @@ function App() {
     const [loading, setLoading] = useState(true)
     const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null)
     const [checkingSubscription, setCheckingSubscription] = useState(false)
+    const [pendingInvite, setPendingInvite] = useState<PendingInviteCheck | null>(null)
+    const [checkingPendingInvite, setCheckingPendingInvite] = useState(false)
     const isMobile = useIsMobile()
     const checkedUserIdRef = useRef<string | null>(null)
 
@@ -145,8 +151,11 @@ function App() {
 
     // User is logged in - check subscription status
     if (user) {
-        // Only show blocking loader on initial subscription check
-        if (checkingSubscription && subscriptionStatus === null) {
+        // Check if user is trying to access an invite page - always allow this
+        const isOnInvitePage = window.location.pathname.startsWith('/invite/')
+        
+        // Only show blocking loader on initial subscription check (unless on invite page)
+        if (checkingSubscription && subscriptionStatus === null && !isOnInvitePage) {
             return (
                 <div className="min-h-screen flex items-center justify-center bg-gray-50">
                     <div className="text-center">
@@ -154,6 +163,25 @@ function App() {
                         <p className="mt-4 text-gray-600">Checking subscription...</p>
                     </div>
                 </div>
+            )
+        }
+        
+        // If on invite page, let them through immediately to accept the invite
+        if (isOnInvitePage) {
+            return (
+                <Router>
+                    <Routes>
+                        <Route 
+                            path="/invite/:token" 
+                            element={<InviteAcceptPage onInviteAccepted={() => {
+                                // After accepting, do a full page reload to refresh all state
+                                window.location.href = '/'
+                            }} />} 
+                        />
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
+                    <Toaster position="top-right" />
+                </Router>
             )
         }
         
@@ -170,14 +198,81 @@ function App() {
             )
         }
 
-        // User needs to activate trial (status is 'none')
+        // User has no own subscription (status is 'none') but might have inherited access
+        // or a pending team invitation
         if (subscriptionStatus.subscription.status === 'none') {
-            return (
-                <>
-                    <TrialActivationPage onTrialStarted={handleTrialStarted} />
-                    <Toaster position="top-right" />
-                </>
-            )
+            // If user already has access (inherited from team), skip the trial/invite checks
+            if (subscriptionStatus.hasAccess) {
+                // They have inherited access - let them through to the app
+                // (The code below will handle this case)
+            } else {
+                // No access yet - check for pending invites if we haven't already
+                if (pendingInvite === null && !checkingPendingInvite) {
+                    setCheckingPendingInvite(true)
+                    TeamService.checkMyPendingInvite()
+                        .then(result => {
+                            setPendingInvite(result)
+                        })
+                        .catch(() => {
+                            setPendingInvite({ hasPendingInvite: false })
+                        })
+                        .finally(() => {
+                            setCheckingPendingInvite(false)
+                        })
+                    
+                    return (
+                        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                            <div className="text-center">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+                                <p className="mt-4 text-gray-600">Checking account...</p>
+                            </div>
+                        </div>
+                    )
+                }
+
+                // If checking pending invite, show loader
+                if (checkingPendingInvite) {
+                    return (
+                        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                            <div className="text-center">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+                                <p className="mt-4 text-gray-600">Checking account...</p>
+                            </div>
+                        </div>
+                    )
+                }
+
+                // If user has a pending invite, redirect them to accept it
+                if (pendingInvite?.hasPendingInvite && pendingInvite.inviteToken) {
+                    return (
+                        <Router>
+                            <Routes>
+                                <Route 
+                                    path="/invite/:token" 
+                                    element={<InviteAcceptPage onInviteAccepted={() => {
+                                        // After accepting, do a full page reload to refresh all state
+                                        // This ensures subscription status and team context are fresh
+                                        window.location.href = '/'
+                                    }} />} 
+                                />
+                                <Route 
+                                    path="*" 
+                                    element={<Navigate to={`/invite/${pendingInvite.inviteToken}`} replace />} 
+                                />
+                            </Routes>
+                            <Toaster position="top-right" />
+                        </Router>
+                    )
+                }
+
+                // No pending invite and no access - show trial activation
+                return (
+                    <>
+                        <TrialActivationPage onTrialStarted={handleTrialStarted} />
+                        <Toaster position="top-right" />
+                    </>
+                )
+            }
         }
 
         // User subscription expired or cancelled
@@ -222,33 +317,39 @@ function App() {
         return (
             <Router>
                 <StorageProvider>
-                    <TutorialProvider>
-                        {/* Show trial banner if on trial and not dismissed */}
-                        {showTrialBanner && (
-                            <TrialBanner 
-                                remainingDays={subscriptionStatus.remainingTrialDays} 
-                            />
-                        )}
-                        
-                        <Routes>
-                            {/* Public routes - accessible without auth */}
-                            <Route path="/org/:slug" element={<PublicOrganizationPage />} />
+                    <TeamProvider>
+                        <TutorialProvider>
+                            {/* Show trial banner if on trial and not dismissed */}
+                            {showTrialBanner && (
+                                <TrialBanner 
+                                    remainingDays={subscriptionStatus.remainingTrialDays} 
+                                />
+                            )}
                             
-                            {/* Authenticated routes */}
-                            <Route path="/*" element={
-                                <Layout user={user}>
-                                    <Routes>
-                                        <Route index element={<Dashboard />} />
-                                        <Route path="initiatives/:id" element={<InitiativePage />} />
-                                        <Route path="initiatives/:id/metrics/:kpiId" element={<InitiativePage />} />
-                                        <Route path="account" element={<AccountPage subscriptionStatus={subscriptionStatus} />} />
-                                        <Route path="*" element={<Navigate to="/" replace />} />
-                                    </Routes>
-                                </Layout>
-                            } />
-                        </Routes>
-                        <InteractiveTutorial />
-                    </TutorialProvider>
+                            <Routes>
+                                {/* Public routes - accessible without auth */}
+                                <Route path="/org/:slug" element={<PublicOrganizationPage />} />
+                                
+                                {/* Invite acceptance page */}
+                                <Route path="/invite/:token" element={<InviteAcceptPage />} />
+                                
+                                {/* Authenticated routes */}
+                                <Route path="/*" element={
+                                    <Layout user={user}>
+                                        <Routes>
+                                            <Route index element={<Dashboard />} />
+                                            <Route path="initiatives/:id" element={<InitiativePage />} />
+                                            <Route path="initiatives/:id/metrics/:kpiId" element={<InitiativePage />} />
+                                            <Route path="account" element={<AccountPage subscriptionStatus={subscriptionStatus} />} />
+                                            <Route path="settings/team" element={<TeamSettingsPage />} />
+                                            <Route path="*" element={<Navigate to="/" replace />} />
+                                        </Routes>
+                                    </Layout>
+                                } />
+                            </Routes>
+                            <InteractiveTutorial />
+                        </TutorialProvider>
+                    </TeamProvider>
                 </StorageProvider>
                 <Toaster position="top-right" />
             </Router>
@@ -261,6 +362,9 @@ function App() {
             <Routes>
                 {/* Public routes - accessible without auth */}
                 <Route path="/org/:slug" element={<PublicOrganizationPage />} />
+                
+                {/* Invite acceptance page (accessible without login) */}
+                <Route path="/invite/:token" element={<InviteAcceptPage />} />
                 
                 {/* Login/Auth page */}
                 <Route path="/login" element={<AuthPage />} />

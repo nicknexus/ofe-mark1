@@ -1,8 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { AuthService } from '../services/auth'
 import toast from 'react-hot-toast'
 
 export default function AuthPage() {
+    const [searchParams] = useSearchParams()
+    const navigate = useNavigate()
     const [isSignUp, setIsSignUp] = useState(false)
     const [loading, setLoading] = useState(false)
     const [formData, setFormData] = useState({
@@ -12,6 +15,17 @@ export default function AuthPage() {
         name: '',
         organization: ''
     })
+
+    // Check if coming from an invite link (redirect contains /invite/)
+    const redirectPath = searchParams.get('redirect') || ''
+    const isFromInvite = redirectPath.includes('/invite/')
+    
+    // Auto-switch to signup mode if requested via URL param
+    useEffect(() => {
+        if (searchParams.get('signup') === 'true') {
+            setIsSignUp(true)
+        }
+    }, [searchParams])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -25,7 +39,8 @@ export default function AuthPage() {
                     return
                 }
 
-                if (!formData.organization || formData.organization.trim() === '') {
+                // Organization is required UNLESS signing up from an invite link
+                if (!isFromInvite && (!formData.organization || formData.organization.trim() === '')) {
                     toast.error('Organization name is required')
                     setLoading(false)
                     return
@@ -35,13 +50,27 @@ export default function AuthPage() {
                     formData.email, 
                     formData.password,
                     formData.name,
-                    formData.organization
+                    formData.organization || undefined // Pass undefined if empty
                 )
 
                 toast.success('Account created successfully!')
+                
+                // Redirect to the specified path (e.g., invite page) or dashboard
+                if (redirectPath) {
+                    navigate(redirectPath)
+                } else {
+                    navigate('/')
+                }
             } else {
                 await AuthService.signIn(formData.email, formData.password)
                 toast.success('Welcome back!')
+                
+                // Redirect to the specified path or dashboard
+                if (redirectPath) {
+                    navigate(redirectPath)
+                } else {
+                    navigate('/')
+                }
             }
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'Authentication failed')
@@ -164,7 +193,7 @@ export default function AuthPage() {
                             </div>
                         )}
 
-                        {isSignUp && (
+                        {isSignUp && !isFromInvite && (
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Organization Name <span className="text-red-500">*</span>
@@ -180,6 +209,15 @@ export default function AuthPage() {
                                 />
                                 <p className="mt-1 text-xs text-gray-500">
                                     This will be your organization's public page name
+                                </p>
+                            </div>
+                        )}
+
+                        {isSignUp && isFromInvite && (
+                            <div className="p-3 bg-primary-50 rounded-lg border border-primary-100">
+                                <p className="text-sm text-primary-700">
+                                    <strong>Signing up to join a team</strong><br />
+                                    <span className="text-primary-600">You'll be added to the organization that invited you. You can create your own organization later from Account Settings if needed.</span>
                                 </p>
                             </div>
                         )}

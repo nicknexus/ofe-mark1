@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, User as UserIcon, Mail, Building2, Save, HardDrive, Info, Clock, CreditCard, Calendar, Sparkles, ExternalLink, Settings, Zap } from 'lucide-react'
+import { ArrowLeft, User as UserIcon, Mail, Building2, Save, HardDrive, Info, Clock, CreditCard, Calendar, Sparkles, ExternalLink, Settings, Zap, Users, ChevronRight, Plus, Rocket } from 'lucide-react'
 import { AuthService } from '../services/auth'
 import { apiService } from '../services/api'
 import { SubscriptionService } from '../services/subscription'
+import { useTeam } from '../context/TeamContext'
 import { User, SubscriptionStatus } from '../types'
 import toast from 'react-hot-toast'
 
@@ -21,6 +22,7 @@ interface Props {
 
 export default function AccountPage({ subscriptionStatus }: Props) {
     const navigate = useNavigate()
+    const { isOwner, isSharedMember, organizationName, accessibleOrganizations, refreshPermissions } = useTeam()
     const [user, setUser] = useState<User | null>(null)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -33,6 +35,14 @@ export default function AccountPage({ subscriptionStatus }: Props) {
     const [initiativesUsage, setInitiativesUsage] = useState<{ current: number; limit: number | null } | null>(null)
     const [managingSubscription, setManagingSubscription] = useState(false)
     const [upgrading, setUpgrading] = useState(false)
+    
+    // State for creating a new organization
+    const [showCreateOrg, setShowCreateOrg] = useState(false)
+    const [newOrgName, setNewOrgName] = useState('')
+    const [creatingOrg, setCreatingOrg] = useState(false)
+    
+    // Check if user has their own organization
+    const hasOwnOrganization = accessibleOrganizations.some(org => org.role === 'owner')
 
     useEffect(() => {
         const loadUser = async () => {
@@ -126,6 +136,30 @@ export default function AccountPage({ subscriptionStatus }: Props) {
             toast.error('Failed to update profile')
         } finally {
             setSaving(false)
+        }
+    }
+
+    const handleCreateOrganization = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newOrgName.trim()) {
+            toast.error('Organization name is required')
+            return
+        }
+
+        setCreatingOrg(true)
+        try {
+            await apiService.createOrganization(newOrgName.trim())
+            toast.success('Organization created! You can now start a free trial.')
+            setShowCreateOrg(false)
+            setNewOrgName('')
+            // Refresh team context to pick up the new organization
+            await refreshPermissions()
+            // Reload page to refresh all states
+            window.location.reload()
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Failed to create organization')
+        } finally {
+            setCreatingOrg(false)
         }
     }
 
@@ -296,8 +330,8 @@ export default function AccountPage({ subscriptionStatus }: Props) {
                         )}
                     </div>
 
-                    {/* Upgrade CTA for trial users */}
-                    {subscriptionStatus.subscription.status === 'trial' && (
+                    {/* Upgrade CTA for trial users - only show for owners */}
+                    {subscriptionStatus.subscription.status === 'trial' && isOwner && (
                         <div className="mt-6 pt-5 border-t border-gray-100">
                             <div className="flex items-center justify-between">
                                 <div>
@@ -322,8 +356,20 @@ export default function AccountPage({ subscriptionStatus }: Props) {
                         </div>
                     )}
 
-                    {/* Add More Initiatives - for active subscribers at limit */}
-                    {subscriptionStatus.subscription.status === 'active' && initiativesUsage && initiativesUsage.limit !== null && initiativesUsage.current >= initiativesUsage.limit && (
+                    {/* Shared member contact owner message */}
+                    {isSharedMember && (
+                        <div className="mt-6 pt-5 border-t border-gray-100">
+                            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                                <Info className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                                <p className="text-sm text-gray-600">
+                                    Billing is managed by your organization owner. Contact them for subscription changes.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Add More Initiatives - for active subscribers at limit - only show for owners */}
+                    {subscriptionStatus.subscription.status === 'active' && isOwner && initiativesUsage && initiativesUsage.limit !== null && initiativesUsage.current >= initiativesUsage.limit && (
                         <div className="mt-6 pt-5 border-t border-gray-100">
                             <div className="flex items-center justify-between">
                                 <div>
@@ -339,6 +385,124 @@ export default function AccountPage({ subscriptionStatus }: Props) {
                                 </button>
                             </div>
                         </div>
+                    )}
+                </div>
+            )}
+
+            {/* Team Card - For owners to manage team, for shared members to see their status */}
+            <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6 w-full max-w-4xl mb-5">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-purple-50 rounded-xl">
+                            <Users className="w-5 h-5 text-purple-600" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-semibold text-gray-800">Team</h2>
+                            {organizationName && (
+                                <p className="text-xs text-gray-500">{organizationName}</p>
+                            )}
+                        </div>
+                    </div>
+                    {isOwner && (
+                        <button
+                            onClick={() => navigate('/settings/team')}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-xl transition-colors"
+                        >
+                            <Settings className="w-4 h-4" />
+                            Manage Team
+                            <ChevronRight className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
+                
+                {isSharedMember && (
+                    <div className="mt-4 p-4 bg-purple-50 rounded-xl">
+                        <p className="text-sm text-purple-800">
+                            <strong>You're a team member</strong> — You can view, create, and edit data. 
+                            Contact your organization owner for billing or to change your permissions.
+                        </p>
+                    </div>
+                )}
+
+                {isOwner && (
+                    <p className="mt-3 text-sm text-gray-500">
+                        Invite team members to collaborate on your organization's initiatives and data.
+                    </p>
+                )}
+            </div>
+
+            {/* Create Your Own Organization - For users without their own org */}
+            {!hasOwnOrganization && (
+                <div className="bg-gradient-to-r from-primary-50 to-purple-50 rounded-2xl shadow-bubble border border-primary-100 p-6 w-full max-w-4xl mb-5">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="p-2 bg-white rounded-xl shadow-sm">
+                            <Rocket className="w-5 h-5 text-primary-600" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-semibold text-gray-800">Start Your Own Organization</h2>
+                            <p className="text-xs text-gray-600">Create your own initiatives and invite your own team</p>
+                        </div>
+                    </div>
+
+                    {!showCreateOrg ? (
+                        <div className="flex items-center justify-between">
+                            <p className="text-sm text-gray-600 max-w-md">
+                                Want to track impact for your own organization? Create one and start a 14-day free trial with full access.
+                            </p>
+                            <button
+                                onClick={() => setShowCreateOrg(true)}
+                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-colors whitespace-nowrap"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Create Organization
+                            </button>
+                        </div>
+                    ) : (
+                        <form onSubmit={handleCreateOrganization} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                    Organization Name
+                                </label>
+                                <input
+                                    type="text"
+                                    value={newOrgName}
+                                    onChange={(e) => setNewOrgName(e.target.value)}
+                                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none transition-all bg-white"
+                                    placeholder="Enter your organization name"
+                                    required
+                                    autoFocus
+                                />
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="submit"
+                                    disabled={creatingOrg}
+                                    className="px-5 py-2.5 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-colors flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    {creatingOrg ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                            Creating...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Rocket className="w-4 h-4" />
+                                            Create & Start Trial
+                                        </>
+                                    )}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowCreateOrg(false)
+                                        setNewOrgName('')
+                                    }}
+                                    className="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
                     )}
                 </div>
             )}

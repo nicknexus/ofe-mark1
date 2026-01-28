@@ -4,13 +4,16 @@ import { KPIService } from '../services/kpiService';
 import { EvidenceService } from '../services/evidenceService';
 import { SubscriptionService } from '../services/subscriptionService';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
+import { requireOwnerPermission } from '../middleware/teamPermissions';
 
 const router = Router();
 
 // Get all initiatives
 router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const initiatives = await InitiativeService.getAll(req.user!.id);
+        // Get optional org context from header
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const initiatives = await InitiativeService.getAll(req.user!.id, requestedOrgId);
         res.json(initiatives);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
@@ -62,8 +65,8 @@ router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     }
 });
 
-// Delete initiative
-router.delete('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
+// Delete initiative (owner only)
+router.delete('/:id', authenticateUser, requireOwnerPermission, async (req: AuthenticatedRequest, res) => {
     try {
         await InitiativeService.delete(req.params.id, req.user!.id);
         res.status(204).send();

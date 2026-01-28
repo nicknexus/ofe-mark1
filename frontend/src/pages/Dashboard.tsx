@@ -8,24 +8,27 @@ import {
     GraduationCap,
     Zap,
     X,
-    ArrowRight
+    ArrowRight,
+    Users
 } from 'lucide-react'
 import { apiService } from '../services/api'
-import { Initiative, LoadingState, CreateInitiativeForm, KPI, Organization, Location } from '../types'
+import { Initiative, LoadingState, CreateInitiativeForm, KPI, Location } from '../types'
 import { formatDate, truncateText } from '../utils'
 import toast from 'react-hot-toast'
 import CreateInitiativeModal from '../components/CreateInitiativeModal'
 import LocationMap from '../components/LocationMap'
 import { useTutorial } from '../context/TutorialContext'
+import { useTeam } from '../context/TeamContext'
 
 export default function Dashboard() {
     const navigate = useNavigate()
     const { isActive: isTutorialActive, currentStep, advanceStep, startTutorial } = useTutorial()
+    const { isOwner, isSharedMember, organizationName } = useTeam()
     const [initiatives, setInitiatives] = useState<Initiative[]>([])
     const [allKPIs, setAllKPIs] = useState<KPI[]>([])
     const [allLocations, setAllLocations] = useState<Location[]>([])
     const [totalEvidence, setTotalEvidence] = useState<number>(0)
-    const [organization, setOrganization] = useState<Organization | null>(null)
+    // Organization info now comes from TeamContext
     const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: true })
     const [isLoadingStats, setIsLoadingStats] = useState(true)
     const [showCreateModal, setShowCreateModal] = useState(false)
@@ -79,16 +82,9 @@ export default function Dashboard() {
         setLoadingState({ isLoading: true })
 
         try {
-            // Load organization and initiatives in parallel for immediate display
-            const [orgs, initiatives] = await Promise.all([
-                apiService.getOrganizations(),
-                apiService.loadInitiativesOnly()
-            ])
-            
+            // Load initiatives - organization comes from TeamContext now
+            const initiatives = await apiService.loadInitiativesOnly()
             setInitiatives(initiatives)
-            if (orgs && orgs.length > 0) {
-                setOrganization(orgs[0]) // User has one organization
-            }
             setLoadingState({ isLoading: false }) // Show initiatives immediately
 
             // Load KPIs, evidence, and locations in background
@@ -257,8 +253,20 @@ export default function Dashboard() {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
                         {/* Initiatives Module - Takes 2 columns on desktop, full width on mobile */}
                         <div className="col-span-1 lg:col-span-2 bg-white rounded-2xl shadow-bubble border border-gray-100 overflow-hidden flex flex-col">
+                            {/* Team Member Banner */}
+                            {isSharedMember && organizationName && (
+                                <div className="px-6 py-3 bg-purple-50 border-b border-purple-100 flex items-center gap-2">
+                                    <Users className="w-4 h-4 text-purple-600" />
+                                    <span className="text-sm text-purple-800">
+                                        You're viewing <strong>{organizationName}</strong>'s initiatives as a team member
+                                    </span>
+                                </div>
+                            )}
+
                             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-                                <h2 className="text-lg font-semibold text-gray-800">Your Initiatives</h2>
+                                <h2 className="text-lg font-semibold text-gray-800">
+                                    {isSharedMember ? 'Team Initiatives' : 'Your Initiatives'}
+                                </h2>
                                 <div className="flex items-center gap-2">
                                     <button
                                         onClick={startTutorial}
@@ -268,14 +276,16 @@ export default function Dashboard() {
                                         <GraduationCap className="w-4 h-4" />
                                         <span className="hidden sm:inline">Tutorial</span>
                                     </button>
-                                    <button
-                                        onClick={() => setShowCreateModal(true)}
-                                        data-tutorial="create-initiative"
-                                        className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-all duration-200 flex items-center gap-1.5 shadow-bubble-sm"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                        {initiatives.length === 0 ? 'Get Started' : 'New Initiative'}
-                                    </button>
+                                    {isOwner && (
+                                        <button
+                                            onClick={() => setShowCreateModal(true)}
+                                            data-tutorial="create-initiative"
+                                            className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-all duration-200 flex items-center gap-1.5 shadow-bubble-sm"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                            {initiatives.length === 0 ? 'Get Started' : 'New Initiative'}
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                             
@@ -285,18 +295,32 @@ export default function Dashboard() {
                                         <div className="icon-bubble mx-auto mb-4">
                                             <img src="/Nexuslogo.png" alt="Nexus Logo" className="w-6 h-6 object-contain" />
                                         </div>
-                                        <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                                            Welcome to OFE
-                                        </h3>
-                                        <p className="text-gray-500 mb-6 max-w-md mx-auto text-sm">
-                                            Create your first initiative to start tracking impact.
-                                        </p>
-                                        <button
-                                            onClick={() => setShowCreateModal(true)}
-                                            className="px-5 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-all duration-200 shadow-bubble-sm"
-                                        >
-                                            Create Your First Initiative
-                                        </button>
+                                        {isSharedMember ? (
+                                            <>
+                                                <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                                                    No Initiatives Yet
+                                                </h3>
+                                                <p className="text-gray-500 mb-6 max-w-md mx-auto text-sm">
+                                                    Your organization doesn't have any initiatives yet. 
+                                                    Contact your organization owner to create one.
+                                                </p>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                                                    Welcome to OFE
+                                                </h3>
+                                                <p className="text-gray-500 mb-6 max-w-md mx-auto text-sm">
+                                                    Create your first initiative to start tracking impact.
+                                                </p>
+                                                <button
+                                                    onClick={() => setShowCreateModal(true)}
+                                                    className="px-5 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-all duration-200 shadow-bubble-sm"
+                                                >
+                                                    Create Your First Initiative
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                 ) : (
                                     <div className="space-y-4">
@@ -329,31 +353,33 @@ export default function Dashboard() {
                                                     </div>
                                                 </Link>
 
-                                                {/* Action Buttons */}
-                                                <div className="absolute top-2 right-8 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.preventDefault()
-                                                            e.stopPropagation()
-                                                            openEditModal(initiative)
-                                                        }}
-                                                        className="p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
-                                                        title="Edit Initiative"
-                                                    >
-                                                        <Edit className="w-3 h-3 text-gray-500" />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.preventDefault()
-                                                            e.stopPropagation()
-                                                            openDeleteConfirm(initiative)
-                                                        }}
-                                                        className="p-1.5 bg-white border border-red-200 rounded-lg shadow-sm hover:bg-red-50 hover:border-red-300 transition-all duration-200"
-                                                        title="Delete Initiative"
-                                                    >
-                                                        <Trash2 className="w-3 h-3 text-red-500" />
-                                                    </button>
-                                                </div>
+                                                {/* Action Buttons - Only show for owners */}
+                                                {isOwner && (
+                                                    <div className="absolute top-2 right-8 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.preventDefault()
+                                                                e.stopPropagation()
+                                                                openEditModal(initiative)
+                                                            }}
+                                                            className="p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
+                                                            title="Edit Initiative"
+                                                        >
+                                                            <Edit className="w-3 h-3 text-gray-500" />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.preventDefault()
+                                                                e.stopPropagation()
+                                                                openDeleteConfirm(initiative)
+                                                            }}
+                                                            className="p-1.5 bg-white border border-red-200 rounded-lg shadow-sm hover:bg-red-50 hover:border-red-300 transition-all duration-200"
+                                                            title="Delete Initiative"
+                                                        >
+                                                            <Trash2 className="w-3 h-3 text-red-500" />
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
