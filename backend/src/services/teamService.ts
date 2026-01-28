@@ -539,16 +539,42 @@ export class TeamService {
      * Accept an invitation
      */
     static async acceptInvitation(token: string, userId: string, userEmail: string): Promise<TeamMember> {
-        // Get invitation
-        const { data: invite, error: inviteError } = await supabase
-            .from('team_invitations')
-            .select('*')
-            .eq('token', token)
-            .eq('status', 'pending')
-            .maybeSingle();
+        console.log(`[acceptInvitation] Starting for token: ${token?.substring(0, 15)}..., user: ${userEmail}`);
+        
+        // Get invitation with retry logic for serverless connection issues
+        let invite = null;
+        let inviteError = null;
+        
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            const { data, error } = await supabase
+                .from('team_invitations')
+                .select('*')
+                .eq('token', token)
+                .maybeSingle();
+            
+            console.log(`[acceptInvitation] Attempt ${attempt} - Found: ${!!data}, Error: ${error?.message || 'none'}, Status: ${data?.status}`);
+            
+            if (data) {
+                invite = data;
+                inviteError = null;
+                break;
+            }
+            
+            inviteError = error;
+            if (attempt < 3) {
+                await new Promise(r => setTimeout(r, 200));
+            }
+        }
 
         if (inviteError || !invite) {
+            console.log(`[acceptInvitation] Invite not found after retries`);
             throw new Error('Invalid or expired invitation');
+        }
+        
+        // Check status
+        if (invite.status !== 'pending') {
+            console.log(`[acceptInvitation] Invite status is '${invite.status}', not 'pending'`);
+            throw new Error(`Invitation is ${invite.status}, not pending`);
         }
 
         // Check if expired
@@ -561,8 +587,10 @@ export class TeamService {
             throw new Error('This invitation has expired');
         }
 
-        // Optional: verify email matches (recommended but can be disabled)
+        // Verify email matches
+        console.log(`[acceptInvitation] Email check - Invite email: ${invite.email}, User email: ${userEmail}`);
         if (invite.email.toLowerCase() !== userEmail.toLowerCase()) {
+            console.log(`[acceptInvitation] Email mismatch!`);
             throw new Error('This invitation was sent to a different email address');
         }
 
@@ -585,6 +613,7 @@ export class TeamService {
         }
 
         // Create team member record
+        console.log(`[acceptInvitation] Creating team member for org: ${invite.organization_id}`);
         const { data: member, error: memberError } = await supabase
             .from('team_members')
             .insert([{
@@ -597,8 +626,11 @@ export class TeamService {
             .single();
 
         if (memberError) {
+            console.error(`[acceptInvitation] Failed to create membership:`, memberError);
             throw new Error(`Failed to create membership: ${memberError.message}`);
         }
+        
+        console.log(`[acceptInvitation] Successfully created team member: ${member.id}`);
 
         // Mark invitation as accepted
         await supabase
