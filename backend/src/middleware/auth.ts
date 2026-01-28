@@ -35,6 +35,8 @@ export const authenticateUser = async (
             email: user.email || ''
         };
 
+        console.log(`[Auth] Authenticated user: ${user.email} (${user.id})`);
+
         next();
     } catch (error) {
         console.error('Authentication error:', error);

@@ -67,6 +67,8 @@ export class StorageService {
      * Get storage usage for a user (via their organization)
      */
     static async getUsageForUser(userId: string): Promise<StorageUsage | null> {
+        console.log(`[getUsageForUser] Looking up org for user: ${userId}`);
+        
         // Get user's organization
         const { data: org, error } = await supabase
             .from('organizations')
@@ -75,11 +77,17 @@ export class StorageService {
             .single();
 
         if (error) {
+            console.log(`[getUsageForUser] Error or no org found for user ${userId}:`, error.code, error.message);
             if (error.code === 'PGRST116') return null; // No org found
             throw new Error(`Failed to get organization: ${error.message}`);
         }
 
-        if (!org) return null;
+        if (!org) {
+            console.log(`[getUsageForUser] No org data returned for user ${userId}`);
+            return null;
+        }
+        
+        console.log(`[getUsageForUser] Found org ${org.id} for user ${userId}`);
 
         const usedBytes = org.storage_used_bytes || 0;
         const usedGb = usedBytes / (1024 * 1024 * 1024);

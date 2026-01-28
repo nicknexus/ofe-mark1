@@ -142,13 +142,25 @@ export class TeamService {
      * Get user's organization (where they are owner)
      */
     static async getUserOwnedOrganization(userId: string): Promise<{ id: string; name: string } | null> {
+        console.log(`[getUserOwnedOrganization] Looking up org for user: ${userId}`);
+        
         const { data, error } = await supabase
             .from('organizations')
             .select('id, name')
             .eq('owner_id', userId)
             .maybeSingle();
 
-        if (error || !data) return null;
+        if (error) {
+            console.error(`[getUserOwnedOrganization] Database error:`, error);
+            return null;
+        }
+        
+        if (!data) {
+            console.log(`[getUserOwnedOrganization] No owned org found for user: ${userId}`);
+            return null;
+        }
+        
+        console.log(`[getUserOwnedOrganization] Found org: ${data.name} (${data.id})`);
         return data;
     }
 
@@ -446,12 +458,25 @@ export class TeamService {
         
         if (!invite) {
             console.log(`[getInvitationByToken] No invite found for token: ${token?.substring(0, 15)}...`);
-            // Let's also check if ANY invites exist to debug
+            // Let's check ALL invites to debug what happened
             const { data: allInvites, error: countError } = await supabase
                 .from('team_invitations')
-                .select('token, status')
+                .select('token, status, email')
+                .limit(10);
+            console.log(`[getInvitationByToken] ALL invites in DB:`, JSON.stringify(allInvites?.map(i => ({ 
+                token: i.token?.substring(0, 15), 
+                status: i.status,
+                email: i.email 
+            }))));
+            
+            // Also check team_members to see if invite was auto-accepted
+            const { data: members } = await supabase
+                .from('team_members')
+                .select('user_id, organization_id, created_at')
+                .order('created_at', { ascending: false })
                 .limit(5);
-            console.log(`[getInvitationByToken] Sample invites in DB:`, allInvites?.map(i => ({ token: i.token?.substring(0, 10), status: i.status })));
+            console.log(`[getInvitationByToken] Recent team_members:`, JSON.stringify(members));
+            
             return null;
         }
         
