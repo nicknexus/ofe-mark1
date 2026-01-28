@@ -11,7 +11,7 @@ import toast from 'react-hot-toast'
 
 export default function TeamSettingsPage() {
     const navigate = useNavigate()
-    const { isOwner, organizationName, loading: permissionsLoading } = useTeam()
+    const { hasOwnOrganization, ownedOrganization, loading: permissionsLoading } = useTeam()
     
     const [members, setMembers] = useState<TeamMember[]>([])
     const [invitations, setInvitations] = useState<TeamInvitation[]>([])
@@ -29,18 +29,21 @@ export default function TeamSettingsPage() {
     const [resendingInvite, setResendingInvite] = useState<string | null>(null)
     const [revokingInvite, setRevokingInvite] = useState<string | null>(null)
 
+    // Use ownedOrganization name for display
+    const organizationName = ownedOrganization?.name
+
     useEffect(() => {
-        if (!permissionsLoading && !isOwner) {
+        if (!permissionsLoading && !hasOwnOrganization) {
             toast.error('Only organization owners can access team settings')
             navigate('/')
         }
-    }, [isOwner, permissionsLoading, navigate])
+    }, [hasOwnOrganization, permissionsLoading, navigate])
 
     useEffect(() => {
-        if (isOwner) {
+        if (hasOwnOrganization) {
             loadTeamData()
         }
-    }, [isOwner])
+    }, [hasOwnOrganization])
 
     const loadTeamData = async () => {
         try {

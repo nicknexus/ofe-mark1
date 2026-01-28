@@ -17,6 +17,9 @@ interface TeamContextType {
     switchOrganization: (orgId: string) => void
     hasMultipleOrgs: boolean
     refreshPermissions: () => Promise<void>
+    // Does user own ANY organization (regardless of which one is active)
+    hasOwnOrganization: boolean
+    ownedOrganization: AccessibleOrganization | null
 }
 
 const defaultPermissions: UserPermissions = {
@@ -38,7 +41,9 @@ const TeamContext = createContext<TeamContextType>({
     activeOrganization: null,
     switchOrganization: () => {},
     hasMultipleOrgs: false,
-    refreshPermissions: async () => {}
+    refreshPermissions: async () => {},
+    hasOwnOrganization: false,
+    ownedOrganization: null
 })
 
 const ACTIVE_ORG_STORAGE_KEY = 'nexus-active-org-id'
@@ -113,6 +118,7 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
     }, [accessibleOrganizations])
 
     const activeOrganization = accessibleOrganizations.find(o => o.id === activeOrgId) || null
+    const ownedOrganization = accessibleOrganizations.find(o => o.role === 'owner') || null
     
     // Determine if viewing as shared member based on active org
     const isViewingAsSharedMember = activeOrganization?.role === 'member'
@@ -131,7 +137,9 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
         activeOrganization,
         switchOrganization,
         hasMultipleOrgs: accessibleOrganizations.length > 1,
-        refreshPermissions: fetchData
+        refreshPermissions: fetchData,
+        hasOwnOrganization: ownedOrganization !== null,
+        ownedOrganization
     }
 
     return (

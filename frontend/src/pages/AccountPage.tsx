@@ -22,7 +22,7 @@ interface Props {
 
 export default function AccountPage({ subscriptionStatus }: Props) {
     const navigate = useNavigate()
-    const { isOwner, isSharedMember, organizationName, accessibleOrganizations, refreshPermissions } = useTeam()
+    const { isOwner, isSharedMember, organizationName, accessibleOrganizations, refreshPermissions, hasOwnOrganization, ownedOrganization } = useTeam()
     const [user, setUser] = useState<User | null>(null)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -40,9 +40,6 @@ export default function AccountPage({ subscriptionStatus }: Props) {
     const [showCreateOrg, setShowCreateOrg] = useState(false)
     const [newOrgName, setNewOrgName] = useState('')
     const [creatingOrg, setCreatingOrg] = useState(false)
-    
-    // Check if user has their own organization
-    const hasOwnOrganization = accessibleOrganizations.some(org => org.role === 'owner')
 
     useEffect(() => {
         const loadUser = async () => {
@@ -403,7 +400,8 @@ export default function AccountPage({ subscriptionStatus }: Props) {
                             )}
                         </div>
                     </div>
-                    {isOwner && (
+                    {/* Show Manage Team if user owns ANY organization */}
+                    {hasOwnOrganization && (
                         <button
                             onClick={() => navigate('/settings/team')}
                             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-xl transition-colors"
@@ -418,8 +416,9 @@ export default function AccountPage({ subscriptionStatus }: Props) {
                 {isSharedMember && (
                     <div className="mt-4 p-4 bg-purple-50 rounded-xl">
                         <p className="text-sm text-purple-800">
-                            <strong>You're a team member</strong> — You can view, create, and edit data. 
-                            Contact your organization owner for billing or to change your permissions.
+                            <strong>You're viewing as a team member</strong> — You can view, create, and edit data. 
+                            {hasOwnOrganization && ' Switch to your own organization to manage your team.'}
+                            {!hasOwnOrganization && ' Contact the organization owner for billing or permissions.'}
                         </p>
                     </div>
                 )}
