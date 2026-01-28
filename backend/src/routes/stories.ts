@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth'
 import { StoryService } from '../services/storyService'
-import { requireImpactClaimsPermission, requireOwnerPermission } from '../middleware/teamPermissions'
+import { requireOwnerPermission } from '../middleware/teamPermissions'
 
 const router = Router()
 
@@ -53,8 +53,8 @@ router.get('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     }
 })
 
-// Create story (requires impact claims permission)
-router.post('/', authenticateUser, requireImpactClaimsPermission, async (req: AuthenticatedRequest, res) => {
+// Create story (all team members can create stories)
+router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const story = await StoryService.create(req.body, req.user!.id)
         res.status(201).json(story)
