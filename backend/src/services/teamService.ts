@@ -423,6 +423,8 @@ export class TeamService {
      * Get invitation details by token (public - no auth required)
      */
     static async getInvitationByToken(token: string): Promise<InviteDetails | null> {
+        console.log(`[getInvitationByToken] Looking up token: ${token?.substring(0, 15)}...`);
+        
         // Use service role to bypass RLS for public token lookup
         const { data: invite, error } = await supabase
             .from('team_invitations')
@@ -437,7 +439,23 @@ export class TeamService {
             .eq('token', token)
             .maybeSingle();
 
-        if (error || !invite) return null;
+        if (error) {
+            console.error(`[getInvitationByToken] Database error:`, error);
+            return null;
+        }
+        
+        if (!invite) {
+            console.log(`[getInvitationByToken] No invite found for token: ${token?.substring(0, 15)}...`);
+            // Let's also check if ANY invites exist to debug
+            const { data: allInvites, error: countError } = await supabase
+                .from('team_invitations')
+                .select('token, status')
+                .limit(5);
+            console.log(`[getInvitationByToken] Sample invites in DB:`, allInvites?.map(i => ({ token: i.token?.substring(0, 10), status: i.status })));
+            return null;
+        }
+        
+        console.log(`[getInvitationByToken] Found invite with status: ${invite.status}, org_id: ${invite.organization_id}`);
 
         // Get organization name
         const { data: org } = await supabase

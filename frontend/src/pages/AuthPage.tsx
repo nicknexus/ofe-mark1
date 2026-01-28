@@ -54,9 +54,14 @@ export default function AuthPage() {
 
                 toast.success('Account created successfully!')
                 
+                // Small delay to ensure session is fully persisted before navigation
+                // This prevents race conditions where the new page loads before auth is ready
+                await new Promise(resolve => setTimeout(resolve, 500))
+                
                 // Use window.location for redirect to ensure URL is updated before App re-renders
                 // This is important because the Router instance changes when auth state changes
                 if (redirectPath) {
+                    console.log('[AuthPage] Redirecting to:', redirectPath)
                     window.location.href = redirectPath
                 } else {
                     window.location.href = '/'
