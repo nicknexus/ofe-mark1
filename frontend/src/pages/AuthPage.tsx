@@ -54,6 +54,12 @@ export default function AuthPage() {
 
                 toast.success('Account created successfully!')
                 
+                // Set flag so InviteAcceptPage knows this is a post-signup navigation
+                // This helps handle timing issues with the invite lookup
+                if (isFromInvite) {
+                    sessionStorage.setItem('just_signed_up', 'true')
+                }
+                
                 // Small delay to ensure session is fully persisted before navigation
                 // This prevents race conditions where the new page loads before auth is ready
                 await new Promise(resolve => setTimeout(resolve, 500))

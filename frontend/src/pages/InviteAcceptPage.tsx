@@ -45,16 +45,16 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
         checkUser()
     }, [])
 
-    // Fetch invite details with retry logic for post-signup timing issues
+    // Fetch invite details with reload fallback for post-signup timing issues
     useEffect(() => {
-        const fetchInvite = async (retryCount = 0): Promise<void> => {
+        const fetchInvite = async (): Promise<void> => {
             if (!token) {
                 setError('Invalid invitation link - no token provided')
                 setLoading(false)
                 return
             }
 
-            console.log(`[InviteAcceptPage] Fetching invite with token: ${token.substring(0, 10)}... (length: ${token.length}, attempt: ${retryCount + 1})`)
+            console.log(`[InviteAcceptPage] Fetching invite with token: ${token.substring(0, 10)}... (length: ${token.length})`)
 
             try {
                 const inviteDetails = await TeamService.getInviteDetails(token)
@@ -62,16 +62,22 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
                 setInvite(inviteDetails)
                 setLoading(false)
             } catch (err) {
-                console.error(`[InviteAcceptPage] Error fetching invite (attempt ${retryCount + 1}):`, err)
+                console.error(`[InviteAcceptPage] Error fetching invite:`, err)
                 
-                // Retry up to 2 times with a delay (helps with timing issues after signup)
-                if (retryCount < 2) {
-                    console.log(`[InviteAcceptPage] Retrying in 1 second...`)
-                    await new Promise(resolve => setTimeout(resolve, 1000))
-                    return fetchInvite(retryCount + 1)
+                // Check if this might be a post-signup timing issue
+                // If we came from signup (indicated by referrer or session storage flag), try a full reload
+                const isPostSignup = sessionStorage.getItem('just_signed_up') === 'true'
+                
+                if (isPostSignup) {
+                    console.log(`[InviteAcceptPage] Post-signup detected, doing full page reload...`)
+                    sessionStorage.removeItem('just_signed_up')
+                    // Wait a moment then reload
+                    await new Promise(resolve => setTimeout(resolve, 500))
+                    window.location.reload()
+                    return
                 }
                 
-                // Only show error after all retries exhausted
+                // Not post-signup, show the error
                 setError((err as Error).message)
                 setLoading(false)
             }
