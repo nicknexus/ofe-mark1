@@ -47,7 +47,7 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
 
     // Fetch invite details with retry logic for post-signup timing issues
     useEffect(() => {
-        const fetchInvite = async (retryCount = 0) => {
+        const fetchInvite = async (retryCount = 0): Promise<void> => {
             if (!token) {
                 setError('Invalid invitation link - no token provided')
                 setLoading(false)
@@ -60,6 +60,7 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
                 const inviteDetails = await TeamService.getInviteDetails(token)
                 console.log(`[InviteAcceptPage] Successfully fetched invite for org: ${inviteDetails.organization_name}`)
                 setInvite(inviteDetails)
+                setLoading(false)
             } catch (err) {
                 console.error(`[InviteAcceptPage] Error fetching invite (attempt ${retryCount + 1}):`, err)
                 
@@ -70,8 +71,8 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
                     return fetchInvite(retryCount + 1)
                 }
                 
+                // Only show error after all retries exhausted
                 setError((err as Error).message)
-            } finally {
                 setLoading(false)
             }
         }
