@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { TrendingUp, Target, BarChart3, Calendar, FileText, Filter, ChevronDown, X, MapPin, ExternalLink, Plus, Users, GripVertical, Settings, Upload } from 'lucide-react'
+import { useTeam } from '../context/TeamContext'
 import { createPortal } from 'react-dom'
 import {
     DndContext,
@@ -115,6 +116,7 @@ interface MetricsDashboardProps {
 }
 
 export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = [], initiativeId, onNavigateToLocations, onMetricCardClick, onAddKPI, onStoryClick, user, organization, onOrderChange, onAddImpactClaim, onAddEvidence }: MetricsDashboardProps) {
+    const { canAddImpactClaims } = useTeam()
     const [timeFrame, setTimeFrame] = useState<'all' | '1month' | '6months' | '1year' | '5years'>('all')
     const [isCumulative, setIsCumulative] = useState(false)
     const [visibleKPIs, setVisibleKPIs] = useState<Set<string>>(new Set())
@@ -1069,7 +1071,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                 {/* Right side: Add Impact Claim, Add Evidence, Settings and User Profile */}
                 <div className="flex items-center gap-3 shrink-0">
                     {/* Add Impact Claim Button */}
-                    {onAddImpactClaim && (
+                    {onAddImpactClaim && canAddImpactClaims && (
                         <button
                             onClick={onAddImpactClaim}
                             className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25"

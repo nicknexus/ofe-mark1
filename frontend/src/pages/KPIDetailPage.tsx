@@ -23,6 +23,7 @@ import {
     Users
 } from 'lucide-react'
 import { apiService } from '../services/api'
+import { useTeam } from '../context/TeamContext'
 import { KPI, KPIUpdate, LoadingState, CreateKPIUpdateForm } from '../types'
 import { formatDate, getCategoryColor, getEvidenceTypeInfo } from '../utils'
 import AddKPIUpdateModal from '../components/AddKPIUpdateModal'
@@ -451,6 +452,7 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
 
 export default function KPIDetailPage() {
     const { initiativeId, kpiId } = useParams<{ initiativeId: string; kpiId: string }>()
+    const { canAddImpactClaims } = useTeam()
     const [kpi, setKPI] = useState<KPI | null>(null)
     const [updates, setUpdates] = useState<KPIUpdate[]>([])
     const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: true })
@@ -777,14 +779,16 @@ export default function KPIDetailPage() {
                                         <div className="text-xs text-gray-500">Total {kpi.unit_of_measurement}</div>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => setIsUpdateModalOpen(true)}
-                                    className="flex items-center space-x-2 px-4 py-2 bg-primary-100/80 text-primary-700 rounded-xl hover:bg-primary-200/80 font-medium transition-all duration-200 text-sm"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    <span className="hidden sm:inline">Add Impact Claim</span>
-                                    <span className="sm:hidden">Add</span>
-                                </button>
+                                {canAddImpactClaims && (
+                                    <button
+                                        onClick={() => setIsUpdateModalOpen(true)}
+                                        className="flex items-center space-x-2 px-4 py-2 bg-primary-100/80 text-primary-700 rounded-xl hover:bg-primary-200/80 font-medium transition-all duration-200 text-sm"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        <span className="hidden sm:inline">Add Impact Claim</span>
+                                        <span className="sm:hidden">Add</span>
+                                    </button>
+                                )}
                             </div>
                         </div>
 
@@ -809,7 +813,7 @@ export default function KPIDetailPage() {
                                     <p className="text-gray-500 text-sm sm:text-base">
                                         {dateFilter.isActive ? 'No impact claims in selected date range' : 'No impact claims yet'}
                                     </p>
-                                    {!dateFilter.isActive && (
+                                    {!dateFilter.isActive && canAddImpactClaims && (
                                         <button
                                             onClick={() => setIsUpdateModalOpen(true)}
                                             className="mt-4 px-5 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25 text-sm"

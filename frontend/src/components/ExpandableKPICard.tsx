@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useTutorial } from '../context/TutorialContext'
+import { useTeam } from '../context/TeamContext'
 import {
     ChevronDown,
     ChevronUp,
@@ -89,6 +90,9 @@ export default function ExpandableKPICard({
 
     // Tutorial hook for advancing steps
     const { isActive: isTutorialActive, currentStep, advanceStep } = useTutorial()
+    
+    // Team permissions
+    const { canAddImpactClaims } = useTeam()
 
     // Lock body scroll when expanded (only for portal mode, not page mode)
     useEffect(() => {
@@ -838,10 +842,12 @@ export default function ExpandableKPICard({
                                 </div>
                             </div>
                             <div className="flex items-center space-x-2">
-                                <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} data-tutorial="add-impact-claim" className="flex items-center space-x-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25">
-                                    <Plus className="w-4 h-4" />
-                                    <span>Add Impact Claim</span>
-                                </button>
+                                {canAddImpactClaims && (
+                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} data-tutorial="add-impact-claim" className="flex items-center space-x-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25">
+                                        <Plus className="w-4 h-4" />
+                                        <span>Add Impact Claim</span>
+                                    </button>
+                                )}
                                 <button onClick={(e) => { e.stopPropagation(); onAddEvidence() }} data-tutorial="add-evidence" className="flex items-center space-x-2 px-4 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25">
                                     <Upload className="w-4 h-4" />
                                     <span>Add Evidence</span>
@@ -948,7 +954,7 @@ export default function ExpandableKPICard({
                                             <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-3 shadow-soft-float flex flex-col flex-1 min-h-0">
                                                 <div className="flex items-center justify-between mb-2 flex-shrink-0">
                                                     <h5 className="text-sm font-semibold text-gray-800">Impact Claims ({kpiUpdates.length})</h5>
-                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25"><Plus className="w-4 h-4" /><span>Add Impact Claim</span></button>
+                                                    {canAddImpactClaims && <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25"><Plus className="w-4 h-4" /><span>Add Impact Claim</span></button>}
                                                 </div>
                                                 <div className="flex-1 overflow-y-auto space-y-1 pr-1 min-h-0">
                                                     {[...kpiUpdates].sort((a, b) => {
@@ -1016,8 +1022,8 @@ export default function ExpandableKPICard({
                                                 <div className="text-center">
                                                     <div className="w-10 h-10 mx-auto mb-2 bg-primary-100/80 rounded-lg flex items-center justify-center"><BarChart3 className="w-5 h-5 text-primary-500" /></div>
                                                     <h5 className="text-sm font-semibold text-gray-800 mb-1">Impact Claims</h5>
-                                                    <p className="text-xs text-gray-500 mb-3">Start tracking your impact</p>
-                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25 animate-pulse"><Plus className="w-4 h-4" /><span>Add Impact Claim</span></button>
+                                                    <p className="text-xs text-gray-500 mb-3">{canAddImpactClaims ? 'Start tracking your impact' : 'No impact claims yet'}</p>
+                                                    {canAddImpactClaims && <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25 animate-pulse"><Plus className="w-4 h-4" /><span>Add Impact Claim</span></button>}
                                                 </div>
                                             </div>
                                         )}
@@ -1315,16 +1321,18 @@ export default function ExpandableKPICard({
                                 </div>
                             </div>
                             <div className="flex items-center space-x-2">
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        onAddUpdate()
-                                    }}
-                                    className="flex items-center space-x-2 px-4 py-2.5 bg-primary-100/80 hover:bg-primary-200/80 text-evidence-700 rounded-xl text-sm font-medium transition-all duration-200"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    <span>Add Impact Claim</span>
-                                </button>
+                                {canAddImpactClaims && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            onAddUpdate()
+                                        }}
+                                        className="flex items-center space-x-2 px-4 py-2.5 bg-primary-100/80 hover:bg-primary-200/80 text-evidence-700 rounded-xl text-sm font-medium transition-all duration-200"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        <span>Add Impact Claim</span>
+                                    </button>
+                                )}
                                 {kpi.total_updates > 0 && (
                                     <button
                                         onClick={(e) => {
@@ -1566,10 +1574,12 @@ export default function ExpandableKPICard({
                                                 <div className="text-center">
                                                     <div className="w-14 h-14 mx-auto mb-3 bg-primary-100/80 rounded-xl flex items-center justify-center"><BarChart3 className="w-7 h-7 text-primary-500" /></div>
                                                     <h5 className="text-base font-semibold text-gray-800 mb-1">Impact Claims</h5>
-                                                    <p className="text-sm text-gray-500 mb-3">Start tracking your impact</p>
-                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25 animate-pulse">
-                                                        <Plus className="w-5 h-5" /><span>Add Impact Claim</span>
-                                                    </button>
+                                                    <p className="text-sm text-gray-500 mb-3">{canAddImpactClaims ? 'Start tracking your impact' : 'No impact claims yet'}</p>
+                                                    {canAddImpactClaims && (
+                                                        <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25 animate-pulse">
+                                                            <Plus className="w-5 h-5" /><span>Add Impact Claim</span>
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
@@ -1604,16 +1614,18 @@ export default function ExpandableKPICard({
                                 </div>
                             </div>
                             <div className="flex items-center space-x-2">
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        onAddUpdate()
-                                    }}
-                                    className="flex items-center space-x-2 px-4 py-2.5 bg-primary-100/80 hover:bg-primary-200/80 text-evidence-700 rounded-xl text-sm font-medium transition-all duration-200"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    <span>Add Impact Claim</span>
-                                </button>
+                                {canAddImpactClaims && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            onAddUpdate()
+                                        }}
+                                        className="flex items-center space-x-2 px-4 py-2.5 bg-primary-100/80 hover:bg-primary-200/80 text-evidence-700 rounded-xl text-sm font-medium transition-all duration-200"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        <span>Add Impact Claim</span>
+                                    </button>
+                                )}
                                 {kpi.total_updates > 0 && (
                                     <button
                                         onClick={(e) => {
@@ -1954,17 +1966,19 @@ export default function ExpandableKPICard({
                                                         <BarChart3 className="w-7 h-7 text-primary-500" />
                                                     </div>
                                                     <h5 className="text-base font-semibold text-gray-800 mb-1">Impact Claims</h5>
-                                                    <p className="text-sm text-gray-500 mb-3">Start tracking your impact</p>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            onAddUpdate()
-                                                        }}
-                                                        className="inline-flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25 animate-pulse"
-                                                    >
-                                                        <Plus className="w-5 h-5" />
-                                                        <span>Add Impact Claim</span>
-                                                    </button>
+                                                    <p className="text-sm text-gray-500 mb-3">{canAddImpactClaims ? 'Start tracking your impact' : 'No impact claims yet'}</p>
+                                                    {canAddImpactClaims && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                onAddUpdate()
+                                                            }}
+                                                            className="inline-flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25 animate-pulse"
+                                                        >
+                                                            <Plus className="w-5 h-5" />
+                                                            <span>Add Impact Claim</span>
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}

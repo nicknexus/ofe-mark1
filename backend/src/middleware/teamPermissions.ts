@@ -12,7 +12,9 @@ export const requireOwnerPermission = async (
     next: NextFunction
 ): Promise<void> => {
     try {
-        const permissions = await TeamService.getUserPermissions(req.user!.id);
+        // Get active organization from header
+        const activeOrgId = req.headers['x-organization-id'] as string | undefined;
+        const permissions = await TeamService.getUserPermissions(req.user!.id, activeOrgId);
 
         if (!permissions.isOwner) {
             res.status(403).json({
@@ -41,7 +43,9 @@ export const requireImpactClaimsPermission = async (
     next: NextFunction
 ): Promise<void> => {
     try {
-        const permissions = await TeamService.getUserPermissions(req.user!.id);
+        // Get active organization from header
+        const activeOrgId = req.headers['x-organization-id'] as string | undefined;
+        const permissions = await TeamService.getUserPermissions(req.user!.id, activeOrgId);
 
         if (!permissions.canAddImpactClaims) {
             res.status(403).json({
@@ -70,7 +74,9 @@ export const loadPermissions = async (
     next: NextFunction
 ): Promise<void> => {
     try {
-        const permissions = await TeamService.getUserPermissions(req.user!.id);
+        // Get active organization from header
+        const activeOrgId = req.headers['x-organization-id'] as string | undefined;
+        const permissions = await TeamService.getUserPermissions(req.user!.id, activeOrgId);
         (req as any).permissions = permissions;
         next();
     } catch (error) {
@@ -84,8 +90,8 @@ export const loadPermissions = async (
  * Helper function to check delete permission for a resource
  * Returns true if user can delete, false otherwise
  */
-export async function canDeleteResource(userId: string): Promise<boolean> {
-    const permissions = await TeamService.getUserPermissions(userId);
+export async function canDeleteResource(userId: string, activeOrgId?: string): Promise<boolean> {
+    const permissions = await TeamService.getUserPermissions(userId, activeOrgId);
     return permissions.isOwner;
 }
 
@@ -93,7 +99,7 @@ export async function canDeleteResource(userId: string): Promise<boolean> {
  * Helper function to check impact claims permission
  * Returns true if user can create impact claims, false otherwise
  */
-export async function canCreateImpactClaim(userId: string): Promise<boolean> {
-    const permissions = await TeamService.getUserPermissions(userId);
+export async function canCreateImpactClaim(userId: string, activeOrgId?: string): Promise<boolean> {
+    const permissions = await TeamService.getUserPermissions(userId, activeOrgId);
     return permissions.canAddImpactClaims;
 }

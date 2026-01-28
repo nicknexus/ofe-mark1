@@ -119,4 +119,36 @@ export class AuthService {
             }
         })
     }
+
+    /**
+     * Delete the current user's account and all associated data
+     * Requires typing "DELETE MY ACCOUNT" as confirmation
+     */
+    static async deleteAccount(confirmation: string): Promise<{ success: boolean; message: string }> {
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (!session) {
+            throw new Error('You must be logged in to delete your account')
+        }
+
+        const response = await fetch(`${API_URL}/api/auth/account`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ confirmation })
+        })
+
+        if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Failed to delete account')
+        }
+
+        // Clear cache and sign out locally
+        apiService.clearCache()
+        await supabase.auth.signOut()
+
+        return response.json()
+    }
 } 

@@ -8,6 +8,7 @@ import StoryCard from '../StoryCard'
 import AddStoryModal from '../AddStoryModal'
 import StoryDetailModal from '../StoryDetailModal'
 import DateRangePicker from '../DateRangePicker'
+import { useTeam } from '../../context/TeamContext'
 import toast from 'react-hot-toast'
 
 interface StoriesTabProps {
@@ -17,6 +18,7 @@ interface StoriesTabProps {
 }
 
 export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: StoriesTabProps) {
+    const { canAddImpactClaims } = useTeam()
     const [stories, setStories] = useState<Story[]>([])
     const [loading, setLoading] = useState(false)
     const [locations, setLocations] = useState<Location[]>([])
@@ -194,13 +196,15 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                                 <h2 className="text-xl font-semibold text-gray-800">Stories</h2>
                                 <p className="text-sm text-gray-500">Showcase your impact with photos and stories</p>
                             </div>
-                            <button
-                                onClick={handleAddStory}
-                                className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-medium transition-colors shadow-bubble-sm"
-                            >
-                                <Plus className="w-5 h-5" />
-                                <span>Add Story</span>
-                            </button>
+                            {canAddImpactClaims && (
+                                <button
+                                    onClick={handleAddStory}
+                                    className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-medium transition-colors shadow-bubble-sm"
+                                >
+                                    <Plus className="w-5 h-5" />
+                                    <span>Add Story</span>
+                                </button>
+                            )}
                         </div>
 
                         {/* Search Bar */}
@@ -442,13 +446,19 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                 ) : stories.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-64 text-gray-500">
                         <p className="text-lg font-medium mb-2">No stories yet</p>
-                        <p className="text-sm mb-4">Add your first story to showcase your impact</p>
-                        <button
-                            onClick={handleAddStory}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-                        >
-                            Add Story
-                        </button>
+                        <p className="text-sm mb-4">
+                            {canAddImpactClaims 
+                                ? 'Add your first story to showcase your impact'
+                                : 'No stories have been added to this initiative yet'}
+                        </p>
+                        {canAddImpactClaims && (
+                            <button
+                                onClick={handleAddStory}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                            >
+                                Add Story
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <div className="flex justify-center">

@@ -236,10 +236,50 @@ export class TeamService {
 
     /**
      * Get user's permissions for their active organization context
+     * @param userId - The user's ID
+     * @param activeOrgId - Optional: The organization ID from X-Organization-Id header
      */
-    static async getUserPermissions(userId: string): Promise<UserPermissions> {
+    static async getUserPermissions(userId: string, activeOrgId?: string): Promise<UserPermissions> {
         // First check if user owns an organization
         const ownedOrg = await this.getUserOwnedOrganization(userId);
+        
+        // Check if user is a team member of any org
+        const membership = await this.getUserTeamMembership(userId);
+
+        // If activeOrgId is provided, use it to determine context
+        if (activeOrgId) {
+            // Check if user owns this specific org
+            if (ownedOrg && ownedOrg.id === activeOrgId) {
+                return {
+                    isOwner: true,
+                    isSharedMember: false,
+                    canAddImpactClaims: true,
+                    canDelete: true,
+                    organizationId: ownedOrg.id,
+                    organizationName: ownedOrg.name
+                };
+            }
+            
+            // Check if user is a member of this specific org
+            if (membership && membership.organization_id === activeOrgId) {
+                const { data: org } = await supabase
+                    .from('organizations')
+                    .select('name')
+                    .eq('id', membership.organization_id)
+                    .single();
+
+                return {
+                    isOwner: false,
+                    isSharedMember: true,
+                    canAddImpactClaims: membership.can_add_impact_claims,
+                    canDelete: false,
+                    organizationId: membership.organization_id,
+                    organizationName: org?.name
+                };
+            }
+        }
+
+        // No activeOrgId provided or didn't match - use default priority (owned org first)
         if (ownedOrg) {
             return {
                 isOwner: true,
@@ -252,7 +292,6 @@ export class TeamService {
         }
 
         // Check if user is a team member
-        const membership = await this.getUserTeamMembership(userId);
         if (membership) {
             // Get org name
             const { data: org } = await supabase

@@ -167,13 +167,22 @@ export class TeamService {
      * Get invitation details by token (public - no auth required for fetching)
      */
     static async getInviteDetails(token: string): Promise<InviteDetails> {
+        console.log(`[TeamService] Fetching invite details for token: ${token.substring(0, 10)}...`)
+        
         const response = await fetch(`${API_BASE_URL}/api/team/invite/${token}`, {
             method: 'GET',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+            }
         })
+        
+        console.log(`[TeamService] Response status: ${response.status}`)
         
         if (!response.ok) {
             const error = await response.json()
+            console.error(`[TeamService] Error fetching invite:`, error)
             throw new Error(error.error || 'Invitation not found')
         }
         

@@ -4,6 +4,7 @@ import { formatDate } from '../utils'
 import EasyEvidenceModal from './EasyEvidenceModal'
 import { apiService } from '../services/api'
 import { CreateEvidenceForm } from '../types'
+import { useTeam } from '../context/TeamContext'
 
 interface MobileMetricDetailProps {
     kpi: any
@@ -24,6 +25,7 @@ export default function MobileMetricDetail({
     onDataPointClick,
     initiativeId
 }: MobileMetricDetailProps) {
+    const { canAddImpactClaims } = useTeam()
     const [isEasyEvidenceOpen, setIsEasyEvidenceOpen] = useState(false)
     const [selectedClaim, setSelectedClaim] = useState<any>(null)
 
@@ -87,14 +89,16 @@ export default function MobileMetricDetail({
                             <Plus className="w-6 h-6 text-gray-400" />
                         </div>
                         <h3 className="mobile-empty-title">No Impact Claims Yet</h3>
-                        <p className="mobile-empty-text">Add your first impact claim to track progress</p>
-                        <button
-                            onClick={onAddUpdate}
-                            className="mt-6 inline-flex items-center space-x-2 px-5 py-3 bg-primary-500 text-white rounded-2xl text-sm font-semibold shadow-lg active:scale-95 transition-transform"
-                        >
-                            <Plus className="w-5 h-5" />
-                            <span>Add Impact Claim</span>
-                        </button>
+                        <p className="mobile-empty-text">{canAddImpactClaims ? 'Add your first impact claim to track progress' : 'No impact claims have been added yet'}</p>
+                        {canAddImpactClaims && (
+                            <button
+                                onClick={onAddUpdate}
+                                className="mt-6 inline-flex items-center space-x-2 px-5 py-3 bg-primary-500 text-white rounded-2xl text-sm font-semibold shadow-lg active:scale-95 transition-transform"
+                            >
+                                <Plus className="w-5 h-5" />
+                                <span>Add Impact Claim</span>
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <>

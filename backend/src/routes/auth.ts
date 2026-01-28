@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabase } from '../utils/supabase';
 import { OrganizationService } from '../services/organizationService';
 import { SubscriptionService } from '../services/subscriptionService';
+import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -96,6 +97,135 @@ router.post('/signup', async (req, res) => {
         });
     } catch (error) {
         console.error('Signup error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * DELETE /api/auth/account
+ * Delete the current user's account and all associated data
+ * Requires authentication and confirmation phrase
+ */
+router.delete('/account', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const userId = req.user!.id;
+        const { confirmation } = req.body;
+
+        // Require confirmation phrase
+        if (confirmation !== 'DELETE MY ACCOUNT') {
+            res.status(400).json({ 
+                error: 'Please type "DELETE MY ACCOUNT" to confirm deletion' 
+            });
+            return;
+        }
+
+        console.log(`[Account Delete] Starting deletion for user: ${userId}`);
+
+        // Get user's owned organization (if any)
+        const { data: ownedOrg } = await supabase
+            .from('organizations')
+            .select('id')
+            .eq('owner_id', userId)
+            .maybeSingle();
+
+        if (ownedOrg) {
+            console.log(`[Account Delete] User owns organization: ${ownedOrg.id}`);
+            
+            // Get all initiatives for this organization
+            const { data: initiatives } = await supabase
+                .from('initiatives')
+                .select('id')
+                .eq('organization_id', ownedOrg.id);
+
+            if (initiatives && initiatives.length > 0) {
+                const initiativeIds = initiatives.map(i => i.id);
+                console.log(`[Account Delete] Deleting ${initiativeIds.length} initiatives`);
+
+                // Delete KPIs and their related data
+                const { data: kpis } = await supabase
+                    .from('kpis')
+                    .select('id')
+                    .in('initiative_id', initiativeIds);
+
+                if (kpis && kpis.length > 0) {
+                    const kpiIds = kpis.map(k => k.id);
+                    
+                    // Delete KPI updates
+                    await supabase.from('kpi_updates').delete().in('kpi_id', kpiIds);
+                    
+                    // Delete KPIs
+                    await supabase.from('kpis').delete().in('id', kpiIds);
+                }
+
+                // Delete evidence and evidence_kpis links
+                const { data: evidence } = await supabase
+                    .from('evidence')
+                    .select('id')
+                    .in('initiative_id', initiativeIds);
+
+                if (evidence && evidence.length > 0) {
+                    const evidenceIds = evidence.map(e => e.id);
+                    await supabase.from('evidence_kpis').delete().in('evidence_id', evidenceIds);
+                    await supabase.from('evidence').delete().in('id', evidenceIds);
+                }
+
+                // Delete stories and story_beneficiaries links
+                const { data: stories } = await supabase
+                    .from('stories')
+                    .select('id')
+                    .in('initiative_id', initiativeIds);
+
+                if (stories && stories.length > 0) {
+                    const storyIds = stories.map(s => s.id);
+                    await supabase.from('story_beneficiaries').delete().in('story_id', storyIds);
+                    await supabase.from('stories').delete().in('id', storyIds);
+                }
+
+                // Delete locations
+                await supabase.from('locations').delete().in('initiative_id', initiativeIds);
+
+                // Delete beneficiary groups
+                await supabase.from('beneficiary_groups').delete().in('initiative_id', initiativeIds);
+
+                // Delete donors
+                await supabase.from('donors').delete().in('initiative_id', initiativeIds);
+
+                // Delete initiatives
+                await supabase.from('initiatives').delete().in('id', initiativeIds);
+            }
+
+            // Delete team members of this organization
+            await supabase.from('team_members').delete().eq('organization_id', ownedOrg.id);
+
+            // Delete team invitations of this organization
+            await supabase.from('team_invitations').delete().eq('organization_id', ownedOrg.id);
+
+            // Delete the organization
+            await supabase.from('organizations').delete().eq('id', ownedOrg.id);
+        }
+
+        // Delete user's team memberships (where they are a member, not owner)
+        await supabase.from('team_members').delete().eq('user_id', userId);
+
+        // Delete user's subscription
+        await supabase.from('subscriptions').delete().eq('user_id', userId);
+
+        // Finally, delete the user from auth
+        const { error: deleteError } = await supabase.auth.admin.deleteUser(userId);
+
+        if (deleteError) {
+            console.error('[Account Delete] Error deleting auth user:', deleteError);
+            throw new Error('Failed to delete account. Please try again.');
+        }
+
+        console.log(`[Account Delete] Successfully deleted user: ${userId}`);
+
+        res.json({ 
+            success: true, 
+            message: 'Your account and all associated data have been permanently deleted.' 
+        });
+    } catch (error) {
+        console.error('[Account Delete] Error:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });

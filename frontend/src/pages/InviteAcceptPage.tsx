@@ -24,6 +24,12 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
     const [checkingUser, setCheckingUser] = useState(true)
     const [accepting, setAccepting] = useState(false)
 
+    // Log token on mount for debugging
+    useEffect(() => {
+        console.log(`[InviteAcceptPage] Mounted with URL: ${window.location.href}`)
+        console.log(`[InviteAcceptPage] Token from params: ${token}`)
+    }, [token])
+
     // Check if user is logged in
     useEffect(() => {
         const checkUser = async () => {
@@ -43,15 +49,19 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
     useEffect(() => {
         const fetchInvite = async () => {
             if (!token) {
-                setError('Invalid invitation link')
+                setError('Invalid invitation link - no token provided')
                 setLoading(false)
                 return
             }
 
+            console.log(`[InviteAcceptPage] Fetching invite with token: ${token.substring(0, 10)}... (length: ${token.length})`)
+
             try {
                 const inviteDetails = await TeamService.getInviteDetails(token)
+                console.log(`[InviteAcceptPage] Successfully fetched invite for org: ${inviteDetails.organization_name}`)
                 setInvite(inviteDetails)
             } catch (err) {
+                console.error(`[InviteAcceptPage] Error fetching invite:`, err)
                 setError((err as Error).message)
             } finally {
                 setLoading(false)
@@ -257,7 +267,7 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
                     // User not logged in - show login/signup options
                     <div className="space-y-3">
                         <Link
-                            to={`/login?redirect=/invite/${token}`}
+                            to={`/login?redirect=${encodeURIComponent(`/invite/${token}`)}`}
                             className="w-full px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
                         >
                             <LogIn className="w-4 h-4" />
@@ -267,7 +277,7 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
                             Don't have an account?
                         </div>
                         <Link
-                            to={`/login?signup=true&redirect=/invite/${token}`}
+                            to={`/login?signup=true&redirect=${encodeURIComponent(`/invite/${token}`)}`}
                             className="w-full px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
                         >
                             <UserPlus className="w-4 h-4" />
