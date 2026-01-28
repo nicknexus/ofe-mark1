@@ -55,21 +55,27 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
             }
 
             console.log(`[InviteAcceptPage] Fetching invite with token: ${token.substring(0, 10)}... (length: ${token.length})`)
+            
+            // Check for post-signup flag
+            const isPostSignup = sessionStorage.getItem('just_signed_up') === 'true'
+            const hasReloaded = sessionStorage.getItem('invite_page_reloaded') === 'true'
+            console.log(`[InviteAcceptPage] isPostSignup: ${isPostSignup}, hasReloaded: ${hasReloaded}`)
 
             try {
                 const inviteDetails = await TeamService.getInviteDetails(token)
                 console.log(`[InviteAcceptPage] Successfully fetched invite for org: ${inviteDetails.organization_name}`)
+                // Clear flags on success
+                sessionStorage.removeItem('just_signed_up')
+                sessionStorage.removeItem('invite_page_reloaded')
                 setInvite(inviteDetails)
                 setLoading(false)
             } catch (err) {
                 console.error(`[InviteAcceptPage] Error fetching invite:`, err)
                 
-                // Check if this might be a post-signup timing issue
-                // If we came from signup (indicated by referrer or session storage flag), try a full reload
-                const isPostSignup = sessionStorage.getItem('just_signed_up') === 'true'
-                
-                if (isPostSignup) {
-                    console.log(`[InviteAcceptPage] Post-signup detected, doing full page reload...`)
+                // If we haven't already reloaded, do a reload (handles post-signup timing issues)
+                if (!hasReloaded) {
+                    console.log(`[InviteAcceptPage] First failure, attempting page reload to fix timing issue...`)
+                    sessionStorage.setItem('invite_page_reloaded', 'true')
                     sessionStorage.removeItem('just_signed_up')
                     // Wait a moment then reload
                     await new Promise(resolve => setTimeout(resolve, 500))
@@ -77,7 +83,9 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
                     return
                 }
                 
-                // Not post-signup, show the error
+                // Already reloaded once, show the error (it's a real invalid invite)
+                console.log(`[InviteAcceptPage] Already reloaded once, showing error`)
+                sessionStorage.removeItem('invite_page_reloaded')
                 setError((err as Error).message)
                 setLoading(false)
             }
