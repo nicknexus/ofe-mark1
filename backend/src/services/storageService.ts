@@ -69,21 +69,22 @@ export class StorageService {
     static async getUsageForUser(userId: string): Promise<StorageUsage | null> {
         console.log(`[getUsageForUser] Looking up org for user: ${userId}`);
         
-        // Get user's organization
+        // Get user's organization - use maybeSingle to handle 0 rows gracefully
+        // Also limit to 1 in case of duplicates
         const { data: org, error } = await supabase
             .from('organizations')
             .select('id, storage_used_bytes')
             .eq('owner_id', userId)
-            .single();
+            .limit(1)
+            .maybeSingle();
 
         if (error) {
-            console.log(`[getUsageForUser] Error or no org found for user ${userId}:`, error.code, error.message);
-            if (error.code === 'PGRST116') return null; // No org found
+            console.log(`[getUsageForUser] Error for user ${userId}:`, error.code, error.message);
             throw new Error(`Failed to get organization: ${error.message}`);
         }
 
         if (!org) {
-            console.log(`[getUsageForUser] No org data returned for user ${userId}`);
+            console.log(`[getUsageForUser] No org found for user ${userId}`);
             return null;
         }
         

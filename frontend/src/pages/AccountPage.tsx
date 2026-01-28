@@ -22,7 +22,7 @@ interface Props {
 
 export default function AccountPage({ subscriptionStatus }: Props) {
     const navigate = useNavigate()
-    const { isOwner, isSharedMember, organizationName, accessibleOrganizations, refreshPermissions, hasOwnOrganization, ownedOrganization } = useTeam()
+    const { isOwner, isSharedMember, organizationName, accessibleOrganizations, refreshPermissions, hasOwnOrganization, ownedOrganization, loading: teamLoading } = useTeam()
     const [user, setUser] = useState<User | null>(null)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -454,7 +454,7 @@ export default function AccountPage({ subscriptionStatus }: Props) {
             </div>
 
             {/* Create Your Own Organization - For users without their own org */}
-            {!hasOwnOrganization && (
+            {!teamLoading && !hasOwnOrganization && (
                 <div className="bg-gradient-to-r from-primary-50 to-purple-50 rounded-2xl shadow-bubble border border-primary-100 p-6 w-full max-w-4xl mb-5">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="p-2 bg-white rounded-xl shadow-sm">

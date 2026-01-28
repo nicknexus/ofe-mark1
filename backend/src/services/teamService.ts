@@ -144,24 +144,49 @@ export class TeamService {
     static async getUserOwnedOrganization(userId: string): Promise<{ id: string; name: string } | null> {
         console.log(`[getUserOwnedOrganization] Looking up org for user: ${userId}`);
         
-        const { data, error } = await supabase
-            .from('organizations')
-            .select('id, name')
-            .eq('owner_id', userId)
-            .maybeSingle();
+        // Retry logic for serverless connection issues
+        const maxRetries = 2;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const { data, error, status } = await supabase
+                    .from('organizations')
+                    .select('id, name')
+                    .eq('owner_id', userId)
+                    .limit(1)
+                    .maybeSingle();
 
-        if (error) {
-            console.error(`[getUserOwnedOrganization] Database error:`, error);
-            return null;
+                if (error) {
+                    console.error(`[getUserOwnedOrganization] Attempt ${attempt} - Database error:`, error);
+                    if (attempt < maxRetries) {
+                        await new Promise(r => setTimeout(r, 100)); // Brief delay before retry
+                        continue;
+                    }
+                    return null;
+                }
+                
+                if (!data) {
+                    // Only retry if this is the first attempt - might be a connection issue
+                    if (attempt < maxRetries) {
+                        console.log(`[getUserOwnedOrganization] Attempt ${attempt} - No data, retrying...`);
+                        await new Promise(r => setTimeout(r, 100));
+                        continue;
+                    }
+                    console.log(`[getUserOwnedOrganization] No owned org found for user: ${userId} (after ${attempt} attempts)`);
+                    return null;
+                }
+                
+                console.log(`[getUserOwnedOrganization] Found org: ${data.name} (${data.id}) on attempt ${attempt}`);
+                return data;
+            } catch (e) {
+                console.error(`[getUserOwnedOrganization] Attempt ${attempt} - Exception:`, e);
+                if (attempt < maxRetries) {
+                    await new Promise(r => setTimeout(r, 100));
+                    continue;
+                }
+                return null;
+            }
         }
-        
-        if (!data) {
-            console.log(`[getUserOwnedOrganization] No owned org found for user: ${userId}`);
-            return null;
-        }
-        
-        console.log(`[getUserOwnedOrganization] Found org: ${data.name} (${data.id})`);
-        return data;
+        return null;
     }
 
     /**

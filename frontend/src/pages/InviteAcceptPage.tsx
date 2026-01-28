@@ -304,7 +304,7 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
                             className="w-full px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
                         >
                             <UserPlus className="w-4 h-4" />
-                            Sign Up
+                            Sign Up to Accept
                         </Link>
                     </div>
                 )}
