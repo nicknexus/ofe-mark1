@@ -178,7 +178,7 @@ export default function TeamSettingsPage() {
         )
     }
 
-    if (!isOwner) {
+    if (!hasOwnOrganization) {
         return null // Will redirect
     }
 
