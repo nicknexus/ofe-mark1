@@ -153,7 +153,7 @@ function App() {
     if (user) {
         // Check if user is trying to access an invite page - always allow this
         const isOnInvitePage = window.location.pathname.startsWith('/invite/')
-        
+
         // Only show blocking loader on initial subscription check (unless on invite page)
         if (checkingSubscription && subscriptionStatus === null && !isOnInvitePage) {
             return (
@@ -165,18 +165,18 @@ function App() {
                 </div>
             )
         }
-        
+
         // If on invite page, let them through immediately to accept the invite
         if (isOnInvitePage) {
             return (
                 <Router>
                     <Routes>
-                        <Route 
-                            path="/invite/:token" 
+                        <Route
+                            path="/invite/:token"
                             element={<InviteAcceptPage onInviteAccepted={() => {
                                 // After accepting, do a full page reload to refresh all state
                                 window.location.href = '/'
-                            }} />} 
+                            }} />}
                         />
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
@@ -184,7 +184,7 @@ function App() {
                 </Router>
             )
         }
-        
+
         // If we have no subscription status yet and not checking, something's wrong - trigger check
         if (subscriptionStatus === null) {
             checkSubscription(true)
@@ -219,7 +219,7 @@ function App() {
                         .finally(() => {
                             setCheckingPendingInvite(false)
                         })
-                    
+
                     return (
                         <div className="min-h-screen flex items-center justify-center bg-gray-50">
                             <div className="text-center">
@@ -247,17 +247,17 @@ function App() {
                     return (
                         <Router>
                             <Routes>
-                                <Route 
-                                    path="/invite/:token" 
+                                <Route
+                                    path="/invite/:token"
                                     element={<InviteAcceptPage onInviteAccepted={() => {
                                         // After accepting, do a full page reload to refresh all state
                                         // This ensures subscription status and team context are fresh
                                         window.location.href = '/'
-                                    }} />} 
+                                    }} />}
                                 />
-                                <Route 
-                                    path="*" 
-                                    element={<Navigate to={`/invite/${pendingInvite.inviteToken}`} replace />} 
+                                <Route
+                                    path="*"
+                                    element={<Navigate to={`/invite/${pendingInvite.inviteToken}`} replace />}
                                 />
                             </Routes>
                             <Toaster position="top-right" />
@@ -279,7 +279,7 @@ function App() {
         if (!subscriptionStatus.hasAccess) {
             return (
                 <>
-                    <SubscriptionExpiredPage 
+                    <SubscriptionExpiredPage
                         reason={subscriptionStatus.reason}
                         remainingDays={subscriptionStatus.remainingTrialDays}
                     />
@@ -292,20 +292,22 @@ function App() {
         const isOnTrial = subscriptionStatus.subscription.status === 'trial' && (subscriptionStatus.remainingTrialDays ?? 0) > 0
         const bannerDismissed = localStorage.getItem('nexus-trial-banner-dismissed') === 'true'
         const showTrialBanner = isOnTrial && !bannerDismissed
-        
+
         // Show mobile app for mobile users
         if (isMobile) {
             return (
                 <Router>
                     <div className="min-h-screen" style={{ backgroundColor: '#F9FAFB' }}>
                         <StorageProvider>
-                            {/* Show trial banner if on trial and not dismissed */}
-                            {showTrialBanner && (
-                                <TrialBanner 
-                                    remainingDays={subscriptionStatus.remainingTrialDays} 
-                                />
-                            )}
-                            <MobileApp user={user} subscriptionStatus={subscriptionStatus} />
+                            <TeamProvider>
+                                {/* Show trial banner if on trial and not dismissed */}
+                                {showTrialBanner && (
+                                    <TrialBanner
+                                        remainingDays={subscriptionStatus.remainingTrialDays}
+                                    />
+                                )}
+                                <MobileApp user={user} subscriptionStatus={subscriptionStatus} />
+                            </TeamProvider>
                         </StorageProvider>
                         <Toaster position="top-center" />
                     </div>
@@ -321,18 +323,18 @@ function App() {
                         <TutorialProvider>
                             {/* Show trial banner if on trial and not dismissed */}
                             {showTrialBanner && (
-                                <TrialBanner 
-                                    remainingDays={subscriptionStatus.remainingTrialDays} 
+                                <TrialBanner
+                                    remainingDays={subscriptionStatus.remainingTrialDays}
                                 />
                             )}
-                            
+
                             <Routes>
                                 {/* Public routes - accessible without auth */}
                                 <Route path="/org/:slug" element={<PublicOrganizationPage />} />
-                                
+
                                 {/* Invite acceptance page */}
                                 <Route path="/invite/:token" element={<InviteAcceptPage />} />
-                                
+
                                 {/* Authenticated routes */}
                                 <Route path="/*" element={
                                     <Layout user={user}>
@@ -362,13 +364,13 @@ function App() {
             <Routes>
                 {/* Public routes - accessible without auth */}
                 <Route path="/org/:slug" element={<PublicOrganizationPage />} />
-                
+
                 {/* Invite acceptance page (accessible without login) */}
                 <Route path="/invite/:token" element={<InviteAcceptPage />} />
-                
+
                 {/* Login/Auth page */}
                 <Route path="/login" element={<AuthPage />} />
-                
+
                 {/* Homepage for non-authenticated users */}
                 <Route path="/*" element={<HomePage />} />
             </Routes>

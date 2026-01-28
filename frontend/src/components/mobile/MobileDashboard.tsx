@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
-import { Plus, ChevronRight, Edit, Trash2, X, Zap, ArrowRight } from 'lucide-react'
+import { Plus, ChevronRight, Edit, Trash2, X, Zap, ArrowRight, Users } from 'lucide-react'
 import { Initiative, CreateInitiativeForm } from '../../types'
 import { apiService } from '../../services/api'
+import { useTeam } from '../../context/TeamContext'
 import CreateInitiativeModal from '../CreateInitiativeModal'
 import toast from 'react-hot-toast'
 
@@ -20,6 +21,7 @@ export default function MobileDashboard({
     loading,
     onNavigateToAccount
 }: MobileDashboardProps) {
+    const { isOwner, isSharedMember, organizationName } = useTeam()
     const [showCreateModal, setShowCreateModal] = useState(false)
     const [showEditModal, setShowEditModal] = useState(false)
     const [editingInitiative, setEditingInitiative] = useState<Initiative | null>(null)
@@ -88,22 +90,41 @@ export default function MobileDashboard({
 
     return (
         <div className="p-4">
+            {/* Team Member Banner */}
+            {isSharedMember && (
+                <div className="mb-4 p-3 bg-purple-50 border border-purple-100 rounded-xl flex items-center gap-3">
+                    <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                        <Users className="w-4 h-4 text-purple-600" />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-sm font-medium text-purple-800 truncate">
+                            Viewing {organizationName}'s initiatives
+                        </p>
+                        <p className="text-xs text-purple-600">Team member</p>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="mb-6">
-                <h1 className="text-2xl font-bold text-gray-900">Your Initiatives</h1>
+                <h1 className="text-2xl font-bold text-gray-900">
+                    {isSharedMember ? 'Initiatives' : 'Your Initiatives'}
+                </h1>
                 <p className="text-sm text-gray-500 mt-1">
                     {initiatives.length} initiative{initiatives.length !== 1 ? 's' : ''}
                 </p>
             </div>
 
-            {/* Create Button */}
-            <button
-                onClick={() => setShowCreateModal(true)}
-                className="w-full mb-6 flex items-center justify-center gap-2 px-4 py-4 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-semibold text-base transition-colors shadow-lg shadow-primary-500/25 active:scale-[0.98]"
-            >
-                <Plus className="w-5 h-5" />
-                {initiatives.length === 0 ? 'Create Your First Initiative' : 'New Initiative'}
-            </button>
+            {/* Create Button - Only for owners */}
+            {isOwner && (
+                <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="w-full mb-6 flex items-center justify-center gap-2 px-4 py-4 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-semibold text-base transition-colors shadow-lg shadow-primary-500/25 active:scale-[0.98]"
+                >
+                    <Plus className="w-5 h-5" />
+                    {initiatives.length === 0 ? 'Create Your First Initiative' : 'New Initiative'}
+                </button>
+            )}
 
             {/* Initiatives List */}
             {initiatives.length === 0 ? (
@@ -111,10 +132,21 @@ export default function MobileDashboard({
                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <img src="/Nexuslogo.png" alt="Logo" className="w-8 h-8 object-contain" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Welcome to OFE</h3>
-                    <p className="text-gray-500 text-sm px-6">
-                        Create your first initiative to start tracking impact.
-                    </p>
+                    {isSharedMember ? (
+                        <>
+                            <h3 className="text-lg font-semibold text-gray-800 mb-2">No Initiatives Yet</h3>
+                            <p className="text-gray-500 text-sm px-6">
+                                Contact the organization owner to create initiatives.
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            <h3 className="text-lg font-semibold text-gray-800 mb-2">Welcome to Nexus</h3>
+                            <p className="text-gray-500 text-sm px-6">
+                                Create your first initiative to start tracking impact.
+                            </p>
+                        </>
+                    )}
                 </div>
             ) : (
                 <div className="space-y-3">
@@ -150,31 +182,33 @@ export default function MobileDashboard({
                                 </div>
                             </button>
                             
-                            {/* Action buttons */}
-                            <div className="flex border-t border-gray-100">
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        setEditingInitiative(initiative)
-                                        setShowEditModal(true)
-                                    }}
-                                    className="flex-1 flex items-center justify-center gap-2 py-3 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-                                >
-                                    <Edit className="w-4 h-4" />
-                                    Edit
-                                </button>
-                                <div className="w-px bg-gray-100" />
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        setDeleteConfirmInitiative(initiative)
-                                    }}
-                                    className="flex-1 flex items-center justify-center gap-2 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                    Delete
-                                </button>
-                            </div>
+                            {/* Action buttons - Only show for owners */}
+                            {isOwner && (
+                                <div className="flex border-t border-gray-100">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            setEditingInitiative(initiative)
+                                            setShowEditModal(true)
+                                        }}
+                                        className="flex-1 flex items-center justify-center gap-2 py-3 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                                    >
+                                        <Edit className="w-4 h-4" />
+                                        Edit
+                                    </button>
+                                    <div className="w-px bg-gray-100" />
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            setDeleteConfirmInitiative(initiative)
+                                        }}
+                                        className="flex-1 flex items-center justify-center gap-2 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                        Delete
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>

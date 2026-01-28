@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { 
-    User as UserIcon, 
-    Mail, 
-    Building2, 
+import {
+    User as UserIcon,
+    Mail,
+    Building2,
     LogOut,
     CreditCard,
     Calendar,
@@ -13,11 +13,13 @@ import {
     Info,
     Settings,
     ExternalLink,
-    Zap
+    Zap,
+    Users
 } from 'lucide-react'
 import { AuthService } from '../../services/auth'
 import { apiService } from '../../services/api'
 import { SubscriptionService } from '../../services/subscription'
+import { useTeam } from '../../context/TeamContext'
 import { User, SubscriptionStatus, Organization } from '../../types'
 import toast from 'react-hot-toast'
 
@@ -35,6 +37,7 @@ interface StorageUsage {
 }
 
 export default function MobileAccountTab({ user, subscriptionStatus }: MobileAccountTabProps) {
+    const { isOwner, isSharedMember, organizationName } = useTeam()
     const [name, setName] = useState(user.name || '')
     const [saving, setSaving] = useState(false)
     const [organization, setOrganization] = useState<Organization | null>(null)
@@ -171,16 +174,15 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
                                 <Sparkles className="w-3.5 h-3.5" />
                                 Status
                             </span>
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                                subscriptionStatus.subscription.status === 'trial' 
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${subscriptionStatus.subscription.status === 'trial'
                                     ? 'bg-primary-100 text-primary-700'
                                     : subscriptionStatus.subscription.status === 'active'
-                                    ? 'bg-green-100 text-green-700'
-                                    : 'bg-gray-100 text-gray-700'
-                            }`}>
+                                        ? 'bg-green-100 text-green-700'
+                                        : 'bg-gray-100 text-gray-700'
+                                }`}>
                                 {subscriptionStatus.subscription.status === 'trial' ? 'Free Trial' :
-                                 subscriptionStatus.subscription.status === 'active' ? 'Active' :
-                                 subscriptionStatus.subscription.status}
+                                    subscriptionStatus.subscription.status === 'active' ? 'Active' :
+                                        subscriptionStatus.subscription.status}
                             </span>
                         </div>
 
@@ -189,7 +191,7 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
                             <span className="text-sm text-gray-500">Plan</span>
                             <span className="text-sm font-medium text-gray-900 capitalize">
                                 {subscriptionStatus.subscription.status === 'trial' ? 'Trial' :
-                                 subscriptionStatus.subscription.plan_tier || 'Starter'}
+                                    subscriptionStatus.subscription.plan_tier || 'Starter'}
                             </span>
                         </div>
 
@@ -199,13 +201,12 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
                                 <Zap className="w-3.5 h-3.5" />
                                 Initiatives
                             </span>
-                            <span className={`text-sm font-medium ${
-                                initiativesUsage && initiativesUsage.limit !== null && initiativesUsage.current >= initiativesUsage.limit 
-                                    ? 'text-amber-600' 
+                            <span className={`text-sm font-medium ${initiativesUsage && initiativesUsage.limit !== null && initiativesUsage.current >= initiativesUsage.limit
+                                    ? 'text-amber-600'
                                     : 'text-gray-900'
-                            }`}>
+                                }`}>
                                 {initiativesUsage ? (
-                                    initiativesUsage.limit === null 
+                                    initiativesUsage.limit === null
                                         ? `${initiativesUsage.current} (unlimited)`
                                         : `${initiativesUsage.current}/${initiativesUsage.limit}`
                                 ) : '...'}
@@ -245,20 +246,19 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
                                     <Clock className="w-3.5 h-3.5" />
                                     Time Left
                                 </span>
-                                <span className={`text-sm font-medium ${
-                                    subscriptionStatus.remainingTrialDays <= 3 ? 'text-red-600' :
-                                    subscriptionStatus.remainingTrialDays <= 7 ? 'text-amber-600' :
-                                    'text-gray-900'
-                                }`}>
+                                <span className={`text-sm font-medium ${subscriptionStatus.remainingTrialDays <= 3 ? 'text-red-600' :
+                                        subscriptionStatus.remainingTrialDays <= 7 ? 'text-amber-600' :
+                                            'text-gray-900'
+                                    }`}>
                                     {subscriptionStatus.remainingTrialDays === 0 ? 'Ends today' :
-                                     `${subscriptionStatus.remainingTrialDays} days`}
+                                        `${subscriptionStatus.remainingTrialDays} days`}
                                 </span>
                             </div>
                         )}
                     </div>
 
-                    {/* Upgrade CTA for trial */}
-                    {subscriptionStatus.subscription.status === 'trial' && (
+                    {/* Upgrade CTA for trial - only for owners */}
+                    {subscriptionStatus.subscription.status === 'trial' && isOwner && (
                         <div className="mt-4 pt-4 border-t border-gray-100">
                             <button
                                 onClick={handleUpgrade}
@@ -278,8 +278,20 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
                         </div>
                     )}
 
-                    {/* Add More Initiatives for active subscribers at limit */}
-                    {subscriptionStatus.subscription.status === 'active' && initiativesUsage && initiativesUsage.limit !== null && initiativesUsage.current >= initiativesUsage.limit && (
+                    {/* Shared member notice */}
+                    {isSharedMember && (
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl">
+                                <Info className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                <p className="text-xs text-gray-600">
+                                    Billing is managed by the organization owner.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Add More Initiatives for active subscribers at limit - only for owners */}
+                    {subscriptionStatus.subscription.status === 'active' && isOwner && initiativesUsage && initiativesUsage.limit !== null && initiativesUsage.current >= initiativesUsage.limit && (
                         <div className="mt-4 pt-4 border-t border-gray-100">
                             <button
                                 disabled
@@ -293,6 +305,34 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
                     )}
                 </div>
             )}
+
+            {/* Team Status Card */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
+                        <Users className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div>
+                        <h2 className="font-semibold text-gray-800">Team</h2>
+                        {organizationName && (
+                            <p className="text-xs text-gray-500">{organizationName}</p>
+                        )}
+                    </div>
+                </div>
+
+                {isSharedMember ? (
+                    <div className="p-3 bg-purple-50 rounded-xl">
+                        <p className="text-sm text-purple-800">
+                            <strong>Team member</strong> — You can view, create, and edit data. 
+                            Contact the owner for billing or permissions.
+                        </p>
+                    </div>
+                ) : (
+                    <p className="text-sm text-gray-500">
+                        Manage your team from the desktop app.
+                    </p>
+                )}
+            </div>
 
             {/* Profile Card */}
             <div className="bg-white rounded-2xl border border-gray-100 p-4">
@@ -385,7 +425,7 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
 
                         <div className="space-y-1.5">
                             <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                                <div 
+                                <div
                                     className="h-full bg-blue-500 rounded-full"
                                     style={{ width: `${Math.min(storageUsage.used_percentage, 100)}%` }}
                                 />

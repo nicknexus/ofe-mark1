@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { AuthService } from '../services/auth'
 import toast from 'react-hot-toast'
 
 export default function AuthPage() {
     const [searchParams] = useSearchParams()
-    const navigate = useNavigate()
     const [isSignUp, setIsSignUp] = useState(false)
     const [loading, setLoading] = useState(false)
     const [formData, setFormData] = useState({
@@ -55,22 +54,25 @@ export default function AuthPage() {
 
                 toast.success('Account created successfully!')
                 
-                // Redirect to the specified path (e.g., invite page) or dashboard
+                // Use window.location for redirect to ensure URL is updated before App re-renders
+                // This is important because the Router instance changes when auth state changes
                 if (redirectPath) {
-                    navigate(redirectPath)
+                    window.location.href = redirectPath
                 } else {
-                    navigate('/')
+                    window.location.href = '/'
                 }
+                return // Don't continue after redirect
             } else {
                 await AuthService.signIn(formData.email, formData.password)
                 toast.success('Welcome back!')
                 
-                // Redirect to the specified path or dashboard
+                // Use window.location for redirect
                 if (redirectPath) {
-                    navigate(redirectPath)
+                    window.location.href = redirectPath
                 } else {
-                    navigate('/')
+                    window.location.href = '/'
                 }
+                return // Don't continue after redirect
             }
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'Authentication failed')

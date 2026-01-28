@@ -129,13 +129,18 @@ router.post('/invite', authenticateUser, async (req: AuthenticatedRequest, res) 
  */
 router.get('/invite/:token', async (req, res) => {
     try {
-        const invite = await TeamService.getInvitationByToken(req.params.token);
+        const token = req.params.token;
+        console.log(`[Invite Lookup] Token: ${token?.substring(0, 10)}... (length: ${token?.length})`);
+        
+        const invite = await TeamService.getInvitationByToken(token);
         
         if (!invite) {
+            console.log(`[Invite Lookup] NOT FOUND for token: ${token?.substring(0, 10)}...`);
             res.status(404).json({ error: 'Invitation not found' });
             return;
         }
 
+        console.log(`[Invite Lookup] Found invite for org: ${invite.organization_name}`);
         res.json(invite);
     } catch (error) {
         console.error('Error fetching invitation:', error);
@@ -265,7 +270,11 @@ router.get('/capacity', authenticateUser, async (req: AuthenticatedRequest, res)
  */
 router.get('/members', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
+        console.log(`[Team Members] User ID: ${req.user!.id}, Email: ${req.user!.email}`);
+        
         const org = await TeamService.getUserOwnedOrganization(req.user!.id);
+        console.log(`[Team Members] Owned org:`, org ? org.name : 'NONE');
+        
         if (!org) {
             res.status(403).json({ error: 'Only organization owners can view team members' });
             return;
