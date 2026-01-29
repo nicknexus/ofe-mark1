@@ -24,6 +24,15 @@ export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
     auth: {
         autoRefreshToken: false,
         persistSession: false
+    },
+    // Serverless-optimized settings
+    db: {
+        schema: 'public'
+    },
+    global: {
+        headers: {
+            'x-connection-encrypted': 'true'
+        }
     }
 });
 

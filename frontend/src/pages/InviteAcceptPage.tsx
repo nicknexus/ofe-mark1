@@ -97,21 +97,39 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
         if (!token) return
 
         setAccepting(true)
-        try {
-            const result = await TeamService.acceptInvite(token)
-            toast.success(result.message || 'Welcome to the team!')
-            
-            // Use callback if provided, otherwise do a full page reload
-            // Full reload ensures subscription status and team context are fresh
-            if (onInviteAccepted) {
-                onInviteAccepted()
-            } else {
-                window.location.href = '/'
+        
+        // Retry logic for transient serverless connection issues
+        const maxRetries = 3
+        let lastError: Error | null = null
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`[InviteAcceptPage] Accept attempt ${attempt}/${maxRetries}`)
+                const result = await TeamService.acceptInvite(token)
+                toast.success(result.message || 'Welcome to the team!')
+                
+                // Use callback if provided, otherwise do a full page reload
+                // Full reload ensures subscription status and team context are fresh
+                if (onInviteAccepted) {
+                    onInviteAccepted()
+                } else {
+                    window.location.href = '/'
+                }
+                return // Success, exit
+            } catch (err) {
+                lastError = err as Error
+                console.error(`[InviteAcceptPage] Accept attempt ${attempt} failed:`, err)
+                
+                if (attempt < maxRetries) {
+                    // Wait before retry (exponential backoff)
+                    await new Promise(r => setTimeout(r, 500 * attempt))
+                }
             }
-        } catch (err) {
-            toast.error((err as Error).message)
-            setAccepting(false)
         }
+        
+        // All retries failed
+        toast.error(lastError?.message || 'Failed to accept invitation. Please try again.')
+        setAccepting(false)
     }
 
     // Loading state

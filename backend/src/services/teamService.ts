@@ -388,15 +388,33 @@ export class TeamService {
         // Check if there's already a pending invitation for this email
         const { data: existingInvite } = await supabase
             .from('team_invitations')
-            .select('id')
+            .select('id, expires_at')
             .eq('organization_id', organizationId)
             .eq('email', email.toLowerCase())
             .eq('status', 'pending')
             .maybeSingle();
 
         if (existingInvite) {
-            throw new Error('An invitation is already pending for this email');
+            // If the existing invite is expired, revoke it and allow creating a new one
+            const isExpired = new Date(existingInvite.expires_at) < new Date();
+            if (isExpired) {
+                await supabase
+                    .from('team_invitations')
+                    .update({ status: 'expired' })
+                    .eq('id', existingInvite.id);
+                console.log(`[createInvitation] Expired old invite for ${email}`);
+            } else {
+                throw new Error('An invitation is already pending for this email');
+            }
         }
+        
+        // Clean up any very old invites for this email (older than 30 days)
+        await supabase
+            .from('team_invitations')
+            .delete()
+            .eq('email', email.toLowerCase())
+            .lt('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+            .in('status', ['expired', 'revoked']);
 
         const token = this.generateToken();
         const expiresAt = new Date();

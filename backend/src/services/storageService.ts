@@ -69,26 +69,42 @@ export class StorageService {
     static async getUsageForUser(userId: string): Promise<StorageUsage | null> {
         console.log(`[getUsageForUser] Looking up org for user: ${userId}`);
         
-        // Get user's organization - use maybeSingle to handle 0 rows gracefully
-        // Also limit to 1 in case of duplicates
-        const { data: org, error } = await supabase
-            .from('organizations')
-            .select('id, storage_used_bytes')
-            .eq('owner_id', userId)
-            .limit(1)
-            .maybeSingle();
+        // Retry logic for serverless connection issues
+        let org = null;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            const { data, error } = await supabase
+                .from('organizations')
+                .select('id, storage_used_bytes')
+                .eq('owner_id', userId)
+                .limit(1)
+                .maybeSingle();
 
-        if (error) {
-            console.log(`[getUsageForUser] Error for user ${userId}:`, error.code, error.message);
-            throw new Error(`Failed to get organization: ${error.message}`);
+            if (error) {
+                console.log(`[getUsageForUser] Attempt ${attempt} error:`, error.code, error.message);
+                if (attempt < 3) {
+                    await new Promise(r => setTimeout(r, 100 * attempt));
+                    continue;
+                }
+                throw new Error(`Failed to get organization: ${error.message}`);
+            }
+
+            if (data) {
+                org = data;
+                console.log(`[getUsageForUser] Found org ${org.id} on attempt ${attempt}`);
+                break;
+            }
+            
+            // No data, retry
+            if (attempt < 3) {
+                console.log(`[getUsageForUser] Attempt ${attempt} no data, retrying...`);
+                await new Promise(r => setTimeout(r, 100 * attempt));
+            }
         }
 
         if (!org) {
-            console.log(`[getUsageForUser] No org found for user ${userId}`);
+            console.log(`[getUsageForUser] No org found for user ${userId} after retries`);
             return null;
         }
-        
-        console.log(`[getUsageForUser] Found org ${org.id} for user ${userId}`);
 
         const usedBytes = org.storage_used_bytes || 0;
         const usedGb = usedBytes / (1024 * 1024 * 1024);
