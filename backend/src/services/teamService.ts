@@ -145,30 +145,40 @@ export class TeamService {
         console.log(`[getUserOwnedOrganization] Looking up org for user: ${userId}`);
         
         // Retry logic for serverless connection issues
-        const maxRetries = 2;
+        const maxRetries = 3;
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                const { data, error, status } = await supabase
+                // Try a different query approach - select all then filter
+                // This helps debug if the issue is with the query or the connection
+                const response = await supabase
                     .from('organizations')
-                    .select('id, name')
+                    .select('id, name, owner_id')
                     .eq('owner_id', userId)
-                    .limit(1)
-                    .maybeSingle();
+                    .limit(1);
+                
+                console.log(`[getUserOwnedOrganization] Attempt ${attempt} - Raw response:`, {
+                    status: response.status,
+                    statusText: response.statusText,
+                    dataLength: response.data?.length,
+                    error: response.error?.message,
+                    data: response.data
+                });
 
-                if (error) {
-                    console.error(`[getUserOwnedOrganization] Attempt ${attempt} - Database error:`, error);
+                if (response.error) {
+                    console.error(`[getUserOwnedOrganization] Attempt ${attempt} - Database error:`, response.error);
                     if (attempt < maxRetries) {
-                        await new Promise(r => setTimeout(r, 100)); // Brief delay before retry
+                        await new Promise(r => setTimeout(r, 150 * attempt));
                         continue;
                     }
                     return null;
                 }
                 
+                const data = response.data?.[0] || null;
+                
                 if (!data) {
-                    // Only retry if this is the first attempt - might be a connection issue
                     if (attempt < maxRetries) {
-                        console.log(`[getUserOwnedOrganization] Attempt ${attempt} - No data, retrying...`);
-                        await new Promise(r => setTimeout(r, 100));
+                        console.log(`[getUserOwnedOrganization] Attempt ${attempt} - No data, retrying in ${150 * attempt}ms...`);
+                        await new Promise(r => setTimeout(r, 150 * attempt));
                         continue;
                     }
                     console.log(`[getUserOwnedOrganization] No owned org found for user: ${userId} (after ${attempt} attempts)`);
@@ -176,11 +186,11 @@ export class TeamService {
                 }
                 
                 console.log(`[getUserOwnedOrganization] Found org: ${data.name} (${data.id}) on attempt ${attempt}`);
-                return data;
+                return { id: data.id, name: data.name };
             } catch (e) {
                 console.error(`[getUserOwnedOrganization] Attempt ${attempt} - Exception:`, e);
                 if (attempt < maxRetries) {
-                    await new Promise(r => setTimeout(r, 100));
+                    await new Promise(r => setTimeout(r, 150 * attempt));
                     continue;
                 }
                 return null;
