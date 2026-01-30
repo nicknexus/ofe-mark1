@@ -96,6 +96,7 @@ const LandingNavbar = ({ onGetStarted }: LandingNavbarProps) => {
           </div> */}
           
           <div className="hidden lg:flex items-center gap-6">
+            <Link to="/explore" className="text-accent hover:text-accent/80 transition-colors duration-200 whitespace-nowrap text-sm font-medium">Explore</Link>
             <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors duration-200 whitespace-nowrap text-sm">Benefits</a>
             <a href="#how-it-works" className="text-muted-foreground hover:text-foreground transition-colors duration-200 whitespace-nowrap text-sm">How It Works</a>
             {/* <a href="#testimonials" className="text-muted-foreground hover:text-foreground transition-colors duration-200 whitespace-nowrap text-sm">Stories</a> */}

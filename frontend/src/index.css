@@ -71,6 +71,21 @@
         }
     }
 
+    /* Override browser default blue focus ring with site green accent */
+    input:focus,
+    textarea:focus,
+    select:focus {
+        outline: none !important;
+        --tw-ring-color: #c0dfa1 !important;
+    }
+
+    input:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible {
+        outline: none !important;
+        --tw-ring-color: #c0dfa1 !important;
+    }
+
     /* Override all very dark text colors with custom grey */
     .text-black,
     [class*="text-black"],
@@ -259,6 +274,16 @@
 @layer utilities {
     .text-balance {
         text-wrap: balance;
+    }
+
+    /* Hide scrollbar but keep functionality */
+    .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
     }
 }
 
@@ -1230,7 +1255,20 @@ body.location-modal-open .leaflet-pane {
 .landing-page .ring-accent { --tw-ring-color: #c0dfa1; }
 .landing-page .ring-accent\/50 { --tw-ring-color: rgba(192, 223, 161, 0.5); }
 
-/* Glass components for landing page - scoped */
+/* Glass components - global */
+.glass {
+    @apply bg-white/70 backdrop-blur-xl border-2 border-white/70 shadow-md;
+}
+
+.glass-card {
+    @apply bg-white/60 backdrop-blur-2xl border-2 border-white/80 shadow-lg rounded-2xl;
+}
+
+.glass-subtle {
+    @apply bg-white/40 backdrop-blur-md border border-white/20;
+}
+
+/* Glass components for landing page - scoped (kept for backwards compatibility) */
 .landing-page .glass {
     @apply bg-white/70 backdrop-blur-xl border-2 border-white/70 shadow-md;
 }

@@ -3,6 +3,7 @@ export interface Organization {
     name: string;
     slug?: string;
     description?: string;
+    logo_url?: string; // URL to organization logo image
     is_public?: boolean;
     owner_id?: string; // Single owner user (cascades delete when user is deleted)
     created_at?: string;

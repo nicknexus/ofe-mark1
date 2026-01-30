@@ -94,30 +94,27 @@ export class InitiativeService {
         let attempt = 0;
         let conflict = true;
 
-        // Check if slug already exists globally (handle unique constraint)
+        // Check if slug already exists within this organization (not globally)
         while (conflict && attempt < 100) {
             const { data: check } = await supabase
                 .from('initiatives')
                 .select('id')
                 .eq('slug', slug)
+                .eq('organization_id', organizationId)
                 .maybeSingle();
 
             if (!check) {
                 conflict = false;
             } else {
                 attempt++;
-                // Use UUID suffix for better uniqueness instead of just incrementing
-                if (attempt === 1) {
-                    slug = `${baseSlug}-${Date.now().toString().slice(-6)}`;
-                } else {
-                    slug = `${baseSlug}-${Date.now().toString().slice(-6)}-${attempt}`;
-                }
+                // Use incrementing suffix for uniqueness within org
+                slug = `${baseSlug}-${attempt}`;
             }
         }
 
         if (attempt >= 100) {
-            // Fallback: use UUID suffix if we can't find a unique slug
-            slug = `${baseSlug}-${Date.now().toString()}`;
+            // Fallback: use timestamp suffix
+            slug = `${baseSlug}-${Date.now().toString().slice(-6)}`;
         }
 
         const { data, error } = await supabase
@@ -133,9 +130,9 @@ export class InitiativeService {
             .single();
 
         if (error) {
-            // If it's a duplicate slug error, try one more time with UUID suffix
+            // If it's a duplicate slug error (race condition), try one more time with unique suffix
             if (error.message.includes('duplicate key') && error.message.includes('slug')) {
-                const fallbackSlug = `${baseSlug}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+                const fallbackSlug = `${baseSlug}-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 6)}`;
                 const { data: retryData, error: retryError } = await supabase
                     .from('initiatives')
                     .insert([{ 
@@ -212,12 +209,13 @@ export class InitiativeService {
             let attempt = 0;
             let conflict = true;
 
-            // Check if slug already exists (excluding current initiative)
+            // Check if slug already exists within this org (excluding current initiative)
             while (conflict && attempt < 100) {
                 const { data: check } = await supabase
                     .from('initiatives')
                     .select('id')
                     .eq('slug', slug)
+                    .eq('organization_id', organizationId)
                     .neq('id', id)
                     .maybeSingle();
 

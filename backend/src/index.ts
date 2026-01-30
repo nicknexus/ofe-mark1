@@ -22,6 +22,7 @@ import donorCreditRoutes from './routes/donorCredits';
 import storageRoutes from './routes/storage';
 import subscriptionRoutes from './routes/subscription';
 import teamRoutes from './routes/team';
+import publicRoutes from './routes/public';
 import { processStorageCleanupQueue } from './services/storageCleanupService';
 import { authenticateUser, AuthenticatedRequest } from './middleware/auth';
 
@@ -153,6 +154,7 @@ app.post('/api/admin/cleanup-storage', authenticateUser, async (req: Authenticat
 
 // Routes - Enable one by one to find the problem
 app.use('/api/auth', authRoutes);
+app.use('/api/public', publicRoutes); // Public routes (no auth required)
 app.use('/api/organizations', organizationRoutes);
 app.use('/api/initiatives', initiativeRoutes);
 app.use('/api/kpis', kpiRoutes);

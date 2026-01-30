@@ -8,7 +8,8 @@ import {
     ChevronDown,
     Building2,
     Users,
-    Check
+    Check,
+    Compass
 } from 'lucide-react'
 import { AuthService } from '../services/auth'
 import { apiService } from '../services/api'
@@ -213,8 +214,18 @@ export default function Layout({ user, children }: LayoutProps) {
                             )}
                         </div>
 
-                        {/* Right side: Tutorial, Settings, User Profile */}
+                        {/* Right side: Explore, Tutorial, Settings, User Profile */}
                         <div className="flex items-center gap-3">
+                            {/* Explore Button */}
+                            <Link
+                                to="/explore"
+                                className="hidden sm:flex items-center gap-2 px-4 py-2 bg-primary-50 hover:bg-primary-100 border border-primary-200 rounded-full transition-all duration-200 shadow-bubble-sm"
+                                title="Explore organizations"
+                            >
+                                <Compass className="w-4 h-4 text-primary-600" />
+                                <span className="text-sm font-medium text-primary-700">Explore</span>
+                            </Link>
+
                             {/* Tutorial Button - Circle Icon */}
                             <button
                                 onClick={handleTutorialClick}
@@ -295,6 +306,14 @@ export default function Layout({ user, children }: LayoutProps) {
                     {mobileMenuOpen && (
                         <div className="md:hidden border-t border-gray-200 pb-4 mt-2 bg-white/95 backdrop-blur-sm rounded-2xl shadow-bubble-lg">
                             <div className="pt-4 px-4 space-y-3">
+                                <Link
+                                    to="/explore"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    className="flex items-center space-x-3 px-4 py-3 text-base font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-xl transition-colors"
+                                >
+                                    <Compass className="w-5 h-5" />
+                                    <span>Explore Organizations</span>
+                                </Link>
                                 <button
                                     onClick={() => {
                                         handleTutorialClick()

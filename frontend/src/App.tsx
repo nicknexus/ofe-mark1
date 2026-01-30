@@ -19,6 +19,8 @@ import Dashboard from './pages/Dashboard'
 import InitiativePage from './pages/InitiativePage'
 import AccountPage from './pages/AccountPage'
 import PublicOrganizationPage from './pages/PublicOrganizationPage'
+import PublicInitiativePage from './pages/PublicInitiativePage'
+import ExplorePage from './pages/ExplorePage'
 import TrialActivationPage from './pages/TrialActivationPage'
 import SubscriptionExpiredPage from './pages/SubscriptionExpiredPage'
 import TeamSettingsPage from './pages/TeamSettingsPage'
@@ -330,7 +332,9 @@ function App() {
 
                             <Routes>
                                 {/* Public routes - accessible without auth */}
+                                <Route path="/explore" element={<ExplorePage />} />
                                 <Route path="/org/:slug" element={<PublicOrganizationPage />} />
+                                <Route path="/org/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
 
                                 {/* Invite acceptance page */}
                                 <Route path="/invite/:token" element={<InviteAcceptPage />} />
@@ -363,7 +367,9 @@ function App() {
         <Router>
             <Routes>
                 {/* Public routes - accessible without auth */}
+                <Route path="/explore" element={<ExplorePage />} />
                 <Route path="/org/:slug" element={<PublicOrganizationPage />} />
+                <Route path="/org/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
 
                 {/* Invite acceptance page (accessible without login) */}
                 <Route path="/invite/:token" element={<InviteAcceptPage />} />

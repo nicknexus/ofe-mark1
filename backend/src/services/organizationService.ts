@@ -163,9 +163,31 @@ export class OrganizationService {
             throw new Error('Permission denied - must be owner');
         }
 
-        // Generate slug if name is being updated
+        // Generate slug if name is being updated, with collision detection
         if (updates.name) {
-            updates.slug = this.generateSlug(updates.name);
+            let baseSlug = this.generateSlug(updates.name);
+            let slug = baseSlug;
+            let attempt = 0;
+            let conflict = true;
+
+            // Check if slug already exists (excluding current org)
+            while (conflict && attempt < 100) {
+                const { data: check } = await supabase
+                    .from('organizations')
+                    .select('id')
+                    .eq('slug', slug)
+                    .neq('id', id)
+                    .maybeSingle();
+
+                if (!check) {
+                    conflict = false;
+                } else {
+                    attempt++;
+                    slug = `${baseSlug}-${attempt}`;
+                }
+            }
+
+            updates.slug = slug;
         }
 
         const { data, error } = await supabase
