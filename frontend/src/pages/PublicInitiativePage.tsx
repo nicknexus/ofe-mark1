@@ -181,10 +181,8 @@ export default function PublicInitiativePage() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 font-figtree">
-            {/* Animated background */}
+            {/* Subtle grid background */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-[15%] right-[10%] w-32 h-32 border-2 border-accent/15 rounded-3xl rotate-12 animate-float" />
-                <div className="absolute bottom-[30%] left-[5%] w-20 h-20 bg-accent/10 rounded-2xl rotate-45 animate-float-slow" />
                 <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(192,223,161,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(192,223,161,0.03)_1px,transparent_1px)] bg-[size:60px_60px]" />
             </div>
 
@@ -308,31 +306,71 @@ function OverviewTab({ dashboard, orgLogoUrl }: { dashboard: InitiativeDashboard
         )
     }
 
+    const getCategoryConfig = (category: string) => {
+        switch (category) {
+            case 'impact': return { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200', accent: 'text-purple-600' }
+            case 'output': return { bg: 'bg-accent/20', text: 'text-accent', border: 'border-accent/30', accent: 'text-accent' }
+            case 'input': return { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200', accent: 'text-blue-600' }
+            default: return { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200', accent: 'text-gray-600' }
+        }
+    }
+
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {kpis.map((kpi) => (
-                <div key={kpi.id} className="glass-card p-5 rounded-2xl border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all">
-                    <div className="flex items-start justify-between mb-3">
-                        <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${
-                            kpi.category === 'impact' ? 'bg-accent/20 text-accent' :
-                            kpi.category === 'output' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
-                        }`}>{kpi.category}</span>
-                        {kpi.total_value !== undefined && (
-                            <div className="flex items-center gap-1 text-primary-500">
-                                <TrendingUp className="w-4 h-4" />
-                                <span className="text-lg font-bold">{kpi.total_value.toLocaleString()}</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            {kpis.map((kpi) => {
+                const config = getCategoryConfig(kpi.category)
+                
+                return (
+                    <div key={kpi.id} className="glass-card rounded-2xl border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all overflow-hidden">
+                        {/* Header */}
+                        <div className={`px-5 py-3 ${config.bg} border-b ${config.border}`}>
+                            <div className="flex items-center justify-between">
+                                <span className={`px-2.5 py-1 text-xs font-semibold rounded-full bg-white/60 ${config.text} capitalize`}>
+                                    {kpi.category}
+                                </span>
+                                {kpi.update_count !== undefined && kpi.update_count > 0 && (
+                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                        <BarChart3 className="w-3 h-3" />
+                                        {kpi.update_count} data point{kpi.update_count !== 1 ? 's' : ''}
+                                    </span>
+                                )}
                             </div>
-                        )}
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-5">
+                            <h4 className="font-semibold text-foreground mb-1 text-lg">{kpi.title}</h4>
+                            {kpi.description && (
+                                <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{kpi.description}</p>
+                            )}
+
+                            {/* Main Value */}
+                            <div className="mb-4">
+                                <div className="flex items-baseline gap-2">
+                                    <span className={`text-3xl font-bold ${config.accent}`}>
+                                        {kpi.total_value !== undefined ? kpi.total_value.toLocaleString() : '—'}
+                                    </span>
+                                    <span className="text-sm text-muted-foreground">{kpi.unit_of_measurement}</span>
+                                </div>
+                            </div>
+
+                            {/* Stats Row */}
+                            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-100">
+                                <div className="text-center p-2 bg-gray-50 rounded-lg">
+                                    <p className="text-xs text-muted-foreground mb-0.5">Evidence</p>
+                                    <p className="text-sm font-semibold text-foreground">{kpi.evidence_count || 0} items</p>
+                                </div>
+                                <div className="text-center p-2 bg-gray-50 rounded-lg">
+                                    <p className="text-xs text-muted-foreground mb-0.5">Coverage</p>
+                                    <p className={`text-sm font-semibold ${(kpi.evidence_percentage || 0) >= 50 ? 'text-accent' : 'text-orange-500'}`}>
+                                        {kpi.evidence_percentage || 0}%
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <h4 className="font-semibold text-foreground mb-1">{kpi.title}</h4>
-                    <p className="text-sm text-muted-foreground">{kpi.unit_of_measurement}</p>
-                    {kpi.update_count !== undefined && kpi.update_count > 0 && (
-                        <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
-                            <BarChart3 className="w-3 h-3" />{kpi.update_count} data point{kpi.update_count !== 1 ? 's' : ''}
-                        </p>
-                    )}
-                </div>
-            ))}
+                )
+            })}
         </div>
     )
 }
@@ -411,58 +449,184 @@ function LocationsTab({ locations }: { locations: PublicLocation[] | null }) {
 }
 
 function EvidenceTab({ evidence }: { evidence: PublicEvidence[] | null }) {
-    const [displayCount, setDisplayCount] = useState(3)
+    const [displayCount, setDisplayCount] = useState(8)
+    const [activeFilter, setActiveFilter] = useState<string | null>(null)
 
     if (!evidence) return <LoadingState />
     if (evidence.length === 0) return <EmptyState icon={FileText} message="No evidence available yet." />
 
-    const typeConfig: Record<string, { bg: string; label: string }> = {
-        visual_proof: { bg: 'bg-accent/20 text-accent', label: 'Visual Proof' },
-        documentation: { bg: 'bg-blue-100 text-blue-700', label: 'Documentation' },
-        testimony: { bg: 'bg-purple-100 text-purple-700', label: 'Testimony' },
-        financials: { bg: 'bg-yellow-100 text-yellow-700', label: 'Financials' }
+    // Colors matching the signed-in app
+    const typeConfig: Record<string, { bg: string; label: string; filterBg: string; filterActive: string }> = {
+        visual_proof: { 
+            bg: 'bg-pink-100 text-pink-800', 
+            label: 'Visual Proof',
+            filterBg: 'bg-pink-50 text-pink-700 border-pink-200 hover:bg-pink-100',
+            filterActive: 'bg-pink-500 text-white border-pink-500'
+        },
+        documentation: { 
+            bg: 'bg-blue-100 text-blue-700', 
+            label: 'Documentation',
+            filterBg: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100',
+            filterActive: 'bg-blue-500 text-white border-blue-500'
+        },
+        testimony: { 
+            bg: 'bg-orange-100 text-orange-800', 
+            label: 'Testimonies',
+            filterBg: 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100',
+            filterActive: 'bg-orange-500 text-white border-orange-500'
+        },
+        financials: { 
+            bg: 'bg-primary-100 text-primary-800', 
+            label: 'Financials',
+            filterBg: 'bg-primary-50 text-primary-700 border-primary-200 hover:bg-primary-100',
+            filterActive: 'bg-primary-500 text-white border-primary-500'
+        }
     }
 
-    const displayedEvidence = evidence.slice(0, displayCount)
-    const hasMore = displayCount < evidence.length
+    const isImageFile = (url: string) => {
+        const ext = url.split('.').pop()?.toLowerCase() || ''
+        return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)
+    }
+
+    const getPreviewUrl = (item: PublicEvidence) => {
+        if (item.files && item.files.length > 0) {
+            const imageFile = item.files.find(f => isImageFile(f.file_url))
+            if (imageFile) return imageFile.file_url
+        }
+        if (item.file_url && isImageFile(item.file_url)) {
+            return item.file_url
+        }
+        return null
+    }
+
+    // Filter evidence
+    const filteredEvidence = activeFilter 
+        ? evidence.filter(e => e.type === activeFilter)
+        : evidence
+
+    // Count by type
+    const typeCounts = evidence.reduce((acc, e) => {
+        acc[e.type] = (acc[e.type] || 0) + 1
+        return acc
+    }, {} as Record<string, number>)
+
+    const displayedEvidence = filteredEvidence.slice(0, displayCount)
+    const hasMore = displayCount < filteredEvidence.length
 
     return (
         <div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {displayedEvidence.map((item) => (
-                    <div key={item.id} className="glass-card p-5 rounded-2xl border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all">
-                        <div className="flex items-start justify-between mb-3">
-                            <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${typeConfig[item.type]?.bg || 'bg-gray-100 text-gray-600'}`}>
-                                {typeConfig[item.type]?.label || item.type}
-                            </span>
-                            <span className="text-xs text-muted-foreground">{new Date(item.date_represented).toLocaleDateString()}</span>
-                        </div>
-                        <h3 className="font-semibold text-foreground mb-2">{item.title}</h3>
-                        {item.description && <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{item.description}</p>}
-                        {(item.file_url || (item.file_urls && item.file_urls.length > 0)) && (
-                            <a href={item.file_url || item.file_urls?.[0]} target="_blank" rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-sm text-accent hover:text-accent/80 font-medium">
-                                <ExternalLink className="w-4 h-4" />View file{item.file_urls && item.file_urls.length > 1 ? `s (${item.file_urls.length})` : ''}
-                            </a>
-                        )}
-                        {item.locations && item.locations.length > 0 && (
-                            <div className="mt-3 flex flex-wrap gap-1">
-                                {item.locations.map((loc) => (
-                                    <span key={loc.id} className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded-lg">{loc.name}</span>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                ))}
+            {/* Filter Bar */}
+            <div className="glass-card p-4 rounded-2xl mb-5 border-accent/20">
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium text-muted-foreground mr-2">Filter by type:</span>
+                    <button
+                        onClick={() => { setActiveFilter(null); setDisplayCount(8) }}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+                            activeFilter === null 
+                                ? 'bg-accent text-white border-accent' 
+                                : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                        }`}
+                    >
+                        All ({evidence.length})
+                    </button>
+                    {Object.entries(typeConfig).map(([type, config]) => {
+                        const count = typeCounts[type] || 0
+                        if (count === 0) return null
+                        return (
+                            <button
+                                key={type}
+                                onClick={() => { setActiveFilter(type); setDisplayCount(8) }}
+                                className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+                                    activeFilter === type ? config.filterActive : config.filterBg
+                                }`}
+                            >
+                                {config.label} ({count})
+                            </button>
+                        )
+                    })}
+                </div>
             </div>
+
+            {/* Evidence Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {displayedEvidence.map((item) => {
+                    const previewUrl = getPreviewUrl(item)
+                    const fileUrl = item.files?.[0]?.file_url || item.file_url
+                    const fileCount = item.files?.length || (item.file_url ? 1 : 0)
+                    
+                    return (
+                        <div key={item.id} className="glass-card rounded-2xl border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all overflow-hidden">
+                            {/* Image Preview */}
+                            {previewUrl ? (
+                                <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="block">
+                                    <div className="relative aspect-video bg-gray-100 overflow-hidden">
+                                        <img 
+                                            src={previewUrl} 
+                                            alt={item.title}
+                                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                                        />
+                                        {fileCount > 1 && (
+                                            <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-lg">
+                                                +{fileCount - 1} more
+                                            </div>
+                                        )}
+                                    </div>
+                                </a>
+                            ) : fileUrl ? (
+                                <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="block">
+                                    <div className="aspect-video bg-gradient-to-br from-accent/10 to-accent/5 flex items-center justify-center">
+                                        <div className="text-center">
+                                            <FileText className="w-10 h-10 text-accent/50 mx-auto mb-2" />
+                                            <span className="text-sm text-muted-foreground">
+                                                {fileCount} file{fileCount > 1 ? 's' : ''}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </a>
+                            ) : null}
+
+                            {/* Content */}
+                            <div className="p-4">
+                                <div className="flex items-start justify-between mb-2">
+                                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${typeConfig[item.type]?.bg || 'bg-gray-100 text-gray-600'}`}>
+                                        {typeConfig[item.type]?.label || item.type}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">{new Date(item.date_represented).toLocaleDateString()}</span>
+                                </div>
+                                <h3 className="font-semibold text-foreground text-sm mb-1">{item.title}</h3>
+                                {item.description && <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{item.description}</p>}
+                                
+                                {/* File link (if no preview shown) */}
+                                {!previewUrl && fileUrl && (
+                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent/80 font-medium">
+                                        <ExternalLink className="w-3.5 h-3.5" />View file{fileCount > 1 ? `s (${fileCount})` : ''}
+                                    </a>
+                                )}
+                                
+                                {/* Locations */}
+                                {item.locations && item.locations.length > 0 && (
+                                    <div className="mt-2 flex flex-wrap gap-1">
+                                        {item.locations.map((loc) => (
+                                            <span key={loc.id} className="text-[10px] bg-accent/10 text-accent px-1.5 py-0.5 rounded">{loc.name}</span>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )
+                })}
+            </div>
+            
+            {/* Load More */}
             {hasMore && (
                 <div className="text-center mt-6">
                     <button 
-                        onClick={() => setDisplayCount(prev => prev + 3)}
+                        onClick={() => setDisplayCount(prev => prev + 8)}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-accent/10 text-accent rounded-xl hover:bg-accent/20 transition-colors font-medium border border-accent/20 hover:border-accent"
                     >
                         <ChevronDown className="w-4 h-4" />
-                        Load More ({evidence.length - displayCount} remaining)
+                        Load More ({filteredEvidence.length - displayCount} remaining)
                     </button>
                 </div>
             )}

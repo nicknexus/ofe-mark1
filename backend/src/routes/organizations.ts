@@ -5,6 +5,9 @@ import { TeamService } from '../services/teamService';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { supabase } from '../utils/supabase';
 import { KPIService } from '../services/kpiService';
+import { upload } from '../utils/fileUpload';
+import { compressImage, isCompressibleImage } from '../utils/imageCompression';
+import path from 'path';
 
 const router = Router();
 
@@ -150,6 +153,147 @@ router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
         const organization = await OrganizationService.update(req.params.id, req.body, req.user!.id);
         res.json(organization);
     } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// Upload organization logo
+router.post('/:id/logo', authenticateUser, upload.single('logo'), async (req: AuthenticatedRequest, res) => {
+    console.log('[Logo Upload] Starting logo upload for org:', req.params.id);
+    console.log('[Logo Upload] File received:', req.file ? { name: req.file.originalname, size: req.file.size, type: req.file.mimetype } : 'NO FILE');
+    
+    try {
+        if (!req.file) {
+            console.log('[Logo Upload] ERROR: No file uploaded');
+            res.status(400).json({ error: 'No file uploaded' });
+            return;
+        }
+
+        const userId = req.user!.id;
+        const orgId = req.params.id;
+
+        // Verify user owns this organization
+        const ownedOrg = await TeamService.getUserOwnedOrganization(userId);
+        if (!ownedOrg || ownedOrg.id !== orgId) {
+            res.status(403).json({ error: 'Only the organization owner can update the logo' });
+            return;
+        }
+
+        // Compress image if needed
+        let finalBuffer = req.file.buffer;
+        let finalMimetype = req.file.mimetype;
+        let finalSize = req.file.size;
+
+        if (isCompressibleImage(req.file.mimetype)) {
+            const compressionResult = await compressImage(
+                req.file.buffer,
+                req.file.mimetype,
+                req.file.size
+            );
+            finalBuffer = compressionResult.buffer;
+            finalMimetype = compressionResult.mimetype;
+            finalSize = compressionResult.size;
+        }
+
+        // Generate unique filename
+        const timestamp = Date.now();
+        const randomId = Math.round(Math.random() * 1E9);
+        const ext = path.extname(req.file.originalname);
+        const filename = `${timestamp}-${randomId}-logo${ext}`;
+        const filePath = `logos/${orgId}/${filename}`;
+
+        // Upload to Supabase Storage
+        const { error: uploadError } = await supabase.storage
+            .from('evidence-files')
+            .upload(filePath, finalBuffer, {
+                contentType: finalMimetype,
+                upsert: false
+            });
+
+        if (uploadError) {
+            console.error('[Logo Upload] Storage upload error:', uploadError);
+            res.status(500).json({ error: 'Failed to upload logo' });
+            return;
+        }
+
+        console.log('[Logo Upload] File uploaded to storage, getting public URL');
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+            .from('evidence-files')
+            .getPublicUrl(filePath);
+
+        if (!urlData?.publicUrl) {
+            console.log('[Logo Upload] ERROR: Failed to generate public URL');
+            res.status(500).json({ error: 'Failed to generate logo URL' });
+            return;
+        }
+
+        console.log('[Logo Upload] Public URL:', urlData.publicUrl);
+
+        // Delete old logo if exists
+        if (ownedOrg.logo_url) {
+            try {
+                const oldUrlParts = ownedOrg.logo_url.split('/evidence-files/');
+                if (oldUrlParts.length === 2) {
+                    await supabase.storage.from('evidence-files').remove([oldUrlParts[1]]);
+                }
+            } catch (e) {
+                console.warn('[Logo Upload] Failed to delete old logo:', e);
+            }
+        }
+
+        // Update organization with new logo URL
+        console.log('[Logo Upload] Updating organization with logo URL');
+        const updatedOrg = await OrganizationService.update(orgId, { logo_url: urlData.publicUrl }, userId);
+        console.log('[Logo Upload] Updated org:', updatedOrg?.id, 'logo_url:', updatedOrg?.logo_url);
+
+        res.json({
+            success: true,
+            logo_url: urlData.publicUrl,
+            organization: updatedOrg
+        });
+        console.log('[Logo Upload] SUCCESS');
+    } catch (error) {
+        console.error('Logo upload error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// Delete organization logo
+router.delete('/:id/logo', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const userId = req.user!.id;
+        const orgId = req.params.id;
+
+        // Verify user owns this organization
+        const ownedOrg = await TeamService.getUserOwnedOrganization(userId);
+        if (!ownedOrg || ownedOrg.id !== orgId) {
+            res.status(403).json({ error: 'Only the organization owner can delete the logo' });
+            return;
+        }
+
+        // Delete logo from storage if exists
+        if (ownedOrg.logo_url) {
+            try {
+                const urlParts = ownedOrg.logo_url.split('/evidence-files/');
+                if (urlParts.length === 2) {
+                    await supabase.storage.from('evidence-files').remove([urlParts[1]]);
+                }
+            } catch (e) {
+                console.warn('Failed to delete logo from storage:', e);
+            }
+        }
+
+        // Update organization to remove logo URL
+        const updatedOrg = await OrganizationService.update(orgId, { logo_url: '' }, userId);
+
+        res.json({
+            success: true,
+            organization: updatedOrg
+        });
+    } catch (error) {
+        console.error('Logo delete error:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });

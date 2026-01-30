@@ -245,11 +245,8 @@ export default function PublicOrganizationPage() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 font-figtree">
-            {/* Animated background */}
+            {/* Subtle grid background */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-[10%] left-[5%] w-40 h-40 border-2 border-accent/15 rounded-3xl rotate-12 animate-float" />
-                <div className="absolute top-[30%] right-[10%] w-24 h-24 bg-accent/10 rounded-full animate-float-delayed" />
-                <div className="absolute bottom-[20%] left-[8%] w-20 h-20 bg-accent/10 rounded-2xl rotate-45 animate-float-slow" />
                 <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(192,223,161,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(192,223,161,0.03)_1px,transparent_1px)] bg-[size:60px_60px]" />
             </div>
 

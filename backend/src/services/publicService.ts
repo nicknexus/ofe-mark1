@@ -171,7 +171,7 @@ export class PublicService {
     static async getAllOrganizations(): Promise<PublicOrganization[]> {
         const { data, error } = await supabase
             .from('organizations')
-            .select('id, name, slug, description, created_at')
+            .select('id, name, slug, description, logo_url, created_at')
             .eq('is_public', true)
             .order('name')
             .limit(100);
@@ -186,7 +186,7 @@ export class PublicService {
     } | null> {
         const { data: org, error } = await supabase
             .from('organizations')
-            .select('id, name, slug, description, created_at')
+            .select('id, name, slug, description, logo_url, created_at')
             .eq('slug', slug)
             .eq('is_public', true)
             .single();
@@ -384,10 +384,11 @@ export class PublicService {
         let query = supabase
             .from('evidence')
             .select(`
-                id, title, description, type, file_url, file_urls, date_represented, initiative_id,
+                id, title, description, type, file_url, date_represented, initiative_id,
                 initiatives!inner(id, slug, title, is_public, organization_id,
                     organizations!inner(slug, is_public)
-                )
+                ),
+                evidence_files(id, file_url, file_name, file_type, display_order)
             `)
             .eq('initiatives.organizations.slug', orgSlug)
             .eq('initiatives.organizations.is_public', true)
@@ -408,7 +409,7 @@ export class PublicService {
             description: e.description,
             type: e.type,
             file_url: e.file_url,
-            file_urls: e.file_urls,
+            files: e.evidence_files || [],
             date_represented: e.date_represented,
             initiative_id: e.initiative_id,
             initiative_slug: e.initiatives?.slug,
@@ -457,7 +458,7 @@ export class PublicService {
         if (!initiative) return null;
 
         // Get KPIs with updates
-        const { data: kpis } = await supabase
+        const { data: kpis, error: kpisError } = await supabase
             .from('kpis')
             .select(`
                 id, title, description, metric_type, unit_of_measurement, category, display_order,
@@ -465,6 +466,59 @@ export class PublicService {
             `)
             .eq('initiative_id', initiative.id)
             .order('display_order');
+        
+        if (kpisError) {
+            console.error('[Dashboard] KPIs query error:', kpisError);
+        }
+        console.log('[Dashboard] KPIs fetched:', kpis?.length || 0, 'for initiative:', initiative.id);
+
+        // Get evidence counts per KPI separately (to avoid RLS issues)
+        const kpiIds = (kpis || []).map(k => k.id);
+        let evidenceCounts: Record<string, number> = {};
+        
+        if (kpiIds.length > 0) {
+            const { data: evidenceLinks, error: evidenceError } = await supabase
+                .from('evidence_kpis')
+                .select('kpi_id')
+                .in('kpi_id', kpiIds);
+            
+            if (evidenceError) {
+                console.log('[Dashboard] Evidence links query error (may be RLS):', evidenceError.message);
+            } else {
+                // Count evidence per KPI
+                (evidenceLinks || []).forEach((link: any) => {
+                    evidenceCounts[link.kpi_id] = (evidenceCounts[link.kpi_id] || 0) + 1;
+                });
+            }
+        }
+
+        // Process KPIs with computed values
+        const processedKpis = (kpis || []).map(kpi => {
+            const updates = kpi.kpi_updates || [];
+            const totalValue = updates.reduce((sum: number, u: any) => sum + (parseFloat(u.value) || 0), 0);
+            const updateCount = updates.length;
+            const evidenceCount = evidenceCounts[kpi.id] || 0;
+            // Simple coverage: if there's evidence linked, estimate coverage based on evidence vs updates
+            const evidencePercentage = updateCount > 0 && evidenceCount > 0 
+                ? Math.min(100, Math.round((evidenceCount / updateCount) * 100))
+                : 0;
+
+            return {
+                id: kpi.id,
+                title: kpi.title,
+                description: kpi.description,
+                metric_type: kpi.metric_type,
+                unit_of_measurement: kpi.unit_of_measurement,
+                category: kpi.category,
+                display_order: kpi.display_order,
+                total_value: totalValue,
+                update_count: updateCount,
+                evidence_count: evidenceCount,
+                evidence_percentage: evidencePercentage
+            };
+        });
+        
+        console.log('[Dashboard] Processed KPIs:', processedKpis.length);
 
         // Get locations
         const { data: locations } = await supabase
@@ -487,10 +541,10 @@ export class PublicService {
 
         return {
             initiative,
-            kpis: kpis || [],
+            kpis: processedKpis,
             locations: locations || [],
             stats: {
-                kpis: (kpis || []).length,
+                kpis: processedKpis.length,
                 evidence: evidenceCount || 0,
                 stories: storyCount || 0,
                 locations: (locations || []).length
@@ -549,7 +603,8 @@ export class PublicService {
         const { data, error } = await supabase
             .from('evidence')
             .select(`
-                id, title, description, type, file_url, file_urls, date_represented, date_range_start, date_range_end, created_at,
+                id, title, description, type, file_url, date_represented, date_range_start, date_range_end, created_at,
+                evidence_files(id, file_url, file_name, file_type, display_order),
                 evidence_locations(locations(id, name)),
                 evidence_kpis(kpis(id, title))
             `)
@@ -564,7 +619,7 @@ export class PublicService {
             description: e.description,
             type: e.type,
             file_url: e.file_url,
-            file_urls: e.file_urls,
+            files: e.evidence_files || [],
             date_represented: e.date_represented,
             date_range_start: e.date_range_start,
             date_range_end: e.date_range_end,

@@ -617,6 +617,37 @@ class ApiService {
         })
     }
 
+    async uploadOrganizationLogo(orgId: string, file: File): Promise<{ success: boolean; logo_url: string; organization: Organization }> {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
+            throw new Error('No authenticated session')
+        }
+
+        const formData = new FormData()
+        formData.append('logo', file)
+
+        const response = await fetch(`${API_BASE_URL}/api/organizations/${orgId}/logo`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${session.access_token}`
+            },
+            body: formData
+        })
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ error: 'Upload failed' }))
+            throw new Error(error.error || 'Failed to upload logo')
+        }
+
+        return response.json()
+    }
+
+    async deleteOrganizationLogo(orgId: string): Promise<{ success: boolean; organization: Organization }> {
+        return this.request<{ success: boolean; organization: Organization }>(`/organizations/${orgId}/logo`, {
+            method: 'DELETE'
+        })
+    }
+
     // Locations
     async getLocations(initiativeId?: string): Promise<Location[]> {
         const params = initiativeId ? `?initiative_id=${initiativeId}` : ''

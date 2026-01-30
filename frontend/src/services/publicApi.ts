@@ -41,6 +41,7 @@ export interface PublicKPI {
     unit_of_measurement: string
     category: 'input' | 'output' | 'impact'
     display_order?: number
+    target_value?: number
     initiative_id: string
     initiative_slug?: string
     initiative_title?: string
@@ -48,6 +49,8 @@ export interface PublicKPI {
     updates?: PublicKPIUpdate[]
     total_value?: number
     update_count?: number
+    evidence_count?: number
+    evidence_percentage?: number
 }
 
 export interface PublicKPIUpdate {
@@ -92,13 +95,21 @@ export interface PublicStory {
     created_at?: string
 }
 
+export interface PublicEvidenceFile {
+    id: string
+    file_url: string
+    file_name: string
+    file_type: string
+    display_order: number
+}
+
 export interface PublicEvidence {
     id: string
     title: string
     description?: string
     type: 'visual_proof' | 'documentation' | 'testimony' | 'financials'
     file_url?: string
-    file_urls?: string[]
+    files?: PublicEvidenceFile[]
     date_represented: string
     date_range_start?: string
     date_range_end?: string

@@ -80,6 +80,7 @@ export interface AccessibleOrganization {
     name: string
     role: 'owner' | 'member'
     canAddImpactClaims?: boolean
+    logo_url?: string
 }
 
 export class TeamService {

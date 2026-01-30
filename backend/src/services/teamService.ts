@@ -141,7 +141,7 @@ export class TeamService {
     /**
      * Get user's organization (where they are owner)
      */
-    static async getUserOwnedOrganization(userId: string): Promise<{ id: string; name: string } | null> {
+    static async getUserOwnedOrganization(userId: string): Promise<{ id: string; name: string; logo_url?: string } | null> {
         console.log(`[getUserOwnedOrganization] Looking up org for user: ${userId}`);
         
         // Retry logic for serverless connection issues
@@ -152,7 +152,7 @@ export class TeamService {
                 // This helps debug if the issue is with the query or the connection
                 const response = await supabase
                     .from('organizations')
-                    .select('id, name, owner_id')
+                    .select('id, name, owner_id, logo_url')
                     .eq('owner_id', userId)
                     .limit(1);
                 
@@ -186,7 +186,7 @@ export class TeamService {
                 }
                 
                 console.log(`[getUserOwnedOrganization] Found org: ${data.name} (${data.id}) on attempt ${attempt}`);
-                return { id: data.id, name: data.name };
+                return { id: data.id, name: data.name, logo_url: data.logo_url };
             } catch (e) {
                 console.error(`[getUserOwnedOrganization] Attempt ${attempt} - Exception:`, e);
                 if (attempt < maxRetries) {
@@ -221,12 +221,14 @@ export class TeamService {
         name: string;
         role: 'owner' | 'member';
         canAddImpactClaims?: boolean;
+        logo_url?: string;
     }>> {
         const orgs: Array<{
             id: string;
             name: string;
             role: 'owner' | 'member';
             canAddImpactClaims?: boolean;
+            logo_url?: string;
         }> = [];
 
         // Get owned organization
@@ -236,7 +238,8 @@ export class TeamService {
                 id: ownedOrg.id,
                 name: ownedOrg.name,
                 role: 'owner',
-                canAddImpactClaims: true
+                canAddImpactClaims: true,
+                logo_url: ownedOrg.logo_url
             });
         }
 
@@ -246,7 +249,7 @@ export class TeamService {
             .select(`
                 organization_id,
                 can_add_impact_claims,
-                organizations(id, name)
+                organizations(id, name, logo_url)
             `)
             .eq('user_id', userId);
 
@@ -258,7 +261,8 @@ export class TeamService {
                         id: org.id,
                         name: org.name,
                         role: 'member',
-                        canAddImpactClaims: membership.can_add_impact_claims
+                        canAddImpactClaims: membership.can_add_impact_claims,
+                        logo_url: org.logo_url
                     });
                 }
             }
