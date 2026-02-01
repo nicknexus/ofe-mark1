@@ -846,7 +846,7 @@ export class PublicService {
             const groupIds = storyBeneficiaries.map((sb: any) => sb.beneficiary_group_id);
             const { data: groups } = await supabase
                 .from('beneficiary_groups')
-                .select('id, name, description, count')
+                .select('id, name, description, total_number')
                 .in('id', groupIds);
             beneficiaryGroups = groups || [];
         }

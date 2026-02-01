@@ -178,7 +178,7 @@ export default function PublicStoryPage() {
                                             className="px-3 py-1.5 bg-primary-50 text-primary-700 rounded-full text-sm font-medium"
                                         >
                                             {group.name}
-                                            {group.count && <span className="ml-1 opacity-70">({group.count})</span>}
+                                            {group.total_number && <span className="ml-1 opacity-70">({group.total_number})</span>}
                                         </span>
                                     ))}
                                 </div>
