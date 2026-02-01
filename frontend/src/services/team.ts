@@ -4,11 +4,11 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 async function getAuthHeaders() {
     const { data: { session } } = await supabase.auth.getSession()
-    
+
     if (!session) {
         throw new Error('No authenticated session')
     }
-    
+
     return {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`
@@ -82,6 +82,7 @@ export interface AccessibleOrganization {
     canAddImpactClaims?: boolean
     logo_url?: string
     brand_color?: string
+    is_public?: boolean
 }
 
 export class TeamService {
@@ -90,17 +91,17 @@ export class TeamService {
      */
     static async getPermissions(): Promise<UserPermissions> {
         const headers = await getAuthHeaders()
-        
+
         const response = await fetch(`${API_BASE_URL}/api/team/permissions`, {
             method: 'GET',
             headers
         })
-        
+
         if (!response.ok) {
             const error = await response.json()
             throw new Error(error.error || 'Failed to get permissions')
         }
-        
+
         return response.json()
     }
 
@@ -109,16 +110,16 @@ export class TeamService {
      */
     static async checkMyPendingInvite(): Promise<PendingInviteCheck> {
         const headers = await getAuthHeaders()
-        
+
         const response = await fetch(`${API_BASE_URL}/api/team/my-pending-invite`, {
             method: 'GET',
             headers
         })
-        
+
         if (!response.ok) {
             return { hasPendingInvite: false }
         }
-        
+
         return response.json()
     }
 
@@ -127,16 +128,16 @@ export class TeamService {
      */
     static async getAccessibleOrganizations(): Promise<AccessibleOrganization[]> {
         const headers = await getAuthHeaders()
-        
+
         const response = await fetch(`${API_BASE_URL}/api/team/organizations`, {
             method: 'GET',
             headers
         })
-        
+
         if (!response.ok) {
             return []
         }
-        
+
         return response.json()
     }
 
@@ -150,18 +151,18 @@ export class TeamService {
         emailError?: string
     }> {
         const headers = await getAuthHeaders()
-        
+
         const response = await fetch(`${API_BASE_URL}/api/team/invite`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ email, canAddImpactClaims })
         })
-        
+
         if (!response.ok) {
             const error = await response.json()
             throw new Error(error.error || 'Failed to send invitation')
         }
-        
+
         return response.json()
     }
 
@@ -170,24 +171,24 @@ export class TeamService {
      */
     static async getInviteDetails(token: string): Promise<InviteDetails> {
         console.log(`[TeamService] Fetching invite details for token: ${token.substring(0, 10)}...`)
-        
+
         const response = await fetch(`${API_BASE_URL}/api/team/invite/${token}`, {
             method: 'GET',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'Pragma': 'no-cache'
             }
         })
-        
+
         console.log(`[TeamService] Response status: ${response.status}`)
-        
+
         if (!response.ok) {
             const error = await response.json()
             console.error(`[TeamService] Error fetching invite:`, error)
             throw new Error(error.error || 'Invitation not found')
         }
-        
+
         return response.json()
     }
 
@@ -201,17 +202,17 @@ export class TeamService {
         message: string
     }> {
         const headers = await getAuthHeaders()
-        
+
         const response = await fetch(`${API_BASE_URL}/api/team/invite/${token}/accept`, {
             method: 'POST',
             headers
         })
-        
+
         if (!response.ok) {
             const error = await response.json()
             throw new Error(error.error || 'Failed to accept invitation')
         }
-        
+
         return response.json()
     }
 
@@ -225,17 +226,17 @@ export class TeamService {
         emailError?: string
     }> {
         const headers = await getAuthHeaders()
-        
+
         const response = await fetch(`${API_BASE_URL}/api/team/invite/${invitationId}/resend`, {
             method: 'POST',
             headers
         })
-        
+
         if (!response.ok) {
             const error = await response.json()
             throw new Error(error.error || 'Failed to resend invitation')
         }
-        
+
         return response.json()
     }
 
@@ -244,12 +245,12 @@ export class TeamService {
      */
     static async revokeInvite(invitationId: string): Promise<void> {
         const headers = await getAuthHeaders()
-        
+
         const response = await fetch(`${API_BASE_URL}/api/team/invite/${invitationId}`, {
             method: 'DELETE',
             headers
         })
-        
+
         if (!response.ok) {
             const error = await response.json()
             throw new Error(error.error || 'Failed to revoke invitation')
@@ -261,17 +262,17 @@ export class TeamService {
      */
     static async getMembers(): Promise<TeamMember[]> {
         const headers = await getAuthHeaders()
-        
+
         const response = await fetch(`${API_BASE_URL}/api/team/members`, {
             method: 'GET',
             headers
         })
-        
+
         if (!response.ok) {
             const error = await response.json()
             throw new Error(error.error || 'Failed to get team members')
         }
-        
+
         return response.json()
     }
 
@@ -280,17 +281,17 @@ export class TeamService {
      */
     static async getCapacity(): Promise<TeamCapacity> {
         const headers = await getAuthHeaders()
-        
+
         const response = await fetch(`${API_BASE_URL}/api/team/capacity`, {
             method: 'GET',
             headers
         })
-        
+
         if (!response.ok) {
             const error = await response.json()
             throw new Error(error.error || 'Failed to get team capacity')
         }
-        
+
         return response.json()
     }
 
@@ -299,17 +300,17 @@ export class TeamService {
      */
     static async getPendingInvitations(): Promise<TeamInvitation[]> {
         const headers = await getAuthHeaders()
-        
+
         const response = await fetch(`${API_BASE_URL}/api/team/invitations`, {
             method: 'GET',
             headers
         })
-        
+
         if (!response.ok) {
             const error = await response.json()
             throw new Error(error.error || 'Failed to get invitations')
         }
-        
+
         return response.json()
     }
 
@@ -318,18 +319,18 @@ export class TeamService {
      */
     static async updateMemberPermissions(memberId: string, canAddImpactClaims: boolean): Promise<TeamMember> {
         const headers = await getAuthHeaders()
-        
+
         const response = await fetch(`${API_BASE_URL}/api/team/members/${memberId}`, {
             method: 'PUT',
             headers,
             body: JSON.stringify({ canAddImpactClaims })
         })
-        
+
         if (!response.ok) {
             const error = await response.json()
             throw new Error(error.error || 'Failed to update member')
         }
-        
+
         return response.json()
     }
 
@@ -338,12 +339,12 @@ export class TeamService {
      */
     static async removeMember(memberId: string): Promise<void> {
         const headers = await getAuthHeaders()
-        
+
         const response = await fetch(`${API_BASE_URL}/api/team/members/${memberId}`, {
             method: 'DELETE',
             headers
         })
-        
+
         if (!response.ok) {
             const error = await response.json()
             throw new Error(error.error || 'Failed to remove member')

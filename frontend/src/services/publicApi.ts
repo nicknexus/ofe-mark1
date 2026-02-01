@@ -217,10 +217,10 @@ class PublicApiService {
         }
 
         const data = await response.json()
-        
+
         // Cache the result
         this.cache.set(endpoint, data)
-        
+
         return data
     }
 

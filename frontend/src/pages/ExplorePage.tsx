@@ -64,7 +64,7 @@ export default function ExplorePage() {
     return (
         <div className="min-h-screen font-figtree relative animate-fadeIn">
             {/* Flowing gradient background */}
-            <div 
+            <div
                 className="fixed inset-0 pointer-events-none"
                 style={{
                     background: `
@@ -76,7 +76,7 @@ export default function ExplorePage() {
                     `
                 }}
             />
-            
+
             {/* Header */}
             <div className="relative z-10 pt-8 pb-12">
                 <div className="max-w-7xl mx-auto px-6">

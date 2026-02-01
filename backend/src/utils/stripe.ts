@@ -37,11 +37,11 @@ export const STRIPE_CONFIG = {
 // Plan configurations
 export const PLAN_LIMITS = {
     starter: {
-        initiatives_limit: 2,
+        initiatives_limit: 3,
         plan_tier: 'starter' as const,
     },
     trial: {
-        initiatives_limit: null, // unlimited during trial
+        initiatives_limit: 3,
         plan_tier: null,
     }
 };

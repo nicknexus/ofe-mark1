@@ -56,12 +56,12 @@ router.get('/public/:slug', async (req, res) => {
             return;
         }
 
-        // Get public initiatives for this organization
+        // Get all initiatives for this public organization
+        // If org is public, all its initiatives are visible
         const { data: initiatives } = await supabase
             .from('initiatives')
             .select('*')
             .eq('organization_id', organization.id)
-            .eq('is_public', true)
             .order('created_at', { ascending: false });
 
         res.json({

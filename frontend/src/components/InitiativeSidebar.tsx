@@ -14,6 +14,7 @@ import {
     User as UserIcon
 } from 'lucide-react'
 import { User } from '../types'
+import { useTeam } from '../context/TeamContext'
 
 interface InitiativeSidebarProps {
     activeTab: string
@@ -37,6 +38,7 @@ export default function InitiativeSidebar({
     const navigate = useNavigate()
     const [settingsOpen, setSettingsOpen] = useState(false)
     const settingsRef = useRef<HTMLDivElement>(null)
+    const { ownedOrganization, hasOwnOrganization } = useTeam()
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -166,9 +168,13 @@ export default function InitiativeSidebar({
                     <div className="relative" ref={settingsRef}>
                         <button
                             onClick={() => setSettingsOpen(!settingsOpen)}
-                            className="w-9 h-9 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
+                            className="relative w-9 h-9 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
+                            title={hasOwnOrganization && !ownedOrganization?.is_public ? "Settings - Organization not public" : "Settings"}
                         >
                             <Settings className="w-4 h-4 text-gray-500" />
+                            {hasOwnOrganization && !ownedOrganization?.is_public && (
+                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">!</span>
+                            )}
                         </button>
 
                         {/* Dropdown Menu */}

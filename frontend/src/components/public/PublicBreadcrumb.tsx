@@ -23,14 +23,14 @@ export default function PublicBreadcrumb({ items, orgSlug, orgName }: PublicBrea
         <nav className="flex items-center gap-2 text-base mb-6">
             {allItems.map((item, index) => {
                 const isLast = index === allItems.length - 1
-                
+
                 return (
                     <React.Fragment key={index}>
                         {index > 0 && (
                             <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
                         )}
                         {item.href && !isLast ? (
-                            <Link 
+                            <Link
                                 to={item.href}
                                 className="text-gray-500 hover:text-gray-800 transition-colors truncate max-w-[220px] font-medium"
                             >

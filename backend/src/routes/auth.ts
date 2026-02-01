@@ -3,6 +3,7 @@ import { supabase } from '../utils/supabase';
 import { OrganizationService } from '../services/organizationService';
 import { SubscriptionService } from '../services/subscriptionService';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
+import { stripe } from '../utils/stripe';
 
 const router = Router();
 
@@ -207,7 +208,17 @@ router.delete('/account', authenticateUser, async (req: AuthenticatedRequest, re
         // Delete user's team memberships (where they are a member, not owner)
         await supabase.from('team_members').delete().eq('user_id', userId);
 
-        // Delete user's subscription
+        // Cancel Stripe subscription if exists, then delete from database
+        const subscription = await SubscriptionService.getByUserId(userId);
+        if (subscription?.stripe_subscription_id && stripe) {
+            try {
+                await stripe.subscriptions.cancel(subscription.stripe_subscription_id);
+                console.log(`[Account Delete] Cancelled Stripe subscription: ${subscription.stripe_subscription_id}`);
+            } catch (stripeError) {
+                console.error('[Account Delete] Error cancelling Stripe subscription:', stripeError);
+                // Continue with deletion even if Stripe cancel fails
+            }
+        }
         await supabase.from('subscriptions').delete().eq('user_id', userId);
 
         // Finally, delete the user from auth

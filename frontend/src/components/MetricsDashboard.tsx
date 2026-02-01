@@ -116,7 +116,7 @@ interface MetricsDashboardProps {
 }
 
 export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = [], initiativeId, onNavigateToLocations, onMetricCardClick, onAddKPI, onStoryClick, user, organization, onOrderChange, onAddImpactClaim, onAddEvidence }: MetricsDashboardProps) {
-    const { canAddImpactClaims } = useTeam()
+    const { canAddImpactClaims, ownedOrganization, hasOwnOrganization } = useTeam()
     const [timeFrame, setTimeFrame] = useState<'all' | '1month' | '6months' | '1year' | '5years'>('all')
     const [isCumulative, setIsCumulative] = useState(false)
     const [visibleKPIs, setVisibleKPIs] = useState<Set<string>>(new Set())
@@ -1093,10 +1093,13 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     {/* Settings Button - Circle Icon */}
                     <Link
                         to="/account"
-                        className="w-10 h-10 rounded-full bg-white/80 hover:bg-white border border-gray-200 hover:border-gray-300 flex items-center justify-center transition-all duration-200 shadow-bubble-sm"
-                        title="Settings"
+                        className="relative w-10 h-10 rounded-full bg-white/80 hover:bg-white border border-gray-200 hover:border-gray-300 flex items-center justify-center transition-all duration-200 shadow-bubble-sm"
+                        title={hasOwnOrganization && !ownedOrganization?.is_public ? "Settings - Organization not public" : "Settings"}
                     >
                         <Settings className="w-5 h-5 text-gray-700" />
+                        {hasOwnOrganization && !ownedOrganization?.is_public && (
+                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center">!</span>
+                        )}
                     </Link>
 
                     {/* User Profile with Organization and Dropdown */}

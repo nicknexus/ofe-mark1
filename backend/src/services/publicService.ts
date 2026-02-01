@@ -71,19 +71,20 @@ export class PublicService {
             .limit(20);
 
         // Search initiatives (with org info including logo)
+        // If org is public, all its initiatives are visible
         const { data: inits } = await supabase
             .from('initiatives')
             .select(`
                 id, title, description, region, location, slug, coordinates, created_at, organization_id,
                 organizations!inner(id, name, slug, logo_url, is_public)
             `)
-            .eq('is_public', true)
             .eq('organizations.is_public', true)
             .or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,region.ilike.%${searchTerm}%`)
             .order('title')
             .limit(20);
 
         // Search locations (returns initiatives that have matching locations)
+        // If org is public, all its initiatives/locations are visible
         const { data: locs } = await supabase
             .from('locations')
             .select(`
@@ -94,7 +95,6 @@ export class PublicService {
                 )
             `)
             .ilike('name', `%${searchTerm}%`)
-            .eq('initiatives.is_public', true)
             .eq('initiatives.organizations.is_public', true)
             .limit(20);
 
@@ -194,12 +194,11 @@ export class PublicService {
 
         if (error || !org) return null;
 
-        // Get stats
+        // Get stats - if org is public, all its initiatives count
         const { data: initiatives } = await supabase
             .from('initiatives')
             .select('id')
-            .eq('organization_id', org.id)
-            .eq('is_public', true);
+            .eq('organization_id', org.id);
 
         const initiativeIds = (initiatives || []).map(i => i.id);
         let locationCount = 0;
@@ -238,6 +237,7 @@ export class PublicService {
     }
 
     static async getOrganizationInitiatives(orgSlug: string): Promise<PublicInitiative[]> {
+        // If org is public, all its initiatives are visible
         const { data, error } = await supabase
             .from('initiatives')
             .select(`
@@ -246,11 +246,10 @@ export class PublicService {
             `)
             .eq('organizations.slug', orgSlug)
             .eq('organizations.is_public', true)
-            .eq('is_public', true)
             .order('created_at', { ascending: false });
 
         if (error) throw new Error(`Failed to fetch initiatives: ${error.message}`);
-        
+
         return (data || []).map((i: any) => ({
             id: i.id,
             title: i.title,
@@ -291,7 +290,7 @@ export class PublicService {
 
         return (data || []).map((k: any) => {
             const updates = k.kpi_updates || [];
-            const totalValue = updates.length > 0 
+            const totalValue = updates.length > 0
                 ? updates.reduce((sum: number, u: any) => sum + (u.value || 0), 0)
                 : undefined;
 
@@ -424,6 +423,7 @@ export class PublicService {
     // ============================================
 
     static async getInitiativeBySlug(orgSlug: string, initiativeSlug: string): Promise<PublicInitiative | null> {
+        // If org is public, all its initiatives are visible
         const { data, error } = await supabase
             .from('initiatives')
             .select(`
@@ -433,7 +433,6 @@ export class PublicService {
             .eq('slug', initiativeSlug)
             .eq('organizations.slug', orgSlug)
             .eq('organizations.is_public', true)
-            .eq('is_public', true)
             .single();
 
         if (error || !data) return null;
@@ -468,7 +467,7 @@ export class PublicService {
             `)
             .eq('initiative_id', initiative.id)
             .order('display_order');
-        
+
         if (kpisError) {
             console.error('[Dashboard] KPIs query error:', kpisError);
         }
@@ -477,13 +476,13 @@ export class PublicService {
         // Get evidence counts per KPI separately (to avoid RLS issues)
         const kpiIds = (kpis || []).map(k => k.id);
         let evidenceCounts: Record<string, number> = {};
-        
+
         if (kpiIds.length > 0) {
             const { data: evidenceLinks, error: evidenceError } = await supabase
                 .from('evidence_kpis')
                 .select('kpi_id')
                 .in('kpi_id', kpiIds);
-            
+
             if (evidenceError) {
                 console.log('[Dashboard] Evidence links query error (may be RLS):', evidenceError.message);
             } else {
@@ -501,7 +500,7 @@ export class PublicService {
             const updateCount = updates.length;
             const evidenceCount = evidenceCounts[kpi.id] || 0;
             // Simple coverage: if there's evidence linked, estimate coverage based on evidence vs updates
-            const evidencePercentage = updateCount > 0 && evidenceCount > 0 
+            const evidencePercentage = updateCount > 0 && evidenceCount > 0
                 ? Math.min(100, Math.round((evidenceCount / updateCount) * 100))
                 : 0;
 
@@ -529,7 +528,7 @@ export class PublicService {
                 }))
             };
         });
-        
+
         console.log('[Dashboard] Processed KPIs:', processedKpis.length);
 
         // Get locations
@@ -684,7 +683,7 @@ export class PublicService {
         return (data || []).map((k: any) => {
             const updates = k.kpi_updates || [];
             const totalValue = updates.reduce((sum: number, u: any) => sum + (u.value || 0), 0);
-            
+
             return {
                 id: k.id,
                 title: k.title,

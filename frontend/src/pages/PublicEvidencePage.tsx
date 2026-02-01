@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { 
+import {
     ArrowLeft, Calendar, FileText, ChevronLeft, ChevronRight,
     Image, File, Video, Mic, ExternalLink
 } from 'lucide-react'
@@ -25,12 +25,12 @@ const categoryColors: Record<string, { bg: string; text: string }> = {
 }
 
 export default function PublicEvidencePage() {
-    const { orgSlug, initiativeSlug, evidenceId } = useParams<{ 
+    const { orgSlug, initiativeSlug, evidenceId } = useParams<{
         orgSlug: string
         initiativeSlug: string
-        evidenceId: string 
+        evidenceId: string
     }>()
-    
+
     const [evidence, setEvidence] = useState<PublicEvidenceDetail | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -67,7 +67,7 @@ export default function PublicEvidencePage() {
                     <FileText className="w-16 h-16 text-gray-300 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-gray-800 mb-3">Evidence Not Found</h1>
                     <p className="text-gray-500 mb-8">{error || 'This evidence does not exist.'}</p>
-                    <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=evidence`} 
+                    <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=evidence`}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-xl hover:bg-gray-700 transition-colors font-medium">
                         <ArrowLeft className="w-4 h-4" /> Back to Evidence
                     </Link>
@@ -81,9 +81,9 @@ export default function PublicEvidencePage() {
     const brandColor = evidence.initiative.brand_color || '#c0dfa1'
 
     // Get all files (either from files array or single file_url)
-    const allFiles = evidence.files.length > 0 
-        ? evidence.files 
-        : evidence.file_url 
+    const allFiles = evidence.files.length > 0
+        ? evidence.files
+        : evidence.file_url
             ? [{ id: '0', file_url: evidence.file_url, file_name: evidence.title, file_type: evidence.type }]
             : []
 
@@ -105,7 +105,7 @@ export default function PublicEvidencePage() {
     return (
         <div className="min-h-screen font-figtree relative animate-fadeIn">
             {/* Flowing gradient background */}
-            <div 
+            <div
                 className="fixed inset-0 pointer-events-none"
                 style={{
                     background: `
@@ -122,7 +122,7 @@ export default function PublicEvidencePage() {
             <div className="sticky top-0 z-50 bg-white/60 backdrop-blur-2xl border-b border-white/40">
                 <div className="max-w-5xl mx-auto px-6 py-4">
                     <div className="flex items-center justify-between">
-                        <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=evidence`} 
+                        <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=evidence`}
                             className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors">
                             <ArrowLeft className="w-5 h-5" />
                             <span className="font-medium">Back to Evidence</span>
@@ -134,7 +134,7 @@ export default function PublicEvidencePage() {
             {/* Main Content */}
             <div className="relative z-10 max-w-6xl mx-auto px-6 py-6 h-[calc(100vh-80px)] flex flex-col">
                 {/* Breadcrumb */}
-                <PublicBreadcrumb 
+                <PublicBreadcrumb
                     orgSlug={orgSlug!}
                     orgName={evidence.initiative.org_name || ''}
                     items={[
@@ -151,13 +151,13 @@ export default function PublicEvidencePage() {
                             <div className="relative bg-gray-900 flex-1 min-h-[400px] flex items-center justify-center">
                                 {currentFile ? (
                                     isImage(currentFile) ? (
-                                        <img 
-                                            src={currentFile.file_url} 
+                                        <img
+                                            src={currentFile.file_url}
                                             alt={currentFile.file_name}
                                             className="max-w-full max-h-full object-contain"
                                         />
                                     ) : isPdf(currentFile) ? (
-                                        <iframe 
+                                        <iframe
                                             src={currentFile.file_url}
                                             className="w-full h-full"
                                             title={currentFile.file_name}
@@ -166,7 +166,7 @@ export default function PublicEvidencePage() {
                                         <div className="text-center text-white">
                                             <TypeIcon className="w-16 h-16 mx-auto mb-4 opacity-50" />
                                             <p className="text-sm opacity-70">{currentFile.file_name}</p>
-                                            <a 
+                                            <a
                                                 href={currentFile.file_url}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
@@ -204,11 +204,10 @@ export default function PublicEvidencePage() {
                                                 <button
                                                     key={index}
                                                     onClick={() => setCurrentFileIndex(index)}
-                                                    className={`w-2 h-2 rounded-full transition-all ${
-                                                        index === currentFileIndex 
-                                                            ? 'w-6 bg-white' 
+                                                    className={`w-2 h-2 rounded-full transition-all ${index === currentFileIndex
+                                                            ? 'w-6 bg-white'
                                                             : 'bg-white/50 hover:bg-white/70'
-                                                    }`}
+                                                        }`}
                                                 />
                                             ))}
                                         </div>
@@ -260,10 +259,10 @@ export default function PublicEvidencePage() {
                             {/* Date */}
                             <div className="flex items-center gap-2 text-sm text-gray-500">
                                 <Calendar className="w-4 h-4" />
-                                {new Date(evidence.date_represented).toLocaleDateString('en-US', { 
-                                    year: 'numeric', 
-                                    month: 'long', 
-                                    day: 'numeric' 
+                                {new Date(evidence.date_represented).toLocaleDateString('en-US', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric'
                                 })}
                             </div>
 
@@ -311,7 +310,7 @@ export default function PublicEvidencePage() {
                         {/* Initiative Link */}
                         <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 flex-shrink-0">
                             <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">From Initiative</p>
-                            <Link 
+                            <Link
                                 to={`/org/${orgSlug}/${initiativeSlug}`}
                                 className="flex items-center justify-between text-gray-800 hover:text-primary-600 font-medium transition-colors group"
                             >

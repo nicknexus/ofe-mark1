@@ -190,11 +190,12 @@ export class OrganizationService {
             updates.slug = slug;
         }
 
+        // Note: Ownership is verified in route handlers before calling this function
+        // Using service role key bypasses RLS, so we just filter by id
         const { data, error } = await supabase
             .from('organizations')
             .update(updates)
             .eq('id', id)
-            .eq('owner_id', userId) // Ensure only owner can update
             .select()
             .single();
 

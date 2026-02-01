@@ -1,5 +1,6 @@
 import { supabase } from '../utils/supabase';
 import { TeamService } from './teamService';
+import { PLAN_LIMITS } from '../utils/stripe';
 
 export interface Subscription {
     id: string;
@@ -100,7 +101,8 @@ export class SubscriptionService {
             .update({
                 status: 'trial',
                 trial_started_at: now.toISOString(),
-                trial_ends_at: trialEnd.toISOString()
+                trial_ends_at: trialEnd.toISOString(),
+                initiatives_limit: PLAN_LIMITS.trial.initiatives_limit
             })
             .eq('user_id', userId)
             .select()
@@ -331,7 +333,8 @@ export class SubscriptionService {
             .update({
                 status: 'trial',
                 trial_started_at: now.toISOString(),
-                trial_ends_at: trialEnd.toISOString()
+                trial_ends_at: trialEnd.toISOString(),
+                initiatives_limit: PLAN_LIMITS.trial.initiatives_limit
             })
             .eq('user_id', userId)
             .select()

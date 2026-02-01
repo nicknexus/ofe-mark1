@@ -141,9 +141,9 @@ export class TeamService {
     /**
      * Get user's organization (where they are owner)
      */
-    static async getUserOwnedOrganization(userId: string): Promise<{ id: string; name: string; logo_url?: string; brand_color?: string } | null> {
+    static async getUserOwnedOrganization(userId: string): Promise<{ id: string; name: string; logo_url?: string; brand_color?: string; is_public?: boolean } | null> {
         console.log(`[getUserOwnedOrganization] Looking up org for user: ${userId}`);
-        
+
         // Retry logic for serverless connection issues
         const maxRetries = 3;
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -152,10 +152,10 @@ export class TeamService {
                 // This helps debug if the issue is with the query or the connection
                 const response = await supabase
                     .from('organizations')
-                    .select('id, name, owner_id, logo_url, brand_color')
+                    .select('id, name, owner_id, logo_url, brand_color, is_public')
                     .eq('owner_id', userId)
                     .limit(1);
-                
+
                 console.log(`[getUserOwnedOrganization] Attempt ${attempt} - Raw response:`, {
                     status: response.status,
                     statusText: response.statusText,
@@ -172,9 +172,9 @@ export class TeamService {
                     }
                     return null;
                 }
-                
+
                 const data = response.data?.[0] || null;
-                
+
                 if (!data) {
                     if (attempt < maxRetries) {
                         console.log(`[getUserOwnedOrganization] Attempt ${attempt} - No data, retrying in ${150 * attempt}ms...`);
@@ -184,9 +184,9 @@ export class TeamService {
                     console.log(`[getUserOwnedOrganization] No owned org found for user: ${userId} (after ${attempt} attempts)`);
                     return null;
                 }
-                
+
                 console.log(`[getUserOwnedOrganization] Found org: ${data.name} (${data.id}) on attempt ${attempt}`);
-                return { id: data.id, name: data.name, logo_url: data.logo_url, brand_color: data.brand_color };
+                return { id: data.id, name: data.name, logo_url: data.logo_url, brand_color: data.brand_color, is_public: data.is_public };
             } catch (e) {
                 console.error(`[getUserOwnedOrganization] Attempt ${attempt} - Exception:`, e);
                 if (attempt < maxRetries) {
@@ -223,6 +223,7 @@ export class TeamService {
         canAddImpactClaims?: boolean;
         logo_url?: string;
         brand_color?: string;
+        is_public?: boolean;
     }>> {
         const orgs: Array<{
             id: string;
@@ -231,6 +232,7 @@ export class TeamService {
             canAddImpactClaims?: boolean;
             logo_url?: string;
             brand_color?: string;
+            is_public?: boolean;
         }> = [];
 
         // Get owned organization
@@ -242,7 +244,8 @@ export class TeamService {
                 role: 'owner',
                 canAddImpactClaims: true,
                 logo_url: ownedOrg.logo_url,
-                brand_color: ownedOrg.brand_color
+                brand_color: ownedOrg.brand_color,
+                is_public: ownedOrg.is_public
             });
         }
 
@@ -297,7 +300,7 @@ export class TeamService {
     static async getUserPermissions(userId: string, activeOrgId?: string): Promise<UserPermissions> {
         // First check if user owns an organization
         const ownedOrg = await this.getUserOwnedOrganization(userId);
-        
+
         // Check if user is a team member of any org
         const membership = await this.getUserTeamMembership(userId);
 
@@ -314,7 +317,7 @@ export class TeamService {
                     organizationName: ownedOrg.name
                 };
             }
-            
+
             // Check if user is a member of this specific org
             if (membership && membership.organization_id === activeOrgId) {
                 const { data: org } = await supabase
@@ -425,7 +428,7 @@ export class TeamService {
                 throw new Error('An invitation is already pending for this email');
             }
         }
-        
+
         // Clean up any very old invites for this email (older than 30 days)
         await supabase
             .from('team_invitations')
@@ -497,7 +500,7 @@ export class TeamService {
      */
     static async getInvitationByToken(token: string): Promise<InviteDetails | null> {
         console.log(`[getInvitationByToken] Looking up token: ${token?.substring(0, 15)}...`);
-        
+
         // Use service role to bypass RLS for public token lookup
         const { data: invite, error } = await supabase
             .from('team_invitations')
@@ -516,7 +519,7 @@ export class TeamService {
             console.error(`[getInvitationByToken] Database error:`, error);
             return null;
         }
-        
+
         if (!invite) {
             console.log(`[getInvitationByToken] No invite found for token: ${token?.substring(0, 15)}...`);
             // Let's check ALL invites to debug what happened
@@ -524,12 +527,12 @@ export class TeamService {
                 .from('team_invitations')
                 .select('token, status, email')
                 .limit(10);
-            console.log(`[getInvitationByToken] ALL invites in DB:`, JSON.stringify(allInvites?.map(i => ({ 
-                token: i.token?.substring(0, 15), 
+            console.log(`[getInvitationByToken] ALL invites in DB:`, JSON.stringify(allInvites?.map(i => ({
+                token: i.token?.substring(0, 15),
                 status: i.status,
-                email: i.email 
+                email: i.email
             }))));
-            
+
             // Also check team_members to see if invite was auto-accepted
             const { data: members } = await supabase
                 .from('team_members')
@@ -537,10 +540,10 @@ export class TeamService {
                 .order('created_at', { ascending: false })
                 .limit(5);
             console.log(`[getInvitationByToken] Recent team_members:`, JSON.stringify(members));
-            
+
             return null;
         }
-        
+
         console.log(`[getInvitationByToken] Found invite with status: ${invite.status}, org_id: ${invite.organization_id}`);
 
         // Get organization name
@@ -576,26 +579,26 @@ export class TeamService {
      */
     static async acceptInvitation(token: string, userId: string, userEmail: string): Promise<TeamMember> {
         console.log(`[acceptInvitation] Starting for token: ${token?.substring(0, 15)}..., user: ${userEmail}`);
-        
+
         // Get invitation with retry logic for serverless connection issues
         let invite = null;
         let inviteError = null;
-        
+
         for (let attempt = 1; attempt <= 3; attempt++) {
             const { data, error } = await supabase
                 .from('team_invitations')
                 .select('*')
                 .eq('token', token)
                 .maybeSingle();
-            
+
             console.log(`[acceptInvitation] Attempt ${attempt} - Found: ${!!data}, Error: ${error?.message || 'none'}, Status: ${data?.status}`);
-            
+
             if (data) {
                 invite = data;
                 inviteError = null;
                 break;
             }
-            
+
             inviteError = error;
             if (attempt < 3) {
                 await new Promise(r => setTimeout(r, 200));
@@ -606,7 +609,7 @@ export class TeamService {
             console.log(`[acceptInvitation] Invite not found after retries`);
             throw new Error('Invalid or expired invitation');
         }
-        
+
         // Check status
         if (invite.status !== 'pending') {
             console.log(`[acceptInvitation] Invite status is '${invite.status}', not 'pending'`);
@@ -665,7 +668,7 @@ export class TeamService {
             console.error(`[acceptInvitation] Failed to create membership:`, memberError);
             throw new Error(`Failed to create membership: ${memberError.message}`);
         }
-        
+
         console.log(`[acceptInvitation] Successfully created team member: ${member.id}`);
 
         // Mark invitation as accepted

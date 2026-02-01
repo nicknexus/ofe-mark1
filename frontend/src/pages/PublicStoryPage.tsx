@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { 
+import {
     ArrowLeft, Calendar, MapPin, Users, FileText, BookOpen
 } from 'lucide-react'
 import { publicApi, PublicStoryDetail } from '../services/publicApi'
@@ -8,12 +8,12 @@ import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
 
 export default function PublicStoryPage() {
-    const { orgSlug, initiativeSlug, storyId } = useParams<{ 
+    const { orgSlug, initiativeSlug, storyId } = useParams<{
         orgSlug: string
         initiativeSlug: string
-        storyId: string 
+        storyId: string
     }>()
-    
+
     const [story, setStory] = useState<PublicStoryDetail | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -49,7 +49,7 @@ export default function PublicStoryPage() {
                     <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-gray-800 mb-3">Story Not Found</h1>
                     <p className="text-gray-500 mb-8">{error || 'This story does not exist.'}</p>
-                    <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=stories`} 
+                    <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=stories`}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-xl hover:bg-gray-700 transition-colors font-medium">
                         <ArrowLeft className="w-4 h-4" /> Back to Stories
                     </Link>
@@ -64,7 +64,7 @@ export default function PublicStoryPage() {
     return (
         <div className="min-h-screen font-figtree relative animate-fadeIn">
             {/* Flowing gradient background */}
-            <div 
+            <div
                 className="fixed inset-0 pointer-events-none"
                 style={{
                     background: `
@@ -81,7 +81,7 @@ export default function PublicStoryPage() {
             <div className="sticky top-0 z-50 bg-white/60 backdrop-blur-2xl border-b border-white/40">
                 <div className="max-w-4xl mx-auto px-6 py-4">
                     <div className="flex items-center justify-between">
-                        <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=stories`} 
+                        <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=stories`}
                             className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors">
                             <ArrowLeft className="w-5 h-5" />
                             <span className="font-medium">Back to Stories</span>
@@ -93,7 +93,7 @@ export default function PublicStoryPage() {
             {/* Main Content */}
             <div className="relative z-10 max-w-4xl mx-auto px-6 py-8">
                 {/* Breadcrumb */}
-                <PublicBreadcrumb 
+                <PublicBreadcrumb
                     orgSlug={orgSlug!}
                     orgName={story.initiative.org_name || ''}
                     items={[
@@ -107,8 +107,8 @@ export default function PublicStoryPage() {
                     {/* Media */}
                     {story.media_url && story.media_type === 'photo' && (
                         <div className="w-full aspect-video bg-gray-100 overflow-hidden">
-                            <img 
-                                src={story.media_url} 
+                            <img
+                                src={story.media_url}
                                 alt={story.title}
                                 className="w-full h-full object-cover"
                             />
@@ -116,9 +116,9 @@ export default function PublicStoryPage() {
                     )}
                     {story.media_type === 'video' && story.media_url && (
                         <div className="w-full aspect-video bg-black">
-                            <video 
-                                src={story.media_url} 
-                                controls 
+                            <video
+                                src={story.media_url}
+                                controls
                                 className="w-full h-full"
                             />
                         </div>
@@ -138,10 +138,10 @@ export default function PublicStoryPage() {
                         <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-6 pb-6 border-b border-gray-100">
                             <span className="flex items-center gap-1.5">
                                 <Calendar className="w-4 h-4" />
-                                {new Date(story.date_represented).toLocaleDateString('en-US', { 
-                                    year: 'numeric', 
-                                    month: 'long', 
-                                    day: 'numeric' 
+                                {new Date(story.date_represented).toLocaleDateString('en-US', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric'
                                 })}
                             </span>
                             {story.location && (
@@ -173,7 +173,7 @@ export default function PublicStoryPage() {
                                 </h3>
                                 <div className="flex flex-wrap gap-2">
                                     {story.beneficiary_groups.map((group) => (
-                                        <span 
+                                        <span
                                             key={group.id}
                                             className="px-3 py-1.5 bg-primary-50 text-primary-700 rounded-full text-sm font-medium"
                                         >
@@ -188,7 +188,7 @@ export default function PublicStoryPage() {
                         {/* Initiative Link */}
                         <div className="mt-8 pt-6 border-t border-gray-100">
                             <p className="text-sm text-gray-500 mb-2">From initiative:</p>
-                            <Link 
+                            <Link
                                 to={`/org/${orgSlug}/${initiativeSlug}`}
                                 className="inline-flex items-center gap-2 text-gray-800 hover:text-primary-600 font-medium transition-colors"
                             >
