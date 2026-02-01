@@ -78,7 +78,7 @@ export default function PublicEvidencePage() {
 
     const typeConfig = evidenceTypeConfig[evidence.type] || evidenceTypeConfig.document
     const TypeIcon = typeConfig.icon
-    const brandColor = '#c0dfa1'
+    const brandColor = evidence.initiative.brand_color || '#c0dfa1'
 
     // Get all files (either from files array or single file_url)
     const allFiles = evidence.files.length > 0 

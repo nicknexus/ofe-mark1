@@ -23,6 +23,11 @@ export default function PublicLoader({ message = 'Loading...' }: PublicLoaderPro
             
             {/* Loader content */}
             <div className="relative z-10 flex flex-col items-center">
+                {/* Nexus Logo */}
+                <div className="w-16 h-16 mb-6">
+                    <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                </div>
+                
                 {/* Three bouncing dots */}
                 <div className="flex items-center gap-1.5 mb-4">
                     <div className="w-2.5 h-2.5 rounded-full bg-primary-400 animate-bounce" style={{ animationDelay: '0ms', animationDuration: '600ms' }} />

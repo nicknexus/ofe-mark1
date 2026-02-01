@@ -59,7 +59,7 @@ export default function PublicStoryPage() {
     }
 
     // Brand color (could be passed from initiative if available)
-    const brandColor = '#c0dfa1'
+    const brandColor = story.initiative.brand_color || '#c0dfa1'
 
     return (
         <div className="min-h-screen font-figtree relative animate-fadeIn">

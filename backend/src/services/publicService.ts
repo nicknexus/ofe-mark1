@@ -24,6 +24,7 @@ export interface PublicInitiative {
     org_slug?: string; // For navigation
     organization_name?: string; // For display
     organization_logo_url?: string; // For display
+    organization_brand_color?: string; // For branding
 }
 
 export interface PublicKPI {
@@ -807,7 +808,8 @@ export class PublicService {
                 title: initiative.title,
                 slug: initiative.slug,
                 org_slug: initiative.org_slug,
-                org_name: initiative.organization_name
+                org_name: initiative.organization_name,
+                brand_color: initiative.organization_brand_color
             }
         };
     }
@@ -866,7 +868,8 @@ export class PublicService {
                 title: initiative.title,
                 slug: initiative.slug,
                 org_slug: initiative.org_slug,
-                org_name: initiative.organization_name
+                org_name: initiative.organization_name,
+                brand_color: initiative.organization_brand_color
             }
         };
     }
@@ -923,7 +926,8 @@ export class PublicService {
                 title: initiative.title,
                 slug: initiative.slug,
                 org_slug: initiative.org_slug,
-                org_name: initiative.organization_name
+                org_name: initiative.organization_name,
+                brand_color: initiative.organization_brand_color
             }
         };
     }

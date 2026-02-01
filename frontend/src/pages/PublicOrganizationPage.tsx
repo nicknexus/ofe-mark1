@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { 
-    Loader2, Building2, MapPin, BarChart3, ArrowLeft, Globe, 
+    Building2, MapPin, BarChart3, ArrowLeft, Globe, 
     BookOpen, FileText, Calendar, ChevronRight, ChevronLeft, ArrowRight,
     TrendingUp, Filter, ChevronDown, X
 } from 'lucide-react'

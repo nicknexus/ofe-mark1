@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { 
-    Loader2, ArrowLeft, BarChart3, TrendingUp, FileText, Calendar, 
+    ArrowLeft, BarChart3, TrendingUp, FileText, Calendar, 
     ExternalLink, MapPin, Target, Sparkles, CheckCircle2
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
@@ -54,12 +54,12 @@ export default function PublicMetricPage() {
     if (error || !metric) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center px-6">
-                <div className="glass-card p-12 rounded-3xl text-center max-w-md">
-                    <BarChart3 className="w-16 h-16 text-muted-foreground/50 mx-auto mb-6" />
-                    <h1 className="text-2xl font-semibold text-foreground mb-3">Metric Not Found</h1>
-                    <p className="text-muted-foreground mb-8">{error || 'This metric does not exist.'}</p>
+                <div className="bg-white/50 backdrop-blur-2xl border border-white/60 shadow-xl p-12 rounded-3xl text-center max-w-md">
+                    <BarChart3 className="w-16 h-16 text-gray-300 mx-auto mb-6" />
+                    <h1 className="text-2xl font-semibold text-gray-800 mb-3">Metric Not Found</h1>
+                    <p className="text-gray-500 mb-8">{error || 'This metric does not exist.'}</p>
                     <Link to={`/org/${orgSlug}/${initiativeSlug}`} 
-                        className="inline-flex items-center gap-2 px-6 py-3 bg-accent text-white rounded-xl hover:bg-accent/90 transition-colors font-medium">
+                        className="inline-flex items-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-xl hover:bg-gray-700 transition-colors font-medium">
                         <ArrowLeft className="w-4 h-4" /> Back to Initiative
                     </Link>
                 </div>
@@ -87,8 +87,8 @@ export default function PublicMetricPage() {
         return { ...d, cumulative }
     })
 
-    // Brand color from initiative data or fallback
-    const brandColor = '#c0dfa1' // Could be passed from initiative if available
+    // Brand color from initiative/organization data
+    const brandColor = metric.initiative.brand_color || '#c0dfa1'
 
     return (
         <div className="min-h-screen font-figtree relative animate-fadeIn">
@@ -110,7 +110,7 @@ export default function PublicMetricPage() {
             <div className="sticky top-0 z-50 bg-white/60 backdrop-blur-2xl border-b border-white/40">
                 <div className="max-w-7xl mx-auto px-6 py-3">
                     <div className="flex items-center justify-between">
-                        <Link to={`/org/${orgSlug}/${initiativeSlug}`} className="flex items-center gap-2 text-muted-foreground hover:text-accent transition-colors">
+                        <Link to={`/org/${orgSlug}/${initiativeSlug}`} className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors">
                             <ArrowLeft className="w-4 h-4" />
                             <span className="text-sm font-medium">Back to Initiative</span>
                         </Link>
@@ -118,7 +118,7 @@ export default function PublicMetricPage() {
                             <div className="w-7 h-7 rounded-lg flex items-center justify-center overflow-hidden">
                                 <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
                             </div>
-                            <span className="text-base font-newsreader font-extralight text-foreground hidden sm:block">Nexus Impacts</span>
+                            <span className="text-base font-newsreader font-extralight text-gray-800 hidden sm:block">Nexus Impacts</span>
                         </Link>
                     </div>
                 </div>
@@ -145,24 +145,24 @@ export default function PublicMetricPage() {
                                 <span className={`px-3 py-1.5 text-xs font-bold rounded-full text-white ${config.bg} uppercase tracking-wide`}>
                                     {metric.category}
                                 </span>
-                                <span className="text-sm text-muted-foreground flex items-center gap-1">
+                                <span className="text-sm text-gray-500 flex items-center gap-1">
                                     <Sparkles className="w-3.5 h-3.5" />
                                     {metric.update_count} impact claim{metric.update_count !== 1 ? 's' : ''}
                                 </span>
                             </div>
-                            <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-2">{metric.title}</h1>
+                            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">{metric.title}</h1>
                             {metric.description && (
-                                <p className="text-lg text-muted-foreground max-w-2xl">{metric.description}</p>
+                                <p className="text-lg text-gray-600 max-w-2xl">{metric.description}</p>
                             )}
                         </div>
                         
                         {/* Big Total Card */}
-                        <div className={`bg-gradient-to-br ${config.gradient} p-6 rounded-3xl text-white shadow-xl shadow-accent/10 min-w-[200px]`}>
-                            <p className="text-white/80 text-sm font-medium mb-1">Total Impact</p>
-                            <p className="text-4xl sm:text-5xl font-bold tracking-tight">
+                        <div className="bg-white/70 backdrop-blur-2xl p-6 rounded-3xl shadow-xl shadow-black/10 border border-white/60 min-w-[200px]">
+                            <p className="text-gray-500 text-sm font-medium mb-1">Total Impact</p>
+                            <p className={`text-4xl sm:text-5xl font-bold tracking-tight ${config.text}`}>
                                 {metric.total_value.toLocaleString()}
                             </p>
-                            <p className="text-white/80 text-sm mt-1">{metric.unit_of_measurement}</p>
+                            <p className="text-gray-500 text-sm mt-1">{metric.unit_of_measurement}</p>
                         </div>
                     </div>
                 </div>
@@ -170,19 +170,19 @@ export default function PublicMetricPage() {
                 {/* Dashboard Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                     {/* Chart - Takes 2 columns */}
-                    <div className="lg:col-span-2 bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                            <h2 className="font-semibold text-foreground flex items-center gap-2">
+                    <div className="lg:col-span-2 bg-white/50 backdrop-blur-2xl rounded-3xl border border-white/60 shadow-xl shadow-black/5 overflow-hidden">
+                        <div className="px-6 py-4 border-b border-white/40 flex items-center justify-between">
+                            <h2 className="font-semibold text-gray-800 flex items-center gap-2">
                                 <TrendingUp className="w-5 h-5 text-accent" />
                                 Cumulative Progress
                             </h2>
-                            <span className="text-xs text-muted-foreground bg-gray-100 px-3 py-1 rounded-full">
+                            <span className="text-xs text-gray-500 bg-white/60 px-3 py-1 rounded-full">
                                 All time
                             </span>
                         </div>
                         
                         {chartData.length === 0 ? (
-                            <div className="h-72 flex items-center justify-center text-muted-foreground">
+                            <div className="h-72 flex items-center justify-center text-gray-500">
                                 <div className="text-center">
                                     <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-30" />
                                     <p>No impact claims recorded yet</p>
@@ -240,16 +240,16 @@ export default function PublicMetricPage() {
                     </div>
 
                     {/* Impact Claims - Right side scrollable */}
-                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col max-h-[400px]">
-                        <div className="px-6 py-4 border-b border-gray-100 flex-shrink-0">
-                            <h2 className="font-semibold text-foreground flex items-center gap-2">
+                    <div className="bg-white/50 backdrop-blur-2xl rounded-3xl border border-white/60 shadow-xl shadow-black/5 overflow-hidden flex flex-col max-h-[400px]">
+                        <div className="px-6 py-4 border-b border-white/40 flex-shrink-0">
+                            <h2 className="font-semibold text-gray-800 flex items-center gap-2">
                                 <Target className="w-5 h-5 text-accent" />
                                 Impact Claims
                             </h2>
                         </div>
                         
                         {metric.updates.length === 0 ? (
-                            <div className="flex-1 flex items-center justify-center text-muted-foreground p-6">
+                            <div className="flex-1 flex items-center justify-center text-gray-500 p-6">
                                 <div className="text-center">
                                     <Target className="w-10 h-10 mx-auto mb-2 opacity-30" />
                                     <p className="text-sm">No claims yet</p>
@@ -268,9 +268,9 @@ export default function PublicMetricPage() {
                 </div>
 
                 {/* Evidence Section */}
-                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                        <h2 className="font-semibold text-foreground flex items-center gap-2">
+                <div className="bg-white/50 backdrop-blur-2xl rounded-3xl border border-white/60 shadow-xl shadow-black/5 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-white/40 flex items-center justify-between">
+                        <h2 className="font-semibold text-gray-800 flex items-center gap-2">
                             <FileText className="w-5 h-5 text-accent" />
                             Supporting Evidence
                         </h2>
@@ -280,7 +280,7 @@ export default function PublicMetricPage() {
                     </div>
                     
                     {metric.evidence.length === 0 ? (
-                        <div className="py-16 text-center text-muted-foreground">
+                        <div className="py-16 text-center text-gray-500">
                             <FileText className="w-14 h-14 mx-auto mb-4 opacity-20" />
                             <p className="text-lg font-medium mb-1">No evidence linked yet</p>
                             <p className="text-sm">Evidence will appear here when linked to this metric</p>
@@ -296,10 +296,10 @@ export default function PublicMetricPage() {
             </div>
 
             {/* Footer */}
-            <div className="relative z-10 border-t border-gray-100 bg-white/50 backdrop-blur-sm mt-12">
+            <div className="relative z-10 border-t border-white/40 bg-white/40 backdrop-blur-xl mt-12">
                 <div className="max-w-7xl mx-auto px-6 py-6">
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-gray-600">
                             Part of <Link to={`/org/${orgSlug}/${initiativeSlug}`} className="text-accent hover:underline font-medium">{metric.initiative.title}</Link>
                         </p>
                         <Link to={`/org/${orgSlug}`} className="text-sm text-accent hover:text-accent/80 font-medium flex items-center gap-1">
@@ -324,16 +324,16 @@ function ImpactClaimCard({ update, unit, config }: {
         : new Date(update.date_represented).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
     return (
-        <div className="p-4 bg-gradient-to-r from-gray-50 to-white rounded-2xl border border-gray-100 hover:border-accent/30 hover:shadow-md transition-all group">
+        <div className="p-4 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/50 hover:bg-white/80 hover:shadow-md transition-all group">
             <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                         <span className={`text-xl font-bold ${config.text}`}>
                             +{parseFloat(update.value).toLocaleString()}
                         </span>
-                        <span className="text-xs text-muted-foreground">{unit}</span>
+                        <span className="text-xs text-gray-500">{unit}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
                         <Calendar className="w-3 h-3" />
                         <span>{displayDate}</span>
                     </div>
@@ -341,13 +341,13 @@ function ImpactClaimCard({ update, unit, config }: {
                 <CheckCircle2 className="w-5 h-5 text-accent/50 group-hover:text-accent transition-colors flex-shrink-0" />
             </div>
             {update.location && (
-                <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
                     <MapPin className="w-3 h-3" />
                     <span>{update.location.name}</span>
                 </div>
             )}
             {update.note && (
-                <p className="mt-2 text-xs text-muted-foreground line-clamp-2 italic">"{update.note}"</p>
+                <p className="mt-2 text-xs text-gray-500 line-clamp-2 italic">"{update.note}"</p>
             )}
         </div>
     )
@@ -386,7 +386,7 @@ function EvidenceCard({ evidence }: { evidence: PublicEvidence }) {
     const fileCount = evidence.files?.length || (evidence.file_url ? 1 : 0)
 
     return (
-        <div className="glass-card rounded-2xl border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all overflow-hidden">
+        <div className="bg-white/60 backdrop-blur-sm rounded-2xl border border-white/50 hover:bg-white/80 hover:shadow-lg transition-all overflow-hidden">
             {/* Image Preview */}
             {previewUrl ? (
                 <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="block">
@@ -408,7 +408,7 @@ function EvidenceCard({ evidence }: { evidence: PublicEvidence }) {
                     <div className="aspect-video bg-gradient-to-br from-accent/10 to-accent/5 flex items-center justify-center">
                         <div className="text-center">
                             <FileText className="w-10 h-10 text-accent/50 mx-auto mb-2" />
-                            <span className="text-sm text-muted-foreground">
+                            <span className="text-sm text-gray-500">
                                 {fileCount} file{fileCount > 1 ? 's' : ''}
                             </span>
                         </div>
@@ -422,10 +422,10 @@ function EvidenceCard({ evidence }: { evidence: PublicEvidence }) {
                     <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${config.bg}`}>
                         {config.label}
                     </span>
-                    <span className="text-xs text-muted-foreground">{new Date(evidence.date_represented).toLocaleDateString()}</span>
+                    <span className="text-xs text-gray-500">{new Date(evidence.date_represented).toLocaleDateString()}</span>
                 </div>
-                <h3 className="font-semibold text-foreground text-sm mb-1">{evidence.title}</h3>
-                {evidence.description && <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{evidence.description}</p>}
+                <h3 className="font-semibold text-gray-800 text-sm mb-1">{evidence.title}</h3>
+                {evidence.description && <p className="text-xs text-gray-500 line-clamp-2 mb-2">{evidence.description}</p>}
                 
                 {/* File link (if no preview shown) */}
                 {!previewUrl && fileUrl && (

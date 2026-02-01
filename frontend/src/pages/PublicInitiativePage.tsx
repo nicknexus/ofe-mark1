@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { 
-    Loader2, ArrowLeft, Globe, BarChart3, BookOpen, MapPin, 
+    ArrowLeft, Globe, BarChart3, BookOpen, MapPin, 
     FileText, Users, Calendar, ChevronRight, ExternalLink, TrendingUp,
     Building2, ChevronDown, Filter, X, Activity, Layers, Zap
 } from 'lucide-react'
@@ -520,6 +520,10 @@ export default function PublicInitiativePage() {
                         {switching ? (
                             <div className="flex items-center justify-center py-32">
                                 <div className="flex flex-col items-center">
+                                    {/* Nexus Logo */}
+                                    <div className="w-12 h-12 mb-4">
+                                        <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                                    </div>
                                     {/* Three bouncing dots */}
                                     <div className="flex items-center gap-1.5 mb-3">
                                         <div className="w-2 h-2 rounded-full bg-primary-400 animate-bounce" style={{ animationDelay: '0ms', animationDuration: '600ms' }} />
@@ -1455,7 +1459,18 @@ function BeneficiariesTab({ beneficiaries }: { beneficiaries: PublicBeneficiaryG
 function LoadingState() {
     return (
         <div className="glass-card p-16 rounded-2xl text-center border-accent/20">
-            <Loader2 className="w-10 h-10 text-primary-500 animate-spin mx-auto" />
+            <div className="flex flex-col items-center">
+                {/* Nexus Logo */}
+                <div className="w-12 h-12 mb-4">
+                    <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                </div>
+                {/* Three bouncing dots */}
+                <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-primary-400 animate-bounce" style={{ animationDelay: '0ms', animationDuration: '600ms' }} />
+                    <div className="w-2 h-2 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '150ms', animationDuration: '600ms' }} />
+                    <div className="w-2 h-2 rounded-full bg-primary-400 animate-bounce" style={{ animationDelay: '300ms', animationDuration: '600ms' }} />
+                </div>
+            </div>
         </div>
     )
 }

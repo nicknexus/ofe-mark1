@@ -338,6 +338,7 @@ export interface PublicMetricDetail {
         slug: string
         org_slug?: string
         org_name?: string
+        brand_color?: string
     }
 }
 
@@ -358,6 +359,7 @@ export interface PublicStoryDetail {
         slug: string
         org_slug?: string
         org_name?: string
+        brand_color?: string
     }
 }
 
@@ -392,6 +394,7 @@ export interface PublicEvidenceDetail {
         slug: string
         org_slug?: string
         org_name?: string
+        brand_color?: string
     }
 }
 
