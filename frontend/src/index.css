@@ -42,7 +42,8 @@
 @layer base {
     html {
         scroll-behavior: smooth;
-        color: #465360; /* Default text color for entire app */
+        color: #465360;
+        /* Default text color for entire app */
         /* Prevent zooming on mobile */
         touch-action: manipulation;
         -webkit-text-size-adjust: 100%;
@@ -57,13 +58,15 @@
         letter-spacing: -0.01em;
         min-height: 100vh;
         background: #F8F9FB;
-        color: #465360; /* Ensure body uses custom grey */
+        color: #465360;
+        /* Ensure body uses custom grey */
         /* Prevent pull-to-refresh and overscroll */
         overscroll-behavior: none;
     }
 
     /* Prevent iOS Safari auto-zoom on input focus (needs 16px minimum) */
     @media screen and (max-width: 767px) {
+
         input,
         textarea,
         select {
@@ -369,6 +372,10 @@
     animation: fadeIn 0.4s ease-out;
 }
 
+.animate-fadeIn {
+    animation: fadeIn 0.35s ease-out forwards;
+}
+
 .animate-slide-up {
     animation: slideUp 0.5s ease-out;
 }
@@ -386,9 +393,12 @@
 }
 
 @keyframes pulseSlight {
-    0%, 100% {
+
+    0%,
+    100% {
         opacity: 1;
     }
+
     50% {
         opacity: 0.85;
     }
@@ -625,6 +635,7 @@ body.location-modal-open .leaflet-pane {
    ======================================== */
 
 @media (max-width: 767px) {
+
     /* Hide desktop sidebar on mobile */
     .desktop-sidebar {
         display: none !important;
@@ -1075,8 +1086,9 @@ body.location-modal-open .leaflet-pane {
 
     /* Mobile modal styling - all modals become full screen */
     @media (max-width: 767px) {
+
         /* Make all modals full screen on mobile */
-        .fixed.inset-0 > div[class*="max-w"] {
+        .fixed.inset-0>div[class*="max-w"] {
             max-width: 100vw !important;
             width: 100vw !important;
             height: 100vh !important;
@@ -1175,7 +1187,7 @@ body.location-modal-open .leaflet-pane {
     .mobile-bottom-nav {
         display: none !important;
     }
-    
+
     .mobile-only {
         display: none !important;
     }
@@ -1213,47 +1225,169 @@ body.location-modal-open .leaflet-pane {
 }
 
 /* Landing page color utilities - scoped to .landing-page */
-.landing-page .bg-background { background-color: #ffffff; }
-.landing-page .bg-foreground { background-color: #465360; }
-.landing-page .bg-muted { background-color: #f5f5f5; }
-.landing-page .bg-muted\/30 { background-color: rgba(245, 245, 245, 0.3); }
-.landing-page .bg-accent { background-color: #c0dfa1; }
-.landing-page .bg-accent\/10 { background-color: rgba(192, 223, 161, 0.1); }
-.landing-page .bg-accent\/15 { background-color: rgba(192, 223, 161, 0.15); }
-.landing-page .bg-accent\/20 { background-color: rgba(192, 223, 161, 0.2); }
-.landing-page .bg-accent\/30 { background-color: rgba(192, 223, 161, 0.3); }
-.landing-page .bg-accent\/50 { background-color: rgba(192, 223, 161, 0.5); }
-.landing-page .text-foreground { color: #465360; }
-.landing-page .text-muted-foreground { color: #6b7280; }
-.landing-page .text-accent { color: #c0dfa1; }
-.landing-page .text-accent-foreground { color: #465360; }
-.landing-page .border-border { border-color: #e5e7eb; }
-.landing-page .border-border\/30 { border-color: rgba(229, 231, 235, 0.3); }
-.landing-page .border-border\/50 { border-color: rgba(229, 231, 235, 0.5); }
-.landing-page .border-accent { border-color: #c0dfa1; }
-.landing-page .border-accent\/20 { border-color: rgba(192, 223, 161, 0.2); }
-.landing-page .border-accent\/30 { border-color: rgba(192, 223, 161, 0.3); }
-.landing-page .border-accent\/50 { border-color: rgba(192, 223, 161, 0.5); }
-.landing-page .from-background { --tw-gradient-from: #ffffff; }
-.landing-page .to-background { --tw-gradient-to: #ffffff; }
-.landing-page .from-foreground { --tw-gradient-from: #465360; }
-.landing-page .to-foreground { --tw-gradient-to: #465360; }
-.landing-page .via-muted\/30 { --tw-gradient-stops: var(--tw-gradient-from), rgba(245, 245, 245, 0.3), var(--tw-gradient-to); }
-.landing-page .via-sage-light\/10 { --tw-gradient-stops: var(--tw-gradient-from), rgba(232, 243, 223, 0.1), var(--tw-gradient-to); }
-.landing-page .via-slate-light { --tw-gradient-stops: var(--tw-gradient-from), #6b7280, var(--tw-gradient-to); }
-.landing-page .from-accent { --tw-gradient-from: #c0dfa1; }
-.landing-page .from-accent\/20 { --tw-gradient-from: rgba(192, 223, 161, 0.2); }
-.landing-page .to-accent { --tw-gradient-to: #c0dfa1; }
-.landing-page .to-accent\/10 { --tw-gradient-to: rgba(192, 223, 161, 0.1); }
-.landing-page .to-accent\/50 { --tw-gradient-to: rgba(192, 223, 161, 0.5); }
-.landing-page .bg-sage-light { background-color: #e8f3df; }
-.landing-page .bg-sage-light\/10 { background-color: rgba(232, 243, 223, 0.1); }
-.landing-page .bg-sage-light\/20 { background-color: rgba(232, 243, 223, 0.2); }
-.landing-page .bg-sage-light\/40 { background-color: rgba(232, 243, 223, 0.4); }
-.landing-page .from-sage-light { --tw-gradient-from: #e8f3df; }
-.landing-page .to-sage-light { --tw-gradient-to: #e8f3df; }
-.landing-page .ring-accent { --tw-ring-color: #c0dfa1; }
-.landing-page .ring-accent\/50 { --tw-ring-color: rgba(192, 223, 161, 0.5); }
+.landing-page .bg-background {
+    background-color: #ffffff;
+}
+
+.landing-page .bg-foreground {
+    background-color: #465360;
+}
+
+.landing-page .bg-muted {
+    background-color: #f5f5f5;
+}
+
+.landing-page .bg-muted\/30 {
+    background-color: rgba(245, 245, 245, 0.3);
+}
+
+.landing-page .bg-accent {
+    background-color: #c0dfa1;
+}
+
+.landing-page .bg-accent\/10 {
+    background-color: rgba(192, 223, 161, 0.1);
+}
+
+.landing-page .bg-accent\/15 {
+    background-color: rgba(192, 223, 161, 0.15);
+}
+
+.landing-page .bg-accent\/20 {
+    background-color: rgba(192, 223, 161, 0.2);
+}
+
+.landing-page .bg-accent\/30 {
+    background-color: rgba(192, 223, 161, 0.3);
+}
+
+.landing-page .bg-accent\/50 {
+    background-color: rgba(192, 223, 161, 0.5);
+}
+
+.landing-page .text-foreground {
+    color: #465360;
+}
+
+.landing-page .text-muted-foreground {
+    color: #6b7280;
+}
+
+.landing-page .text-accent {
+    color: #c0dfa1;
+}
+
+.landing-page .text-accent-foreground {
+    color: #465360;
+}
+
+.landing-page .border-border {
+    border-color: #e5e7eb;
+}
+
+.landing-page .border-border\/30 {
+    border-color: rgba(229, 231, 235, 0.3);
+}
+
+.landing-page .border-border\/50 {
+    border-color: rgba(229, 231, 235, 0.5);
+}
+
+.landing-page .border-accent {
+    border-color: #c0dfa1;
+}
+
+.landing-page .border-accent\/20 {
+    border-color: rgba(192, 223, 161, 0.2);
+}
+
+.landing-page .border-accent\/30 {
+    border-color: rgba(192, 223, 161, 0.3);
+}
+
+.landing-page .border-accent\/50 {
+    border-color: rgba(192, 223, 161, 0.5);
+}
+
+.landing-page .from-background {
+    --tw-gradient-from: #ffffff;
+}
+
+.landing-page .to-background {
+    --tw-gradient-to: #ffffff;
+}
+
+.landing-page .from-foreground {
+    --tw-gradient-from: #465360;
+}
+
+.landing-page .to-foreground {
+    --tw-gradient-to: #465360;
+}
+
+.landing-page .via-muted\/30 {
+    --tw-gradient-stops: var(--tw-gradient-from), rgba(245, 245, 245, 0.3), var(--tw-gradient-to);
+}
+
+.landing-page .via-sage-light\/10 {
+    --tw-gradient-stops: var(--tw-gradient-from), rgba(232, 243, 223, 0.1), var(--tw-gradient-to);
+}
+
+.landing-page .via-slate-light {
+    --tw-gradient-stops: var(--tw-gradient-from), #6b7280, var(--tw-gradient-to);
+}
+
+.landing-page .from-accent {
+    --tw-gradient-from: #c0dfa1;
+}
+
+.landing-page .from-accent\/20 {
+    --tw-gradient-from: rgba(192, 223, 161, 0.2);
+}
+
+.landing-page .to-accent {
+    --tw-gradient-to: #c0dfa1;
+}
+
+.landing-page .to-accent\/10 {
+    --tw-gradient-to: rgba(192, 223, 161, 0.1);
+}
+
+.landing-page .to-accent\/50 {
+    --tw-gradient-to: rgba(192, 223, 161, 0.5);
+}
+
+.landing-page .bg-sage-light {
+    background-color: #e8f3df;
+}
+
+.landing-page .bg-sage-light\/10 {
+    background-color: rgba(232, 243, 223, 0.1);
+}
+
+.landing-page .bg-sage-light\/20 {
+    background-color: rgba(232, 243, 223, 0.2);
+}
+
+.landing-page .bg-sage-light\/40 {
+    background-color: rgba(232, 243, 223, 0.4);
+}
+
+.landing-page .from-sage-light {
+    --tw-gradient-from: #e8f3df;
+}
+
+.landing-page .to-sage-light {
+    --tw-gradient-to: #e8f3df;
+}
+
+.landing-page .ring-accent {
+    --tw-ring-color: #c0dfa1;
+}
+
+.landing-page .ring-accent\/50 {
+    --tw-ring-color: rgba(192, 223, 161, 0.5);
+}
 
 /* Glass components - global */
 .glass {
@@ -1300,54 +1434,123 @@ body.location-modal-open .leaflet-pane {
 
 /* Landing page animations */
 @keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-20px); }
+
+    0%,
+    100% {
+        transform: translateY(0px);
+    }
+
+    50% {
+        transform: translateY(-20px);
+    }
 }
 
 @keyframes pulse-soft-landing {
-    0%, 100% { opacity: 0.6; }
-    50% { opacity: 1; }
+
+    0%,
+    100% {
+        opacity: 0.6;
+    }
+
+    50% {
+        opacity: 1;
+    }
 }
 
 @keyframes spin-slow {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 @keyframes morph {
-    0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
-    50% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
+
+    0%,
+    100% {
+        border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+    }
+
+    50% {
+        border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
+    }
 }
 
 @keyframes gradient-shift {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
 }
 
 @keyframes scale-pulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.05); }
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
 }
 
 @keyframes fade-up-landing {
-    from { opacity: 0; transform: translateY(30px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 @keyframes fade-in-scale-landing {
-    from { opacity: 0; transform: scale(0.9); }
-    to { opacity: 1; transform: scale(1); }
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 @keyframes slide-in-left {
-    from { opacity: 0; transform: translateX(-50px); }
-    to { opacity: 1; transform: translateX(0); }
+    from {
+        opacity: 0;
+        transform: translateX(-50px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
 @keyframes slide-in-right {
-    from { opacity: 0; transform: translateX(50px); }
-    to { opacity: 1; transform: translateX(0); }
+    from {
+        opacity: 0;
+        transform: translateX(50px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
 .animate-float {

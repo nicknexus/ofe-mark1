@@ -81,6 +81,7 @@ export interface AccessibleOrganization {
     role: 'owner' | 'member'
     canAddImpactClaims?: boolean
     logo_url?: string
+    brand_color?: string
 }
 
 export class TeamService {

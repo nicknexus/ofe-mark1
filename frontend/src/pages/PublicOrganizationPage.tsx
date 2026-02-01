@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { 
-    Loader2, Building2, MapPin, BarChart3, ArrowLeft, Target, 
+    Loader2, Building2, MapPin, BarChart3, ArrowLeft, Globe, 
     BookOpen, FileText, Calendar, ChevronRight, ChevronLeft, ArrowRight,
-    TrendingUp, Users, Sparkles
+    TrendingUp, Filter, ChevronDown, X
 } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet'
 import L from 'leaflet'
@@ -17,130 +17,32 @@ import {
     PublicLocation,
     OrganizationStats
 } from '../services/publicApi'
+import PublicLoader from '../components/public/PublicLoader'
 
-// Map tile configuration - matches internal app
+// Map tile configuration
 const CARTO_VOYAGER_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-const CARTO_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+const CARTO_ATTRIBUTION = '&copy; OpenStreetMap contributors &copy; CARTO'
 
-// Fix Leaflet marker icons
 delete (L.Icon.Default.prototype as any)._getIconUrl
 
-// Tile layer with fallback
 function TileLayerWithFallback() {
     const [useFallback, setUseFallback] = useState(false)
-    const map = useMap()
-    
     useEffect(() => {
-        if (useFallback) return
         const testImg = new Image()
         testImg.onerror = () => setUseFallback(true)
         testImg.src = 'https://a.basemaps.cartocdn.com/rastertiles/voyager/0/0/0.png'
         return () => { testImg.onerror = null }
-    }, [useFallback])
-    
+    }, [])
     return (
         <TileLayer
-            attribution={useFallback 
-                ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                : CARTO_ATTRIBUTION}
-            url={useFallback 
-                ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-                : CARTO_VOYAGER_URL}
+            attribution={useFallback ? '&copy; OpenStreetMap' : CARTO_ATTRIBUTION}
+            url={useFallback ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' : CARTO_VOYAGER_URL}
             subdomains={['a', 'b', 'c', 'd']}
             maxZoom={20}
         />
     )
 }
 
-// Custom marker component matching internal app style
-function LocationMarker({ location, orgSlug }: { location: PublicLocation; orgSlug: string }) {
-    const [isHovered, setIsHovered] = useState(false)
-    
-    const icon = useMemo(() => {
-        const size = isHovered ? 36 : 32
-        const color = '#c0dfa1' // Green accent color
-        
-        return L.divIcon({
-            className: 'custom-marker',
-            html: `
-                <div style="
-                    position: relative;
-                    width: ${size}px;
-                    height: ${size}px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    cursor: pointer;
-                ">
-                    ${isHovered ? `
-                        <div style="
-                            position: absolute;
-                            width: 42px;
-                            height: 42px;
-                            border-radius: 50%;
-                            background-color: ${color};
-                            opacity: 0.2;
-                            animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
-                        "></div>
-                        <div style="
-                            position: absolute;
-                            width: 38px;
-                            height: 38px;
-                            border-radius: 50%;
-                            background-color: ${color};
-                            opacity: 0.3;
-                        "></div>
-                    ` : ''}
-                    <div style="
-                        width: ${isHovered ? '24px' : '20px'};
-                        height: ${isHovered ? '24px' : '20px'};
-                        border-radius: 50%;
-                        background-color: ${color};
-                        border: ${isHovered ? '4px' : '3px'} solid white;
-                        position: relative;
-                        z-index: 10;
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-                    ">
-                        <div style="
-                            position: absolute;
-                            left: 50%;
-                            top: 50%;
-                            transform: translate(-50%, -50%);
-                            width: ${isHovered ? '10px' : '8px'};
-                            height: ${isHovered ? '10px' : '8px'};
-                            border-radius: 50%;
-                            background-color: white;
-                        "></div>
-                    </div>
-                </div>
-            `,
-            iconSize: [size, size],
-            iconAnchor: [size / 2, size / 2],
-        })
-    }, [isHovered])
-
-    return (
-        <Marker
-            position={[location.latitude, location.longitude]}
-            icon={icon}
-            eventHandlers={{
-                mouseover: () => setIsHovered(true),
-                mouseout: () => setIsHovered(false),
-            }}
-        >
-            <Tooltip direction="top" offset={[0, -15]}>
-                <div className="font-sans">
-                    <p className="font-semibold text-sm">{location.name}</p>
-                    {location.initiative_title && (
-                        <p className="text-xs text-gray-500">{location.initiative_title}</p>
-                    )}
-                </div>
-            </Tooltip>
-        </Marker>
-    )
-}
-
-// Map resize handler
 function MapResizeHandler() {
     const map = useMap()
     useEffect(() => {
@@ -150,6 +52,26 @@ function MapResizeHandler() {
         return () => resizeObserver.disconnect()
     }, [map])
     return null
+}
+
+function LocationMarker({ location, brandColor }: { location: PublicLocation; brandColor: string }) {
+    const icon = useMemo(() => L.divIcon({
+        className: 'custom-marker',
+        html: `<div style="width:16px;height:16px;border-radius:50%;background:#374151;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.2);"></div>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+    }), [brandColor])
+
+    return location.latitude && location.longitude ? (
+        <Marker position={[location.latitude, location.longitude]} icon={icon}>
+            <Tooltip><span className="font-medium text-sm">{location.name}</span></Tooltip>
+        </Marker>
+    ) : null
+}
+
+// Generate metric slug
+function generateMetricSlug(title: string): string {
+    return title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim()
 }
 
 export default function PublicOrganizationPage() {
@@ -163,78 +85,159 @@ export default function PublicOrganizationPage() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     
-    // Carousel state
+    // Pagination state
+    const [metricPage, setMetricPage] = useState(0)
+    const [initiativePage, setInitiativePage] = useState(0)
     const [storyIndex, setStoryIndex] = useState(0)
+    
+    // Filter state
+    const [selectedInitiative, setSelectedInitiative] = useState<string>('all')
+    const [startDate, setStartDate] = useState<string>('')
+    const [endDate, setEndDate] = useState<string>('')
+    const [showInitiativeDropdown, setShowInitiativeDropdown] = useState(false)
 
     useEffect(() => {
         if (slug) loadOrganizationData()
     }, [slug])
 
-    // Auto-advance stories
-    useEffect(() => {
-        if (stories.length <= 1) return
-        const interval = setInterval(() => {
-            setStoryIndex(prev => (prev + 1) % stories.length)
-        }, 5000)
-        return () => clearInterval(interval)
-    }, [stories.length])
-
     const loadOrganizationData = async () => {
         try {
             setLoading(true)
-            setError(null)
-
+            // Clear cache when entering a DIFFERENT org (fresh load from explore)
+            // If same org (e.g., coming back via breadcrumb), use cached data
+            publicApi.clearCacheForOrg(slug!)
             const orgData = await publicApi.getOrganization(slug!)
             if (!orgData) { setError('Organization not found'); return }
-
             setOrganization(orgData.organization)
             setStats(orgData.stats)
-
             const [inits, mets, stors, locs] = await Promise.all([
                 publicApi.getOrganizationInitiatives(slug!),
                 publicApi.getOrganizationMetrics(slug!),
-                publicApi.getOrganizationStories(slug!, 10),
+                publicApi.getOrganizationStories(slug!, 20),
                 publicApi.getOrganizationLocations(slug!)
             ])
-
             setInitiatives(inits)
             setMetrics(mets)
             setStories(stors)
             setLocations(locs)
         } catch (err) {
-            console.error('Error loading organization:', err)
             setError('Failed to load organization')
         } finally {
             setLoading(false)
         }
     }
 
-    // Map center calculation
-    const mapCenter = locations.length > 0
-        ? [
-            locations.reduce((sum, l) => sum + l.latitude, 0) / locations.length,
-            locations.reduce((sum, l) => sum + l.longitude, 0) / locations.length
-        ] as [number, number]
+    // Filter logic
+    const filteredMetrics = useMemo(() => {
+        let filtered = metrics
+        if (selectedInitiative !== 'all') {
+            filtered = filtered.filter(m => m.initiative_id === selectedInitiative)
+        }
+        if (startDate || endDate) {
+            filtered = filtered.filter(m => {
+                if (!m.updates || m.updates.length === 0) return false
+                return m.updates.some(update => {
+                    const updateDate = new Date(update.date_represented)
+                    if (startDate && updateDate < new Date(startDate)) return false
+                    if (endDate && updateDate > new Date(endDate + 'T23:59:59')) return false
+                    return true
+                })
+            })
+            filtered = filtered.map(m => {
+                const filteredUpdates = (m.updates || []).filter(update => {
+                    const updateDate = new Date(update.date_represented)
+                    if (startDate && updateDate < new Date(startDate)) return false
+                    if (endDate && updateDate > new Date(endDate + 'T23:59:59')) return false
+                    return true
+                })
+                const newTotal = filteredUpdates.reduce((sum, u) => sum + (parseFloat(String(u.value)) || 0), 0)
+                return { ...m, total_value: newTotal, update_count: filteredUpdates.length }
+            })
+        }
+        return filtered
+    }, [metrics, selectedInitiative, startDate, endDate])
+
+    const filteredStories = useMemo(() => {
+        let filtered = stories
+        if (selectedInitiative !== 'all') {
+            filtered = filtered.filter(s => s.initiative_id === selectedInitiative)
+        }
+        if (startDate || endDate) {
+            filtered = filtered.filter(s => {
+                const storyDate = new Date(s.date_represented)
+                if (startDate && storyDate < new Date(startDate)) return false
+                if (endDate && storyDate > new Date(endDate + 'T23:59:59')) return false
+                return true
+            })
+        }
+        return filtered
+    }, [stories, selectedInitiative, startDate, endDate])
+
+    // Auto-cycle stories
+    useEffect(() => {
+        if (filteredStories.length <= 1) return
+        const interval = setInterval(() => {
+            setStoryIndex(prev => (prev + 1) % filteredStories.length)
+        }, 6000)
+        return () => clearInterval(interval)
+    }, [filteredStories.length])
+
+    const filteredLocations = useMemo(() => {
+        if (selectedInitiative !== 'all') {
+            return locations.filter(l => l.initiative_id === selectedInitiative)
+        }
+        return locations
+    }, [locations, selectedInitiative])
+
+    const filteredInitiatives = useMemo(() => {
+        if (selectedInitiative !== 'all') {
+            return initiatives.filter(i => i.id === selectedInitiative)
+        }
+        return initiatives
+    }, [initiatives, selectedInitiative])
+
+    // Reset pagination when filters change
+    useEffect(() => {
+        setMetricPage(0)
+        setInitiativePage(0)
+        setStoryIndex(0)
+    }, [selectedInitiative, startDate, endDate])
+
+    const hasActiveFilters = selectedInitiative !== 'all' || startDate || endDate
+    const clearFilters = () => {
+        setSelectedInitiative('all')
+        setStartDate('')
+        setEndDate('')
+    }
+
+    // Pagination helpers
+    const metricsPerPage = 4
+    const initiativesPerPage = 2
+    const totalMetricPages = Math.ceil(filteredMetrics.length / metricsPerPage)
+    const totalInitiativePages = Math.ceil(filteredInitiatives.length / initiativesPerPage)
+    const displayedMetrics = filteredMetrics.slice(metricPage * metricsPerPage, (metricPage + 1) * metricsPerPage)
+    const displayedInitiatives = filteredInitiatives.slice(initiativePage * initiativesPerPage, (initiativePage + 1) * initiativesPerPage)
+    const currentStory = filteredStories[storyIndex]
+
+    const mapCenter = filteredLocations.length > 0
+        ? [filteredLocations.reduce((s, l) => s + l.latitude, 0) / filteredLocations.length,
+           filteredLocations.reduce((s, l) => s + l.longitude, 0) / filteredLocations.length] as [number, number]
         : [20, 0] as [number, number]
 
+    // Brand color with fallback
+    const brandColor = organization?.brand_color || '#c0dfa1'
+
     if (loading) {
-        return (
-            <div className="min-h-screen bg-background flex items-center justify-center">
-                <div className="text-center">
-                    <Loader2 className="w-12 h-12 animate-spin text-primary-500 mx-auto mb-4" />
-                    <p className="text-muted-foreground">Loading organization...</p>
-                </div>
-            </div>
-        )
+        return <PublicLoader message="Loading dashboard..." />
     }
 
     if (error || !organization) {
         return (
-            <div className="min-h-screen bg-background flex items-center justify-center px-6">
+            <div className="h-screen bg-background flex items-center justify-center px-6">
                 <div className="glass-card p-12 rounded-3xl text-center max-w-md">
                     <Building2 className="w-16 h-16 text-muted-foreground/50 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-foreground mb-3">Organization Not Found</h1>
-                    <p className="text-muted-foreground mb-8">{error || 'This organization does not exist.'}</p>
+                    <p className="text-muted-foreground mb-8">{error}</p>
                     <Link to="/explore" className="inline-flex items-center gap-2 px-6 py-3 bg-accent text-white rounded-xl hover:bg-accent/90 transition-colors font-medium">
                         Browse Organizations <ArrowRight className="w-4 h-4" />
                     </Link>
@@ -244,292 +247,419 @@ export default function PublicOrganizationPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 font-figtree">
-            {/* Subtle grid background */}
-            <div className="fixed inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(192,223,161,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(192,223,161,0.03)_1px,transparent_1px)] bg-[size:60px_60px]" />
-            </div>
-
-            {/* Header */}
-            <div className="relative z-10 pt-8">
-                <div className="max-w-7xl mx-auto px-6">
-                    {/* Navigation */}
-                    <nav className="mb-8">
-                        <div className="glass rounded-2xl px-6 py-3 flex items-center justify-between border-accent/20">
+        <div className="h-screen flex flex-col font-figtree overflow-hidden relative animate-fadeIn">
+            {/* Flowing gradient background */}
+            <div 
+                className="fixed inset-0 pointer-events-none"
+                style={{
+                    background: `
+                        radial-gradient(ellipse 80% 50% at 20% 40%, ${brandColor}90, transparent 60%),
+                        radial-gradient(ellipse 60% 80% at 80% 20%, ${brandColor}70, transparent 55%),
+                        radial-gradient(ellipse 50% 60% at 60% 80%, ${brandColor}60, transparent 55%),
+                        radial-gradient(ellipse 70% 40% at 10% 90%, ${brandColor}50, transparent 50%),
+                        linear-gradient(180deg, white 0%, #fafafa 100%)
+                    `
+                }}
+            />
+            
+            {/* Fixed Header */}
+            <header className="flex-shrink-0 bg-white/60 backdrop-blur-2xl border-b border-white/40 shadow-sm z-50 relative">
+                <div className="max-w-[1800px] mx-auto px-6 py-3">
+                    {/* Top Row */}
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-4">
                             <Link to="/explore" className="flex items-center gap-2 text-muted-foreground hover:text-accent transition-colors">
                                 <ArrowLeft className="w-4 h-4" />
-                                <span className="text-sm font-medium">Back to Explore</span>
+                                <span className="text-sm font-medium hidden sm:inline">Explore</span>
                             </Link>
-                            <Link to="/" className="flex items-center gap-2 group">
-                                <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden">
-                                    <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                            <div className="h-6 w-px bg-gray-200" />
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden bg-white shadow-md border border-gray-200/50">
+                                    {organization.logo_url ? (
+                                        <img src={organization.logo_url} alt={organization.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <Building2 className="w-5 h-5 text-gray-400" />
+                                    )}
                                 </div>
-                                <span className="text-lg font-newsreader font-extralight text-foreground hidden sm:block">Nexus Impacts</span>
-                            </Link>
-                        </div>
-                    </nav>
-
-                    {/* Organization Header */}
-                    <div className="glass-card p-8 rounded-3xl mb-6 border-accent/20">
-                        <div className="flex flex-col md:flex-row items-start gap-6">
-                            <div className="w-20 h-20 bg-gradient-to-br from-accent/20 to-accent/10 rounded-2xl flex items-center justify-center flex-shrink-0 border border-accent/30">
-                                {organization.logo_url ? (
-                                    <img src={organization.logo_url} alt={organization.name} className="w-full h-full object-cover rounded-2xl" />
-                                ) : (
-                                    <Building2 className="w-10 h-10 text-accent" />
-                                )}
-                            </div>
-                            <div className="flex-1">
-                                <h1 className="text-3xl sm:text-4xl font-newsreader font-light text-foreground mb-2">{organization.name}</h1>
-                                {organization.description && (
-                                    <p className="text-muted-foreground text-lg max-w-3xl">{organization.description}</p>
-                                )}
+                                <div>
+                                    <h1 className="text-lg font-semibold text-foreground">{organization.name}</h1>
+                                    <p className="text-xs font-medium text-muted-foreground">Public Dashboard</p>
+                                </div>
                             </div>
                         </div>
-
-                        {/* Stats */}
-                        {stats && (
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
-                                <StatCard icon={Target} label="Initiatives" value={stats.initiatives} />
-                                <StatCard icon={BarChart3} label="Metrics" value={stats.kpis} />
-                                <StatCard icon={MapPin} label="Locations" value={stats.locations} />
-                                <StatCard icon={BookOpen} label="Stories" value={stats.stories} />
+                        <Link to="/" className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg overflow-hidden">
+                                <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
                             </div>
-                        )}
+                            <span className="text-base font-newsreader font-extralight text-foreground hidden md:block">Nexus Impacts</span>
+                        </Link>
                     </div>
-                </div>
-            </div>
 
-            {/* Dashboard Content */}
-            <div className="relative z-10 max-w-7xl mx-auto px-6 pb-20">
-                {/* Row 1: Stories + Metrics - Side by Side */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    {/* Stories Carousel */}
-                    <div className="glass-card p-5 rounded-2xl border-accent/20 h-[420px] flex flex-col">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 bg-accent/20 rounded-lg flex items-center justify-center">
-                                    <BookOpen className="w-4 h-4 text-accent" />
-                                </div>
-                                <h2 className="text-lg font-semibold text-foreground">Recent Stories</h2>
-                            </div>
-                            {stories.length > 1 && (
-                                <div className="flex items-center gap-1.5">
-                                    <button onClick={() => setStoryIndex(prev => prev === 0 ? stories.length - 1 : prev - 1)}
-                                        className="w-7 h-7 rounded-full bg-accent/10 hover:bg-accent/20 flex items-center justify-center transition-colors">
-                                        <ChevronLeft className="w-4 h-4 text-accent" />
-                                    </button>
-                                    <span className="text-xs text-muted-foreground w-10 text-center">{storyIndex + 1}/{stories.length}</span>
-                                    <button onClick={() => setStoryIndex(prev => (prev + 1) % stories.length)}
-                                        className="w-7 h-7 rounded-full bg-accent/10 hover:bg-accent/20 flex items-center justify-center transition-colors">
-                                        <ChevronRight className="w-4 h-4 text-accent" />
-                                    </button>
-                                </div>
+                    {/* Filter Row */}
+                    <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-gray-200/50">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Filter className="w-4 h-4" />
+                            <span className="font-medium">Filter:</span>
+                        </div>
+                        
+                        {/* Initiative Dropdown */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowInitiativeDropdown(!showInitiativeDropdown)}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
+                                    selectedInitiative !== 'all'
+                                        ? 'bg-gray-800 text-white border-gray-800'
+                                        : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+                                }`}
+                            >
+                                <Globe className="w-3.5 h-3.5" />
+                                <span className="max-w-[140px] truncate">
+                                    {selectedInitiative === 'all' ? 'All Initiatives' : initiatives.find(i => i.id === selectedInitiative)?.title || 'Select'}
+                                </span>
+                                <ChevronDown className="w-3.5 h-3.5" />
+                            </button>
+                            
+                            {showInitiativeDropdown && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setShowInitiativeDropdown(false)} />
+                                    <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-2 max-h-64 overflow-y-auto">
+                                        <button
+                                            onClick={() => { setSelectedInitiative('all'); setShowInitiativeDropdown(false) }}
+                                            className={`w-full px-4 py-2 text-left text-sm hover:bg-accent/10 ${
+                                                selectedInitiative === 'all' ? 'bg-accent/10 text-accent font-medium' : 'text-foreground'
+                                            }`}
+                                        >
+                                            All Initiatives
+                                        </button>
+                                        {initiatives.map(init => (
+                                            <button
+                                                key={init.id}
+                                                onClick={() => { setSelectedInitiative(init.id); setShowInitiativeDropdown(false) }}
+                                                className={`w-full px-4 py-2 text-left text-sm hover:bg-accent/10 ${
+                                                    selectedInitiative === init.id ? 'bg-accent/10 text-accent font-medium' : 'text-foreground'
+                                                }`}
+                                            >
+                                                <span className="truncate">{init.title}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
                             )}
                         </div>
                         
-                        {stories.length === 0 ? (
-                            <div className="flex-1 flex items-center justify-center">
-                                <div className="text-center">
-                                    <BookOpen className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-                                    <p className="text-muted-foreground text-sm">No stories yet</p>
-                                </div>
+                        {/* Date Range */}
+                        <div className="flex items-center gap-2">
+                            <div className="relative">
+                                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="pl-8 pr-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 bg-white w-[130px]"
+                                />
                             </div>
-                        ) : (
-                            <div className="relative overflow-hidden rounded-xl flex-1">
-                                <div className="flex transition-transform duration-500 ease-out h-full"
-                                    style={{ transform: `translateX(-${storyIndex * 100}%)` }}>
-                                    {stories.map((story) => (
-                                        <div key={story.id} className="w-full flex-shrink-0 h-full">
-                                            <Link to={`/org/${slug}/${story.initiative_slug}`} className="block h-full group">
-                                                <div className="flex flex-col h-full bg-gradient-to-br from-accent/5 to-transparent rounded-xl overflow-hidden border border-transparent group-hover:border-accent transition-colors">
-                                                    <div className="h-40 bg-gray-100 overflow-hidden flex-shrink-0">
-                                                        {story.media_url && story.media_type === 'photo' ? (
-                                                            <img src={story.media_url} alt={story.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                            <span className="text-muted-foreground text-sm">to</span>
+                            <div className="relative">
+                                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="pl-8 pr-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 bg-white w-[130px]"
+                                />
+                            </div>
+                        </div>
+                        
+                        {hasActiveFilters && (
+                            <button onClick={clearFilters} className="flex items-center gap-1 px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                                <X className="w-3.5 h-3.5" /> Clear
+                            </button>
+                        )}
+
+                        {/* Stats Pills */}
+                        <div className="ml-auto flex items-center gap-2">
+                            <span className="px-3 py-1 bg-white/60 text-gray-600 rounded-full text-xs font-semibold flex items-center gap-1 backdrop-blur-sm">
+                                <BarChart3 className="w-3 h-3" /> {filteredMetrics.length} Metrics
+                            </span>
+                            <span className="px-3 py-1 bg-white/60 text-gray-600 rounded-full text-xs font-semibold flex items-center gap-1 backdrop-blur-sm">
+                                <BookOpen className="w-3 h-3" /> {filteredStories.length} Stories
+                            </span>
+                            <span className="px-3 py-1 bg-white/60 text-gray-600 rounded-full text-xs font-semibold flex items-center gap-1 backdrop-blur-sm">
+                                <MapPin className="w-3 h-3" /> {filteredLocations.length} Locations
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            {/* Main Dashboard Grid */}
+            <main className="flex-1 overflow-hidden p-4 relative min-h-0">
+                <div className="max-w-[1800px] mx-auto h-full grid grid-cols-12 gap-3 lg:gap-4">
+                    
+                    {/* Left Column - Initiatives & Metrics */}
+                    <div className="col-span-12 lg:col-span-4 flex flex-col gap-3 lg:gap-4 h-full min-h-0">
+                        {/* Initiatives Module */}
+                        <div className="bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-2xl shadow-black/10 flex-1 flex flex-col overflow-hidden min-h-0">
+                            <div className="px-3 lg:px-4 py-2 lg:py-3 flex items-center justify-between flex-shrink-0 border-b border-white/50">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center bg-white/60">
+                                        <Globe className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-gray-600" />
+                                    </div>
+                                    <h2 className="font-semibold text-foreground text-sm lg:text-base">Initiatives</h2>
+                                    <span className="px-1.5 lg:px-2 py-0.5 text-[10px] lg:text-xs font-semibold rounded-full bg-white/60 text-gray-600">{filteredInitiatives.length}</span>
+                                </div>
+                                {totalInitiativePages > 1 && (
+                                    <div className="flex items-center gap-1">
+                                        <button onClick={() => setInitiativePage(p => Math.max(0, p - 1))} disabled={initiativePage === 0}
+                                            className="w-7 h-7 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors">
+                                            <ChevronLeft className="w-4 h-4 text-gray-600" />
+                                        </button>
+                                        <span className="text-xs text-muted-foreground w-12 text-center">{initiativePage + 1}/{totalInitiativePages}</span>
+                                        <button onClick={() => setInitiativePage(p => Math.min(totalInitiativePages - 1, p + 1))} disabled={initiativePage >= totalInitiativePages - 1}
+                                            className="w-7 h-7 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors">
+                                            <ChevronRight className="w-4 h-4 text-gray-600" />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex-1 p-2 lg:p-3 overflow-hidden min-h-0">
+                                {displayedInitiatives.length === 0 ? (
+                                    <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                                        <div className="text-center">
+                                            <Globe className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                                            <p>No initiatives match filters</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-1.5 h-full">
+                                        {displayedInitiatives.map((init) => (
+                                            <Link key={init.id} to={`/org/${slug}/${init.slug}`}
+                                                className="block p-2 bg-white/60 backdrop-blur-lg rounded-lg border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all group">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden bg-white/80 border border-white/50">
+                                                        {organization.logo_url ? (
+                                                            <img src={organization.logo_url} alt="" className="w-full h-full object-cover" />
                                                         ) : (
-                                                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-accent/10 to-accent/5">
-                                                                <FileText className="w-10 h-10 text-accent/40" />
-                                                            </div>
+                                                            <Globe className="w-4 h-4 text-gray-500" />
                                                         )}
                                                     </div>
-                                                    <div className="p-4 flex-1 flex flex-col">
-                                                        <span className="text-xs text-accent font-medium mb-1">{story.initiative_title}</span>
-                                                        <h3 className="text-base font-semibold text-foreground group-hover:text-accent transition-colors line-clamp-2 mb-2">{story.title}</h3>
-                                                        {story.description && <p className="text-sm text-muted-foreground line-clamp-2 flex-1">{story.description}</p>}
-                                                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-2">
-                                                            <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(story.date_represented).toLocaleDateString()}</span>
-                                                        </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h3 className="font-medium text-foreground text-xs transition-colors truncate">{init.title}</h3>
+                                                        {init.region && <p className="text-[10px] text-muted-foreground flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5" />{init.region}</p>}
                                                     </div>
+                                                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
                                                 </div>
                                             </Link>
-                                        </div>
-                                    ))}
-                                </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
-
-                    {/* Metrics - Scrollable Cards */}
-                    <div className="glass-card p-5 rounded-2xl border-accent/20 h-[420px] flex flex-col">
-                        <div className="flex items-center gap-2 mb-4">
-                            <div className="w-8 h-8 bg-accent/20 rounded-lg flex items-center justify-center">
-                                <BarChart3 className="w-4 h-4 text-accent" />
-                            </div>
-                            <h2 className="text-lg font-semibold text-foreground">Impact Metrics</h2>
-                            <span className="px-2 py-0.5 bg-accent/10 rounded-full text-xs text-accent font-medium">{metrics.length}</span>
                         </div>
-                        
-                        {metrics.length === 0 ? (
-                            <div className="flex-1 flex items-center justify-center">
-                                <div className="text-center">
-                                    <BarChart3 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-                                    <p className="text-muted-foreground text-sm">No metrics yet</p>
+
+                        {/* Metrics Module */}
+                        <div className="bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-2xl shadow-black/10 flex-[1.5] flex flex-col overflow-hidden min-h-0">
+                            <div className="px-3 lg:px-4 py-2 lg:py-3 flex items-center justify-between flex-shrink-0 border-b border-white/50">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center bg-white/60">
+                                        <BarChart3 className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-gray-600" />
+                                    </div>
+                                    <h2 className="font-semibold text-foreground text-sm lg:text-base">Metrics</h2>
+                                    <span className="px-1.5 lg:px-2 py-0.5 text-[10px] lg:text-xs font-semibold rounded-full bg-white/60 text-gray-600">{filteredMetrics.length}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {filteredMetrics.length > 0 && (
+                                        <Link 
+                                            to={`/org/${slug}/${selectedInitiative !== 'all' 
+                                                ? initiatives.find(i => i.id === selectedInitiative)?.slug 
+                                                : filteredMetrics[0]?.initiative_slug}?tab=metrics`}
+                                            className="text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors"
+                                        >
+                                            See All →
+                                        </Link>
+                                    )}
+                                    {totalMetricPages > 1 && (
+                                        <div className="flex items-center gap-1">
+                                            <button onClick={() => setMetricPage(p => Math.max(0, p - 1))} disabled={metricPage === 0}
+                                                className="w-7 h-7 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors">
+                                                <ChevronLeft className="w-4 h-4 text-gray-600" />
+                                            </button>
+                                            <span className="text-xs text-muted-foreground w-12 text-center">{metricPage + 1}/{totalMetricPages}</span>
+                                            <button onClick={() => setMetricPage(p => Math.min(totalMetricPages - 1, p + 1))} disabled={metricPage >= totalMetricPages - 1}
+                                                className="w-7 h-7 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors">
+                                                <ChevronRight className="w-4 h-4 text-gray-600" />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                        ) : (
-                            <div className="flex-1 overflow-y-auto pr-1 space-y-3">
-                                {metrics.map((metric) => (
-                                    <Link key={metric.id} to={`/org/${slug}/${metric.initiative_slug}`}
-                                        className="block p-4 bg-gradient-to-r from-accent/5 to-transparent rounded-xl transition-all group border border-transparent hover:border-accent hover:shadow-[0_0_15px_rgba(192,223,161,0.2)]">
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${
-                                                        metric.category === 'impact' ? 'bg-accent/20 text-accent' :
-                                                        metric.category === 'output' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
-                                                    }`}>{metric.category}</span>
+                            <div className="flex-1 p-2 lg:p-3 overflow-hidden min-h-0">
+                                {displayedMetrics.length === 0 ? (
+                                    <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                                        <div className="text-center">
+                                            <BarChart3 className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                                            <p>No metrics match filters</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 gap-1.5 h-full">
+                                        {displayedMetrics.map((metric) => (
+                                            <Link key={metric.id} to={`/org/${slug}/${metric.initiative_slug}/metric/${generateMetricSlug(metric.title)}`}
+                                                className="p-2 rounded-lg transition-all group flex flex-col bg-white/60 backdrop-blur-lg border border-white/80 hover:bg-white/80 hover:shadow-lg">
+                                                <span className={`self-start px-1.5 py-0.5 text-[9px] font-semibold rounded-full mb-1 ${
+                                                    metric.category === 'impact' ? 'bg-purple-100/80 text-purple-700' :
+                                                    metric.category === 'output' ? 'bg-green-100/80 text-green-700' : 'bg-blue-100/80 text-blue-700'
+                                                }`}>{metric.category}</span>
+                                                <h4 className="font-medium text-foreground text-xs transition-colors line-clamp-2 mb-auto">{metric.title}</h4>
+                                                <div className="mt-1">
+                                                    <span className="text-lg font-bold text-foreground">{metric.total_value?.toLocaleString() || '—'}</span>
+                                                    <span className="text-[10px] text-muted-foreground ml-0.5">{metric.unit_of_measurement}</span>
                                                 </div>
-                                                <h3 className="font-medium text-foreground text-sm group-hover:text-accent transition-colors">{metric.title}</h3>
-                                                <p className="text-xs text-muted-foreground mt-0.5 truncate">{metric.initiative_title}</p>
-                                            </div>
-                                            <div className="text-right ml-4 flex-shrink-0">
-                                                {metric.total_value !== undefined && metric.total_value !== null ? (
-                                                    <>
-                                                        <div className="text-2xl font-bold text-primary-500">
-                                                            {metric.total_value.toLocaleString()}
-                                                        </div>
-                                                        <p className="text-xs text-muted-foreground">{metric.unit_of_measurement}</p>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <div className="text-2xl font-bold text-muted-foreground/40">—</div>
-                                                        <p className="text-xs text-muted-foreground">{metric.unit_of_measurement}</p>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </Link>
-                                ))}
+                                                <p className="text-[9px] text-muted-foreground mt-0.5 truncate">{metric.initiative_title}</p>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Row 2: Initiatives + Locations - Side by Side */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Initiatives */}
-                    <div className="glass-card p-5 rounded-2xl border-accent/20">
-                        <div className="flex items-center gap-2 mb-4">
-                            <div className="w-8 h-8 bg-accent/20 rounded-lg flex items-center justify-center">
-                                <Target className="w-4 h-4 text-accent" />
-                            </div>
-                            <h2 className="text-lg font-semibold text-foreground">Initiatives</h2>
-                            <span className="px-2 py-0.5 bg-accent/10 rounded-full text-xs text-accent font-medium">{initiatives.length}</span>
                         </div>
-                        
-                        {initiatives.length === 0 ? (
-                            <div className="py-12 text-center">
-                                <Target className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-                                <p className="text-muted-foreground text-sm">No initiatives yet</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
-                                {initiatives.map((initiative) => (
-                                    <Link key={initiative.id} to={`/org/${slug}/${initiative.slug}`}
-                                        className="flex items-center justify-between p-3 bg-gradient-to-r from-accent/5 to-transparent rounded-xl transition-all group border border-transparent hover:border-accent hover:shadow-[0_0_15px_rgba(192,223,161,0.2)]">
-                                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                                            <div className="w-9 h-9 bg-accent/20 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
-                                                {organization.logo_url ? (
-                                                    <img src={organization.logo_url} alt={organization.name} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <Target className="w-4 h-4 text-accent" />
-                                                )}
-                                            </div>
-                                            <div className="min-w-0">
-                                                <h3 className="font-medium text-foreground text-sm group-hover:text-accent transition-colors truncate">{initiative.title}</h3>
-                                                {initiative.region && (
-                                                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                                                        <MapPin className="w-3 h-3" />{initiative.region}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-accent group-hover:translate-x-0.5 transition-all flex-shrink-0 ml-2" />
-                                    </Link>
-                                ))}
-                            </div>
-                        )}
                     </div>
 
-                    {/* Locations Map */}
-                    <div className="glass-card p-5 rounded-2xl border-accent/20 h-[420px] flex flex-col">
-                        <div className="flex items-center gap-2 mb-4">
-                            <div className="w-8 h-8 bg-accent/20 rounded-lg flex items-center justify-center">
-                                <MapPin className="w-4 h-4 text-accent" />
-                            </div>
-                            <h2 className="text-lg font-semibold text-foreground">Impact Locations</h2>
-                            <span className="px-2 py-0.5 bg-accent/10 rounded-full text-xs text-accent font-medium">{locations.length}</span>
-                        </div>
-                        
-                        {locations.length === 0 ? (
-                            <div className="flex-1 flex items-center justify-center rounded-xl bg-gray-50">
-                                <div className="text-center">
-                                    <MapPin className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-                                    <p className="text-muted-foreground text-sm">No locations yet</p>
+                    {/* Center Column - Story */}
+                    <div className="col-span-12 lg:col-span-4 flex flex-col gap-3 lg:gap-4 h-full min-h-0">
+                        <div className="bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-2xl shadow-black/10 flex-1 flex flex-col overflow-hidden min-h-0">
+                            <div className="px-3 lg:px-4 py-2 lg:py-3 flex items-center justify-between flex-shrink-0 border-b border-white/50">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center bg-white/60">
+                                        <BookOpen className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-gray-600" />
+                                    </div>
+                                    <h2 className="font-semibold text-foreground text-sm lg:text-base">Stories</h2>
+                                    <span className="px-1.5 lg:px-2 py-0.5 text-[10px] lg:text-xs font-semibold rounded-full bg-white/60 text-gray-600">{filteredStories.length}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {filteredStories.length > 0 && (
+                                        <Link 
+                                            to={`/org/${slug}/${selectedInitiative !== 'all' 
+                                                ? initiatives.find(i => i.id === selectedInitiative)?.slug 
+                                                : filteredStories[0]?.initiative_slug}?tab=stories`}
+                                            className="text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors"
+                                        >
+                                            See All →
+                                        </Link>
+                                    )}
+                                    {filteredStories.length > 1 && (
+                                        <div className="flex items-center gap-1">
+                                            <button onClick={() => setStoryIndex(p => p === 0 ? filteredStories.length - 1 : p - 1)}
+                                                className="w-7 h-7 rounded-lg bg-white/60 hover:bg-white/80 flex items-center justify-center transition-colors">
+                                                <ChevronLeft className="w-4 h-4 text-gray-600" />
+                                            </button>
+                                            <span className="text-xs text-muted-foreground w-12 text-center">{storyIndex + 1}/{filteredStories.length}</span>
+                                            <button onClick={() => setStoryIndex(p => (p + 1) % filteredStories.length)}
+                                                className="w-7 h-7 rounded-lg bg-white/60 hover:bg-white/80 flex items-center justify-center transition-colors">
+                                                <ChevronRight className="w-4 h-4 text-gray-600" />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                        ) : (
-                            <div className="flex-1 rounded-xl overflow-hidden border border-gray-200">
-                                <MapContainer center={mapCenter} zoom={locations.length === 1 ? 8 : 3} className="w-full h-full" zoomControl={false} scrollWheelZoom={false}>
-                                    <MapResizeHandler />
-                                    <TileLayerWithFallback />
-                                    {locations.map((location) => (
-                                        <LocationMarker key={location.id} location={location} orgSlug={slug!} />
-                                    ))}
-                                </MapContainer>
+                            <div className="flex-1 p-3 lg:p-4 overflow-hidden min-h-0">
+                                {!currentStory ? (
+                                    <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                                        <div className="text-center">
+                                            <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                                            <p>No stories match filters</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <Link to={`/org/${slug}/${currentStory.initiative_slug}?tab=stories`} className="block h-full group">
+                                        <div className="h-full flex flex-col bg-white/60 backdrop-blur-lg rounded-xl overflow-hidden border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all">
+                                            {currentStory.media_url && currentStory.media_type === 'photo' ? (
+                                                <div className="h-[30%] min-h-[100px] max-h-[180px] flex-shrink-0 overflow-hidden">
+                                                    <img src={currentStory.media_url} alt={currentStory.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                </div>
+                                            ) : (
+                                                <div className="h-[20%] min-h-[80px] max-h-[120px] flex-shrink-0 flex items-center justify-center bg-white/40">
+                                                    <FileText className="w-10 h-10 text-gray-400" />
+                                                </div>
+                                            )}
+                                            <div className="p-4 flex-1 flex flex-col">
+                                                <span className="text-xs font-semibold mb-1 text-muted-foreground">{currentStory.initiative_title}</span>
+                                                <h3 className="text-lg font-semibold text-foreground transition-colors line-clamp-2 mb-2">{currentStory.title}</h3>
+                                                {currentStory.description && <p className="text-sm text-muted-foreground line-clamp-3 flex-1">{currentStory.description}</p>}
+                                                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3 pt-3 border-t border-white/50">
+                                                    <Calendar className="w-3.5 h-3.5" />
+                                                    {new Date(currentStory.date_represented).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Link>
+                                )}
                             </div>
-                        )}
+                            {/* Story Progress Dots */}
+                            {filteredStories.length > 1 && (
+                                <div className="px-4 pb-3 flex justify-center gap-1.5">
+                                    {filteredStories.slice(0, 8).map((_, idx) => (
+                                        <button key={idx} onClick={() => setStoryIndex(idx)}
+                                            className={`h-2 rounded-full transition-all ${idx === storyIndex ? 'w-6 bg-gray-800' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
+                                    ))}
+                                    {filteredStories.length > 8 && <span className="text-xs text-muted-foreground ml-1">+{filteredStories.length - 8}</span>}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Right Column - Map */}
+                    <div className="col-span-12 lg:col-span-4 flex flex-col gap-3 lg:gap-4 h-full min-h-0">
+                        <div className="bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-2xl shadow-black/10 flex-1 flex flex-col overflow-hidden min-h-0">
+                            <div className="px-3 lg:px-4 py-2 lg:py-3 flex items-center justify-between flex-shrink-0 border-b border-white/50">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center bg-white/60">
+                                        <MapPin className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-gray-600" />
+                                    </div>
+                                    <h2 className="font-semibold text-foreground text-sm lg:text-base">Locations</h2>
+                                    <span className="px-1.5 lg:px-2 py-0.5 text-[10px] lg:text-xs font-semibold rounded-full bg-white/60 text-gray-600">{filteredLocations.length}</span>
+                                </div>
+                                {filteredLocations.length > 0 && (
+                                    <Link 
+                                        to={`/org/${slug}/${selectedInitiative !== 'all' 
+                                            ? initiatives.find(i => i.id === selectedInitiative)?.slug 
+                                            : filteredLocations[0]?.initiative_slug}?tab=locations`}
+                                        className="text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors"
+                                    >
+                                        See All →
+                                    </Link>
+                                )}
+                            </div>
+                            <div className="flex-1 relative min-h-0">
+                                {filteredLocations.length === 0 ? (
+                                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm bg-gray-50">
+                                        <div className="text-center">
+                                            <MapPin className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                                            <p>No locations match filters</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <MapContainer center={mapCenter} zoom={filteredLocations.length === 1 ? 8 : 2} className="w-full h-full" zoomControl={false} scrollWheelZoom={false}>
+                                        <MapResizeHandler />
+                                        <TileLayerWithFallback />
+                                        {filteredLocations.map((loc) => <LocationMarker key={loc.id} location={loc} brandColor={brandColor} />)}
+                                    </MapContainer>
+                                )}
+                            </div>
+                            {/* Location List */}
+                            {filteredLocations.length > 0 && (
+                                <div className="p-2 lg:p-3 max-h-24 lg:max-h-32 overflow-y-auto border-t border-white/50 flex-shrink-0">
+                                    <div className="flex flex-wrap gap-1">
+                                        {filteredLocations.map((loc) => (
+                                            <span key={loc.id} className="px-2 py-0.5 rounded-full text-[10px] lg:text-xs font-medium bg-white/60 text-gray-600">
+                                                {loc.name}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
-
-            {/* Footer */}
-            <div className="relative z-10 border-t border-accent/10 bg-white/50 backdrop-blur-sm">
-                <div className="max-w-7xl mx-auto px-6 py-6">
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <p className="text-sm text-muted-foreground">Public impact dashboard for <span className="text-accent font-medium">{organization.name}</span></p>
-                        <Link to="/explore" className="text-sm text-accent hover:text-accent/80 font-medium">Explore more organizations →</Link>
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
-}
-
-// ============================================
-// Helper Components
-// ============================================
-
-function StatCard({ icon: Icon, label, value }: { icon: any; label: string; value: number }) {
-    return (
-        <div className="bg-gradient-to-br from-accent/10 to-accent/5 rounded-xl p-3 flex items-center gap-3 border border-accent/20">
-            <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center">
-                <Icon className="w-5 h-5 text-accent" />
-            </div>
-            <div>
-                <p className="text-xl font-bold text-primary-500">{value}</p>
-                <p className="text-xs text-muted-foreground">{label}</p>
-            </div>
+            </main>
         </div>
     )
 }

@@ -1,13 +1,27 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { 
-    Loader2, ArrowLeft, Target, BarChart3, BookOpen, MapPin, 
+    Loader2, ArrowLeft, Globe, BarChart3, BookOpen, MapPin, 
     FileText, Users, Calendar, ChevronRight, ExternalLink, TrendingUp,
-    Building2, ChevronDown
+    Building2, ChevronDown, Filter, X, Activity, Layers, Zap
 } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import {
+    AreaChart,
+    Area,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip as RechartsTooltip,
+    ResponsiveContainer,
+    PieChart,
+    Pie,
+    Cell,
+    BarChart,
+    Bar
+} from 'recharts'
 import { 
     publicApi, 
     PublicInitiative, 
@@ -18,6 +32,7 @@ import {
     PublicBeneficiaryGroup,
     InitiativeDashboard
 } from '../services/publicApi'
+import PublicLoader from '../components/public/PublicLoader'
 
 // Map tile configuration - matches internal app
 const CARTO_VOYAGER_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
@@ -98,14 +113,18 @@ function MapResizeHandler() {
     return null
 }
 
-type TabType = 'overview' | 'stories' | 'locations' | 'evidence' | 'beneficiaries'
+type TabType = 'overview' | 'metrics' | 'stories' | 'locations' | 'evidence' | 'beneficiaries'
 
 export default function PublicInitiativePage() {
     const { orgSlug, initiativeSlug } = useParams<{ orgSlug: string; initiativeSlug: string }>()
+    const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
+    
     const [initiative, setInitiative] = useState<PublicInitiative | null>(null)
     const [dashboard, setDashboard] = useState<InitiativeDashboard | null>(null)
     const [activeTab, setActiveTab] = useState<TabType>('overview')
-    const [loading, setLoading] = useState(true)
+    const [initialLoading, setInitialLoading] = useState(true)
+    const [switching, setSwitching] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
     // Tab data
@@ -113,14 +132,59 @@ export default function PublicInitiativePage() {
     const [locations, setLocations] = useState<PublicLocation[] | null>(null)
     const [evidence, setEvidence] = useState<PublicEvidence[] | null>(null)
     const [beneficiaries, setBeneficiaries] = useState<PublicBeneficiaryGroup[] | null>(null)
+    
+    // All initiatives for switcher
+    const [allInitiatives, setAllInitiatives] = useState<PublicInitiative[]>([])
+    const [showInitiativeDropdown, setShowInitiativeDropdown] = useState(false)
+    
+    // Date filter state - initialize from URL params
+    const [startDate, setStartDate] = useState<string>(searchParams.get('startDate') || '')
+    const [endDate, setEndDate] = useState<string>(searchParams.get('endDate') || '')
 
-    useEffect(() => { if (orgSlug && initiativeSlug) loadInitiative() }, [orgSlug, initiativeSlug])
+    // Initialize tab from URL params
+    useEffect(() => {
+        const tabParam = searchParams.get('tab') as TabType | null
+        if (tabParam && ['overview', 'metrics', 'stories', 'locations', 'evidence', 'beneficiaries'].includes(tabParam)) {
+            setActiveTab(tabParam)
+        }
+    }, [searchParams])
+
+    // Track if we've loaded before to detect switches
+    const hasLoadedRef = React.useRef(false)
+    
+    useEffect(() => { 
+        if (orgSlug && initiativeSlug) {
+            const isSwitch = hasLoadedRef.current
+            loadInitiative(isSwitch)
+            hasLoadedRef.current = true
+        }
+    }, [orgSlug, initiativeSlug])
     useEffect(() => { if (orgSlug && initiativeSlug) loadTabData(activeTab) }, [activeTab, orgSlug, initiativeSlug])
+    
+    // Load all initiatives for the org (for switcher)
+    useEffect(() => {
+        if (orgSlug) {
+            publicApi.getOrganizationInitiatives(orgSlug).then(setAllInitiatives).catch(console.error)
+        }
+    }, [orgSlug])
 
-    const loadInitiative = async () => {
+    const loadInitiative = async (isSwitch = false) => {
         try {
-            setLoading(true)
+            if (isSwitch) {
+                setSwitching(true)
+            } else {
+                setInitialLoading(true)
+            }
             setError(null)
+            
+            // Clear tab data when switching initiatives
+            if (isSwitch) {
+                setStories(null)
+                setLocations(null)
+                setEvidence(null)
+                setBeneficiaries(null)
+            }
+            
             const dashboardData = await publicApi.getInitiativeDashboard(orgSlug!, initiativeSlug!)
             if (!dashboardData) { setError('Initiative not found'); return }
             setInitiative(dashboardData.initiative)
@@ -129,7 +193,8 @@ export default function PublicInitiativePage() {
             console.error('Error loading initiative:', err)
             setError('Failed to load initiative')
         } finally {
-            setLoading(false)
+            setInitialLoading(false)
+            setSwitching(false)
         }
     }
 
@@ -145,22 +210,78 @@ export default function PublicInitiativePage() {
         } catch (err) { console.error(`Error loading ${tab}:`, err) }
     }
 
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-background flex items-center justify-center">
-                <div className="text-center">
-                    <Loader2 className="w-12 h-12 animate-spin text-primary-500 mx-auto mb-4" />
-                    <p className="text-muted-foreground">Loading initiative...</p>
-                </div>
-            </div>
-        )
+    // Filter helpers
+    const hasActiveFilters = startDate || endDate
+    
+    const clearFilters = () => {
+        setStartDate('')
+        setEndDate('')
+    }
+    
+    // Handle initiative switch
+    const handleInitiativeSwitch = (slug: string) => {
+        setShowInitiativeDropdown(false)
+        if (slug === initiativeSlug) return
+        
+        // Build query params
+        const params = new URLSearchParams()
+        if (startDate) params.set('startDate', startDate)
+        if (endDate) params.set('endDate', endDate)
+        const queryString = params.toString()
+        
+        navigate(`/org/${orgSlug}/${slug}${queryString ? `?${queryString}` : ''}`)
+    }
+    
+    // Filter dashboard KPIs by date
+    const filteredDashboard = useMemo(() => {
+        if (!dashboard) return null
+        if (!startDate && !endDate) return dashboard
+        
+        const filteredKpis = dashboard.kpis.map(kpi => {
+            // Note: We don't have updates in dashboard kpis, so we can't filter by date here
+            // The backend would need to support date filtering for accurate totals
+            return kpi
+        })
+        
+        return { ...dashboard, kpis: filteredKpis }
+    }, [dashboard, startDate, endDate])
+    
+    // Filter stories by date
+    const filteredStories = useMemo(() => {
+        if (!stories) return null
+        if (!startDate && !endDate) return stories
+        
+        return stories.filter(s => {
+            const storyDate = new Date(s.date_represented)
+            if (startDate && storyDate < new Date(startDate)) return false
+            if (endDate && storyDate > new Date(endDate + 'T23:59:59')) return false
+            return true
+        })
+    }, [stories, startDate, endDate])
+    
+    // Filter evidence by date
+    const filteredEvidence = useMemo(() => {
+        if (!evidence) return null
+        if (!startDate && !endDate) return evidence
+        
+        return evidence.filter(e => {
+            const evidenceDate = new Date(e.date_represented)
+            if (startDate && evidenceDate < new Date(startDate)) return false
+            if (endDate && evidenceDate > new Date(endDate + 'T23:59:59')) return false
+            return true
+        })
+    }, [evidence, startDate, endDate])
+
+    // Early returns for initial loading/error states must come before accessing dashboard
+    if (initialLoading && !initiative) {
+        return <PublicLoader message="Loading initiative..." />
     }
 
     if (error || !initiative || !dashboard) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center px-6">
                 <div className="glass-card p-12 rounded-3xl text-center max-w-md">
-                    <Target className="w-16 h-16 text-muted-foreground/50 mx-auto mb-6" />
+                    <Globe className="w-16 h-16 text-muted-foreground/50 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-foreground mb-3">Initiative Not Found</h1>
                     <p className="text-muted-foreground mb-8">{error || 'This initiative does not exist.'}</p>
                     <Link to={`/org/${orgSlug}`} className="inline-flex items-center gap-2 px-6 py-3 bg-accent text-white rounded-xl hover:bg-accent/90 transition-colors font-medium">
@@ -172,118 +293,253 @@ export default function PublicInitiativePage() {
     }
 
     const tabs: { id: TabType; label: string; icon: any; count?: number }[] = [
-        { id: 'overview', label: 'Overview', icon: BarChart3, count: dashboard.stats.kpis },
-        { id: 'stories', label: 'Stories', icon: BookOpen, count: dashboard.stats.stories },
+        { id: 'overview', label: 'Overview', icon: Globe },
+        { id: 'metrics', label: 'Metrics', icon: BarChart3, count: filteredDashboard?.kpis.length || 0 },
+        { id: 'stories', label: 'Stories', icon: BookOpen, count: filteredStories?.length ?? dashboard.stats.stories },
         { id: 'locations', label: 'Locations', icon: MapPin, count: dashboard.stats.locations },
-        { id: 'evidence', label: 'Evidence', icon: FileText, count: dashboard.stats.evidence },
+        { id: 'evidence', label: 'Evidence', icon: FileText, count: filteredEvidence?.length ?? dashboard.stats.evidence },
         { id: 'beneficiaries', label: 'Beneficiaries', icon: Users }
     ]
 
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 font-figtree">
-            {/* Subtle grid background */}
-            <div className="fixed inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(192,223,161,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(192,223,161,0.03)_1px,transparent_1px)] bg-[size:60px_60px]" />
-            </div>
+    // Brand color with fallback
+    const brandColor = initiative.organization_brand_color || '#c0dfa1'
 
-            {/* Header */}
-            <div className="relative z-10 pt-8">
-                <div className="max-w-7xl mx-auto px-6">
-                    <nav className="mb-8">
-                        <div className="glass rounded-2xl px-6 py-3 flex items-center justify-between border-accent/20">
+    return (
+        <div className="min-h-screen font-figtree relative animate-fadeIn">
+            {/* Flowing gradient background */}
+            <div 
+                className="fixed inset-0 pointer-events-none"
+                style={{
+                    background: `
+                        radial-gradient(ellipse 80% 50% at 20% 40%, ${brandColor}90, transparent 60%),
+                        radial-gradient(ellipse 60% 80% at 80% 20%, ${brandColor}70, transparent 55%),
+                        radial-gradient(ellipse 50% 60% at 60% 80%, ${brandColor}60, transparent 55%),
+                        radial-gradient(ellipse 70% 40% at 10% 90%, ${brandColor}50, transparent 50%),
+                        linear-gradient(180deg, white 0%, #fafafa 100%)
+                    `
+                }}
+            />
+
+            {/* Fixed Header with Filter - Compact like org page */}
+            <header className="sticky top-0 z-40 bg-white/60 backdrop-blur-2xl border-b border-white/40 shadow-sm">
+                <div className="max-w-7xl mx-auto px-6 py-3">
+                    {/* Top Row - Nav + Initiative Info + Logo */}
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-4">
                             <Link to={`/org/${orgSlug}`} className="flex items-center gap-2 text-muted-foreground hover:text-accent transition-colors">
                                 <ArrowLeft className="w-4 h-4" />
-                                <span className="text-sm font-medium">Back to Organization</span>
+                                <span className="text-sm font-medium hidden sm:inline">Back</span>
                             </Link>
-                            <Link to="/" className="flex items-center gap-2 group">
-                                <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden">
-                                    <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
-                                </div>
-                                <span className="text-lg font-newsreader font-extralight text-foreground hidden sm:block">Nexus Impacts</span>
-                            </Link>
-                        </div>
-                    </nav>
-
-                    {/* Initiative Header */}
-                    <div className="glass-card p-6 rounded-3xl mb-6 border-accent/20">
-                        <div className="flex flex-col lg:flex-row items-start gap-6">
-                            <div className="w-14 h-14 bg-gradient-to-br from-accent/20 to-accent/10 rounded-xl flex items-center justify-center flex-shrink-0 border border-accent/30 overflow-hidden">
-                                {initiative.organization_logo_url ? (
-                                    <img src={initiative.organization_logo_url} alt={initiative.organization_name || 'Organization'} className="w-full h-full object-cover" />
-                                ) : (
-                                    <Target className="w-7 h-7 text-accent" />
-                                )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <Link to={`/org/${orgSlug}`} className="text-xs text-accent hover:text-accent/80 font-medium mb-1 inline-flex items-center gap-1">
-                                    <Building2 className="w-3 h-3" /> {initiative.organization_name || 'View Organization'}
-                                </Link>
-                                <h1 className="text-2xl sm:text-3xl font-newsreader font-light text-foreground mb-2">{initiative.title}</h1>
-                                {initiative.description && <p className="text-muted-foreground max-w-3xl mb-2">{initiative.description}</p>}
-                                {initiative.region && (
-                                    <p className="text-sm text-muted-foreground flex items-center gap-1">
-                                        <MapPin className="w-4 h-4 text-accent" />{initiative.region}
-                                    </p>
-                                )}
-                            </div>
-                            
-                            {/* Quick Stats */}
-                            <div className="flex gap-3 flex-shrink-0">
-                                <div className="bg-gradient-to-br from-accent/10 to-accent/5 rounded-xl px-4 py-3 text-center border border-accent/20">
-                                    <p className="text-xl font-bold text-foreground">{dashboard.stats.kpis}</p>
-                                    <p className="text-xs text-muted-foreground">Metrics</p>
-                                </div>
-                                <div className="bg-gradient-to-br from-accent/10 to-accent/5 rounded-xl px-4 py-3 text-center border border-accent/20">
-                                    <p className="text-xl font-bold text-foreground">{dashboard.stats.evidence}</p>
-                                    <p className="text-xs text-muted-foreground">Evidence</p>
-                                </div>
-                                <div className="bg-gradient-to-br from-accent/10 to-accent/5 rounded-xl px-4 py-3 text-center border border-accent/20">
-                                    <p className="text-xl font-bold text-foreground">{dashboard.stats.stories}</p>
-                                    <p className="text-xs text-muted-foreground">Stories</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Tabs - Fixed text visibility */}
-                        <div className="mt-6 flex flex-wrap gap-2">
-                            {tabs.map((tab) => (
-                                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                                        activeTab === tab.id
-                                            ? 'bg-primary-500 shadow-lg shadow-primary-500/25'
-                                            : 'bg-white/60 text-foreground hover:bg-primary-100 hover:text-primary-700'
-                                    }`}
-                                    style={activeTab === tab.id ? { color: '#465360' } : {}}>
-                                    <tab.icon className="w-4 h-4" style={activeTab === tab.id ? { color: '#465360' } : {}} />
-                                    <span style={activeTab === tab.id ? { color: '#465360' } : {}}>{tab.label}</span>
-                                    {tab.count !== undefined && (
-                                        <span className={`px-1.5 py-0.5 text-xs rounded-full ${
-                                            activeTab === tab.id ? 'bg-white/40' : 'bg-primary-100 text-primary-700'
-                                        }`}
-                                        style={activeTab === tab.id ? { color: '#465360' } : {}}>{tab.count}</span>
+                            <div className="h-6 w-px bg-gray-200" />
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden bg-white shadow-md border border-gray-200/50">
+                                    {initiative.organization_logo_url ? (
+                                        <img src={initiative.organization_logo_url} alt={initiative.organization_name || ''} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <Building2 className="w-5 h-5 text-gray-400" />
                                     )}
+                                </div>
+                                <div>
+                                    <h1 className="text-lg font-semibold text-foreground truncate max-w-[300px]">{initiative.title}</h1>
+                                    <Link to={`/org/${orgSlug}`} className="text-xs font-medium text-muted-foreground hover:text-accent transition-colors">
+                                        {initiative.organization_name}
+                                    </Link>
+                                </div>
+                            </div>
+                        </div>
+                        <Link to="/" className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg overflow-hidden">
+                                <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                            </div>
+                            <span className="text-base font-newsreader font-extralight text-foreground hidden md:block">Nexus Impacts</span>
+                        </Link>
+                    </div>
+
+                    {/* Filter Row */}
+                    <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-gray-200/50">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Filter className="w-4 h-4" />
+                            <span className="font-medium">Filter:</span>
+                        </div>
+                        
+                        {/* Initiative Switcher Dropdown */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowInitiativeDropdown(!showInitiativeDropdown)}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-gray-800 text-white border-gray-800 text-sm font-medium transition-colors hover:bg-gray-700"
+                            >
+                                <Globe className="w-3.5 h-3.5" />
+                                <span className="max-w-[120px] truncate">{initiative.title}</span>
+                                <ChevronDown className="w-3.5 h-3.5" />
+                            </button>
+                            
+                            {showInitiativeDropdown && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setShowInitiativeDropdown(false)} />
+                                    <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-2 max-h-64 overflow-y-auto">
+                                        {allInitiatives.map(init => (
+                                            <button
+                                                key={init.id}
+                                                onClick={() => handleInitiativeSwitch(init.slug)}
+                                                className={`w-full px-4 py-2 text-left text-sm hover:bg-accent/10 ${
+                                                    init.slug === initiativeSlug ? 'bg-accent/10 text-accent font-medium' : 'text-foreground'
+                                                }`}
+                                            >
+                                                <span className="truncate">{init.title}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                        
+                        {/* Date Range */}
+                        <div className="flex items-center gap-2">
+                            <div className="relative">
+                                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="pl-8 pr-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 bg-white w-[130px]"
+                                />
+                            </div>
+                            <span className="text-muted-foreground text-sm">to</span>
+                            <div className="relative">
+                                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="pl-8 pr-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 bg-white w-[130px]"
+                                />
+                            </div>
+                        </div>
+                        
+                        {hasActiveFilters && (
+                            <button onClick={clearFilters} className="flex items-center gap-1 px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                                <X className="w-3.5 h-3.5" /> Clear
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </header>
+
+            {/* Main Content with Sidebar */}
+            <div className="max-w-7xl mx-auto px-6 py-6 relative">
+                <div className="flex gap-6">
+                    {/* Sidebar */}
+                    <div className="w-56 flex-shrink-0 hidden lg:block">
+                        <div className="sticky top-[140px]">
+                            {/* Initiative Info Card */}
+                            <div className="bg-white/40 backdrop-blur-2xl p-4 rounded-2xl border border-white/60 shadow-xl shadow-black/5 mb-4">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="w-11 h-11 bg-white/60 rounded-xl flex items-center justify-center flex-shrink-0 border border-white/50 overflow-hidden shadow-md">
+                                        {initiative.organization_logo_url ? (
+                                            <img src={initiative.organization_logo_url} alt={initiative.organization_name || 'Organization'} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <Globe className="w-5 h-5 text-gray-500" />
+                                        )}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h2 className="font-semibold text-foreground text-sm truncate">{initiative.title}</h2>
+                                        <Link to={`/org/${orgSlug}`} className="text-xs text-muted-foreground hover:text-foreground font-medium">
+                                            {initiative.organization_name}
+                                        </Link>
+                                    </div>
+                                </div>
+                                
+                                {/* Quick Stats */}
+                                <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/50">
+                                    <div className="text-center p-2 rounded-lg bg-white/40">
+                                        <p className="text-lg font-bold text-foreground">{dashboard.stats.kpis}</p>
+                                        <p className="text-[10px] text-muted-foreground font-medium">Metrics</p>
+                                    </div>
+                                    <div className="text-center p-2 rounded-lg bg-white/40">
+                                        <p className="text-lg font-bold text-foreground">{dashboard.stats.evidence}</p>
+                                        <p className="text-[10px] text-muted-foreground font-medium">Evidence</p>
+                                    </div>
+                                    <div className="text-center p-2 rounded-lg bg-white/40">
+                                        <p className="text-lg font-bold text-foreground">{dashboard.stats.stories}</p>
+                                        <p className="text-[10px] text-muted-foreground font-medium">Stories</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Navigation Tabs */}
+                            <nav className="space-y-1 bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-2">
+                                {tabs.map((tab) => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                                            activeTab === tab.id
+                                                ? 'bg-gray-800 text-white shadow-lg'
+                                                : 'text-gray-700 hover:bg-white/60'
+                                        }`}
+                                    >
+                                        <tab.icon className="w-4 h-4" />
+                                        <span className="flex-1 text-left">{tab.label}</span>
+                                        {tab.count !== undefined && (
+                                            <span className={`px-2 py-0.5 text-xs rounded-full font-semibold ${
+                                                activeTab === tab.id 
+                                                    ? 'bg-white/30 text-white' 
+                                                    : 'bg-white/60 text-gray-600'
+                                            }`}>
+                                                {tab.count}
+                                            </span>
+                                        )}
+                                    </button>
+                                ))}
+                            </nav>
+                        </div>
+                    </div>
+
+                    {/* Mobile Tab Bar */}
+                    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-2xl border-t border-white/40 z-30 px-2 py-2">
+                        <div className="flex justify-around">
+                            {tabs.slice(0, 5).map((tab) => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all ${
+                                        activeTab === tab.id 
+                                            ? 'text-foreground bg-gray-100' 
+                                            : 'text-muted-foreground'
+                                    }`}
+                                >
+                                    <tab.icon className="w-5 h-5" />
+                                    <span className="text-[10px] font-medium">{tab.label}</span>
                                 </button>
                             ))}
                         </div>
                     </div>
-                </div>
-            </div>
 
-            {/* Tab Content */}
-            <div className="relative z-10 max-w-7xl mx-auto px-6 pb-20">
-                {activeTab === 'overview' && <OverviewTab dashboard={dashboard} orgLogoUrl={initiative.organization_logo_url} />}
-                {activeTab === 'stories' && <StoriesTab stories={stories} />}
-                {activeTab === 'locations' && <LocationsTab locations={locations || dashboard.locations} />}
-                {activeTab === 'evidence' && <EvidenceTab evidence={evidence} />}
-                {activeTab === 'beneficiaries' && <BeneficiariesTab beneficiaries={beneficiaries} />}
-            </div>
-
-            {/* Footer */}
-            <div className="relative z-10 border-t border-accent/10 bg-white/50 backdrop-blur-sm">
-                <div className="max-w-7xl mx-auto px-6 py-6">
-                    <p className="text-center text-sm text-muted-foreground">
-                        Impact data for <span className="text-accent font-medium">{initiative.title}</span>
-                    </p>
+                    {/* Main Content Area */}
+                    <div className="flex-1 min-w-0 pb-20 lg:pb-0 relative">
+                        {switching ? (
+                            <div className="flex items-center justify-center py-32">
+                                <div className="flex flex-col items-center">
+                                    {/* Three bouncing dots */}
+                                    <div className="flex items-center gap-1.5 mb-3">
+                                        <div className="w-2 h-2 rounded-full bg-primary-400 animate-bounce" style={{ animationDelay: '0ms', animationDuration: '600ms' }} />
+                                        <div className="w-2 h-2 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '150ms', animationDuration: '600ms' }} />
+                                        <div className="w-2 h-2 rounded-full bg-primary-400 animate-bounce" style={{ animationDelay: '300ms', animationDuration: '600ms' }} />
+                                    </div>
+                                    <p className="text-gray-400 text-sm font-medium">Loading...</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                {activeTab === 'overview' && <InitiativeOverviewTab initiative={initiative} dashboard={dashboard} />}
+                                {activeTab === 'metrics' && filteredDashboard && <MetricsTab dashboard={filteredDashboard} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />}
+                                {activeTab === 'stories' && <StoriesTab stories={filteredStories} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />}
+                                {activeTab === 'locations' && <LocationsTab locations={locations || dashboard.locations} />}
+                                {activeTab === 'evidence' && <EvidenceTab evidence={filteredEvidence} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />}
+                                {activeTab === 'beneficiaries' && <BeneficiariesTab beneficiaries={beneficiaries} />}
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
@@ -294,7 +550,536 @@ export default function PublicInitiativePage() {
 // Tab Components
 // ============================================
 
-function OverviewTab({ dashboard, orgLogoUrl }: { dashboard: InitiativeDashboard; orgLogoUrl?: string }) {
+// Color palette for charts - matches MetricsDashboard
+const METRIC_COLOR_PALETTE = [
+    '#3b82f6', // blue
+    '#10b981', // green
+    '#8b5cf6', // purple
+    '#f59e0b', // amber
+    '#ef4444', // red
+    '#06b6d4', // cyan
+    '#ec4899', // pink
+    '#84cc16', // lime
+    '#f97316', // orange
+    '#6366f1', // indigo
+    '#14b8a6', // teal
+    '#a855f7', // violet
+]
+
+const getMetricColor = (index: number): string => {
+    return METRIC_COLOR_PALETTE[index % METRIC_COLOR_PALETTE.length]
+}
+
+const CATEGORY_COLORS = {
+    input: '#3b82f6',
+    output: '#10b981', 
+    impact: '#8b5cf6'
+}
+
+// Initiative Overview - Modern dashboard with multi-line chart like MetricsDashboard
+function InitiativeOverviewTab({ initiative, dashboard }: { 
+    initiative: PublicInitiative; 
+    dashboard: InitiativeDashboard 
+}) {
+    const brandColor = initiative.organization_brand_color || '#c0dfa1'
+    const [timeFrame, setTimeFrame] = useState<'all' | '1month' | '6months' | '1year'>('all')
+    const [isCumulative, setIsCumulative] = useState(false)
+    const [visibleKPIs, setVisibleKPIs] = useState<Set<string>>(new Set(dashboard.kpis.map(k => k.id)))
+    
+    // Flatten all updates from all KPIs
+    const allUpdates = useMemo(() => {
+        const updates: Array<{ kpi_id: string; value: number; date_represented: string }> = []
+        dashboard.kpis.forEach(kpi => {
+            if (kpi.updates && kpi.updates.length > 0) {
+                kpi.updates.forEach(update => {
+                    updates.push({
+                        kpi_id: kpi.id,
+                        value: update.value,
+                        date_represented: update.date_represented
+                    })
+                })
+            }
+        })
+        return updates
+    }, [dashboard.kpis])
+
+    // Generate chart data similar to MetricsDashboard
+    const chartData = useMemo(() => {
+        if (allUpdates.length === 0 || visibleKPIs.size === 0) return []
+        
+        // Get date range
+        const now = new Date()
+        let startDate: Date
+        
+        if (timeFrame === 'all') {
+            // Find oldest update
+            const oldestDate = allUpdates.reduce((oldest, update) => {
+                const d = new Date(update.date_represented)
+                return d < oldest ? d : oldest
+            }, new Date())
+            startDate = new Date(oldestDate)
+            startDate.setMonth(startDate.getMonth() - 1)
+        } else {
+            startDate = new Date()
+            switch (timeFrame) {
+                case '1month': startDate.setMonth(now.getMonth() - 1); break
+                case '6months': startDate.setMonth(now.getMonth() - 6); break
+                case '1year': startDate.setFullYear(now.getFullYear() - 1); break
+            }
+        }
+
+        // Group updates by KPI
+        const updatesByKPI: Record<string, Array<{ value: number; date: Date }>> = {}
+        allUpdates.forEach(update => {
+            if (!updatesByKPI[update.kpi_id]) {
+                updatesByKPI[update.kpi_id] = []
+            }
+            updatesByKPI[update.kpi_id].push({
+                value: update.value,
+                date: new Date(update.date_represented)
+            })
+        })
+
+        // Sort updates by date
+        Object.keys(updatesByKPI).forEach(kpiId => {
+            updatesByKPI[kpiId].sort((a, b) => a.date.getTime() - b.date.getTime())
+        })
+
+        if (!isCumulative) {
+            // Monthly aggregation
+            const monthlyTotals: Record<string, Record<string, number>> = {}
+            
+            Object.keys(updatesByKPI).forEach(kpiId => {
+                if (!visibleKPIs.has(kpiId)) return
+                updatesByKPI[kpiId].forEach(update => {
+                    if (update.date < startDate) return
+                    const monthKey = `${update.date.getFullYear()}-${String(update.date.getMonth() + 1).padStart(2, '0')}`
+                    if (!monthlyTotals[monthKey]) monthlyTotals[monthKey] = {}
+                    if (!monthlyTotals[monthKey][kpiId]) monthlyTotals[monthKey][kpiId] = 0
+                    monthlyTotals[monthKey][kpiId] += update.value
+                })
+            })
+
+            // Generate data points for each month
+            const result: any[] = []
+            let currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
+            const endDate = new Date(now.getFullYear(), now.getMonth(), 1)
+            
+            while (currentDate <= endDate) {
+                const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
+                const monthLabel = currentDate.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+                
+                const dataPoint: any = { date: monthLabel, fullDate: new Date(currentDate) }
+                Array.from(visibleKPIs).forEach(kpiId => {
+                    dataPoint[kpiId] = monthlyTotals[monthKey]?.[kpiId] || 0
+                })
+                result.push(dataPoint)
+                
+                currentDate.setMonth(currentDate.getMonth() + 1)
+            }
+            
+            return result
+        } else {
+            // Cumulative - daily data points
+            const result: any[] = []
+            const daysDiff = Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 3600 * 24))
+            
+            for (let i = 0; i <= daysDiff; i++) {
+                const currentDate = new Date(startDate)
+                currentDate.setDate(startDate.getDate() + i)
+                if (currentDate > now) break
+                
+                const dateLabel = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                const dataPoint: any = { date: dateLabel, fullDate: new Date(currentDate) }
+                
+                // Calculate cumulative for each visible KPI
+                Array.from(visibleKPIs).forEach(kpiId => {
+                    const cumulative = (updatesByKPI[kpiId] || [])
+                        .filter(u => u.date <= currentDate)
+                        .reduce((sum, u) => sum + u.value, 0)
+                    dataPoint[kpiId] = cumulative
+                })
+                
+                result.push(dataPoint)
+            }
+            
+            // Reduce data points for better performance (every 7th day for cumulative)
+            if (result.length > 60) {
+                return result.filter((_, i) => i % 7 === 0 || i === result.length - 1)
+            }
+            return result
+        }
+    }, [allUpdates, timeFrame, isCumulative, visibleKPIs])
+
+    // Category breakdown data
+    const categoryData = useMemo(() => {
+        const categories = { input: 0, output: 0, impact: 0 }
+        dashboard.kpis.forEach(kpi => {
+            if (kpi.category && categories.hasOwnProperty(kpi.category)) {
+                categories[kpi.category as keyof typeof categories]++
+            }
+        })
+        return Object.entries(categories)
+            .filter(([_, count]) => count > 0)
+            .map(([category, count]) => ({
+                name: category.charAt(0).toUpperCase() + category.slice(1),
+                value: count,
+                color: CATEGORY_COLORS[category as keyof typeof CATEGORY_COLORS]
+            }))
+    }, [dashboard.kpis])
+
+    const totalDataPoints = useMemo(() => {
+        return dashboard.kpis.reduce((sum, kpi) => sum + (kpi.update_count || 0), 0)
+    }, [dashboard.kpis])
+
+    const toggleKPI = (kpiId: string) => {
+        setVisibleKPIs(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(kpiId)) {
+                newSet.delete(kpiId)
+            } else {
+                newSet.add(kpiId)
+            }
+            return newSet
+        })
+    }
+
+    return (
+        <div className="space-y-5">
+            {/* Hero Section - Compact */}
+            <div className="bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl p-6">
+                <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                    <div className="flex-1">
+                        <h1 className="text-2xl font-semibold text-foreground mb-2">{initiative.title}</h1>
+                        {initiative.description && (
+                            <p className="text-muted-foreground leading-relaxed line-clamp-2">{initiative.description}</p>
+                        )}
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                        {initiative.region && (
+                            <span className="inline-flex items-center gap-2 px-4 py-2 bg-white/60 rounded-xl text-sm font-medium text-foreground border border-white/80">
+                                <MapPin className="w-4 h-4 text-gray-500" />
+                                {initiative.region}
+                            </span>
+                        )}
+                        <span className="inline-flex items-center gap-2 px-4 py-2 bg-white/60 rounded-xl text-sm font-medium text-foreground border border-white/80">
+                            <Activity className="w-4 h-4 text-gray-500" />
+                            {totalDataPoints} data points
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Metric Cards Row */}
+            {dashboard.kpis.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    {dashboard.kpis.slice(0, 12).map((kpi, index) => {
+                        const metricColor = getMetricColor(index)
+                        const isVisible = visibleKPIs.has(kpi.id)
+                        return (
+                            <div
+                                key={kpi.id}
+                                onClick={() => toggleKPI(kpi.id)}
+                                className={`bg-white/60 backdrop-blur rounded-xl border p-3 cursor-pointer transition-all hover:shadow-lg ${
+                                    isVisible ? 'border-white/80' : 'border-gray-300 opacity-50'
+                                }`}
+                            >
+                                <div className="flex items-center justify-between mb-1">
+                                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: metricColor }} />
+                                    <span className="text-[10px] text-gray-400 truncate ml-1">{kpi.unit_of_measurement}</span>
+                                </div>
+                                <div className="text-xs font-medium text-gray-700 truncate mb-1">{kpi.title}</div>
+                                <div className="text-lg font-bold" style={{ color: metricColor }}>
+                                    {(kpi.total_value || 0).toLocaleString()}
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+
+            {/* Main Chart */}
+            <div className="bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${brandColor}30` }}>
+                            <TrendingUp className="w-4 h-4" style={{ color: brandColor }} />
+                        </div>
+                        <h2 className="font-semibold text-foreground">Metrics Over Time</h2>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {/* Monthly/Cumulative Toggle */}
+                        <div className="flex items-center bg-white/60 rounded-xl p-0.5 border border-white/80">
+                            <button
+                                onClick={() => setIsCumulative(false)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                    !isCumulative ? 'bg-gray-800 text-white' : 'text-gray-600 hover:text-gray-800'
+                                }`}
+                            >
+                                Monthly
+                            </button>
+                            <button
+                                onClick={() => setIsCumulative(true)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                    isCumulative ? 'bg-gray-800 text-white' : 'text-gray-600 hover:text-gray-800'
+                                }`}
+                            >
+                                Cumulative
+                            </button>
+                        </div>
+                        {/* Time Frame */}
+                        <div className="flex items-center bg-white/60 rounded-xl p-0.5 border border-white/80">
+                            {(['all', '1month', '6months', '1year'] as const).map((tf) => (
+                                <button
+                                    key={tf}
+                                    onClick={() => setTimeFrame(tf)}
+                                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                        timeFrame === tf ? 'bg-gray-800 text-white' : 'text-gray-600 hover:text-gray-800'
+                                    }`}
+                                >
+                                    {tf === 'all' ? 'All' : tf === '1month' ? '1M' : tf === '6months' ? '6M' : '1Y'}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+                
+                <div className="h-[320px]">
+                    {chartData.length > 0 && visibleKPIs.size > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 30 }}>
+                                <defs>
+                                    {dashboard.kpis.map((kpi, index) => (
+                                        <linearGradient key={kpi.id} id={`gradient-${kpi.id}`} x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor={getMetricColor(index)} stopOpacity={0.3}/>
+                                            <stop offset="95%" stopColor={getMetricColor(index)} stopOpacity={0.05}/>
+                                        </linearGradient>
+                                    ))}
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                                <XAxis 
+                                    dataKey="date" 
+                                    stroke="#9ca3af" 
+                                    fontSize={10}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    angle={-45}
+                                    textAnchor="end"
+                                    height={50}
+                                    interval={chartData.length > 12 ? Math.floor(chartData.length / 12) : 0}
+                                />
+                                <YAxis 
+                                    stroke="#9ca3af" 
+                                    fontSize={10}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickFormatter={(value) => {
+                                        if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
+                                        if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
+                                        return value.toString()
+                                    }}
+                                />
+                                <RechartsTooltip
+                                    contentStyle={{
+                                        backgroundColor: 'white',
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '12px',
+                                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                        fontSize: '12px'
+                                    }}
+                                    formatter={(value: number, name: string) => {
+                                        const kpi = dashboard.kpis.find(k => k.id === name)
+                                        return [value.toLocaleString() + (kpi?.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : ''), kpi?.title || name]
+                                    }}
+                                />
+                                {dashboard.kpis.filter(kpi => visibleKPIs.has(kpi.id)).map((kpi, i) => {
+                                    const originalIndex = dashboard.kpis.findIndex(k => k.id === kpi.id)
+                                    return (
+                                        <Area
+                                            key={kpi.id}
+                                            type="monotone"
+                                            dataKey={kpi.id}
+                                            stroke={getMetricColor(originalIndex)}
+                                            strokeWidth={2}
+                                            fill={`url(#gradient-${kpi.id})`}
+                                            dot={false}
+                                        />
+                                    )
+                                })}
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="h-full flex items-center justify-center text-muted-foreground">
+                            <div className="text-center">
+                                <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                                <p>{visibleKPIs.size === 0 ? 'Click metrics above to show on chart' : 'No data available yet'}</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+                
+                {/* Legend */}
+                {visibleKPIs.size > 0 && (
+                    <div className="flex flex-wrap justify-center gap-4 mt-4 pt-4 border-t border-white/50">
+                        {dashboard.kpis.filter(kpi => visibleKPIs.has(kpi.id)).map((kpi, i) => {
+                            const originalIndex = dashboard.kpis.findIndex(k => k.id === kpi.id)
+                            return (
+                                <div key={kpi.id} className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: getMetricColor(originalIndex) }} />
+                                    <span className="text-xs text-muted-foreground">{kpi.title}</span>
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
+            </div>
+
+            {/* Bottom Row: Stats + Category Breakdown + Locations */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                {/* Stats */}
+                <div className="bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${brandColor}30` }}>
+                            <BarChart3 className="w-4 h-4" style={{ color: brandColor }} />
+                        </div>
+                        <h2 className="font-semibold text-foreground">Quick Stats</h2>
+                    </div>
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between p-3 bg-white/60 rounded-xl">
+                            <span className="text-sm text-muted-foreground">Metrics</span>
+                            <span className="font-bold text-foreground">{dashboard.stats.kpis}</span>
+                        </div>
+                        <div className="flex items-center justify-between p-3 bg-white/60 rounded-xl">
+                            <span className="text-sm text-muted-foreground">Evidence</span>
+                            <span className="font-bold text-foreground">{dashboard.stats.evidence}</span>
+                        </div>
+                        <div className="flex items-center justify-between p-3 bg-white/60 rounded-xl">
+                            <span className="text-sm text-muted-foreground">Stories</span>
+                            <span className="font-bold text-foreground">{dashboard.stats.stories}</span>
+                        </div>
+                        <div className="flex items-center justify-between p-3 bg-white/60 rounded-xl">
+                            <span className="text-sm text-muted-foreground">Locations</span>
+                            <span className="font-bold text-foreground">{dashboard.stats.locations}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Category Breakdown */}
+                <div className="bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-purple-100">
+                            <Layers className="w-4 h-4 text-purple-600" />
+                        </div>
+                        <h2 className="font-semibold text-foreground">Categories</h2>
+                    </div>
+                    
+                    {categoryData.length > 0 ? (
+                        <>
+                            <div className="h-[160px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={categoryData}
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={40}
+                                            outerRadius={65}
+                                            paddingAngle={4}
+                                            dataKey="value"
+                                        >
+                                            {categoryData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                            ))}
+                                        </Pie>
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+                            <div className="flex justify-center gap-4">
+                                {categoryData.map((cat, i) => (
+                                    <div key={i} className="flex items-center gap-2">
+                                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
+                                        <span className="text-xs text-muted-foreground">{cat.name} ({cat.value})</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    ) : (
+                        <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                            <p className="text-sm">No metrics yet</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Locations Preview */}
+                <div className="bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl p-5">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-amber-100">
+                                <MapPin className="w-4 h-4 text-amber-600" />
+                            </div>
+                            <h2 className="font-semibold text-foreground">Locations</h2>
+                        </div>
+                        <span className="text-xs text-muted-foreground">{dashboard.locations?.length || 0}</span>
+                    </div>
+                    
+                    {dashboard.locations && dashboard.locations.length > 0 ? (
+                        <>
+                            <div className="h-[120px] rounded-xl overflow-hidden border border-gray-200 mb-3">
+                                <MapContainer 
+                                    center={[
+                                        dashboard.locations.reduce((s, l) => s + l.latitude, 0) / dashboard.locations.length,
+                                        dashboard.locations.reduce((s, l) => s + l.longitude, 0) / dashboard.locations.length
+                                    ]} 
+                                    zoom={dashboard.locations.length === 1 ? 8 : 3} 
+                                    className="w-full h-full" 
+                                    zoomControl={false}
+                                    scrollWheelZoom={false}
+                                    dragging={false}
+                                >
+                                    <TileLayerWithFallback />
+                                    {dashboard.locations.map((loc) => (
+                                        <LocationMarker key={loc.id} location={loc} />
+                                    ))}
+                                </MapContainer>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                                {dashboard.locations.slice(0, 5).map((loc) => (
+                                    <span key={loc.id} className="px-2 py-1 bg-white/60 text-foreground rounded text-xs font-medium">
+                                        {loc.name}
+                                    </span>
+                                ))}
+                                {dashboard.locations.length > 5 && (
+                                    <span className="px-2 py-1 text-muted-foreground text-xs">+{dashboard.locations.length - 5} more</span>
+                                )}
+                            </div>
+                        </>
+                    ) : (
+                        <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                            <p className="text-sm">No locations yet</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// Generate slug from metric title
+function generateMetricSlug(title: string): string {
+    return title
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .trim()
+}
+
+// Metrics Tab - Shows all metrics with links to detail pages
+function MetricsTab({ dashboard, orgSlug, initiativeSlug }: { 
+    dashboard: InitiativeDashboard; 
+    orgSlug: string; 
+    initiativeSlug: string 
+}) {
     const { kpis } = dashboard
 
     if (kpis.length === 0) {
@@ -319,9 +1104,14 @@ function OverviewTab({ dashboard, orgLogoUrl }: { dashboard: InitiativeDashboard
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {kpis.map((kpi) => {
                 const config = getCategoryConfig(kpi.category)
+                const metricSlug = generateMetricSlug(kpi.title)
                 
                 return (
-                    <div key={kpi.id} className="glass-card rounded-2xl border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all overflow-hidden">
+                    <Link 
+                        key={kpi.id} 
+                        to={`/org/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`}
+                        className="glass-card rounded-2xl border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all overflow-hidden group cursor-pointer"
+                    >
                         {/* Header */}
                         <div className={`px-5 py-3 ${config.bg} border-b ${config.border}`}>
                             <div className="flex items-center justify-between">
@@ -339,7 +1129,10 @@ function OverviewTab({ dashboard, orgLogoUrl }: { dashboard: InitiativeDashboard
 
                         {/* Content */}
                         <div className="p-5">
-                            <h4 className="font-semibold text-foreground mb-1 text-lg">{kpi.title}</h4>
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                                <h4 className="font-semibold text-foreground text-lg group-hover:text-accent transition-colors">{kpi.title}</h4>
+                                <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-accent transition-colors flex-shrink-0 mt-1" />
+                            </div>
                             {kpi.description && (
                                 <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{kpi.description}</p>
                             )}
@@ -368,26 +1161,32 @@ function OverviewTab({ dashboard, orgLogoUrl }: { dashboard: InitiativeDashboard
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </Link>
                 )
             })}
         </div>
     )
 }
 
-function StoriesTab({ stories }: { stories: PublicStory[] | null }) {
+function StoriesTab({ stories, orgSlug, initiativeSlug }: { stories: PublicStory[] | null; orgSlug: string; initiativeSlug: string }) {
     if (!stories) return <LoadingState />
     if (stories.length === 0) return <EmptyState icon={BookOpen} message="No stories available yet." />
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {stories.map((story) => (
-                <div key={story.id} className="glass-card rounded-2xl overflow-hidden group border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all">
+                <Link 
+                    key={story.id} 
+                    to={`/org/${orgSlug}/${initiativeSlug}/story/${story.id}`}
+                    className="glass-card rounded-2xl overflow-hidden group border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all"
+                >
                     <div className="h-44 bg-gradient-to-br from-accent/10 to-accent/5 overflow-hidden">
                         {story.media_url && story.media_type === 'photo' ? (
                             <img src={story.media_url} alt={story.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                         ) : story.media_type === 'video' && story.media_url ? (
-                            <video src={story.media_url} className="w-full h-full object-cover" controls />
+                            <div className="w-full h-full bg-gray-900 flex items-center justify-center">
+                                <FileText className="w-12 h-12 text-white/30" />
+                            </div>
                         ) : (
                             <div className="w-full h-full flex items-center justify-center">
                                 <FileText className="w-12 h-12 text-accent/30" />
@@ -395,14 +1194,14 @@ function StoriesTab({ stories }: { stories: PublicStory[] | null }) {
                         )}
                     </div>
                     <div className="p-4">
-                        <h3 className="font-semibold text-foreground mb-2">{story.title}</h3>
+                        <h3 className="font-semibold text-foreground mb-2 group-hover:text-accent transition-colors">{story.title}</h3>
                         {story.description && <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{story.description}</p>}
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-accent" />{new Date(story.date_represented).toLocaleDateString()}</span>
                             {story.location?.name && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-accent" />{story.location.name}</span>}
                         </div>
                     </div>
-                </div>
+                </Link>
             ))}
         </div>
     )
@@ -448,7 +1247,7 @@ function LocationsTab({ locations }: { locations: PublicLocation[] | null }) {
     )
 }
 
-function EvidenceTab({ evidence }: { evidence: PublicEvidence[] | null }) {
+function EvidenceTab({ evidence, orgSlug, initiativeSlug }: { evidence: PublicEvidence[] | null; orgSlug: string; initiativeSlug: string }) {
     const [displayCount, setDisplayCount] = useState(8)
     const [activeFilter, setActiveFilter] = useState<string | null>(null)
 
@@ -551,39 +1350,38 @@ function EvidenceTab({ evidence }: { evidence: PublicEvidence[] | null }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {displayedEvidence.map((item) => {
                     const previewUrl = getPreviewUrl(item)
-                    const fileUrl = item.files?.[0]?.file_url || item.file_url
                     const fileCount = item.files?.length || (item.file_url ? 1 : 0)
                     
                     return (
-                        <div key={item.id} className="glass-card rounded-2xl border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all overflow-hidden">
+                        <Link 
+                            key={item.id} 
+                            to={`/org/${orgSlug}/${initiativeSlug}/evidence/${item.id}`}
+                            className="glass-card rounded-2xl border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all overflow-hidden group"
+                        >
                             {/* Image Preview */}
                             {previewUrl ? (
-                                <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="block">
-                                    <div className="relative aspect-video bg-gray-100 overflow-hidden">
-                                        <img 
-                                            src={previewUrl} 
-                                            alt={item.title}
-                                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                                        />
-                                        {fileCount > 1 && (
-                                            <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-lg">
-                                                +{fileCount - 1} more
-                                            </div>
-                                        )}
-                                    </div>
-                                </a>
-                            ) : fileUrl ? (
-                                <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="block">
-                                    <div className="aspect-video bg-gradient-to-br from-accent/10 to-accent/5 flex items-center justify-center">
-                                        <div className="text-center">
-                                            <FileText className="w-10 h-10 text-accent/50 mx-auto mb-2" />
-                                            <span className="text-sm text-muted-foreground">
-                                                {fileCount} file{fileCount > 1 ? 's' : ''}
-                                            </span>
+                                <div className="relative aspect-video bg-gray-100 overflow-hidden">
+                                    <img 
+                                        src={previewUrl} 
+                                        alt={item.title}
+                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                    />
+                                    {fileCount > 1 && (
+                                        <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-lg">
+                                            +{fileCount - 1} more
                                         </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="aspect-video bg-gradient-to-br from-accent/10 to-accent/5 flex items-center justify-center">
+                                    <div className="text-center">
+                                        <FileText className="w-10 h-10 text-accent/50 mx-auto mb-2" />
+                                        <span className="text-sm text-muted-foreground">
+                                            {fileCount} file{fileCount > 1 ? 's' : ''}
+                                        </span>
                                     </div>
-                                </a>
-                            ) : null}
+                                </div>
+                            )}
 
                             {/* Content */}
                             <div className="p-4">
@@ -593,16 +1391,8 @@ function EvidenceTab({ evidence }: { evidence: PublicEvidence[] | null }) {
                                     </span>
                                     <span className="text-xs text-muted-foreground">{new Date(item.date_represented).toLocaleDateString()}</span>
                                 </div>
-                                <h3 className="font-semibold text-foreground text-sm mb-1">{item.title}</h3>
+                                <h3 className="font-semibold text-foreground text-sm mb-1 group-hover:text-accent transition-colors">{item.title}</h3>
                                 {item.description && <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{item.description}</p>}
-                                
-                                {/* File link (if no preview shown) */}
-                                {!previewUrl && fileUrl && (
-                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent/80 font-medium">
-                                        <ExternalLink className="w-3.5 h-3.5" />View file{fileCount > 1 ? `s (${fileCount})` : ''}
-                                    </a>
-                                )}
                                 
                                 {/* Locations */}
                                 {item.locations && item.locations.length > 0 && (
@@ -613,7 +1403,7 @@ function EvidenceTab({ evidence }: { evidence: PublicEvidence[] | null }) {
                                     </div>
                                 )}
                             </div>
-                        </div>
+                        </Link>
                     )
                 })}
             </div>

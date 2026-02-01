@@ -4,6 +4,7 @@ export interface Organization {
     slug?: string;
     description?: string;
     logo_url?: string; // URL to organization logo image
+    brand_color?: string; // Hex color for public page branding
     is_public?: boolean;
     owner_id?: string; // Single owner user (cascades delete when user is deleted)
     created_at?: string;

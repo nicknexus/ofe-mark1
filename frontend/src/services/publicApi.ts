@@ -15,6 +15,7 @@ export interface PublicOrganization {
     slug: string
     description?: string
     logo_url?: string
+    brand_color?: string
     created_at?: string
 }
 
@@ -31,6 +32,7 @@ export interface PublicInitiative {
     org_slug?: string
     organization_name?: string
     organization_logo_url?: string
+    organization_brand_color?: string
 }
 
 export interface PublicKPI {
@@ -164,11 +166,38 @@ export interface InitiativeDashboard {
 }
 
 // ============================================
-// API Service
+// API Service with Caching
 // ============================================
 
 class PublicApiService {
-    private async request<T>(endpoint: string): Promise<T> {
+    private cache: Map<string, any> = new Map()
+    private currentOrgSlug: string | null = null
+
+    /**
+     * Clear cache when entering a new organization (fresh load)
+     * Call this when navigating to an org from the explore page
+     */
+    clearCacheForOrg(orgSlug: string): void {
+        if (this.currentOrgSlug !== orgSlug) {
+            this.cache.clear()
+            this.currentOrgSlug = orgSlug
+        }
+    }
+
+    /**
+     * Clear all cache (useful for testing or forced refresh)
+     */
+    clearAllCache(): void {
+        this.cache.clear()
+        this.currentOrgSlug = null
+    }
+
+    private async request<T>(endpoint: string, skipCache: boolean = false): Promise<T> {
+        // Check cache first (unless skipCache is true)
+        if (!skipCache && this.cache.has(endpoint)) {
+            return this.cache.get(endpoint) as T
+        }
+
         const response = await fetch(`${API_BASE_URL}/api/public${endpoint}`)
 
         if (!response.ok) {
@@ -187,7 +216,12 @@ class PublicApiService {
             throw new Error(errorMessage)
         }
 
-        return response.json()
+        const data = await response.json()
+        
+        // Cache the result
+        this.cache.set(endpoint, data)
+        
+        return data
     }
 
     // ============================================
@@ -268,6 +302,96 @@ class PublicApiService {
 
     async getInitiativeBeneficiaries(orgSlug: string, initiativeSlug: string): Promise<PublicBeneficiaryGroup[]> {
         return this.request<PublicBeneficiaryGroup[]>(`/initiatives/${orgSlug}/${initiativeSlug}/beneficiaries`)
+    }
+
+    async getMetricDetail(orgSlug: string, initiativeSlug: string, metricSlug: string): Promise<PublicMetricDetail> {
+        return this.request<PublicMetricDetail>(`/initiatives/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`)
+    }
+
+    async getStoryDetail(orgSlug: string, initiativeSlug: string, storyId: string): Promise<PublicStoryDetail> {
+        return this.request<PublicStoryDetail>(`/initiatives/${orgSlug}/${initiativeSlug}/story/${storyId}`)
+    }
+
+    async getEvidenceDetail(orgSlug: string, initiativeSlug: string, evidenceId: string): Promise<PublicEvidenceDetail> {
+        return this.request<PublicEvidenceDetail>(`/initiatives/${orgSlug}/${initiativeSlug}/evidence/${evidenceId}`)
+    }
+}
+
+// Metric Detail types
+export interface PublicMetricDetail {
+    id: string
+    title: string
+    slug: string
+    description?: string
+    metric_type: 'number' | 'percentage'
+    unit_of_measurement: string
+    category: 'input' | 'output' | 'impact'
+    display_order?: number
+    total_value: number
+    update_count: number
+    updates: PublicKPIUpdate[]
+    evidence: PublicEvidence[]
+    evidence_count: number
+    initiative: {
+        id: string
+        title: string
+        slug: string
+        org_slug?: string
+        org_name?: string
+    }
+}
+
+// Story Detail types
+export interface PublicStoryDetail {
+    id: string
+    title: string
+    description?: string
+    media_url?: string
+    media_type: 'photo' | 'video' | 'recording' | 'text'
+    date_represented: string
+    created_at?: string
+    location?: PublicLocation
+    beneficiary_groups?: PublicBeneficiaryGroup[]
+    initiative: {
+        id: string
+        title: string
+        slug: string
+        org_slug?: string
+        org_name?: string
+    }
+}
+
+// Evidence Detail types
+export interface PublicEvidenceDetail {
+    id: string
+    title: string
+    description?: string
+    type: string
+    file_url?: string
+    files: Array<{
+        id: string
+        file_url: string
+        file_name: string
+        file_type: string
+        display_order?: number
+    }>
+    date_represented: string
+    date_range_start?: string
+    date_range_end?: string
+    created_at?: string
+    linked_kpis: Array<{
+        id: string
+        title: string
+        description?: string
+        unit_of_measurement: string
+        category: 'input' | 'output' | 'impact'
+    }>
+    initiative: {
+        id: string
+        title: string
+        slug: string
+        org_slug?: string
+        org_name?: string
     }
 }
 

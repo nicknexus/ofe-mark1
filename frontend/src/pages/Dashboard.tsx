@@ -144,7 +144,7 @@ export default function Dashboard() {
             toast.success('Initiative created successfully!')
             // Only refresh initiatives, not all data
             await refreshInitiatives()
-            
+
             // If tutorial is active and on create-initiative step, advance to next step
             if (isTutorialActive && currentStep === 'create-initiative' && newInitiative?.id) {
                 advanceStep({ initiativeId: newInitiative.id })
@@ -288,7 +288,7 @@ export default function Dashboard() {
                                     )}
                                 </div>
                             </div>
-                            
+
                             <div className="p-6 flex-1 overflow-y-auto min-h-0">
                                 {initiatives.length === 0 ? (
                                     <div className="text-center py-8">
@@ -301,7 +301,7 @@ export default function Dashboard() {
                                                     No Initiatives Yet
                                                 </h3>
                                                 <p className="text-gray-500 mb-6 max-w-md mx-auto text-sm">
-                                                    Your organization doesn't have any initiatives yet. 
+                                                    Your organization doesn't have any initiatives yet.
                                                     Contact your organization owner to create one.
                                                 </p>
                                             </>
@@ -398,7 +398,7 @@ export default function Dashboard() {
                                     {allLocations.length} location{allLocations.length !== 1 ? 's' : ''}
                                 </span>
                             </div>
-                            
+
                             <div className="flex-1 min-h-0 rounded-b-2xl overflow-hidden">
                                 <LocationMap
                                     locations={allLocations}

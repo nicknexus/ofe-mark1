@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Search, Building2, Target, MapPin, Loader2, ArrowRight, Sparkles } from 'lucide-react'
 import { publicApi, PublicOrganization, PublicInitiative, SearchResult } from '../services/publicApi'
+import PublicLoader from '../components/public/PublicLoader'
 
 // Debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -55,24 +56,33 @@ export default function ExplorePage() {
     const hasResults = results && (results.organizations.length > 0 || results.initiatives.length > 0 || results.locationMatches.length > 0)
     const showInitialOrgs = !searchQuery.trim() && !loading
 
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 font-figtree">
-            {/* Animated background */}
-            <div className="fixed inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-1/4 left-[10%] w-32 h-32 border-2 border-accent/20 rounded-3xl rotate-12 animate-float" />
-                <div className="absolute top-[20%] right-[20%] w-20 h-20 bg-accent/15 rounded-full animate-float-delayed" />
-                <div className="absolute bottom-1/3 left-[5%] w-16 h-16 bg-accent/10 rounded-2xl rotate-45 animate-float-slow" />
-                <div className="absolute bottom-1/4 right-[10%] w-24 h-24 border-2 border-accent/15 rounded-full animate-float" />
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(192,223,161,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(192,223,161,0.05)_1px,transparent_1px)] bg-[size:60px_60px]" />
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,transparent_0%,white_70%)]" />
-            </div>
+    // Show loader only on initial page load
+    if (loadingInitial && initialOrgs.length === 0) {
+        return <PublicLoader message="Discovering organizations..." />
+    }
 
+    return (
+        <div className="min-h-screen font-figtree relative animate-fadeIn">
+            {/* Flowing gradient background */}
+            <div 
+                className="fixed inset-0 pointer-events-none"
+                style={{
+                    background: `
+                        radial-gradient(ellipse 80% 50% at 20% 40%, rgba(192, 223, 161, 0.5), transparent 60%),
+                        radial-gradient(ellipse 60% 80% at 80% 20%, rgba(192, 223, 161, 0.4), transparent 55%),
+                        radial-gradient(ellipse 50% 60% at 60% 80%, rgba(192, 223, 161, 0.35), transparent 55%),
+                        radial-gradient(ellipse 70% 40% at 10% 90%, rgba(192, 223, 161, 0.3), transparent 50%),
+                        linear-gradient(180deg, white 0%, #fafafa 100%)
+                    `
+                }}
+            />
+            
             {/* Header */}
             <div className="relative z-10 pt-8 pb-12">
                 <div className="max-w-7xl mx-auto px-6">
                     {/* Navigation */}
                     <nav className="mb-12">
-                        <div className="glass rounded-2xl px-6 py-3 flex items-center justify-between border-accent/20">
+                        <div className="bg-white/40 backdrop-blur-2xl rounded-2xl px-6 py-3 flex items-center justify-between border border-white/60 shadow-xl shadow-black/5">
                             <Link to="/" className="flex items-center gap-2 group">
                                 <div className="w-10 h-10 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform duration-300 overflow-hidden">
                                     <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
@@ -101,7 +111,7 @@ export default function ExplorePage() {
 
                         {/* Search Bar - GREEN focus */}
                         <div className="relative max-w-2xl mx-auto">
-                            <div className="glass-card p-2 rounded-2xl border-accent/20">
+                            <div className="bg-white/50 backdrop-blur-2xl p-2 rounded-2xl border border-white/60 shadow-xl shadow-black/5">
                                 <div className="relative">
                                     <Search className="absolute left-5 top-1/2 transform -translate-y-1/2 w-5 h-5 text-accent" />
                                     <input
@@ -147,7 +157,7 @@ export default function ExplorePage() {
                             </ResultSection>
                         )}
                         {!hasResults && !loading && (
-                            <div className="glass-card p-12 rounded-3xl text-center border-accent/20">
+                            <div className="bg-white/40 backdrop-blur-2xl p-12 rounded-3xl text-center border border-white/60 shadow-xl shadow-black/5">
                                 <Search className="w-16 h-16 text-muted-foreground/30 mx-auto mb-6" />
                                 <h3 className="text-xl font-semibold text-foreground mb-3">No results found</h3>
                                 <p className="text-muted-foreground">Try searching with different keywords or browse organizations below.</p>
@@ -164,12 +174,12 @@ export default function ExplorePage() {
                             <span className="text-sm text-muted-foreground px-3 py-1 bg-accent/10 rounded-full">{initialOrgs.length} organizations</span>
                         </div>
                         {loadingInitial ? (
-                            <div className="glass-card p-16 rounded-3xl text-center border-accent/20">
+                            <div className="bg-white/40 backdrop-blur-2xl p-16 rounded-3xl text-center border border-white/60 shadow-xl shadow-black/5">
                                 <Loader2 className="w-10 h-10 text-primary-500 animate-spin mx-auto mb-4" />
                                 <p className="text-muted-foreground">Loading organizations...</p>
                             </div>
                         ) : initialOrgs.length === 0 ? (
-                            <div className="glass-card p-16 rounded-3xl text-center border-accent/20">
+                            <div className="bg-white/40 backdrop-blur-2xl p-16 rounded-3xl text-center border border-white/60 shadow-xl shadow-black/5">
                                 <Building2 className="w-16 h-16 text-muted-foreground/30 mx-auto mb-6" />
                                 <p className="text-muted-foreground">No public organizations available yet.</p>
                             </div>
@@ -207,7 +217,7 @@ function ResultSection({ title, icon: Icon, count, children }: { title: string; 
 function OrgCard({ org }: { org: PublicOrganization }) {
     return (
         <Link to={`/org/${org.slug}`}
-            className="group glass-card p-5 rounded-2xl transition-all duration-300 hover:-translate-y-1 border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)]">
+            className="group bg-white/50 backdrop-blur-xl p-5 rounded-2xl transition-all duration-300 hover:-translate-y-1 border border-white/60 hover:bg-white/70 hover:shadow-lg shadow-xl shadow-black/5">
             <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-gradient-to-br from-accent/20 to-accent/10 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:from-accent/30 group-hover:to-accent/15 transition-colors border border-accent/20">
                     {org.logo_url ? (
@@ -229,7 +239,7 @@ function OrgCard({ org }: { org: PublicOrganization }) {
 function InitiativeCard({ initiative }: { initiative: PublicInitiative & { organization_name?: string; organization_logo_url?: string } }) {
     return (
         <Link to={`/org/${initiative.org_slug}/${initiative.slug}`}
-            className="group glass-card p-5 rounded-2xl transition-all duration-300 hover:-translate-y-1 border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)]">
+            className="group bg-white/50 backdrop-blur-xl p-5 rounded-2xl transition-all duration-300 hover:-translate-y-1 border border-white/60 hover:bg-white/70 hover:shadow-lg shadow-xl shadow-black/5">
             <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-gradient-to-br from-accent/20 to-accent/10 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:from-accent/30 group-hover:to-accent/15 transition-colors border border-accent/20 overflow-hidden">
                     {initiative.organization_logo_url ? (
@@ -256,7 +266,7 @@ function InitiativeCard({ initiative }: { initiative: PublicInitiative & { organ
 function LocationMatchCard({ match }: { match: SearchResult['locationMatches'][0] }) {
     return (
         <Link to={`/org/${match.organization.slug}/${match.initiative.slug}`}
-            className="group glass-card p-5 rounded-2xl transition-all duration-300 hover:-translate-y-1 border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)]">
+            className="group bg-white/50 backdrop-blur-xl p-5 rounded-2xl transition-all duration-300 hover:-translate-y-1 border border-white/60 hover:bg-white/70 hover:shadow-lg shadow-xl shadow-black/5">
             <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-gradient-to-br from-accent/20 to-accent/10 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:from-accent/30 group-hover:to-accent/15 transition-colors border border-accent/20 overflow-hidden">
                     {match.organization.logo_url ? (

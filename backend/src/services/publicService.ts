@@ -171,7 +171,7 @@ export class PublicService {
     static async getAllOrganizations(): Promise<PublicOrganization[]> {
         const { data, error } = await supabase
             .from('organizations')
-            .select('id, name, slug, description, logo_url, created_at')
+            .select('id, name, slug, description, logo_url, brand_color, created_at')
             .eq('is_public', true)
             .order('name')
             .limit(100);
@@ -186,7 +186,7 @@ export class PublicService {
     } | null> {
         const { data: org, error } = await supabase
             .from('organizations')
-            .select('id, name, slug, description, logo_url, created_at')
+            .select('id, name, slug, description, logo_url, brand_color, created_at')
             .eq('slug', slug)
             .eq('is_public', true)
             .single();
@@ -427,7 +427,7 @@ export class PublicService {
             .from('initiatives')
             .select(`
                 id, title, description, region, location, slug, coordinates, created_at, organization_id,
-                organizations!inner(id, slug, name, logo_url, is_public)
+                organizations!inner(id, slug, name, logo_url, brand_color, is_public)
             `)
             .eq('slug', initiativeSlug)
             .eq('organizations.slug', orgSlug)
@@ -449,7 +449,8 @@ export class PublicService {
             organization_id: data.organization_id,
             org_slug: (data as any).organizations?.slug,
             organization_name: (data as any).organizations?.name,
-            organization_logo_url: (data as any).organizations?.logo_url
+            organization_logo_url: (data as any).organizations?.logo_url,
+            organization_brand_color: (data as any).organizations?.brand_color
         } as PublicInitiative;
     }
 
@@ -492,7 +493,7 @@ export class PublicService {
             }
         }
 
-        // Process KPIs with computed values
+        // Process KPIs with computed values AND include updates for charts
         const processedKpis = (kpis || []).map(kpi => {
             const updates = kpi.kpi_updates || [];
             const totalValue = updates.reduce((sum: number, u: any) => sum + (parseFloat(u.value) || 0), 0);
@@ -514,7 +515,17 @@ export class PublicService {
                 total_value: totalValue,
                 update_count: updateCount,
                 evidence_count: evidenceCount,
-                evidence_percentage: evidencePercentage
+                evidence_percentage: evidencePercentage,
+                // Include updates array for charts
+                updates: updates.map((u: any) => ({
+                    id: u.id,
+                    value: parseFloat(u.value) || 0,
+                    date_represented: u.date_represented,
+                    date_range_start: u.date_range_start,
+                    date_range_end: u.date_range_end,
+                    location_id: u.location_id,
+                    note: u.note
+                }))
             };
         });
         
@@ -689,5 +700,231 @@ export class PublicService {
                 update_count: updates.length
             };
         });
+    }
+
+    // ============================================
+    // METRIC DETAILS (for Metric Detail Page)
+    // ============================================
+
+    /**
+     * Generate a URL-friendly slug from a metric title
+     */
+    static generateMetricSlug(title: string): string {
+        return title
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .trim();
+    }
+
+    /**
+     * Get a single metric by its slug within an initiative
+     */
+    static async getMetricBySlug(orgSlug: string, initiativeSlug: string, metricSlug: string): Promise<any | null> {
+        const initiative = await this.getInitiativeBySlug(orgSlug, initiativeSlug);
+        if (!initiative) return null;
+
+        // Get all KPIs for this initiative and find matching slug
+        const { data: kpis, error: kpisError } = await supabase
+            .from('kpis')
+            .select(`
+                id, title, description, metric_type, unit_of_measurement, category, display_order,
+                kpi_updates(id, value, date_represented, date_range_start, date_range_end, location_id, note, locations(id, name))
+            `)
+            .eq('initiative_id', initiative.id)
+            .order('display_order');
+
+        if (kpisError) {
+            console.error('[getMetricBySlug] Error:', kpisError);
+            return null;
+        }
+
+        // Find the KPI that matches the slug
+        const kpi = (kpis || []).find(k => this.generateMetricSlug(k.title) === metricSlug);
+        if (!kpi) return null;
+
+        // Get evidence linked to this KPI
+        const { data: evidenceLinks } = await supabase
+            .from('evidence_kpis')
+            .select('evidence_id')
+            .eq('kpi_id', kpi.id);
+
+        const evidenceIds = (evidenceLinks || []).map((e: any) => e.evidence_id);
+
+        let evidence: any[] = [];
+        if (evidenceIds.length > 0) {
+            const { data: evidenceData } = await supabase
+                .from('evidence')
+                .select(`
+                    id, title, description, type, file_url, date_represented, date_range_start, date_range_end, created_at,
+                    evidence_files(id, file_url, file_name, file_type, display_order)
+                `)
+                .in('id', evidenceIds)
+                .order('date_represented', { ascending: false });
+
+            evidence = (evidenceData || []).map((e: any) => ({
+                id: e.id,
+                title: e.title,
+                description: e.description,
+                type: e.type,
+                file_url: e.file_url,
+                files: e.evidence_files || [],
+                date_represented: e.date_represented,
+                date_range_start: e.date_range_start,
+                date_range_end: e.date_range_end,
+                created_at: e.created_at
+            }));
+        }
+
+        const updates = kpi.kpi_updates || [];
+        const totalValue = updates.reduce((sum: number, u: any) => sum + (parseFloat(u.value) || 0), 0);
+
+        return {
+            id: kpi.id,
+            title: kpi.title,
+            slug: this.generateMetricSlug(kpi.title),
+            description: kpi.description,
+            metric_type: kpi.metric_type,
+            unit_of_measurement: kpi.unit_of_measurement,
+            category: kpi.category,
+            display_order: kpi.display_order,
+            total_value: totalValue,
+            update_count: updates.length,
+            updates: updates.map((u: any) => ({
+                id: u.id,
+                value: u.value,
+                date_represented: u.date_represented,
+                date_range_start: u.date_range_start,
+                date_range_end: u.date_range_end,
+                note: u.note,
+                location: u.locations
+            })),
+            evidence,
+            evidence_count: evidence.length,
+            initiative: {
+                id: initiative.id,
+                title: initiative.title,
+                slug: initiative.slug,
+                org_slug: initiative.org_slug,
+                org_name: initiative.organization_name
+            }
+        };
+    }
+
+    /**
+     * Get a single story by ID
+     */
+    static async getStoryById(orgSlug: string, initiativeSlug: string, storyId: string): Promise<any | null> {
+        const initiative = await this.getInitiativeBySlug(orgSlug, initiativeSlug);
+        if (!initiative) return null;
+
+        // Fetch story with location
+        const { data: story, error } = await supabase
+            .from('stories')
+            .select(`
+                id, title, description, media_url, media_type, date_represented, created_at,
+                locations(id, name, description, latitude, longitude)
+            `)
+            .eq('id', storyId)
+            .eq('initiative_id', initiative.id)
+            .single();
+
+        if (error || !story) {
+            console.error('[getStoryById] Error:', error);
+            return null;
+        }
+
+        // Fetch beneficiary groups separately to avoid GROUP BY issue
+        const { data: storyBeneficiaries } = await supabase
+            .from('story_beneficiaries')
+            .select('beneficiary_group_id')
+            .eq('story_id', storyId);
+
+        let beneficiaryGroups: any[] = [];
+        if (storyBeneficiaries && storyBeneficiaries.length > 0) {
+            const groupIds = storyBeneficiaries.map((sb: any) => sb.beneficiary_group_id);
+            const { data: groups } = await supabase
+                .from('beneficiary_groups')
+                .select('id, name, description, count')
+                .in('id', groupIds);
+            beneficiaryGroups = groups || [];
+        }
+
+        return {
+            id: story.id,
+            title: story.title,
+            description: story.description,
+            media_url: story.media_url,
+            media_type: story.media_type,
+            date_represented: story.date_represented,
+            created_at: story.created_at,
+            location: story.locations,
+            beneficiary_groups: beneficiaryGroups,
+            initiative: {
+                id: initiative.id,
+                title: initiative.title,
+                slug: initiative.slug,
+                org_slug: initiative.org_slug,
+                org_name: initiative.organization_name
+            }
+        };
+    }
+
+    /**
+     * Get a single evidence item by ID with linked KPIs
+     */
+    static async getEvidenceById(orgSlug: string, initiativeSlug: string, evidenceId: string): Promise<any | null> {
+        const initiative = await this.getInitiativeBySlug(orgSlug, initiativeSlug);
+        if (!initiative) return null;
+
+        const { data: evidence, error } = await supabase
+            .from('evidence')
+            .select(`
+                id, title, description, type, file_url, date_represented, date_range_start, date_range_end, created_at,
+                evidence_files(id, file_url, file_name, file_type, display_order),
+                evidence_kpis(kpi_id, kpis(id, title, description, unit_of_measurement, category))
+            `)
+            .eq('id', evidenceId)
+            .eq('initiative_id', initiative.id)
+            .single();
+
+        if (error || !evidence) {
+            console.error('[getEvidenceById] Error:', error);
+            return null;
+        }
+
+        // Get the linked KPIs (impact claims)
+        const linkedKpis = (evidence.evidence_kpis || [])
+            .map((ek: any) => ek.kpis)
+            .filter(Boolean)
+            .map((kpi: any) => ({
+                id: kpi.id,
+                title: kpi.title,
+                description: kpi.description,
+                unit_of_measurement: kpi.unit_of_measurement,
+                category: kpi.category
+            }));
+
+        return {
+            id: evidence.id,
+            title: evidence.title,
+            description: evidence.description,
+            type: evidence.type,
+            file_url: evidence.file_url,
+            files: (evidence.evidence_files || []).sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0)),
+            date_represented: evidence.date_represented,
+            date_range_start: evidence.date_range_start,
+            date_range_end: evidence.date_range_end,
+            created_at: evidence.created_at,
+            linked_kpis: linkedKpis,
+            initiative: {
+                id: initiative.id,
+                title: initiative.title,
+                slug: initiative.slug,
+                org_slug: initiative.org_slug,
+                org_name: initiative.organization_name
+            }
+        };
     }
 }

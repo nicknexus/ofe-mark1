@@ -195,4 +195,61 @@ router.get('/initiatives/:orgSlug/:slug/beneficiaries', async (req, res) => {
     }
 });
 
+// Get single metric by slug (for Metric Detail Page)
+router.get('/initiatives/:orgSlug/:initiativeSlug/metric/:metricSlug', async (req, res) => {
+    try {
+        const metric = await PublicService.getMetricBySlug(
+            req.params.orgSlug,
+            req.params.initiativeSlug,
+            req.params.metricSlug
+        );
+        if (!metric) {
+            res.status(404).json({ error: 'Metric not found' });
+            return;
+        }
+        res.json(metric);
+    } catch (error) {
+        console.error('Get metric detail error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// Get single story by ID (for Story Detail Page)
+router.get('/initiatives/:orgSlug/:initiativeSlug/story/:storyId', async (req, res) => {
+    try {
+        const story = await PublicService.getStoryById(
+            req.params.orgSlug,
+            req.params.initiativeSlug,
+            req.params.storyId
+        );
+        if (!story) {
+            res.status(404).json({ error: 'Story not found' });
+            return;
+        }
+        res.json(story);
+    } catch (error) {
+        console.error('Get story detail error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// Get single evidence by ID (for Evidence Detail Page)
+router.get('/initiatives/:orgSlug/:initiativeSlug/evidence/:evidenceId', async (req, res) => {
+    try {
+        const evidence = await PublicService.getEvidenceById(
+            req.params.orgSlug,
+            req.params.initiativeSlug,
+            req.params.evidenceId
+        );
+        if (!evidence) {
+            res.status(404).json({ error: 'Evidence not found' });
+            return;
+        }
+        res.json(evidence);
+    } catch (error) {
+        console.error('Get evidence detail error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
 export default router;
