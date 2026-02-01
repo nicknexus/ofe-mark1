@@ -122,6 +122,19 @@ router.delete('/account', authenticateUser, async (req: AuthenticatedRequest, re
 
         console.log(`[Account Delete] Starting deletion for user: ${userId}`);
 
+        // FIRST: Cancel Stripe subscription before any database deletions
+        // (cascade deletes might remove the subscription record)
+        const subscription = await SubscriptionService.getByUserId(userId);
+        if (subscription?.stripe_subscription_id && stripe) {
+            try {
+                await stripe.subscriptions.cancel(subscription.stripe_subscription_id);
+                console.log(`[Account Delete] Cancelled Stripe subscription: ${subscription.stripe_subscription_id}`);
+            } catch (stripeError) {
+                console.error('[Account Delete] Error cancelling Stripe subscription:', stripeError);
+                // Continue with deletion even if Stripe cancel fails
+            }
+        }
+
         // Get user's owned organization (if any)
         const { data: ownedOrg } = await supabase
             .from('organizations')
@@ -208,17 +221,7 @@ router.delete('/account', authenticateUser, async (req: AuthenticatedRequest, re
         // Delete user's team memberships (where they are a member, not owner)
         await supabase.from('team_members').delete().eq('user_id', userId);
 
-        // Cancel Stripe subscription if exists, then delete from database
-        const subscription = await SubscriptionService.getByUserId(userId);
-        if (subscription?.stripe_subscription_id && stripe) {
-            try {
-                await stripe.subscriptions.cancel(subscription.stripe_subscription_id);
-                console.log(`[Account Delete] Cancelled Stripe subscription: ${subscription.stripe_subscription_id}`);
-            } catch (stripeError) {
-                console.error('[Account Delete] Error cancelling Stripe subscription:', stripeError);
-                // Continue with deletion even if Stripe cancel fails
-            }
-        }
+        // Delete subscription from database (Stripe was already cancelled at the start)
         await supabase.from('subscriptions').delete().eq('user_id', userId);
 
         // Finally, delete the user from auth
