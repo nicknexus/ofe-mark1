@@ -138,7 +138,7 @@ export default function PublicEvidencePage() {
                     orgSlug={orgSlug!}
                     orgName={evidence.initiative.org_name || ''}
                     items={[
-                        { label: evidence.initiative.title, href: `/org/${orgSlug}/${initiativeSlug}` },
+                        { label: evidence.initiative.title, href: `/org/${orgSlug}/${initiativeSlug}?tab=evidence` },
                         { label: evidence.title }
                     ]}
                 />
@@ -311,7 +311,7 @@ export default function PublicEvidencePage() {
                         <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 flex-shrink-0">
                             <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">From Initiative</p>
                             <Link
-                                to={`/org/${orgSlug}/${initiativeSlug}`}
+                                to={`/org/${orgSlug}/${initiativeSlug}?tab=evidence`}
                                 className="flex items-center justify-between text-gray-800 hover:text-primary-600 font-medium transition-colors group"
                             >
                                 <span className="text-sm">{evidence.initiative.title}</span>

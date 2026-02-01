@@ -71,6 +71,7 @@ export default function InitiativePage() {
     const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false)
     const [isEditKPIModalOpen, setIsEditKPIModalOpen] = useState(false)
     const [deleteConfirmKPI, setDeleteConfirmKPI] = useState<any>(null)
+    const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
     // Selected KPI for modals
     const [selectedKPI, setSelectedKPI] = useState<any>(null)
@@ -265,6 +266,10 @@ export default function InitiativePage() {
     }
 
     const handleDeleteKPI = async (kpi: any) => {
+        if (deleteConfirmText !== 'DELETE MY METRIC') {
+            toast.error('Please type "DELETE MY METRIC" exactly to confirm')
+            return
+        }
         try {
             await apiService.deleteKPI(kpi.id)
             toast.success('Metric deleted successfully!')
@@ -277,6 +282,7 @@ export default function InitiativePage() {
                 loadDashboard() // Refresh the dashboard
             }
             setDeleteConfirmKPI(null)
+            setDeleteConfirmText('')
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to delete metric'
             toast.error(message)
@@ -691,20 +697,34 @@ export default function InitiativePage() {
                         <p className="text-gray-600 mb-2 text-sm">
                             Are you sure you want to delete <strong className="text-gray-800">"{deleteConfirmKPI.title}"</strong>?
                         </p>
-                        <p className="text-xs text-gray-500 mb-6">
+                        <p className="text-xs text-gray-500 mb-4">
                             This will also delete all associated impact claims and evidence links.
                         </p>
 
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Type <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">DELETE MY METRIC</span> to confirm:
+                            </label>
+                            <input
+                                type="text"
+                                value={deleteConfirmText}
+                                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                                placeholder="DELETE MY METRIC"
+                                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                            />
+                        </div>
+
                         <div className="flex space-x-3">
                             <button
-                                onClick={() => setDeleteConfirmKPI(null)}
+                                onClick={() => { setDeleteConfirmKPI(null); setDeleteConfirmText('') }}
                                 className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-all duration-200"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={() => handleDeleteKPI(deleteConfirmKPI)}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-2xl transition-all duration-200 shadow-bubble-sm"
+                                disabled={deleteConfirmText !== 'DELETE MY METRIC'}
+                                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-2xl transition-all duration-200 shadow-bubble-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Delete Metric
                             </button>

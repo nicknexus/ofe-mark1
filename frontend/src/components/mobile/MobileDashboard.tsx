@@ -26,6 +26,7 @@ export default function MobileDashboard({
     const [showEditModal, setShowEditModal] = useState(false)
     const [editingInitiative, setEditingInitiative] = useState<Initiative | null>(null)
     const [deleteConfirmInitiative, setDeleteConfirmInitiative] = useState<Initiative | null>(null)
+    const [deleteConfirmText, setDeleteConfirmText] = useState('')
     const [showUpgradeModal, setShowUpgradeModal] = useState(false)
     const [upgradeUsage, setUpgradeUsage] = useState<{ current: number; limit: number } | null>(null)
 
@@ -69,11 +70,16 @@ export default function MobileDashboard({
 
     const handleDeleteInitiative = async (initiative: Initiative) => {
         if (!initiative.id) return
+        if (deleteConfirmText !== 'DELETE MY INITIATIVE') {
+            toast.error('Please type "DELETE MY INITIATIVE" exactly to confirm')
+            return
+        }
         try {
             await apiService.deleteInitiative(initiative.id)
             toast.success('Initiative deleted!')
             onRefresh()
             setDeleteConfirmInitiative(null)
+            setDeleteConfirmText('')
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to delete initiative'
             toast.error(message)
@@ -249,19 +255,32 @@ export default function MobileDashboard({
                                 <p className="text-xs text-gray-500">This cannot be undone</p>
                             </div>
                         </div>
-                        <p className="text-sm text-gray-600 mb-6">
+                        <p className="text-sm text-gray-600 mb-4">
                             Delete "<strong>{deleteConfirmInitiative.title}</strong>"? This will also delete all KPIs, evidence, and stories.
                         </p>
+                        <div className="mb-4">
+                            <label className="block text-xs font-medium text-gray-700 mb-2">
+                                Type <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-xs">DELETE MY INITIATIVE</span> to confirm:
+                            </label>
+                            <input
+                                type="text"
+                                value={deleteConfirmText}
+                                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                                placeholder="DELETE MY INITIATIVE"
+                                className="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 text-sm"
+                            />
+                        </div>
                         <div className="flex gap-3">
                             <button
-                                onClick={() => setDeleteConfirmInitiative(null)}
+                                onClick={() => { setDeleteConfirmInitiative(null); setDeleteConfirmText('') }}
                                 className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 rounded-xl font-medium text-sm"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={() => handleDeleteInitiative(deleteConfirmInitiative)}
-                                className="flex-1 py-3 px-4 bg-red-500 text-white rounded-xl font-medium text-sm"
+                                disabled={deleteConfirmText !== 'DELETE MY INITIATIVE'}
+                                className="flex-1 py-3 px-4 bg-red-500 text-white rounded-xl font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Delete
                             </button>

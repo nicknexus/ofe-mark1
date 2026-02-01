@@ -3,7 +3,8 @@ import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { 
     ArrowLeft, Globe, BarChart3, BookOpen, MapPin, 
     FileText, Users, Calendar, ChevronRight, ExternalLink, TrendingUp,
-    Building2, ChevronDown, Filter, X, Activity, Layers, Zap
+    Building2, ChevronDown, Filter, X, Activity, Layers, Zap,
+    Camera, MessageSquare, DollarSign
 } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet'
 import L from 'leaflet'
@@ -33,6 +34,7 @@ import {
     InitiativeDashboard
 } from '../services/publicApi'
 import PublicLoader from '../components/public/PublicLoader'
+import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 
 // Map tile configuration - matches internal app
 const CARTO_VOYAGER_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
@@ -427,6 +429,15 @@ export default function PublicInitiativePage() {
 
             {/* Main Content with Sidebar */}
             <div className="max-w-7xl mx-auto px-6 py-6 relative">
+                {/* Breadcrumb */}
+                <PublicBreadcrumb
+                    items={[
+                        { label: initiative.title }
+                    ]}
+                    orgSlug={orgSlug!}
+                    orgName={initiative.organization_name || 'Organization'}
+                />
+
                 <div className="flex gap-6">
                     {/* Sidebar */}
                     <div className="w-56 flex-shrink-0 hidden lg:block">
@@ -535,7 +546,7 @@ export default function PublicInitiativePage() {
                             </div>
                         ) : (
                             <>
-                                {activeTab === 'overview' && <InitiativeOverviewTab initiative={initiative} dashboard={dashboard} />}
+                                {activeTab === 'overview' && <InitiativeOverviewTab initiative={initiative} dashboard={dashboard} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />}
                                 {activeTab === 'metrics' && filteredDashboard && <MetricsTab dashboard={filteredDashboard} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />}
                                 {activeTab === 'stories' && <StoriesTab stories={filteredStories} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />}
                                 {activeTab === 'locations' && <LocationsTab locations={locations || dashboard.locations} />}
@@ -581,14 +592,17 @@ const CATEGORY_COLORS = {
 }
 
 // Initiative Overview - Modern dashboard with multi-line chart like MetricsDashboard
-function InitiativeOverviewTab({ initiative, dashboard }: { 
+function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug }: { 
     initiative: PublicInitiative; 
-    dashboard: InitiativeDashboard 
+    dashboard: InitiativeDashboard;
+    orgSlug: string;
+    initiativeSlug: string;
 }) {
     const brandColor = initiative.organization_brand_color || '#c0dfa1'
     const [timeFrame, setTimeFrame] = useState<'all' | '1month' | '6months' | '1year'>('all')
     const [isCumulative, setIsCumulative] = useState(false)
     const [visibleKPIs, setVisibleKPIs] = useState<Set<string>>(new Set(dashboard.kpis.map(k => k.id)))
+    const [isMetricDropdownOpen, setIsMetricDropdownOpen] = useState(false)
     
     // Flatten all updates from all KPIs
     const allUpdates = useMemo(() => {
@@ -774,29 +788,27 @@ function InitiativeOverviewTab({ initiative, dashboard }: {
                 </div>
             </div>
 
-            {/* Metric Cards Row */}
+            {/* Metric Cards Row - Links to metric detail pages */}
             {dashboard.kpis.length > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                     {dashboard.kpis.slice(0, 12).map((kpi, index) => {
                         const metricColor = getMetricColor(index)
-                        const isVisible = visibleKPIs.has(kpi.id)
+                        const metricSlug = generateMetricSlug(kpi.title)
                         return (
-                            <div
+                            <Link
                                 key={kpi.id}
-                                onClick={() => toggleKPI(kpi.id)}
-                                className={`bg-white/60 backdrop-blur rounded-xl border p-3 cursor-pointer transition-all hover:shadow-lg ${
-                                    isVisible ? 'border-white/80' : 'border-gray-300 opacity-50'
-                                }`}
+                                to={`/org/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`}
+                                className="bg-white/60 backdrop-blur rounded-xl border border-white/80 p-3 transition-all hover:shadow-lg hover:border-accent group"
                             >
                                 <div className="flex items-center justify-between mb-1">
                                     <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: metricColor }} />
                                     <span className="text-[10px] text-gray-400 truncate ml-1">{kpi.unit_of_measurement}</span>
                                 </div>
-                                <div className="text-xs font-medium text-gray-700 truncate mb-1">{kpi.title}</div>
+                                <div className="text-xs font-medium text-gray-700 truncate mb-1 group-hover:text-accent transition-colors">{kpi.title}</div>
                                 <div className="text-lg font-bold" style={{ color: metricColor }}>
                                     {(kpi.total_value || 0).toLocaleString()}
                                 </div>
-                            </div>
+                            </Link>
                         )
                     })}
                 </div>
@@ -804,14 +816,91 @@ function InitiativeOverviewTab({ initiative, dashboard }: {
 
             {/* Main Chart */}
             <div className="bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl p-5">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${brandColor}30` }}>
                             <TrendingUp className="w-4 h-4" style={{ color: brandColor }} />
                         </div>
                         <h2 className="font-semibold text-foreground">Metrics Over Time</h2>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {/* Metrics Dropdown */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setIsMetricDropdownOpen(!isMetricDropdownOpen)}
+                                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-xl border-2 transition-all duration-200 ${
+                                    visibleKPIs.size < dashboard.kpis.length
+                                        ? 'bg-accent/10 text-accent border-accent/30 hover:bg-accent/20' 
+                                        : 'bg-white/60 text-gray-700 border-white/80 hover:bg-white/80'
+                                }`}
+                            >
+                                <Layers className="w-3.5 h-3.5" />
+                                <span>
+                                    {visibleKPIs.size === dashboard.kpis.length
+                                        ? 'All Metrics'
+                                        : visibleKPIs.size === 1
+                                            ? '1 metric'
+                                            : `${visibleKPIs.size} metrics`}
+                                </span>
+                                {visibleKPIs.size < dashboard.kpis.length && (
+                                    <span className="bg-accent text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                                        {visibleKPIs.size}
+                                    </span>
+                                )}
+                                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isMetricDropdownOpen ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {isMetricDropdownOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setIsMetricDropdownOpen(false)} />
+                                    <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+                                        {/* Select all / Clear */}
+                                        <div className="px-3 pb-2 mb-1 border-b border-gray-100 flex gap-2">
+                                            <button
+                                                onClick={() => setVisibleKPIs(new Set(dashboard.kpis.map(k => k.id)))}
+                                                className="text-xs text-gray-500 hover:text-accent transition-colors"
+                                            >
+                                                Select all
+                                            </button>
+                                            <span className="text-gray-300">|</span>
+                                            <button
+                                                onClick={() => setVisibleKPIs(new Set())}
+                                                className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                                            >
+                                                Clear all
+                                            </button>
+                                        </div>
+                                        
+                                        {/* Metric options */}
+                                        {dashboard.kpis.map((kpi, index) => {
+                                            const isSelected = visibleKPIs.has(kpi.id)
+                                            const metricColor = getMetricColor(index)
+                                            return (
+                                                <label
+                                                    key={kpi.id}
+                                                    className="w-full px-3 py-2 text-xs flex items-center gap-2.5 hover:bg-gray-50 transition-colors cursor-pointer"
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={() => toggleKPI(kpi.id)}
+                                                        className="w-3.5 h-3.5 rounded border-gray-300 text-accent focus:ring-accent"
+                                                    />
+                                                    <div 
+                                                        className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
+                                                        style={{ backgroundColor: metricColor }} 
+                                                    />
+                                                    <span className={`flex-1 truncate ${isSelected ? 'font-medium text-gray-700' : 'text-gray-500'}`}>
+                                                        {kpi.title}
+                                                    </span>
+                                                </label>
+                                            )
+                                        })}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
                         {/* Monthly/Cumulative Toggle */}
                         <div className="flex items-center bg-white/60 rounded-xl p-0.5 border border-white/80">
                             <button
@@ -916,7 +1005,7 @@ function InitiativeOverviewTab({ initiative, dashboard }: {
                         <div className="h-full flex items-center justify-center text-muted-foreground">
                             <div className="text-center">
                                 <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                                <p>{visibleKPIs.size === 0 ? 'Click metrics above to show on chart' : 'No data available yet'}</p>
+                                <p>{visibleKPIs.size === 0 ? 'Toggle metrics below to show on chart' : 'No data available yet'}</p>
                             </div>
                         </div>
                     )}
@@ -925,7 +1014,7 @@ function InitiativeOverviewTab({ initiative, dashboard }: {
                 {/* Legend */}
                 {visibleKPIs.size > 0 && (
                     <div className="flex flex-wrap justify-center gap-4 mt-4 pt-4 border-t border-white/50">
-                        {dashboard.kpis.filter(kpi => visibleKPIs.has(kpi.id)).map((kpi, i) => {
+                        {dashboard.kpis.filter(kpi => visibleKPIs.has(kpi.id)).map((kpi) => {
                             const originalIndex = dashboard.kpis.findIndex(k => k.id === kpi.id)
                             return (
                                 <div key={kpi.id} className="flex items-center gap-2">
@@ -1253,36 +1342,41 @@ function LocationsTab({ locations }: { locations: PublicLocation[] | null }) {
 
 function EvidenceTab({ evidence, orgSlug, initiativeSlug }: { evidence: PublicEvidence[] | null; orgSlug: string; initiativeSlug: string }) {
     const [displayCount, setDisplayCount] = useState(8)
-    const [activeFilter, setActiveFilter] = useState<string | null>(null)
+    const [selectedTypes, setSelectedTypes] = useState<string[]>([])
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
     if (!evidence) return <LoadingState />
     if (evidence.length === 0) return <EmptyState icon={FileText} message="No evidence available yet." />
 
+    // Evidence types with icons matching the signed-in app
+    const evidenceTypes = [
+        { value: 'visual_proof', label: 'Visual Support', icon: Camera },
+        { value: 'documentation', label: 'Documentation', icon: FileText },
+        { value: 'testimony', label: 'Testimonies', icon: MessageSquare },
+        { value: 'financials', label: 'Financials', icon: DollarSign }
+    ] as const
+
     // Colors matching the signed-in app
-    const typeConfig: Record<string, { bg: string; label: string; filterBg: string; filterActive: string }> = {
+    const typeConfig: Record<string, { bg: string; label: string; color: string }> = {
         visual_proof: { 
             bg: 'bg-pink-100 text-pink-800', 
-            label: 'Visual Proof',
-            filterBg: 'bg-pink-50 text-pink-700 border-pink-200 hover:bg-pink-100',
-            filterActive: 'bg-pink-500 text-white border-pink-500'
+            label: 'Visual Support',
+            color: 'text-pink-500'
         },
         documentation: { 
             bg: 'bg-blue-100 text-blue-700', 
             label: 'Documentation',
-            filterBg: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100',
-            filterActive: 'bg-blue-500 text-white border-blue-500'
+            color: 'text-blue-500'
         },
         testimony: { 
             bg: 'bg-orange-100 text-orange-800', 
             label: 'Testimonies',
-            filterBg: 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100',
-            filterActive: 'bg-orange-500 text-white border-orange-500'
+            color: 'text-orange-500'
         },
         financials: { 
             bg: 'bg-primary-100 text-primary-800', 
             label: 'Financials',
-            filterBg: 'bg-primary-50 text-primary-700 border-primary-200 hover:bg-primary-100',
-            filterActive: 'bg-primary-500 text-white border-primary-500'
+            color: 'text-primary-500'
         }
     }
 
@@ -1303,8 +1397,8 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug }: { evidence: PublicEv
     }
 
     // Filter evidence
-    const filteredEvidence = activeFilter 
-        ? evidence.filter(e => e.type === activeFilter)
+    const filteredEvidence = selectedTypes.length > 0
+        ? evidence.filter(e => selectedTypes.includes(e.type))
         : evidence
 
     // Count by type
@@ -1316,38 +1410,111 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug }: { evidence: PublicEv
     const displayedEvidence = filteredEvidence.slice(0, displayCount)
     const hasMore = displayCount < filteredEvidence.length
 
+    const toggleType = (type: string) => {
+        if (selectedTypes.includes(type)) {
+            setSelectedTypes(selectedTypes.filter(t => t !== type))
+        } else {
+            setSelectedTypes([...selectedTypes, type])
+        }
+        setDisplayCount(8)
+    }
+
     return (
         <div>
-            {/* Filter Bar */}
-            <div className="glass-card p-4 rounded-2xl mb-5 border-accent/20">
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium text-muted-foreground mr-2">Filter by type:</span>
+            {/* Filter Dropdown */}
+            <div className="mb-5 flex items-center gap-3">
+                <span className="text-sm font-medium text-muted-foreground">Filter by type:</span>
+                <div className="relative">
                     <button
-                        onClick={() => { setActiveFilter(null); setDisplayCount(8) }}
-                        className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
-                            activeFilter === null 
-                                ? 'bg-accent text-white border-accent' 
-                                : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                        className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border-2 transition-all duration-200 shadow-sm ${
+                            selectedTypes.length > 0 
+                                ? 'bg-accent/10 text-accent border-accent/30 hover:bg-accent/20' 
+                                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
                         }`}
                     >
-                        All ({evidence.length})
+                        <FileText className="w-4 h-4" />
+                        <span>
+                            {selectedTypes.length === 0
+                                ? `All Types`
+                                : selectedTypes.length === 1
+                                    ? evidenceTypes.find(et => et.value === selectedTypes[0])?.label || '1 type'
+                                    : `${selectedTypes.length} types`}
+                        </span>
+                        {selectedTypes.length > 0 && (
+                            <span className="bg-accent text-white text-xs px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                                {selectedTypes.length}
+                            </span>
+                        )}
+                        <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                     </button>
-                    {Object.entries(typeConfig).map(([type, config]) => {
-                        const count = typeCounts[type] || 0
-                        if (count === 0) return null
-                        return (
-                            <button
-                                key={type}
-                                onClick={() => { setActiveFilter(type); setDisplayCount(8) }}
-                                className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
-                                    activeFilter === type ? config.filterActive : config.filterBg
-                                }`}
-                            >
-                                {config.label} ({count})
-                            </button>
-                        )
-                    })}
+
+                    {isDropdownOpen && (
+                        <>
+                            {/* Backdrop */}
+                            <div 
+                                className="fixed inset-0 z-40" 
+                                onClick={() => setIsDropdownOpen(false)} 
+                            />
+                            {/* Dropdown */}
+                            <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+                                {/* Clear all button */}
+                                {selectedTypes.length > 0 && (
+                                    <>
+                                        <button
+                                            onClick={() => { setSelectedTypes([]); setDisplayCount(8) }}
+                                            className="w-full px-4 py-2 text-left text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                        >
+                                            <X className="w-3.5 h-3.5" />
+                                            Clear all filters
+                                        </button>
+                                        <div className="h-px bg-gray-100 my-1" />
+                                    </>
+                                )}
+                                
+                                {/* Type options with checkboxes */}
+                                {evidenceTypes.map((type) => {
+                                    const count = typeCounts[type.value] || 0
+                                    const isSelected = selectedTypes.includes(type.value)
+                                    const TypeIcon = type.icon
+                                    
+                                    return (
+                                        <label
+                                            key={type.value}
+                                            className={`w-full px-4 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 transition-colors cursor-pointer ${
+                                                count === 0 ? 'opacity-50 cursor-not-allowed' : ''
+                                            }`}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => count > 0 && toggleType(type.value)}
+                                                disabled={count === 0}
+                                                className="w-4 h-4 rounded border-gray-300 text-accent focus:ring-accent"
+                                            />
+                                            <TypeIcon className={`w-4 h-4 ${typeConfig[type.value]?.color || 'text-gray-500'}`} />
+                                            <span className={`flex-1 ${isSelected ? 'font-medium text-accent' : 'text-gray-700'}`}>
+                                                {type.label}
+                                            </span>
+                                            <span className="text-xs text-muted-foreground">{count}</span>
+                                        </label>
+                                    )
+                                })}
+                            </div>
+                        </>
+                    )}
                 </div>
+                
+                {/* Clear filter button */}
+                {selectedTypes.length > 0 && (
+                    <button
+                        onClick={() => { setSelectedTypes([]); setDisplayCount(8) }}
+                        className="flex items-center gap-1 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                        <X className="w-3.5 h-3.5" />
+                        Clear
+                    </button>
+                )}
             </div>
 
             {/* Evidence Grid */}

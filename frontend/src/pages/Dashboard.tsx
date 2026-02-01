@@ -34,6 +34,7 @@ export default function Dashboard() {
     const [showCreateModal, setShowCreateModal] = useState(false)
     const [showEditModal, setShowEditModal] = useState(false)
     const [deleteConfirmInitiative, setDeleteConfirmInitiative] = useState<Initiative | null>(null)
+    const [deleteConfirmText, setDeleteConfirmText] = useState('')
     const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null)
     const [showUpgradeModal, setShowUpgradeModal] = useState(false)
     const [upgradeUsage, setUpgradeUsage] = useState<{ current: number; limit: number } | null>(null)
@@ -183,6 +184,10 @@ export default function Dashboard() {
 
     const handleDeleteInitiative = async (initiative: Initiative) => {
         if (!initiative.id) return
+        if (deleteConfirmText !== 'DELETE MY INITIATIVE') {
+            toast.error('Please type "DELETE MY INITIATIVE" exactly to confirm')
+            return
+        }
         try {
             await apiService.deleteInitiative(initiative.id)
             toast.success('Initiative deleted successfully!')
@@ -190,6 +195,7 @@ export default function Dashboard() {
             setIsLoadingStats(true)
             await loadAllData()
             setDeleteConfirmInitiative(null)
+            setDeleteConfirmText('')
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to delete initiative'
             toast.error(message)
@@ -447,21 +453,35 @@ export default function Dashboard() {
                             </div>
                         </div>
 
-                        <p className="text-gray-600 mb-6 text-sm leading-relaxed">
+                        <p className="text-gray-600 mb-4 text-sm leading-relaxed">
                             Are you sure you want to delete "<strong className="font-medium text-gray-800">{deleteConfirmInitiative.title}</strong>"?
                             This will also delete all associated KPIs, impact claims, and evidence.
                         </p>
 
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Type <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">DELETE MY INITIATIVE</span> to confirm:
+                            </label>
+                            <input
+                                type="text"
+                                value={deleteConfirmText}
+                                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                                placeholder="DELETE MY INITIATIVE"
+                                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                            />
+                        </div>
+
                         <div className="flex space-x-3">
                             <button
-                                onClick={() => setDeleteConfirmInitiative(null)}
+                                onClick={() => { setDeleteConfirmInitiative(null); setDeleteConfirmText('') }}
                                 className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-all duration-200"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={() => handleDeleteInitiative(deleteConfirmInitiative)}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-2xl transition-all duration-200 shadow-bubble-sm"
+                                disabled={deleteConfirmText !== 'DELETE MY INITIATIVE'}
+                                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-2xl transition-all duration-200 shadow-bubble-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Delete Initiative
                             </button>

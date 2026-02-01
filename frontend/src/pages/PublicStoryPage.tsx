@@ -97,7 +97,7 @@ export default function PublicStoryPage() {
                     orgSlug={orgSlug!}
                     orgName={story.initiative.org_name || ''}
                     items={[
-                        { label: story.initiative.title, href: `/org/${orgSlug}/${initiativeSlug}` },
+                        { label: story.initiative.title, href: `/org/${orgSlug}/${initiativeSlug}?tab=stories` },
                         { label: story.title }
                     ]}
                 />
@@ -106,11 +106,11 @@ export default function PublicStoryPage() {
                 <div className="bg-white/50 backdrop-blur-2xl rounded-3xl border border-white/60 shadow-2xl shadow-black/10 overflow-hidden">
                     {/* Media */}
                     {story.media_url && story.media_type === 'photo' && (
-                        <div className="w-full aspect-video bg-gray-100 overflow-hidden">
+                        <div className="w-full min-h-[200px] max-h-[70vh] bg-transparent flex items-center justify-center overflow-hidden">
                             <img
                                 src={story.media_url}
                                 alt={story.title}
-                                className="w-full h-full object-cover"
+                                className="max-w-full max-h-[70vh] object-contain"
                             />
                         </div>
                     )}
