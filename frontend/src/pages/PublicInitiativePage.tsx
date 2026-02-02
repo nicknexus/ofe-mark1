@@ -324,61 +324,61 @@ export default function PublicInitiativePage() {
 
             {/* Fixed Header with Filter - Compact like org page */}
             <header className="sticky top-0 z-40 bg-white/60 backdrop-blur-2xl border-b border-white/40 shadow-sm">
-                <div className="max-w-7xl mx-auto px-6 py-3">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 sm:py-3">
                     {/* Top Row - Nav + Initiative Info + Logo */}
-                    <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-4">
-                            <Link to={`/org/${orgSlug}`} className="flex items-center gap-2 text-muted-foreground hover:text-accent transition-colors">
+                    <div className="flex items-center justify-between mb-2 sm:mb-3">
+                        <div className="flex items-center gap-2 sm:gap-4">
+                            <Link to={`/org/${orgSlug}`} className="flex items-center gap-1.5 sm:gap-2 text-muted-foreground hover:text-accent transition-colors">
                                 <ArrowLeft className="w-4 h-4" />
-                                <span className="text-sm font-medium hidden sm:inline">Back</span>
+                                <span className="text-xs sm:text-sm font-medium">Back</span>
                             </Link>
-                            <div className="h-6 w-px bg-gray-200" />
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden bg-white shadow-md border border-gray-200/50">
+                            <div className="h-5 sm:h-6 w-px bg-gray-200" />
+                            <div className="flex items-center gap-2 sm:gap-3">
+                                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center overflow-hidden bg-white shadow-md border border-gray-200/50">
                                     {initiative.organization_logo_url ? (
                                         <img src={initiative.organization_logo_url} alt={initiative.organization_name || ''} className="w-full h-full object-cover" />
                                     ) : (
-                                        <Building2 className="w-5 h-5 text-gray-400" />
+                                        <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                                     )}
                                 </div>
-                                <div>
-                                    <h1 className="text-lg font-semibold text-foreground truncate max-w-[300px]">{initiative.title}</h1>
-                                    <Link to={`/org/${orgSlug}`} className="text-xs font-medium text-muted-foreground hover:text-accent transition-colors">
+                                <div className="min-w-0">
+                                    <h1 className="text-sm sm:text-lg font-semibold text-foreground truncate max-w-[120px] sm:max-w-[300px]">{initiative.title}</h1>
+                                    <Link to={`/org/${orgSlug}`} className="text-[10px] sm:text-xs font-medium text-muted-foreground hover:text-accent transition-colors hidden sm:block">
                                         {initiative.organization_name}
                                     </Link>
                                 </div>
                             </div>
                         </div>
                         <Link to="/" className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg overflow-hidden">
+                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg overflow-hidden">
                                 <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
                             </div>
                             <span className="text-base font-newsreader font-extralight text-foreground hidden md:block">Nexus Impacts</span>
                         </Link>
                     </div>
 
-                    {/* Filter Row */}
-                    <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-gray-200/50">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Filter className="w-4 h-4" />
-                            <span className="font-medium">Filter:</span>
+                    {/* Filter Row - Scrollable on mobile */}
+                    <div className="flex items-center gap-2 sm:gap-3 pt-2 sm:pt-3 border-t border-gray-200/50 overflow-x-auto scrollbar-hide pb-1">
+                        <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-muted-foreground flex-shrink-0">
+                            <Filter className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            <span className="font-medium hidden sm:inline">Filter:</span>
                         </div>
                         
                         {/* Initiative Switcher Dropdown */}
-                        <div className="relative">
+                        <div className="relative flex-shrink-0">
                             <button
                                 onClick={() => setShowInitiativeDropdown(!showInitiativeDropdown)}
-                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-gray-800 text-white border-gray-800 text-sm font-medium transition-colors hover:bg-gray-700"
+                                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg border bg-gray-800 text-white border-gray-800 text-xs sm:text-sm font-medium transition-colors hover:bg-gray-700"
                             >
-                                <Globe className="w-3.5 h-3.5" />
-                                <span className="max-w-[120px] truncate">{initiative.title}</span>
-                                <ChevronDown className="w-3.5 h-3.5" />
+                                <Globe className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                <span className="max-w-[80px] sm:max-w-[120px] truncate">{initiative.title}</span>
+                                <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                             </button>
                             
                             {showInitiativeDropdown && (
                                 <>
                                     <div className="fixed inset-0 z-40" onClick={() => setShowInitiativeDropdown(false)} />
-                                    <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-2 max-h-64 overflow-y-auto">
+                                    <div className="absolute top-full left-0 mt-2 w-64 sm:w-72 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-2 max-h-64 overflow-y-auto">
                                         {allInitiatives.map(init => (
                                             <button
                                                 key={init.id}
@@ -395,8 +395,8 @@ export default function PublicInitiativePage() {
                             )}
                         </div>
                         
-                        {/* Date Range */}
-                        <div className="flex items-center gap-2">
+                        {/* Date Range - Hidden on small mobile */}
+                        <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
                             <div className="relative">
                                 <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
                                 <input
@@ -419,8 +419,8 @@ export default function PublicInitiativePage() {
                         </div>
                         
                         {hasActiveFilters && (
-                            <button onClick={clearFilters} className="flex items-center gap-1 px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-                                <X className="w-3.5 h-3.5" /> Clear
+                            <button onClick={clearFilters} className="flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
+                                <X className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Clear
                             </button>
                         )}
                     </div>
@@ -428,15 +428,17 @@ export default function PublicInitiativePage() {
             </header>
 
             {/* Main Content with Sidebar */}
-            <div className="max-w-7xl mx-auto px-6 py-6 relative">
-                {/* Breadcrumb */}
-                <PublicBreadcrumb
-                    items={[
-                        { label: initiative.title }
-                    ]}
-                    orgSlug={orgSlug!}
-                    orgName={initiative.organization_name || 'Organization'}
-                />
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 relative">
+                {/* Breadcrumb - Hidden on mobile */}
+                <div className="hidden sm:block">
+                    <PublicBreadcrumb
+                        items={[
+                            { label: initiative.title }
+                        ]}
+                        orgSlug={orgSlug!}
+                        orgName={initiative.organization_name || 'Organization'}
+                    />
+                </div>
 
                 <div className="flex gap-6">
                     {/* Sidebar */}
@@ -507,27 +509,29 @@ export default function PublicInitiativePage() {
                     </div>
 
                     {/* Mobile Tab Bar */}
-                    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-2xl border-t border-white/40 z-30 px-2 py-2">
-                        <div className="flex justify-around">
+                    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-2xl border-t border-gray-200 z-30 safe-area-pb">
+                        <div className="flex justify-around px-1 py-2">
                             {tabs.slice(0, 5).map((tab) => (
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
-                                    className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all ${
+                                    className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all min-w-[52px] ${
                                         activeTab === tab.id 
-                                            ? 'text-foreground bg-gray-100' 
+                                            ? 'text-foreground' 
                                             : 'text-muted-foreground'
                                     }`}
                                 >
-                                    <tab.icon className="w-5 h-5" />
-                                    <span className="text-[10px] font-medium">{tab.label}</span>
+                                    <div className={`p-1.5 rounded-lg transition-colors ${activeTab === tab.id ? 'bg-primary-100' : ''}`}>
+                                        <tab.icon className={`w-5 h-5 ${activeTab === tab.id ? 'text-primary-600' : ''}`} />
+                                    </div>
+                                    <span className="text-[9px] font-medium">{tab.label}</span>
                                 </button>
                             ))}
                         </div>
                     </div>
 
                     {/* Main Content Area */}
-                    <div className="flex-1 min-w-0 pb-20 lg:pb-0 relative">
+                    <div className="flex-1 min-w-0 pb-24 lg:pb-0 relative">
                         {switching ? (
                             <div className="flex items-center justify-center py-32">
                                 <div className="flex flex-col items-center">

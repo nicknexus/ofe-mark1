@@ -247,7 +247,7 @@ export default function PublicOrganizationPage() {
     }
 
     return (
-        <div className="h-screen flex flex-col font-figtree overflow-hidden relative animate-fadeIn">
+        <div className="min-h-screen lg:h-screen flex flex-col font-figtree lg:overflow-hidden relative animate-fadeIn">
             {/* Flowing gradient background */}
             <div 
                 className="fixed inset-0 pointer-events-none"
@@ -264,59 +264,59 @@ export default function PublicOrganizationPage() {
             
             {/* Fixed Header */}
             <header className="flex-shrink-0 bg-white/60 backdrop-blur-2xl border-b border-white/40 shadow-sm z-50 relative">
-                <div className="max-w-[1800px] mx-auto px-6 py-3">
+                <div className="max-w-[1800px] mx-auto px-4 sm:px-6 py-3">
                     {/* Top Row */}
-                    <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-4">
-                            <Link to="/explore" className="flex items-center gap-2 text-muted-foreground hover:text-accent transition-colors">
+                    <div className="flex items-center justify-between mb-2 sm:mb-3">
+                        <div className="flex items-center gap-2 sm:gap-4">
+                            <Link to="/explore" className="flex items-center gap-1.5 sm:gap-2 text-muted-foreground hover:text-accent transition-colors">
                                 <ArrowLeft className="w-4 h-4" />
-                                <span className="text-sm font-medium hidden sm:inline">Explore</span>
+                                <span className="text-xs sm:text-sm font-medium">Explore</span>
                             </Link>
-                            <div className="h-6 w-px bg-gray-200" />
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden bg-white shadow-md border border-gray-200/50">
+                            <div className="h-5 sm:h-6 w-px bg-gray-200" />
+                            <div className="flex items-center gap-2 sm:gap-3">
+                                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center overflow-hidden bg-white shadow-md border border-gray-200/50">
                                     {organization.logo_url ? (
                                         <img src={organization.logo_url} alt={organization.name} className="w-full h-full object-cover" />
                                     ) : (
-                                        <Building2 className="w-5 h-5 text-gray-400" />
+                                        <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                                     )}
                                 </div>
                                 <div>
-                                    <h1 className="text-lg font-semibold text-foreground">{organization.name}</h1>
-                                    <p className="text-xs font-medium text-muted-foreground">Public Dashboard</p>
+                                    <h1 className="text-sm sm:text-lg font-semibold text-foreground truncate max-w-[140px] sm:max-w-none">{organization.name}</h1>
+                                    <p className="text-[10px] sm:text-xs font-medium text-muted-foreground hidden sm:block">Public Dashboard</p>
                                 </div>
                             </div>
                         </div>
                         <Link to="/" className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg overflow-hidden">
+                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg overflow-hidden">
                                 <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
                             </div>
                             <span className="text-base font-newsreader font-extralight text-foreground hidden md:block">Nexus Impacts</span>
                         </Link>
                     </div>
 
-                    {/* Filter Row */}
-                    <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-gray-200/50">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Filter className="w-4 h-4" />
-                            <span className="font-medium">Filter:</span>
+                    {/* Filter Row - Scrollable on mobile */}
+                    <div className="flex items-center gap-2 sm:gap-3 pt-2 sm:pt-3 border-t border-gray-200/50 overflow-x-auto scrollbar-hide pb-1">
+                        <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-muted-foreground flex-shrink-0">
+                            <Filter className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            <span className="font-medium hidden sm:inline">Filter:</span>
                         </div>
                         
                         {/* Initiative Dropdown */}
-                        <div className="relative">
+                        <div className="relative flex-shrink-0">
                             <button
                                 onClick={() => setShowInitiativeDropdown(!showInitiativeDropdown)}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
+                                className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg border text-xs sm:text-sm font-medium transition-all ${
                                     selectedInitiative !== 'all'
                                         ? 'bg-gray-800 text-white border-gray-800'
                                         : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
                                 }`}
                             >
-                                <Globe className="w-3.5 h-3.5" />
-                                <span className="max-w-[140px] truncate">
-                                    {selectedInitiative === 'all' ? 'All Initiatives' : initiatives.find(i => i.id === selectedInitiative)?.title || 'Select'}
+                                <Globe className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                <span className="max-w-[80px] sm:max-w-[140px] truncate">
+                                    {selectedInitiative === 'all' ? 'All' : initiatives.find(i => i.id === selectedInitiative)?.title || 'Select'}
                                 </span>
-                                <ChevronDown className="w-3.5 h-3.5" />
+                                <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                             </button>
                             
                             {showInitiativeDropdown && (
@@ -347,8 +347,8 @@ export default function PublicOrganizationPage() {
                             )}
                         </div>
                         
-                        {/* Date Range */}
-                        <div className="flex items-center gap-2">
+                        {/* Date Range - Hidden on small mobile */}
+                        <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
                             <div className="relative">
                                 <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
                                 <input
@@ -371,21 +371,21 @@ export default function PublicOrganizationPage() {
                         </div>
                         
                         {hasActiveFilters && (
-                            <button onClick={clearFilters} className="flex items-center gap-1 px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-                                <X className="w-3.5 h-3.5" /> Clear
+                            <button onClick={clearFilters} className="flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
+                                <X className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Clear
                             </button>
                         )}
 
-                        {/* Stats Pills */}
-                        <div className="ml-auto flex items-center gap-2">
-                            <span className="px-3 py-1 bg-white/60 text-gray-600 rounded-full text-xs font-semibold flex items-center gap-1 backdrop-blur-sm">
-                                <BarChart3 className="w-3 h-3" /> {filteredMetrics.length} Metrics
+                        {/* Stats Pills - Scrollable with the rest */}
+                        <div className="ml-auto flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                            <span className="px-2 sm:px-3 py-1 bg-white/60 text-gray-600 rounded-full text-[10px] sm:text-xs font-semibold flex items-center gap-1 backdrop-blur-sm whitespace-nowrap">
+                                <BarChart3 className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> {filteredMetrics.length}
                             </span>
-                            <span className="px-3 py-1 bg-white/60 text-gray-600 rounded-full text-xs font-semibold flex items-center gap-1 backdrop-blur-sm">
-                                <BookOpen className="w-3 h-3" /> {filteredStories.length} Stories
+                            <span className="px-2 sm:px-3 py-1 bg-white/60 text-gray-600 rounded-full text-[10px] sm:text-xs font-semibold flex items-center gap-1 backdrop-blur-sm whitespace-nowrap">
+                                <BookOpen className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> {filteredStories.length}
                             </span>
-                            <span className="px-3 py-1 bg-white/60 text-gray-600 rounded-full text-xs font-semibold flex items-center gap-1 backdrop-blur-sm">
-                                <MapPin className="w-3 h-3" /> {filteredLocations.length} Locations
+                            <span className="px-2 sm:px-3 py-1 bg-white/60 text-gray-600 rounded-full text-[10px] sm:text-xs font-semibold flex items-center gap-1 backdrop-blur-sm whitespace-nowrap">
+                                <MapPin className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> {filteredLocations.length}
                             </span>
                         </div>
                     </div>
@@ -393,54 +393,54 @@ export default function PublicOrganizationPage() {
             </header>
 
             {/* Main Dashboard Grid */}
-            <main className="flex-1 overflow-hidden p-4 relative min-h-0">
-                <div className="max-w-[1800px] mx-auto h-full grid grid-cols-12 gap-3 lg:gap-4">
+            <main className="flex-1 overflow-y-auto lg:overflow-hidden p-3 sm:p-4 relative min-h-0">
+                <div className="max-w-[1800px] mx-auto h-auto lg:h-full grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-4">
                     
                     {/* Left Column - Initiatives & Metrics */}
-                    <div className="col-span-12 lg:col-span-4 flex flex-col gap-3 lg:gap-4 h-full min-h-0">
+                    <div className="lg:col-span-4 flex flex-col gap-3 lg:gap-4 lg:h-full min-h-0">
                         {/* Initiatives Module */}
-                        <div className="bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-2xl shadow-black/10 flex-1 flex flex-col overflow-hidden min-h-0">
+                        <div className="bg-white/40 backdrop-blur-2xl rounded-xl sm:rounded-2xl border border-white/60 shadow-2xl shadow-black/10 flex-1 flex flex-col overflow-hidden min-h-[200px] lg:min-h-0">
                             <div className="px-3 lg:px-4 py-2 lg:py-3 flex items-center justify-between flex-shrink-0 border-b border-white/50">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center bg-white/60">
-                                        <Globe className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-gray-600" />
+                                    <div className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center bg-white/60">
+                                        <Globe className="w-3 h-3 sm:w-3.5 sm:h-3.5 lg:w-4 lg:h-4 text-gray-600" />
                                     </div>
-                                    <h2 className="font-semibold text-foreground text-sm lg:text-base">Initiatives</h2>
+                                    <h2 className="font-semibold text-foreground text-xs sm:text-sm lg:text-base">Initiatives</h2>
                                     <span className="px-1.5 lg:px-2 py-0.5 text-[10px] lg:text-xs font-semibold rounded-full bg-white/60 text-gray-600">{filteredInitiatives.length}</span>
                                 </div>
                                 {totalInitiativePages > 1 && (
                                     <div className="flex items-center gap-1">
                                         <button onClick={() => setInitiativePage(p => Math.max(0, p - 1))} disabled={initiativePage === 0}
-                                            className="w-7 h-7 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors">
-                                            <ChevronLeft className="w-4 h-4 text-gray-600" />
+                                            className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors">
+                                            <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600" />
                                         </button>
-                                        <span className="text-xs text-muted-foreground w-12 text-center">{initiativePage + 1}/{totalInitiativePages}</span>
+                                        <span className="text-[10px] sm:text-xs text-muted-foreground w-10 sm:w-12 text-center">{initiativePage + 1}/{totalInitiativePages}</span>
                                         <button onClick={() => setInitiativePage(p => Math.min(totalInitiativePages - 1, p + 1))} disabled={initiativePage >= totalInitiativePages - 1}
-                                            className="w-7 h-7 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors">
-                                            <ChevronRight className="w-4 h-4 text-gray-600" />
+                                            className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors">
+                                            <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600" />
                                         </button>
                                     </div>
                                 )}
                             </div>
-                            <div className="flex-1 p-2 lg:p-3 overflow-hidden min-h-0">
+                            <div className="flex-1 p-2 lg:p-3 overflow-y-auto min-h-0">
                                 {displayedInitiatives.length === 0 ? (
-                                    <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                                    <div className="h-full flex items-center justify-center text-muted-foreground text-xs sm:text-sm py-6 lg:py-0">
                                         <div className="text-center">
-                                            <Globe className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                                            <Globe className="w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-2 opacity-30" />
                                             <p>No initiatives match filters</p>
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="space-y-1.5 h-full">
+                                    <div className="space-y-1.5">
                                         {displayedInitiatives.map((init) => (
                                             <Link key={init.id} to={`/org/${slug}/${init.slug}`}
-                                                className="block p-2 bg-white/60 backdrop-blur-lg rounded-lg border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all group">
+                                                className="block p-2 bg-white/60 backdrop-blur-lg rounded-lg border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all group active:scale-[0.98]">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden bg-white/80 border border-white/50">
+                                                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden bg-white/80 border border-white/50">
                                                         {organization.logo_url ? (
                                                             <img src={organization.logo_url} alt="" className="w-full h-full object-cover" />
                                                         ) : (
-                                                            <Globe className="w-4 h-4 text-gray-500" />
+                                                            <Globe className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500" />
                                                         )}
                                                     </div>
                                                     <div className="flex-1 min-w-0">
@@ -457,22 +457,22 @@ export default function PublicOrganizationPage() {
                         </div>
 
                         {/* Metrics Module */}
-                        <div className="bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-2xl shadow-black/10 flex-[1.5] flex flex-col overflow-hidden min-h-0">
+                        <div className="bg-white/40 backdrop-blur-2xl rounded-xl sm:rounded-2xl border border-white/60 shadow-2xl shadow-black/10 flex-[1.5] flex flex-col overflow-hidden min-h-[250px] lg:min-h-0">
                             <div className="px-3 lg:px-4 py-2 lg:py-3 flex items-center justify-between flex-shrink-0 border-b border-white/50">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center bg-white/60">
-                                        <BarChart3 className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-gray-600" />
+                                    <div className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center bg-white/60">
+                                        <BarChart3 className="w-3 h-3 sm:w-3.5 sm:h-3.5 lg:w-4 lg:h-4 text-gray-600" />
                                     </div>
-                                    <h2 className="font-semibold text-foreground text-sm lg:text-base">Metrics</h2>
+                                    <h2 className="font-semibold text-foreground text-xs sm:text-sm lg:text-base">Metrics</h2>
                                     <span className="px-1.5 lg:px-2 py-0.5 text-[10px] lg:text-xs font-semibold rounded-full bg-white/60 text-gray-600">{filteredMetrics.length}</span>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1 sm:gap-2">
                                     {filteredMetrics.length > 0 && (
                                         <Link 
                                             to={`/org/${slug}/${selectedInitiative !== 'all' 
                                                 ? initiatives.find(i => i.id === selectedInitiative)?.slug 
                                                 : filteredMetrics[0]?.initiative_slug}?tab=metrics`}
-                                            className="text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors"
+                                            className="text-[10px] sm:text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors"
                                         >
                                             See All →
                                         </Link>
@@ -480,41 +480,41 @@ export default function PublicOrganizationPage() {
                                     {totalMetricPages > 1 && (
                                         <div className="flex items-center gap-1">
                                             <button onClick={() => setMetricPage(p => Math.max(0, p - 1))} disabled={metricPage === 0}
-                                                className="w-7 h-7 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors">
-                                                <ChevronLeft className="w-4 h-4 text-gray-600" />
+                                                className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors">
+                                                <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600" />
                                             </button>
-                                            <span className="text-xs text-muted-foreground w-12 text-center">{metricPage + 1}/{totalMetricPages}</span>
+                                            <span className="text-[10px] sm:text-xs text-muted-foreground w-10 sm:w-12 text-center">{metricPage + 1}/{totalMetricPages}</span>
                                             <button onClick={() => setMetricPage(p => Math.min(totalMetricPages - 1, p + 1))} disabled={metricPage >= totalMetricPages - 1}
-                                                className="w-7 h-7 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors">
-                                                <ChevronRight className="w-4 h-4 text-gray-600" />
+                                                className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors">
+                                                <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600" />
                                             </button>
                                         </div>
                                     )}
                                 </div>
                             </div>
-                            <div className="flex-1 p-2 lg:p-3 overflow-hidden min-h-0">
+                            <div className="flex-1 p-2 lg:p-3 overflow-y-auto min-h-0">
                                 {displayedMetrics.length === 0 ? (
-                                    <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                                    <div className="h-full flex items-center justify-center text-muted-foreground text-xs sm:text-sm py-6 lg:py-0">
                                         <div className="text-center">
-                                            <BarChart3 className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                                            <BarChart3 className="w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-2 opacity-30" />
                                             <p>No metrics match filters</p>
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="grid grid-cols-2 gap-1.5 h-full">
+                                    <div className="grid grid-cols-2 gap-1.5">
                                         {displayedMetrics.map((metric) => (
                                             <Link key={metric.id} to={`/org/${slug}/${metric.initiative_slug}/metric/${generateMetricSlug(metric.title)}`}
-                                                className="p-2 rounded-lg transition-all group flex flex-col bg-white/60 backdrop-blur-lg border border-white/80 hover:bg-white/80 hover:shadow-lg">
-                                                <span className={`self-start px-1.5 py-0.5 text-[9px] font-semibold rounded-full mb-1 ${
+                                                className="p-2 rounded-lg transition-all group flex flex-col bg-white/60 backdrop-blur-lg border border-white/80 hover:bg-white/80 hover:shadow-lg active:scale-[0.98]">
+                                                <span className={`self-start px-1.5 py-0.5 text-[8px] sm:text-[9px] font-semibold rounded-full mb-1 ${
                                                     metric.category === 'impact' ? 'bg-purple-100/80 text-purple-700' :
                                                     metric.category === 'output' ? 'bg-green-100/80 text-green-700' : 'bg-blue-100/80 text-blue-700'
                                                 }`}>{metric.category}</span>
-                                                <h4 className="font-medium text-foreground text-xs transition-colors line-clamp-2 mb-auto">{metric.title}</h4>
+                                                <h4 className="font-medium text-foreground text-[10px] sm:text-xs transition-colors line-clamp-2 mb-auto">{metric.title}</h4>
                                                 <div className="mt-1">
-                                                    <span className="text-lg font-bold text-foreground">{metric.total_value?.toLocaleString() || '—'}</span>
-                                                    <span className="text-[10px] text-muted-foreground ml-0.5">{metric.unit_of_measurement}</span>
+                                                    <span className="text-base sm:text-lg font-bold text-foreground">{metric.total_value?.toLocaleString() || '—'}</span>
+                                                    <span className="text-[9px] sm:text-[10px] text-muted-foreground ml-0.5">{metric.unit_of_measurement}</span>
                                                 </div>
-                                                <p className="text-[9px] text-muted-foreground mt-0.5 truncate">{metric.initiative_title}</p>
+                                                <p className="text-[8px] sm:text-[9px] text-muted-foreground mt-0.5 truncate">{metric.initiative_title}</p>
                                             </Link>
                                         ))}
                                     </div>
@@ -524,23 +524,23 @@ export default function PublicOrganizationPage() {
                     </div>
 
                     {/* Center Column - Story */}
-                    <div className="col-span-12 lg:col-span-4 flex flex-col gap-3 lg:gap-4 h-full min-h-0">
-                        <div className="bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-2xl shadow-black/10 flex-1 flex flex-col overflow-hidden min-h-0">
+                    <div className="lg:col-span-4 flex flex-col gap-3 lg:gap-4 lg:h-full min-h-0">
+                        <div className="bg-white/40 backdrop-blur-2xl rounded-xl sm:rounded-2xl border border-white/60 shadow-2xl shadow-black/10 flex-1 flex flex-col overflow-hidden min-h-[300px] lg:min-h-0">
                             <div className="px-3 lg:px-4 py-2 lg:py-3 flex items-center justify-between flex-shrink-0 border-b border-white/50">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center bg-white/60">
-                                        <BookOpen className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-gray-600" />
+                                    <div className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center bg-white/60">
+                                        <BookOpen className="w-3 h-3 sm:w-3.5 sm:h-3.5 lg:w-4 lg:h-4 text-gray-600" />
                                     </div>
-                                    <h2 className="font-semibold text-foreground text-sm lg:text-base">Stories</h2>
+                                    <h2 className="font-semibold text-foreground text-xs sm:text-sm lg:text-base">Stories</h2>
                                     <span className="px-1.5 lg:px-2 py-0.5 text-[10px] lg:text-xs font-semibold rounded-full bg-white/60 text-gray-600">{filteredStories.length}</span>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1 sm:gap-2">
                                     {filteredStories.length > 0 && (
                                         <Link 
                                             to={`/org/${slug}/${selectedInitiative !== 'all' 
                                                 ? initiatives.find(i => i.id === selectedInitiative)?.slug 
                                                 : filteredStories[0]?.initiative_slug}?tab=stories`}
-                                            className="text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors"
+                                            className="text-[10px] sm:text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors"
                                         >
                                             See All →
                                         </Link>
@@ -548,44 +548,44 @@ export default function PublicOrganizationPage() {
                                     {filteredStories.length > 1 && (
                                         <div className="flex items-center gap-1">
                                             <button onClick={() => setStoryIndex(p => p === 0 ? filteredStories.length - 1 : p - 1)}
-                                                className="w-7 h-7 rounded-lg bg-white/60 hover:bg-white/80 flex items-center justify-center transition-colors">
-                                                <ChevronLeft className="w-4 h-4 text-gray-600" />
+                                                className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white/60 hover:bg-white/80 flex items-center justify-center transition-colors">
+                                                <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600" />
                                             </button>
-                                            <span className="text-xs text-muted-foreground w-12 text-center">{storyIndex + 1}/{filteredStories.length}</span>
+                                            <span className="text-[10px] sm:text-xs text-muted-foreground w-10 sm:w-12 text-center">{storyIndex + 1}/{filteredStories.length}</span>
                                             <button onClick={() => setStoryIndex(p => (p + 1) % filteredStories.length)}
-                                                className="w-7 h-7 rounded-lg bg-white/60 hover:bg-white/80 flex items-center justify-center transition-colors">
-                                                <ChevronRight className="w-4 h-4 text-gray-600" />
+                                                className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white/60 hover:bg-white/80 flex items-center justify-center transition-colors">
+                                                <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600" />
                                             </button>
                                         </div>
                                     )}
                                 </div>
                             </div>
-                            <div className="flex-1 p-3 lg:p-4 overflow-hidden min-h-0">
+                            <div className="flex-1 p-2 sm:p-3 lg:p-4 overflow-hidden min-h-0">
                                 {!currentStory ? (
-                                    <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                                    <div className="h-full flex items-center justify-center text-muted-foreground text-xs sm:text-sm py-6 lg:py-0">
                                         <div className="text-center">
-                                            <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                                            <BookOpen className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 opacity-30" />
                                             <p>No stories match filters</p>
                                         </div>
                                     </div>
                                 ) : (
                                     <Link to={`/org/${slug}/${currentStory.initiative_slug}?tab=stories`} className="block h-full group">
-                                        <div className="h-full flex flex-col bg-white/60 backdrop-blur-lg rounded-xl overflow-hidden border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all">
+                                        <div className="h-full flex flex-col bg-white/60 backdrop-blur-lg rounded-xl overflow-hidden border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all active:scale-[0.98]">
                                             {currentStory.media_url && currentStory.media_type === 'photo' ? (
-                                                <div className="h-[30%] min-h-[100px] max-h-[180px] flex-shrink-0 overflow-hidden">
+                                                <div className="h-[120px] sm:h-[30%] sm:min-h-[100px] sm:max-h-[180px] flex-shrink-0 overflow-hidden">
                                                     <img src={currentStory.media_url} alt={currentStory.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                                 </div>
                                             ) : (
-                                                <div className="h-[20%] min-h-[80px] max-h-[120px] flex-shrink-0 flex items-center justify-center bg-white/40">
-                                                    <FileText className="w-10 h-10 text-gray-400" />
+                                                <div className="h-[80px] sm:h-[20%] sm:min-h-[80px] sm:max-h-[120px] flex-shrink-0 flex items-center justify-center bg-white/40">
+                                                    <FileText className="w-8 h-8 sm:w-10 sm:h-10 text-gray-400" />
                                                 </div>
                                             )}
-                                            <div className="p-4 flex-1 flex flex-col">
-                                                <span className="text-xs font-semibold mb-1 text-muted-foreground">{currentStory.initiative_title}</span>
-                                                <h3 className="text-lg font-semibold text-foreground transition-colors line-clamp-2 mb-2">{currentStory.title}</h3>
-                                                {currentStory.description && <p className="text-sm text-muted-foreground line-clamp-3 flex-1">{currentStory.description}</p>}
-                                                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3 pt-3 border-t border-white/50">
-                                                    <Calendar className="w-3.5 h-3.5" />
+                                            <div className="p-3 sm:p-4 flex-1 flex flex-col">
+                                                <span className="text-[10px] sm:text-xs font-semibold mb-1 text-muted-foreground">{currentStory.initiative_title}</span>
+                                                <h3 className="text-sm sm:text-lg font-semibold text-foreground transition-colors line-clamp-2 mb-1 sm:mb-2">{currentStory.title}</h3>
+                                                {currentStory.description && <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 sm:line-clamp-3 flex-1">{currentStory.description}</p>}
+                                                <div className="flex items-center gap-2 text-[10px] sm:text-xs text-muted-foreground mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-white/50">
+                                                    <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                                                     {new Date(currentStory.date_represented).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                                 </div>
                                             </div>
@@ -595,26 +595,26 @@ export default function PublicOrganizationPage() {
                             </div>
                             {/* Story Progress Dots */}
                             {filteredStories.length > 1 && (
-                                <div className="px-4 pb-3 flex justify-center gap-1.5">
+                                <div className="px-3 sm:px-4 pb-2 sm:pb-3 flex justify-center gap-1.5">
                                     {filteredStories.slice(0, 8).map((_, idx) => (
                                         <button key={idx} onClick={() => setStoryIndex(idx)}
-                                            className={`h-2 rounded-full transition-all ${idx === storyIndex ? 'w-6 bg-gray-800' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
+                                            className={`h-1.5 sm:h-2 rounded-full transition-all ${idx === storyIndex ? 'w-5 sm:w-6 bg-gray-800' : 'w-1.5 sm:w-2 bg-gray-300 hover:bg-gray-400'}`} />
                                     ))}
-                                    {filteredStories.length > 8 && <span className="text-xs text-muted-foreground ml-1">+{filteredStories.length - 8}</span>}
+                                    {filteredStories.length > 8 && <span className="text-[10px] sm:text-xs text-muted-foreground ml-1">+{filteredStories.length - 8}</span>}
                                 </div>
                             )}
                         </div>
                     </div>
 
                     {/* Right Column - Map */}
-                    <div className="col-span-12 lg:col-span-4 flex flex-col gap-3 lg:gap-4 h-full min-h-0">
-                        <div className="bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-2xl shadow-black/10 flex-1 flex flex-col overflow-hidden min-h-0">
+                    <div className="lg:col-span-4 flex flex-col gap-3 lg:gap-4 lg:h-full min-h-0">
+                        <div className="bg-white/40 backdrop-blur-2xl rounded-xl sm:rounded-2xl border border-white/60 shadow-2xl shadow-black/10 flex-1 flex flex-col overflow-hidden min-h-[250px] lg:min-h-0">
                             <div className="px-3 lg:px-4 py-2 lg:py-3 flex items-center justify-between flex-shrink-0 border-b border-white/50">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center bg-white/60">
-                                        <MapPin className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-gray-600" />
+                                    <div className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center bg-white/60">
+                                        <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 lg:w-4 lg:h-4 text-gray-600" />
                                     </div>
-                                    <h2 className="font-semibold text-foreground text-sm lg:text-base">Locations</h2>
+                                    <h2 className="font-semibold text-foreground text-xs sm:text-sm lg:text-base">Locations</h2>
                                     <span className="px-1.5 lg:px-2 py-0.5 text-[10px] lg:text-xs font-semibold rounded-full bg-white/60 text-gray-600">{filteredLocations.length}</span>
                                 </div>
                                 {filteredLocations.length > 0 && (
@@ -622,17 +622,17 @@ export default function PublicOrganizationPage() {
                                         to={`/org/${slug}/${selectedInitiative !== 'all' 
                                             ? initiatives.find(i => i.id === selectedInitiative)?.slug 
                                             : filteredLocations[0]?.initiative_slug}?tab=locations`}
-                                        className="text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors"
+                                        className="text-[10px] sm:text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors"
                                     >
                                         See All →
                                     </Link>
                                 )}
                             </div>
-                            <div className="flex-1 relative min-h-0">
+                            <div className="flex-1 relative min-h-[150px] lg:min-h-0">
                                 {filteredLocations.length === 0 ? (
-                                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm bg-gray-50">
+                                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-xs sm:text-sm bg-gray-50">
                                         <div className="text-center">
-                                            <MapPin className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                                            <MapPin className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 opacity-30" />
                                             <p>No locations match filters</p>
                                         </div>
                                     </div>
@@ -646,10 +646,10 @@ export default function PublicOrganizationPage() {
                             </div>
                             {/* Location List */}
                             {filteredLocations.length > 0 && (
-                                <div className="p-2 lg:p-3 max-h-24 lg:max-h-32 overflow-y-auto border-t border-white/50 flex-shrink-0">
+                                <div className="p-2 lg:p-3 max-h-20 sm:max-h-24 lg:max-h-32 overflow-y-auto border-t border-white/50 flex-shrink-0">
                                     <div className="flex flex-wrap gap-1">
                                         {filteredLocations.map((loc) => (
-                                            <span key={loc.id} className="px-2 py-0.5 rounded-full text-[10px] lg:text-xs font-medium bg-white/60 text-gray-600">
+                                            <span key={loc.id} className="px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] lg:text-xs font-medium bg-white/60 text-gray-600">
                                                 {loc.name}
                                             </span>
                                         ))}

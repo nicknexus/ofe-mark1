@@ -1214,6 +1214,74 @@ body.location-modal-open .leaflet-pane {
 }
 
 /* ========================================
+   PUBLIC PAGES MOBILE STYLES
+   Mobile-only styles for public-facing pages
+   ======================================== */
+
+@media (max-width: 767px) {
+    /* Public page navbar mobile adjustments */
+    .public-nav-mobile {
+        padding: 0.75rem 1rem;
+    }
+    
+    /* Public page header compact styling */
+    .public-header-mobile {
+        padding: 0.5rem 1rem;
+    }
+    
+    /* Public page card mobile sizing */
+    .public-card-mobile {
+        border-radius: 0.75rem;
+        padding: 0.75rem;
+    }
+    
+    /* Public dashboard module mobile */
+    .public-module-mobile {
+        min-height: 200px;
+        border-radius: 0.75rem;
+    }
+    
+    /* Public page grid stack on mobile */
+    .public-grid-mobile {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    /* Public page filter bar scrollable */
+    .public-filter-scroll {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 0.25rem;
+    }
+    
+    /* Hide on mobile for public pages */
+    .public-desktop-only {
+        display: none !important;
+    }
+    
+    /* Show only on mobile for public pages */
+    .public-mobile-only {
+        display: block !important;
+    }
+    
+    .public-mobile-flex {
+        display: flex !important;
+    }
+}
+
+/* Hide mobile-only elements on desktop */
+@media (min-width: 768px) {
+    .public-mobile-only {
+        display: none !important;
+    }
+    
+    .public-mobile-flex {
+        display: none !important;
+    }
+}
+
+/* ========================================
    LANDING PAGE STYLES
    ======================================== */
 

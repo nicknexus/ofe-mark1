@@ -120,35 +120,42 @@ export default function PublicEvidencePage() {
 
             {/* Navigation Header */}
             <div className="sticky top-0 z-50 bg-white/60 backdrop-blur-2xl border-b border-white/40">
-                <div className="max-w-5xl mx-auto px-6 py-4">
+                <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
                     <div className="flex items-center justify-between">
                         <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=evidence`}
-                            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors">
-                            <ArrowLeft className="w-5 h-5" />
-                            <span className="font-medium">Back to Evidence</span>
+                            className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-800 transition-colors">
+                            <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+                            <span className="text-sm sm:text-base font-medium">Back</span>
+                        </Link>
+                        <Link to="/" className="flex items-center gap-2">
+                            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg overflow-hidden">
+                                <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                            </div>
                         </Link>
                     </div>
                 </div>
             </div>
 
             {/* Main Content */}
-            <div className="relative z-10 max-w-6xl mx-auto px-6 py-6 h-[calc(100vh-80px)] flex flex-col">
-                {/* Breadcrumb */}
-                <PublicBreadcrumb
-                    orgSlug={orgSlug!}
-                    orgName={evidence.initiative.org_name || ''}
-                    items={[
-                        { label: evidence.initiative.title, href: `/org/${orgSlug}/${initiativeSlug}?tab=evidence` },
-                        { label: evidence.title }
-                    ]}
-                />
+            <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6 min-h-[calc(100vh-60px)] sm:h-[calc(100vh-80px)] flex flex-col">
+                {/* Breadcrumb - Hidden on mobile */}
+                <div className="hidden sm:block">
+                    <PublicBreadcrumb
+                        orgSlug={orgSlug!}
+                        orgName={evidence.initiative.org_name || ''}
+                        items={[
+                            { label: evidence.initiative.title, href: `/org/${orgSlug}/${initiativeSlug}?tab=evidence` },
+                            { label: evidence.title }
+                        ]}
+                    />
+                </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 flex-1 min-h-0">
                     {/* File Preview - Takes 2 columns */}
                     <div className="lg:col-span-2 flex flex-col">
-                        <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-2xl shadow-black/10 overflow-hidden flex-1 flex flex-col">
+                        <div className="bg-white/50 backdrop-blur-2xl rounded-xl sm:rounded-2xl border border-white/60 shadow-2xl shadow-black/10 overflow-hidden flex-1 flex flex-col">
                             {/* Preview Area */}
-                            <div className="relative bg-gray-900 flex-1 min-h-[400px] flex items-center justify-center">
+                            <div className="relative bg-gray-900 flex-1 min-h-[250px] sm:min-h-[400px] flex items-center justify-center">
                                 {currentFile ? (
                                     isImage(currentFile) ? (
                                         <img
@@ -189,24 +196,24 @@ export default function PublicEvidencePage() {
                                     <>
                                         <button
                                             onClick={() => setCurrentFileIndex(i => i === 0 ? allFiles.length - 1 : i - 1)}
-                                            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white transition-colors"
+                                            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white transition-colors"
                                         >
-                                            <ChevronLeft className="w-6 h-6" />
+                                            <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
                                         </button>
                                         <button
                                             onClick={() => setCurrentFileIndex(i => (i + 1) % allFiles.length)}
-                                            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white transition-colors"
+                                            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white transition-colors"
                                         >
-                                            <ChevronRight className="w-6 h-6" />
+                                            <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
                                         </button>
-                                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
+                                        <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 sm:gap-2">
                                             {allFiles.map((_, index) => (
                                                 <button
                                                     key={index}
                                                     onClick={() => setCurrentFileIndex(index)}
-                                                    className={`w-2 h-2 rounded-full transition-all ${index === currentFileIndex
-                                                            ? 'w-6 bg-white'
-                                                            : 'bg-white/50 hover:bg-white/70'
+                                                    className={`h-1.5 sm:h-2 rounded-full transition-all ${index === currentFileIndex
+                                                            ? 'w-5 sm:w-6 bg-white'
+                                                            : 'w-1.5 sm:w-2 bg-white/50 hover:bg-white/70'
                                                         }`}
                                                 />
                                             ))}
@@ -216,12 +223,12 @@ export default function PublicEvidencePage() {
                             </div>
 
                             {/* File info bar */}
-                            <div className="px-4 py-3 bg-white/30 border-t border-white/30 flex items-center justify-between">
-                                <span className="text-sm text-gray-600 truncate flex-1">
+                            <div className="px-3 sm:px-4 py-2 sm:py-3 bg-white/30 border-t border-white/30 flex items-center justify-between gap-2">
+                                <span className="text-xs sm:text-sm text-gray-600 truncate flex-1">
                                     {currentFile?.file_name}
                                     {hasMultipleFiles && (
-                                        <span className="text-xs text-gray-400 ml-2">
-                                            ({currentFileIndex + 1} of {allFiles.length})
+                                        <span className="text-[10px] sm:text-xs text-gray-400 ml-1 sm:ml-2">
+                                            ({currentFileIndex + 1}/{allFiles.length})
                                         </span>
                                     )}
                                 </span>
@@ -230,10 +237,11 @@ export default function PublicEvidencePage() {
                                         href={currentFile.file_url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors text-sm font-medium ml-4"
+                                        className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors text-xs sm:text-sm font-medium flex-shrink-0"
                                     >
-                                        <ExternalLink className="w-4 h-4" />
-                                        Open in New Tab
+                                        <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                        <span className="hidden sm:inline">Open in New Tab</span>
+                                        <span className="sm:hidden">Open</span>
                                     </a>
                                 )}
                             </div>
@@ -241,34 +249,34 @@ export default function PublicEvidencePage() {
                     </div>
 
                     {/* Details Sidebar */}
-                    <div className="flex flex-col gap-4 min-h-0">
+                    <div className="flex flex-col gap-3 sm:gap-4 min-h-0">
                         {/* Evidence Info */}
-                        <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-5 flex-shrink-0">
+                        <div className="bg-white/50 backdrop-blur-2xl rounded-xl sm:rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 sm:p-5 flex-shrink-0">
                             {/* Type Badge */}
-                            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full ${typeConfig.bg} ${typeConfig.color} text-sm font-medium mb-3`}>
-                                <TypeIcon className="w-4 h-4" />
+                            <div className={`inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full ${typeConfig.bg} ${typeConfig.color} text-xs sm:text-sm font-medium mb-2 sm:mb-3`}>
+                                <TypeIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 {typeConfig.label}
                             </div>
 
-                            <h1 className="text-lg font-bold text-gray-900 mb-2">{evidence.title}</h1>
+                            <h1 className="text-base sm:text-lg font-bold text-gray-900 mb-1 sm:mb-2">{evidence.title}</h1>
 
                             {evidence.description && (
-                                <p className="text-gray-600 text-sm mb-3 line-clamp-2">{evidence.description}</p>
+                                <p className="text-gray-600 text-xs sm:text-sm mb-2 sm:mb-3 line-clamp-2">{evidence.description}</p>
                             )}
 
                             {/* Date */}
-                            <div className="flex items-center gap-2 text-sm text-gray-500">
-                                <Calendar className="w-4 h-4" />
+                            <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-gray-500">
+                                <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 {new Date(evidence.date_represented).toLocaleDateString('en-US', {
                                     year: 'numeric',
-                                    month: 'long',
+                                    month: 'short',
                                     day: 'numeric'
                                 })}
                             </div>
 
                             {/* Date Range */}
                             {evidence.date_range_start && evidence.date_range_end && (
-                                <p className="text-xs text-gray-400 mt-1">
+                                <p className="text-[10px] sm:text-xs text-gray-400 mt-1">
                                     Covers: {new Date(evidence.date_range_start).toLocaleDateString()} - {new Date(evidence.date_range_end).toLocaleDateString()}
                                 </p>
                             )}
@@ -276,8 +284,8 @@ export default function PublicEvidencePage() {
 
                         {/* Linked Impact Claims - Scrollable */}
                         {evidence.linked_kpis && evidence.linked_kpis.length > 0 && (
-                            <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-5 flex-1 min-h-0 flex flex-col">
-                                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3 flex-shrink-0">
+                            <div className="bg-white/50 backdrop-blur-2xl rounded-xl sm:rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 sm:p-5 flex-1 min-h-0 flex flex-col max-h-[200px] sm:max-h-none">
+                                <h3 className="text-xs sm:text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2 sm:mb-3 flex-shrink-0">
                                     Supporting Impact Claims
                                 </h3>
                                 <div className="space-y-2 overflow-y-auto flex-1 pr-1">
@@ -287,18 +295,18 @@ export default function PublicEvidencePage() {
                                             <Link
                                                 key={kpi.id}
                                                 to={`/org/${orgSlug}/${initiativeSlug}/metric/${kpi.title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}`}
-                                                className="block p-3 bg-white/60 rounded-xl border border-white/50 hover:bg-white/80 hover:shadow-md transition-all group"
+                                                className="block p-2.5 sm:p-3 bg-white/60 rounded-lg sm:rounded-xl border border-white/50 hover:bg-white/80 hover:shadow-md transition-all group active:scale-[0.98]"
                                             >
-                                                <div className="flex items-center justify-between gap-3">
+                                                <div className="flex items-center justify-between gap-2 sm:gap-3">
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="font-medium text-gray-800 text-sm group-hover:text-primary-600 transition-colors">
+                                                        <p className="font-medium text-gray-800 text-xs sm:text-sm group-hover:text-primary-600 transition-colors truncate">
                                                             {kpi.title}
                                                         </p>
-                                                        <p className="text-xs text-gray-500 mt-0.5">
+                                                        <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">
                                                             {kpi.unit_of_measurement} • <span className={colors.text}>{kpi.category}</span>
                                                         </p>
                                                     </div>
-                                                    <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors flex-shrink-0" />
+                                                    <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400 group-hover:text-gray-600 transition-colors flex-shrink-0" />
                                                 </div>
                                             </Link>
                                         )
@@ -308,14 +316,14 @@ export default function PublicEvidencePage() {
                         )}
 
                         {/* Initiative Link */}
-                        <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 flex-shrink-0">
-                            <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">From Initiative</p>
+                        <div className="bg-white/50 backdrop-blur-2xl rounded-xl sm:rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-3 sm:p-4 flex-shrink-0">
+                            <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide mb-1">From Initiative</p>
                             <Link
                                 to={`/org/${orgSlug}/${initiativeSlug}?tab=evidence`}
                                 className="flex items-center justify-between text-gray-800 hover:text-primary-600 font-medium transition-colors group"
                             >
-                                <span className="text-sm">{evidence.initiative.title}</span>
-                                <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                <span className="text-xs sm:text-sm truncate">{evidence.initiative.title}</span>
+                                <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-1 transition-transform flex-shrink-0" />
                             </Link>
                         </div>
                     </div>

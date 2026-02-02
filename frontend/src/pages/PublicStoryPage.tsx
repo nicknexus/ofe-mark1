@@ -79,38 +79,45 @@ export default function PublicStoryPage() {
 
             {/* Navigation Header */}
             <div className="sticky top-0 z-50 bg-white/60 backdrop-blur-2xl border-b border-white/40">
-                <div className="max-w-4xl mx-auto px-6 py-4">
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
                     <div className="flex items-center justify-between">
                         <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=stories`}
-                            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors">
-                            <ArrowLeft className="w-5 h-5" />
-                            <span className="font-medium">Back to Stories</span>
+                            className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-800 transition-colors">
+                            <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+                            <span className="text-sm sm:text-base font-medium">Back</span>
+                        </Link>
+                        <Link to="/" className="flex items-center gap-2">
+                            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg overflow-hidden">
+                                <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                            </div>
                         </Link>
                     </div>
                 </div>
             </div>
 
             {/* Main Content */}
-            <div className="relative z-10 max-w-4xl mx-auto px-6 py-8">
-                {/* Breadcrumb */}
-                <PublicBreadcrumb
-                    orgSlug={orgSlug!}
-                    orgName={story.initiative.org_name || ''}
-                    items={[
-                        { label: story.initiative.title, href: `/org/${orgSlug}/${initiativeSlug}?tab=stories` },
-                        { label: story.title }
-                    ]}
-                />
+            <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+                {/* Breadcrumb - Hidden on mobile */}
+                <div className="hidden sm:block">
+                    <PublicBreadcrumb
+                        orgSlug={orgSlug!}
+                        orgName={story.initiative.org_name || ''}
+                        items={[
+                            { label: story.initiative.title, href: `/org/${orgSlug}/${initiativeSlug}?tab=stories` },
+                            { label: story.title }
+                        ]}
+                    />
+                </div>
 
                 {/* Story Card */}
-                <div className="bg-white/50 backdrop-blur-2xl rounded-3xl border border-white/60 shadow-2xl shadow-black/10 overflow-hidden">
+                <div className="bg-white/50 backdrop-blur-2xl rounded-2xl sm:rounded-3xl border border-white/60 shadow-2xl shadow-black/10 overflow-hidden">
                     {/* Media */}
                     {story.media_url && story.media_type === 'photo' && (
-                        <div className="w-full min-h-[200px] max-h-[70vh] bg-transparent flex items-center justify-center overflow-hidden">
+                        <div className="w-full min-h-[150px] sm:min-h-[200px] max-h-[50vh] sm:max-h-[70vh] bg-transparent flex items-center justify-center overflow-hidden">
                             <img
                                 src={story.media_url}
                                 alt={story.title}
-                                className="max-w-full max-h-[70vh] object-contain"
+                                className="max-w-full max-h-[50vh] sm:max-h-[70vh] object-contain"
                             />
                         </div>
                     )}
@@ -124,33 +131,33 @@ export default function PublicStoryPage() {
                         </div>
                     )}
                     {story.media_type === 'text' && !story.media_url && (
-                        <div className="w-full h-48 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
-                            <FileText className="w-16 h-16 text-gray-300" />
+                        <div className="w-full h-32 sm:h-48 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
+                            <FileText className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300" />
                         </div>
                     )}
 
                     {/* Content */}
-                    <div className="p-8">
+                    <div className="p-4 sm:p-8">
                         {/* Title */}
-                        <h1 className="text-3xl font-bold text-gray-900 mb-4">{story.title}</h1>
+                        <h1 className="text-xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">{story.title}</h1>
 
                         {/* Meta */}
-                        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-6 pb-6 border-b border-gray-100">
-                            <span className="flex items-center gap-1.5">
-                                <Calendar className="w-4 h-4" />
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6 pb-4 sm:pb-6 border-b border-gray-100">
+                            <span className="flex items-center gap-1 sm:gap-1.5">
+                                <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 {new Date(story.date_represented).toLocaleDateString('en-US', {
                                     year: 'numeric',
-                                    month: 'long',
+                                    month: 'short',
                                     day: 'numeric'
                                 })}
                             </span>
                             {story.location && (
-                                <span className="flex items-center gap-1.5">
-                                    <MapPin className="w-4 h-4" />
+                                <span className="flex items-center gap-1 sm:gap-1.5">
+                                    <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                     {story.location.name}
                                 </span>
                             )}
-                            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-full text-xs font-medium">
+                            <span className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 bg-gray-100 rounded-full text-[10px] sm:text-xs font-medium">
                                 {story.media_type}
                             </span>
                         </div>
@@ -158,7 +165,7 @@ export default function PublicStoryPage() {
                         {/* Description */}
                         {story.description && (
                             <div className="prose prose-gray max-w-none">
-                                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap text-lg">
+                                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap text-sm sm:text-lg">
                                     {story.description}
                                 </p>
                             </div>
@@ -166,16 +173,16 @@ export default function PublicStoryPage() {
 
                         {/* Beneficiary Groups */}
                         {story.beneficiary_groups && story.beneficiary_groups.length > 0 && (
-                            <div className="mt-8 pt-6 border-t border-gray-100">
-                                <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4 flex items-center gap-2">
-                                    <Users className="w-4 h-4" />
+                            <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-100">
+                                <h3 className="text-xs sm:text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3 sm:mb-4 flex items-center gap-1.5 sm:gap-2">
+                                    <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                     People in this Story
                                 </h3>
-                                <div className="flex flex-wrap gap-2">
+                                <div className="flex flex-wrap gap-1.5 sm:gap-2">
                                     {story.beneficiary_groups.map((group) => (
                                         <span
                                             key={group.id}
-                                            className="px-3 py-1.5 bg-primary-50 text-primary-700 rounded-full text-sm font-medium"
+                                            className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-primary-50 text-primary-700 rounded-full text-xs sm:text-sm font-medium"
                                         >
                                             {group.name}
                                             {group.total_number && <span className="ml-1 opacity-70">({group.total_number})</span>}
@@ -186,14 +193,14 @@ export default function PublicStoryPage() {
                         )}
 
                         {/* Initiative Link */}
-                        <div className="mt-8 pt-6 border-t border-gray-100">
-                            <p className="text-sm text-gray-500 mb-2">From initiative:</p>
+                        <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-100">
+                            <p className="text-xs sm:text-sm text-gray-500 mb-1.5 sm:mb-2">From initiative:</p>
                             <Link
                                 to={`/org/${orgSlug}/${initiativeSlug}`}
-                                className="inline-flex items-center gap-2 text-gray-800 hover:text-primary-600 font-medium transition-colors"
+                                className="inline-flex items-center gap-1.5 sm:gap-2 text-gray-800 hover:text-primary-600 font-medium transition-colors text-sm sm:text-base"
                             >
                                 {story.initiative.title}
-                                <ArrowLeft className="w-4 h-4 rotate-180" />
+                                <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 rotate-180" />
                             </Link>
                         </div>
                     </div>
