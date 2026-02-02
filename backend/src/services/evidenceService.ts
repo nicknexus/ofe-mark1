@@ -278,11 +278,12 @@ export class EvidenceService {
 
     static async delete(id: string, userId: string): Promise<void> {
         // Get evidence record first to delete associated file and track storage
+        // Note: We don't filter by user_id here because the route middleware (requireOwnerPermission)
+        // already verifies the user is an org owner who can delete any evidence in their org
         const { data: evidence, error: fetchError } = await supabase
             .from('evidence')
             .select('file_url, initiative_id')
             .eq('id', id)
-            .eq('user_id', userId)
             .single();
 
         if (fetchError) {
@@ -332,11 +333,11 @@ export class EvidenceService {
             .eq('evidence_id', id);
 
         // Delete evidence record
+        // Note: We don't filter by user_id - authorization is handled by route middleware
         const { error } = await supabase
             .from('evidence')
             .delete()
-            .eq('id', id)
-            .eq('user_id', userId);
+            .eq('id', id);
 
         if (error) throw new Error(`Failed to delete evidence: ${error.message}`);
 
