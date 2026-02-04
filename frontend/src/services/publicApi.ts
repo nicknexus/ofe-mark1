@@ -14,6 +14,7 @@ export interface PublicOrganization {
     name: string
     slug: string
     description?: string
+    statement?: string
     logo_url?: string
     brand_color?: string
     created_at?: string
@@ -73,6 +74,7 @@ export interface PublicLocation {
     description?: string
     latitude: number
     longitude: number
+    country?: string
     initiative_id?: string
     initiative_slug?: string
     initiative_title?: string

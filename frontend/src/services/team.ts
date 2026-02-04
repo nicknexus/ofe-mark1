@@ -78,11 +78,15 @@ export interface PendingInviteCheck {
 export interface AccessibleOrganization {
     id: string
     name: string
+    slug?: string
     role: 'owner' | 'member'
     canAddImpactClaims?: boolean
     logo_url?: string
     brand_color?: string
     is_public?: boolean
+    statement?: string
+    website_url?: string
+    donation_url?: string
 }
 
 export class TeamService {

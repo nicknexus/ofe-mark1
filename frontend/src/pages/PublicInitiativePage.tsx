@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { 
-    ArrowLeft, Globe, BarChart3, BookOpen, MapPin, 
+import {
+    ArrowLeft, Globe, BarChart3, BookOpen, MapPin,
     FileText, Users, Calendar, ChevronRight, ExternalLink, TrendingUp,
     Building2, ChevronDown, Filter, X, Activity, Layers, Zap,
     Camera, MessageSquare, DollarSign
@@ -23,11 +23,11 @@ import {
     BarChart,
     Bar
 } from 'recharts'
-import { 
-    publicApi, 
-    PublicInitiative, 
-    PublicKPI, 
-    PublicStory, 
+import {
+    publicApi,
+    PublicInitiative,
+    PublicKPI,
+    PublicStory,
     PublicLocation,
     PublicEvidence,
     PublicBeneficiaryGroup,
@@ -46,7 +46,7 @@ delete (L.Icon.Default.prototype as any)._getIconUrl
 function TileLayerWithFallback() {
     const [useFallback, setUseFallback] = useState(false)
     const map = useMap()
-    
+
     useEffect(() => {
         if (useFallback) return
         const testImg = new Image()
@@ -54,7 +54,7 @@ function TileLayerWithFallback() {
         testImg.src = 'https://a.basemaps.cartocdn.com/rastertiles/voyager/0/0/0.png'
         return () => { testImg.onerror = null }
     }, [useFallback])
-    
+
     return (
         <TileLayer
             attribution={useFallback ? '&copy; OpenStreetMap contributors' : CARTO_ATTRIBUTION}
@@ -68,11 +68,11 @@ function TileLayerWithFallback() {
 // Custom marker matching internal app style
 function LocationMarker({ location }: { location: PublicLocation }) {
     const [isHovered, setIsHovered] = useState(false)
-    
+
     const icon = useMemo(() => {
         const size = isHovered ? 36 : 32
         const color = '#c0dfa1'
-        
+
         return L.divIcon({
             className: 'custom-marker',
             html: `
@@ -121,7 +121,7 @@ export default function PublicInitiativePage() {
     const { orgSlug, initiativeSlug } = useParams<{ orgSlug: string; initiativeSlug: string }>()
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
-    
+
     const [initiative, setInitiative] = useState<PublicInitiative | null>(null)
     const [dashboard, setDashboard] = useState<InitiativeDashboard | null>(null)
     const [activeTab, setActiveTab] = useState<TabType>('overview')
@@ -134,11 +134,11 @@ export default function PublicInitiativePage() {
     const [locations, setLocations] = useState<PublicLocation[] | null>(null)
     const [evidence, setEvidence] = useState<PublicEvidence[] | null>(null)
     const [beneficiaries, setBeneficiaries] = useState<PublicBeneficiaryGroup[] | null>(null)
-    
+
     // All initiatives for switcher
     const [allInitiatives, setAllInitiatives] = useState<PublicInitiative[]>([])
     const [showInitiativeDropdown, setShowInitiativeDropdown] = useState(false)
-    
+
     // Date filter state - initialize from URL params
     const [startDate, setStartDate] = useState<string>(searchParams.get('startDate') || '')
     const [endDate, setEndDate] = useState<string>(searchParams.get('endDate') || '')
@@ -153,8 +153,8 @@ export default function PublicInitiativePage() {
 
     // Track if we've loaded before to detect switches
     const hasLoadedRef = React.useRef(false)
-    
-    useEffect(() => { 
+
+    useEffect(() => {
         if (orgSlug && initiativeSlug) {
             const isSwitch = hasLoadedRef.current
             loadInitiative(isSwitch)
@@ -162,7 +162,7 @@ export default function PublicInitiativePage() {
         }
     }, [orgSlug, initiativeSlug])
     useEffect(() => { if (orgSlug && initiativeSlug) loadTabData(activeTab) }, [activeTab, orgSlug, initiativeSlug])
-    
+
     // Load all initiatives for the org (for switcher)
     useEffect(() => {
         if (orgSlug) {
@@ -178,7 +178,7 @@ export default function PublicInitiativePage() {
                 setInitialLoading(true)
             }
             setError(null)
-            
+
             // Clear tab data when switching initiatives
             if (isSwitch) {
                 setStories(null)
@@ -186,7 +186,7 @@ export default function PublicInitiativePage() {
                 setEvidence(null)
                 setBeneficiaries(null)
             }
-            
+
             const dashboardData = await publicApi.getInitiativeDashboard(orgSlug!, initiativeSlug!)
             if (!dashboardData) { setError('Initiative not found'); return }
             setInitiative(dashboardData.initiative)
@@ -214,45 +214,45 @@ export default function PublicInitiativePage() {
 
     // Filter helpers
     const hasActiveFilters = startDate || endDate
-    
+
     const clearFilters = () => {
         setStartDate('')
         setEndDate('')
     }
-    
+
     // Handle initiative switch
     const handleInitiativeSwitch = (slug: string) => {
         setShowInitiativeDropdown(false)
         if (slug === initiativeSlug) return
-        
+
         // Build query params
         const params = new URLSearchParams()
         if (startDate) params.set('startDate', startDate)
         if (endDate) params.set('endDate', endDate)
         const queryString = params.toString()
-        
+
         navigate(`/org/${orgSlug}/${slug}${queryString ? `?${queryString}` : ''}`)
     }
-    
+
     // Filter dashboard KPIs by date
     const filteredDashboard = useMemo(() => {
         if (!dashboard) return null
         if (!startDate && !endDate) return dashboard
-        
+
         const filteredKpis = dashboard.kpis.map(kpi => {
             // Note: We don't have updates in dashboard kpis, so we can't filter by date here
             // The backend would need to support date filtering for accurate totals
             return kpi
         })
-        
+
         return { ...dashboard, kpis: filteredKpis }
     }, [dashboard, startDate, endDate])
-    
+
     // Filter stories by date
     const filteredStories = useMemo(() => {
         if (!stories) return null
         if (!startDate && !endDate) return stories
-        
+
         return stories.filter(s => {
             const storyDate = new Date(s.date_represented)
             if (startDate && storyDate < new Date(startDate)) return false
@@ -260,12 +260,12 @@ export default function PublicInitiativePage() {
             return true
         })
     }, [stories, startDate, endDate])
-    
+
     // Filter evidence by date
     const filteredEvidence = useMemo(() => {
         if (!evidence) return null
         if (!startDate && !endDate) return evidence
-        
+
         return evidence.filter(e => {
             const evidenceDate = new Date(e.date_represented)
             if (startDate && evidenceDate < new Date(startDate)) return false
@@ -309,7 +309,7 @@ export default function PublicInitiativePage() {
     return (
         <div className="min-h-screen font-figtree relative animate-fadeIn">
             {/* Flowing gradient background */}
-            <div 
+            <div
                 className="fixed inset-0 pointer-events-none"
                 style={{
                     background: `
@@ -363,7 +363,7 @@ export default function PublicInitiativePage() {
                             <Filter className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                             <span className="font-medium hidden sm:inline">Filter:</span>
                         </div>
-                        
+
                         {/* Initiative Switcher Dropdown */}
                         <div className="relative flex-shrink-0">
                             <button
@@ -374,7 +374,7 @@ export default function PublicInitiativePage() {
                                 <span className="max-w-[80px] sm:max-w-[120px] truncate">{initiative.title}</span>
                                 <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                             </button>
-                            
+
                             {showInitiativeDropdown && (
                                 <>
                                     <div className="fixed inset-0 z-40" onClick={() => setShowInitiativeDropdown(false)} />
@@ -383,9 +383,8 @@ export default function PublicInitiativePage() {
                                             <button
                                                 key={init.id}
                                                 onClick={() => handleInitiativeSwitch(init.slug)}
-                                                className={`w-full px-4 py-2 text-left text-sm hover:bg-accent/10 ${
-                                                    init.slug === initiativeSlug ? 'bg-accent/10 text-accent font-medium' : 'text-foreground'
-                                                }`}
+                                                className={`w-full px-4 py-2 text-left text-sm hover:bg-accent/10 ${init.slug === initiativeSlug ? 'bg-accent/10 text-accent font-medium' : 'text-foreground'
+                                                    }`}
                                             >
                                                 <span className="truncate">{init.title}</span>
                                             </button>
@@ -394,7 +393,7 @@ export default function PublicInitiativePage() {
                                 </>
                             )}
                         </div>
-                        
+
                         {/* Date Range - Hidden on small mobile */}
                         <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
                             <div className="relative">
@@ -417,7 +416,7 @@ export default function PublicInitiativePage() {
                                 />
                             </div>
                         </div>
-                        
+
                         {hasActiveFilters && (
                             <button onClick={clearFilters} className="flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
                                 <X className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Clear
@@ -461,7 +460,7 @@ export default function PublicInitiativePage() {
                                         </Link>
                                     </div>
                                 </div>
-                                
+
                                 {/* Quick Stats */}
                                 <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/50">
                                     <div className="text-center p-2 rounded-lg bg-white/40">
@@ -485,20 +484,18 @@ export default function PublicInitiativePage() {
                                     <button
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
-                                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                                            activeTab === tab.id
+                                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === tab.id
                                                 ? 'bg-gray-800 text-white shadow-lg'
                                                 : 'text-gray-700 hover:bg-white/60'
-                                        }`}
+                                            }`}
                                     >
                                         <tab.icon className="w-4 h-4" />
                                         <span className="flex-1 text-left">{tab.label}</span>
                                         {tab.count !== undefined && (
-                                            <span className={`px-2 py-0.5 text-xs rounded-full font-semibold ${
-                                                activeTab === tab.id 
-                                                    ? 'bg-white/30 text-white' 
+                                            <span className={`px-2 py-0.5 text-xs rounded-full font-semibold ${activeTab === tab.id
+                                                    ? 'bg-white/30 text-white'
                                                     : 'bg-white/60 text-gray-600'
-                                            }`}>
+                                                }`}>
                                                 {tab.count}
                                             </span>
                                         )}
@@ -515,11 +512,10 @@ export default function PublicInitiativePage() {
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
-                                    className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all min-w-[52px] ${
-                                        activeTab === tab.id 
-                                            ? 'text-foreground' 
+                                    className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all min-w-[52px] ${activeTab === tab.id
+                                            ? 'text-foreground'
                                             : 'text-muted-foreground'
-                                    }`}
+                                        }`}
                                 >
                                     <div className={`p-1.5 rounded-lg transition-colors ${activeTab === tab.id ? 'bg-primary-100' : ''}`}>
                                         <tab.icon className={`w-5 h-5 ${activeTab === tab.id ? 'text-primary-600' : ''}`} />
@@ -591,13 +587,13 @@ const getMetricColor = (index: number): string => {
 
 const CATEGORY_COLORS = {
     input: '#3b82f6',
-    output: '#10b981', 
+    output: '#10b981',
     impact: '#8b5cf6'
 }
 
 // Initiative Overview - Modern dashboard with multi-line chart like MetricsDashboard
-function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug }: { 
-    initiative: PublicInitiative; 
+function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug }: {
+    initiative: PublicInitiative;
     dashboard: InitiativeDashboard;
     orgSlug: string;
     initiativeSlug: string;
@@ -607,7 +603,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
     const [isCumulative, setIsCumulative] = useState(false)
     const [visibleKPIs, setVisibleKPIs] = useState<Set<string>>(new Set(dashboard.kpis.map(k => k.id)))
     const [isMetricDropdownOpen, setIsMetricDropdownOpen] = useState(false)
-    
+
     // Flatten all updates from all KPIs
     const allUpdates = useMemo(() => {
         const updates: Array<{ kpi_id: string; value: number; date_represented: string }> = []
@@ -628,11 +624,11 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
     // Generate chart data similar to MetricsDashboard
     const chartData = useMemo(() => {
         if (allUpdates.length === 0 || visibleKPIs.size === 0) return []
-        
+
         // Get date range
         const now = new Date()
         let startDate: Date
-        
+
         if (timeFrame === 'all') {
             // Find oldest update
             const oldestDate = allUpdates.reduce((oldest, update) => {
@@ -670,7 +666,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
         if (!isCumulative) {
             // Monthly aggregation
             const monthlyTotals: Record<string, Record<string, number>> = {}
-            
+
             Object.keys(updatesByKPI).forEach(kpiId => {
                 if (!visibleKPIs.has(kpiId)) return
                 updatesByKPI[kpiId].forEach(update => {
@@ -686,34 +682,34 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
             const result: any[] = []
             let currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
             const endDate = new Date(now.getFullYear(), now.getMonth(), 1)
-            
+
             while (currentDate <= endDate) {
                 const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
                 const monthLabel = currentDate.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-                
+
                 const dataPoint: any = { date: monthLabel, fullDate: new Date(currentDate) }
                 Array.from(visibleKPIs).forEach(kpiId => {
                     dataPoint[kpiId] = monthlyTotals[monthKey]?.[kpiId] || 0
                 })
                 result.push(dataPoint)
-                
+
                 currentDate.setMonth(currentDate.getMonth() + 1)
             }
-            
+
             return result
         } else {
             // Cumulative - daily data points
             const result: any[] = []
             const daysDiff = Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 3600 * 24))
-            
+
             for (let i = 0; i <= daysDiff; i++) {
                 const currentDate = new Date(startDate)
                 currentDate.setDate(startDate.getDate() + i)
                 if (currentDate > now) break
-                
+
                 const dateLabel = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                 const dataPoint: any = { date: dateLabel, fullDate: new Date(currentDate) }
-                
+
                 // Calculate cumulative for each visible KPI
                 Array.from(visibleKPIs).forEach(kpiId => {
                     const cumulative = (updatesByKPI[kpiId] || [])
@@ -721,10 +717,10 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
                         .reduce((sum, u) => sum + u.value, 0)
                     dataPoint[kpiId] = cumulative
                 })
-                
+
                 result.push(dataPoint)
             }
-            
+
             // Reduce data points for better performance (every 7th day for cumulative)
             if (result.length > 60) {
                 return result.filter((_, i) => i % 7 === 0 || i === result.length - 1)
@@ -832,11 +828,10 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
                         <div className="relative">
                             <button
                                 onClick={() => setIsMetricDropdownOpen(!isMetricDropdownOpen)}
-                                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-xl border-2 transition-all duration-200 ${
-                                    visibleKPIs.size < dashboard.kpis.length
-                                        ? 'bg-accent/10 text-accent border-accent/30 hover:bg-accent/20' 
+                                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-xl border-2 transition-all duration-200 ${visibleKPIs.size < dashboard.kpis.length
+                                        ? 'bg-accent/10 text-accent border-accent/30 hover:bg-accent/20'
                                         : 'bg-white/60 text-gray-700 border-white/80 hover:bg-white/80'
-                                }`}
+                                    }`}
                             >
                                 <Layers className="w-3.5 h-3.5" />
                                 <span>
@@ -874,7 +869,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
                                                 Clear all
                                             </button>
                                         </div>
-                                        
+
                                         {/* Metric options */}
                                         {dashboard.kpis.map((kpi, index) => {
                                             const isSelected = visibleKPIs.has(kpi.id)
@@ -890,9 +885,9 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
                                                         onChange={() => toggleKPI(kpi.id)}
                                                         className="w-3.5 h-3.5 rounded border-gray-300 text-accent focus:ring-accent"
                                                     />
-                                                    <div 
-                                                        className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
-                                                        style={{ backgroundColor: metricColor }} 
+                                                    <div
+                                                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                                        style={{ backgroundColor: metricColor }}
                                                     />
                                                     <span className={`flex-1 truncate ${isSelected ? 'font-medium text-gray-700' : 'text-gray-500'}`}>
                                                         {kpi.title}
@@ -909,17 +904,15 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
                         <div className="flex items-center bg-white/60 rounded-xl p-0.5 border border-white/80">
                             <button
                                 onClick={() => setIsCumulative(false)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                                    !isCumulative ? 'bg-gray-800 text-white' : 'text-gray-600 hover:text-gray-800'
-                                }`}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${!isCumulative ? 'bg-gray-800 text-white' : 'text-gray-600 hover:text-gray-800'
+                                    }`}
                             >
                                 Monthly
                             </button>
                             <button
                                 onClick={() => setIsCumulative(true)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                                    isCumulative ? 'bg-gray-800 text-white' : 'text-gray-600 hover:text-gray-800'
-                                }`}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${isCumulative ? 'bg-gray-800 text-white' : 'text-gray-600 hover:text-gray-800'
+                                    }`}
                             >
                                 Cumulative
                             </button>
@@ -930,9 +923,8 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
                                 <button
                                     key={tf}
                                     onClick={() => setTimeFrame(tf)}
-                                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                                        timeFrame === tf ? 'bg-gray-800 text-white' : 'text-gray-600 hover:text-gray-800'
-                                    }`}
+                                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${timeFrame === tf ? 'bg-gray-800 text-white' : 'text-gray-600 hover:text-gray-800'
+                                        }`}
                                 >
                                     {tf === 'all' ? 'All' : tf === '1month' ? '1M' : tf === '6months' ? '6M' : '1Y'}
                                 </button>
@@ -940,7 +932,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
                         </div>
                     </div>
                 </div>
-                
+
                 <div className="h-[320px]">
                     {chartData.length > 0 && visibleKPIs.size > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
@@ -948,15 +940,15 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
                                 <defs>
                                     {dashboard.kpis.map((kpi, index) => (
                                         <linearGradient key={kpi.id} id={`gradient-${kpi.id}`} x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor={getMetricColor(index)} stopOpacity={0.3}/>
-                                            <stop offset="95%" stopColor={getMetricColor(index)} stopOpacity={0.05}/>
+                                            <stop offset="5%" stopColor={getMetricColor(index)} stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor={getMetricColor(index)} stopOpacity={0.05} />
                                         </linearGradient>
                                     ))}
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                                <XAxis 
-                                    dataKey="date" 
-                                    stroke="#9ca3af" 
+                                <XAxis
+                                    dataKey="date"
+                                    stroke="#9ca3af"
                                     fontSize={10}
                                     tickLine={false}
                                     axisLine={false}
@@ -965,8 +957,8 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
                                     height={50}
                                     interval={chartData.length > 12 ? Math.floor(chartData.length / 12) : 0}
                                 />
-                                <YAxis 
-                                    stroke="#9ca3af" 
+                                <YAxis
+                                    stroke="#9ca3af"
                                     fontSize={10}
                                     tickLine={false}
                                     axisLine={false}
@@ -1014,7 +1006,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
                         </div>
                     )}
                 </div>
-                
+
                 {/* Legend */}
                 {visibleKPIs.size > 0 && (
                     <div className="flex flex-wrap justify-center gap-4 mt-4 pt-4 border-t border-white/50">
@@ -1069,7 +1061,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
                         </div>
                         <h2 className="font-semibold text-foreground">Categories</h2>
                     </div>
-                    
+
                     {categoryData.length > 0 ? (
                         <>
                             <div className="h-[160px]">
@@ -1118,17 +1110,17 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
                         </div>
                         <span className="text-xs text-muted-foreground">{dashboard.locations?.length || 0}</span>
                     </div>
-                    
+
                     {dashboard.locations && dashboard.locations.length > 0 ? (
                         <>
                             <div className="h-[120px] rounded-xl overflow-hidden border border-gray-200 mb-3">
-                                <MapContainer 
+                                <MapContainer
                                     center={[
                                         dashboard.locations.reduce((s, l) => s + l.latitude, 0) / dashboard.locations.length,
                                         dashboard.locations.reduce((s, l) => s + l.longitude, 0) / dashboard.locations.length
-                                    ]} 
-                                    zoom={dashboard.locations.length === 1 ? 8 : 3} 
-                                    className="w-full h-full" 
+                                    ]}
+                                    zoom={dashboard.locations.length === 1 ? 8 : 3}
+                                    className="w-full h-full"
                                     zoomControl={false}
                                     scrollWheelZoom={false}
                                     dragging={false}
@@ -1172,10 +1164,10 @@ function generateMetricSlug(title: string): string {
 }
 
 // Metrics Tab - Shows all metrics with links to detail pages
-function MetricsTab({ dashboard, orgSlug, initiativeSlug }: { 
-    dashboard: InitiativeDashboard; 
-    orgSlug: string; 
-    initiativeSlug: string 
+function MetricsTab({ dashboard, orgSlug, initiativeSlug }: {
+    dashboard: InitiativeDashboard;
+    orgSlug: string;
+    initiativeSlug: string
 }) {
     const { kpis } = dashboard
 
@@ -1202,10 +1194,10 @@ function MetricsTab({ dashboard, orgSlug, initiativeSlug }: {
             {kpis.map((kpi) => {
                 const config = getCategoryConfig(kpi.category)
                 const metricSlug = generateMetricSlug(kpi.title)
-                
+
                 return (
-                    <Link 
-                        key={kpi.id} 
+                    <Link
+                        key={kpi.id}
                         to={`/org/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`}
                         className="glass-card rounded-2xl border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all overflow-hidden group cursor-pointer"
                     >
@@ -1272,8 +1264,8 @@ function StoriesTab({ stories, orgSlug, initiativeSlug }: { stories: PublicStory
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {stories.map((story) => (
-                <Link 
-                    key={story.id} 
+                <Link
+                    key={story.id}
                     to={`/org/${orgSlug}/${initiativeSlug}/story/${story.id}`}
                     className="glass-card rounded-2xl overflow-hidden group border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all"
                 >
@@ -1362,23 +1354,23 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug }: { evidence: PublicEv
 
     // Colors matching the signed-in app
     const typeConfig: Record<string, { bg: string; label: string; color: string }> = {
-        visual_proof: { 
-            bg: 'bg-pink-100 text-pink-800', 
+        visual_proof: {
+            bg: 'bg-pink-100 text-pink-800',
             label: 'Visual Support',
             color: 'text-pink-500'
         },
-        documentation: { 
-            bg: 'bg-blue-100 text-blue-700', 
+        documentation: {
+            bg: 'bg-blue-100 text-blue-700',
             label: 'Documentation',
             color: 'text-blue-500'
         },
-        testimony: { 
-            bg: 'bg-orange-100 text-orange-800', 
+        testimony: {
+            bg: 'bg-orange-100 text-orange-800',
             label: 'Testimonies',
             color: 'text-orange-500'
         },
-        financials: { 
-            bg: 'bg-primary-100 text-primary-800', 
+        financials: {
+            bg: 'bg-primary-100 text-primary-800',
             label: 'Financials',
             color: 'text-primary-500'
         }
@@ -1431,11 +1423,10 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug }: { evidence: PublicEv
                 <div className="relative">
                     <button
                         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                        className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border-2 transition-all duration-200 shadow-sm ${
-                            selectedTypes.length > 0 
-                                ? 'bg-accent/10 text-accent border-accent/30 hover:bg-accent/20' 
+                        className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border-2 transition-all duration-200 shadow-sm ${selectedTypes.length > 0
+                                ? 'bg-accent/10 text-accent border-accent/30 hover:bg-accent/20'
                                 : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        }`}
+                            }`}
                     >
                         <FileText className="w-4 h-4" />
                         <span>
@@ -1456,9 +1447,9 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug }: { evidence: PublicEv
                     {isDropdownOpen && (
                         <>
                             {/* Backdrop */}
-                            <div 
-                                className="fixed inset-0 z-40" 
-                                onClick={() => setIsDropdownOpen(false)} 
+                            <div
+                                className="fixed inset-0 z-40"
+                                onClick={() => setIsDropdownOpen(false)}
                             />
                             {/* Dropdown */}
                             <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
@@ -1475,19 +1466,18 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug }: { evidence: PublicEv
                                         <div className="h-px bg-gray-100 my-1" />
                                     </>
                                 )}
-                                
+
                                 {/* Type options with checkboxes */}
                                 {evidenceTypes.map((type) => {
                                     const count = typeCounts[type.value] || 0
                                     const isSelected = selectedTypes.includes(type.value)
                                     const TypeIcon = type.icon
-                                    
+
                                     return (
                                         <label
                                             key={type.value}
-                                            className={`w-full px-4 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 transition-colors cursor-pointer ${
-                                                count === 0 ? 'opacity-50 cursor-not-allowed' : ''
-                                            }`}
+                                            className={`w-full px-4 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 transition-colors cursor-pointer ${count === 0 ? 'opacity-50 cursor-not-allowed' : ''
+                                                }`}
                                         >
                                             <input
                                                 type="checkbox"
@@ -1508,7 +1498,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug }: { evidence: PublicEv
                         </>
                     )}
                 </div>
-                
+
                 {/* Clear filter button */}
                 {selectedTypes.length > 0 && (
                     <button
@@ -1526,18 +1516,18 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug }: { evidence: PublicEv
                 {displayedEvidence.map((item) => {
                     const previewUrl = getPreviewUrl(item)
                     const fileCount = item.files?.length || (item.file_url ? 1 : 0)
-                    
+
                     return (
-                        <Link 
-                            key={item.id} 
+                        <Link
+                            key={item.id}
                             to={`/org/${orgSlug}/${initiativeSlug}/evidence/${item.id}`}
                             className="glass-card rounded-2xl border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all overflow-hidden group"
                         >
                             {/* Image Preview */}
                             {previewUrl ? (
                                 <div className="relative aspect-video bg-gray-100 overflow-hidden">
-                                    <img 
-                                        src={previewUrl} 
+                                    <img
+                                        src={previewUrl}
                                         alt={item.title}
                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                     />
@@ -1568,7 +1558,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug }: { evidence: PublicEv
                                 </div>
                                 <h3 className="font-semibold text-foreground text-sm mb-1 group-hover:text-accent transition-colors">{item.title}</h3>
                                 {item.description && <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{item.description}</p>}
-                                
+
                                 {/* Locations */}
                                 {item.locations && item.locations.length > 0 && (
                                     <div className="mt-2 flex flex-wrap gap-1">
@@ -1582,11 +1572,11 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug }: { evidence: PublicEv
                     )
                 })}
             </div>
-            
+
             {/* Load More */}
             {hasMore && (
                 <div className="text-center mt-6">
-                    <button 
+                    <button
                         onClick={() => setDisplayCount(prev => prev + 8)}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-accent/10 text-accent rounded-xl hover:bg-accent/20 transition-colors font-medium border border-accent/20 hover:border-accent"
                     >

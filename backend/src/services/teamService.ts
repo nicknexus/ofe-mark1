@@ -141,7 +141,7 @@ export class TeamService {
     /**
      * Get user's organization (where they are owner)
      */
-    static async getUserOwnedOrganization(userId: string): Promise<{ id: string; name: string; logo_url?: string; brand_color?: string; is_public?: boolean } | null> {
+    static async getUserOwnedOrganization(userId: string): Promise<{ id: string; name: string; slug?: string; logo_url?: string; brand_color?: string; is_public?: boolean; statement?: string; website_url?: string; donation_url?: string } | null> {
         console.log(`[getUserOwnedOrganization] Looking up org for user: ${userId}`);
 
         // Retry logic for serverless connection issues
@@ -152,7 +152,7 @@ export class TeamService {
                 // This helps debug if the issue is with the query or the connection
                 const response = await supabase
                     .from('organizations')
-                    .select('id, name, owner_id, logo_url, brand_color, is_public')
+                    .select('id, name, slug, owner_id, logo_url, brand_color, is_public, statement, website_url, donation_url')
                     .eq('owner_id', userId)
                     .limit(1);
 
@@ -186,7 +186,17 @@ export class TeamService {
                 }
 
                 console.log(`[getUserOwnedOrganization] Found org: ${data.name} (${data.id}) on attempt ${attempt}`);
-                return { id: data.id, name: data.name, logo_url: data.logo_url, brand_color: data.brand_color, is_public: data.is_public };
+                return { 
+                    id: data.id, 
+                    name: data.name, 
+                    slug: data.slug,
+                    logo_url: data.logo_url, 
+                    brand_color: data.brand_color, 
+                    is_public: data.is_public,
+                    statement: data.statement,
+                    website_url: data.website_url,
+                    donation_url: data.donation_url
+                };
             } catch (e) {
                 console.error(`[getUserOwnedOrganization] Attempt ${attempt} - Exception:`, e);
                 if (attempt < maxRetries) {
@@ -219,20 +229,28 @@ export class TeamService {
     static async getUserAccessibleOrganizations(userId: string): Promise<Array<{
         id: string;
         name: string;
+        slug?: string;
         role: 'owner' | 'member';
         canAddImpactClaims?: boolean;
         logo_url?: string;
         brand_color?: string;
         is_public?: boolean;
+        statement?: string;
+        website_url?: string;
+        donation_url?: string;
     }>> {
         const orgs: Array<{
             id: string;
             name: string;
+            slug?: string;
             role: 'owner' | 'member';
             canAddImpactClaims?: boolean;
             logo_url?: string;
             brand_color?: string;
             is_public?: boolean;
+            statement?: string;
+            website_url?: string;
+            donation_url?: string;
         }> = [];
 
         // Get owned organization
@@ -241,11 +259,15 @@ export class TeamService {
             orgs.push({
                 id: ownedOrg.id,
                 name: ownedOrg.name,
+                slug: ownedOrg.slug,
                 role: 'owner',
                 canAddImpactClaims: true,
                 logo_url: ownedOrg.logo_url,
                 brand_color: ownedOrg.brand_color,
-                is_public: ownedOrg.is_public
+                is_public: ownedOrg.is_public,
+                statement: ownedOrg.statement,
+                website_url: ownedOrg.website_url,
+                donation_url: ownedOrg.donation_url
             });
         }
 
@@ -255,7 +277,7 @@ export class TeamService {
             .select(`
                 organization_id,
                 can_add_impact_claims,
-                organizations(id, name, logo_url, brand_color)
+                organizations(id, name, slug, logo_url, brand_color, statement, website_url, donation_url)
             `)
             .eq('user_id', userId);
 
@@ -266,10 +288,14 @@ export class TeamService {
                     orgs.push({
                         id: org.id,
                         name: org.name,
+                        slug: org.slug,
                         role: 'member',
                         canAddImpactClaims: membership.can_add_impact_claims,
                         logo_url: org.logo_url,
-                        brand_color: org.brand_color
+                        brand_color: org.brand_color,
+                        statement: org.statement,
+                        website_url: org.website_url,
+                        donation_url: org.donation_url
                     });
                 }
             }

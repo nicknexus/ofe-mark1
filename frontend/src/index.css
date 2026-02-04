@@ -288,6 +288,30 @@
     .scrollbar-hide::-webkit-scrollbar {
         display: none;
     }
+
+    /* Thin minimal scrollbar */
+    .scrollbar-thin {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
+    }
+
+    .scrollbar-thin::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+    }
+
+    .scrollbar-thin::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 4px;
+    }
+
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+        background: rgba(0, 0, 0, 0.2);
+    }
 }
 
 /* Ultra crisp fonts for report dashboard */
@@ -328,6 +352,25 @@
 
     to {
         opacity: 1;
+    }
+}
+
+@keyframes fadeInOut {
+    0% {
+        opacity: 0;
+        transform: scale(0.8) translateY(10px);
+    }
+    15% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+    85% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(0.8) translateY(-10px);
     }
 }
 
@@ -1219,52 +1262,53 @@ body.location-modal-open .leaflet-pane {
    ======================================== */
 
 @media (max-width: 767px) {
+
     /* Public page navbar mobile adjustments */
     .public-nav-mobile {
         padding: 0.75rem 1rem;
     }
-    
+
     /* Public page header compact styling */
     .public-header-mobile {
         padding: 0.5rem 1rem;
     }
-    
+
     /* Public page card mobile sizing */
     .public-card-mobile {
         border-radius: 0.75rem;
         padding: 0.75rem;
     }
-    
+
     /* Public dashboard module mobile */
     .public-module-mobile {
         min-height: 200px;
         border-radius: 0.75rem;
     }
-    
+
     /* Public page grid stack on mobile */
     .public-grid-mobile {
         display: flex;
         flex-direction: column;
         gap: 0.75rem;
     }
-    
+
     /* Public page filter bar scrollable */
     .public-filter-scroll {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         padding-bottom: 0.25rem;
     }
-    
+
     /* Hide on mobile for public pages */
     .public-desktop-only {
         display: none !important;
     }
-    
+
     /* Show only on mobile for public pages */
     .public-mobile-only {
         display: block !important;
     }
-    
+
     .public-mobile-flex {
         display: flex !important;
     }
@@ -1275,7 +1319,7 @@ body.location-modal-open .leaflet-pane {
     .public-mobile-only {
         display: none !important;
     }
-    
+
     .public-mobile-flex {
         display: none !important;
     }

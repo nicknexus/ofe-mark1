@@ -3,6 +3,9 @@ export interface Organization {
     name: string;
     slug?: string;
     description?: string;
+    statement?: string; // Brief mission statement (max 150 characters)
+    website_url?: string; // Organization website URL
+    donation_url?: string; // URL where people can donate
     logo_url?: string; // URL to organization logo image
     brand_color?: string; // Hex color for public page branding
     is_public?: boolean;

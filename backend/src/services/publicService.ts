@@ -187,7 +187,7 @@ export class PublicService {
     } | null> {
         const { data: org, error } = await supabase
             .from('organizations')
-            .select('id, name, slug, description, logo_url, brand_color, created_at')
+            .select('id, name, slug, description, statement, logo_url, brand_color, created_at')
             .eq('slug', slug)
             .eq('is_public', true)
             .single();
@@ -307,7 +307,12 @@ export class PublicService {
                 initiative_title: k.initiatives?.title,
                 org_slug: k.initiatives?.organizations?.slug,
                 total_value: totalValue,
-                update_count: updates.length
+                update_count: updates.length,
+                updates: updates.map((u: any) => ({
+                    id: u.id,
+                    value: u.value,
+                    date_represented: u.date_represented
+                }))
             };
         });
     }
@@ -355,7 +360,7 @@ export class PublicService {
         const { data, error } = await supabase
             .from('locations')
             .select(`
-                id, name, description, latitude, longitude, initiative_id,
+                id, name, description, latitude, longitude, country, initiative_id,
                 initiatives!inner(id, slug, title, is_public, organization_id,
                     organizations!inner(slug, is_public)
                 )
@@ -373,6 +378,7 @@ export class PublicService {
             description: l.description,
             latitude: l.latitude,
             longitude: l.longitude,
+            country: l.country,
             initiative_id: l.initiative_id,
             initiative_slug: l.initiatives?.slug,
             initiative_title: l.initiatives?.title,
