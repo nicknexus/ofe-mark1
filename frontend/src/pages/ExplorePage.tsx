@@ -63,19 +63,27 @@ export default function ExplorePage() {
 
     return (
         <div className="min-h-screen font-figtree relative animate-fadeIn">
-            {/* Flowing gradient background */}
-            <div
-                className="fixed inset-0 pointer-events-none"
-                style={{
-                    background: `
-                        radial-gradient(ellipse 80% 50% at 20% 40%, rgba(192, 223, 161, 0.5), transparent 60%),
-                        radial-gradient(ellipse 60% 80% at 80% 20%, rgba(192, 223, 161, 0.4), transparent 55%),
-                        radial-gradient(ellipse 50% 60% at 60% 80%, rgba(192, 223, 161, 0.35), transparent 55%),
-                        radial-gradient(ellipse 70% 40% at 10% 90%, rgba(192, 223, 161, 0.3), transparent 50%),
-                        linear-gradient(180deg, white 0%, #fafafa 100%)
-                    `
-                }}
-            />
+            {/* Flowing gradient background with fading grid */}
+            <div className="fixed inset-0 pointer-events-none">
+                {/* Subtle grid pattern */}
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(210,220,230,0.2)_1px,transparent_1px),linear-gradient(to_bottom,rgba(210,220,230,0.2)_1px,transparent_1px)] bg-[size:60px_60px]" />
+                
+                {/* Radial gradient overlay to fade the grid */}
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_30%,transparent_0%,white_60%)]" />
+                
+                {/* Green gradient blobs */}
+                <div
+                    className="absolute inset-0"
+                    style={{
+                        background: `
+                            radial-gradient(ellipse 80% 50% at 20% 40%, rgba(192, 223, 161, 0.5), transparent 60%),
+                            radial-gradient(ellipse 60% 80% at 80% 20%, rgba(192, 223, 161, 0.4), transparent 55%),
+                            radial-gradient(ellipse 50% 60% at 60% 80%, rgba(192, 223, 161, 0.35), transparent 55%),
+                            radial-gradient(ellipse 70% 40% at 10% 90%, rgba(192, 223, 161, 0.3), transparent 50%)
+                        `
+                    }}
+                />
+            </div>
 
             {/* Header */}
             <div className="relative z-10 pt-4 sm:pt-8 pb-8 sm:pb-12">

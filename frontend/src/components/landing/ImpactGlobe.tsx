@@ -80,7 +80,7 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
     if (locations && locations.length > 0) {
       const avgLat = locations.reduce((sum, loc) => sum + loc.lat, 0) / locations.length;
       const avgLng = locations.reduce((sum, loc) => sum + loc.lng, 0) / locations.length;
-      return { lat: avgLat, lng: avgLng, altitude: locations.length === 1 ? 1.5 : 2.2 };
+      return { lat: avgLat, lng: avgLng, altitude: 2.2 };
     }
     return { lat: 20, lng: 0, altitude: 2.5 };
   }, [locations]);
