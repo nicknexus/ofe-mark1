@@ -97,7 +97,7 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
       setIsLoaded(true);
       return;
     }
-    
+
     fetch("https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson")
       .then((res) => res.json())
       .then((data) => {
@@ -129,13 +129,13 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
 
   // Set up controls once when globe is ready
   const hasSetInitialPov = useRef(false);
-  
+
   useEffect(() => {
     if (globeRef.current && dimensions.width > 0) {
       globeRef.current.controls().autoRotate = true;
       globeRef.current.controls().autoRotateSpeed = locations ? 0.3 : 0.5;
       globeRef.current.controls().enableZoom = enableZoom;
-      
+
       // Only set initial POV once
       if (!hasSetInitialPov.current) {
         globeRef.current.pointOfView(initialPov);

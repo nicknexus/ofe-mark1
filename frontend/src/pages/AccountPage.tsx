@@ -425,8 +425,8 @@ export default function AccountPage({ subscriptionStatus }: Props) {
                                             key={tab.id}
                                             onClick={() => handleTabChange(tab.id)}
                                             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${activeTab === tab.id
-                                                    ? tab.danger ? 'bg-red-50 text-red-700' : 'bg-primary-50 text-primary-700'
-                                                    : tab.danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-600 hover:bg-gray-50'
+                                                ? tab.danger ? 'bg-red-50 text-red-700' : 'bg-primary-50 text-primary-700'
+                                                : tab.danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-600 hover:bg-gray-50'
                                                 }`}
                                         >
                                             <tab.icon className="w-4 h-4" />
@@ -580,7 +580,7 @@ function AccountTab({
                         <div className="space-y-1">
                             <div className="text-sm text-gray-500 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" />Status</div>
                             <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium ${subscriptionStatus.subscription.status === 'trial' ? 'bg-primary-100 text-primary-700' :
-                                    subscriptionStatus.subscription.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                                subscriptionStatus.subscription.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
                                 }`}>
                                 {subscriptionStatus.subscription.status === 'trial' ? 'Free Trial' : subscriptionStatus.subscription.status === 'active' ? 'Active' : subscriptionStatus.subscription.status.charAt(0).toUpperCase() + subscriptionStatus.subscription.status.slice(1)}
                             </span>
@@ -681,8 +681,8 @@ function AccountTab({
                                 {ownedOrganization.is_public ? 'Public' : 'Private'}
                             </span>
                             <span className="text-sm text-gray-600">
-                                {ownedOrganization.is_public 
-                                    ? 'Your organization is visible on the Explore page' 
+                                {ownedOrganization.is_public
+                                    ? 'Your organization is visible on the Explore page'
                                     : 'Your organization is hidden from the public site'}
                             </span>
                         </div>
@@ -708,7 +708,7 @@ function AccountTab({
                             <div className="text-sm text-amber-800">
                                 <p className="font-medium mb-1">Important Notice</p>
                                 <p className="text-amber-700">
-                                    When your organization is public, all your initiatives, impact data, stories, and uploaded media can be viewed by anyone on the internet. 
+                                    When your organization is public, all your initiatives, impact data, stories, and uploaded media can be viewed by anyone on the internet.
                                     Content that violates our Terms of Service may be removed without notice.
                                 </p>
                             </div>
@@ -792,7 +792,7 @@ function OrganizationTab({ organization, refreshPermissions }: { organization: a
         }
     }
 
-    const hasChanges = 
+    const hasChanges =
         statement !== (organization?.statement || '') ||
         websiteUrl !== (organization?.website_url || '') ||
         donationUrl !== (organization?.donation_url || '')
@@ -849,11 +849,10 @@ function OrganizationTab({ organization, refreshPermissions }: { organization: a
                             value={websiteUrl}
                             onChange={(e) => setWebsiteUrl(e.target.value)}
                             placeholder="https://yourorganization.org"
-                            className={`w-full px-3.5 py-2.5 border rounded-xl text-sm focus:ring-1 focus:outline-none transition-all ${
-                                !isValidUrl(websiteUrl) 
-                                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500' 
+                            className={`w-full px-3.5 py-2.5 border rounded-xl text-sm focus:ring-1 focus:outline-none transition-all ${!isValidUrl(websiteUrl)
+                                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
                                     : 'border-gray-200 focus:border-primary-500 focus:ring-primary-500'
-                            }`}
+                                }`}
                         />
                         {!isValidUrl(websiteUrl) && (
                             <p className="text-xs text-red-500 mt-1">Please enter a valid URL</p>
@@ -871,11 +870,10 @@ function OrganizationTab({ organization, refreshPermissions }: { organization: a
                             value={donationUrl}
                             onChange={(e) => setDonationUrl(e.target.value)}
                             placeholder="https://donate.yourorganization.org"
-                            className={`w-full px-3.5 py-2.5 border rounded-xl text-sm focus:ring-1 focus:outline-none transition-all ${
-                                !isValidUrl(donationUrl) 
-                                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500' 
+                            className={`w-full px-3.5 py-2.5 border rounded-xl text-sm focus:ring-1 focus:outline-none transition-all ${!isValidUrl(donationUrl)
+                                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
                                     : 'border-gray-200 focus:border-primary-500 focus:ring-primary-500'
-                            }`}
+                                }`}
                         />
                         {!isValidUrl(donationUrl) && (
                             <p className="text-xs text-red-500 mt-1">Please enter a valid URL</p>

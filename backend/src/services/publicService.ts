@@ -271,19 +271,18 @@ export class PublicService {
     // ============================================
 
     static async getOrganizationMetrics(orgSlug: string): Promise<any[]> {
-        // Get all KPIs from all public initiatives in this org, including updates for totals
+        // Get all KPIs from all initiatives in this public org, including updates for totals
         const { data, error } = await supabase
             .from('kpis')
             .select(`
                 id, title, description, metric_type, unit_of_measurement, category, display_order, initiative_id,
-                initiatives!inner(id, slug, title, is_public, organization_id,
+                initiatives!inner(id, slug, title, organization_id,
                     organizations!inner(slug, is_public)
                 ),
                 kpi_updates(id, value, date_represented)
             `)
             .eq('initiatives.organizations.slug', orgSlug)
             .eq('initiatives.organizations.is_public', true)
-            .eq('initiatives.is_public', true)
             .order('display_order');
 
         if (error) throw new Error(`Failed to fetch metrics: ${error.message}`);
@@ -323,13 +322,12 @@ export class PublicService {
             .select(`
                 id, title, description, media_url, media_type, date_represented, location_id, initiative_id,
                 locations(id, name),
-                initiatives!inner(id, slug, title, is_public, organization_id,
+                initiatives!inner(id, slug, title, organization_id,
                     organizations!inner(slug, is_public)
                 )
             `)
             .eq('initiatives.organizations.slug', orgSlug)
             .eq('initiatives.organizations.is_public', true)
-            .eq('initiatives.is_public', true)
             .order('date_represented', { ascending: false });
 
         if (limit) {
@@ -361,13 +359,12 @@ export class PublicService {
             .from('locations')
             .select(`
                 id, name, description, latitude, longitude, country, initiative_id,
-                initiatives!inner(id, slug, title, is_public, organization_id,
+                initiatives!inner(id, slug, title, organization_id,
                     organizations!inner(slug, is_public)
                 )
             `)
             .eq('initiatives.organizations.slug', orgSlug)
             .eq('initiatives.organizations.is_public', true)
-            .eq('initiatives.is_public', true)
             .order('name');
 
         if (error) throw new Error(`Failed to fetch locations: ${error.message}`);
@@ -391,14 +388,13 @@ export class PublicService {
             .from('evidence')
             .select(`
                 id, title, description, type, file_url, date_represented, initiative_id,
-                initiatives!inner(id, slug, title, is_public, organization_id,
+                initiatives!inner(id, slug, title, organization_id,
                     organizations!inner(slug, is_public)
                 ),
                 evidence_files(id, file_url, file_name, file_type, display_order)
             `)
             .eq('initiatives.organizations.slug', orgSlug)
             .eq('initiatives.organizations.is_public', true)
-            .eq('initiatives.is_public', true)
             .order('date_represented', { ascending: false });
 
         if (limit) {

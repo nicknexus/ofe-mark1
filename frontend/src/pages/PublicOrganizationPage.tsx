@@ -328,9 +328,17 @@ export default function PublicOrganizationPage() {
             }
         })
         
-        // Sort each initiative's metrics by total_value descending
+        // Sort each initiative's metrics: prioritize those with actual updates, then by total_value descending
         metricsByInitiative.forEach(entry => {
-            entry.metrics.sort((a, b) => (b.total_value || 0) - (a.total_value || 0))
+            entry.metrics.sort((a, b) => {
+                const aHasUpdates = a.updates && a.updates.length > 0
+                const bHasUpdates = b.updates && b.updates.length > 0
+                // Metrics with updates come first
+                if (aHasUpdates && !bHasUpdates) return -1
+                if (!aHasUpdates && bHasUpdates) return 1
+                // Then sort by total_value descending
+                return (b.total_value || 0) - (a.total_value || 0)
+            })
         })
         
         const initiativeCount = metricsByInitiative.size
@@ -353,39 +361,71 @@ export default function PublicOrganizationPage() {
         return result
     }, [filteredMetrics, initiatives])
 
-    // Chart data: selected metrics over time (cumulative)
+    // Chart data: selected metrics over time (cumulative monthly, anchored to today's date)
     const initiativeChartData = useMemo(() => {
-        // Get all updates grouped by month, keyed by metric.id
-        const monthlyData: Record<string, Record<string, number>> = {}
+        if (chartMetrics.length === 0) return []
         
+        // Collect all updates with their dates
+        const allUpdates: { metricId: string; value: number; date: Date }[] = []
         chartMetrics.forEach(({ metric }) => {
             if (!metric.updates) return
             metric.updates.forEach(update => {
-                const date = new Date(update.date_represented)
-                const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-                if (!monthlyData[monthKey]) monthlyData[monthKey] = {}
-                if (!monthlyData[monthKey][metric.id]) monthlyData[monthKey][metric.id] = 0
-                monthlyData[monthKey][metric.id] += update.value
+                allUpdates.push({
+                    metricId: metric.id,
+                    value: update.value,
+                    date: new Date(update.date_represented)
+                })
             })
         })
         
-        // Sort months and create cumulative chart data
-        const sortedMonths = Object.keys(monthlyData).sort()
-        const cumulativeTotals: Record<string, number> = {}
+        if (allUpdates.length === 0) return []
         
-        return sortedMonths.map(monthKey => {
-            const [year, month] = monthKey.split('-')
-            const date = new Date(parseInt(year), parseInt(month) - 1)
-            const label = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+        // Find the oldest update date
+        const oldestDate = allUpdates.reduce((oldest, u) => u.date < oldest ? u.date : oldest, new Date())
+        const now = new Date()
+        
+        // Group updates by metric for efficient lookup
+        const updatesByMetric: Record<string, Array<{ value: number; date: Date }>> = {}
+        allUpdates.forEach(u => {
+            if (!updatesByMetric[u.metricId]) updatesByMetric[u.metricId] = []
+            updatesByMetric[u.metricId].push({ value: u.value, date: u.date })
+        })
+        
+        // Sort each metric's updates by date
+        Object.values(updatesByMetric).forEach(updates => {
+            updates.sort((a, b) => a.date.getTime() - b.date.getTime())
+        })
+        
+        // Calculate stop date: one month before the oldest data's month
+        const stopDate = new Date(oldestDate.getFullYear(), oldestDate.getMonth() - 1, oldestDate.getDate())
+        
+        // Generate monthly data points going backwards from today (Feb 5, Jan 5, Dec 5, etc.)
+        const dataPoints: any[] = []
+        const currentDate = new Date(now)
+        
+        // Go back month by month until we're a full month before the oldest data
+        while (currentDate > stopDate) {
+            const label = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+            const dataPoint: any = { date: label, fullDate: new Date(currentDate) }
             
-            const dataPoint: any = { date: label }
             chartMetrics.forEach(({ metric }) => {
-                if (!cumulativeTotals[metric.id]) cumulativeTotals[metric.id] = 0
-                cumulativeTotals[metric.id] += monthlyData[monthKey]?.[metric.id] || 0
-                dataPoint[metric.id] = cumulativeTotals[metric.id]
+                // Calculate cumulative total up to this date
+                const cumulative = (updatesByMetric[metric.id] || [])
+                    .filter(u => u.date <= currentDate)
+                    .reduce((sum, u) => sum + u.value, 0)
+                dataPoint[metric.id] = cumulative
             })
-            return dataPoint
-        })
+            dataPoints.push(dataPoint)
+            
+            // Go back one month
+            currentDate.setMonth(currentDate.getMonth() - 1)
+            
+            // Safety: limit to 24 months max
+            if (dataPoints.length >= 24) break
+        }
+        
+        // Reverse so oldest is first (left side of chart)
+        return dataPoints.reverse()
     }, [chartMetrics])
 
     // List for chart legend (now uses chartMetrics directly)

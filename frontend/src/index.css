@@ -360,14 +360,17 @@
         opacity: 0;
         transform: scale(0.8) translateY(10px);
     }
+
     15% {
         opacity: 1;
         transform: scale(1) translateY(0);
     }
+
     85% {
         opacity: 1;
         transform: scale(1) translateY(0);
     }
+
     100% {
         opacity: 0;
         transform: scale(0.8) translateY(-10px);
