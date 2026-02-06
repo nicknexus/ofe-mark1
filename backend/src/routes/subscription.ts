@@ -197,6 +197,7 @@ router.post('/create-checkout-session', authenticateUser, async (req: Authentica
             res.status(503).json({ error: 'Payment system not configured' });
             return;
         }
+        const stripeClient = stripe;
 
         const userId = req.user!.id;
         const userEmail = req.user!.email;
@@ -208,48 +209,59 @@ router.post('/create-checkout-session', authenticateUser, async (req: Authentica
         
         // Create Stripe customer if doesn't exist
         if (!customerId) {
-            const customer = await stripe.customers.create({
+            const customer = await stripeClient.customers.create({
                 email: userEmail,
                 metadata: {
                     user_id: userId,
                 }
             });
             customerId = customer.id;
-            
-            // Save customer ID
             await supabase
                 .from('subscriptions')
                 .update({ stripe_customer_id: customerId })
                 .eq('user_id', userId);
         }
 
-        // Create checkout session
-        const session = await stripe.checkout.sessions.create({
-            customer: customerId,
-            payment_method_types: ['card'],
-            line_items: [
-                {
-                    price: STRIPE_CONFIG.STARTER_PRICE_ID,
-                    quantity: 1,
-                },
-            ],
-            mode: 'subscription',
-            success_url: `${STRIPE_CONFIG.SUCCESS_URL}?checkout=success`,
-            cancel_url: `${STRIPE_CONFIG.CANCEL_URL}?checkout=cancelled`,
-            metadata: {
-                user_id: userId,
-            },
-            subscription_data: {
-                metadata: {
-                    user_id: userId,
-                }
-            }
-        });
+        const createSession = () =>
+            stripeClient.checkout.sessions.create({
+                customer: customerId,
+                payment_method_types: ['card'],
+                billing_address_collection: 'required',
+                automatic_tax: { enabled: true },
+                customer_update: { address: 'auto' },
+                line_items: [
+                    { price: STRIPE_CONFIG.STARTER_PRICE_ID, quantity: 1 },
+                ],
+                mode: 'subscription',
+                success_url: `${STRIPE_CONFIG.SUCCESS_URL}?checkout=success`,
+                cancel_url: `${STRIPE_CONFIG.CANCEL_URL}?checkout=cancelled`,
+                metadata: { user_id: userId },
+                subscription_data: { metadata: { user_id: userId } },
+            });
 
-        res.json({ 
-            sessionId: session.id,
-            url: session.url 
-        });
+        let session;
+        try {
+            session = await createSession();
+        } catch (err: unknown) {
+            const stripeErr = err as { code?: string; param?: string };
+            // Stale customer ID (e.g. live id in test mode, or deleted in Stripe)
+            if (stripeErr.code === 'resource_missing' && stripeErr.param === 'customer') {
+                const customer = await stripeClient.customers.create({
+                    email: userEmail,
+                    metadata: { user_id: userId },
+                });
+                customerId = customer.id;
+                await supabase
+                    .from('subscriptions')
+                    .update({ stripe_customer_id: customerId })
+                    .eq('user_id', userId);
+                session = await createSession();
+            } else {
+                throw err;
+            }
+        }
+
+        res.json({ sessionId: session.id, url: session.url });
     } catch (error) {
         console.error('Error creating checkout session:', error);
         res.status(500).json({ error: (error as Error).message });
