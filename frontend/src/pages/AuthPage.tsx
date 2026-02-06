@@ -99,181 +99,179 @@ export default function AuthPage() {
         }))
     }
 
+    const brandColor = '#c0dfa1'
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-primary-50 to-white flex items-center justify-center px-4 py-8">
-            <div className="max-w-md w-full space-y-6 sm:space-y-8">
-                {/* Header */}
-                <div className="text-center">
-                    <div className="flex justify-center">
-                        <img 
-                            src="/Nexuslogo.png" 
-                            alt="Nexus Logo" 
-                            className="h-16 sm:h-20 w-auto"
-                        />
-                    </div>
-                    <h1 className="mt-4 sm:mt-6 text-2xl sm:text-3xl font-bold text-gray-900">
-                        Nexus Impacts AI
-                    </h1>
-                    <p className="mt-2 text-sm text-gray-600 px-2">
-                        AI-powered impact tracking for nonprofits
-                    </p>
-                </div>
-
-                {/* Form */}
-                <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 space-y-4 sm:space-y-6">
-                    {/* Tab Buttons */}
-                    <div className="grid grid-cols-2 gap-1 p-1 bg-gray-100 rounded-lg">
-                        <button
-                            onClick={() => setIsSignUp(false)}
-                            className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${!isSignUp
-                                ? 'bg-white text-gray-900 shadow-sm'
-                                : 'text-gray-600 hover:text-gray-900'}`}
-                        >
-                            Sign In
-                        </button>
-                        <button
-                            onClick={() => setIsSignUp(true)}
-                            className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${isSignUp
-                                ? 'bg-white text-gray-900 shadow-sm'
-                                : 'text-gray-600 hover:text-gray-900'}`}
-                        >
-                            Sign Up
-                        </button>
+        <div className="min-h-screen font-figtree relative">
+            <div
+                className="fixed inset-0 pointer-events-none"
+                style={{
+                    background: `
+                        radial-gradient(ellipse 80% 50% at 20% 40%, ${brandColor}90, transparent 60%),
+                        radial-gradient(ellipse 60% 80% at 80% 20%, ${brandColor}70, transparent 55%),
+                        radial-gradient(ellipse 50% 60% at 60% 80%, ${brandColor}60, transparent 55%),
+                        linear-gradient(180deg, white 0%, #fafafa 100%)
+                    `
+                }}
+            />
+            <div className="relative z-10 flex items-center justify-center px-4 py-8 min-h-screen">
+                <div className="max-w-md w-full space-y-6 sm:space-y-8">
+                    {/* Header - public style */}
+                    <div className="text-center">
+                        <div className="flex justify-center items-center gap-2 mb-4">
+                            <div className="w-10 h-10 rounded-lg overflow-hidden">
+                                <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                            </div>
+                            <span className="text-xl font-newsreader font-extralight text-foreground">Nexus Impacts</span>
+                        </div>
+                        <h1 className="text-2xl sm:text-3xl font-semibold text-foreground">
+                            Nexus Impacts AI
+                        </h1>
+                        <p className="mt-2 text-sm text-muted-foreground px-2">
+                            AI-powered impact tracking for nonprofits
+                        </p>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        {isSignUp && (
+                    {/* Form - glass card */}
+                    <div className="glass-card p-6 sm:p-8 space-y-4 sm:space-y-6">
+                        <div className="grid grid-cols-2 gap-1 p-1 bg-white/40 rounded-xl border border-white/60">
+                            <button
+                                type="button"
+                                onClick={() => setIsSignUp(false)}
+                                className={`px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${!isSignUp
+                                    ? 'bg-primary-500 text-gray-800 shadow-sm'
+                                    : 'text-gray-600 hover:text-foreground'}`}
+                            >
+                                Sign In
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsSignUp(true)}
+                                className={`px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${isSignUp
+                                    ? 'bg-primary-500 text-gray-800 shadow-sm'
+                                    : 'text-gray-600 hover:text-foreground'}`}
+                            >
+                                Sign Up
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            {isSignUp && (
+                                <div>
+                                    <label className="block text-sm font-medium text-foreground mb-1">Full Name</label>
+                                    <input
+                                        type="text"
+                                        name="name"
+                                        value={formData.name}
+                                        onChange={handleInputChange}
+                                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-white/80 text-sm"
+                                        placeholder="Enter your full name"
+                                        required
+                                    />
+                                </div>
+                            )}
+
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Full Name
-                                </label>
+                                <label className="block text-sm font-medium text-foreground mb-1">Email</label>
                                 <input
-                                    type="text"
-                                    name="name"
-                                    value={formData.name}
+                                    type="email"
+                                    name="email"
+                                    value={formData.email}
                                     onChange={handleInputChange}
-                                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
-                                    placeholder="Enter your full name"
+                                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-white/80 text-sm"
+                                    placeholder="Enter your email"
                                     required
                                 />
                             </div>
-                        )}
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Email
-                            </label>
-                            <input
-                                type="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleInputChange}
-                                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
-                                placeholder="Enter your email"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Password
-                            </label>
-                            <input
-                                type="password"
-                                name="password"
-                                value={formData.password}
-                                onChange={handleInputChange}
-                                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
-                                placeholder="Enter your password"
-                                required
-                            />
-                        </div>
-
-                        {isSignUp && (
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Confirm Password
-                                </label>
+                                <label className="block text-sm font-medium text-foreground mb-1">Password</label>
                                 <input
                                     type="password"
-                                    name="confirmPassword"
-                                    value={formData.confirmPassword}
+                                    name="password"
+                                    value={formData.password}
                                     onChange={handleInputChange}
-                                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
-                                    placeholder="Confirm your password"
+                                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-white/80 text-sm"
+                                    placeholder="Enter your password"
                                     required
                                 />
                             </div>
-                        )}
 
-                        {isSignUp && !isFromInvite && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Organization Name <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    name="organization"
-                                    value={formData.organization}
-                                    onChange={handleInputChange}
-                                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
-                                    placeholder="Your organization name"
-                                    required
-                                />
-                                <p className="mt-1 text-xs text-gray-500">
-                                    This will be your organization's public page name
+                            {isSignUp && (
+                                <div>
+                                    <label className="block text-sm font-medium text-foreground mb-1">Confirm Password</label>
+                                    <input
+                                        type="password"
+                                        name="confirmPassword"
+                                        value={formData.confirmPassword}
+                                        onChange={handleInputChange}
+                                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-white/80 text-sm"
+                                        placeholder="Confirm your password"
+                                        required
+                                    />
+                                </div>
+                            )}
+
+                            {isSignUp && !isFromInvite && (
+                                <div>
+                                    <label className="block text-sm font-medium text-foreground mb-1">
+                                        Organization Name <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="organization"
+                                        value={formData.organization}
+                                        onChange={handleInputChange}
+                                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-white/80 text-sm"
+                                        placeholder="Your organization name"
+                                        required
+                                    />
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        This will be your organization's public page name
+                                    </p>
+                                </div>
+                            )}
+
+                            {isSignUp && isFromInvite && (
+                                <div className="p-3 bg-primary-500/15 rounded-xl border border-primary-500/30">
+                                    <p className="text-sm text-foreground">
+                                        <strong>Signing up to join a team</strong><br />
+                                        <span className="text-muted-foreground">You'll be added to the organization that invited you. You can create your own organization later from Account Settings if needed.</span>
+                                    </p>
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full bg-primary-500 text-gray-800 py-2.5 px-4 rounded-xl hover:bg-primary-600 focus:ring-2 focus:ring-primary-500/30 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm"
+                            >
+                                {loading ? 'Please wait...' : (isSignUp ? 'Create Account' : 'Sign In')}
+                            </button>
+                        </form>
+
+                        <div className="text-center text-xs sm:text-sm text-muted-foreground px-2">
+                            {isSignUp ? (
+                                <p>
+                                    Already have an account?{' '}
+                                    <button type="button" onClick={() => setIsSignUp(false)} className="text-primary-500 hover:text-primary-600 font-medium">
+                                        Sign in
+                                    </button>
                                 </p>
-                            </div>
-                        )}
-
-                        {isSignUp && isFromInvite && (
-                            <div className="p-3 bg-primary-50 rounded-lg border border-primary-100">
-                                <p className="text-sm text-primary-700">
-                                    <strong>Signing up to join a team</strong><br />
-                                    <span className="text-primary-600">You'll be added to the organization that invited you. You can create your own organization later from Account Settings if needed.</span>
+                            ) : (
+                                <p>
+                                    Don't have an account?{' '}
+                                    <button type="button" onClick={() => setIsSignUp(true)} className="text-primary-500 hover:text-primary-600 font-medium">
+                                        Sign up
+                                    </button>
                                 </p>
-                            </div>
-                        )}
-
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full bg-primary-500 text-white py-2.5 px-4 rounded-lg hover:bg-primary-600 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm"
-                        >
-                            {loading ? 'Please wait...' : (isSignUp ? 'Create Account' : 'Sign In')}
-                        </button>
-                    </form>
-
-                    <div className="text-center text-xs sm:text-sm text-gray-600 px-2">
-                        {isSignUp ? (
-                            <p>
-                                Already have an account?{' '}
-                                <button
-                                    onClick={() => setIsSignUp(false)}
-                                    className="text-primary-500 hover:text-primary-700 font-medium"
-                                >
-                                    Sign in
-                                </button>
-                            </p>
-                        ) : (
-                            <p>
-                                Don't have an account?{' '}
-                                <button
-                                    onClick={() => setIsSignUp(true)}
-                                    className="text-primary-500 hover:text-primary-700 font-medium"
-                                >
-                                    Sign up
-                                </button>
-                            </p>
-                        )}
+                            )}
+                        </div>
                     </div>
-                </div>
 
-                {/* Footer */}
-                <div className="text-center text-xs text-gray-500 px-4">
-                    <p>
-                        Secure authentication powered by Supabase
-                    </p>
+                    <div className="text-center text-xs text-muted-foreground px-4">
+                        <p>Secure authentication powered by Supabase</p>
+                    </div>
                 </div>
             </div>
         </div>

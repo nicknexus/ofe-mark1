@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { AlertCircle, CreditCard, LogOut, Clock, ArrowRight, Users, Mail } from 'lucide-react'
+import { AlertCircle, CreditCard, LogOut, Clock, ArrowRight, Users, Mail, Ticket } from 'lucide-react'
 import { AuthService } from '../services/auth'
 import { SubscriptionService } from '../services/subscription'
 import { TeamService } from '../services/team'
@@ -14,6 +14,9 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
     const [subscribing, setSubscribing] = useState(false)
     const [isSharedMember, setIsSharedMember] = useState(false)
     const [checkingPermissions, setCheckingPermissions] = useState(true)
+    const [showAccessCode, setShowAccessCode] = useState(false)
+    const [accessCode, setAccessCode] = useState('')
+    const [redeemingCode, setRedeemingCode] = useState(false)
 
     useEffect(() => {
         const checkPermissions = async () => {
@@ -47,6 +50,24 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
             toast.error(error instanceof Error ? error.message : 'Failed to start checkout')
         } finally {
             setSubscribing(false)
+        }
+    }
+
+    const handleRedeemCode = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!accessCode.trim()) {
+            toast.error('Please enter an access code')
+            return
+        }
+        setRedeemingCode(true)
+        try {
+            await SubscriptionService.redeemCode(accessCode.trim())
+            toast.success('Access code redeemed! Reloading...')
+            window.location.reload()
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Invalid access code')
+        } finally {
+            setRedeemingCode(false)
         }
     }
 
@@ -94,12 +115,21 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
         }
     }
 
+    const brandColor = '#c0dfa1'
+
     if (checkingPermissions) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading...</p>
+            <div className="min-h-screen font-figtree bg-background flex items-center justify-center px-4">
+                <div className="glass-card p-12 rounded-3xl text-center max-w-md">
+                    <div className="w-12 h-12 mb-4 mx-auto">
+                        <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                    </div>
+                    <div className="flex items-center justify-center gap-1.5 mb-3">
+                        <div className="w-2 h-2 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '0ms', animationDuration: '600ms' }} />
+                        <div className="w-2 h-2 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '150ms', animationDuration: '600ms' }} />
+                        <div className="w-2 h-2 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '300ms', animationDuration: '600ms' }} />
+                    </div>
+                    <p className="text-muted-foreground text-sm font-medium">Loading...</p>
                 </div>
             </div>
         )
@@ -108,129 +138,174 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
     const { title, subtitle, icon: Icon } = getMessage()
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex items-center justify-center px-4 py-8">
-            <div className="max-w-lg w-full">
-                {/* Logo */}
-                <div className="text-center mb-8">
-                    <div className="flex justify-center mb-4">
-                        <img 
-                            src="/Nexuslogo.png" 
-                            alt="Nexus Impacts AI" 
-                            className="h-20 w-auto opacity-50"
-                        />
+        <div className="min-h-screen font-figtree relative">
+            {/* Flowing gradient background - same as public initiative page */}
+            <div
+                className="fixed inset-0 pointer-events-none"
+                style={{
+                    background: `
+                        radial-gradient(ellipse 80% 50% at 20% 40%, ${brandColor}90, transparent 60%),
+                        radial-gradient(ellipse 60% 80% at 80% 20%, ${brandColor}70, transparent 55%),
+                        radial-gradient(ellipse 50% 60% at 60% 80%, ${brandColor}60, transparent 55%),
+                        linear-gradient(180deg, white 0%, #fafafa 100%)
+                    `
+                }}
+            />
+            <div className="relative z-10 flex items-center justify-center px-4 py-8 min-h-screen">
+                <div className="max-w-lg w-full">
+                    {/* Logo - public style */}
+                    <div className="text-center mb-8">
+                        <div className="flex justify-center items-center gap-2 mb-4">
+                            <div className="w-10 h-10 rounded-lg overflow-hidden">
+                                <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                            </div>
+                            <span className="text-xl font-newsreader font-extralight text-foreground">Nexus Impacts</span>
+                        </div>
                     </div>
-                </div>
 
-                {/* Main Card */}
-                <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
-                    <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-amber-200 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <Icon className="w-8 h-8 text-amber-600" />
-                    </div>
+                    {/* Main Card - glass style */}
+                    <div className="glass-card p-8 text-center">
+                        <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 border border-primary-500/40 shadow-md bg-primary-500/30">
+                            <Icon className="w-8 h-8 text-gray-800" />
+                        </div>
 
-                    <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                        {title}
-                    </h1>
+                        <h1 className="text-2xl font-semibold text-foreground mb-2">
+                            {title}
+                        </h1>
 
-                    <p className="text-gray-600 mb-8">
-                        {subtitle}
-                    </p>
+                        <p className="text-muted-foreground mb-8">
+                            {subtitle}
+                        </p>
 
-                    {/* Content varies based on whether user is shared member or owner */}
-                    {isSharedMember ? (
-                        <>
-                            {/* Shared member - contact owner message */}
-                            <div className="bg-purple-50 rounded-xl p-5 mb-6 text-left">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <Mail className="w-5 h-5 text-purple-600" />
-                                    <h3 className="font-medium text-purple-800">Contact Your Organization Owner</h3>
+                        {isSharedMember ? (
+                            <>
+                                <div className="bg-white/40 backdrop-blur rounded-xl border border-white/60 p-5 mb-6 text-left">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <Mail className="w-5 h-5 text-purple-600" />
+                                        <h3 className="font-medium text-foreground">Contact Your Organization Owner</h3>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">
+                                        Your access is managed by your organization owner. Please contact them to restore access to the organization's data.
+                                    </p>
                                 </div>
-                                <p className="text-sm text-purple-700">
-                                    Your access is managed by your organization owner. Please contact them to restore access to the organization's data.
+
+                                <div className="space-y-3">
+                                    <button
+                                        onClick={handleSignOut}
+                                        className="w-full bg-primary-500 text-gray-800 py-3 px-6 rounded-xl hover:bg-primary-600 transition-all font-medium flex items-center justify-center gap-2"
+                                    >
+                                        <LogOut className="w-5 h-5" />
+                                        Sign Out
+                                    </button>
+                                </div>
+
+                                <p className="mt-6 text-xs text-muted-foreground">
+                                    Once your organization owner renews their subscription, you'll automatically regain access.
                                 </p>
-                            </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="bg-white/40 backdrop-blur rounded-xl border border-white/60 p-5 mb-6 text-left">
+                                    <h3 className="font-medium text-foreground mb-3">Starter Plan - $2/day (billed $56 every 4 weeks)</h3>
+                                    <ul className="space-y-2 text-sm text-muted-foreground">
+                                        <li className="flex items-center gap-2">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
+                                            2 initiatives included
+                                        </li>
+                                        <li className="flex items-center gap-2">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
+                                            Full KPI tracking & analytics
+                                        </li>
+                                        <li className="flex items-center gap-2">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
+                                            Evidence management
+                                        </li>
+                                        <li className="flex items-center gap-2">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
+                                            Public impact reports
+                                        </li>
+                                    </ul>
+                                </div>
 
-                            {/* Action Buttons for shared member */}
-                            <div className="space-y-3">
-                                <button
-                                    onClick={handleSignOut}
-                                    className="w-full bg-gray-100 text-gray-700 py-3 px-6 rounded-xl hover:bg-gray-200 transition-all font-medium flex items-center justify-center gap-2"
-                                >
-                                    <LogOut className="w-5 h-5" />
-                                    Sign Out
-                                </button>
-                            </div>
+                                <div className="space-y-3">
+                                    <button
+                                        onClick={handleSubscribe}
+                                        disabled={subscribing}
+                                        className="w-full bg-primary-500 text-gray-800 py-3.5 px-6 rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium flex items-center justify-center gap-2"
+                                    >
+                                        {subscribing ? (
+                                            <>
+                                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                Loading...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CreditCard className="w-5 h-5" />
+                                                Subscribe Now - $2/day
+                                                <ArrowRight className="w-5 h-5" />
+                                            </>
+                                        )}
+                                    </button>
 
-                            {/* Help text for shared member */}
-                            <p className="mt-6 text-xs text-gray-500">
-                                Once your organization owner renews their subscription, you'll automatically regain access.
-                            </p>
-                        </>
-                    ) : (
-                        <>
-                            {/* Owner - show subscription options */}
-                            <div className="bg-gray-50 rounded-xl p-5 mb-6 text-left">
-                                <h3 className="font-medium text-gray-700 mb-3">Starter Plan - $2/day (billed $56 every 4 weeks)</h3>
-                                <ul className="space-y-2 text-sm text-gray-600">
-                                    <li className="flex items-center gap-2">
-                                        <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
-                                        2 initiatives included
-                                    </li>
-                                    <li className="flex items-center gap-2">
-                                        <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
-                                        Full KPI tracking & analytics
-                                    </li>
-                                    <li className="flex items-center gap-2">
-                                        <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
-                                        Evidence management
-                                    </li>
-                                    <li className="flex items-center gap-2">
-                                        <span className="w-1.5 h-1.5 bg-primary-500 rounded-full" />
-                                        Public impact reports
-                                    </li>
-                                </ul>
-                            </div>
+                                    <button
+                                        onClick={handleSignOut}
+                                        className="w-full bg-white/60 text-foreground py-3 px-6 rounded-xl border border-primary-500/30 hover:bg-primary-500/15 hover:border-primary-500/40 transition-all font-medium flex items-center justify-center gap-2"
+                                    >
+                                        <LogOut className="w-5 h-5" />
+                                        Sign Out
+                                    </button>
+                                </div>
 
-                            {/* Action Buttons for owner */}
-                            <div className="space-y-3">
-                                <button
-                                    onClick={handleSubscribe}
-                                    disabled={subscribing}
-                                    className="w-full bg-primary-500 text-white py-3.5 px-6 rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium flex items-center justify-center gap-2 shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40"
-                                >
-                                    {subscribing ? (
-                                        <>
-                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                            Loading...
-                                        </>
+                                <div className="mt-6 bg-white/40 backdrop-blur rounded-xl border border-white/60 p-4 text-center">
+                                    {!showAccessCode ? (
+                                        <button
+                                            onClick={() => setShowAccessCode(true)}
+                                            className="text-sm text-primary-600 hover:text-primary-700 transition-colors flex items-center gap-1.5 mx-auto font-medium"
+                                        >
+                                            <Ticket className="w-4 h-4" />
+                                            Have an access code?
+                                        </button>
                                     ) : (
-                                        <>
-                                            <CreditCard className="w-5 h-5" />
-                                            Subscribe Now - $2/day
-                                            <ArrowRight className="w-5 h-5" />
-                                        </>
+                                        <form onSubmit={handleRedeemCode} className="space-y-3 max-w-md mx-auto">
+                                            <div className="text-sm font-medium text-foreground text-left">Enter access code</div>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={accessCode}
+                                                    onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
+                                                    placeholder="ENTER CODE"
+                                                    className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 focus:outline-none uppercase tracking-wider font-mono bg-white/80"
+                                                    disabled={redeemingCode}
+                                                />
+                                                <button
+                                                    type="submit"
+                                                    disabled={redeemingCode || !accessCode.trim()}
+                                                    className="px-4 py-2.5 bg-primary-500 text-gray-800 rounded-xl text-sm font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                >
+                                                    {redeemingCode ? 'Redeeming...' : 'Redeem'}
+                                                </button>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setShowAccessCode(false); setAccessCode('') }}
+                                                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </form>
                                     )}
-                                </button>
+                                </div>
 
-                                <button
-                                    onClick={handleSignOut}
-                                    className="w-full bg-gray-100 text-gray-700 py-3 px-6 rounded-xl hover:bg-gray-200 transition-all font-medium flex items-center justify-center gap-2"
-                                >
-                                    <LogOut className="w-5 h-5" />
-                                    Sign Out
-                                </button>
-                            </div>
+                                <p className="mt-6 text-xs text-muted-foreground">
+                                    Your data is safely stored. Subscribe anytime to pick up where you left off.
+                                </p>
+                            </>
+                        )}
+                    </div>
 
-                            {/* Help text for owner */}
-                            <p className="mt-6 text-xs text-gray-500">
-                                Your data is safely stored. Subscribe anytime to pick up where you left off.
-                            </p>
-                        </>
-                    )}
-                </div>
-
-                {/* Footer */}
-                <div className="text-center mt-6 text-xs text-gray-500">
-                    <p>Need help? Contact support@nexusimpacts.com</p>
+                    <div className="text-center mt-6 text-xs text-muted-foreground">
+                        <p>Need help? Contact support@nexusimpacts.com</p>
+                    </div>
                 </div>
             </div>
         </div>

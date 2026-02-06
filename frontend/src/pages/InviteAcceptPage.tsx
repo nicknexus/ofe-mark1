@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { 
-    Users, CheckCircle, XCircle, Clock, AlertCircle, 
-    LogIn, UserPlus, ArrowRight, FileText
+    Users, CheckCircle, XCircle, Clock, 
+    LogIn, UserPlus
 } from 'lucide-react'
 import { TeamService, InviteDetails } from '../services/team'
 import { AuthService } from '../services/auth'
@@ -132,35 +132,69 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
         setAccepting(false)
     }
 
+    const brandColor = '#c0dfa1'
+
+    const pageWrapper = (children: React.ReactNode) => (
+        <div className="min-h-screen font-figtree relative">
+            <div
+                className="fixed inset-0 pointer-events-none"
+                style={{
+                    background: `
+                        radial-gradient(ellipse 80% 50% at 20% 40%, ${brandColor}90, transparent 60%),
+                        radial-gradient(ellipse 60% 80% at 80% 20%, ${brandColor}70, transparent 55%),
+                        radial-gradient(ellipse 50% 60% at 60% 80%, ${brandColor}60, transparent 55%),
+                        linear-gradient(180deg, white 0%, #fafafa 100%)
+                    `
+                }}
+            />
+            <div className="relative z-10 flex items-center justify-center p-4 min-h-screen">
+                {children}
+            </div>
+        </div>
+    )
+
+    const logoHeader = () => (
+        <div className="text-center mb-6">
+            <div className="flex justify-center items-center gap-2 mb-4">
+                <div className="w-10 h-10 rounded-lg overflow-hidden">
+                    <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                </div>
+                <span className="text-xl font-newsreader font-extralight text-foreground">Nexus Impacts</span>
+            </div>
+        </div>
+    )
+
     // Loading state
     if (loading || checkingUser) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-purple-50">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading invitation...</p>
+        return pageWrapper(
+            <div className="glass-card p-12 rounded-3xl text-center max-w-md w-full">
+                {logoHeader()}
+                <div className="flex items-center justify-center gap-1.5 mb-3">
+                    <div className="w-2 h-2 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '0ms', animationDuration: '600ms' }} />
+                    <div className="w-2 h-2 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '150ms', animationDuration: '600ms' }} />
+                    <div className="w-2 h-2 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '300ms', animationDuration: '600ms' }} />
                 </div>
+                <p className="text-muted-foreground text-sm font-medium">Loading invitation...</p>
             </div>
         )
     }
 
     // Error state
     if (error || !invite) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50 p-4">
-                <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <XCircle className="w-8 h-8 text-red-500" />
-                    </div>
-                    <h1 className="text-2xl font-bold text-gray-900 mb-2">Invalid Invitation</h1>
-                    <p className="text-gray-600 mb-6">{error || 'This invitation link is not valid.'}</p>
-                    <Link
-                        to="/"
-                        className="inline-flex items-center gap-2 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors"
-                    >
-                        Go to Homepage
-                    </Link>
+        return pageWrapper(
+            <div className="glass-card p-8 max-w-md w-full text-center">
+                {logoHeader()}
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <XCircle className="w-8 h-8 text-red-500" />
                 </div>
+                <h1 className="text-2xl font-semibold text-foreground mb-2">Invalid Invitation</h1>
+                <p className="text-muted-foreground mb-6">{error || 'This invitation link is not valid.'}</p>
+                <Link
+                    to="/"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-gray-800 font-medium rounded-xl transition-colors"
+                >
+                    Go to Homepage
+                </Link>
             </div>
         )
     }
@@ -171,162 +205,152 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
         const isRevoked = invite.status === 'revoked'
         const isAccepted = invite.status === 'accepted'
 
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-slate-100 p-4">
-                <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
-                        isAccepted ? 'bg-green-100' : 'bg-amber-100'
-                    }`}>
-                        {isAccepted ? (
-                            <CheckCircle className="w-8 h-8 text-green-500" />
-                        ) : isExpired ? (
-                            <Clock className="w-8 h-8 text-amber-500" />
-                        ) : (
-                            <XCircle className="w-8 h-8 text-amber-500" />
-                        )}
-                    </div>
-                    <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                        {isAccepted ? 'Already Accepted' : isExpired ? 'Invitation Expired' : 'Invitation Revoked'}
-                    </h1>
-                    <p className="text-gray-600 mb-6">
-                        {isAccepted 
-                            ? 'This invitation has already been accepted. You can log in to access the organization.'
-                            : isExpired 
-                                ? 'This invitation has expired. Please contact the organization owner for a new invitation.'
-                                : 'This invitation has been revoked by the organization owner.'}
-                    </p>
-                    <Link
-                        to="/login"
-                        className="inline-flex items-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-xl transition-colors"
-                    >
-                        <LogIn className="w-4 h-4" />
-                        Go to Login
-                    </Link>
+        return pageWrapper(
+            <div className="glass-card p-8 max-w-md w-full text-center">
+                {logoHeader()}
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${isAccepted ? 'bg-primary-500/30' : 'bg-amber-100'}`}>
+                    {isAccepted ? (
+                        <CheckCircle className="w-8 h-8 text-primary-500" />
+                    ) : isExpired ? (
+                        <Clock className="w-8 h-8 text-amber-500" />
+                    ) : (
+                        <XCircle className="w-8 h-8 text-amber-500" />
+                    )}
                 </div>
+                <h1 className="text-2xl font-semibold text-foreground mb-2">
+                    {isAccepted ? 'Already Accepted' : isExpired ? 'Invitation Expired' : 'Invitation Revoked'}
+                </h1>
+                <p className="text-muted-foreground mb-6">
+                    {isAccepted
+                        ? 'This invitation has already been accepted. You can log in to access the organization.'
+                        : isExpired
+                            ? 'This invitation has expired. Please contact the organization owner for a new invitation.'
+                            : 'This invitation has been revoked by the organization owner.'}
+                </p>
+                <Link
+                    to="/login"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-gray-800 font-medium rounded-xl transition-colors"
+                >
+                    <LogIn className="w-4 h-4" />
+                    Go to Login
+                </Link>
             </div>
         )
     }
 
     // Valid pending invitation
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-purple-50 p-4">
-            <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
-                {/* Header */}
-                <div className="text-center mb-6">
-                    <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Users className="w-8 h-8 text-primary-600" />
+    return pageWrapper(
+        <div className="glass-card p-8 max-w-md w-full">
+            {logoHeader()}
+            <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-primary-500/30 rounded-full flex items-center justify-center mx-auto mb-4 border border-primary-500/40">
+                    <Users className="w-8 h-8 text-primary-500" />
+                </div>
+                <h1 className="text-2xl font-semibold text-foreground mb-2">You're Invited!</h1>
+                <p className="text-muted-foreground">
+                    {invite.inviter_name || invite.inviter_email} has invited you to join
+                </p>
+            </div>
+
+            <div className="bg-white/40 backdrop-blur rounded-xl border border-white/60 p-4 mb-6">
+                <h2 className="text-lg font-semibold text-foreground text-center">
+                    {invite.organization_name}
+                </h2>
+            </div>
+
+            <div className="space-y-3 mb-6">
+                <h3 className="text-sm font-medium text-foreground">What you'll be able to do:</h3>
+                <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <CheckCircle className="w-4 h-4 text-primary-500 flex-shrink-0" />
+                        <span>View all initiatives, KPIs, and evidence</span>
                     </div>
-                    <h1 className="text-2xl font-bold text-gray-900 mb-2">You're Invited!</h1>
-                    <p className="text-gray-600">
-                        {invite.inviter_name || invite.inviter_email} has invited you to join
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <CheckCircle className="w-4 h-4 text-primary-500 flex-shrink-0" />
+                        <span>Create and edit data</span>
+                    </div>
+                    {invite.can_add_impact_claims ? (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <CheckCircle className="w-4 h-4 text-primary-500 flex-shrink-0" />
+                            <span>Create Impact Claims (stories)</span>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 text-sm text-gray-400">
+                            <XCircle className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                            <span>Impact Claims (not enabled for this invite)</span>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-white/40 rounded-xl p-3 mb-6 border border-white/60">
+                <Clock className="w-4 h-4 flex-shrink-0" />
+                <span>
+                    This invitation expires on {new Date(invite.expires_at).toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric'
+                    })}
+                </span>
+            </div>
+
+            {user ? (
+                <div className="space-y-3">
+                    <div className="text-center text-sm text-muted-foreground mb-2">
+                        Logged in as <strong className="text-foreground">{user.email}</strong>
+                    </div>
+                    <button
+                        onClick={handleAccept}
+                        disabled={accepting}
+                        className="w-full px-6 py-3 bg-primary-500 hover:bg-primary-600 text-gray-800 font-medium rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                        {accepting ? (
+                            <>
+                                <div className="w-4 h-4 border-2 border-gray-800 border-t-transparent rounded-full animate-spin" />
+                                Joining...
+                            </>
+                        ) : (
+                            <>
+                                <CheckCircle className="w-4 h-4" />
+                                Accept Invitation
+                            </>
+                        )}
+                    </button>
+                    <p className="text-center text-xs text-muted-foreground">
+                        Not {user.email}?{' '}
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                await AuthService.signOut()
+                                window.location.reload()
+                            }}
+                            className="text-primary-500 hover:text-primary-600 font-medium"
+                        >
+                            Sign out
+                        </button>
                     </p>
                 </div>
-
-                {/* Organization Info */}
-                <div className="bg-gradient-to-r from-primary-50 to-purple-50 rounded-xl p-4 mb-6">
-                    <h2 className="text-lg font-semibold text-gray-900 text-center">
-                        {invite.organization_name}
-                    </h2>
-                </div>
-
-                {/* Permissions Info */}
-                <div className="space-y-3 mb-6">
-                    <h3 className="text-sm font-medium text-gray-700">What you'll be able to do:</h3>
-                    <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                            <span>View all initiatives, KPIs, and evidence</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                            <span>Create and edit data</span>
-                        </div>
-                        {invite.can_add_impact_claims ? (
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                                <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                                <span>Create Impact Claims (stories)</span>
-                            </div>
-                        ) : (
-                            <div className="flex items-center gap-2 text-sm text-gray-400">
-                                <XCircle className="w-4 h-4 text-gray-300 flex-shrink-0" />
-                                <span>Impact Claims (not enabled for this invite)</span>
-                            </div>
-                        )}
+            ) : (
+                <div className="space-y-3">
+                    <Link
+                        to={`/login?redirect=${encodeURIComponent(`/invite/${token}`)}`}
+                        className="w-full px-6 py-3 bg-primary-500 hover:bg-primary-600 text-gray-800 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                    >
+                        <LogIn className="w-4 h-4" />
+                        Log In to Accept
+                    </Link>
+                    <div className="text-center text-sm text-muted-foreground">
+                        Don't have an account?
                     </div>
+                    <Link
+                        to={`/login?signup=true&redirect=${encodeURIComponent(`/invite/${token}`)}`}
+                        className="w-full px-6 py-3 bg-white/60 hover:bg-white/80 text-foreground font-medium rounded-xl border border-white/80 transition-colors flex items-center justify-center gap-2"
+                    >
+                        <UserPlus className="w-4 h-4" />
+                        Sign Up to Accept
+                    </Link>
                 </div>
-
-                {/* Expiry Notice */}
-                <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 p-3 rounded-lg mb-6">
-                    <Clock className="w-4 h-4 flex-shrink-0" />
-                    <span>
-                        This invitation expires on {new Date(invite.expires_at).toLocaleDateString('en-US', {
-                            month: 'long',
-                            day: 'numeric',
-                            year: 'numeric'
-                        })}
-                    </span>
-                </div>
-
-                {/* Action Buttons */}
-                {user ? (
-                    // User is logged in - show accept button
-                    <div className="space-y-3">
-                        <div className="text-center text-sm text-gray-600 mb-2">
-                            Logged in as <strong>{user.email}</strong>
-                        </div>
-                        <button
-                            onClick={handleAccept}
-                            disabled={accepting}
-                            className="w-full px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                        >
-                            {accepting ? (
-                                <>
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                    Joining...
-                                </>
-                            ) : (
-                                <>
-                                    <CheckCircle className="w-4 h-4" />
-                                    Accept Invitation
-                                </>
-                            )}
-                        </button>
-                        <p className="text-center text-xs text-gray-500">
-                            Not {user.email}?{' '}
-                            <button 
-                                onClick={async () => {
-                                    await AuthService.signOut()
-                                    window.location.reload()
-                                }}
-                                className="text-primary-600 hover:underline"
-                            >
-                                Sign out
-                            </button>
-                        </p>
-                    </div>
-                ) : (
-                    // User not logged in - show login/signup options
-                    <div className="space-y-3">
-                        <Link
-                            to={`/login?redirect=${encodeURIComponent(`/invite/${token}`)}`}
-                            className="w-full px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
-                        >
-                            <LogIn className="w-4 h-4" />
-                            Log In to Accept
-                        </Link>
-                        <div className="text-center text-sm text-gray-500">
-                            Don't have an account?
-                        </div>
-                        <Link
-                            to={`/login?signup=true&redirect=${encodeURIComponent(`/invite/${token}`)}`}
-                            className="w-full px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
-                        >
-                            <UserPlus className="w-4 h-4" />
-                            Sign Up to Accept
-                        </Link>
-                    </div>
-                )}
-            </div>
+            )}
         </div>
     )
 }
