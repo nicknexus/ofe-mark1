@@ -131,7 +131,8 @@ async function syncSubscriptionFromStripe(userId: string, stripeSubscriptionId: 
             cancel_at_period_end: cancelAtPeriodEnd,
             ...(sub.current_period_start && { current_period_start: new Date(sub.current_period_start * 1000).toISOString() }),
             ...(periodEnd && { current_period_end: new Date(periodEnd * 1000).toISOString() }),
-            ...((status === 'cancelled') && { cancelled_at: new Date().toISOString() }),
+            ...(status === 'cancelled' && { cancelled_at: new Date().toISOString() }),
+            ...(status === 'active' && { cancelled_at: null }),
         });
     } catch (e) {
         console.warn('Sync from Stripe failed:', (e as Error).message);
@@ -410,6 +411,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
                         ...(periodEnd && { current_period_end: periodEnd }),
                         cancel_at_period_end: cancelAtPeriodEnd,
                         ...(status === 'cancelled' && { cancelled_at: new Date().toISOString() }),
+                        ...(status === 'active' && { cancelled_at: null }),
                     });
                     
                     console.log(`✅ Subscription updated for user ${userId}: ${status}, cancel_at_period_end=${cancelAtPeriodEnd}`);

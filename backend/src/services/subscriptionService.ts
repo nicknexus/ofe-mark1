@@ -437,7 +437,7 @@ export class SubscriptionService {
             current_period_start?: string;
             current_period_end?: string;
             cancel_at_period_end?: boolean;
-            cancelled_at?: string;
+            cancelled_at?: string | null;
         }
     ): Promise<Subscription> {
         const { data, error } = await supabase
