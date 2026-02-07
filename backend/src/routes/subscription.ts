@@ -80,8 +80,10 @@ router.post('/start-trial', authenticateUser, async (req: AuthenticatedRequest, 
 router.post('/redeem-code', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const { code } = req.body;
+        console.log('[redeem-code] body:', JSON.stringify(req.body), 'code:', code);
 
         if (!code || typeof code !== 'string') {
+            console.log('[redeem-code] 400: Access code is required');
             res.status(400).json({ error: 'Access code is required' });
             return;
         }
@@ -89,11 +91,12 @@ router.post('/redeem-code', authenticateUser, async (req: AuthenticatedRequest, 
         const result = await SubscriptionService.redeemAccessCode(req.user!.id, code);
 
         if (!result.success) {
+            console.log('[redeem-code] 400:', result.error);
             res.status(400).json({ error: result.error });
             return;
         }
 
-        const remainingTrialDays = result.subscription 
+        const remainingTrialDays = result.subscription
             ? SubscriptionService.getRemainingTrialDays(result.subscription)
             : result.daysGranted;
 
@@ -120,8 +123,8 @@ async function syncSubscriptionFromStripe(userId: string, stripeSubscriptionId: 
         const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId) as any;
         const status = sub.status === 'active' ? 'active'
             : sub.status === 'past_due' ? 'past_due'
-            : sub.status === 'canceled' || sub.status === 'unpaid' ? 'cancelled'
-            : 'active';
+                : sub.status === 'canceled' || sub.status === 'unpaid' ? 'cancelled'
+                    : 'active';
         const cancelAtPeriodEnd =
             sub.cancel_at_period_end === true ||
             (!!sub.cancel_at && sub.status === 'active');
@@ -241,9 +244,9 @@ router.post('/create-checkout-session', authenticateUser, async (req: Authentica
 
         // Get or create subscription to get/create stripe customer
         let subscription = await SubscriptionService.getOrCreate(userId);
-        
+
         let customerId = subscription.stripe_customer_id;
-        
+
         // Create Stripe customer if doesn't exist
         if (!customerId) {
             const customer = await stripeClient.customers.create({
@@ -317,9 +320,9 @@ router.post('/webhook', async (req: Request, res: Response) => {
     }
 
     const sig = req.headers['stripe-signature'] as string;
-    
+
     let event;
-    
+
     try {
         // req.body should be raw buffer for webhook verification
         event = stripe.webhooks.constructEvent(
@@ -339,20 +342,20 @@ router.post('/webhook', async (req: Request, res: Response) => {
             case 'checkout.session.completed': {
                 const session = event.data.object as any;
                 const userId = session.metadata?.user_id;
-                
+
                 if (userId && session.subscription) {
                     // Get subscription details from Stripe
                     const stripeSubscription = await stripe.subscriptions.retrieve(
                         session.subscription as string
                     ) as any;
-                    
-                    const periodStart = stripeSubscription.current_period_start 
+
+                    const periodStart = stripeSubscription.current_period_start
                         ? new Date(stripeSubscription.current_period_start * 1000).toISOString()
                         : new Date().toISOString();
                     const periodEnd = stripeSubscription.current_period_end
                         ? new Date(stripeSubscription.current_period_end * 1000).toISOString()
                         : new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(); // 28 days from now
-                    
+
                     await SubscriptionService.updateFromStripe(userId, {
                         stripe_subscription_id: stripeSubscription.id,
                         stripe_price_id: STRIPE_CONFIG.STARTER_PRICE_ID,
@@ -368,7 +371,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
                         .from('subscriptions')
                         .update({ initiatives_limit: PLAN_LIMITS.starter.initiatives_limit })
                         .eq('user_id', userId);
-                        
+
                     console.log(`✅ Subscription activated for user ${userId}`);
                 }
                 break;
@@ -388,12 +391,12 @@ router.post('/webhook', async (req: Request, res: Response) => {
                     metadata: subscription.metadata,
                 });
                 if (userId) {
-                    const status = subscription.status === 'active' ? 'active' 
+                    const status = subscription.status === 'active' ? 'active'
                         : subscription.status === 'past_due' ? 'past_due'
-                        : subscription.status === 'canceled' ? 'cancelled'
-                        : 'active';
+                            : subscription.status === 'canceled' ? 'cancelled'
+                                : 'active';
 
-                    const periodStart = subscription.current_period_start 
+                    const periodStart = subscription.current_period_start
                         ? new Date(subscription.current_period_start * 1000).toISOString()
                         : undefined;
                     const periodEnd = (subscription.current_period_end || subscription.cancel_at)
@@ -413,7 +416,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
                         ...(status === 'cancelled' && { cancelled_at: new Date().toISOString() }),
                         ...(status === 'active' && { cancelled_at: null }),
                     });
-                    
+
                     console.log(`✅ Subscription updated for user ${userId}: ${status}, cancel_at_period_end=${cancelAtPeriodEnd}`);
                 }
                 break;
@@ -440,16 +443,16 @@ router.post('/webhook', async (req: Request, res: Response) => {
             case 'invoice.payment_failed': {
                 const invoice = event.data.object as any;
                 const subscriptionId = invoice.subscription as string;
-                
+
                 if (subscriptionId) {
                     const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId) as any;
                     const userId = stripeSubscription.metadata?.user_id;
-                    
+
                     if (userId) {
                         await SubscriptionService.updateFromStripe(userId, {
                             status: 'past_due',
                         });
-                        
+
                         console.log(`⚠️ Payment failed for user ${userId}`);
                     }
                 }
@@ -494,7 +497,7 @@ router.post('/create-portal-session', authenticateUser, async (req: Authenticate
         }
 
         const subscription = await SubscriptionService.getOrCreate(req.user!.id);
-        
+
         if (!subscription.stripe_customer_id) {
             res.status(400).json({ error: 'No billing account found' });
             return;

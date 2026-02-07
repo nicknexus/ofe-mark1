@@ -102,10 +102,16 @@ export class SubscriptionService {
         })
         
         if (!response.ok) {
-            const error = await response.json()
-            throw new Error(error.error || 'Failed to redeem access code')
+            let message = 'Failed to redeem access code'
+            try {
+                const error = await response.json()
+                if (error?.error && typeof error.error === 'string') message = error.error
+            } catch {
+                // non-JSON or empty body
+            }
+            throw new Error(message)
         }
-        
+
         return response.json()
     }
 

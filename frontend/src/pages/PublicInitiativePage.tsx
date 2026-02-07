@@ -485,16 +485,16 @@ export default function PublicInitiativePage() {
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
                                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === tab.id
-                                                ? 'bg-gray-800 text-white shadow-lg'
-                                                : 'text-gray-700 hover:bg-white/60'
+                                            ? 'bg-gray-800 text-white shadow-lg'
+                                            : 'text-gray-700 hover:bg-white/60'
                                             }`}
                                     >
                                         <tab.icon className="w-4 h-4" />
                                         <span className="flex-1 text-left">{tab.label}</span>
                                         {tab.count !== undefined && (
                                             <span className={`px-2 py-0.5 text-xs rounded-full font-semibold ${activeTab === tab.id
-                                                    ? 'bg-white/30 text-white'
-                                                    : 'bg-white/60 text-gray-600'
+                                                ? 'bg-white/30 text-white'
+                                                : 'bg-white/60 text-gray-600'
                                                 }`}>
                                                 {tab.count}
                                             </span>
@@ -513,8 +513,8 @@ export default function PublicInitiativePage() {
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
                                     className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all min-w-[52px] ${activeTab === tab.id
-                                            ? 'text-foreground'
-                                            : 'text-muted-foreground'
+                                        ? 'text-foreground'
+                                        : 'text-muted-foreground'
                                         }`}
                                 >
                                     <div className={`p-1.5 rounded-lg transition-colors ${activeTab === tab.id ? 'bg-primary-100' : ''}`}>
@@ -829,8 +829,8 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
                             <button
                                 onClick={() => setIsMetricDropdownOpen(!isMetricDropdownOpen)}
                                 className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-xl border-2 transition-all duration-200 ${visibleKPIs.size < dashboard.kpis.length
-                                        ? 'bg-accent/10 text-accent border-accent/30 hover:bg-accent/20'
-                                        : 'bg-white/60 text-gray-700 border-white/80 hover:bg-white/80'
+                                    ? 'bg-accent/10 text-accent border-accent/30 hover:bg-accent/20'
+                                    : 'bg-white/60 text-gray-700 border-white/80 hover:bg-white/80'
                                     }`}
                             >
                                 <Layers className="w-3.5 h-3.5" />
@@ -1424,8 +1424,8 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug }: { evidence: PublicEv
                     <button
                         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                         className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border-2 transition-all duration-200 shadow-sm ${selectedTypes.length > 0
-                                ? 'bg-accent/10 text-accent border-accent/30 hover:bg-accent/20'
-                                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                            ? 'bg-accent/10 text-accent border-accent/30 hover:bg-accent/20'
+                            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
                             }`}
                     >
                         <FileText className="w-4 h-4" />

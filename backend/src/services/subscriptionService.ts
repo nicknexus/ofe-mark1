@@ -305,17 +305,6 @@ export class SubscriptionService {
      * Validate and redeem an access code
      */
     static async redeemAccessCode(userId: string, code: string): Promise<{ success: boolean; subscription?: Subscription; error?: string; daysGranted?: number }> {
-        // Check if user already redeemed a code
-        const { data: existingRedemption } = await supabase
-            .from('access_code_redemptions')
-            .select('id')
-            .eq('user_id', userId)
-            .maybeSingle();
-
-        if (existingRedemption) {
-            return { success: false, error: 'You have already redeemed an access code' };
-        }
-
         // Find the access code
         const { data: accessCode, error: codeError } = await supabase
             .from('access_codes')
@@ -342,7 +331,8 @@ export class SubscriptionService {
         const now = new Date();
         const trialEnd = new Date(now.getTime() + accessCode.days_granted * 24 * 60 * 60 * 1000);
 
-        // Update subscription
+        // Ensure subscription row exists, then update it
+        const existing = await this.getOrCreate(userId);
         const { data: subscription, error: subError } = await supabase
             .from('subscriptions')
             .update({
@@ -356,6 +346,7 @@ export class SubscriptionService {
             .single();
 
         if (subError) {
+            console.error('[redeem-code] subscription update failed:', subError);
             return { success: false, error: 'Failed to activate access code' };
         }
 
