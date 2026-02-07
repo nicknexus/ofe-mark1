@@ -156,8 +156,12 @@ export class SubscriptionService {
                 if (subscription.current_period_end && new Date(subscription.current_period_end) > new Date()) {
                     return { hasAccess: true, reason: 'subscription_active', subscription };
                 }
-                // Period ended - for Stripe this would be handled by webhooks
-                return { hasAccess: true, reason: 'subscription_active', subscription };
+                // Period ended (webhook may have been missed) - revoke access and mark expired
+                subscription = await this.updateFromStripe(userId, {
+                    status: 'expired',
+                    cancelled_at: subscription.current_period_end || new Date().toISOString(),
+                });
+                break;
 
             case 'past_due':
                 // Could implement grace period here - but check inherited access first
@@ -284,6 +288,17 @@ export class SubscriptionService {
         }
 
         return data;
+    }
+
+    /** Get user_id by Stripe subscription ID (for webhooks when metadata is missing) */
+    static async getUserIdByStripeSubscriptionId(stripeSubscriptionId: string): Promise<string | null> {
+        const { data, error } = await supabase
+            .from('subscriptions')
+            .select('user_id')
+            .eq('stripe_subscription_id', stripeSubscriptionId)
+            .maybeSingle();
+        if (error || !data) return null;
+        return data.user_id;
     }
 
     /**

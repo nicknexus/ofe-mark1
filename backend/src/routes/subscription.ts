@@ -12,6 +12,10 @@ const router = Router();
  */
 router.get('/status', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
+        const sub = await SubscriptionService.getOrCreate(req.user!.id);
+        if (sub.stripe_subscription_id) {
+            await syncSubscriptionFromStripe(req.user!.id, sub.stripe_subscription_id);
+        }
         const { hasAccess, reason, subscription } = await SubscriptionService.hasAccess(req.user!.id);
         const remainingTrialDays = SubscriptionService.getRemainingTrialDays(subscription);
 
@@ -107,12 +111,44 @@ router.post('/redeem-code', authenticateUser, async (req: AuthenticatedRequest, 
 });
 
 /**
+ * Sync subscription row from Stripe (cancel_at_period_end, status, period end, cancelled_at).
+ * Call when loading subscription so DB matches Stripe even if webhooks were missed.
+ */
+async function syncSubscriptionFromStripe(userId: string, stripeSubscriptionId: string): Promise<void> {
+    if (!stripe) return;
+    try {
+        const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId) as any;
+        const status = sub.status === 'active' ? 'active'
+            : sub.status === 'past_due' ? 'past_due'
+            : sub.status === 'canceled' || sub.status === 'unpaid' ? 'cancelled'
+            : 'active';
+        const cancelAtPeriodEnd =
+            sub.cancel_at_period_end === true ||
+            (!!sub.cancel_at && sub.status === 'active');
+        const periodEnd = sub.current_period_end || sub.cancel_at;
+        await SubscriptionService.updateFromStripe(userId, {
+            status,
+            cancel_at_period_end: cancelAtPeriodEnd,
+            ...(sub.current_period_start && { current_period_start: new Date(sub.current_period_start * 1000).toISOString() }),
+            ...(periodEnd && { current_period_end: new Date(periodEnd * 1000).toISOString() }),
+            ...((status === 'cancelled') && { cancelled_at: new Date().toISOString() }),
+        });
+    } catch (e) {
+        console.warn('Sync from Stripe failed:', (e as Error).message);
+    }
+}
+
+/**
  * GET /api/subscription/details
  * Get full subscription details (for account page)
  */
 router.get('/details', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const subscription = await SubscriptionService.getOrCreate(req.user!.id);
+        let subscription = await SubscriptionService.getOrCreate(req.user!.id);
+        if (subscription.stripe_subscription_id) {
+            await syncSubscriptionFromStripe(req.user!.id, subscription.stripe_subscription_id);
+            subscription = (await SubscriptionService.getByUserId(req.user!.id)) ?? subscription;
+        }
         const remainingTrialDays = SubscriptionService.getRemainingTrialDays(subscription);
 
         res.json({
@@ -339,8 +375,17 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
             case 'customer.subscription.updated': {
                 const subscription = event.data.object as any;
-                const userId = subscription.metadata?.user_id;
-                
+                let userId = subscription.metadata?.user_id;
+                if (!userId) {
+                    userId = await SubscriptionService.getUserIdByStripeSubscriptionId(subscription.id) ?? undefined;
+                }
+                console.log('[webhook] customer.subscription.updated', {
+                    subscriptionId: subscription.id,
+                    status: subscription.status,
+                    cancel_at_period_end: subscription.cancel_at_period_end,
+                    hasUserId: !!userId,
+                    metadata: subscription.metadata,
+                });
                 if (userId) {
                     const status = subscription.status === 'active' ? 'active' 
                         : subscription.status === 'past_due' ? 'past_due'
@@ -350,33 +395,42 @@ router.post('/webhook', async (req: Request, res: Response) => {
                     const periodStart = subscription.current_period_start 
                         ? new Date(subscription.current_period_start * 1000).toISOString()
                         : undefined;
-                    const periodEnd = subscription.current_period_end
-                        ? new Date(subscription.current_period_end * 1000).toISOString()
+                    const periodEnd = (subscription.current_period_end || subscription.cancel_at)
+                        ? new Date((subscription.current_period_end || subscription.cancel_at) * 1000).toISOString()
                         : undefined;
+
+                    // Billing Portal sets cancel_at (timestamp) but can leave cancel_at_period_end false
+                    const cancelAtPeriodEnd =
+                        subscription.cancel_at_period_end === true ||
+                        (!!subscription.cancel_at && subscription.status === 'active');
 
                     await SubscriptionService.updateFromStripe(userId, {
                         status,
                         ...(periodStart && { current_period_start: periodStart }),
                         ...(periodEnd && { current_period_end: periodEnd }),
-                        cancel_at_period_end: subscription.cancel_at_period_end,
+                        cancel_at_period_end: cancelAtPeriodEnd,
+                        ...(status === 'cancelled' && { cancelled_at: new Date().toISOString() }),
                     });
                     
-                    console.log(`✅ Subscription updated for user ${userId}: ${status}`);
+                    console.log(`✅ Subscription updated for user ${userId}: ${status}, cancel_at_period_end=${cancelAtPeriodEnd}`);
                 }
                 break;
             }
 
             case 'customer.subscription.deleted': {
                 const subscription = event.data.object as any;
-                const userId = subscription.metadata?.user_id;
-                
+                let userId = subscription.metadata?.user_id;
+                if (!userId) {
+                    userId = await SubscriptionService.getUserIdByStripeSubscriptionId(subscription.id) ?? undefined;
+                }
                 if (userId) {
                     await SubscriptionService.updateFromStripe(userId, {
                         status: 'cancelled',
                         cancelled_at: new Date().toISOString(),
                     });
-                    
                     console.log(`✅ Subscription cancelled for user ${userId}`);
+                } else {
+                    console.warn('[webhook] customer.subscription.deleted: no user_id (metadata or stripe_subscription_id lookup)', subscription.id);
                 }
                 break;
             }
