@@ -23,6 +23,7 @@ import PublicInitiativePage from './pages/PublicInitiativePage'
 import PublicMetricPage from './pages/PublicMetricPage'
 import PublicStoryPage from './pages/PublicStoryPage'
 import PublicEvidencePage from './pages/PublicEvidencePage'
+import PublicImpactClaimPage from './pages/PublicImpactClaimPage'
 import ExplorePage from './pages/ExplorePage'
 import TrialActivationPage from './pages/TrialActivationPage'
 import SubscriptionExpiredPage from './pages/SubscriptionExpiredPage'
@@ -339,6 +340,7 @@ function App() {
                                 <Route path="/org/:slug" element={<PublicOrganizationPage />} />
                                 <Route path="/org/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
                                 <Route path="/org/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
+                                <Route path="/org/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
                                 <Route path="/org/:orgSlug/:initiativeSlug/story/:storyId" element={<PublicStoryPage />} />
                                 <Route path="/org/:orgSlug/:initiativeSlug/evidence/:evidenceId" element={<PublicEvidencePage />} />
 
@@ -377,6 +379,7 @@ function App() {
                 <Route path="/org/:slug" element={<PublicOrganizationPage />} />
                 <Route path="/org/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
                 <Route path="/org/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
+                <Route path="/org/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
                 <Route path="/org/:orgSlug/:initiativeSlug/story/:storyId" element={<PublicStoryPage />} />
                 <Route path="/org/:orgSlug/:initiativeSlug/evidence/:evidenceId" element={<PublicEvidencePage />} />
 

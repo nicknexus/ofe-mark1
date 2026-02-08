@@ -1117,14 +1117,15 @@ export default function PublicOrganizationPage() {
                                 ) : (
                                     <div className="space-y-2">
                                         {allImpactClaims.map((claim, idx) => (
-                                            <div 
+                                            <Link
                                                 key={`${claim.id}-${idx}`}
-                                                className="p-3 rounded-xl bg-white/60 backdrop-blur-lg border border-white/80 hover:bg-white/80 transition-all"
+                                                to={`/org/${slug}/${claim.initiativeSlug}/claim/${claim.id}?from=org`}
+                                                className="block p-3 rounded-xl bg-white/60 backdrop-blur-lg border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group"
                                             >
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-lg font-bold text-foreground">{claim.value?.toLocaleString()}</span>
+                                                            <span className="text-lg font-bold text-foreground group-hover:text-accent transition-colors">{claim.value?.toLocaleString()}</span>
                                                             <span className="text-xs text-muted-foreground">{claim.metricUnit}</span>
                                                         </div>
                                                         <p className="text-xs text-muted-foreground truncate mt-0.5">{claim.metricTitle}</p>
@@ -1140,7 +1141,7 @@ export default function PublicOrganizationPage() {
                                                         </p>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            </Link>
                                         ))}
                                     </div>
                                 )}

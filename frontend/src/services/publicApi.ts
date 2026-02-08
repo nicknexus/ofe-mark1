@@ -122,7 +122,7 @@ export interface PublicEvidence {
     initiative_title?: string
     org_slug?: string
     locations?: { id: string; name: string }[]
-    kpis?: { id: string; title: string }[]
+    kpis?: { id: string; title: string; category?: string; unit_of_measurement?: string }[]
     created_at?: string
 }
 
@@ -136,6 +136,21 @@ export interface PublicBeneficiaryGroup {
     age_range_end?: number
     total_number?: number
     display_order?: number
+}
+
+export interface LocationDetail {
+    location: PublicLocation
+    stories: { id: string; title: string; description?: string; media_url?: string; media_type: string; date_represented: string }[]
+    evidence: PublicEvidence[]
+    claims: {
+        id: string; value: number; date_represented: string; date_range_start?: string; date_range_end?: string;
+        note?: string; label?: string; metric_title: string; metric_slug: string; metric_unit: string; metric_category: string
+    }[]
+    metrics: {
+        id: string; title: string; slug: string; unit_of_measurement: string; category: string;
+        total_value: number; claim_count: number
+    }[]
+    initiative: { id: string; title: string; slug: string; org_slug: string }
 }
 
 export interface SearchResult {
@@ -298,6 +313,10 @@ class PublicApiService {
         return this.request<PublicLocation[]>(`/initiatives/${orgSlug}/${initiativeSlug}/locations`)
     }
 
+    async getLocationDetail(orgSlug: string, initiativeSlug: string, locationId: string): Promise<LocationDetail> {
+        return this.request<LocationDetail>(`/initiatives/${orgSlug}/${initiativeSlug}/location/${locationId}`)
+    }
+
     async getInitiativeEvidence(orgSlug: string, initiativeSlug: string): Promise<PublicEvidence[]> {
         return this.request<PublicEvidence[]>(`/initiatives/${orgSlug}/${initiativeSlug}/evidence`)
     }
@@ -316,6 +335,10 @@ class PublicApiService {
 
     async getEvidenceDetail(orgSlug: string, initiativeSlug: string, evidenceId: string): Promise<PublicEvidenceDetail> {
         return this.request<PublicEvidenceDetail>(`/initiatives/${orgSlug}/${initiativeSlug}/evidence/${evidenceId}`)
+    }
+
+    async getImpactClaimDetail(orgSlug: string, initiativeSlug: string, claimId: string): Promise<PublicImpactClaimDetail> {
+        return this.request<PublicImpactClaimDetail>(`/initiatives/${orgSlug}/${initiativeSlug}/claim/${claimId}`)
     }
 }
 
@@ -390,6 +413,41 @@ export interface PublicEvidenceDetail {
         unit_of_measurement: string
         category: 'input' | 'output' | 'impact'
     }>
+    initiative: {
+        id: string
+        title: string
+        slug: string
+        org_slug?: string
+        org_name?: string
+        brand_color?: string
+    }
+}
+
+export interface PublicImpactClaimDetail {
+    id: string
+    value: number
+    date_represented: string
+    date_range_start?: string
+    date_range_end?: string
+    note?: string
+    label?: string
+    location?: {
+        id: string
+        name: string
+        description?: string
+        latitude: number
+        longitude: number
+    }
+    metric: {
+        id: string
+        title: string
+        description?: string
+        unit_of_measurement: string
+        category: 'input' | 'output' | 'impact'
+        slug: string
+    }
+    evidence: PublicEvidence[]
+    evidence_count: number
     initiative: {
         id: string
         title: string

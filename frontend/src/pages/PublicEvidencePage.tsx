@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import {
     ArrowLeft, Calendar, FileText, ChevronLeft, ChevronRight,
     Image, File, Video, Mic, ExternalLink
@@ -30,11 +30,25 @@ export default function PublicEvidencePage() {
         initiativeSlug: string
         evidenceId: string
     }>()
+    const [searchParams] = useSearchParams()
+
+    // Referrer context for breadcrumb continuity
+    const fromClaim = searchParams.get('from') === 'claim'
+    const claimId = searchParams.get('claimId')
+    const metricSlug = searchParams.get('metricSlug')
+    const metricTitle = searchParams.get('metricTitle')
+    const claimValue = searchParams.get('claimValue')
 
     const [evidence, setEvidence] = useState<PublicEvidenceDetail | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [currentFileIndex, setCurrentFileIndex] = useState(0)
+
+    // Build back URL based on referrer
+    const backUrl = fromClaim && claimId
+        ? `/org/${orgSlug}/${initiativeSlug}/claim/${claimId}`
+        : `/org/${orgSlug}/${initiativeSlug}?tab=evidence`
+    const backLabel = fromClaim ? 'Back to Impact Claim' : 'Back'
 
     useEffect(() => {
         if (orgSlug && initiativeSlug && evidenceId) {
@@ -67,9 +81,9 @@ export default function PublicEvidencePage() {
                     <FileText className="w-16 h-16 text-gray-300 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-gray-800 mb-3">Evidence Not Found</h1>
                     <p className="text-gray-500 mb-8">{error || 'This evidence does not exist.'}</p>
-                    <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=evidence`}
+                    <Link to={backUrl}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-xl hover:bg-gray-700 transition-colors font-medium">
-                        <ArrowLeft className="w-4 h-4" /> Back to Evidence
+                        <ArrowLeft className="w-4 h-4" /> {fromClaim ? 'Back to Impact Claim' : 'Back to Evidence'}
                     </Link>
                 </div>
             </div>
@@ -122,10 +136,10 @@ export default function PublicEvidencePage() {
             <div className="sticky top-0 z-50 bg-white/60 backdrop-blur-2xl border-b border-white/40">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
                     <div className="flex items-center justify-between">
-                        <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=evidence`}
+                        <Link to={backUrl}
                             className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-800 transition-colors">
                             <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-                            <span className="text-sm sm:text-base font-medium">Back</span>
+                            <span className="text-sm sm:text-base font-medium">{backLabel}</span>
                         </Link>
                         <Link to="/" className="flex items-center gap-2">
                             <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg overflow-hidden">
@@ -143,10 +157,19 @@ export default function PublicEvidencePage() {
                     <PublicBreadcrumb
                         orgSlug={orgSlug!}
                         orgName={evidence.initiative.org_name || ''}
-                        items={[
-                            { label: evidence.initiative.title, href: `/org/${orgSlug}/${initiativeSlug}?tab=evidence` },
-                            { label: evidence.title }
-                        ]}
+                        items={
+                            fromClaim && claimId && metricSlug
+                                ? [
+                                    { label: evidence.initiative.title, href: `/org/${orgSlug}/${initiativeSlug}?tab=metrics` },
+                                    { label: metricTitle || 'Metric', href: `/org/${orgSlug}/${initiativeSlug}/metric/${metricSlug}` },
+                                    { label: claimValue ? `+${claimValue}` : 'Impact Claim', href: `/org/${orgSlug}/${initiativeSlug}/claim/${claimId}` },
+                                    { label: evidence.title }
+                                ]
+                                : [
+                                    { label: evidence.initiative.title, href: `/org/${orgSlug}/${initiativeSlug}?tab=evidence` },
+                                    { label: evidence.title }
+                                ]
+                        }
                     />
                 </div>
 

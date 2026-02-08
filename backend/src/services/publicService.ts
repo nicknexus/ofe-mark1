@@ -619,7 +619,7 @@ export class PublicService {
                 id, title, description, type, file_url, date_represented, date_range_start, date_range_end, created_at,
                 evidence_files(id, file_url, file_name, file_type, display_order),
                 evidence_locations(locations(id, name)),
-                evidence_kpis(kpis(id, title))
+                evidence_kpis(kpis(id, title, category, unit_of_measurement))
             `)
             .eq('initiative_id', initiative.id)
             .order('date_represented', { ascending: false });
@@ -760,7 +760,9 @@ export class PublicService {
                 .from('evidence')
                 .select(`
                     id, title, description, type, file_url, date_represented, date_range_start, date_range_end, created_at,
-                    evidence_files(id, file_url, file_name, file_type, display_order)
+                    evidence_files(id, file_url, file_name, file_type, display_order),
+                    evidence_locations(locations(id, name)),
+                    evidence_kpis(kpis(id, title, category, unit_of_measurement))
                 `)
                 .in('id', evidenceIds)
                 .order('date_represented', { ascending: false });
@@ -775,6 +777,8 @@ export class PublicService {
                 date_represented: e.date_represented,
                 date_range_start: e.date_range_start,
                 date_range_end: e.date_range_end,
+                locations: e.evidence_locations?.map((el: any) => el.locations).filter(Boolean) || [],
+                kpis: e.evidence_kpis?.map((ek: any) => ek.kpis).filter(Boolean) || [],
                 created_at: e.created_at
             }));
         }
@@ -802,6 +806,138 @@ export class PublicService {
                 note: u.note,
                 location: u.locations
             })),
+            evidence,
+            evidence_count: evidence.length,
+            initiative: {
+                id: initiative.id,
+                title: initiative.title,
+                slug: initiative.slug,
+                org_slug: initiative.org_slug,
+                org_name: initiative.organization_name,
+                brand_color: initiative.organization_brand_color
+            }
+        };
+    }
+
+    /**
+     * Get a single impact claim (kpi_update) by ID
+     */
+    static async getImpactClaimById(orgSlug: string, initiativeSlug: string, claimId: string): Promise<any | null> {
+        const initiative = await this.getInitiativeBySlug(orgSlug, initiativeSlug);
+        if (!initiative) return null;
+
+        // Fetch the kpi_update with its parent KPI and location
+        const { data: update, error } = await supabase
+            .from('kpi_updates')
+            .select(`
+                id, value, date_represented, date_range_start, date_range_end, note, label, location_id,
+                locations(id, name, description, latitude, longitude),
+                kpis!inner(id, title, description, unit_of_measurement, category, initiative_id)
+            `)
+            .eq('id', claimId)
+            .single();
+
+        if (error || !update) {
+            console.error('[getImpactClaimById] Error:', error);
+            return null;
+        }
+
+        // Verify this update belongs to the correct initiative
+        const kpi = (update as any).kpis;
+        if (!kpi || kpi.initiative_id !== initiative.id) return null;
+
+        // Get evidence linked to this specific update via evidence_kpi_updates
+        const { data: evidenceLinks } = await supabase
+            .from('evidence_kpi_updates')
+            .select('evidence_id')
+            .eq('kpi_update_id', claimId);
+
+        const evidenceIds = (evidenceLinks || []).map((e: any) => e.evidence_id);
+
+        let evidence: any[] = [];
+        if (evidenceIds.length > 0) {
+            const { data: evidenceData } = await supabase
+                .from('evidence')
+                .select(`
+                    id, title, description, type, file_url, date_represented, date_range_start, date_range_end, created_at,
+                    evidence_files(id, file_url, file_name, file_type, display_order),
+                    evidence_locations(locations(id, name)),
+                    evidence_kpis(kpis(id, title, category, unit_of_measurement))
+                `)
+                .in('id', evidenceIds)
+                .order('date_represented', { ascending: false });
+
+            evidence = (evidenceData || []).map((e: any) => ({
+                id: e.id,
+                title: e.title,
+                description: e.description,
+                type: e.type,
+                file_url: e.file_url,
+                files: e.evidence_files || [],
+                date_represented: e.date_represented,
+                date_range_start: e.date_range_start,
+                date_range_end: e.date_range_end,
+                locations: e.evidence_locations?.map((el: any) => el.locations).filter(Boolean) || [],
+                kpis: e.evidence_kpis?.map((ek: any) => ek.kpis).filter(Boolean) || [],
+                created_at: e.created_at
+            }));
+        }
+
+        // Also check evidence_kpis (KPI-level evidence) as fallback
+        if (evidence.length === 0) {
+            const { data: kpiEvidenceLinks } = await supabase
+                .from('evidence_kpis')
+                .select('evidence_id')
+                .eq('kpi_id', kpi.id);
+
+            const kpiEvidenceIds = (kpiEvidenceLinks || []).map((e: any) => e.evidence_id);
+
+            if (kpiEvidenceIds.length > 0) {
+                const { data: evidenceData } = await supabase
+                    .from('evidence')
+                    .select(`
+                        id, title, description, type, file_url, date_represented, date_range_start, date_range_end, created_at,
+                        evidence_files(id, file_url, file_name, file_type, display_order),
+                        evidence_locations(locations(id, name)),
+                        evidence_kpis(kpis(id, title, category, unit_of_measurement))
+                    `)
+                    .in('id', kpiEvidenceIds)
+                    .order('date_represented', { ascending: false });
+
+                evidence = (evidenceData || []).map((e: any) => ({
+                    id: e.id,
+                    title: e.title,
+                    description: e.description,
+                    type: e.type,
+                    file_url: e.file_url,
+                    files: e.evidence_files || [],
+                    date_represented: e.date_represented,
+                    date_range_start: e.date_range_start,
+                    date_range_end: e.date_range_end,
+                    locations: e.evidence_locations?.map((el: any) => el.locations).filter(Boolean) || [],
+                    kpis: e.evidence_kpis?.map((ek: any) => ek.kpis).filter(Boolean) || [],
+                    created_at: e.created_at
+                }));
+            }
+        }
+
+        return {
+            id: update.id,
+            value: (update as any).value,
+            date_represented: (update as any).date_represented,
+            date_range_start: (update as any).date_range_start,
+            date_range_end: (update as any).date_range_end,
+            note: (update as any).note,
+            label: (update as any).label,
+            location: (update as any).locations || null,
+            metric: {
+                id: kpi.id,
+                title: kpi.title,
+                description: kpi.description,
+                unit_of_measurement: kpi.unit_of_measurement,
+                category: kpi.category,
+                slug: this.generateMetricSlug(kpi.title)
+            },
             evidence,
             evidence_count: evidence.length,
             initiative: {
@@ -929,6 +1065,127 @@ export class PublicService {
                 org_slug: initiative.org_slug,
                 org_name: initiative.organization_name,
                 brand_color: initiative.organization_brand_color
+            }
+        };
+    }
+
+    /**
+     * Get everything linked to a specific location within an initiative
+     */
+    static async getLocationDetail(orgSlug: string, initiativeSlug: string, locationId: string): Promise<any | null> {
+        const initiative = await this.getInitiativeBySlug(orgSlug, initiativeSlug);
+        if (!initiative) return null;
+
+        // Fetch the location
+        const { data: location, error: locError } = await supabase
+            .from('locations')
+            .select('id, name, description, latitude, longitude')
+            .eq('id', locationId)
+            .eq('initiative_id', initiative.id)
+            .single();
+
+        if (locError || !location) return null;
+
+        // Stories at this location
+        const { data: stories } = await supabase
+            .from('stories')
+            .select('id, title, description, media_url, media_type, date_represented, created_at')
+            .eq('initiative_id', initiative.id)
+            .eq('location_id', locationId)
+            .order('date_represented', { ascending: false });
+
+        // Evidence at this location via evidence_locations
+        const { data: evidenceLinks } = await supabase
+            .from('evidence_locations')
+            .select('evidence_id')
+            .eq('location_id', locationId);
+
+        const evidenceIds = (evidenceLinks || []).map((el: any) => el.evidence_id);
+
+        let evidence: any[] = [];
+        if (evidenceIds.length > 0) {
+            const { data: evidenceData } = await supabase
+                .from('evidence')
+                .select(`
+                    id, title, description, type, file_url, date_represented, created_at,
+                    evidence_files(id, file_url, file_name, file_type, display_order),
+                    evidence_kpis(kpis(id, title, category, unit_of_measurement))
+                `)
+                .eq('initiative_id', initiative.id)
+                .in('id', evidenceIds)
+                .order('date_represented', { ascending: false });
+
+            evidence = (evidenceData || []).map((e: any) => ({
+                id: e.id,
+                title: e.title,
+                description: e.description,
+                type: e.type,
+                file_url: e.file_url,
+                files: e.evidence_files || [],
+                date_represented: e.date_represented,
+                kpis: e.evidence_kpis?.map((ek: any) => ek.kpis).filter(Boolean) || [],
+                created_at: e.created_at
+            }));
+        }
+
+        // KPI updates (impact claims) at this location
+        const { data: kpiUpdates } = await supabase
+            .from('kpi_updates')
+            .select(`
+                id, value, date_represented, date_range_start, date_range_end, note, label,
+                kpis!inner(id, title, description, unit_of_measurement, category, initiative_id)
+            `)
+            .eq('location_id', locationId);
+
+        // Filter to only this initiative's KPIs and build response
+        const claims = (kpiUpdates || [])
+            .filter((u: any) => u.kpis?.initiative_id === initiative.id)
+            .map((u: any) => ({
+                id: u.id,
+                value: u.value,
+                date_represented: u.date_represented,
+                date_range_start: u.date_range_start,
+                date_range_end: u.date_range_end,
+                note: u.note,
+                label: u.label,
+                metric_title: u.kpis.title,
+                metric_slug: this.generateMetricSlug(u.kpis.title),
+                metric_unit: u.kpis.unit_of_measurement,
+                metric_category: u.kpis.category
+            }));
+
+        // Unique metrics that have claims at this location
+        const metricsMap = new Map<string, any>();
+        (kpiUpdates || [])
+            .filter((u: any) => u.kpis?.initiative_id === initiative.id)
+            .forEach((u: any) => {
+                if (!metricsMap.has(u.kpis.id)) {
+                    metricsMap.set(u.kpis.id, {
+                        id: u.kpis.id,
+                        title: u.kpis.title,
+                        slug: this.generateMetricSlug(u.kpis.title),
+                        unit_of_measurement: u.kpis.unit_of_measurement,
+                        category: u.kpis.category,
+                        total_value: 0,
+                        claim_count: 0
+                    });
+                }
+                const m = metricsMap.get(u.kpis.id)!;
+                m.total_value += parseFloat(u.value) || 0;
+                m.claim_count += 1;
+            });
+
+        return {
+            location,
+            stories: stories || [],
+            evidence,
+            claims,
+            metrics: Array.from(metricsMap.values()),
+            initiative: {
+                id: initiative.id,
+                title: initiative.title,
+                slug: initiative.slug,
+                org_slug: initiative.org_slug
             }
         };
     }

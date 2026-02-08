@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import React, { useState, useEffect, useCallback } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
-    ArrowLeft, Calendar, MapPin, Users, FileText, BookOpen
+    ArrowLeft, Calendar, MapPin, Users, FileText, BookOpen, ChevronLeft, ChevronRight
 } from 'lucide-react'
-import { publicApi, PublicStoryDetail } from '../services/publicApi'
+import { publicApi, PublicStoryDetail, PublicStory } from '../services/publicApi'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
 
@@ -13,16 +13,52 @@ export default function PublicStoryPage() {
         initiativeSlug: string
         storyId: string
     }>()
+    const navigate = useNavigate()
 
     const [story, setStory] = useState<PublicStoryDetail | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+
+    // All stories for prev/next navigation
+    const [allStories, setAllStories] = useState<PublicStory[]>([])
 
     useEffect(() => {
         if (orgSlug && initiativeSlug && storyId) {
             loadStory()
         }
     }, [orgSlug, initiativeSlug, storyId])
+
+    // Load story list for navigation
+    useEffect(() => {
+        if (orgSlug && initiativeSlug) {
+            publicApi.getInitiativeStories(orgSlug, initiativeSlug)
+                .then(setAllStories)
+                .catch(console.error)
+        }
+    }, [orgSlug, initiativeSlug])
+
+    // Find current position
+    const currentIndex = allStories.findIndex(s => s.id === storyId)
+    const prevStory = currentIndex > 0 ? allStories[currentIndex - 1] : null
+    const nextStory = currentIndex >= 0 && currentIndex < allStories.length - 1 ? allStories[currentIndex + 1] : null
+
+    const goToPrev = useCallback(() => {
+        if (prevStory) navigate(`/org/${orgSlug}/${initiativeSlug}/story/${prevStory.id}`)
+    }, [prevStory, orgSlug, initiativeSlug, navigate])
+
+    const goToNext = useCallback(() => {
+        if (nextStory) navigate(`/org/${orgSlug}/${initiativeSlug}/story/${nextStory.id}`)
+    }, [nextStory, orgSlug, initiativeSlug, navigate])
+
+    // Keyboard navigation
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'ArrowLeft') goToPrev()
+            else if (e.key === 'ArrowRight') goToNext()
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [goToPrev, goToNext])
 
     const loadStory = async () => {
         try {
@@ -203,6 +239,41 @@ export default function PublicStoryPage() {
                                 <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 rotate-180" />
                             </Link>
                         </div>
+
+                        {/* Story Navigation */}
+                        {allStories.length > 1 && currentIndex >= 0 && (
+                            <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-100 flex items-center justify-between gap-4">
+                                {prevStory ? (
+                                    <button
+                                        onClick={goToPrev}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/50 text-foreground rounded-xl transition-colors text-sm font-medium shadow-sm group min-w-0 flex-1"
+                                    >
+                                        <ChevronLeft className="w-4 h-4 flex-shrink-0 group-hover:-translate-x-0.5 transition-transform" />
+                                        <div className="min-w-0 text-left">
+                                            <p className="text-[10px] text-muted-foreground">Previous</p>
+                                            <p className="truncate text-xs">{prevStory.title}</p>
+                                        </div>
+                                    </button>
+                                ) : <div />}
+
+                                <span className="text-xs text-muted-foreground flex-shrink-0">
+                                    {currentIndex + 1} / {allStories.length}
+                                </span>
+
+                                {nextStory ? (
+                                    <button
+                                        onClick={goToNext}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/50 text-foreground rounded-xl transition-colors text-sm font-medium shadow-sm group min-w-0 flex-1 justify-end"
+                                    >
+                                        <div className="min-w-0 text-right">
+                                            <p className="text-[10px] text-muted-foreground">Next</p>
+                                            <p className="truncate text-xs">{nextStory.title}</p>
+                                        </div>
+                                        <ChevronRight className="w-4 h-4 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                                    </button>
+                                ) : <div />}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

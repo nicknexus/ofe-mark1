@@ -173,6 +173,21 @@ router.get('/initiatives/:orgSlug/:slug/locations', async (req, res) => {
     }
 });
 
+// Get location detail (everything linked to a location)
+router.get('/initiatives/:orgSlug/:slug/location/:locationId', async (req, res) => {
+    try {
+        const detail = await PublicService.getLocationDetail(req.params.orgSlug, req.params.slug, req.params.locationId);
+        if (!detail) {
+            res.status(404).json({ error: 'Location not found' });
+            return;
+        }
+        res.json(detail);
+    } catch (error) {
+        console.error('Get location detail error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
 // Get initiative evidence
 router.get('/initiatives/:orgSlug/:slug/evidence', async (req, res) => {
     try {
@@ -210,6 +225,25 @@ router.get('/initiatives/:orgSlug/:initiativeSlug/metric/:metricSlug', async (re
         res.json(metric);
     } catch (error) {
         console.error('Get metric detail error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// Get single impact claim by ID (for Impact Claim Detail Page)
+router.get('/initiatives/:orgSlug/:initiativeSlug/claim/:claimId', async (req, res) => {
+    try {
+        const claim = await PublicService.getImpactClaimById(
+            req.params.orgSlug,
+            req.params.initiativeSlug,
+            req.params.claimId
+        );
+        if (!claim) {
+            res.status(404).json({ error: 'Impact claim not found' });
+            return;
+        }
+        res.json(claim);
+    } catch (error) {
+        console.error('Get impact claim detail error:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });
