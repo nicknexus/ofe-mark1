@@ -138,7 +138,7 @@ export class SubscriptionService {
      * Checks own subscription first, then inherited access from team membership
      */
     static async hasAccess(userId: string): Promise<SubscriptionAccessResult> {
-        const subscription = await this.getOrCreate(userId);
+        let subscription = await this.getOrCreate(userId);
 
         // First check user's own subscription
         switch (subscription.status) {
@@ -314,6 +314,7 @@ export class SubscriptionService {
             .maybeSingle();
 
         if (codeError || !accessCode) {
+            console.log('[redeem-code] lookup failed — code:', code.toUpperCase().trim(), 'error:', codeError, 'data:', accessCode);
             return { success: false, error: 'Invalid access code' };
         }
 
@@ -364,8 +365,8 @@ export class SubscriptionService {
             .update({ times_used: accessCode.times_used + 1 })
             .eq('id', accessCode.id);
 
-        return { 
-            success: true, 
+        return {
+            success: true,
             subscription,
             daysGranted: accessCode.days_granted
         };
@@ -381,7 +382,7 @@ export class SubscriptionService {
     }> {
         // Get subscription to check limit
         const subscription = await this.getOrCreate(userId);
-        
+
         // Get current initiatives count for this user's organization
         const { count, error } = await supabase
             .from('initiatives')
@@ -394,7 +395,7 @@ export class SubscriptionService {
 
         const currentCount = count || 0;
         const limit = subscription.initiatives_limit ?? null;
-        
+
         // Can create if no limit (null/undefined = unlimited) or under limit
         const canCreate = limit === null || currentCount < limit;
 
