@@ -383,7 +383,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
         testimony: { bg: 'bg-orange-100 text-orange-800', label: 'Testimonies' },
         financials: { bg: 'bg-primary-100 text-primary-800', label: 'Financials' }
     }
-
+    
     const isImageFile = (url: string) => {
         const ext = url.split('.').pop()?.toLowerCase() || ''
         return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)
@@ -489,23 +489,23 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                     onClick={() => openGallery(idx)}
                                     className="bg-white/60 backdrop-blur-sm rounded-2xl border border-white/50 hover:bg-white/80 hover:shadow-lg hover:border-accent transition-all overflow-hidden group text-left"
                                 >
-                                    {previewUrl ? (
-                                        <div className="relative aspect-video bg-gray-100 overflow-hidden">
+            {previewUrl ? (
+                    <div className="relative aspect-video bg-gray-100 overflow-hidden">
                                             <img src={previewUrl} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                            {fileCount > 1 && (
+                        {fileCount > 1 && (
                                                 <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-lg">{fileCount} files</div>
-                                            )}
-                                        </div>
+                        )}
+                    </div>
                                     ) : (
-                                        <div className="aspect-video bg-gradient-to-br from-accent/10 to-accent/5 flex items-center justify-center">
-                                            <div className="text-center">
-                                                <FileText className="w-10 h-10 text-accent/50 mx-auto mb-2" />
+                    <div className="aspect-video bg-gradient-to-br from-accent/10 to-accent/5 flex items-center justify-center">
+                        <div className="text-center">
+                            <FileText className="w-10 h-10 text-accent/50 mx-auto mb-2" />
                                                 <span className="text-sm text-gray-500">{fileCount} file{fileCount !== 1 ? 's' : ''}</span>
-                                            </div>
-                                        </div>
+                        </div>
+                    </div>
                                     )}
-                                    <div className="p-4">
-                                        <div className="flex items-start justify-between mb-2">
+            <div className="p-4">
+                <div className="flex items-start justify-between mb-2">
                                             <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${evTypeConfig.bg}`}>{evTypeConfig.label}</span>
                                             <span className="text-xs text-gray-500">{new Date(ev.date_represented).toLocaleDateString()}</span>
                                         </div>
@@ -515,7 +515,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                 </button>
                             )
                         })}
-                    </div>
+                </div>
                 )}
             </div>
 
@@ -681,8 +681,8 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                 <span className="hidden sm:inline">Next</span>
                                 <ChevronRight className="w-4 h-4" />
                             </button>
-                        </div>
-                    </div>
+            </div>
+        </div>
                 </div>,
                 document.body
             )}

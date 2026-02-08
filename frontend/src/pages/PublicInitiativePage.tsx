@@ -4,7 +4,7 @@ import {
     ArrowLeft, Globe, BarChart3, BookOpen, MapPin,
     FileText, Users, Calendar, ChevronRight, ChevronLeft, ExternalLink, TrendingUp,
     Building2, ChevronDown, Filter, X, Activity, Layers, Zap,
-    Camera, MessageSquare, DollarSign, Target, Loader2
+    Camera, MessageSquare, DollarSign, Target, Loader2, HelpCircle
 } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet'
 import L from 'leaflet'
@@ -37,6 +37,8 @@ import {
 } from '../services/publicApi'
 import PublicLoader from '../components/public/PublicLoader'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
+import DateRangePicker from '../components/DateRangePicker'
+import { getLocalDateString } from '../utils'
 
 // Map tile configuration - matches internal app
 const CARTO_VOYAGER_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
@@ -119,6 +121,43 @@ function MapResizeHandler() {
 
 type TabType = 'overview' | 'metrics' | 'stories' | 'locations' | 'evidence' | 'beneficiaries'
 
+function TabTooltip({ text }: { text: string }) {
+    const [show, setShow] = useState(false)
+    const [pos, setPos] = useState({ top: 0, left: 0 })
+    const ref = React.useRef<HTMLButtonElement>(null)
+
+    const handleEnter = () => {
+        if (ref.current) {
+            const rect = ref.current.getBoundingClientRect()
+            setPos({ top: rect.top + rect.height / 2, left: rect.right + 10 })
+        }
+        setShow(true)
+    }
+
+    return (
+        <>
+            <button
+                ref={ref}
+                onMouseEnter={handleEnter}
+                onMouseLeave={() => setShow(false)}
+                className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-white/60 transition-colors"
+            >
+                <HelpCircle className="w-3.5 h-3.5" />
+            </button>
+            {show && createPortal(
+                <div
+                    className="fixed px-3 py-2 bg-gray-800 text-white text-xs rounded-lg shadow-xl max-w-[220px] leading-relaxed pointer-events-none"
+                    style={{ top: pos.top, left: pos.left, transform: 'translateY(-50%)', zIndex: 9999 }}
+                >
+                    {text}
+                    <div className="absolute right-full top-1/2 -translate-y-1/2 border-[5px] border-transparent border-r-gray-800" />
+                </div>,
+                document.body
+            )}
+        </>
+    )
+}
+
 export default function PublicInitiativePage() {
     const { orgSlug, initiativeSlug } = useParams<{ orgSlug: string; initiativeSlug: string }>()
     const navigate = useNavigate()
@@ -142,8 +181,15 @@ export default function PublicInitiativePage() {
     const [showInitiativeDropdown, setShowInitiativeDropdown] = useState(false)
 
     // Date filter state - initialize from URL params
-    const [startDate, setStartDate] = useState<string>(searchParams.get('startDate') || '')
-    const [endDate, setEndDate] = useState<string>(searchParams.get('endDate') || '')
+    const [dateFilter, setDateFilter] = useState<{ singleDate?: string; startDate?: string; endDate?: string }>(() => {
+        const s = searchParams.get('startDate')
+        const e = searchParams.get('endDate')
+        if (s && e) return { startDate: s, endDate: e }
+        if (s) return { singleDate: s }
+        return {}
+    })
+    const startDate = dateFilter.singleDate || dateFilter.startDate || ''
+    const endDate = dateFilter.endDate || dateFilter.singleDate || ''
 
     // Initialize tab from URL params
     useEffect(() => {
@@ -231,8 +277,7 @@ export default function PublicInitiativePage() {
     const hasActiveFilters = startDate || endDate
 
     const clearFilters = () => {
-        setStartDate('')
-        setEndDate('')
+        setDateFilter({})
     }
 
     // Handle initiative switch
@@ -250,15 +295,31 @@ export default function PublicInitiativePage() {
         navigate(`/org/${orgSlug}/${slug}${queryString ? `?${queryString}` : ''}`)
     }
 
-    // Filter dashboard KPIs by date
+    // Filter dashboard KPIs by date — filter each KPI's updates and recalculate totals
     const filteredDashboard = useMemo(() => {
         if (!dashboard) return null
         if (!startDate && !endDate) return dashboard
 
+        const sd = startDate ? new Date(startDate) : null
+        const ed = endDate ? new Date(endDate + 'T23:59:59') : null
+
         const filteredKpis = dashboard.kpis.map(kpi => {
-            // Note: We don't have updates in dashboard kpis, so we can't filter by date here
-            // The backend would need to support date filtering for accurate totals
-            return kpi
+            if (!kpi.updates || kpi.updates.length === 0) return kpi
+
+            const filtered = kpi.updates.filter(u => {
+                const d = new Date(u.date_represented)
+                if (sd && d < sd) return false
+                if (ed && d > ed) return false
+                return true
+            })
+
+            const totalValue = filtered.reduce((sum, u) => sum + (u.value || 0), 0)
+            return {
+                ...kpi,
+                updates: filtered,
+                total_value: totalValue,
+                update_count: filtered.length
+            }
         })
 
         return { ...dashboard, kpis: filteredKpis }
@@ -310,13 +371,13 @@ export default function PublicInitiativePage() {
         )
     }
 
-    const tabs: { id: TabType; label: string; icon: any; count?: number }[] = [
-        { id: 'overview', label: 'Overview', icon: Globe },
-        { id: 'metrics', label: 'Metrics', icon: BarChart3, count: filteredDashboard?.kpis.length || 0 },
-        { id: 'stories', label: 'Stories', icon: BookOpen, count: filteredStories?.length ?? dashboard.stats.stories },
-        { id: 'locations', label: 'Locations', icon: MapPin, count: dashboard.stats.locations },
-        { id: 'evidence', label: 'Evidence', icon: FileText, count: filteredEvidence?.length ?? dashboard.stats.evidence },
-        { id: 'beneficiaries', label: 'Beneficiaries', icon: Users }
+    const tabs: { id: TabType; label: string; icon: any; count?: number; tooltip: string }[] = [
+        { id: 'overview', label: 'Overview', icon: Globe, tooltip: 'A snapshot of this initiative\'s key stats, metrics, and recent activity' },
+        { id: 'metrics', label: 'Metrics', icon: BarChart3, count: filteredDashboard?.kpis.length || 0, tooltip: 'Measurable indicators tracking inputs, outputs, and impact over time' },
+        { id: 'stories', label: 'Stories', icon: BookOpen, count: filteredStories?.length ?? dashboard.stats.stories, tooltip: 'First-hand accounts and narratives from the people and communities involved' },
+        { id: 'locations', label: 'Locations', icon: MapPin, count: dashboard.stats.locations, tooltip: 'Geographic areas where this initiative operates and collects data' },
+        { id: 'evidence', label: 'Evidence', icon: FileText, count: filteredEvidence?.length ?? dashboard.stats.evidence, tooltip: 'Photos, documents, and files that verify and support reported outcomes' },
+        { id: 'beneficiaries', label: 'Beneficiaries', icon: Users, tooltip: 'The people and communities this initiative aims to serve' }
     ]
 
     // Brand color with fallback
@@ -410,27 +471,15 @@ export default function PublicInitiativePage() {
                             )}
                         </div>
 
-                        {/* Date Range - Hidden on small mobile */}
-                        <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
-                            <div className="relative">
-                                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-                                <input
-                                    type="date"
-                                    value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
-                                    className="pl-8 pr-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 bg-white w-[130px]"
-                                />
-                            </div>
-                            <span className="text-muted-foreground text-sm">to</span>
-                            <div className="relative">
-                                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-                                <input
-                                    type="date"
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
-                                    className="pl-8 pr-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 bg-white w-[130px]"
-                                />
-                            </div>
+                        {/* Date Range Picker */}
+                        <div className="hidden sm:block flex-shrink-0">
+                            <DateRangePicker
+                                value={dateFilter}
+                                onChange={setDateFilter}
+                                maxDate={getLocalDateString(new Date())}
+                                placeholder="Filter by date"
+                                className="w-auto"
+                            />
                         </div>
 
                         {hasActiveFilters && (
@@ -497,25 +546,27 @@ export default function PublicInitiativePage() {
                             {/* Navigation Tabs */}
                             <nav className="space-y-1 bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-2">
                                 {tabs.map((tab) => (
-                                    <button
-                                        key={tab.id}
-                                        onClick={() => setActiveTab(tab.id)}
-                                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === tab.id
-                                            ? 'bg-gray-800 text-white shadow-lg'
-                                            : 'text-gray-700 hover:bg-white/60'
-                                            }`}
-                                    >
-                                        <tab.icon className="w-4 h-4" />
-                                        <span className="flex-1 text-left">{tab.label}</span>
-                                        {tab.count !== undefined && (
-                                            <span className={`px-2 py-0.5 text-xs rounded-full font-semibold ${activeTab === tab.id
-                                                ? 'bg-white/30 text-white'
-                                                : 'bg-white/60 text-gray-600'
-                                                }`}>
-                                                {tab.count}
-                                            </span>
-                                        )}
-                                    </button>
+                                    <div key={tab.id} className="flex items-center gap-1">
+                                        <button
+                                            onClick={() => setActiveTab(tab.id)}
+                                            className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === tab.id
+                                                ? 'bg-gray-800 text-white shadow-lg'
+                                                : 'text-gray-700 hover:bg-white/60'
+                                                }`}
+                                        >
+                                            <tab.icon className="w-4 h-4" />
+                                            <span className="flex-1 text-left">{tab.label}</span>
+                                            {tab.count !== undefined && (
+                                                <span className={`px-2 py-0.5 text-xs rounded-full font-semibold ${activeTab === tab.id
+                                                    ? 'bg-white/30 text-white'
+                                                    : 'bg-white/60 text-gray-600'
+                                                    }`}>
+                                                    {tab.count}
+                                                </span>
+                                            )}
+                                        </button>
+                                        <TabTooltip text={tab.tooltip} />
+                                    </div>
                                 ))}
                             </nav>
                         </div>
@@ -562,7 +613,7 @@ export default function PublicInitiativePage() {
                             </div>
                         ) : (
                             <>
-                                {activeTab === 'overview' && <InitiativeOverviewTab initiative={initiative} dashboard={dashboard} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />}
+                                {activeTab === 'overview' && filteredDashboard && <InitiativeOverviewTab initiative={initiative} dashboard={filteredDashboard} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />}
                                 {activeTab === 'metrics' && filteredDashboard && <MetricsTab dashboard={filteredDashboard} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />}
                                 {activeTab === 'stories' && <StoriesTab stories={filteredStories} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />}
                                 {activeTab === 'locations' && <LocationsTab locations={locations || dashboard.locations} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />}
@@ -619,6 +670,16 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
     const [isCumulative, setIsCumulative] = useState(false)
     const [visibleKPIs, setVisibleKPIs] = useState<Set<string>>(new Set(dashboard.kpis.map(k => k.id)))
     const [isMetricDropdownOpen, setIsMetricDropdownOpen] = useState(false)
+    const [descExpanded, setDescExpanded] = useState(false)
+    const descRef = React.useRef<HTMLParagraphElement>(null)
+    const [descClamped, setDescClamped] = useState(false)
+
+    useEffect(() => {
+        const el = descRef.current
+        if (el) {
+            setDescClamped(el.scrollHeight > el.clientHeight + 2)
+        }
+    }, [initiative.description])
 
     // Flatten all updates from all KPIs
     const allUpdates = useMemo(() => {
@@ -786,7 +847,22 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
                     <div className="flex-1">
                         <h1 className="text-2xl font-semibold text-foreground mb-2">{initiative.title}</h1>
                         {initiative.description && (
-                            <p className="text-muted-foreground leading-relaxed line-clamp-2">{initiative.description}</p>
+                            <div>
+                                <p
+                                    ref={descRef}
+                                    className={`text-muted-foreground leading-relaxed transition-all duration-300 ${descExpanded ? '' : 'line-clamp-2'}`}
+                                >
+                                    {initiative.description}
+                                </p>
+                                {descClamped && (
+                                    <button
+                                        onClick={() => setDescExpanded(prev => !prev)}
+                                        className="text-accent text-sm font-medium mt-1 hover:underline"
+                                    >
+                                        {descExpanded ? 'Show less' : 'Read more'}
+                                    </button>
+                                )}
+                            </div>
                         )}
                     </div>
                     <div className="flex flex-wrap gap-3">
@@ -1377,29 +1453,8 @@ function LocationsTab({ locations, orgSlug, initiativeSlug }: { locations: Publi
         setLocationDetail(null)
     }, [])
 
-    // Keyboard close
-    useEffect(() => {
-        if (!selectedLocation) return
-        const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeDetail() }
-        window.addEventListener('keydown', handleKey)
-        return () => window.removeEventListener('keydown', handleKey)
-    }, [selectedLocation, closeDetail])
-
-    // Lock scroll
-    useEffect(() => {
-        if (selectedLocation) {
-            document.body.style.overflow = 'hidden'
-            return () => { document.body.style.overflow = '' }
-        }
-    }, [selectedLocation])
-
     if (!locations) return <LoadingState />
     if (locations.length === 0) return <EmptyState icon={MapPin} message="No locations available yet." />
-
-    const mapCenter = [
-        locations.reduce((sum, l) => sum + l.latitude, 0) / locations.length,
-        locations.reduce((sum, l) => sum + l.longitude, 0) / locations.length
-    ] as [number, number]
 
     const categoryConfig: Record<string, { bg: string; text: string }> = {
         impact: { bg: 'bg-purple-100', text: 'text-purple-700' },
@@ -1407,212 +1462,192 @@ function LocationsTab({ locations, orgSlug, initiativeSlug }: { locations: Publi
         input: { bg: 'bg-blue-100', text: 'text-blue-700' }
     }
 
-    return (
-        <>
-            <div className="glass-card p-5 rounded-2xl border-accent/20">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                    <div className="lg:col-span-2 h-[450px] rounded-xl overflow-hidden border border-gray-200">
-                        <MapContainer center={mapCenter} zoom={locations.length === 1 ? 8 : 3} className="w-full h-full" zoomControl={true} scrollWheelZoom={true}>
-                            <MapResizeHandler />
-                            <TileLayerWithFallback />
-                            {locations.map((location) => (
-                                <ClickableLocationMarker key={location.id} location={location} onClick={openLocationDetail} />
-                            ))}
-                        </MapContainer>
-                    </div>
-                    <div className="space-y-2 max-h-[450px] overflow-y-auto">
-                        {locations.map((location) => (
-                            <button
-                                key={location.id}
-                                onClick={() => openLocationDetail(location)}
-                                className="w-full text-left bg-gradient-to-r from-accent/5 to-transparent rounded-xl p-3 border border-transparent hover:border-accent hover:shadow-md transition-all group"
-                            >
-                                <div className="flex items-start gap-3">
-                                    <div className="w-9 h-9 bg-accent/20 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-accent/30 transition-colors">
-                                        <MapPin className="w-4 h-4 text-accent" />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <h4 className="font-medium text-foreground text-sm group-hover:text-accent transition-colors">{location.name}</h4>
-                                        {location.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{location.description}</p>}
-                                        <p className="text-[10px] text-muted-foreground mt-1">{location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}</p>
-                                    </div>
-                                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-accent flex-shrink-0 mt-2 transition-colors" />
-                                </div>
-                            </button>
-                        ))}
+    // If a location is selected, show the detail view instead of the map entirely
+    if (selectedLocation) {
+        const evType: Record<string, string> = { visual_proof: 'Visual Proof', documentation: 'Documentation', testimony: 'Testimonies', financials: 'Financials' }
+        const isImage = (url: string) => ['jpg','jpeg','png','gif','webp','svg'].includes(url.split('.').pop()?.toLowerCase() || '')
+
+        return (
+            <div className="space-y-4">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <button onClick={closeDetail} className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
+                            <ArrowLeft className="w-4 h-4" />
+                            <span className="text-sm font-medium">Back to Locations</span>
+                        </button>
+                        <div className="h-5 w-px bg-gray-200" />
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-accent/20 rounded-lg flex items-center justify-center">
+                                <MapPin className="w-4 h-4 text-accent" />
+                            </div>
+                            <div>
+                                <h2 className="font-semibold text-foreground text-sm sm:text-base">{selectedLocation.name}</h2>
+                                {selectedLocation.description && <p className="text-xs text-muted-foreground">{selectedLocation.description}</p>}
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Location Detail Modal */}
-            {selectedLocation && createPortal(
-                <div className="fixed inset-0 z-[100]">
-                    <div className="absolute inset-0 bg-white/70 backdrop-blur-2xl" onClick={closeDetail} />
-
-                    <div className="relative z-10 w-full h-full max-w-7xl mx-auto flex flex-col p-3 sm:p-6">
-                        {/* Header */}
-                        <div className="flex items-center justify-between mb-4 flex-shrink-0">
-                            <div className="flex items-center gap-3">
-                                <button onClick={closeDetail} className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
-                                    <ArrowLeft className="w-4 h-4" />
-                                    <span className="text-sm font-medium">Back to Locations</span>
-                                </button>
-                                <div className="h-5 w-px bg-gray-200" />
-                                <div className="flex items-center gap-2">
-                                    <div className="w-8 h-8 bg-accent/20 rounded-lg flex items-center justify-center">
-                                        <MapPin className="w-4 h-4 text-accent" />
-                                    </div>
-                                    <div>
-                                        <h2 className="font-semibold text-foreground text-sm sm:text-base">{selectedLocation.name}</h2>
-                                        {selectedLocation.description && <p className="text-xs text-muted-foreground">{selectedLocation.description}</p>}
-                                    </div>
-                                </div>
-                            </div>
-                            <button onClick={closeDetail} className="w-9 h-9 rounded-full bg-white/60 hover:bg-white/80 border border-gray-200/50 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors shadow-sm">
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-
-                        {/* Content — 3 column grid */}
-                        {detailLoading ? (
-                            <div className="flex-1 flex items-center justify-center">
-                                <Loader2 className="w-8 h-8 text-accent animate-spin" />
-                            </div>
-                        ) : locationDetail ? (
-                            locationDetail.metrics.length === 0 && locationDetail.evidence.length === 0 && locationDetail.stories.length === 0 ? (
-                                <div className="flex-1 flex items-center justify-center">
-                                    <div className="text-center">
-                                        <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                                        <p className="text-sm text-muted-foreground">No activity recorded at this location yet</p>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
-                                    {/* Column 1: Stories */}
-                                    <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 flex flex-col min-h-0 overflow-hidden">
-                                        <div className="px-4 py-3 border-b border-white/40 flex items-center justify-between flex-shrink-0">
-                                            <div className="flex items-center gap-2">
-                                                <BookOpen className="w-4 h-4 text-accent" />
-                                                <h3 className="font-semibold text-gray-800 text-sm">Stories</h3>
-                                            </div>
-                                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent">{locationDetail.stories.length}</span>
-                                        </div>
-                                        <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                                            {locationDetail.stories.length === 0 ? (
-                                                <div className="flex items-center justify-center h-full text-center py-10">
-                                                    <div>
-                                                        <BookOpen className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                                                        <p className="text-xs text-muted-foreground">No stories here yet</p>
-                                                    </div>
-                                                </div>
-                                            ) : locationDetail.stories.map((story) => (
-                                                <Link key={story.id} to={`/org/${orgSlug}/${initiativeSlug}/story/${story.id}`}
-                                                    className="block rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all overflow-hidden group">
-                                                    {story.media_url && story.media_type === 'photo' && (
-                                                        <div className="aspect-video bg-gray-100 overflow-hidden">
-                                                            <img src={story.media_url} alt={story.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                                        </div>
-                                                    )}
-                                                    <div className="p-3">
-                                                        <h4 className="text-sm font-medium text-foreground group-hover:text-accent transition-colors">{story.title}</h4>
-                                                        {story.description && <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{story.description}</p>}
-                                                        <p className="text-[10px] text-muted-foreground mt-1.5">{new Date(story.date_represented).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                                                    </div>
-                                                </Link>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Column 2: Metrics */}
-                                    <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 flex flex-col min-h-0 overflow-hidden">
-                                        <div className="px-4 py-3 border-b border-white/40 flex items-center justify-between flex-shrink-0">
-                                            <div className="flex items-center gap-2">
-                                                <BarChart3 className="w-4 h-4 text-accent" />
-                                                <h3 className="font-semibold text-gray-800 text-sm">Metrics</h3>
-                                            </div>
-                                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent">{locationDetail.metrics.length}</span>
-                                        </div>
-                                        <div className="flex-1 overflow-y-auto p-3 space-y-3">
-                                            {locationDetail.metrics.length === 0 ? (
-                                                <div className="flex items-center justify-center h-full text-center py-10">
-                                                    <div>
-                                                        <BarChart3 className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                                                        <p className="text-xs text-muted-foreground">No metrics here yet</p>
-                                                    </div>
-                                                </div>
-                                            ) : locationDetail.metrics.map((m) => {
-                                                const cat = categoryConfig[m.category] || categoryConfig.output
-                                                return (
-                                                    <Link key={m.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${m.slug}`}
-                                                        className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
-                                                        <div className="flex items-start justify-between gap-2">
-                                                            <div className="min-w-0">
-                                                                <p className="text-sm font-medium text-foreground group-hover:text-accent transition-colors">{m.title}</p>
-                                                                <p className="text-lg font-bold text-foreground mt-0.5">{m.total_value.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{m.unit_of_measurement}</span></p>
-                                                                <p className="text-[10px] text-muted-foreground">{m.claim_count} claim{m.claim_count !== 1 ? 's' : ''} at this location</p>
-                                                            </div>
-                                                            <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${cat.bg} ${cat.text} capitalize flex-shrink-0`}>{m.category}</span>
-                                                        </div>
-                                                    </Link>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
-
-                                    {/* Column 3: Evidence */}
-                                    <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 flex flex-col min-h-0 overflow-hidden">
-                                        <div className="px-4 py-3 border-b border-white/40 flex items-center justify-between flex-shrink-0">
-                                            <div className="flex items-center gap-2">
-                                                <FileText className="w-4 h-4 text-accent" />
-                                                <h3 className="font-semibold text-gray-800 text-sm">Evidence</h3>
-                                            </div>
-                                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent">{locationDetail.evidence.length}</span>
-                                        </div>
-                                        <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                                            {locationDetail.evidence.length === 0 ? (
-                                                <div className="flex items-center justify-center h-full text-center py-10">
-                                                    <div>
-                                                        <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                                                        <p className="text-xs text-muted-foreground">No evidence here yet</p>
-                                                    </div>
-                                                </div>
-                                            ) : locationDetail.evidence.map((ev) => {
-                                                const isImage = (url: string) => ['jpg','jpeg','png','gif','webp','svg'].includes(url.split('.').pop()?.toLowerCase() || '')
-                                                const preview = ev.files?.find(f => isImage(f.file_url))?.file_url || (ev.file_url && isImage(ev.file_url) ? ev.file_url : null)
-                                                const evType: Record<string, string> = { visual_proof: 'Visual Proof', documentation: 'Documentation', testimony: 'Testimonies', financials: 'Financials' }
-                                                return (
-                                                    <Link key={ev.id} to={`/org/${orgSlug}/${initiativeSlug}/evidence/${ev.id}`}
-                                                        className="block rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all overflow-hidden group">
-                                                        {preview && (
-                                                            <div className="aspect-video bg-gray-100 overflow-hidden">
-                                                                <img src={preview} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                                            </div>
-                                                        )}
-                                                        <div className="p-3">
-                                                            <span className="text-[10px] text-muted-foreground">{evType[ev.type] || ev.type}</span>
-                                                            <h4 className="text-sm font-medium text-foreground group-hover:text-accent transition-colors mt-0.5">{ev.title}</h4>
-                                                            {ev.description && <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{ev.description}</p>}
-                                                        </div>
-                                                    </Link>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
-                                </div>
-                            )
-                        ) : (
-                            <div className="flex-1 flex items-center justify-center">
-                                <div className="text-center">
-                                    <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                                    <p className="text-sm text-muted-foreground">Failed to load location details</p>
-                                </div>
-                            </div>
-                        )}
+                {/* Content */}
+                {detailLoading ? (
+                    <div className="flex items-center justify-center py-20">
+                        <Loader2 className="w-8 h-8 text-accent animate-spin" />
                     </div>
-                </div>,
-                document.body
-            )}
-        </>
+                ) : locationDetail ? (
+                    locationDetail.metrics.length === 0 && locationDetail.evidence.length === 0 && locationDetail.stories.length === 0 ? (
+                        <div className="text-center py-20">
+                            <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                            <p className="text-sm text-muted-foreground">No activity recorded at this location yet</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                            {/* Stories */}
+                            <div className="bg-white rounded-2xl border border-gray-200 p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <BookOpen className="w-4 h-4 text-accent" />
+                                        <h3 className="font-semibold text-gray-800 text-sm">Stories</h3>
+                                    </div>
+                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent">{locationDetail.stories.length}</span>
+                                </div>
+                                <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                                    {locationDetail.stories.length === 0 ? (
+                                        <div className="text-center py-10">
+                                            <BookOpen className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                                            <p className="text-xs text-muted-foreground">No stories here yet</p>
+                                        </div>
+                                    ) : locationDetail.stories.map((story) => (
+                                        <Link key={story.id} to={`/org/${orgSlug}/${initiativeSlug}/story/${story.id}`}
+                                            className="block rounded-xl border border-gray-100 hover:border-accent/30 p-3 transition-colors">
+                                            {story.media_url && story.media_type === 'photo' && (
+                                                <img src={story.media_url} alt={story.title} loading="lazy" className="w-full h-32 object-cover rounded-lg mb-2" />
+                                            )}
+                                            <h4 className="text-sm font-medium text-foreground">{story.title}</h4>
+                                            {story.description && <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{story.description}</p>}
+                                            <p className="text-[10px] text-muted-foreground mt-1">{new Date(story.date_represented).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                        </Link>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Metrics */}
+                            <div className="bg-white rounded-2xl border border-gray-200 p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <BarChart3 className="w-4 h-4 text-accent" />
+                                        <h3 className="font-semibold text-gray-800 text-sm">Metrics</h3>
+                                    </div>
+                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent">{locationDetail.metrics.length}</span>
+                                </div>
+                                <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                                    {locationDetail.metrics.length === 0 ? (
+                                        <div className="text-center py-10">
+                                            <BarChart3 className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                                            <p className="text-xs text-muted-foreground">No metrics here yet</p>
+                                        </div>
+                                    ) : locationDetail.metrics.map((m) => {
+                                        const cat = categoryConfig[m.category] || categoryConfig.output
+                                        return (
+                                            <Link key={m.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${m.slug}`}
+                                                className="block p-3 rounded-xl border border-gray-100 hover:border-accent/30 transition-colors">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-medium text-foreground">{m.title}</p>
+                                                        <p className="text-lg font-bold text-foreground mt-0.5">{m.total_value.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{m.unit_of_measurement}</span></p>
+                                                        <p className="text-[10px] text-muted-foreground">{m.claim_count} claim{m.claim_count !== 1 ? 's' : ''} at this location</p>
+                                                    </div>
+                                                    <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${cat.bg} ${cat.text} capitalize`}>{m.category}</span>
+                                                </div>
+                                            </Link>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Evidence */}
+                            <div className="bg-white rounded-2xl border border-gray-200 p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <FileText className="w-4 h-4 text-accent" />
+                                        <h3 className="font-semibold text-gray-800 text-sm">Evidence</h3>
+                                    </div>
+                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent">{locationDetail.evidence.length}</span>
+                                </div>
+                                <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                                    {locationDetail.evidence.length === 0 ? (
+                                        <div className="text-center py-10">
+                                            <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                                            <p className="text-xs text-muted-foreground">No evidence here yet</p>
+                                        </div>
+                                    ) : locationDetail.evidence.map((ev) => {
+                                        const preview = ev.files?.find(f => isImage(f.file_url))?.file_url || (ev.file_url && isImage(ev.file_url) ? ev.file_url : null)
+                                        return (
+                                            <Link key={ev.id} to={`/org/${orgSlug}/${initiativeSlug}/evidence/${ev.id}`}
+                                                className="block rounded-xl border border-gray-100 hover:border-accent/30 p-3 transition-colors">
+                                                {preview && (
+                                                    <img src={preview} alt={ev.title} loading="lazy" className="w-full h-32 object-cover rounded-lg mb-2" />
+                                                )}
+                                                <span className="text-[10px] text-muted-foreground">{evType[ev.type] || ev.type}</span>
+                                                <h4 className="text-sm font-medium text-foreground mt-0.5">{ev.title}</h4>
+                                                {ev.description && <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{ev.description}</p>}
+                                            </Link>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    )
+                ) : (
+                    <div className="text-center py-20">
+                        <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                        <p className="text-sm text-muted-foreground">Failed to load location details</p>
+                    </div>
+                )}
+            </div>
+        )
+    }
+
+    const mapCenter = [
+        locations.reduce((sum, l) => sum + l.latitude, 0) / locations.length,
+        locations.reduce((sum, l) => sum + l.longitude, 0) / locations.length
+    ] as [number, number]
+
+    return (
+        <div className="glass-card p-5 rounded-2xl border-accent/20">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <div className="lg:col-span-2 h-[450px] rounded-xl overflow-hidden border border-gray-200">
+                    <MapContainer center={mapCenter} zoom={locations.length === 1 ? 8 : 3} className="w-full h-full" zoomControl={true} scrollWheelZoom={true}>
+                        <MapResizeHandler />
+                        <TileLayerWithFallback />
+                        {locations.map((location) => (
+                            <ClickableLocationMarker key={location.id} location={location} onClick={openLocationDetail} />
+                        ))}
+                    </MapContainer>
+                </div>
+                <div className="space-y-2 max-h-[450px] overflow-y-auto">
+                    {locations.map((location) => (
+                        <button
+                            key={location.id}
+                            onClick={() => openLocationDetail(location)}
+                            className="w-full text-left bg-gradient-to-r from-accent/5 to-transparent rounded-xl p-3 border border-transparent hover:border-accent hover:shadow-md transition-all group"
+                        >
+                            <div className="flex items-start gap-3">
+                                <div className="w-9 h-9 bg-accent/20 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-accent/30 transition-colors">
+                                    <MapPin className="w-4 h-4 text-accent" />
+                                </div>
+                                <div className="min-w-0">
+                                    <h4 className="font-medium text-foreground text-sm group-hover:text-accent transition-colors">{location.name}</h4>
+                                    {location.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{location.description}</p>}
+                                    <p className="text-[10px] text-muted-foreground mt-1">{location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}</p>
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-accent flex-shrink-0 mt-2 transition-colors" />
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </div>
     )
 }
 
