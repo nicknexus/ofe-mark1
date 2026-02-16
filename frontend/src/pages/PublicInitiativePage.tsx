@@ -1466,6 +1466,8 @@ function LocationsTab({ locations, orgSlug, initiativeSlug }: { locations: Publi
     if (selectedLocation) {
         const evType: Record<string, string> = { visual_proof: 'Visual Proof', documentation: 'Documentation', testimony: 'Testimonies', financials: 'Financials' }
         const isImage = (url: string) => ['jpg','jpeg','png','gif','webp','svg'].includes(url.split('.').pop()?.toLowerCase() || '')
+        const isYTUrl = (url: string) => url ? /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(url) : false
+        const getYTId = (url: string): string | null => { const m = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/); return m ? m[1] : null }
 
         return (
             <div className="space-y-4">
@@ -1582,8 +1584,8 @@ function LocationsTab({ locations, orgSlug, initiativeSlug }: { locations: Publi
                                         </div>
                                     ) : locationDetail.evidence.map((ev) => {
                                         const imgPreview = ev.files?.find(f => isImage(f.file_url))?.file_url || (ev.file_url && isImage(ev.file_url) ? ev.file_url : null)
-                                        const ytUrl = !imgPreview ? (ev.files?.find(f => isYouTubeUrl(f.file_url))?.file_url || (ev.file_url && isYouTubeUrl(ev.file_url) ? ev.file_url : null)) : null
-                                        const ytId = ytUrl ? getYouTubeVideoId(ytUrl) : null
+                                        const ytUrl = !imgPreview ? (ev.files?.find(f => isYTUrl(f.file_url))?.file_url || (ev.file_url && isYTUrl(ev.file_url) ? ev.file_url : null)) : null
+                                        const ytId = ytUrl ? getYTId(ytUrl) : null
                                         const preview = imgPreview || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : null)
                                         return (
                                             <Link key={ev.id} to={`/org/${orgSlug}/${initiativeSlug}/evidence/${ev.id}`}
