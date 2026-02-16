@@ -1581,12 +1581,24 @@ function LocationsTab({ locations, orgSlug, initiativeSlug }: { locations: Publi
                                             <p className="text-xs text-muted-foreground">No evidence here yet</p>
                                         </div>
                                     ) : locationDetail.evidence.map((ev) => {
-                                        const preview = ev.files?.find(f => isImage(f.file_url))?.file_url || (ev.file_url && isImage(ev.file_url) ? ev.file_url : null)
+                                        const imgPreview = ev.files?.find(f => isImage(f.file_url))?.file_url || (ev.file_url && isImage(ev.file_url) ? ev.file_url : null)
+                                        const ytUrl = !imgPreview ? (ev.files?.find(f => isYouTubeUrl(f.file_url))?.file_url || (ev.file_url && isYouTubeUrl(ev.file_url) ? ev.file_url : null)) : null
+                                        const ytId = ytUrl ? getYouTubeVideoId(ytUrl) : null
+                                        const preview = imgPreview || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : null)
                                         return (
                                             <Link key={ev.id} to={`/org/${orgSlug}/${initiativeSlug}/evidence/${ev.id}`}
                                                 className="block rounded-xl border border-gray-100 hover:border-accent/30 p-3 transition-colors">
                                                 {preview && (
-                                                    <img src={preview} alt={ev.title} loading="lazy" className="w-full h-32 object-cover rounded-lg mb-2" />
+                                                    <div className="relative">
+                                                        <img src={preview} alt={ev.title} loading="lazy" className="w-full h-32 object-cover rounded-lg mb-2" />
+                                                        {ytId && (
+                                                            <div className="absolute inset-0 flex items-center justify-center mb-2">
+                                                                <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
+                                                                    <svg className="w-4 h-4 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 )}
                                                 <span className="text-[10px] text-muted-foreground">{evType[ev.type] || ev.type}</span>
                                                 <h4 className="text-sm font-medium text-foreground mt-0.5">{ev.title}</h4>
@@ -1702,13 +1714,33 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug }: { evidence: PublicEv
         return ext === 'pdf'
     }
 
+    const isYouTubeUrl = (url: string) => {
+        if (!url) return false
+        return /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(url)
+    }
+
+    const getYouTubeVideoId = (url: string): string | null => {
+        if (!url) return null
+        const match = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+        return match ? match[1] : null
+    }
+
     const getPreviewUrl = (item: PublicEvidence) => {
         if (item.files && item.files.length > 0) {
             const imageFile = item.files.find(f => isImageFile(f.file_url))
             if (imageFile) return imageFile.file_url
+            const ytFile = item.files.find(f => isYouTubeUrl(f.file_url))
+            if (ytFile) {
+                const vid = getYouTubeVideoId(ytFile.file_url)
+                if (vid) return `https://img.youtube.com/vi/${vid}/hqdefault.jpg`
+            }
         }
         if (item.file_url && isImageFile(item.file_url)) {
             return item.file_url
+        }
+        if (item.file_url && isYouTubeUrl(item.file_url)) {
+            const vid = getYouTubeVideoId(item.file_url)
+            if (vid) return `https://img.youtube.com/vi/${vid}/hqdefault.jpg`
         }
         return null
     }
@@ -2036,6 +2068,18 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug }: { evidence: PublicEv
                                                     className="w-full h-full"
                                                     title={galleryFile.file_name || galleryItem.title}
                                                 />
+                                            ) : isYouTubeUrl(galleryFile.file_url) ? (
+                                                <div className="w-full h-full flex items-center justify-center p-4">
+                                                    <div className="relative w-full max-w-2xl" style={{ paddingBottom: '56.25%' }}>
+                                                        <iframe
+                                                            src={`https://www.youtube.com/embed/${getYouTubeVideoId(galleryFile.file_url)}`}
+                                                            title="YouTube video"
+                                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                            allowFullScreen
+                                                            className="absolute inset-0 w-full h-full rounded-lg"
+                                                        />
+                                                    </div>
+                                                </div>
                                             ) : (
                                                 <div className="text-center text-white">
                                                     <FileText className="w-16 h-16 mx-auto mb-4 opacity-50" />

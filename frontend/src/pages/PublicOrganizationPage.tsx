@@ -1191,6 +1191,9 @@ export default function PublicOrganizationPage() {
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 h-full">
                                     {displayedEvidence.map((ev) => {
                                         const isImage = ev.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(ev.file_url)
+                                        const isYT = ev.file_url && /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(ev.file_url)
+                                        const ytMatch = isYT && ev.file_url ? ev.file_url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) : null
+                                        const ytId = ytMatch ? ytMatch[1] : null
                                         return (
                                             <Link 
                                                 key={ev.id}
@@ -1199,6 +1202,15 @@ export default function PublicOrganizationPage() {
                                             >
                                                 {isImage ? (
                                                     <img src={ev.file_url} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                ) : ytId ? (
+                                                    <div className="relative w-full h-full">
+                                                        <img src={`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                            <div className="w-8 h-8 md:w-10 md:h-10 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
+                                                                <svg className="w-3.5 h-3.5 md:w-4 md:h-4 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 ) : (
                                                     <div 
                                                         className="w-full h-full flex flex-col items-center justify-center gap-1 md:gap-2 group-hover:scale-105 transition-transform duration-500"

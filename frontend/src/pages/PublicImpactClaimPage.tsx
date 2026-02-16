@@ -403,12 +403,32 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
         return ext === 'pdf'
     }
 
+    const isYouTubeUrl = (url: string) => {
+        if (!url) return false
+        return /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(url)
+    }
+
+    const getYouTubeVideoId = (url: string): string | null => {
+        if (!url) return null
+        const match = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+        return match ? match[1] : null
+    }
+
     const getPreviewUrl = (item: PublicEvidence) => {
         if (item.files && item.files.length > 0) {
             const imageFile = item.files.find(f => isImageFile(f.file_url))
             if (imageFile) return imageFile.file_url
+            const ytFile = item.files.find(f => isYouTubeUrl(f.file_url))
+            if (ytFile) {
+                const vid = getYouTubeVideoId(ytFile.file_url)
+                if (vid) return `https://img.youtube.com/vi/${vid}/hqdefault.jpg`
+            }
         }
         if (item.file_url && isImageFile(item.file_url)) return item.file_url
+        if (item.file_url && isYouTubeUrl(item.file_url)) {
+            const vid = getYouTubeVideoId(item.file_url)
+            if (vid) return `https://img.youtube.com/vi/${vid}/hqdefault.jpg`
+        }
         return null
     }
 
@@ -564,6 +584,18 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                                 <img src={galleryFile.file_url} alt={galleryFile.file_name || galleryItem.title} className="max-w-full max-h-full object-contain" />
                                             ) : isPdfFile(galleryFile.file_url) ? (
                                                 <iframe src={galleryFile.file_url} className="w-full h-full" title={galleryFile.file_name || galleryItem.title} />
+                                            ) : isYouTubeUrl(galleryFile.file_url) ? (
+                                                <div className="w-full h-full flex items-center justify-center p-4">
+                                                    <div className="relative w-full max-w-2xl" style={{ paddingBottom: '56.25%' }}>
+                                                        <iframe
+                                                            src={`https://www.youtube.com/embed/${getYouTubeVideoId(galleryFile.file_url)}`}
+                                                            title="YouTube video"
+                                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                            allowFullScreen
+                                                            className="absolute inset-0 w-full h-full rounded-lg"
+                                                        />
+                                                    </div>
+                                                </div>
                                             ) : (
                                                 <div className="text-center text-white">
                                                     <FileText className="w-16 h-16 mx-auto mb-4 opacity-50" />

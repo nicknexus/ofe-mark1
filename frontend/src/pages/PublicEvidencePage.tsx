@@ -116,6 +116,17 @@ export default function PublicEvidencePage() {
         return type.includes('pdf') || url.match(/\.pdf$/i)
     }
 
+    const isYouTubeUrl = (url: string) => {
+        if (!url) return false
+        return /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(url)
+    }
+
+    const getYouTubeVideoId = (url: string): string | null => {
+        if (!url) return null
+        const match = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+        return match ? match[1] : null
+    }
+
     return (
         <div className="min-h-screen font-figtree relative animate-fadeIn">
             {/* Flowing gradient background */}
@@ -192,6 +203,18 @@ export default function PublicEvidencePage() {
                                             className="w-full h-full"
                                             title={currentFile.file_name}
                                         />
+                                    ) : isYouTubeUrl(currentFile.file_url) ? (
+                                        <div className="w-full h-full flex items-center justify-center p-4">
+                                            <div className="relative w-full max-w-2xl" style={{ paddingBottom: '56.25%' }}>
+                                                <iframe
+                                                    src={`https://www.youtube.com/embed/${getYouTubeVideoId(currentFile.file_url)}`}
+                                                    title="YouTube video"
+                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                    allowFullScreen
+                                                    className="absolute inset-0 w-full h-full rounded-lg"
+                                                />
+                                            </div>
+                                        </div>
                                     ) : (
                                         <div className="text-center text-white">
                                             <TypeIcon className="w-16 h-16 mx-auto mb-4 opacity-50" />

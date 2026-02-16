@@ -308,6 +308,16 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
             fileUrl.includes('.webp')
     }
 
+    const isYouTubeUrl = (url?: string) => {
+        if (!url) return false
+        return /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(url)
+    }
+
+    const getYouTubeVideoId = (url: string): string | null => {
+        const match = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+        return match ? match[1] : null
+    }
+
     return (
         <div className="h-screen overflow-hidden flex flex-col mobile-content-padding">
             {/* Header with Search and Add Button */}
@@ -815,6 +825,8 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                             const evidenceType = evidenceTypes.find(et => et.value === ev.type)
                             const IconComponent = evidenceType?.icon || FileText
                             const hasImagePreview = isImage(ev.file_url)
+                            const hasYouTubePreview = isYouTubeUrl(ev.file_url)
+                            const youTubeId = hasYouTubePreview && ev.file_url ? getYouTubeVideoId(ev.file_url) : null
 
                             return (
                                 <div
@@ -839,6 +851,21 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                                 />
                                                 <div className={`w-full h-full hidden items-center justify-center ${bgColor}`}>
                                                     <IconComponent className="w-12 h-12 text-gray-400" />
+                                                </div>
+                                            </>
+                                        ) : hasYouTubePreview && youTubeId ? (
+                                            <>
+                                                <img
+                                                    src={`https://img.youtube.com/vi/${youTubeId}/hqdefault.jpg`}
+                                                    alt={ev.title || 'YouTube preview'}
+                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                                />
+                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                    <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
+                                                        <svg className="w-5 h-5 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor">
+                                                            <path d="M8 5v14l11-7z" />
+                                                        </svg>
+                                                    </div>
                                                 </div>
                                             </>
                                         ) : (

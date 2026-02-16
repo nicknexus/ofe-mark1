@@ -209,6 +209,17 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
 
     const isPDF = (fileUrl: string) => fileUrl && fileUrl.includes('.pdf')
 
+    const isYouTubeUrl = (url: string) => {
+        if (!url) return false
+        return /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(url)
+    }
+
+    const getYouTubeVideoId = (url: string): string | null => {
+        if (!url) return null
+        const match = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+        return match ? match[1] : null
+    }
+
     const hasDateRange = displayEvidence.date_range_start && displayEvidence.date_range_end
     const displayDate = hasDateRange
         ? `${formatDate(displayEvidence.date_range_start!)} - ${formatDate(displayEvidence.date_range_end!)}`
@@ -331,6 +342,18 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
                                             </div>
                                         </div>
                                     </div>
+                                ) : currentFile && isYouTubeUrl(currentFile.file_url) ? (
+                                    <div className="w-full">
+                                        <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                                            <iframe
+                                                src={`https://www.youtube.com/embed/${getYouTubeVideoId(currentFile.file_url)}`}
+                                                title="YouTube video"
+                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                allowFullScreen
+                                                className="absolute inset-0 w-full h-full rounded-lg"
+                                            />
+                                        </div>
+                                    </div>
                                 ) : currentFile ? (
                                     <div className="text-center">
                                         <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -379,6 +402,12 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
                                                 <img 
                                                     src={file.file_url} 
                                                     alt={file.file_name}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : isYouTubeUrl(file.file_url) ? (
+                                                <img
+                                                    src={`https://img.youtube.com/vi/${getYouTubeVideoId(file.file_url)}/default.jpg`}
+                                                    alt="YouTube"
                                                     className="w-full h-full object-cover"
                                                 />
                                             ) : (
