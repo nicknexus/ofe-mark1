@@ -136,21 +136,11 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                 })
             }
 
-            // Filter by beneficiary groups (via linked KPIs and locations)
+            // Filter by beneficiary groups (via direct evidence-beneficiary linkage)
             if (selectedBeneficiaryGroups.length > 0) {
-                // Get location IDs from selected beneficiary groups
-                const locationIdsFromBeneficiaries = beneficiaryGroups
-                    .filter(bg => selectedBeneficiaryGroups.includes(bg.id!))
-                    .map(bg => bg.location_id)
-                    .filter(Boolean) as string[]
-
                 filtered = filtered.filter(ev => {
-                    // If evidence has location_id that matches beneficiary group locations
-                    if (ev.location_id && locationIdsFromBeneficiaries.includes(ev.location_id)) {
-                        return true
-                    }
-                    // Otherwise, include it (evidence might be linked via KPIs)
-                    return true
+                    const evBgIds = ev.beneficiary_group_ids || []
+                    return evBgIds.some(bgId => selectedBeneficiaryGroups.includes(bgId))
                 })
             }
 

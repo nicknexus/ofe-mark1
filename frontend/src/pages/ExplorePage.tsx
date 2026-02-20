@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, Building2, Target, MapPin, Loader2, ArrowRight, Sparkles } from 'lucide-react'
+import { Search, Building2, Target, MapPin, Loader2, ArrowRight, Sparkles, ArrowLeft } from 'lucide-react'
 import { publicApi, PublicOrganization, PublicInitiative, SearchResult } from '../services/publicApi'
 import PublicLoader from '../components/public/PublicLoader'
+import { supabase } from '../services/supabase'
 
 // Debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -20,9 +21,13 @@ export default function ExplorePage() {
     const [loading, setLoading] = useState(false)
     const [initialOrgs, setInitialOrgs] = useState<PublicOrganization[]>([])
     const [loadingInitial, setLoadingInitial] = useState(true)
+    const [isLoggedIn, setIsLoggedIn] = useState(false)
 
     const debouncedQuery = useDebounce(searchQuery, 300)
 
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => setIsLoggedIn(!!session))
+    }, [])
     useEffect(() => { loadInitialOrganizations() }, [])
     useEffect(() => {
         if (debouncedQuery.trim()) performSearch(debouncedQuery)
@@ -67,10 +72,10 @@ export default function ExplorePage() {
             <div className="fixed inset-0 pointer-events-none">
                 {/* Subtle grid pattern */}
                 <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(210,220,230,0.2)_1px,transparent_1px),linear-gradient(to_bottom,rgba(210,220,230,0.2)_1px,transparent_1px)] bg-[size:60px_60px]" />
-                
+
                 {/* Radial gradient overlay to fade the grid */}
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_30%,transparent_0%,white_60%)]" />
-                
+
                 {/* Green gradient blobs */}
                 <div
                     className="absolute inset-0"
@@ -98,8 +103,17 @@ export default function ExplorePage() {
                                 <span className="text-lg sm:text-xl font-newsreader font-extralight text-foreground">Nexus Impacts</span>
                             </Link>
                             <div className="flex items-center gap-2 sm:gap-4">
-                                <Link to="/login" className="text-xs sm:text-sm text-muted-foreground hover:text-accent transition-colors">Sign In</Link>
-                                <Link to="/login" className="px-3 sm:px-4 py-2 bg-primary-500 text-gray-700 text-xs sm:text-sm font-medium rounded-xl hover:bg-primary-400 transition-colors">Get Started</Link>
+                                {isLoggedIn ? (
+                                    <Link to="/" className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-primary-500 text-gray-700 text-xs sm:text-sm font-medium rounded-xl hover:bg-primary-400 transition-colors">
+                                        <ArrowLeft className="w-3.5 h-3.5" />
+                                        Back to Dashboard
+                                    </Link>
+                                ) : (
+                                    <>
+                                        <Link to="/login" className="text-xs sm:text-sm text-muted-foreground hover:text-accent transition-colors">Sign In</Link>
+                                        <Link to="/login" className="px-3 sm:px-4 py-2 bg-primary-500 text-gray-700 text-xs sm:text-sm font-medium rounded-xl hover:bg-primary-400 transition-colors">Get Started</Link>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </nav>

@@ -131,7 +131,20 @@ export default function MobileStoriesTab({ initiativeId }: MobileStoriesTabProps
                             >
                                 {/* Media Preview */}
                                 <div className="aspect-square bg-gray-100 relative overflow-hidden">
-                                    {story.media_url && (story.media_type === 'photo' || !story.media_type) ? (
+                                    {story.media_url && /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(story.media_url) ? (
+                                        <>
+                                            <img
+                                                src={`https://img.youtube.com/vi/${(story.media_url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) || [])[1]}/hqdefault.jpg`}
+                                                alt={story.title}
+                                                className="w-full h-full object-cover"
+                                            />
+                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
+                                                    <svg className="w-4 h-4 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : story.media_url && (story.media_type === 'photo' || !story.media_type) ? (
                                         <img
                                             src={story.media_url}
                                             alt={story.title}
@@ -379,13 +392,44 @@ function MobileStoryForm({ initiativeId, onClose, onSuccess }: StoryFormProps) {
                                 </button>
                             </div>
                         ) : (
-                            <button
-                                onClick={() => fileInputRef.current?.click()}
-                                className="w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-primary-400 transition-colors"
-                            >
-                                <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                                <p className="text-sm text-gray-600">Tap to upload</p>
-                            </button>
+                            <>
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-primary-400 transition-colors"
+                                >
+                                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                                    <p className="text-sm text-gray-600">Tap to upload</p>
+                                </button>
+
+                                <div className="mt-4 space-y-3">
+                                    <div className="flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200/60 rounded-xl">
+                                        <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                                            <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                                            </svg>
+                                        </div>
+                                        <input
+                                            type="url"
+                                            value={formData.media_url || ''}
+                                            onChange={(e) => setFormData({ ...formData, media_url: e.target.value })}
+                                            className="flex-1 bg-transparent border-none outline-none text-sm text-gray-800 placeholder-red-400/70 focus:ring-0 p-0"
+                                            placeholder="Paste a YouTube link"
+                                        />
+                                    </div>
+                                    <div className="relative flex items-center">
+                                        <div className="flex-1 border-t border-gray-200"></div>
+                                        <span className="px-3 text-xs text-gray-400 font-medium">or paste any link</span>
+                                        <div className="flex-1 border-t border-gray-200"></div>
+                                    </div>
+                                    <input
+                                        type="url"
+                                        value={formData.media_url || ''}
+                                        onChange={(e) => setFormData({ ...formData, media_url: e.target.value })}
+                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                        placeholder="Paste a link to media (https://...)"
+                                    />
+                                </div>
+                            </>
                         )}
                     </div>
                 )}

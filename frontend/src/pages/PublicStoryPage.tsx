@@ -148,7 +148,18 @@ export default function PublicStoryPage() {
                 {/* Story Card */}
                 <div className="bg-white/50 backdrop-blur-2xl rounded-2xl sm:rounded-3xl border border-white/60 shadow-2xl shadow-black/10 overflow-hidden">
                     {/* Media */}
-                    {story.media_url && story.media_type === 'photo' && (
+                    {story.media_url && /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(story.media_url) ? (
+                        <div className="w-full aspect-video bg-black">
+                            <iframe
+                                src={`https://www.youtube.com/embed/${(story.media_url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) || [])[1]}`}
+                                title="YouTube video"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                                className="w-full h-full"
+                            />
+                        </div>
+                    ) : null}
+                    {story.media_url && story.media_type === 'photo' && !/(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(story.media_url) && (
                         <div className="w-full min-h-[150px] sm:min-h-[200px] max-h-[50vh] sm:max-h-[70vh] bg-transparent flex items-center justify-center overflow-hidden">
                             <img
                                 src={story.media_url}
@@ -157,7 +168,7 @@ export default function PublicStoryPage() {
                             />
                         </div>
                     )}
-                    {story.media_type === 'video' && story.media_url && (
+                    {story.media_type === 'video' && story.media_url && !/(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(story.media_url) && (
                         <div className="w-full aspect-video bg-black">
                             <video
                                 src={story.media_url}

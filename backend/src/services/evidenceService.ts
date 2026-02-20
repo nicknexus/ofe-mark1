@@ -6,7 +6,7 @@ import { StorageService } from './storageService'
 export class EvidenceService {
     static async create(evidence: Evidence, userId: string): Promise<Evidence> {
         // Extract linkage fields and file_urls/file_sizes before inserting into evidence table
-        const { kpi_ids, kpi_update_ids, file_urls, file_sizes, location_ids, ...evidenceData } = evidence;
+        const { kpi_ids, kpi_update_ids, file_urls, file_sizes, location_ids, beneficiary_group_ids, ...evidenceData } = evidence;
 
         const { data, error } = await supabase
             .from('evidence')
@@ -94,14 +94,29 @@ export class EvidenceService {
             if (linkError2) throw new Error(`Failed to link evidence to data points: ${linkError2.message}`);
         }
 
+        // Link to beneficiary groups if provided
+        if (beneficiary_group_ids && beneficiary_group_ids.length > 0) {
+            const bgLinks = beneficiary_group_ids.map(bgId => ({
+                evidence_id: data.id,
+                beneficiary_group_id: bgId
+            }));
+
+            const { error: bgError } = await supabase
+                .from('evidence_beneficiary_groups')
+                .insert(bgLinks);
+
+            if (bgError) {
+                console.error('Failed to insert evidence beneficiary groups:', bgError);
+            }
+        }
+
         return data;
     }
 
-    static async getAll(initiativeId?: string, kpiId?: string): Promise<Evidence[]> {
+    static async getAll(initiativeId?: string, kpiId?: string, beneficiaryGroupId?: string): Promise<Evidence[]> {
         let query;
 
-        if (kpiId) {
-            // When filtering by KPI, we need to join with evidence_kpis table
+        if (kpiId && beneficiaryGroupId) {
             query = supabase
                 .from('evidence')
                 .select(`
@@ -109,11 +124,24 @@ export class EvidenceService {
                     evidence_kpis!inner(kpi_id),
                     evidence_kpi_updates(kpi_update_id),
                     evidence_locations(location_id),
+                    evidence_beneficiary_groups!inner(beneficiary_group_id),
+                    initiatives(title)
+                `)
+                .eq('evidence_kpis.kpi_id', kpiId)
+                .eq('evidence_beneficiary_groups.beneficiary_group_id', beneficiaryGroupId);
+        } else if (kpiId) {
+            query = supabase
+                .from('evidence')
+                .select(`
+                    *,
+                    evidence_kpis!inner(kpi_id),
+                    evidence_kpi_updates(kpi_update_id),
+                    evidence_locations(location_id),
+                    evidence_beneficiary_groups(beneficiary_group_id),
                     initiatives(title)
                 `)
                 .eq('evidence_kpis.kpi_id', kpiId);
-        } else {
-            // Regular query without KPI filtering
+        } else if (beneficiaryGroupId) {
             query = supabase
                 .from('evidence')
                 .select(`
@@ -121,6 +149,19 @@ export class EvidenceService {
                     evidence_kpis(kpi_id),
                     evidence_kpi_updates(kpi_update_id),
                     evidence_locations(location_id),
+                    evidence_beneficiary_groups!inner(beneficiary_group_id),
+                    initiatives(title)
+                `)
+                .eq('evidence_beneficiary_groups.beneficiary_group_id', beneficiaryGroupId);
+        } else {
+            query = supabase
+                .from('evidence')
+                .select(`
+                    *,
+                    evidence_kpis(kpi_id),
+                    evidence_kpi_updates(kpi_update_id),
+                    evidence_locations(location_id),
+                    evidence_beneficiary_groups(beneficiary_group_id),
                     initiatives(title)
                 `);
         }
@@ -137,10 +178,12 @@ export class EvidenceService {
         const transformedData = (data || []).map((item: any) => {
             const kpi_update_ids = item.evidence_kpi_updates?.map((link: any) => link.kpi_update_id).filter(Boolean) || [];
             const location_ids = item.evidence_locations?.map((link: any) => link.location_id).filter(Boolean) || [];
+            const beneficiary_group_ids = item.evidence_beneficiary_groups?.map((link: any) => link.beneficiary_group_id).filter(Boolean) || [];
             return {
                 ...item,
                 kpi_update_ids,
-                location_ids
+                location_ids,
+                beneficiary_group_ids
             };
         });
         
@@ -148,7 +191,6 @@ export class EvidenceService {
     }
 
     static async getById(id: string): Promise<Evidence | null> {
-        // Include linked data points and locations for new model
         const { data, error } = await supabase
             .from('evidence')
             .select(`
@@ -156,6 +198,7 @@ export class EvidenceService {
                 evidence_kpis(kpi_id),
                 evidence_kpi_updates(kpi_update_id),
                 evidence_locations(location_id),
+                evidence_beneficiary_groups(beneficiary_group_id),
                 initiatives(title)
             `)
             .eq('id', id)
@@ -171,14 +214,15 @@ export class EvidenceService {
             const kpi_ids = data.evidence_kpis?.map((link: any) => link.kpi_id).filter(Boolean) || [];
             const kpi_update_ids = data.evidence_kpi_updates?.map((link: any) => link.kpi_update_id).filter(Boolean) || [];
             const location_ids = data.evidence_locations?.map((link: any) => link.location_id).filter(Boolean) || [];
-            return { ...data, kpi_ids, kpi_update_ids, location_ids };
+            const beneficiary_group_ids = data.evidence_beneficiary_groups?.map((link: any) => link.beneficiary_group_id).filter(Boolean) || [];
+            return { ...data, kpi_ids, kpi_update_ids, location_ids, beneficiary_group_ids };
         }
         return data;
     }
 
     static async update(id: string, evidence: Partial<Evidence>, userId: string): Promise<Evidence> {
         // Extract linkage fields for separate handling
-        const { kpi_ids, kpi_update_ids, location_ids, ...evidenceData } = evidence;
+        const { kpi_ids, kpi_update_ids, location_ids, beneficiary_group_ids, ...evidenceData } = evidence;
 
         // Get existing evidence to check if file_url is changing
         const { data: existingEvidence } = await supabase
@@ -270,6 +314,27 @@ export class EvidenceService {
                     .insert(locationLinks);
 
                 if (locationError) throw new Error(`Failed to update evidence location links: ${locationError.message}`);
+            }
+        }
+
+        // Update beneficiary group links if provided
+        if (beneficiary_group_ids !== undefined) {
+            await supabase
+                .from('evidence_beneficiary_groups')
+                .delete()
+                .eq('evidence_id', id);
+
+            if (beneficiary_group_ids.length > 0) {
+                const bgLinks = beneficiary_group_ids.map(bgId => ({
+                    evidence_id: id,
+                    beneficiary_group_id: bgId
+                }));
+
+                const { error: bgError } = await supabase
+                    .from('evidence_beneficiary_groups')
+                    .insert(bgLinks);
+
+                if (bgError) throw new Error(`Failed to update evidence beneficiary group links: ${bgError.message}`);
             }
         }
 

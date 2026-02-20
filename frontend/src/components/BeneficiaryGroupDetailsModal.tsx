@@ -39,40 +39,12 @@ export default function BeneficiaryGroupDetailsModal({
             Promise.all([
                 apiService.getKPIUpdatesForBeneficiaryGroup(beneficiaryGroup.id),
                 apiService.getStories(initiativeId, { beneficiaryGroupIds: [beneficiaryGroup.id] }),
+                apiService.getEvidenceForBeneficiaryGroup(beneficiaryGroup.id),
             ])
-                .then(async ([updates, storiesData]) => {
-                    const updatesArray = Array.isArray(updates) ? updates : []
-                    const storiesArray = Array.isArray(storiesData) ? storiesData : []
-                    
-                    setKpiUpdates(updatesArray)
-                    setStories(storiesArray)
-                    
-                    // Get evidence linked to these KPI updates
-                    const updateIds = updatesArray.map((u: any) => u.id).filter(Boolean)
-                    if (updateIds.length > 0) {
-                        try {
-                            const allEvidence: Evidence[] = []
-                            // Get evidence for each update
-                            for (const updateId of updateIds) {
-                                try {
-                                    const ev = await apiService.getEvidenceForDataPoint(updateId)
-                                    if (ev && Array.isArray(ev)) {
-                                        allEvidence.push(...ev)
-                                    }
-                                } catch (error) {
-                                    console.error(`Failed to load evidence for update ${updateId}:`, error)
-                                }
-                            }
-                            // Remove duplicates
-                            const uniqueEvidence = Array.from(new Map(allEvidence.map(e => [e.id, e])).values())
-                            setEvidence(uniqueEvidence)
-                        } catch (error) {
-                            console.error('Failed to fetch evidence:', error)
-                            setEvidence([])
-                        }
-                    } else {
-                        setEvidence([])
-                    }
+                .then(([updates, storiesData, evidenceData]) => {
+                    setKpiUpdates(Array.isArray(updates) ? updates : [])
+                    setStories(Array.isArray(storiesData) ? storiesData : [])
+                    setEvidence(Array.isArray(evidenceData) ? evidenceData : [])
                 })
                 .catch((error) => {
                     console.error('Failed to fetch beneficiary group data:', error)

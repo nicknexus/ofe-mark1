@@ -849,7 +849,20 @@ export default function PublicOrganizationPage() {
                                             to={`/org/${slug}/${currentStory.initiative_slug}?tab=stories`}
                                             className="flex-1 rounded-2xl overflow-hidden hover:shadow-lg transition-all group relative"
                                         >
-                                            {currentStory.media_url && currentStory.media_type === 'photo' ? (
+                                            {currentStory.media_url && /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(currentStory.media_url) ? (
+                                                <div className="relative w-full h-full">
+                                                    <img
+                                                        src={`https://img.youtube.com/vi/${(currentStory.media_url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) || [])[1]}/hqdefault.jpg`}
+                                                        alt={currentStory.title}
+                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                    />
+                                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                        <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
+                                                            <svg className="w-5 h-5 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : currentStory.media_url && currentStory.media_type === 'photo' ? (
                                                 <img 
                                                     src={currentStory.media_url} 
                                                     alt={currentStory.title} 

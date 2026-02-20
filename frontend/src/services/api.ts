@@ -527,6 +527,10 @@ class ApiService {
         return result
     }
 
+    async getEvidenceForBeneficiaryGroup(beneficiaryGroupId: string): Promise<Evidence[]> {
+        return this.request<Evidence[]>(`/evidence?beneficiary_group_id=${beneficiaryGroupId}`)
+    }
+
     async getEvidenceForDataPoint(updateId: string): Promise<Evidence[]> {
         return this.request<Evidence[]>(`/evidence/for-kpi-update/${updateId}`)
     }

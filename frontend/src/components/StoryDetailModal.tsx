@@ -55,7 +55,15 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
                             </div>
                         ) : story.media_url && story.media_url.trim() ? (
                             <div className="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-lg">
-                                {story.media_type === 'photo' && !imageError ? (
+                                {/(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(story.media_url) ? (
+                                    <iframe
+                                        src={`https://www.youtube.com/embed/${(story.media_url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) || [])[1]}`}
+                                        title="YouTube video"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowFullScreen
+                                        className="w-full h-full"
+                                    />
+                                ) : story.media_type === 'photo' && !imageError ? (
                                     <img
                                         src={story.media_url}
                                         alt={story.title}

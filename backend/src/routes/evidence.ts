@@ -8,10 +8,11 @@ const router = express.Router();
 // Get all evidence
 router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const { initiative_id, kpi_id } = req.query;
+        const { initiative_id, kpi_id, beneficiary_group_id } = req.query;
         const evidence = await EvidenceService.getAll(
             initiative_id as string,
-            kpi_id as string
+            kpi_id as string,
+            beneficiary_group_id as string
         );
         res.json(evidence);
     } catch (error) {

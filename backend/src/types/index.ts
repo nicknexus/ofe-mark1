@@ -127,6 +127,7 @@ export interface Evidence {
     kpi_ids?: string[];
     // New precise linkage to specific KPI updates
     kpi_update_ids?: string[];
+    beneficiary_group_ids?: string[];
     initiative_id?: string;
     created_at?: string;
     updated_at?: string;

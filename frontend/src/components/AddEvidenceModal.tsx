@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { X, Upload, Calendar, Link as LinkIcon, FileText, Camera, DollarSign, MessageSquare, File, MapPin, Plus, ChevronLeft, ChevronRight, Check, Loader2 } from 'lucide-react'
-import { CreateEvidenceForm, KPI, KPIWithEvidence, Location } from '../types'
+import { X, Upload, Calendar, Link as LinkIcon, FileText, Camera, DollarSign, MessageSquare, File, MapPin, Plus, ChevronLeft, ChevronRight, Check, Loader2, Users } from 'lucide-react'
+import { CreateEvidenceForm, KPI, KPIWithEvidence, Location, BeneficiaryGroup } from '../types'
 import { apiService } from '../services/api'
 import { formatDate, getLocalDateString } from '../utils'
 import LocationModal from './LocationModal'
@@ -60,6 +60,9 @@ export default function AddEvidenceModal({
     const [hasChangedKPIs, setHasChangedKPIs] = useState(false)
     const [initialKpiIds, setInitialKpiIds] = useState<string[]>([])
     const [isInitialFetch, setIsInitialFetch] = useState(true)
+    const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
+    const [selectedBeneficiaryGroupIds, setSelectedBeneficiaryGroupIds] = useState<string[]>([])
+    const [hasChangedBeneficiaryGroups, setHasChangedBeneficiaryGroups] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
     const totalSteps = 5
 
@@ -135,6 +138,10 @@ export default function AddEvidenceModal({
                         (editData.location_id ? [editData.location_id] : [])
                     setSelectedLocationIds(locationIds)
 
+                    // Load beneficiary group links
+                    setSelectedBeneficiaryGroupIds(fullEvidence.beneficiary_group_ids || [])
+                    setHasChangedBeneficiaryGroups(false)
+
                     // Store initial KPI IDs to track changes
                     setInitialKpiIds(kpiIds)
                     setHasChangedKPIs(false)
@@ -165,6 +172,8 @@ export default function AddEvidenceModal({
                             : {}
                     setDatePickerValue(initialDateValue)
                     setSelectedLocationIds(editData.location_ids || (editData.location_id ? [editData.location_id] : []))
+                    setSelectedBeneficiaryGroupIds(editData.beneficiary_group_ids || [])
+                    setHasChangedBeneficiaryGroups(false)
                     setInitialKpiIds(kpiIds)
                     setHasChangedKPIs(false)
                     setSelectedUpdateIds([])
@@ -180,7 +189,9 @@ export default function AddEvidenceModal({
             setInitialKpiIds([])
             setHasChangedKPIs(false)
             setDatePickerValue({})
-            setIsInitialFetch(true) // Reset to initial fetch state for new evidence
+            setIsInitialFetch(true)
+            setSelectedBeneficiaryGroupIds([])
+            setHasChangedBeneficiaryGroups(false)
         }
     }, [editData?.id, initiativeId, isOpen])
 
@@ -191,6 +202,16 @@ export default function AddEvidenceModal({
                 .getLocations(initiativeId)
                 .then((locs) => setLocations(locs || []))
                 .catch(() => setLocations([]))
+        }
+    }, [isOpen, initiativeId])
+
+    // Load beneficiary groups when modal opens
+    useEffect(() => {
+        if (isOpen && initiativeId) {
+            apiService
+                .getBeneficiaryGroups(initiativeId)
+                .then((groups) => setBeneficiaryGroups(groups || []))
+                .catch(() => setBeneficiaryGroups([]))
         }
     }, [isOpen, initiativeId])
 
@@ -384,6 +405,11 @@ export default function AddEvidenceModal({
 
             submitData.location_ids = selectedLocationIds
 
+            // Include beneficiary group links
+            if (!editData || hasChangedBeneficiaryGroups) {
+                submitData.beneficiary_group_ids = selectedBeneficiaryGroupIds
+            }
+
             setUploadProgress(editData ? 'Updating evidence record...' : 'Creating evidence record...')
             await onSubmit(submitData)
 
@@ -399,6 +425,7 @@ export default function AddEvidenceModal({
                 })
                 setSelectedFiles([])
                 setDatePickerValue({})
+                setSelectedBeneficiaryGroupIds([])
             }
             setUploadProgress('')
             onClose()
@@ -526,7 +553,7 @@ export default function AddEvidenceModal({
         { number: 1, title: 'Evidence Type' },
         { number: 2, title: 'Date & Location' },
         { number: 3, title: 'Metrics' },
-        { number: 4, title: 'Impact Claims' },
+        { number: 4, title: 'Beneficiaries' },
         { number: 5, title: 'Details & Upload' }
     ]
 
@@ -853,227 +880,103 @@ export default function AddEvidenceModal({
                     </div>
                         )}
 
-                        {/* Step 4: Impact Claims */}
+                        {/* Step 4: Beneficiaries (optional) */}
                         {currentStep === 4 && (
                             <div className="space-y-6 animate-fade-in max-w-3xl mx-auto">
                                 <div className="text-center mb-6">
-                                    <h3 className="text-2xl font-semibold text-gray-900 mb-2">Impact Claims</h3>
+                                    <h3 className="text-2xl font-semibold text-gray-900 mb-2">Beneficiaries</h3>
                                     <p className="text-gray-600">
-                                        Review and confirm the impact claims this evidence supports
-                                        {selectedLocationIds.length > 0 && (
-                                            selectedLocationIds.length === 1
-                                                ? ` at ${locations.find(loc => loc.id === selectedLocationIds[0])?.name || 'selected location'}`
-                                                : ` at ${selectedLocationIds.length} locations`
-                                        )}
+                                        Optionally link this evidence to beneficiary groups
                                     </p>
-                    </div>
+                                </div>
 
-                                {kpiDataSummaries.length === 0 ? (
+                                {beneficiaryGroups.length === 0 ? (
                                     <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
-                                        <p className="text-gray-500">
-                                            {formData.kpi_ids && formData.kpi_ids.length > 0
-                                                ? 'No matching impact claims found for the selected date and location.'
-                                                : 'Select metrics in the previous step to see impact claims.'}
-                                        </p>
+                                        <Users className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                                        <p className="text-gray-500">No beneficiary groups found for this initiative.</p>
+                                        <p className="text-sm text-gray-400 mt-1">You can add beneficiary groups from the Beneficiaries tab.</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-4">
-                                        {(() => {
-                                            // Calculate average coverage percentage for selected claims
-                                            const selectedClaims = kpiDataSummaries.flatMap((s: any) => 
-                                                s.updates.filter((u: any) => selectedUpdateIds.includes(u.id))
-                                            )
-                                            let totalCoverage = 0
-                                            let claimsWithCoverage = 0
-                                            selectedClaims.forEach((claim: any) => {
-                                                if (claim.date_range_start && claim.date_range_end) {
-                                                    const claimStart = new Date(claim.date_range_start)
-                                                    const claimEnd = new Date(claim.date_range_end)
-                                                    const claimDays = Math.ceil((claimEnd.getTime() - claimStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
-                                                    
-                                                    if (datePickerValue.startDate && datePickerValue.endDate) {
-                                                        const evidenceStart = new Date(datePickerValue.startDate)
-                                                        const evidenceEnd = new Date(datePickerValue.endDate)
-                                                        const overlapStart = new Date(Math.max(claimStart.getTime(), evidenceStart.getTime()))
-                                                        const overlapEnd = new Date(Math.min(claimEnd.getTime(), evidenceEnd.getTime()))
-                                                        
-                                                        if (overlapEnd >= overlapStart) {
-                                                            const coveredDays = Math.ceil((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
-                                                            totalCoverage += Math.round((coveredDays / claimDays) * 100)
-                                                            claimsWithCoverage++
-                                                        }
-                                                    } else if (datePickerValue.singleDate) {
-                                                        const evidenceDate = new Date(datePickerValue.singleDate)
-                                                        if (evidenceDate >= claimStart && evidenceDate <= claimEnd) {
-                                                            totalCoverage += Math.round((1 / claimDays) * 100)
-                                                            claimsWithCoverage++
-                                                        }
-                                                    }
-                                                } else {
-                                                    totalCoverage += 100
-                                                    claimsWithCoverage++
-                                                }
-                                            })
-                                            const avgCoverage = claimsWithCoverage > 0 ? Math.round(totalCoverage / claimsWithCoverage) : 0
-                                            
-                                            return (
-                                                <div className="mb-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                                                    <p className="text-sm text-blue-800 mb-2">
-                                                        Based on the dates provided, this evidence is going to cover {avgCoverage}% of the following impact claims
-                                                    </p>
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-sm font-medium text-blue-900">
-                                                            Selected {selectedUpdateIds.length} impact claim{selectedUpdateIds.length !== 1 ? 's' : ''}
-                                                        </span>
-                                                        <div className="space-x-2">
-                                                            <button
-                                                                type="button"
-                                                                className="text-sm px-4 py-2 bg-white hover:bg-blue-100 border border-blue-300 rounded-lg text-blue-700 font-medium transition-colors"
-                                                                onClick={() => {
-                                                                    setSelectedUpdateIds(kpiDataSummaries.flatMap((s: any) => s.updates.map((u: any) => u.id)))
-                                                                    if (editData) setHasChangedDataPoints(true)
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm font-medium text-gray-700">
+                                                {selectedBeneficiaryGroupIds.length} of {beneficiaryGroups.length} selected
+                                            </span>
+                                            <div className="space-x-2">
+                                                <button
+                                                    type="button"
+                                                    className="text-sm px-4 py-2 bg-white hover:bg-blue-100 border border-blue-300 rounded-lg text-blue-700 font-medium transition-colors"
+                                                    onClick={() => {
+                                                        setSelectedBeneficiaryGroupIds(beneficiaryGroups.map(g => g.id!))
+                                                        if (editData) setHasChangedBeneficiaryGroups(true)
+                                                    }}
+                                                >
+                                                    Select All
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="text-sm px-4 py-2 bg-white hover:bg-blue-100 border border-blue-300 rounded-lg text-blue-700 font-medium transition-colors"
+                                                    onClick={() => {
+                                                        setSelectedBeneficiaryGroupIds([])
+                                                        if (editData) setHasChangedBeneficiaryGroups(true)
+                                                    }}
+                                                >
+                                                    Clear
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                                            {beneficiaryGroups.map((group) => {
+                                                const checked = selectedBeneficiaryGroupIds.includes(group.id!)
+                                                const locationName = locations.find(l => l.id === group.location_id)?.name
+                                                return (
+                                                    <div key={group.id} className={`bg-white rounded-lg border-2 transition-colors ${checked ? 'border-primary-400 bg-primary-50/30' : 'border-gray-200'}`}>
+                                                        <label className="flex items-start p-4 cursor-pointer hover:bg-gray-50 rounded-lg">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={checked}
+                                                                onChange={() => {
+                                                                    setSelectedBeneficiaryGroupIds(prev =>
+                                                                        checked ? prev.filter(id => id !== group.id) : [...prev, group.id!]
+                                                                    )
+                                                                    if (editData) setHasChangedBeneficiaryGroups(true)
                                                                 }}
-                                                            >
-                                                                Select All
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                className="text-sm px-4 py-2 bg-white hover:bg-blue-100 border border-blue-300 rounded-lg text-blue-700 font-medium transition-colors"
-                                                                onClick={() => {
-                                                                    setSelectedUpdateIds([])
-                                                                    if (editData) setHasChangedDataPoints(true)
-                                                                }}
-                                                            >
-                                                                Clear
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )
-                                        })()}
-                                        {kpiDataSummaries.map((kpiSummary: any) => {
-                                const updatesWithCoverage = kpiSummary.updates.map((dataPoint: any) => {
-                                    let coveragePercentage = 100
-                                    let coverageText = ''
-
-                                    if (dataPoint.date_range_start && dataPoint.date_range_end) {
-                                        const claimStart = new Date(dataPoint.date_range_start)
-                                        const claimEnd = new Date(dataPoint.date_range_end)
-                                        const claimDays = Math.ceil((claimEnd.getTime() - claimStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
-
-                                        if (datePickerValue.startDate && datePickerValue.endDate) {
-                                            const evidenceStart = new Date(datePickerValue.startDate)
-                                            const evidenceEnd = new Date(datePickerValue.endDate)
-                                            const overlapStart = new Date(Math.max(claimStart.getTime(), evidenceStart.getTime()))
-                                            const overlapEnd = new Date(Math.min(claimEnd.getTime(), evidenceEnd.getTime()))
-                                            
-                                            if (overlapEnd >= overlapStart) {
-                                                const coveredDays = Math.ceil((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
-                                                coveragePercentage = Math.round((coveredDays / claimDays) * 100)
-                                                coverageText = `${coveragePercentage}%`
-                                            } else {
-                                                coveragePercentage = 0
-                                                coverageText = '0%'
-                                            }
-                                        } else if (datePickerValue.singleDate) {
-                                            const evidenceDate = new Date(datePickerValue.singleDate)
-                                            if (evidenceDate >= claimStart && evidenceDate <= claimEnd) {
-                                                coveragePercentage = Math.round((1 / claimDays) * 100)
-                                                coverageText = `${coveragePercentage}%`
-                                            } else {
-                                                coveragePercentage = 0
-                                                coverageText = '0%'
-                                            }
-                                        }
-                                    }
-
-                                    return {
-                                        ...dataPoint,
-                                        coveragePercentage,
-                                                    coverageText
-                                    }
-                                })
-
-                                return (
-                                                <div key={kpiSummary.kpi.id} className="bg-blue-50 border-2 border-blue-200 rounded-xl p-5">
-                                                    <h5 className="text-lg font-semibold text-blue-900 mb-2">
-                                        📈 {kpiSummary.kpi.title}
-                                    </h5>
-                                                    <p className="text-base font-semibold text-blue-800 mb-4">
-                                        Total: {kpiSummary.total} {kpiSummary.kpi.unit_of_measurement}
-                                    </p>
-                                                    <div className="space-y-3 max-h-96 overflow-y-auto">
-                                        {updatesWithCoverage.map((dataPoint: any, index: number) => {
-                                            const checked = selectedUpdateIds.includes(dataPoint.id)
-                                            const hasPartialCoverage = dataPoint.coveragePercentage > 0 && dataPoint.coveragePercentage < 100
-                                            const hasNoCoverage = dataPoint.coveragePercentage === 0
-                                            
-                                            return (
-                                                                <div key={`${dataPoint.id}-${index}`} className={`bg-white rounded-lg border-2 ${
-                                                                    hasPartialCoverage ? 'border-blue-300' : 
-                                                                    hasNoCoverage ? 'border-red-300' : 
-                                                                    'border-gray-200'
-                                                                }`}>
-                                                                    <label className="flex items-start justify-between p-4 cursor-pointer hover:bg-gray-50 rounded-lg">
-                                                                        <div className="flex items-start space-x-4 flex-1">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={checked}
-                                                            onChange={() => {
-                                                                setSelectedUpdateIds(prev => checked ? prev.filter(id => id !== dataPoint.id) : [...prev, dataPoint.id])
-                                                                if (editData) setHasChangedDataPoints(true)
-                                                            }}
-                                                                                className="mt-1 w-5 h-5 text-primary-500 rounded border-gray-300 focus:ring-primary-500"
-                                                        />
-                                                            <div className="flex-1 min-w-0">
-                                                                                <div className="flex items-center space-x-3 mb-2">
-                                                                                    <span className="font-semibold text-gray-900 text-lg">
-                                                            {dataPoint.value} {dataPoint.kpi_unit}
-                                                        </span>
-                                                                    {dataPoint.coverageText && (
-                                                                                        <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                                                                            dataPoint.coveragePercentage === 100 ? 'bg-primary-100 text-primary-700' :
-                                                                                            dataPoint.coveragePercentage > 0 ? 'bg-blue-100 text-blue-700' :
-                                                                            'bg-red-100 text-red-700'
-                                                                        }`}>
-                                                                            {dataPoint.coverageText}
+                                                                className="mt-1 w-5 h-5 text-primary-500 rounded border-gray-300 focus:ring-primary-500"
+                                                            />
+                                                            <div className="ml-4 flex-1 min-w-0">
+                                                                <div className="flex items-center space-x-2 mb-1">
+                                                                    <Users className="w-4 h-4 text-primary-500" />
+                                                                    <span className="font-semibold text-gray-900">{group.name}</span>
+                                                                    {group.total_number && (
+                                                                        <span className="text-xs font-medium px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                                                                            {group.total_number.toLocaleString()} beneficiaries
                                                                         </span>
                                                                     )}
-                                                    </div>
-                                                                                <div className="text-sm text-gray-600 mb-1">
-                                                        {dataPoint.date_range_start && dataPoint.date_range_end ? (
-                                                            <>Date Range: {formatDate(dataPoint.date_range_start)} - {formatDate(dataPoint.date_range_end)}</>
-                                                        ) : (
-                                                            <>Date: {formatDate(dataPoint.date_represented)}</>
-                                                        )}
                                                                 </div>
-                                                                                {dataPoint.location_name && (
-                                                                                    <div className="text-sm text-gray-600 flex items-center mt-1">
-                                                                                        <MapPin className="w-4 h-4 mr-1 text-primary-500" />
-                                                                                        {dataPoint.location_name}
-                                                                                    </div>
-                                                                                )}
-                                                                {hasNoCoverage && (
-                                                                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs">
-                                                                                        <p className="text-red-800 font-medium">
-                                                                            This evidence date range doesn't overlap with this impact claim.
-                                                                        </p>
-                                                                    </div>
+                                                                {group.description && (
+                                                                    <p className="text-sm text-gray-600 mb-1">{group.description}</p>
                                                                 )}
+                                                                <div className="flex items-center gap-3 text-xs text-gray-500">
+                                                                    {locationName && (
+                                                                        <span className="flex items-center">
+                                                                            <MapPin className="w-3 h-3 mr-1" />
+                                                                            {locationName}
+                                                                        </span>
+                                                                    )}
+                                                                    {group.age_range_start != null && group.age_range_end != null && (
+                                                                        <span>Ages {group.age_range_start}–{group.age_range_end}</span>
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                </label>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                </div>
-                                )
-                            })}
+                                                        </label>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
                                     </div>
                                 )}
-                        </div>
-                    )}
+                            </div>
+                        )}
 
                         {/* Step 5: Title, Description & Upload */}
                         {currentStep === 5 && (
@@ -1174,6 +1077,18 @@ export default function AddEvidenceModal({
                                         Remove all files
                                     </button>
                                 </div>
+                            ) : formData.file_url && /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(formData.file_url) ? (
+                                                <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="relative w-full max-w-md mx-auto" style={{ paddingBottom: '56.25%' }}>
+                                                        <iframe
+                                                            src={`https://www.youtube.com/embed/${(formData.file_url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) || [])[1]}`}
+                                                            title="YouTube video"
+                                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                            allowFullScreen
+                                                            className="absolute inset-0 w-full h-full rounded-lg"
+                                                        />
+                                                    </div>
+                                                </div>
                             ) : formData.file_url ? (
                                                 <div className="space-y-3">
                                                     <File className="w-12 h-12 text-blue-600 mx-auto" />
