@@ -414,6 +414,15 @@ export interface PublicEvidenceDetail {
         unit_of_measurement: string
         category: 'input' | 'output' | 'impact'
     }>
+    impact_claims?: Array<{
+        id: string
+        value: number
+        date_represented?: string
+        date_range_start?: string
+        date_range_end?: string
+        kpi_id?: string
+        kpis?: { id: string; title: string; unit_of_measurement?: string }
+    }>
     initiative: {
         id: string
         title: string
