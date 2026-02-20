@@ -619,7 +619,8 @@ export class PublicService {
                 id, title, description, type, file_url, date_represented, date_range_start, date_range_end, created_at,
                 evidence_files(id, file_url, file_name, file_type, display_order),
                 evidence_locations(locations(id, name)),
-                evidence_kpis(kpis(id, title, category, unit_of_measurement))
+                evidence_kpis(kpis(id, title, category, unit_of_measurement)),
+                evidence_kpi_updates(kpi_updates(id, value, date_represented, date_range_start, date_range_end, kpi_id, kpis(id, title, unit_of_measurement)))
             `)
             .eq('initiative_id', initiative.id)
             .order('date_represented', { ascending: false });
@@ -638,6 +639,7 @@ export class PublicService {
             date_range_end: e.date_range_end,
             locations: e.evidence_locations?.map((el: any) => el.locations).filter(Boolean) || [],
             kpis: e.evidence_kpis?.map((ek: any) => ek.kpis).filter(Boolean) || [],
+            impact_claims: e.evidence_kpi_updates?.map((eu: any) => eu.kpi_updates).filter(Boolean) || [],
             created_at: e.created_at
         }));
     }
@@ -762,7 +764,8 @@ export class PublicService {
                     id, title, description, type, file_url, date_represented, date_range_start, date_range_end, created_at,
                     evidence_files(id, file_url, file_name, file_type, display_order),
                     evidence_locations(locations(id, name)),
-                    evidence_kpis(kpis(id, title, category, unit_of_measurement))
+                    evidence_kpis(kpis(id, title, category, unit_of_measurement)),
+                evidence_kpi_updates(kpi_updates(id, value, date_represented, date_range_start, date_range_end, kpi_id, kpis(id, title, unit_of_measurement)))
                 `)
                 .in('id', evidenceIds)
                 .order('date_represented', { ascending: false });
@@ -779,6 +782,7 @@ export class PublicService {
                 date_range_end: e.date_range_end,
                 locations: e.evidence_locations?.map((el: any) => el.locations).filter(Boolean) || [],
                 kpis: e.evidence_kpis?.map((ek: any) => ek.kpis).filter(Boolean) || [],
+                impact_claims: e.evidence_kpi_updates?.map((eu: any) => eu.kpi_updates).filter(Boolean) || [],
                 created_at: e.created_at
             }));
         }
@@ -862,7 +866,8 @@ export class PublicService {
                     id, title, description, type, file_url, date_represented, date_range_start, date_range_end, created_at,
                     evidence_files(id, file_url, file_name, file_type, display_order),
                     evidence_locations(locations(id, name)),
-                    evidence_kpis(kpis(id, title, category, unit_of_measurement))
+                    evidence_kpis(kpis(id, title, category, unit_of_measurement)),
+                evidence_kpi_updates(kpi_updates(id, value, date_represented, date_range_start, date_range_end, kpi_id, kpis(id, title, unit_of_measurement)))
                 `)
                 .in('id', evidenceIds)
                 .order('date_represented', { ascending: false });
@@ -879,6 +884,7 @@ export class PublicService {
                 date_range_end: e.date_range_end,
                 locations: e.evidence_locations?.map((el: any) => el.locations).filter(Boolean) || [],
                 kpis: e.evidence_kpis?.map((ek: any) => ek.kpis).filter(Boolean) || [],
+                impact_claims: e.evidence_kpi_updates?.map((eu: any) => eu.kpi_updates).filter(Boolean) || [],
                 created_at: e.created_at
             }));
         }
@@ -899,7 +905,8 @@ export class PublicService {
                         id, title, description, type, file_url, date_represented, date_range_start, date_range_end, created_at,
                         evidence_files(id, file_url, file_name, file_type, display_order),
                         evidence_locations(locations(id, name)),
-                        evidence_kpis(kpis(id, title, category, unit_of_measurement))
+                        evidence_kpis(kpis(id, title, category, unit_of_measurement)),
+                evidence_kpi_updates(kpi_updates(id, value, date_represented, date_range_start, date_range_end, kpi_id, kpis(id, title, unit_of_measurement)))
                     `)
                     .in('id', kpiEvidenceIds)
                     .order('date_represented', { ascending: false });
@@ -916,6 +923,7 @@ export class PublicService {
                     date_range_end: e.date_range_end,
                     locations: e.evidence_locations?.map((el: any) => el.locations).filter(Boolean) || [],
                     kpis: e.evidence_kpis?.map((ek: any) => ek.kpis).filter(Boolean) || [],
+                    impact_claims: e.evidence_kpi_updates?.map((eu: any) => eu.kpi_updates).filter(Boolean) || [],
                     created_at: e.created_at
                 }));
             }
@@ -1023,7 +1031,8 @@ export class PublicService {
             .select(`
                 id, title, description, type, file_url, date_represented, date_range_start, date_range_end, created_at,
                 evidence_files(id, file_url, file_name, file_type, display_order),
-                evidence_kpis(kpi_id, kpis(id, title, description, unit_of_measurement, category))
+                evidence_kpis(kpi_id, kpis(id, title, description, unit_of_measurement, category)),
+                evidence_kpi_updates(kpi_updates(id, value, date_represented, date_range_start, date_range_end, kpi_id, kpis(id, title, unit_of_measurement)))
             `)
             .eq('id', evidenceId)
             .eq('initiative_id', initiative.id)
@@ -1058,6 +1067,7 @@ export class PublicService {
             date_range_end: evidence.date_range_end,
             created_at: evidence.created_at,
             linked_kpis: linkedKpis,
+            impact_claims: (evidence.evidence_kpi_updates || []).map((eu: any) => eu.kpi_updates).filter(Boolean),
             initiative: {
                 id: initiative.id,
                 title: initiative.title,
@@ -1109,7 +1119,8 @@ export class PublicService {
                 .select(`
                     id, title, description, type, file_url, date_represented, created_at,
                     evidence_files(id, file_url, file_name, file_type, display_order),
-                    evidence_kpis(kpis(id, title, category, unit_of_measurement))
+                    evidence_kpis(kpis(id, title, category, unit_of_measurement)),
+                evidence_kpi_updates(kpi_updates(id, value, date_represented, date_range_start, date_range_end, kpi_id, kpis(id, title, unit_of_measurement)))
                 `)
                 .eq('initiative_id', initiative.id)
                 .in('id', evidenceIds)
@@ -1124,6 +1135,7 @@ export class PublicService {
                 files: e.evidence_files || [],
                 date_represented: e.date_represented,
                 kpis: e.evidence_kpis?.map((ek: any) => ek.kpis).filter(Boolean) || [],
+                impact_claims: e.evidence_kpi_updates?.map((eu: any) => eu.kpi_updates).filter(Boolean) || [],
                 created_at: e.created_at
             }));
         }

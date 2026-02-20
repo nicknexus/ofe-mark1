@@ -7,6 +7,8 @@ import {
 import { publicApi, PublicEvidenceDetail } from '../services/publicApi'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
+import DateRangePicker from '../components/DateRangePicker'
+import { getLocalDateString } from '../utils'
 
 // Evidence type config
 const evidenceTypeConfig: Record<string, { icon: any; label: string; color: string; bg: string }> = {
@@ -31,6 +33,14 @@ export default function PublicEvidencePage() {
         evidenceId: string
     }>()
     const [searchParams] = useSearchParams()
+
+    const [dateFilter, setDateFilter] = useState<{ singleDate?: string; startDate?: string; endDate?: string }>(() => {
+        const s = searchParams.get('startDate')
+        const e = searchParams.get('endDate')
+        if (s && e) return { startDate: s, endDate: e }
+        if (s) return { singleDate: s }
+        return {}
+    })
 
     // Referrer context for breadcrumb continuity
     const fromClaim = searchParams.get('from') === 'claim'
@@ -152,6 +162,13 @@ export default function PublicEvidencePage() {
                             <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
                             <span className="text-sm sm:text-base font-medium">{backLabel}</span>
                         </Link>
+                        <DateRangePicker
+                            value={dateFilter}
+                            onChange={setDateFilter}
+                            maxDate={getLocalDateString(new Date())}
+                            placeholder="Filter by date"
+                            className="w-auto"
+                        />
                         <Link to="/" className="flex items-center gap-2">
                             <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg overflow-hidden">
                                 <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
@@ -189,7 +206,7 @@ export default function PublicEvidencePage() {
                     <div className="lg:col-span-2 flex flex-col">
                         <div className="bg-white/50 backdrop-blur-2xl rounded-xl sm:rounded-2xl border border-white/60 shadow-2xl shadow-black/10 overflow-hidden flex-1 flex flex-col">
                             {/* Preview Area */}
-                            <div className="relative bg-gray-900 flex-1 min-h-[250px] sm:min-h-[400px] flex items-center justify-center">
+                            <div className="relative bg-gray-900 flex-1 min-h-[250px] sm:min-h-[400px] max-h-[50vh] sm:max-h-[60vh] flex items-center justify-center">
                                 {currentFile ? (
                                     isImage(currentFile) ? (
                                         <img
@@ -328,38 +345,57 @@ export default function PublicEvidencePage() {
                             )}
                         </div>
 
-                        {/* Linked Impact Claims - Scrollable */}
-                        {evidence.linked_kpis && evidence.linked_kpis.length > 0 && (
+                        {/* Impact Claims - Scrollable */}
+                        {evidence.impact_claims && evidence.impact_claims.length > 0 ? (
                             <div className="bg-white/50 backdrop-blur-2xl rounded-xl sm:rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 sm:p-5 flex-1 min-h-0 flex flex-col max-h-[200px] sm:max-h-none">
                                 <h3 className="text-xs sm:text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2 sm:mb-3 flex-shrink-0">
                                     Supporting Impact Claims
                                 </h3>
                                 <div className="space-y-2 overflow-y-auto flex-1 pr-1">
-                                    {evidence.linked_kpis.map((kpi) => {
-                                        const colors = categoryColors[kpi.category] || categoryColors.output
+                                    {evidence.impact_claims.map((claim: any) => {
+                                        const metricTitle = claim.kpis?.title || 'Unknown Metric'
+                                        const metricSlug = metricTitle.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')
+                                        const dateLabel = claim.date_range_start && claim.date_range_end
+                                            ? `${new Date(claim.date_range_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(claim.date_range_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                                            : claim.date_represented
+                                                ? new Date(claim.date_represented).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                                : ''
                                         return (
                                             <Link
-                                                key={kpi.id}
-                                                to={`/org/${orgSlug}/${initiativeSlug}/metric/${kpi.title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}`}
+                                                key={claim.id}
+                                                to={`/org/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`}
                                                 className="block p-2.5 sm:p-3 bg-white/60 rounded-lg sm:rounded-xl border border-white/50 hover:bg-white/80 hover:shadow-md transition-all group active:scale-[0.98]"
                                             >
-                                                <div className="flex items-center justify-between gap-2 sm:gap-3">
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="font-medium text-gray-800 text-xs sm:text-sm group-hover:text-primary-600 transition-colors truncate">
-                                                            {kpi.title}
-                                                        </p>
-                                                        <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">
-                                                            {kpi.unit_of_measurement} • <span className={colors.text}>{kpi.category}</span>
-                                                        </p>
-                                                    </div>
-                                                    <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400 group-hover:text-gray-600 transition-colors flex-shrink-0" />
-                                                </div>
+                                                <p className="font-semibold text-gray-800 text-xs sm:text-sm group-hover:text-primary-600 transition-colors">
+                                                    {claim.value} {claim.kpis?.unit_of_measurement || ''}
+                                                </p>
+                                                <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">{metricTitle}</p>
+                                                {dateLabel && <p className="text-[10px] text-gray-400 mt-0.5">{dateLabel}</p>}
                                             </Link>
                                         )
                                     })}
                                 </div>
                             </div>
-                        )}
+                        ) : evidence.linked_kpis && evidence.linked_kpis.length > 0 ? (
+                            <div className="bg-white/50 backdrop-blur-2xl rounded-xl sm:rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 sm:p-5 flex-1 min-h-0 flex flex-col max-h-[200px] sm:max-h-none">
+                                <h3 className="text-xs sm:text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2 sm:mb-3 flex-shrink-0">
+                                    Linked Metrics
+                                </h3>
+                                <div className="space-y-2 overflow-y-auto flex-1 pr-1">
+                                    {evidence.linked_kpis.map((kpi) => (
+                                        <Link
+                                            key={kpi.id}
+                                            to={`/org/${orgSlug}/${initiativeSlug}/metric/${kpi.title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}`}
+                                            className="block p-2.5 sm:p-3 bg-white/60 rounded-lg sm:rounded-xl border border-white/50 hover:bg-white/80 hover:shadow-md transition-all group active:scale-[0.98]"
+                                        >
+                                            <p className="font-medium text-gray-800 text-xs sm:text-sm group-hover:text-primary-600 transition-colors truncate">
+                                                {kpi.title}
+                                            </p>
+                                        </Link>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : null}
 
                         {/* Initiative Link */}
                         <div className="bg-white/50 backdrop-blur-2xl rounded-xl sm:rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-3 sm:p-4 flex-shrink-0">

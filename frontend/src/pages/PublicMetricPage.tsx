@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { 
     ArrowLeft, BarChart3, TrendingUp, FileText, Calendar, 
     ExternalLink, MapPin, Target, Sparkles, CheckCircle2,
@@ -10,6 +10,8 @@ import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianG
 import { publicApi, PublicMetricDetail, PublicEvidence } from '../services/publicApi'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
+import DateRangePicker from '../components/DateRangePicker'
+import { getLocalDateString } from '../utils'
 
 // Category colors
 const categoryConfig: Record<string, { bg: string; text: string; gradient: string; accent: string }> = {
@@ -25,9 +27,20 @@ export default function PublicMetricPage() {
         metricSlug: string 
     }>()
     
+    const [searchParams, setSearchParams] = useSearchParams()
     const [metric, setMetric] = useState<PublicMetricDetail | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+
+    const [dateFilter, setDateFilter] = useState<{ singleDate?: string; startDate?: string; endDate?: string }>(() => {
+        const s = searchParams.get('startDate')
+        const e = searchParams.get('endDate')
+        if (s && e) return { startDate: s, endDate: e }
+        if (s) return { singleDate: s }
+        return {}
+    })
+    const filterStart = dateFilter.singleDate || dateFilter.startDate || ''
+    const filterEnd = dateFilter.endDate || dateFilter.singleDate || ''
 
     // Evidence gallery state
     const [galleryIndex, setGalleryIndex] = useState<number | null>(null)
@@ -75,8 +88,21 @@ export default function PublicMetricPage() {
 
     const config = categoryConfig[metric.category] || categoryConfig.output
 
+    // Date-filter updates and evidence
+    const isInDateRange = (dateStr: string) => {
+        if (!filterStart) return true
+        const d = dateStr?.slice(0, 10)
+        if (!d) return true
+        if (filterEnd) return d >= filterStart && d <= filterEnd
+        return d === filterStart
+    }
+
+    const filteredUpdates = (metric.updates || []).filter(u => isInDateRange(u.date_represented))
+    const filteredEvidence = (metric.evidence || []).filter(e => isInDateRange(e.date_represented))
+    const filteredTotal = filteredUpdates.reduce((sum, u) => sum + (parseFloat(String(u.value)) || 0), 0)
+
     // Prepare chart data (sorted by date)
-    const chartData = [...(metric.updates || [])]
+    const chartData = [...filteredUpdates]
         .sort((a, b) => new Date(a.date_represented).getTime() - new Date(b.date_represented).getTime())
         .map(update => ({
             date: new Date(update.date_represented).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
@@ -120,6 +146,13 @@ export default function PublicMetricPage() {
                             <ArrowLeft className="w-4 h-4" />
                             <span className="text-xs sm:text-sm font-medium">Back</span>
                         </Link>
+                        <DateRangePicker
+                            value={dateFilter}
+                            onChange={setDateFilter}
+                            maxDate={getLocalDateString(new Date())}
+                            placeholder="Filter by date"
+                            className="w-auto"
+                        />
                         <Link to="/" className="flex items-center gap-2">
                             <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center overflow-hidden">
                                 <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
@@ -168,7 +201,7 @@ export default function PublicMetricPage() {
                         <div className="bg-white/70 backdrop-blur-2xl p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-xl shadow-black/10 border border-white/60 lg:min-w-[200px] lg:max-w-[240px]">
                             <p className="text-gray-500 text-xs sm:text-sm font-medium mb-0.5 sm:mb-1">Total Impact</p>
                             <p className={`text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight ${config.text}`}>
-                                {metric.total_value.toLocaleString()}
+                                {(filterStart ? filteredTotal : metric.total_value).toLocaleString()}
                             </p>
                             <p className="text-gray-500 text-xs sm:text-sm mt-0.5 sm:mt-1">{metric.unit_of_measurement}</p>
                         </div>
@@ -259,7 +292,7 @@ export default function PublicMetricPage() {
                             </h2>
                         </div>
                         
-                        {metric.updates.length === 0 ? (
+                        {filteredUpdates.length === 0 ? (
                             <div className="flex-1 flex items-center justify-center text-gray-500 p-4 sm:p-6">
                                 <div className="text-center">
                                     <Target className="w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-2 opacity-30" />
@@ -268,7 +301,7 @@ export default function PublicMetricPage() {
                             </div>
                         ) : (
                             <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2 sm:space-y-3">
-                                {[...metric.updates]
+                                {[...filteredUpdates]
                                     .sort((a, b) => new Date(b.date_represented).getTime() - new Date(a.date_represented).getTime())
                                     .map((update, idx) => (
                                     <ImpactClaimCard key={update.id || idx} update={update} unit={metric.unit_of_measurement} config={config} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />
@@ -280,8 +313,8 @@ export default function PublicMetricPage() {
 
                 {/* Evidence Section */}
                 <EvidenceGallerySection
-                    evidence={metric.evidence}
-                    evidenceCount={metric.evidence_count}
+                    evidence={filteredEvidence}
+                    evidenceCount={filteredEvidence.length}
                     config={config}
                     galleryIndex={galleryIndex}
                     setGalleryIndex={setGalleryIndex}
@@ -568,7 +601,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                             {/* File preview */}
                             <div className="lg:col-span-2 flex flex-col">
                                 <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 overflow-hidden flex-1 flex flex-col">
-                                    <div className="relative bg-gray-900 flex-1 min-h-[250px] sm:min-h-[400px] flex items-center justify-center">
+                                    <div className="relative bg-gray-900 flex-1 min-h-[250px] sm:min-h-[400px] max-h-[50vh] sm:max-h-[60vh] flex items-center justify-center">
                                         {galleryFile ? (
                                             isImageFile(galleryFile.file_url) ? (
                                                 <img src={galleryFile.file_url} alt={galleryFile.file_name || galleryItem.title} className="max-w-full max-h-full object-contain" />
@@ -653,36 +686,43 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                     )}
                                 </div>
 
-                                {/* Linked Metrics */}
-                                {galleryItem.kpis && galleryItem.kpis.length > 0 && (
+                                {/* Impact Claims */}
+                                {galleryItem.impact_claims && galleryItem.impact_claims.length > 0 ? (
                                     <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 sm:p-5 flex-shrink-0">
-                                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Linked Metrics</h3>
+                                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Supporting Impact Claims</h3>
                                         <div className="space-y-2">
-                                            {galleryItem.kpis.map((kpi) => {
-                                                const badgeColor = kpi.category === 'impact'
-                                                    ? 'bg-purple-100 text-purple-700'
-                                                    : kpi.category === 'output'
-                                                        ? 'bg-green-100 text-green-700'
-                                                        : 'bg-blue-100 text-blue-700'
+                                            {galleryItem.impact_claims.map((claim: any) => {
+                                                const metricTitle = claim.kpis?.title || 'Unknown Metric'
+                                                const metricSlug = claim.kpis?.title ? generateMetricSlug(claim.kpis.title) : ''
+                                                const dateLabel = claim.date_range_start && claim.date_range_end
+                                                    ? `${new Date(claim.date_range_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(claim.date_range_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                                                    : claim.date_represented
+                                                        ? new Date(claim.date_represented).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                                        : ''
                                                 return (
-                                                    <Link key={kpi.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
-                                                        <div className="flex items-start justify-between gap-2">
-                                                            <p className="text-sm font-medium text-foreground group-hover:text-accent transition-colors">{kpi.title}</p>
-                                                            {kpi.category && (
-                                                                <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${badgeColor} capitalize flex-shrink-0`}>
-                                                                    {kpi.category}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        {kpi.unit_of_measurement && (
-                                                            <p className="text-[10px] text-muted-foreground mt-0.5">{kpi.unit_of_measurement}</p>
-                                                        )}
+                                                    <Link key={claim.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
+                                                        <p className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors">
+                                                            {claim.value} {claim.kpis?.unit_of_measurement || ''}
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground mt-0.5">{metricTitle}</p>
+                                                        {dateLabel && <p className="text-[10px] text-muted-foreground mt-0.5">{dateLabel}</p>}
                                                     </Link>
                                                 )
                                             })}
                                         </div>
                                     </div>
-                                )}
+                                ) : galleryItem.kpis && galleryItem.kpis.length > 0 ? (
+                                    <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 sm:p-5 flex-shrink-0">
+                                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Linked Metrics</h3>
+                                        <div className="space-y-2">
+                                            {galleryItem.kpis.map((kpi) => (
+                                                <Link key={kpi.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
+                                                    <p className="text-sm font-medium text-foreground group-hover:text-accent transition-colors">{kpi.title}</p>
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : null}
                             </div>
                         </div>
 

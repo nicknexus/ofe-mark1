@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
     ArrowLeft, Calendar, MapPin, Users, FileText, BookOpen, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { publicApi, PublicStoryDetail, PublicStory } from '../services/publicApi'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
+import DateRangePicker from '../components/DateRangePicker'
+import { getLocalDateString } from '../utils'
 
 export default function PublicStoryPage() {
     const { orgSlug, initiativeSlug, storyId } = useParams<{
@@ -14,6 +16,15 @@ export default function PublicStoryPage() {
         storyId: string
     }>()
     const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
+
+    const [dateFilter, setDateFilter] = useState<{ singleDate?: string; startDate?: string; endDate?: string }>(() => {
+        const s = searchParams.get('startDate')
+        const e = searchParams.get('endDate')
+        if (s && e) return { startDate: s, endDate: e }
+        if (s) return { singleDate: s }
+        return {}
+    })
 
     const [story, setStory] = useState<PublicStoryDetail | null>(null)
     const [loading, setLoading] = useState(true)
@@ -122,6 +133,13 @@ export default function PublicStoryPage() {
                             <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
                             <span className="text-sm sm:text-base font-medium">Back</span>
                         </Link>
+                        <DateRangePicker
+                            value={dateFilter}
+                            onChange={setDateFilter}
+                            maxDate={getLocalDateString(new Date())}
+                            placeholder="Filter by date"
+                            className="w-auto"
+                        />
                         <Link to="/" className="flex items-center gap-2">
                             <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg overflow-hidden">
                                 <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />

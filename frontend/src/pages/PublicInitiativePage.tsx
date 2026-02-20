@@ -191,6 +191,8 @@ export default function PublicInitiativePage() {
     const startDate = dateFilter.singleDate || dateFilter.startDate || ''
     const endDate = dateFilter.endDate || dateFilter.singleDate || ''
 
+    const dateQS = startDate && endDate ? `?startDate=${startDate}&endDate=${endDate}` : startDate ? `?startDate=${startDate}` : ''
+
     // Initialize tab from URL params
     useEffect(() => {
         const tabParam = searchParams.get('tab') as TabType | null
@@ -613,11 +615,11 @@ export default function PublicInitiativePage() {
                             </div>
                         ) : (
                             <>
-                                {activeTab === 'overview' && filteredDashboard && <InitiativeOverviewTab initiative={initiative} dashboard={filteredDashboard} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />}
-                                {activeTab === 'metrics' && filteredDashboard && <MetricsTab dashboard={filteredDashboard} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />}
-                                {activeTab === 'stories' && <StoriesTab stories={filteredStories} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />}
-                                {activeTab === 'locations' && <LocationsTab locations={locations || dashboard.locations} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />}
-                                {activeTab === 'evidence' && <EvidenceTab evidence={filteredEvidence} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />}
+                                {activeTab === 'overview' && filteredDashboard && <InitiativeOverviewTab initiative={initiative} dashboard={filteredDashboard} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} />}
+                                {activeTab === 'metrics' && filteredDashboard && <MetricsTab dashboard={filteredDashboard} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} />}
+                                {activeTab === 'stories' && <StoriesTab stories={filteredStories} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} />}
+                                {activeTab === 'locations' && <LocationsTab locations={locations || dashboard.locations} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} />}
+                                {activeTab === 'evidence' && <EvidenceTab evidence={filteredEvidence} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} />}
                                 {activeTab === 'beneficiaries' && <BeneficiariesTab beneficiaries={beneficiaries} />}
                             </>
                         )}
@@ -659,11 +661,12 @@ const CATEGORY_COLORS = {
 }
 
 // Initiative Overview - Modern dashboard with multi-line chart like MetricsDashboard
-function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug }: {
+function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug, dateQS = '' }: {
     initiative: PublicInitiative;
     dashboard: InitiativeDashboard;
     orgSlug: string;
     initiativeSlug: string;
+    dateQS?: string;
 }) {
     const brandColor = initiative.organization_brand_color || '#c0dfa1'
     const [timeFrame, setTimeFrame] = useState<'all' | '1month' | '6months' | '1year'>('all')
@@ -889,7 +892,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug 
                         return (
                             <Link
                                 key={kpi.id}
-                                to={`/org/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`}
+                                to={`/org/${orgSlug}/${initiativeSlug}/metric/${metricSlug}${dateQS}`}
                                 className="bg-white/60 backdrop-blur rounded-xl border border-white/80 p-3 transition-all hover:shadow-lg hover:border-accent group"
                             >
                                 <div className="flex items-center justify-between mb-1">
@@ -1256,10 +1259,11 @@ function generateMetricSlug(title: string): string {
 }
 
 // Metrics Tab - Shows all metrics with links to detail pages
-function MetricsTab({ dashboard, orgSlug, initiativeSlug }: {
+function MetricsTab({ dashboard, orgSlug, initiativeSlug, dateQS = '' }: {
     dashboard: InitiativeDashboard;
     orgSlug: string;
-    initiativeSlug: string
+    initiativeSlug: string;
+    dateQS?: string;
 }) {
     const { kpis } = dashboard
 
@@ -1290,7 +1294,7 @@ function MetricsTab({ dashboard, orgSlug, initiativeSlug }: {
                 return (
                     <Link
                         key={kpi.id}
-                        to={`/org/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`}
+                        to={`/org/${orgSlug}/${initiativeSlug}/metric/${metricSlug}${dateQS}`}
                         className="glass-card rounded-2xl border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all overflow-hidden group cursor-pointer"
                     >
                         {/* Header */}
@@ -1349,7 +1353,7 @@ function MetricsTab({ dashboard, orgSlug, initiativeSlug }: {
     )
 }
 
-function StoriesTab({ stories, orgSlug, initiativeSlug }: { stories: PublicStory[] | null; orgSlug: string; initiativeSlug: string }) {
+function StoriesTab({ stories, orgSlug, initiativeSlug, dateQS = '' }: { stories: PublicStory[] | null; orgSlug: string; initiativeSlug: string; dateQS?: string }) {
     if (!stories) return <LoadingState />
     if (stories.length === 0) return <EmptyState icon={BookOpen} message="No stories available yet." />
 
@@ -1358,7 +1362,7 @@ function StoriesTab({ stories, orgSlug, initiativeSlug }: { stories: PublicStory
             {stories.map((story) => (
                 <Link
                     key={story.id}
-                    to={`/org/${orgSlug}/${initiativeSlug}/story/${story.id}`}
+                    to={`/org/${orgSlug}/${initiativeSlug}/story/${story.id}${dateQS}`}
                     className="glass-card rounded-2xl overflow-hidden group border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all"
                 >
                     <div className="h-44 bg-gradient-to-br from-accent/10 to-accent/5 overflow-hidden">
@@ -1439,7 +1443,7 @@ function ClickableLocationMarker({ location, onClick }: { location: PublicLocati
     )
 }
 
-function LocationsTab({ locations, orgSlug, initiativeSlug }: { locations: PublicLocation[] | null; orgSlug: string; initiativeSlug: string }) {
+function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { locations: PublicLocation[] | null; orgSlug: string; initiativeSlug: string; dateQS?: string }) {
     const [selectedLocation, setSelectedLocation] = useState<PublicLocation | null>(null)
     const [locationDetail, setLocationDetail] = useState<LocationDetail | null>(null)
     const [detailLoading, setDetailLoading] = useState(false)
@@ -1529,7 +1533,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug }: { locations: Publi
                                             <p className="text-xs text-muted-foreground">No stories here yet</p>
                                         </div>
                                     ) : locationDetail.stories.map((story) => (
-                                        <Link key={story.id} to={`/org/${orgSlug}/${initiativeSlug}/story/${story.id}`}
+                                        <Link key={story.id} to={`/org/${orgSlug}/${initiativeSlug}/story/${story.id}${dateQS}`}
                                             className="block rounded-xl border border-gray-100 hover:border-accent/30 p-3 transition-colors">
                                             {story.media_url && story.media_type === 'photo' && (
                                                 <img src={story.media_url} alt={story.title} loading="lazy" className="w-full h-32 object-cover rounded-lg mb-2" />
@@ -1560,7 +1564,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug }: { locations: Publi
                                     ) : locationDetail.metrics.map((m) => {
                                         const cat = categoryConfig[m.category] || categoryConfig.output
                                         return (
-                                            <Link key={m.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${m.slug}`}
+                                            <Link key={m.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${m.slug}${dateQS}`}
                                                 className="block p-3 rounded-xl border border-gray-100 hover:border-accent/30 transition-colors">
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div className="min-w-0">
@@ -1597,7 +1601,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug }: { locations: Publi
                                         const ytId = ytUrl ? getYTId(ytUrl) : null
                                         const preview = imgPreview || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : null)
                                         return (
-                                            <Link key={ev.id} to={`/org/${orgSlug}/${initiativeSlug}/evidence/${ev.id}`}
+                                            <Link key={ev.id} to={`/org/${orgSlug}/${initiativeSlug}/evidence/${ev.id}${dateQS}`}
                                                 className="block rounded-xl border border-gray-100 hover:border-accent/30 p-3 transition-colors">
                                                 {preview && (
                                                     <div className="relative">
@@ -1674,7 +1678,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug }: { locations: Publi
     )
 }
 
-function EvidenceTab({ evidence, orgSlug, initiativeSlug }: { evidence: PublicEvidence[] | null; orgSlug: string; initiativeSlug: string }) {
+function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evidence: PublicEvidence[] | null; orgSlug: string; initiativeSlug: string; dateQS?: string }) {
     const [displayCount, setDisplayCount] = useState(8)
     const [selectedTypes, setSelectedTypes] = useState<string[]>([])
     const [isDropdownOpen, setIsDropdownOpen] = useState(false)
@@ -1990,7 +1994,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug }: { evidence: PublicEv
                                         {item.kpis.slice(0, 2).map((kpi) => {
                                             const catColor = kpi.category === 'impact' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' : kpi.category === 'output' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                                             return (
-                                                <Link key={kpi.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}`} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${catColor} transition-colors`} onClick={e => e.stopPropagation()}>
+                                                <Link key={kpi.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}${dateQS}`} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${catColor} transition-colors`} onClick={e => e.stopPropagation()}>
                                                     {kpi.title}
                                                 </Link>
                                             )
@@ -2065,7 +2069,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug }: { evidence: PublicEv
                             {/* File preview */}
                             <div className="lg:col-span-2 flex flex-col">
                                 <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 overflow-hidden flex-1 flex flex-col">
-                                    <div className="relative bg-gray-900 flex-1 min-h-[250px] sm:min-h-[400px] flex items-center justify-center">
+                                    <div className="relative bg-gray-900 flex-1 min-h-[250px] sm:min-h-[400px] max-h-[50vh] sm:max-h-[60vh] flex items-center justify-center">
                                         {galleryFile ? (
                                             isImageFile(galleryFile.file_url) ? (
                                                 <img
@@ -2188,35 +2192,42 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug }: { evidence: PublicEv
                                 </div>
 
                                 {/* Impact Claims Card */}
-                                {galleryItem.kpis && galleryItem.kpis.length > 0 && (
+                                {galleryItem.impact_claims && galleryItem.impact_claims.length > 0 ? (
                                     <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 sm:p-5 flex-shrink-0">
                                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Supporting Impact Claims</h3>
                                         <div className="space-y-2">
-                                            {galleryItem.kpis.map((kpi) => {
-                                                const badgeColor = kpi.category === 'impact'
-                                                    ? 'bg-purple-100 text-purple-700'
-                                                    : kpi.category === 'output'
-                                                        ? 'bg-green-100 text-green-700'
-                                                        : 'bg-blue-100 text-blue-700'
+                                            {galleryItem.impact_claims.map((claim: any) => {
+                                                const metricTitle = claim.kpis?.title || 'Unknown Metric'
+                                                const metricSlug = claim.kpis?.title ? generateMetricSlug(claim.kpis.title) : ''
+                                                const dateLabel = claim.date_range_start && claim.date_range_end
+                                                    ? `${new Date(claim.date_range_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(claim.date_range_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                                                    : claim.date_represented
+                                                        ? new Date(claim.date_represented).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                                        : ''
                                                 return (
-                                                    <Link key={kpi.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
-                                                        <div className="flex items-start justify-between gap-2">
-                                                            <p className="text-sm font-medium text-foreground group-hover:text-accent transition-colors">{kpi.title}</p>
-                                                            {kpi.category && (
-                                                                <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${badgeColor} capitalize flex-shrink-0`}>
-                                                                    {kpi.category}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        {kpi.unit_of_measurement && (
-                                                            <p className="text-[10px] text-muted-foreground mt-0.5">{kpi.unit_of_measurement}</p>
-                                                        )}
+                                                    <Link key={claim.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${metricSlug}${dateQS}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
+                                                        <p className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors">
+                                                            {claim.value} {claim.kpis?.unit_of_measurement || ''}
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground mt-0.5">{metricTitle}</p>
+                                                        {dateLabel && <p className="text-[10px] text-muted-foreground mt-0.5">{dateLabel}</p>}
                                                     </Link>
                                                 )
                                             })}
                                         </div>
                                     </div>
-                                )}
+                                ) : galleryItem.kpis && galleryItem.kpis.length > 0 ? (
+                                    <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 sm:p-5 flex-shrink-0">
+                                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Linked Metrics</h3>
+                                        <div className="space-y-2">
+                                            {galleryItem.kpis.map((kpi) => (
+                                                <Link key={kpi.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}${dateQS}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
+                                                    <p className="text-sm font-medium text-foreground group-hover:text-accent transition-colors">{kpi.title}</p>
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : null}
                             </div>
                         </div>
 

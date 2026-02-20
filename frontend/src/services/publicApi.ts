@@ -123,6 +123,7 @@ export interface PublicEvidence {
     org_slug?: string
     locations?: { id: string; name: string }[]
     kpis?: { id: string; title: string; category?: string; unit_of_measurement?: string }[]
+    impact_claims?: { id: string; value: number; date_represented?: string; date_range_start?: string; date_range_end?: string; kpi_id?: string; kpis?: { id: string; title: string; unit_of_measurement?: string } }[]
     created_at?: string
 }
 

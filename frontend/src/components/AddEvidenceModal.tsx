@@ -41,7 +41,7 @@ export default function AddEvidenceModal({
         singleDate?: string
         startDate?: string
         endDate?: string
-    }>({})
+    }>({ singleDate: editData ? undefined : getLocalDateString(new Date()) })
     const [loading, setLoading] = useState(false)
     const [selectedFiles, setSelectedFiles] = useState<File[]>([])
     const [isDragOver, setIsDragOver] = useState(false)
@@ -188,7 +188,7 @@ export default function AddEvidenceModal({
             setHasChangedDataPoints(false)
             setInitialKpiIds([])
             setHasChangedKPIs(false)
-            setDatePickerValue({})
+            setDatePickerValue({ singleDate: getLocalDateString(new Date()) })
             setIsInitialFetch(true)
             setSelectedBeneficiaryGroupIds([])
             setHasChangedBeneficiaryGroups(false)
@@ -424,7 +424,7 @@ export default function AddEvidenceModal({
                     initiative_id: initiativeId
                 })
                 setSelectedFiles([])
-                setDatePickerValue({})
+                setDatePickerValue({ singleDate: getLocalDateString(new Date()) })
                 setSelectedBeneficiaryGroupIds([])
             }
             setUploadProgress('')
@@ -867,9 +867,6 @@ export default function AddEvidenceModal({
                                                     </span>
                                                 )}
                                             </div>
-                                                            {kpi.description && (
-                                                                <div className="text-sm text-gray-600 mt-1">{kpi.description}</div>
-                                                            )}
                                         </div>
                                     </label>
                                     )

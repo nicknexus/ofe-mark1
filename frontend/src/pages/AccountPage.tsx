@@ -976,11 +976,16 @@ function TeamsTab({
                             <label className="block text-sm font-medium text-gray-700 mb-1.5">Email Address</label>
                             <input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="colleague@example.com" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none transition-all" />
                         </div>
-                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                            <div className="flex items-center gap-2"><FileText className="w-4 h-4 text-gray-500" /><span className="text-sm text-gray-700">Allow creating Impact Claims</span></div>
-                            <button type="button" onClick={() => setAllowImpactClaims(!allowImpactClaims)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${allowImpactClaims ? 'bg-primary-500' : 'bg-gray-300'}`}>
-                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${allowImpactClaims ? 'translate-x-6' : 'translate-x-1'}`} />
-                            </button>
+                        <div className="p-3 bg-gray-50 rounded-xl space-y-2">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2"><FileText className="w-4 h-4 text-gray-500" /><span className="text-sm text-gray-700">Allow creating Impact Claims</span></div>
+                                <button type="button" onClick={() => setAllowImpactClaims(!allowImpactClaims)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${allowImpactClaims ? 'bg-primary-500' : 'bg-gray-300'}`}>
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${allowImpactClaims ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                            </div>
+                            <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 leading-relaxed">
+                                <strong>Warning:</strong> Impact Claims represent your organization's official reported outcomes. Only authorized administrators with full knowledge of the initiative and its supporting evidence should create them.
+                            </p>
                         </div>
                         <button type="submit" disabled={sending || !inviteEmail.trim()} className="w-full px-4 py-2.5 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
                             {sending ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Sending...</> : <><Send className="w-4 h-4" />Send Invitation</>}
