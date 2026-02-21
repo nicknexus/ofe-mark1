@@ -1,6 +1,7 @@
 import { Button } from "../ui/button";
-import { ArrowRight, Play, TrendingUp, ArrowUpRight, Users, Heart, DollarSign } from "lucide-react";
+import { ArrowRight, Play, TrendingUp, ArrowUpRight, Users, Heart, DollarSign, Search } from "lucide-react";
 import { Suspense, lazy } from "react";
+import { Link } from "react-router-dom";
 
 // Lazy load the heavy globe component
 const ImpactGlobe = lazy(() => import("./ImpactGlobe"));
@@ -55,10 +56,6 @@ const HeroSection = ({ onGetStarted }: HeroSectionProps) => {
                 Build Donor Trust
                 <ArrowRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
               </Button>
-              {/* <Button variant="hero-outline" size="xl" className="group">
-                <Play className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" />
-                Watch Story
-              </Button> */}
             </div>
             
             {/* Social proof with icons */}

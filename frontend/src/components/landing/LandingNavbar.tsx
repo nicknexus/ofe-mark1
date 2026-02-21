@@ -48,12 +48,20 @@ const LandingNavbar = ({ onGetStarted }: LandingNavbarProps) => {
               <span className="text-lg sm:text-xl font-newsreader font-extralight text-foreground">Nexus Impacts</span>
             </a>
             
-            {/* Desktop Navigation */}
-            <div className="hidden lg:flex items-center gap-6">
-              <Link to="/explore" className="text-accent hover:text-accent/80 transition-colors duration-200 whitespace-nowrap text-sm font-medium">Explore</Link>
-              <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors duration-200 whitespace-nowrap text-sm">Benefits</a>
-              <a href="#how-it-works" className="text-muted-foreground hover:text-foreground transition-colors duration-200 whitespace-nowrap text-sm">How It Works</a>
-              <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors duration-200 whitespace-nowrap text-sm">Pricing</a>
+            {/* Desktop Navigation - centered */}
+            <div className="hidden lg:flex items-center justify-center flex-1">
+              <div className="flex items-center gap-6">
+                <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors duration-200 whitespace-nowrap text-sm">Benefits</a>
+                <a href="#how-it-works" className="text-muted-foreground hover:text-foreground transition-colors duration-200 whitespace-nowrap text-sm">How It Works</a>
+                <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors duration-200 whitespace-nowrap text-sm">Pricing</a>
+                <Link 
+                  to="/explore" 
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent/15 text-accent-foreground text-sm font-medium hover:bg-accent/25 transition-colors duration-200 border border-accent/30"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                  Explore
+                </Link>
+              </div>
             </div>
             
             {/* Desktop buttons */}
@@ -86,13 +94,6 @@ const LandingNavbar = ({ onGetStarted }: LandingNavbarProps) => {
           {/* Menu Panel */}
           <div className="absolute top-[72px] left-4 right-4 bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl border border-white/60 overflow-hidden animate-fade-in">
             <div className="p-4 space-y-1">
-              <Link 
-                to="/explore" 
-                className="block px-4 py-3 text-accent font-medium rounded-xl hover:bg-accent/10 transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Explore
-              </Link>
               <a 
                 href="#features" 
                 className="block px-4 py-3 text-foreground rounded-xl hover:bg-black/5 transition-colors"
@@ -114,6 +115,16 @@ const LandingNavbar = ({ onGetStarted }: LandingNavbarProps) => {
               >
                 Pricing
               </a>
+            </div>
+            <div className="px-4 pb-2">
+              <Link 
+                to="/explore" 
+                className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-accent/15 text-accent-foreground font-medium rounded-xl hover:bg-accent/25 transition-colors border border-accent/30"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Search className="w-4 h-4" />
+                Explore Organizations
+              </Link>
             </div>
             <div className="p-4 pt-2 border-t border-gray-100 space-y-2">
               <button 

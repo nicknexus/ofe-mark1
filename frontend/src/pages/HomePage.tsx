@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { LandingNavbar, HeroSection } from '../components/landing';
 
 // Lazy load below-the-fold sections for faster initial load
+const ExplorePromoSection = lazy(() => import('../components/landing/ExplorePromoSection'));
 const FeaturesSection = lazy(() => import('../components/landing/FeaturesSection'));
 const HowItWorksSection = lazy(() => import('../components/landing/HowItWorksSection'));
 // const TestimonialsSection = lazy(() => import('../components/landing/TestimonialsSection'));
@@ -26,6 +27,9 @@ export default function HomePage() {
     <main className="min-h-screen bg-background font-figtree landing-page">
       <LandingNavbar onGetStarted={handleGetStarted} />
       <HeroSection onGetStarted={handleGetStarted} />
+      <Suspense fallback={<SectionLoader />}>
+        <ExplorePromoSection />
+      </Suspense>
       <Suspense fallback={<SectionLoader />}>
         <FeaturesSection onGetStarted={handleGetStarted} />
       </Suspense>
