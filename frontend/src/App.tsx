@@ -11,6 +11,12 @@ import { TeamProvider } from './context/TeamContext'
 import InteractiveTutorial from './components/InteractiveTutorial'
 import TrialBanner from './components/TrialBanner'
 import MobileApp from './components/MobileApp'
+import { isStandalone as checkStandalone } from './utils/pwa'
+import { useVersionCheck } from './hooks/useVersionCheck'
+import PWALoadingScreen from './components/pwa/PWALoadingScreen'
+import PWAAuthPage from './components/pwa/PWAAuthPage'
+import InstallPrompt from './components/pwa/InstallPrompt'
+import UpdateBanner from './components/pwa/UpdateBanner'
 
 // Pages
 import HomePage from './pages/HomePage'
@@ -61,6 +67,8 @@ function App() {
     const [pendingInvite, setPendingInvite] = useState<PendingInviteCheck | null>(null)
     const [checkingPendingInvite, setCheckingPendingInvite] = useState(false)
     const isMobile = useIsMobile()
+    const standalone = checkStandalone()
+    const { updateAvailable, dismiss: dismissUpdate, refresh: refreshApp } = useVersionCheck()
     const checkedUserIdRef = useRef<string | null>(null)
 
     useEffect(() => {
@@ -144,6 +152,135 @@ function App() {
         checkSubscription(true)
     }
 
+    // Shared public routes fragment used in multiple render branches
+    const publicRoutes = (
+        <>
+            <Route path="/explore" element={<ExplorePage />} />
+            <Route path="/org/:slug" element={<PublicOrganizationPage />} />
+            <Route path="/org/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
+            <Route path="/org/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
+            <Route path="/org/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
+            <Route path="/org/:orgSlug/:initiativeSlug/story/:storyId" element={<PublicStoryPage />} />
+            <Route path="/org/:orgSlug/:initiativeSlug/evidence/:evidenceId" element={<PublicEvidencePage />} />
+        </>
+    )
+
+    // ─── PWA STANDALONE MODE ───────────────────────────────────────────
+    if (standalone) {
+        if (loading) return <PWALoadingScreen />
+
+        if (!user) {
+            return (
+                <Router>
+                    <Routes>
+                        {publicRoutes}
+                        <Route path="/invite/:token" element={<InviteAcceptPage />} />
+                        <Route path="/*" element={
+                            <PWAAuthPage onAuthSuccess={() => window.location.reload()} />
+                        } />
+                    </Routes>
+                    <Toaster position="top-center" />
+                </Router>
+            )
+        }
+
+        // Gate: Terms of Service
+        if (!user.accepted_terms_of_service) {
+            return (
+                <>
+                    <TermsOfServicePage onAccepted={async () => {
+                        const updatedUser = await AuthService.getCurrentUser()
+                        if (updatedUser) setUser(updatedUser)
+                    }} />
+                    <Toaster position="top-center" />
+                </>
+            )
+        }
+
+        // Gate: Subscription check loading
+        if (checkingSubscription && subscriptionStatus === null) {
+            return <PWALoadingScreen />
+        }
+        if (subscriptionStatus === null) {
+            checkSubscription(true)
+            return <PWALoadingScreen />
+        }
+
+        // Gate: No subscription — check for pending invites / trial
+        if (subscriptionStatus.subscription.status === 'none' && !subscriptionStatus.hasAccess) {
+            if (pendingInvite === null && !checkingPendingInvite) {
+                setCheckingPendingInvite(true)
+                TeamService.checkMyPendingInvite()
+                    .then(result => setPendingInvite(result))
+                    .catch(() => setPendingInvite({ hasPendingInvite: false }))
+                    .finally(() => setCheckingPendingInvite(false))
+                return <PWALoadingScreen />
+            }
+            if (checkingPendingInvite) return <PWALoadingScreen />
+
+            if (pendingInvite?.hasPendingInvite && pendingInvite.inviteToken) {
+                return (
+                    <Router>
+                        <Routes>
+                            <Route path="/invite/:token" element={<InviteAcceptPage onInviteAccepted={() => { window.location.href = '/' }} />} />
+                            <Route path="*" element={<Navigate to={`/invite/${pendingInvite.inviteToken}`} replace />} />
+                        </Routes>
+                        <Toaster position="top-center" />
+                    </Router>
+                )
+            }
+
+            return (
+                <>
+                    <TrialActivationPage onTrialStarted={handleTrialStarted} />
+                    <Toaster position="top-center" />
+                </>
+            )
+        }
+
+        // Gate: Subscription expired
+        if (!subscriptionStatus.hasAccess) {
+            return (
+                <>
+                    <SubscriptionExpiredPage
+                        reason={subscriptionStatus.reason}
+                        remainingDays={subscriptionStatus.remainingTrialDays}
+                    />
+                    <Toaster position="top-center" />
+                </>
+            )
+        }
+
+        // All gates passed — render PWA app
+        const isOnTrial = subscriptionStatus.subscription.status === 'trial' && (subscriptionStatus.remainingTrialDays ?? 0) > 0
+        const bannerDismissed = localStorage.getItem('nexus-trial-banner-dismissed') === 'true'
+        const showTrialBanner = isOnTrial && !bannerDismissed
+
+        return (
+            <Router>
+                <div className="min-h-screen" style={{ backgroundColor: '#F9FAFB' }}>
+                    <StorageProvider>
+                        <TeamProvider>
+                            {showTrialBanner && (
+                                <TrialBanner remainingDays={subscriptionStatus.remainingTrialDays} />
+                            )}
+                            <Routes>
+                                {publicRoutes}
+                                <Route path="/*" element={
+                                    <MobileApp user={user} subscriptionStatus={subscriptionStatus} />
+                                } />
+                            </Routes>
+                            {updateAvailable && <UpdateBanner onRefresh={refreshApp} onDismiss={dismissUpdate} />}
+                        </TeamProvider>
+                    </StorageProvider>
+                    <Toaster position="top-center" />
+                </div>
+            </Router>
+        )
+    }
+
+    // ─── BROWSER MODE ──────────────────────────────────────────────────
+
     // Loading state
     if (loading) {
         return (
@@ -194,7 +331,6 @@ function App() {
                         <Route
                             path="/invite/:token"
                             element={<InviteAcceptPage onInviteAccepted={() => {
-                                // After accepting, do a full page reload to refresh all state
                                 window.location.href = '/'
                             }} />}
                         />
@@ -221,12 +357,9 @@ function App() {
         // User has no own subscription (status is 'none') but might have inherited access
         // or a pending team invitation
         if (subscriptionStatus.subscription.status === 'none') {
-            // If user already has access (inherited from team), skip the trial/invite checks
             if (subscriptionStatus.hasAccess) {
                 // They have inherited access - let them through to the app
-                // (The code below will handle this case)
             } else {
-                // No access yet - check for pending invites if we haven't already
                 if (pendingInvite === null && !checkingPendingInvite) {
                     setCheckingPendingInvite(true)
                     TeamService.checkMyPendingInvite()
@@ -250,7 +383,6 @@ function App() {
                     )
                 }
 
-                // If checking pending invite, show loader
                 if (checkingPendingInvite) {
                     return (
                         <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -262,7 +394,6 @@ function App() {
                     )
                 }
 
-                // If user has a pending invite, redirect them to accept it
                 if (pendingInvite?.hasPendingInvite && pendingInvite.inviteToken) {
                     return (
                         <Router>
@@ -270,8 +401,6 @@ function App() {
                                 <Route
                                     path="/invite/:token"
                                     element={<InviteAcceptPage onInviteAccepted={() => {
-                                        // After accepting, do a full page reload to refresh all state
-                                        // This ensures subscription status and team context are fresh
                                         window.location.href = '/'
                                     }} />}
                                 />
@@ -285,7 +414,6 @@ function App() {
                     )
                 }
 
-                // No pending invite and no access - show trial activation
                 return (
                     <>
                         <TrialActivationPage onTrialStarted={handleTrialStarted} />
@@ -313,14 +441,21 @@ function App() {
         const bannerDismissed = localStorage.getItem('nexus-trial-banner-dismissed') === 'true'
         const showTrialBanner = isOnTrial && !bannerDismissed
 
-        // Show mobile app for mobile users
+        // Mobile browser: show install gate (prod only, skip in dev for testing)
+        if (isMobile && import.meta.env.PROD) {
+            return <InstallPrompt onLogout={async () => {
+                await AuthService.signOut()
+                setUser(null)
+            }} />
+        }
+
+        // Mobile in dev mode: bypass install gate for testing
         if (isMobile) {
             return (
                 <Router>
                     <div className="min-h-screen" style={{ backgroundColor: '#F9FAFB' }}>
                         <StorageProvider>
                             <TeamProvider>
-                                {/* Show trial banner if on trial and not dismissed */}
                                 {showTrialBanner && (
                                     <TrialBanner
                                         remainingDays={subscriptionStatus.remainingTrialDays}
@@ -335,13 +470,12 @@ function App() {
             )
         }
 
-        // Desktop app
+        // Desktop app (completely unchanged)
         return (
             <Router>
                 <StorageProvider>
                     <TeamProvider>
                         <TutorialProvider>
-                            {/* Show trial banner if on trial and not dismissed */}
                             {showTrialBanner && (
                                 <TrialBanner
                                     remainingDays={subscriptionStatus.remainingTrialDays}
@@ -349,14 +483,7 @@ function App() {
                             )}
 
                             <Routes>
-                                {/* Public routes - accessible without auth */}
-                                <Route path="/explore" element={<ExplorePage />} />
-                                <Route path="/org/:slug" element={<PublicOrganizationPage />} />
-                                <Route path="/org/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
-                                <Route path="/org/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
-                                <Route path="/org/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
-                                <Route path="/org/:orgSlug/:initiativeSlug/story/:storyId" element={<PublicStoryPage />} />
-                                <Route path="/org/:orgSlug/:initiativeSlug/evidence/:evidenceId" element={<PublicEvidencePage />} />
+                                {publicRoutes}
 
                                 {/* Invite acceptance page */}
                                 <Route path="/invite/:token" element={<InviteAcceptPage />} />
@@ -388,14 +515,7 @@ function App() {
     return (
         <Router>
             <Routes>
-                {/* Public routes - accessible without auth */}
-                <Route path="/explore" element={<ExplorePage />} />
-                <Route path="/org/:slug" element={<PublicOrganizationPage />} />
-                <Route path="/org/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
-                <Route path="/org/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
-                <Route path="/org/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
-                <Route path="/org/:orgSlug/:initiativeSlug/story/:storyId" element={<PublicStoryPage />} />
-                <Route path="/org/:orgSlug/:initiativeSlug/evidence/:evidenceId" element={<PublicEvidencePage />} />
+                {publicRoutes}
 
                 {/* Invite acceptance page (accessible without login) */}
                 <Route path="/invite/:token" element={<InviteAcceptPage />} />

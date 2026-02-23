@@ -1,0 +1,25 @@
+{
+    "name": "Nexus Impacts AI",
+    "short_name": "Nexus",
+    "description": "AI-powered impact tracking for nonprofits",
+    "start_url": "/",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "scope": "/",
+    "theme_color": "#c0dfa1",
+    "background_color": "#F9FAFB",
+    "icons": [
+        {
+            "src": "/Nexuslogo.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/Nexuslogo.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}
