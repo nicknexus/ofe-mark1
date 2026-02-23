@@ -29,6 +29,7 @@ import TrialActivationPage from './pages/TrialActivationPage'
 import SubscriptionExpiredPage from './pages/SubscriptionExpiredPage'
 import TeamSettingsPage from './pages/TeamSettingsPage'
 import InviteAcceptPage from './pages/InviteAcceptPage'
+import TermsOfServicePage from './pages/TermsOfServicePage'
 import Layout from './components/Layout'
 
 // Hook to detect mobile
@@ -155,8 +156,21 @@ function App() {
         )
     }
 
-    // User is logged in - check subscription status
+    // User is logged in - check terms of service, then subscription status
     if (user) {
+        // Gate on Terms of Service acceptance before anything else
+        if (!user.accepted_terms_of_service) {
+            return (
+                <>
+                    <TermsOfServicePage onAccepted={async () => {
+                        const updatedUser = await AuthService.getCurrentUser()
+                        if (updatedUser) setUser(updatedUser)
+                    }} />
+                    <Toaster position="top-right" />
+                </>
+            )
+        }
+
         // Check if user is trying to access an invite page - always allow this
         const isOnInvitePage = window.location.pathname.startsWith('/invite/')
 

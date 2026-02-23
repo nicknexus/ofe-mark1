@@ -215,6 +215,8 @@ export interface User {
     email: string;
     name?: string;
     organization?: string;
+    accepted_terms_of_service?: boolean;
+    accepted_terms_of_service_at?: string;
 }
 
 export interface Subscription {

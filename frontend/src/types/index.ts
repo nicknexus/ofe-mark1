@@ -184,6 +184,8 @@ export interface User {
     name?: string;
     organization?: string;
     has_completed_tutorial?: boolean;
+    accepted_terms_of_service?: boolean;
+    accepted_terms_of_service_at?: string;
 }
 
 export interface Subscription {
