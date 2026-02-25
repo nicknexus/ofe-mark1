@@ -17,6 +17,7 @@ import {
     Users
 } from 'lucide-react'
 import { AuthService } from '../../services/auth'
+import { formatDate } from '../../utils'
 import { apiService } from '../../services/api'
 import { SubscriptionService } from '../../services/subscription'
 import { useTeam } from '../../context/TeamContext'
@@ -221,7 +222,7 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
                                     Trial Ends
                                 </span>
                                 <span className="text-sm font-medium text-gray-900">
-                                    {new Date(subscriptionStatus.subscription.trial_ends_at).toLocaleDateString()}
+                                    {formatDate(subscriptionStatus.subscription.trial_ends_at)}
                                 </span>
                             </div>
                         )}
@@ -234,7 +235,7 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
                                     Next Billing
                                 </span>
                                 <span className="text-sm font-medium text-gray-900">
-                                    {new Date(subscriptionStatus.subscription.current_period_end).toLocaleDateString()}
+                                    {formatDate(subscriptionStatus.subscription.current_period_end)}
                                 </span>
                             </div>
                         )}

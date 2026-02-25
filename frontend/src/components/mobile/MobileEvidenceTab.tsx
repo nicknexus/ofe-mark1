@@ -357,6 +357,7 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh }: MobileEvi
                         const bgColor = typeInfo.color.split(' ')[0]
                         const TypeIcon = evidenceTypes.find(t => t.value === ev.type)?.icon || FileText
                         const isImage = ev.file_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+                        const isVideoThumb = ev.file_url?.match(/\.(mp4|webm|mov|avi|mkv)$/i)
 
                         return (
                             <button
@@ -375,6 +376,15 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh }: MobileEvi
                                                 (e.target as HTMLImageElement).style.display = 'none'
                                             }}
                                         />
+                                    ) : isVideoThumb && ev.file_url ? (
+                                        <>
+                                            <video src={ev.file_url} className="w-full h-full object-cover" muted preload="metadata" />
+                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                <div className="w-10 h-10 bg-black/60 rounded-full flex items-center justify-center">
+                                                    <svg className="w-4 h-4 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                                                </div>
+                                            </div>
+                                        </>
                                     ) : (
                                         <TypeIcon className="w-10 h-10 text-gray-400" />
                                     )}
@@ -433,6 +443,7 @@ function MobileEvidencePreview({ evidence, onClose, onEdit, onDelete }: MobileEv
     const typeInfo = getEvidenceTypeInfo(evidence.type)
     
     const isImage = evidence.file_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+    const isVideoPreview = evidence.file_url?.match(/\.(mp4|webm|mov|avi|mkv)$/i)
     const isPDF = evidence.file_url?.match(/\.pdf$/i)
     
     const hasDateRange = evidence.date_range_start && evidence.date_range_end
@@ -512,6 +523,13 @@ function MobileEvidencePreview({ evidence, onClose, onEdit, onDelete }: MobileEv
                                 onError={() => setImageLoading(false)}
                             />
                         </>
+                    ) : isVideoPreview && evidence.file_url ? (
+                        <video
+                            src={evidence.file_url}
+                            controls
+                            className="w-full h-full object-contain rounded-xl"
+                            preload="metadata"
+                        />
                     ) : isPDF ? (
                         <div className="text-center p-6">
                             <div className="w-20 h-20 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">

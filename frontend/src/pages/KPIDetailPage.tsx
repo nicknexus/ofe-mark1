@@ -752,7 +752,7 @@ export default function KPIDetailPage() {
                     {dateFilter.isActive && (
                         <div className="mt-3 p-3 bg-evidence-50/60 backdrop-blur-sm rounded-xl border border-evidence-200/40">
                             <p className="text-sm text-primary-700">
-                                Showing data from {new Date(dateFilter.startDate).toLocaleDateString()} to {new Date(dateFilter.endDate).toLocaleDateString()}
+                                Showing data from {formatDate(dateFilter.startDate)} to {formatDate(dateFilter.endDate)}
                             </p>
                         </div>
                     )}
@@ -859,10 +859,7 @@ export default function KPIDetailPage() {
                                 <LineChart data={updates
                                     .sort((a, b) => new Date(a.date_represented).getTime() - new Date(b.date_represented).getTime())
                                     .map(update => ({
-                                        date: new Date(update.date_represented).toLocaleDateString('en-US', {
-                                            month: 'short',
-                                            day: 'numeric'
-                                        }),
+                                        date: formatDate(update.date_represented, { month: 'short', day: 'numeric' }),
                                         value: update.value,
                                         label: update.label || update.note
                                     }))}>

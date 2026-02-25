@@ -5,44 +5,30 @@ export function cn(...inputs: ClassValue[]) {
     return clsx(inputs)
 }
 
-// Format date for display
-export function formatDate(date: string | Date): string {
-    let dateToFormat: Date
-
-    if (typeof date === 'string') {
-        // Handle YYYY-MM-DD format strings by parsing as local date
-        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-            const [year, month, day] = date.split('-').map(Number)
-            dateToFormat = new Date(year, month - 1, day) // month is 0-indexed
-        } else {
-            dateToFormat = new Date(date)
-        }
-    } else {
-        dateToFormat = date
+// Parse a date string as a local date, avoiding UTC timezone shift.
+// Handles "YYYY-MM-DD", full ISO timestamps, and Date objects.
+export function parseLocalDate(date: string | Date): Date {
+    if (date instanceof Date) return date
+    // Extract just YYYY-MM-DD from any ISO-like string to avoid UTC shift
+    const match = date.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (match) {
+        return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
     }
+    return new Date(date)
+}
 
-    return new Intl.DateTimeFormat('en-US', {
+// Format date for display — default "Feb 24, 2025", pass options to customize
+export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions): string {
+    return new Intl.DateTimeFormat('en-US', options ?? {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
-    }).format(dateToFormat)
+    }).format(parseLocalDate(date))
 }
 
 // Format date for inputs
 export function formatDateForInput(date: string | Date): string {
-    let dateToFormat: Date
-
-    if (typeof date === 'string') {
-        // Handle YYYY-MM-DD format strings by parsing as local date
-        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-            const [year, month, day] = date.split('-').map(Number)
-            dateToFormat = new Date(year, month - 1, day) // month is 0-indexed
-        } else {
-            dateToFormat = new Date(date)
-        }
-    } else {
-        dateToFormat = date
-    }
+    const dateToFormat = parseLocalDate(date)
 
     // Return in YYYY-MM-DD format for input fields
     const year = dateToFormat.getFullYear()
@@ -112,28 +98,6 @@ export function truncateText(text: string, maxLength: number): string {
 // Generate random ID (for temporary use)
 export function generateId(): string {
     return Math.random().toString(36).substr(2, 9)
-}
-
-// Debounce function
-// Parse a date string as a local date (not UTC) to avoid timezone shifts
-// This ensures dates like "2024-11-01" are treated as Nov 1st in the user's timezone
-export function parseLocalDate(dateString: string | Date): Date {
-    if (dateString instanceof Date) {
-        return dateString
-    }
-
-    // If it's a date string like "2024-11-01", parse it as local date
-    // Split and create Date object directly to avoid UTC interpretation
-    const parts = dateString.split('T')[0].split('-')
-    if (parts.length === 3) {
-        const year = parseInt(parts[0], 10)
-        const month = parseInt(parts[1], 10) - 1 // Month is 0-indexed
-        const day = parseInt(parts[2], 10)
-        return new Date(year, month, day)
-    }
-
-    // Fallback to standard Date parsing
-    return new Date(dateString)
 }
 
 // Get date-only string (YYYY-MM-DD) from a Date object, normalized to local timezone

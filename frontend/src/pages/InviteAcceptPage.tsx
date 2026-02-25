@@ -5,6 +5,7 @@ import {
     LogIn, UserPlus
 } from 'lucide-react'
 import { TeamService, InviteDetails } from '../services/team'
+import { formatDate } from '../utils'
 import { AuthService } from '../services/auth'
 import { User } from '../types'
 import toast from 'react-hot-toast'
@@ -286,11 +287,7 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
             <div className="flex items-center gap-2 text-xs text-muted-foreground bg-white/40 rounded-xl p-3 mb-6 border border-white/60">
                 <Clock className="w-4 h-4 flex-shrink-0" />
                 <span>
-                    This invitation expires on {new Date(invite.expires_at).toLocaleDateString('en-US', {
-                        month: 'long',
-                        day: 'numeric',
-                        year: 'numeric'
-                    })}
+                    This invitation expires on {formatDate(invite.expires_at, { month: 'long', day: 'numeric', year: 'numeric' })}
                 </span>
             </div>
 

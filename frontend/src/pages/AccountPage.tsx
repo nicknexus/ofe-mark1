@@ -6,6 +6,7 @@ import {
     UserPlus, RefreshCw, Send, FileText, ToggleLeft, Camera, Upload, Palette, Globe, Lock, Link, Heart
 } from 'lucide-react'
 import { AuthService } from '../services/auth'
+import { formatDate } from '../utils'
 import { apiService } from '../services/api'
 import { SubscriptionService } from '../services/subscription'
 import { TeamService, TeamMember, TeamInvitation, TeamCapacity } from '../services/team'
@@ -379,9 +380,6 @@ export default function AccountPage({ subscriptionStatus }: Props) {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
     }
 
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    }
 
     if (loading) {
         return (
@@ -604,7 +602,7 @@ function AccountTab({
                             <div className="space-y-1">
                                 <div className="text-sm text-gray-500 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />Trial Ends</div>
                                 <div className="text-base font-medium text-gray-900">
-                                    {new Date(subscriptionStatus.subscription.trial_ends_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    {formatDate(subscriptionStatus.subscription.trial_ends_at)}
                                 </div>
                             </div>
                         )}

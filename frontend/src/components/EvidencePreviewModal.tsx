@@ -209,6 +209,12 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
 
     const isPDF = (fileUrl: string) => fileUrl && fileUrl.includes('.pdf')
 
+    const isVideo = (fileUrl: string) => {
+        if (!fileUrl) return false
+        const lower = fileUrl.toLowerCase()
+        return lower.includes('.mp4') || lower.includes('.webm') || lower.includes('.mov') || lower.includes('.avi') || lower.includes('.mkv')
+    }
+
     const isYouTubeUrl = (url: string) => {
         if (!url) return false
         return /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(url)
@@ -341,6 +347,17 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
+                                ) : currentFile && isVideo(currentFile.file_url) ? (
+                                    <div className="w-full">
+                                        <video
+                                            src={currentFile.file_url}
+                                            controls
+                                            className="w-full max-h-[400px] rounded-xl shadow-lg"
+                                            preload="metadata"
+                                            onLoadedData={() => setImageLoading(false)}
+                                        />
+                                        <p className="text-xs text-gray-500 text-center mt-2">{currentFile.file_name}</p>
                                     </div>
                                 ) : currentFile && isYouTubeUrl(currentFile.file_url) ? (
                                     <div className="w-full">

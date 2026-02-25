@@ -477,9 +477,17 @@ class ApiService {
 
             return { file_url: publicUrl, size: file.size }
         } catch (error) {
-            // Fallback: try the old endpoint for small files (backwards compatibility)
             console.warn('Direct upload failed, trying fallback:', error)
-            
+
+            // Vercel has a 4.5MB body limit — only attempt fallback for small files
+            const VERCEL_LIMIT = 4 * 1024 * 1024 // 4MB safe threshold
+            if (file.size > VERCEL_LIMIT) {
+                throw new Error(
+                    `File is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). ` +
+                    'Direct upload to storage failed. Please try a smaller file or contact support.'
+                )
+            }
+
             const formData = new FormData()
             formData.append('file', file)
 

@@ -8,7 +8,7 @@ import { publicApi, PublicEvidenceDetail } from '../services/publicApi'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
 import DateRangePicker from '../components/DateRangePicker'
-import { getLocalDateString } from '../utils'
+import { getLocalDateString, formatDate } from '../utils'
 
 // Evidence type config
 const evidenceTypeConfig: Record<string, { icon: any; label: string; color: string; bg: string }> = {
@@ -126,6 +126,12 @@ export default function PublicEvidencePage() {
         return type.includes('pdf') || url.match(/\.pdf$/i)
     }
 
+    const isVideoFile = (file: any) => {
+        const url = file.file_url?.toLowerCase() || ''
+        const type = file.file_type?.toLowerCase() || ''
+        return type.includes('video') || url.match(/\.(mp4|webm|mov|avi|mkv)$/i)
+    }
+
     const isYouTubeUrl = (url: string) => {
         if (!url) return false
         return /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(url)
@@ -213,6 +219,13 @@ export default function PublicEvidencePage() {
                                             src={currentFile.file_url}
                                             alt={currentFile.file_name}
                                             className="max-w-full max-h-full object-contain"
+                                        />
+                                    ) : isVideoFile(currentFile) ? (
+                                        <video
+                                            src={currentFile.file_url}
+                                            controls
+                                            className="max-w-full max-h-full rounded-xl"
+                                            preload="metadata"
                                         />
                                     ) : isPdf(currentFile) ? (
                                         <iframe
@@ -330,17 +343,13 @@ export default function PublicEvidencePage() {
                             {/* Date */}
                             <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-gray-500">
                                 <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                {new Date(evidence.date_represented).toLocaleDateString('en-US', {
-                                    year: 'numeric',
-                                    month: 'short',
-                                    day: 'numeric'
-                                })}
+                                {formatDate(evidence.date_represented)}
                             </div>
 
                             {/* Date Range */}
                             {evidence.date_range_start && evidence.date_range_end && (
                                 <p className="text-[10px] sm:text-xs text-gray-400 mt-1">
-                                    Covers: {new Date(evidence.date_range_start).toLocaleDateString()} - {new Date(evidence.date_range_end).toLocaleDateString()}
+                                    Covers: {formatDate(evidence.date_range_start)} - {formatDate(evidence.date_range_end)}
                                 </p>
                             )}
                         </div>
@@ -356,9 +365,9 @@ export default function PublicEvidencePage() {
                                         const metricTitle = claim.kpis?.title || 'Unknown Metric'
                                         const metricSlug = metricTitle.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')
                                         const dateLabel = claim.date_range_start && claim.date_range_end
-                                            ? `${new Date(claim.date_range_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(claim.date_range_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                                            ? `${formatDate(claim.date_range_start, { month: 'short', day: 'numeric' })} – ${formatDate(claim.date_range_end)}`
                                             : claim.date_represented
-                                                ? new Date(claim.date_represented).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                                ? formatDate(claim.date_represented)
                                                 : ''
                                         return (
                                             <Link

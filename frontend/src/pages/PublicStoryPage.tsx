@@ -7,7 +7,7 @@ import { publicApi, PublicStoryDetail, PublicStory } from '../services/publicApi
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
 import DateRangePicker from '../components/DateRangePicker'
-import { getLocalDateString } from '../utils'
+import { getLocalDateString, formatDate } from '../utils'
 
 export default function PublicStoryPage() {
     const { orgSlug, initiativeSlug, storyId } = useParams<{
@@ -210,11 +210,7 @@ export default function PublicStoryPage() {
                         <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6 pb-4 sm:pb-6 border-b border-gray-100">
                             <span className="flex items-center gap-1 sm:gap-1.5">
                                 <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                {new Date(story.date_represented).toLocaleDateString('en-US', {
-                                    year: 'numeric',
-                                    month: 'short',
-                                    day: 'numeric'
-                                })}
+                                {formatDate(story.date_represented)}
                             </span>
                             {story.location && (
                                 <span className="flex items-center gap-1 sm:gap-1.5">

@@ -38,7 +38,7 @@ import {
 import PublicLoader from '../components/public/PublicLoader'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import DateRangePicker from '../components/DateRangePicker'
-import { getLocalDateString } from '../utils'
+import { getLocalDateString, formatDate } from '../utils'
 
 // Map tile configuration - matches internal app
 const CARTO_VOYAGER_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
@@ -1391,7 +1391,7 @@ function StoriesTab({ stories, orgSlug, initiativeSlug, dateQS = '' }: { stories
                         <h3 className="font-semibold text-foreground mb-2 group-hover:text-accent transition-colors">{story.title}</h3>
                         {story.description && <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{story.description}</p>}
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-accent" />{new Date(story.date_represented).toLocaleDateString()}</span>
+                            <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-accent" />{formatDate(story.date_represented)}</span>
                             {story.location?.name && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-accent" />{story.location.name}</span>}
                         </div>
                     </div>
@@ -1540,7 +1540,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { loc
                                             )}
                                             <h4 className="text-sm font-medium text-foreground">{story.title}</h4>
                                             {story.description && <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{story.description}</p>}
-                                            <p className="text-[10px] text-muted-foreground mt-1">{new Date(story.date_represented).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                            <p className="text-[10px] text-muted-foreground mt-1">{formatDate(story.date_represented)}</p>
                                         </Link>
                                     ))}
                                 </div>
@@ -1729,6 +1729,11 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evide
         return ext === 'pdf'
     }
 
+    const isVideoFile = (url: string) => {
+        const ext = url.split('.').pop()?.toLowerCase() || ''
+        return ['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(ext)
+    }
+
     const isYouTubeUrl = (url: string) => {
         if (!url) return false
         return /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(url)
@@ -1757,6 +1762,15 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evide
             const vid = getYouTubeVideoId(item.file_url)
             if (vid) return `https://img.youtube.com/vi/${vid}/hqdefault.jpg`
         }
+        return null
+    }
+
+    const getVideoPreviewUrl = (item: PublicEvidence): string | null => {
+        if (item.files && item.files.length > 0) {
+            const videoFile = item.files.find(f => isVideoFile(f.file_url))
+            if (videoFile) return videoFile.file_url
+        }
+        if (item.file_url && isVideoFile(item.file_url)) return item.file_url
         return null
     }
 
@@ -1952,8 +1966,8 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evide
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {displayedEvidence.map((item, idx) => {
                     const previewUrl = getPreviewUrl(item)
+                    const videoUrl = !previewUrl ? getVideoPreviewUrl(item) : null
                     const fileCount = item.files?.length || (item.file_url ? 1 : 0)
-                    // Map display index to filteredEvidence index
                     const filteredIndex = filteredEvidence.indexOf(item)
 
                     return (
@@ -1965,6 +1979,20 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evide
                             {previewUrl ? (
                                 <div className="relative aspect-video bg-gray-100 overflow-hidden">
                                     <img src={previewUrl} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                    {fileCount > 1 && (
+                                        <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-lg">
+                                            {fileCount} files
+                                        </div>
+                                    )}
+                                </div>
+                            ) : videoUrl ? (
+                                <div className="relative aspect-video bg-gray-900 overflow-hidden">
+                                    <video src={videoUrl} className="w-full h-full object-cover" muted preload="metadata" />
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                        <div className="w-12 h-12 bg-black/60 rounded-full flex items-center justify-center shadow-lg">
+                                            <svg className="w-5 h-5 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                                        </div>
+                                    </div>
                                     {fileCount > 1 && (
                                         <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-lg">
                                             {fileCount} files
@@ -1984,7 +2012,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evide
                                     <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${typeConfig[item.type]?.bg || 'bg-gray-100 text-gray-600'}`}>
                                         {typeConfig[item.type]?.label || item.type}
                                     </span>
-                                    <span className="text-xs text-muted-foreground">{new Date(item.date_represented).toLocaleDateString()}</span>
+                                    <span className="text-xs text-muted-foreground">{formatDate(item.date_represented)}</span>
                                 </div>
                                 <h3 className="font-semibold text-foreground text-sm mb-1 group-hover:text-accent transition-colors">{item.title}</h3>
                                 {item.description && <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{item.description}</p>}
@@ -2077,6 +2105,8 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evide
                                                     alt={galleryFile.file_name || galleryItem.title}
                                                     className="max-w-full max-h-full object-contain"
                                                 />
+                                            ) : isVideoFile(galleryFile.file_url) ? (
+                                                <video src={galleryFile.file_url} controls className="max-w-full max-h-full rounded-xl" preload="metadata" />
                                             ) : isPdfFile(galleryFile.file_url) ? (
                                                 <iframe
                                                     src={galleryFile.file_url}
@@ -2180,7 +2210,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evide
                                     )}
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                         <Calendar className="w-3.5 h-3.5" />
-                                        {new Date(galleryItem.date_represented).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                        {formatDate(galleryItem.date_represented)}
                                     </div>
                                     {galleryItem.locations && galleryItem.locations.length > 0 && (
                                         <div className="mt-3 flex flex-wrap gap-1">
@@ -2200,9 +2230,9 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evide
                                                 const metricTitle = claim.kpis?.title || 'Unknown Metric'
                                                 const metricSlug = claim.kpis?.title ? generateMetricSlug(claim.kpis.title) : ''
                                                 const dateLabel = claim.date_range_start && claim.date_range_end
-                                                    ? `${new Date(claim.date_range_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(claim.date_range_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                                                    ? `${formatDate(claim.date_range_start, { month: 'short', day: 'numeric' })} – ${formatDate(claim.date_range_end)}`
                                                     : claim.date_represented
-                                                        ? new Date(claim.date_represented).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                                        ? formatDate(claim.date_represented)
                                                         : ''
                                                 return (
                                                     <Link key={claim.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${metricSlug}${dateQS}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
@@ -2249,6 +2279,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evide
                                 ).map((item, i) => {
                                     const actualIndex = Math.max(0, galleryIndex - 3) + i
                                     const thumb = getPreviewUrl(item)
+                                    const vidThumb = !thumb ? getVideoPreviewUrl(item) : null
                                     return (
                                         <button
                                             key={item.id}
@@ -2260,6 +2291,8 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evide
                                         >
                                             {thumb ? (
                                                 <img src={thumb} alt="" className="w-full h-full object-cover" />
+                                            ) : vidThumb ? (
+                                                <video src={vidThumb} className="w-full h-full object-cover" muted preload="metadata" />
                                             ) : (
                                                 <div className="w-full h-full bg-gray-100 flex items-center justify-center">
                                                     <FileText className="w-4 h-4 text-gray-400" />
