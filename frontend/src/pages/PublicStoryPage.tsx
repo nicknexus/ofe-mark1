@@ -212,10 +212,12 @@ export default function PublicStoryPage() {
                                 <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 {formatDate(story.date_represented)}
                             </span>
-                            {story.location && (
+                            {(story.locations?.length || story.location) && (
                                 <span className="flex items-center gap-1 sm:gap-1.5">
                                     <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                    {story.location.name}
+                                    {story.locations?.length
+                                        ? story.locations.map((l: any) => l.name).join(', ')
+                                        : story.location?.name}
                                 </span>
                             )}
                             <span className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 bg-gray-100 rounded-full text-[10px] sm:text-xs font-medium">

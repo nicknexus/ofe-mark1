@@ -217,7 +217,7 @@ function MobileStoryForm({ initiativeId, onClose, onSuccess }: StoryFormProps) {
         media_url: '',
         file: null as File | null,
         date_represented: getLocalDateString(new Date()),
-        location_id: '',
+        location_ids: [] as string[],
         beneficiary_group_ids: [] as string[]
     })
 
@@ -256,8 +256,8 @@ function MobileStoryForm({ initiativeId, onClose, onSuccess }: StoryFormProps) {
             toast.error('Please enter a title')
             return
         }
-        if (!formData.location_id) {
-            toast.error('Please select a location')
+        if (!formData.location_ids || formData.location_ids.length === 0) {
+            toast.error('Please select at least one location')
             return
         }
 
@@ -269,7 +269,7 @@ function MobileStoryForm({ initiativeId, onClose, onSuccess }: StoryFormProps) {
                 media_type: formData.media_type,
                 media_url: formData.media_url || undefined,
                 date_represented: formData.date_represented,
-                location_id: formData.location_id,
+                location_ids: formData.location_ids,
                 beneficiary_group_ids: formData.beneficiary_group_ids,
                 initiative_id: initiativeId
             })
@@ -451,11 +451,11 @@ function MobileStoryForm({ initiativeId, onClose, onSuccess }: StoryFormProps) {
                     />
                 </div>
 
-                {/* Location */}
+                {/* Locations */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                         <MapPin className="w-4 h-4 inline mr-1" />
-                        Location <span className="text-red-500">*</span>
+                        Locations <span className="text-red-500">*</span>
                     </label>
                     {locations.length === 0 ? (
                         <div className="text-center py-4 bg-gray-50 rounded-xl">
@@ -465,11 +465,16 @@ function MobileStoryForm({ initiativeId, onClose, onSuccess }: StoryFormProps) {
                     ) : (
                         <div className="space-y-2 max-h-40 overflow-y-auto">
                             {locations.map((location) => {
-                                const isSelected = formData.location_id === location.id
+                                const isSelected = formData.location_ids.includes(location.id!)
                                 return (
                                     <button
                                         key={location.id}
-                                        onClick={() => setFormData({ ...formData, location_id: location.id! })}
+                                        onClick={() => setFormData(prev => ({
+                                            ...prev,
+                                            location_ids: isSelected
+                                                ? prev.location_ids.filter(id => id !== location.id)
+                                                : [...prev.location_ids, location.id!]
+                                        }))}
                                         className={`w-full p-3 rounded-xl border-2 text-left transition-all ${
                                             isSelected 
                                                 ? 'border-primary-500 bg-primary-50' 

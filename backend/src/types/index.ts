@@ -142,8 +142,10 @@ export interface Story {
     media_url?: string; // Optional - can be null/empty
     media_type: 'photo' | 'video' | 'recording' | 'text';
     date_represented: string; // Mandatory date
-    location_id?: string;
-    location?: Location; // Populated when fetching
+    location_id?: string; // Legacy single location (kept for backward compatibility)
+    location_ids?: string[]; // Multiple locations via story_locations junction table
+    location?: Location; // Legacy populated single location
+    locations?: Location[]; // Populated when fetching multiple locations
     beneficiary_group_ids?: string[]; // Array of linked beneficiary group IDs
     beneficiary_groups?: BeneficiaryGroup[]; // Populated when fetching
     created_at?: string;

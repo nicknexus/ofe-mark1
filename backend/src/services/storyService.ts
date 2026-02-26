@@ -13,12 +13,11 @@ export class StoryService {
             search?: string
         }
     ): Promise<Story[]> {
-        // Fetch all stories for the initiative (access controlled at route level)
         let query = supabase
             .from('stories')
             .select(`
                 *,
-                locations(id, name, description, latitude, longitude),
+                story_locations(location_id, locations(id, name, description, latitude, longitude)),
                 story_beneficiaries(
                     beneficiary_groups(id, name, description, location_id)
                 )
@@ -26,11 +25,6 @@ export class StoryService {
             .eq('initiative_id', initiativeId)
             .order('date_represented', { ascending: false })
             .order('created_at', { ascending: false })
-
-        // Apply filters
-        if (filters?.locationIds && filters.locationIds.length > 0) {
-            query = query.in('location_id', filters.locationIds)
-        }
 
         if (filters?.startDate) {
             query = query.gte('date_represented', filters.startDate)
@@ -47,22 +41,19 @@ export class StoryService {
         const { data, error } = await query
         if (error) throw new Error(`Failed to fetch stories: ${error.message}`)
 
-        // Transform data to include location and beneficiary groups
-        const stories = (data || []).map((story: any) => {
-            const transformed: Story = {
-                ...story,
-                location: story.locations || undefined,
-                beneficiary_groups: story.story_beneficiaries?.map((sb: any) => sb.beneficiary_groups).filter(Boolean) || [],
-                beneficiary_group_ids: story.story_beneficiaries?.map((sb: any) => sb.beneficiary_groups?.id).filter(Boolean) || []
-            }
-            delete (transformed as any).locations
-            delete (transformed as any).story_beneficiaries
-            return transformed
-        })
+        let stories = (data || []).map((story: any) => this.transformStory(story))
 
-        // Filter by beneficiary groups if specified
+        // Filter by location via junction table (post-query since we can't do .in on nested join)
+        if (filters?.locationIds && filters.locationIds.length > 0) {
+            stories = stories.filter((story: Story) => {
+                const storyLocationIds = story.location_ids || []
+                return storyLocationIds.some(id => filters.locationIds!.includes(id))
+            })
+        }
+
+        // Filter by beneficiary groups
         if (filters?.beneficiaryGroupIds && filters.beneficiaryGroupIds.length > 0) {
-            return stories.filter((story: Story) => {
+            stories = stories.filter((story: Story) => {
                 const storyGroupIds = story.beneficiary_group_ids || []
                 return storyGroupIds.some(id => filters.beneficiaryGroupIds!.includes(id))
             })
@@ -76,7 +67,7 @@ export class StoryService {
             .from('stories')
             .select(`
                 *,
-                locations(id, name, description, latitude, longitude),
+                story_locations(location_id, locations(id, name, description, latitude, longitude)),
                 story_beneficiaries(
                     beneficiary_groups(id, name, description, location_id)
                 )
@@ -88,22 +79,35 @@ export class StoryService {
         if (error) throw new Error(`Failed to fetch story: ${error.message}`)
         if (!data) throw new Error('Story not found')
 
+        return this.transformStory(data)
+    }
+
+    private static transformStory(data: any): Story {
+        const storyLocations = data.story_locations || []
+        const locations = storyLocations
+            .map((sl: any) => sl.locations)
+            .filter(Boolean)
+        const location_ids = storyLocations
+            .map((sl: any) => sl.location_id)
+            .filter(Boolean)
+
         const story: Story = {
             ...data,
-            location: data.locations || undefined,
+            location_ids,
+            locations,
+            // Backward compat: populate legacy single location from first entry
+            location: locations[0] || undefined,
             beneficiary_groups: data.story_beneficiaries?.map((sb: any) => sb.beneficiary_groups).filter(Boolean) || [],
             beneficiary_group_ids: data.story_beneficiaries?.map((sb: any) => sb.beneficiary_groups?.id).filter(Boolean) || []
         }
-        delete (story as any).locations
+        delete (story as any).story_locations
         delete (story as any).story_beneficiaries
-
         return story
     }
 
     static async create(story: Partial<Story>, userId: string): Promise<Story> {
-        const { beneficiary_group_ids, ...storyData } = story
+        const { beneficiary_group_ids, location_ids, locations: _locs, location, ...storyData } = story
 
-        // Insert story
         const { data: storyRecord, error: storyError } = await supabase
             .from('stories')
             .insert([{ ...storyData, user_id: userId }])
@@ -112,7 +116,25 @@ export class StoryService {
 
         if (storyError) throw new Error(`Failed to create story: ${storyError.message}`)
 
-        // Link beneficiary groups if provided
+        // Link locations via junction table
+        if (location_ids && location_ids.length > 0) {
+            const links = location_ids.map(locId => ({
+                story_id: storyRecord.id,
+                location_id: locId,
+                user_id: userId
+            }))
+
+            const { error: locError } = await supabase
+                .from('story_locations')
+                .insert(links)
+
+            if (locError) {
+                await supabase.from('stories').delete().eq('id', storyRecord.id)
+                throw new Error(`Failed to link locations: ${locError.message}`)
+            }
+        }
+
+        // Link beneficiary groups
         if (beneficiary_group_ids && beneficiary_group_ids.length > 0) {
             const links = beneficiary_group_ids.map(bgId => ({
                 story_id: storyRecord.id,
@@ -124,20 +146,17 @@ export class StoryService {
                 .insert(links)
 
             if (linkError) {
-                // Rollback story creation if linking fails
                 await supabase.from('stories').delete().eq('id', storyRecord.id)
                 throw new Error(`Failed to link beneficiary groups: ${linkError.message}`)
             }
         }
 
-        // Fetch complete story with relations
         return this.getById(storyRecord.id, userId)
     }
 
     static async update(id: string, updates: Partial<Story>, userId: string): Promise<Story> {
-        const { beneficiary_group_ids, ...storyData } = updates
+        const { beneficiary_group_ids, location_ids, locations: _locs, location, ...storyData } = updates
 
-        // Update story
         const { error: storyError } = await supabase
             .from('stories')
             .update({ ...storyData, updated_at: new Date().toISOString() })
@@ -146,15 +165,35 @@ export class StoryService {
 
         if (storyError) throw new Error(`Failed to update story: ${storyError.message}`)
 
+        // Update location links if provided
+        if (location_ids !== undefined) {
+            await supabase
+                .from('story_locations')
+                .delete()
+                .eq('story_id', id)
+
+            if (location_ids.length > 0) {
+                const links = location_ids.map(locId => ({
+                    story_id: id,
+                    location_id: locId,
+                    user_id: userId
+                }))
+
+                const { error: locError } = await supabase
+                    .from('story_locations')
+                    .insert(links)
+
+                if (locError) throw new Error(`Failed to update location links: ${locError.message}`)
+            }
+        }
+
         // Update beneficiary group links if provided
         if (beneficiary_group_ids !== undefined) {
-            // Delete existing links
             await supabase
                 .from('story_beneficiaries')
                 .delete()
                 .eq('story_id', id)
 
-            // Insert new links
             if (beneficiary_group_ids.length > 0) {
                 const links = beneficiary_group_ids.map(bgId => ({
                     story_id: id,
@@ -169,12 +208,10 @@ export class StoryService {
             }
         }
 
-        // Fetch updated story with relations
         return this.getById(id, userId)
     }
 
     static async delete(id: string, userId: string): Promise<void> {
-        // Delete will cascade to story_beneficiaries due to ON DELETE CASCADE
         const { error } = await supabase
             .from('stories')
             .delete()
@@ -184,10 +221,3 @@ export class StoryService {
         if (error) throw new Error(`Failed to delete story: ${error.message}`)
     }
 }
-
-
-
-
-
-
-

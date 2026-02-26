@@ -124,13 +124,22 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
                                 </div>
                             </div>
 
-                            {/* Location */}
-                            {story.location ? (
+                            {/* Locations */}
+                            {(story.locations?.length || story.location) ? (
                                 <div className="flex items-start space-x-3">
                                     <MapPin className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
                                     <div>
-                                        <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Location</p>
-                                        <p className="text-gray-900 mt-1">{story.location.name}</p>
+                                        <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                                            {(story.locations?.length || 0) > 1 ? 'Locations' : 'Location'}
+                                        </p>
+                                        <div className="flex flex-wrap gap-2 mt-1">
+                                            {(story.locations?.length ? story.locations : story.location ? [story.location] : []).map(loc => (
+                                                <span key={loc.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 rounded-full text-sm text-gray-900">
+                                                    <MapPin className="w-3 h-3 text-gray-400" />
+                                                    {loc.name}
+                                                </span>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                             ) : null}

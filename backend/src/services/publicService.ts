@@ -321,7 +321,7 @@ export class PublicService {
             .from('stories')
             .select(`
                 id, title, description, media_url, media_type, date_represented, location_id, initiative_id,
-                locations(id, name),
+                story_locations(location_id, locations(id, name)),
                 initiatives!inner(id, slug, title, organization_id,
                     organizations!inner(slug, is_public)
                 )
@@ -338,20 +338,24 @@ export class PublicService {
 
         if (error) throw new Error(`Failed to fetch stories: ${error.message}`);
 
-        return (data || []).map((s: any) => ({
-            id: s.id,
-            title: s.title,
-            description: s.description,
-            media_url: s.media_url,
-            media_type: s.media_type,
-            date_represented: s.date_represented,
-            location_id: s.location_id,
-            location_name: s.locations?.name,
-            initiative_id: s.initiative_id,
-            initiative_slug: s.initiatives?.slug,
-            initiative_title: s.initiatives?.title,
-            org_slug: s.initiatives?.organizations?.slug
-        }));
+        return (data || []).map((s: any) => {
+            const locations = (s.story_locations || []).map((sl: any) => sl.locations).filter(Boolean);
+            return {
+                id: s.id,
+                title: s.title,
+                description: s.description,
+                media_url: s.media_url,
+                media_type: s.media_type,
+                date_represented: s.date_represented,
+                location_ids: locations.map((l: any) => l.id),
+                locations,
+                location_name: locations[0]?.name,
+                initiative_id: s.initiative_id,
+                initiative_slug: s.initiatives?.slug,
+                initiative_title: s.initiatives?.title,
+                org_slug: s.initiatives?.organizations?.slug
+            };
+        });
     }
 
     static async getOrganizationLocations(orgSlug: string): Promise<any[]> {
@@ -572,8 +576,8 @@ export class PublicService {
         const { data, error } = await supabase
             .from('stories')
             .select(`
-                id, title, description, media_url, media_type, date_represented, location_id, created_at,
-                locations(id, name, latitude, longitude),
+                id, title, description, media_url, media_type, date_represented, created_at,
+                story_locations(location_id, locations(id, name, latitude, longitude)),
                 story_beneficiaries(beneficiary_groups(id, name))
             `)
             .eq('initiative_id', initiative.id)
@@ -581,18 +585,22 @@ export class PublicService {
 
         if (error) throw new Error(`Failed to fetch stories: ${error.message}`);
 
-        return (data || []).map((s: any) => ({
-            id: s.id,
-            title: s.title,
-            description: s.description,
-            media_url: s.media_url,
-            media_type: s.media_type,
-            date_represented: s.date_represented,
-            location_id: s.location_id,
-            location: s.locations,
-            beneficiary_groups: s.story_beneficiaries?.map((sb: any) => sb.beneficiary_groups).filter(Boolean) || [],
-            created_at: s.created_at
-        }));
+        return (data || []).map((s: any) => {
+            const locations = (s.story_locations || []).map((sl: any) => sl.locations).filter(Boolean);
+            return {
+                id: s.id,
+                title: s.title,
+                description: s.description,
+                media_url: s.media_url,
+                media_type: s.media_type,
+                date_represented: s.date_represented,
+                location_ids: locations.map((l: any) => l.id),
+                locations,
+                location: locations[0] || undefined,
+                beneficiary_groups: s.story_beneficiaries?.map((sb: any) => sb.beneficiary_groups).filter(Boolean) || [],
+                created_at: s.created_at
+            };
+        });
     }
 
     static async getInitiativeLocations(orgSlug: string, initiativeSlug: string): Promise<Location[]> {
@@ -966,12 +974,11 @@ export class PublicService {
         const initiative = await this.getInitiativeBySlug(orgSlug, initiativeSlug);
         if (!initiative) return null;
 
-        // Fetch story with location
         const { data: story, error } = await supabase
             .from('stories')
             .select(`
                 id, title, description, media_url, media_type, date_represented, created_at,
-                locations(id, name, description, latitude, longitude)
+                story_locations(location_id, locations(id, name, description, latitude, longitude))
             `)
             .eq('id', storyId)
             .eq('initiative_id', initiative.id)
@@ -998,6 +1005,8 @@ export class PublicService {
             beneficiaryGroups = groups || [];
         }
 
+        const storyLocations = (story.story_locations || []).map((sl: any) => sl.locations).filter(Boolean);
+
         return {
             id: story.id,
             title: story.title,
@@ -1006,7 +1015,8 @@ export class PublicService {
             media_type: story.media_type,
             date_represented: story.date_represented,
             created_at: story.created_at,
-            location: story.locations,
+            locations: storyLocations,
+            location: storyLocations[0] || undefined,
             beneficiary_groups: beneficiaryGroups,
             initiative: {
                 id: initiative.id,
@@ -1096,13 +1106,24 @@ export class PublicService {
 
         if (locError || !location) return null;
 
-        // Stories at this location
-        const { data: stories } = await supabase
-            .from('stories')
-            .select('id, title, description, media_url, media_type, date_represented, created_at')
-            .eq('initiative_id', initiative.id)
-            .eq('location_id', locationId)
-            .order('date_represented', { ascending: false });
+        // Stories at this location via story_locations junction table
+        const { data: storyLinks } = await supabase
+            .from('story_locations')
+            .select('story_id')
+            .eq('location_id', locationId);
+
+        const storyIds = (storyLinks || []).map((sl: any) => sl.story_id);
+
+        let stories: any[] = [];
+        if (storyIds.length > 0) {
+            const { data: storiesData } = await supabase
+                .from('stories')
+                .select('id, title, description, media_url, media_type, date_represented, created_at')
+                .eq('initiative_id', initiative.id)
+                .in('id', storyIds)
+                .order('date_represented', { ascending: false });
+            stories = storiesData || [];
+        }
 
         // Evidence at this location via evidence_locations
         const { data: evidenceLinks } = await supabase

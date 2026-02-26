@@ -127,10 +127,14 @@ export default function StoryCard({ story, onView }: StoryCardProps) {
                             <span className="truncate">{formatDate(story.date_represented)}</span>
                         </div>
 
-                        {story.location ? (
+                        {(story.locations?.length || story.location) ? (
                             <div className="flex items-center gap-1 text-[11px] text-gray-500 h-5">
                                 <MapPin className="w-3 h-3 flex-shrink-0" />
-                                <span className="truncate">{story.location.name}</span>
+                                <span className="truncate">
+                                    {story.locations?.length
+                                        ? story.locations.map(l => l.name).join(', ')
+                                        : story.location?.name}
+                                </span>
                             </div>
                         ) : (
                             <div className="h-5" />

@@ -1392,7 +1392,14 @@ function StoriesTab({ stories, orgSlug, initiativeSlug, dateQS = '' }: { stories
                         {story.description && <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{story.description}</p>}
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-accent" />{formatDate(story.date_represented)}</span>
-                            {story.location?.name && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-accent" />{story.location.name}</span>}
+                            {(story.locations?.length || story.location?.name) && (
+                                <span className="flex items-center gap-1">
+                                    <MapPin className="w-3.5 h-3.5 text-accent" />
+                                    {story.locations?.length
+                                        ? story.locations.map((l: any) => l.name).join(', ')
+                                        : story.location?.name}
+                                </span>
+                            )}
                         </div>
                     </div>
                 </Link>

@@ -208,26 +208,45 @@ export class ReportService {
             storiesQuery = storiesQuery.lte('date_represented', dateEnd);
         }
 
-        if (locationIds && locationIds.length > 0) {
-            storiesQuery = storiesQuery.in('location_id', locationIds);
-        }
-
         const { data: storiesData, error: storiesError } = await storiesQuery;
 
         if (storiesError) {
             throw new Error(`Failed to fetch stories: ${storiesError.message}`);
         }
 
-        const stories = (storiesData || []).map((story: any) => ({
+        // Fetch story_locations for all stories to get multi-location data
+        const allStoryIds = (storiesData || []).map((s: any) => s.id);
+        let storyLocationMap = new Map<string, string[]>();
+        if (allStoryIds.length > 0) {
+            const { data: slData } = await supabase
+                .from('story_locations')
+                .select('story_id, location_id')
+                .in('story_id', allStoryIds);
+            (slData || []).forEach((sl: any) => {
+                const existing = storyLocationMap.get(sl.story_id) || [];
+                existing.push(sl.location_id);
+                storyLocationMap.set(sl.story_id, existing);
+            });
+        }
+
+        let stories = (storiesData || []).map((story: any) => ({
             id: story.id,
             title: story.title,
             description: story.description || undefined,
             date_represented: story.date_represented,
+            location_ids: storyLocationMap.get(story.id) || (story.location_id ? [story.location_id] : []),
             location_id: story.location_id || undefined,
             location_name: story.location_name || undefined,
             media_url: story.media_url || undefined,
             media_type: story.media_type || undefined
         }));
+
+        // Filter by locations via junction table
+        if (locationIds && locationIds.length > 0) {
+            stories = stories.filter(story =>
+                story.location_ids.some((lid: string) => locationIds.includes(lid))
+            );
+        }
 
         // Build map points from locations and stories
         const mapPoints: Array<{ lat: number; lng: number; name: string; type: 'location' | 'story' }> = [];
@@ -242,10 +261,9 @@ export class ReportService {
         });
 
         stories.forEach(story => {
-            if (story.location_id) {
-                const location = locations.find(l => l.id === story.location_id);
+            for (const locId of story.location_ids) {
+                const location = locations.find(l => l.id === locId);
                 if (location) {
-                    // Only add if not already added as location
                     const exists = mapPoints.some(p => p.lat === location.latitude && p.lng === location.longitude);
                     if (!exists) {
                         mapPoints.push({
