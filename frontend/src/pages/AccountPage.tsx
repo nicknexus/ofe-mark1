@@ -1299,8 +1299,8 @@ function BillingTab({ subscriptionStatus }: { subscriptionStatus?: SubscriptionS
         }
     }
 
-    const plan = subscriptionStatus?.subscription?.plan_tier || 'free'
-    const status = subscriptionStatus?.subscription?.status || 'none'
+    const plan = (subscriptionStatus?.subscription?.plan_tier as string) || 'free'
+    const status = (subscriptionStatus?.subscription?.status as string) || 'none'
 
     return (
         <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">

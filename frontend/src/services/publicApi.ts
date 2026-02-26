@@ -89,8 +89,10 @@ export interface PublicStory {
     media_type: 'photo' | 'video' | 'recording' | 'text'
     date_represented: string
     location_id?: string
+    location_ids?: string[]
     location_name?: string
     location?: PublicLocation
+    locations?: PublicLocation[]
     initiative_id: string
     initiative_slug?: string
     initiative_title?: string
@@ -378,6 +380,7 @@ export interface PublicStoryDetail {
     date_represented: string
     created_at?: string
     location?: PublicLocation
+    locations?: PublicLocation[]
     beneficiary_groups?: PublicBeneficiaryGroup[]
     initiative: {
         id: string
