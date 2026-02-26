@@ -11,6 +11,7 @@ interface DateRangePickerProps {
         endDate?: string
     }
     onChange: (value: { singleDate?: string; startDate?: string; endDate?: string }) => void
+    minDate?: string // YYYY-MM-DD format
     maxDate?: string // YYYY-MM-DD format
     placeholder?: string
     className?: string
@@ -19,6 +20,7 @@ interface DateRangePickerProps {
 export default function DateRangePicker({
     value,
     onChange,
+    minDate,
     maxDate,
     placeholder = 'Select date or range',
     className = ''
@@ -129,20 +131,22 @@ export default function DateRangePicker({
                 top,
                 left
             })
-            // Reset to current month when opening
-            setCurrentMonth(new Date())
+            setCurrentMonth(
+                appliedStartDate ? appliedStartDate :
+                minDate ? parseLocalDate(minDate) :
+                new Date()
+            )
         }
         setIsOpen(!isOpen)
     }
 
     const today = startOfDay(new Date())
     const maxDateObj = maxDate ? startOfDay(parseLocalDate(maxDate)) : today
+    const minDateObj = minDate ? startOfDay(parseLocalDate(minDate)) : null
 
     const handleDateClick = (date: Date) => {
-        // Don't allow future dates
-        if (isAfter(date, maxDateObj)) {
-            return
-        }
+        if (isAfter(date, maxDateObj)) return
+        if (minDateObj && isBefore(date, minDateObj)) return
 
         // If no start date selected, set it
         if (!tempStartDate) {
@@ -308,7 +312,8 @@ export default function DateRangePicker({
                         <button
                             type="button"
                             onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                            className="p-1 hover:bg-gray-100 rounded"
+                            className="p-1 hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                            disabled={minDateObj ? isBefore(startOfMonth(currentMonth), startOfMonth(addMonths(minDateObj, 1))) : false}
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -344,7 +349,7 @@ export default function DateRangePicker({
                                 const isToday = isSameDay(day, today)
                                 const isSelected = isDateSelected(day)
                                 const isInRange = isDateInRange(day)
-                                const isDisabled = isAfter(day, maxDateObj)
+                                const isDisabled = isAfter(day, maxDateObj) || (minDateObj ? isBefore(day, minDateObj) : false)
                                 const isStart = previewStartDate && isSameDay(day, previewStartDate)
                                 const isEnd = previewEndDate && isSameDay(day, previewEndDate)
 

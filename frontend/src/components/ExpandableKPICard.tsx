@@ -864,45 +864,6 @@ export default function ExpandableKPICard({
 
                     {/* Content - Fit to screen */}
                     <div className="flex-1 p-3 flex flex-col gap-2 max-w-[1800px] mx-auto overflow-hidden w-full min-h-0">
-                                <div className="grid grid-cols-3 gap-2 flex-shrink-0">
-                                    <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-2.5 shadow-soft-float">
-                                        <div className="flex items-center space-x-2">
-                                            <div className="p-1.5 bg-primary-100/80 rounded-lg"><BarChart3 className="w-4 h-4 text-primary-500" /></div>
-                                            <div><p className="text-xs text-gray-500">Impact Claims</p><p className="text-lg font-bold text-primary-500">{kpi.total_updates}</p></div>
-                                        </div>
-                                    </div>
-                                    <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-xl p-2.5 shadow-soft-float">
-                                        <div className="flex items-center space-x-2">
-                                            <div className="p-1.5 bg-evidence-100/80 rounded-lg"><FileText className="w-4 h-4 text-evidence-500" /></div>
-                                            <div><p className="text-xs text-gray-500">Evidence Items</p><p className="text-lg font-bold text-evidence-500">{kpi.evidence_count}</p></div>
-                                        </div>
-                                    </div>
-                                    <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-2.5 shadow-soft-float">
-                                        <div className="flex items-center space-x-2">
-                                            <div className="p-1.5 bg-primary-100/80 rounded-lg"><Target className="w-4 h-4 text-primary-500" /></div>
-                                            <div><p className="text-xs text-gray-500">Evidence Coverage</p><p className="text-lg font-bold text-primary-500">{kpi.evidence_percentage}%</p></div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center justify-between gap-2 h-11 bg-white/60 backdrop-blur-sm border border-gray-100/60 rounded-lg px-3 flex-shrink-0">
-                                    {(['visual_proof', 'documentation', 'testimony', 'financials'] as const).map((type) => {
-                                        const IconComponent = getEvidenceIcon(type)
-                                        const typeInfo = getEvidenceTypeInfo(type)
-                                        const percentage = evidenceTypePercentages[type].percentage
-                                        const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' : typeInfo.color.includes('blue') ? 'text-evidence-600' : typeInfo.color.includes('orange') ? 'text-orange-600' : typeInfo.color.includes('green') ? 'text-primary-500' : 'text-gray-600'
-                                        return (
-                                            <div key={type} className="flex items-center gap-1.5 flex-1 min-w-0">
-                                                <IconComponent className={`w-3.5 h-3.5 ${colorClasses} flex-shrink-0`} />
-                                                <div className="flex flex-col items-start min-w-0 flex-1 overflow-hidden">
-                                                    <span className="text-[9px] font-medium text-gray-700 truncate w-full leading-tight">{typeInfo.label}</span>
-                                                    <span className="text-[8px] font-bold text-gray-600 leading-tight whitespace-nowrap">{percentage}%</span>
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-
                                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 flex-1 min-h-0 overflow-hidden">
                                     <div className="lg:col-span-3 bg-white/80 backdrop-blur-xl border border-gray-100/60 rounded-xl p-3 flex flex-col shadow-soft-float min-h-0 overflow-hidden">
                                         <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
@@ -1028,6 +989,45 @@ export default function ExpandableKPICard({
                                             </div>
                                         )}
                                     </div>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-2 flex-shrink-0">
+                                    <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-2.5 shadow-soft-float">
+                                        <div className="flex items-center space-x-2">
+                                            <div className="p-1.5 bg-primary-100/80 rounded-lg"><BarChart3 className="w-4 h-4 text-primary-500" /></div>
+                                            <div><p className="text-xs text-gray-500">Impact Claims</p><p className="text-lg font-bold text-primary-500">{kpi.total_updates}</p></div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-xl p-2.5 shadow-soft-float">
+                                        <div className="flex items-center space-x-2">
+                                            <div className="p-1.5 bg-evidence-100/80 rounded-lg"><FileText className="w-4 h-4 text-evidence-500" /></div>
+                                            <div><p className="text-xs text-gray-500">Evidence Items</p><p className="text-lg font-bold text-evidence-500">{kpi.evidence_count}</p></div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-2.5 shadow-soft-float">
+                                        <div className="flex items-center space-x-2">
+                                            <div className="p-1.5 bg-primary-100/80 rounded-lg"><Target className="w-4 h-4 text-primary-500" /></div>
+                                            <div><p className="text-xs text-gray-500">Evidence Coverage</p><p className="text-lg font-bold text-primary-500">{kpi.evidence_percentage}%</p></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between gap-2 h-11 bg-white/60 backdrop-blur-sm border border-gray-100/60 rounded-lg px-3 flex-shrink-0">
+                                    {(['visual_proof', 'documentation', 'testimony', 'financials'] as const).map((type) => {
+                                        const IconComponent = getEvidenceIcon(type)
+                                        const typeInfo = getEvidenceTypeInfo(type)
+                                        const percentage = evidenceTypePercentages[type].percentage
+                                        const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' : typeInfo.color.includes('blue') ? 'text-evidence-600' : typeInfo.color.includes('orange') ? 'text-orange-600' : typeInfo.color.includes('green') ? 'text-primary-500' : 'text-gray-600'
+                                        return (
+                                            <div key={type} className="flex items-center gap-1.5 flex-1 min-w-0">
+                                                <IconComponent className={`w-3.5 h-3.5 ${colorClasses} flex-shrink-0`} />
+                                                <div className="flex flex-col items-start min-w-0 flex-1 overflow-hidden">
+                                                    <span className="text-[9px] font-medium text-gray-700 truncate w-full leading-tight">{typeInfo.label}</span>
+                                                    <span className="text-[8px] font-bold text-gray-600 leading-tight whitespace-nowrap">{percentage}%</span>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
                                 </div>
                     </div>
                 </div>

@@ -3,6 +3,7 @@ import { X, Upload, File, Loader2, Check, Camera, FileText, MessageSquare, Dolla
 import { CreateEvidenceForm, Location } from '../types'
 import { apiService } from '../services/api'
 import { formatDate } from '../utils'
+import DateRangePicker from './DateRangePicker'
 import toast from 'react-hot-toast'
 
 interface EasyEvidenceModalProps {
@@ -41,6 +42,9 @@ export default function EasyEvidenceModal({
     const [currentStep, setCurrentStep] = useState(1)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
+    const isRangeClaim = impactClaim?.date_range_start && impactClaim?.date_range_end && impactClaim.date_range_start !== impactClaim.date_range_end
+    const [datePickerValue, setDatePickerValue] = useState<{ singleDate?: string; startDate?: string; endDate?: string }>({})
+
     useEffect(() => {
         if (isOpen && impactClaim?.location_id) {
             loadLocation()
@@ -49,10 +53,20 @@ export default function EasyEvidenceModal({
         }
     }, [isOpen, impactClaim?.location_id])
 
-    // Reset step when modal opens
+    // Reset step and date picker when modal opens
     useEffect(() => {
         if (isOpen) {
             setCurrentStep(1)
+            if (isRangeClaim) {
+                setDatePickerValue({
+                    startDate: impactClaim.date_range_start,
+                    endDate: impactClaim.date_range_end
+                })
+            } else {
+                setDatePickerValue({
+                    singleDate: impactClaim?.date_represented
+                })
+            }
         }
     }, [isOpen])
 
@@ -210,15 +224,13 @@ export default function EasyEvidenceModal({
                 const { file: fileWithType, result: uploadResult } = uploadResults[i]
                 setUploadProgress(`Creating evidence ${i + 1} of ${totalFiles}...`)
 
-                // Create evidence data - auto-fill from impact claim
                 const evidenceData: CreateEvidenceForm = {
                     title: fileWithType.title.trim(),
                     description: fileWithType.description.trim(),
                     type: fileWithType.type,
-                    // Use impact claim's date
-                    date_represented: impactClaim.date_range_end || impactClaim.date_represented,
-                    date_range_start: impactClaim.date_range_start,
-                    date_range_end: impactClaim.date_range_end,
+                    date_represented: datePickerValue.singleDate || datePickerValue.startDate || impactClaim.date_represented,
+                    date_range_start: datePickerValue.startDate,
+                    date_range_end: datePickerValue.endDate,
                     // Use impact claim's location if available (as array for multi-location support)
                     location_ids: impactClaim.location_id ? [impactClaim.location_id] : undefined,
                     // Link to the KPI
@@ -242,10 +254,10 @@ export default function EasyEvidenceModal({
                 await onBatchComplete()
             }
 
-            // Reset form
             setSelectedFiles([])
             setUploadProgress('')
             setCurrentStep(1)
+            setDatePickerValue({})
 
             toast.success(`Successfully added ${totalFiles} evidence ${totalFiles === 1 ? 'item' : 'items'}!`)
             onClose()
@@ -292,40 +304,59 @@ export default function EasyEvidenceModal({
 
                 {/* Impact Claim Summary */}
                 <div className="px-4 md:px-5 py-4 md:py-5 bg-gradient-to-r from-primary-50 to-primary-100/50 border-b border-primary-200/40 flex-shrink-0">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                        <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
-                            <div className="flex items-center gap-2">
-                                <div className="w-2.5 h-2.5 rounded-full bg-primary-500"></div>
-                                <span className="text-xs md:text-sm font-semibold text-primary-600 uppercase tracking-wide">
-                                    Supporting
-                                </span>
-                            </div>
-                            <span className="text-xl md:text-2xl font-bold text-primary-700">
-                                {impactClaim.value?.toLocaleString()} {kpi.unit_of_measurement}
-                            </span>
-                            <div className="flex flex-wrap items-center gap-3 md:gap-4 text-xs md:text-sm text-gray-600">
-                                <div className="flex items-center gap-1.5">
-                                    <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary-500" />
-                                    <span>{getDateDisplay()}</span>
+                    <div className="flex flex-col gap-3">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-primary-500"></div>
+                                    <span className="text-xs md:text-sm font-semibold text-primary-600 uppercase tracking-wide">
+                                        Supporting
+                                    </span>
                                 </div>
-                                {impactClaim.location_id && (
-                                    <div className="flex items-center gap-1.5">
-                                        <MapPin className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary-500" />
-                                        {loadingLocation ? (
-                                            <span className="text-gray-400">...</span>
-                                        ) : location ? (
-                                            <span>{location.name}</span>
-                                        ) : (
-                                            <span className="text-gray-400">—</span>
-                                        )}
-                                    </div>
-                                )}
+                                <span className="text-xl md:text-2xl font-bold text-primary-700">
+                                    {impactClaim.value?.toLocaleString()} {kpi.unit_of_measurement}
+                                </span>
+                                <div className="flex flex-wrap items-center gap-3 md:gap-4 text-xs md:text-sm text-gray-600">
+                                    {!isRangeClaim && (
+                                        <div className="flex items-center gap-1.5">
+                                            <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary-500" />
+                                            <span>{getDateDisplay()}</span>
+                                        </div>
+                                    )}
+                                    {impactClaim.location_id && (
+                                        <div className="flex items-center gap-1.5">
+                                            <MapPin className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary-500" />
+                                            {loadingLocation ? (
+                                                <span className="text-gray-400">...</span>
+                                            ) : location ? (
+                                                <span>{location.name}</span>
+                                            ) : (
+                                                <span className="text-gray-400">—</span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 rounded-lg shadow-sm">
+                                <Check className="w-3.5 h-3.5 text-white" />
+                                <span className="text-xs font-semibold text-white">Auto-linked</span>
                             </div>
                         </div>
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 rounded-lg shadow-sm">
-                            <Check className="w-3.5 h-3.5 text-white" />
-                            <span className="text-xs font-semibold text-white">Auto-linked</span>
-                        </div>
+                        {isRangeClaim && (
+                            <div className="bg-white/60 rounded-xl p-3 border border-primary-200/40">
+                                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                                    Evidence Date — select within claim range ({formatDate(impactClaim.date_range_start)} to {formatDate(impactClaim.date_range_end)})
+                                </label>
+                                <DateRangePicker
+                                    value={datePickerValue}
+                                    onChange={setDatePickerValue}
+                                    minDate={impactClaim.date_range_start}
+                                    maxDate={impactClaim.date_range_end}
+                                    placeholder="Select date or range within claim period"
+                                    className="w-full"
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
 
