@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { 
     Plus, 
     MapPin, 
@@ -7,7 +8,8 @@ import {
     Trash2,
     X,
     Check,
-    Loader2
+    Loader2,
+    Settings
 } from 'lucide-react'
 import { apiService } from '../../services/api'
 import { Location } from '../../types'
@@ -16,6 +18,7 @@ import toast from 'react-hot-toast'
 
 interface MobileLocationsTabProps {
     initiativeId: string
+    autoAdd?: boolean
 }
 
 interface NominatimResult {
@@ -25,12 +28,13 @@ interface NominatimResult {
     lon: string
 }
 
-export default function MobileLocationsTab({ initiativeId }: MobileLocationsTabProps) {
+export default function MobileLocationsTab({ initiativeId, autoAdd }: MobileLocationsTabProps) {
     const [locations, setLocations] = useState<Location[]>([])
     const [loading, setLoading] = useState(true)
-    const [showAddFlow, setShowAddFlow] = useState(false)
+    const [showAddFlow, setShowAddFlow] = useState(!!autoAdd)
     const [editingLocation, setEditingLocation] = useState<Location | null>(null)
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+    const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
     useEffect(() => {
         loadLocations()
@@ -121,47 +125,77 @@ export default function MobileLocationsTab({ initiativeId }: MobileLocationsTabP
                     {locations.map((location) => (
                         <div
                             key={location.id}
-                            className="bg-white rounded-xl border border-gray-100 overflow-hidden"
+                            className="bg-white rounded-xl border border-gray-100 overflow-hidden relative"
                         >
-                            <div className="p-4">
-                                <div className="flex items-start gap-3">
-                                    <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                                        <MapPin className="w-5 h-5 text-primary-500" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="font-semibold text-gray-800">{location.name}</h3>
-                                        {location.description && (
-                                            <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">
-                                                {location.description}
-                                            </p>
-                                        )}
-                                        <p className="text-xs text-gray-400 mt-1">
-                                            {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
-                                        </p>
-                                    </div>
+                            <div className="p-4 flex items-start gap-3">
+                                <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                                    <MapPin className="w-5 h-5 text-primary-500" />
                                 </div>
-                            </div>
-                            <div className="flex border-t border-gray-100">
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="font-semibold text-gray-800">{location.name}</h3>
+                                    {location.description && (
+                                        <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">
+                                            {location.description}
+                                        </p>
+                                    )}
+                                    <p className="text-xs text-gray-400 mt-1">
+                                        {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
+                                    </p>
+                                </div>
                                 <button
-                                    onClick={() => setEditingLocation(location)}
-                                    className="flex-1 flex items-center justify-center gap-2 py-3 text-sm text-gray-600 hover:bg-gray-50"
+                                    onClick={() => setOpenMenuId(openMenuId === location.id ? null : location.id!)}
+                                    className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors flex-shrink-0"
+                                    aria-label="Options"
                                 >
-                                    <Edit className="w-4 h-4" />
-                                    Edit
-                                </button>
-                                <div className="w-px bg-gray-100" />
-                                <button
-                                    onClick={() => setDeleteConfirmId(location.id!)}
-                                    className="flex-1 flex items-center justify-center gap-2 py-3 text-sm text-red-600 hover:bg-red-50"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                    Delete
+                                    <Settings className="w-5 h-5" />
                                 </button>
                             </div>
                         </div>
                     ))}
                 </div>
             )}
+
+            {/* Settings popup - compact centered bubble */}
+            {openMenuId && (() => {
+                const location = locations.find(l => l.id === openMenuId)
+                if (!location) return null
+                return createPortal(
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center" onClick={() => setOpenMenuId(null)}>
+                        <div className="absolute inset-0 bg-black/20" />
+                        <div
+                            className="relative bg-white rounded-2xl shadow-2xl w-64 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+                                <p className="text-sm font-semibold text-gray-800 truncate">{location.name}</p>
+                            </div>
+                            <div className="py-1">
+                                <button
+                                    onClick={() => {
+                                        setEditingLocation(location)
+                                        setOpenMenuId(null)
+                                    }}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                                >
+                                    <Edit className="w-4 h-4 text-gray-400" />
+                                    Edit Location
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setDeleteConfirmId(location.id!)
+                                        setOpenMenuId(null)
+                                    }}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 active:bg-red-100 transition-colors"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>,
+                    document.body
+                )
+            })()}
 
             {/* Delete Confirmation */}
             {deleteConfirmId && (

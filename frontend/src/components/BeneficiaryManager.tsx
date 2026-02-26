@@ -61,28 +61,28 @@ function SortableBeneficiaryGroupCard({
         <div
             ref={setNodeRef}
             style={style}
-            className="bubble-card overflow-hidden transition-all hover:shadow-bubble-hover cursor-pointer group relative"
+            className="bubble-card overflow-hidden transition-all hover:shadow-bubble-hover cursor-pointer group relative min-w-0"
             onClick={onClick}
         >
-            <div className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+            <div className="p-3 sm:p-4">
+                <div className="flex items-start justify-between gap-2 mb-2 sm:mb-3">
+                    <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                         <div className="icon-bubble-sm bg-blue-100 flex-shrink-0">
                             <Users className="w-4 h-4 text-blue-600" />
                         </div>
                         <div className="min-w-0 flex-1">
-                            <h3 className="text-base font-semibold text-gray-900 mb-1 line-clamp-1">
+                            <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-1 line-clamp-1">
                                 {group.name}
                             </h3>
-                            <div className="flex items-center space-x-3 text-xs text-gray-500">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                                 {group.total_number !== null && group.total_number !== undefined && (
-                                    <span>{group.total_number.toLocaleString()} beneficiaries</span>
+                                    <span className="whitespace-nowrap">{group.total_number.toLocaleString()} beneficiaries</span>
                                 )}
-                                {ageRange && <span>Age: {ageRange}</span>}
+                                {ageRange && <span className="whitespace-nowrap">Age: {ageRange}</span>}
                                 {location && (
-                                    <span className="flex items-center space-x-1">
-                                        <MapPin className="w-3 h-3" />
-                                        <span className="truncate max-w-[120px]">{location.name}</span>
+                                    <span className="flex items-center gap-1 min-w-0 max-w-full">
+                                        <MapPin className="w-3 h-3 flex-shrink-0" />
+                                        <span className="truncate">{location.name}</span>
                                     </span>
                                 )}
                             </div>
@@ -111,13 +111,11 @@ function SortableBeneficiaryGroupCard({
                         </button>
                     </div>
                 </div>
-                <div className="flex items-center space-x-4 pt-3 border-t border-gray-100">
-                    <div className="flex items-center space-x-2">
-                        <BarChart3 className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-600">
-                            {dataPointCount} {dataPointCount === 1 ? 'impact claim' : 'impact claims'}
-                        </span>
-                    </div>
+                <div className="flex items-center gap-2 pt-3 border-t border-gray-100 min-w-0">
+                    <BarChart3 className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm text-gray-600 truncate">
+                        {dataPointCount} {dataPointCount === 1 ? 'impact claim' : 'impact claims'}
+                    </span>
                 </div>
             </div>
         </div>
@@ -591,15 +589,15 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
     return (
         <div className="h-full flex flex-col overflow-hidden px-3 pt-2 pb-2 space-y-1.5">
             {/* Header */}
-            <div className="flex items-center justify-between mb-2 flex-shrink-0">
-                <h3 className="text-lg font-semibold text-gray-900">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2 flex-shrink-0">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">
                     Beneficiary Groups ({orderedGroups.length})
                 </h3>
                 <button
                     onClick={() => setIsCreateModalOpen(true)}
-                    className="flex items-center space-x-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm font-medium transition-colors border border-blue-200"
+                    className="flex items-center justify-center sm:justify-start gap-2 px-3 py-2 sm:py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm font-medium transition-colors border border-blue-200 w-full sm:w-auto"
                 >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-4 h-4 flex-shrink-0" />
                     <span>Add Group</span>
                 </button>
             </div>
@@ -629,7 +627,7 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
                         items={orderedGroups.map(group => group.id!)}
                         strategy={verticalListSortingStrategy}
                     >
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 flex-1 overflow-y-auto pr-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 flex-1 overflow-y-auto pr-2 min-w-0">
                             {orderedGroups.map(group => {
                                 const location = group.location_id ? locationsMap[group.location_id] : null
                                 const ageRange = group.age_range_start && group.age_range_end 

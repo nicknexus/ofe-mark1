@@ -461,7 +461,12 @@ function App() {
                                         remainingDays={subscriptionStatus.remainingTrialDays}
                                     />
                                 )}
-                                <MobileApp user={user} subscriptionStatus={subscriptionStatus} />
+                                <Routes>
+                                    {publicRoutes}
+                                    <Route path="/*" element={
+                                        <MobileApp user={user} subscriptionStatus={subscriptionStatus} />
+                                    } />
+                                </Routes>
                             </TeamProvider>
                         </StorageProvider>
                         <Toaster position="top-center" />

@@ -1,16 +1,22 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { 
-    Home, 
+    Zap,
     FileText, 
     MapPin, 
     BookOpen, 
+    BarChart3,
     User,
-    ChevronLeft
+    ChevronLeft,
+    Layers,
+    Compass
 } from 'lucide-react'
 import { apiService } from '../services/api'
 import { Initiative, User as UserType, SubscriptionStatus } from '../types'
 import MobileDashboard from './mobile/MobileDashboard'
+import MobileActionsTab from './mobile/MobileActionsTab'
 import MobileEvidenceTab from './mobile/MobileEvidenceTab'
+import MobileMetricsTab from './mobile/MobileMetricsTab'
 import MobileLocationsTab from './mobile/MobileLocationsTab'
 import MobileStoriesTab from './mobile/MobileStoriesTab'
 import MobileAccountTab from './mobile/MobileAccountTab'
@@ -20,16 +26,16 @@ interface MobileAppProps {
     subscriptionStatus: SubscriptionStatus | null
 }
 
-// Top level: home or account
-// Inside initiative: evidence, locations, stories
-type TopLevelView = 'home' | 'account'
-type InitiativeTab = 'evidence' | 'locations' | 'stories'
+type TopLevelView = 'actions' | 'initiatives' | 'account'
+type InitiativeTab = 'evidence' | 'metrics' | 'locations' | 'stories'
 
 export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) {
-    const [view, setView] = useState<TopLevelView>('home')
+    const navigate = useNavigate()
+    const [view, setView] = useState<TopLevelView>('actions')
     const [initiatives, setInitiatives] = useState<Initiative[]>([])
     const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null)
     const [initiativeTab, setInitiativeTab] = useState<InitiativeTab>('evidence')
+    const [autoAdd, setAutoAdd] = useState(false)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -47,19 +53,31 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
         }
     }
 
-    // Enter an initiative
     const handleEnterInitiative = (initiative: Initiative) => {
         setSelectedInitiative(initiative)
-        setInitiativeTab('evidence') // Default to evidence tab
+        setInitiativeTab('evidence')
+        setAutoAdd(false)
     }
 
-    // Exit back to home
     const handleExitInitiative = () => {
         setSelectedInitiative(null)
-        setView('home')
+        setAutoAdd(false)
     }
 
-    // Show loading spinner while initial data loads
+    const handleQuickAction = (initiativeId: string, action: 'evidence' | 'impact_claim' | 'story' | 'location') => {
+        const initiative = initiatives.find(i => i.id === initiativeId)
+        if (!initiative) return
+        setSelectedInitiative(initiative)
+        setAutoAdd(true)
+        const tabMap: Record<string, InitiativeTab> = {
+            evidence: 'evidence',
+            impact_claim: 'metrics',
+            story: 'stories',
+            location: 'locations',
+        }
+        setInitiativeTab(tabMap[action])
+    }
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F9FAFB' }}>
@@ -71,11 +89,9 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
         )
     }
 
-    // Inside an initiative - show initiative view with tabs
     if (selectedInitiative) {
         return (
             <div className="min-h-screen pb-20" style={{ backgroundColor: '#F9FAFB' }}>
-                {/* Initiative Header */}
                 <div className="bg-white border-b border-gray-100 px-4 py-3 sticky top-0 z-40">
                     <div className="flex items-center gap-3">
                         <button
@@ -97,40 +113,52 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
                     </div>
                 </div>
 
-                {/* Initiative Content */}
                 <div className="flex-1">
                     {initiativeTab === 'evidence' && (
                         <MobileEvidenceTab 
+                            key={`${selectedInitiative.id}-${autoAdd}`}
                             initiativeId={selectedInitiative.id!}
                             onRefresh={() => {}}
+                            autoAdd={autoAdd}
+                        />
+                    )}
+                    {initiativeTab === 'metrics' && (
+                        <MobileMetricsTab 
+                            key={`${selectedInitiative.id}-${autoAdd}`}
+                            initiativeId={selectedInitiative.id!}
+                            autoAdd={autoAdd}
                         />
                     )}
                     {initiativeTab === 'locations' && (
                         <MobileLocationsTab 
+                            key={`${selectedInitiative.id}-${autoAdd}`}
                             initiativeId={selectedInitiative.id!}
+                            autoAdd={autoAdd}
                         />
                     )}
                     {initiativeTab === 'stories' && (
                         <MobileStoriesTab 
+                            key={`${selectedInitiative.id}-${autoAdd}`}
                             initiativeId={selectedInitiative.id!}
+                            autoAdd={autoAdd}
                         />
                     )}
                 </div>
 
-                {/* Initiative Bottom Navigation */}
                 <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 safe-area-pb z-50">
                     <div className="flex justify-around items-center h-16">
                         {[
                             { id: 'evidence' as InitiativeTab, label: 'Evidence', icon: FileText },
-                            { id: 'locations' as InitiativeTab, label: 'Locations', icon: MapPin },
+                            { id: 'metrics' as InitiativeTab, label: 'Metrics', icon: BarChart3 },
                             { id: 'stories' as InitiativeTab, label: 'Stories', icon: BookOpen },
+                            { id: 'locations' as InitiativeTab, label: 'Locations', icon: MapPin },
                         ].map((tab) => {
                             const Icon = tab.icon
                             const isActive = initiativeTab === tab.id
                             return (
                                 <button
                                     key={tab.id}
-                                    onClick={() => setInitiativeTab(tab.id)}
+                                    onClick={() => { setInitiativeTab(tab.id); setAutoAdd(false) }}
                                     className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
                                         isActive 
                                             ? 'text-primary-600' 
@@ -150,12 +178,16 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
         )
     }
 
-    // Top level view - Home or Account
     return (
         <div className="min-h-screen pb-20" style={{ backgroundColor: '#F9FAFB' }}>
-            {/* Main Content */}
             <div className="flex-1">
-                {view === 'home' && (
+                {view === 'actions' && (
+                    <MobileActionsTab
+                        initiatives={initiatives}
+                        onAction={handleQuickAction}
+                    />
+                )}
+                {view === 'initiatives' && (
                     <MobileDashboard 
                         initiatives={initiatives}
                         onEnterInitiative={handleEnterInitiative}
@@ -172,12 +204,11 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
                 )}
             </div>
 
-            {/* Bottom Navigation */}
             <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 safe-area-pb z-50">
                 <div className="flex justify-around items-center h-16">
                     {[
-                        { id: 'home' as TopLevelView, label: 'Home', icon: Home },
-                        { id: 'account' as TopLevelView, label: 'Account', icon: User },
+                        { id: 'actions' as TopLevelView, label: 'Actions', icon: Zap },
+                        { id: 'initiatives' as TopLevelView, label: 'Initiatives', icon: Layers },
                     ].map((tab) => {
                         const Icon = tab.icon
                         const isActive = view === tab.id
@@ -198,9 +229,24 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
                             </button>
                         )
                     })}
+                    <button
+                        onClick={() => navigate('/explore')}
+                        className="flex flex-col items-center justify-center flex-1 h-full transition-colors text-gray-400 hover:text-gray-600"
+                    >
+                        <Compass className="w-5 h-5" />
+                        <span className="text-xs mt-1 font-medium">Explore</span>
+                    </button>
+                    <button
+                        onClick={() => setView('account')}
+                        className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+                            view === 'account' ? 'text-primary-600' : 'text-gray-400 hover:text-gray-600'
+                        }`}
+                    >
+                        <User className={`w-5 h-5 ${view === 'account' ? 'stroke-[2.5]' : ''}`} />
+                        <span className={`text-xs mt-1 ${view === 'account' ? 'font-semibold' : 'font-medium'}`}>Account</span>
+                    </button>
                 </div>
             </nav>
         </div>
     )
 }
-

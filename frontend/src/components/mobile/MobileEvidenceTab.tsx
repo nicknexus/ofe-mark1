@@ -29,12 +29,13 @@ import toast from 'react-hot-toast'
 interface MobileEvidenceTabProps {
     initiativeId: string
     onRefresh?: () => void
+    autoAdd?: boolean
 }
 
-export default function MobileEvidenceTab({ initiativeId, onRefresh }: MobileEvidenceTabProps) {
+export default function MobileEvidenceTab({ initiativeId, onRefresh, autoAdd }: MobileEvidenceTabProps) {
     const [evidence, setEvidence] = useState<Evidence[]>([])
     const [loading, setLoading] = useState(true)
-    const [showUploadFlow, setShowUploadFlow] = useState(false)
+    const [showUploadFlow, setShowUploadFlow] = useState(!!autoAdd)
     const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null)
     const [showPreview, setShowPreview] = useState(false)
     const [editingEvidence, setEditingEvidence] = useState<Evidence | null>(null)
@@ -44,8 +45,7 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh }: MobileEvi
     const [locations, setLocations] = useState<Location[]>([])
     const [filterType, setFilterType] = useState<string>('all')
     const [filterLocation, setFilterLocation] = useState<string>('all')
-    const [filterDateStart, setFilterDateStart] = useState<string>('')
-    const [filterDateEnd, setFilterDateEnd] = useState<string>('')
+    const [datePickerValue, setDatePickerValue] = useState<{ singleDate?: string; startDate?: string; endDate?: string }>({})
 
     useEffect(() => {
         loadEvidence()
@@ -129,32 +129,29 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh }: MobileEvi
             }
             
             // Date filter
-            if (filterDateStart || filterDateEnd) {
-                const evDate = ev.date_represented ? new Date(ev.date_represented) : null
+            if (datePickerValue.startDate || datePickerValue.endDate || datePickerValue.singleDate) {
+                const filterStart = datePickerValue.singleDate || datePickerValue.startDate
+                const filterEnd = datePickerValue.endDate || datePickerValue.singleDate
+                const evDate = ev.date_represented || ev.date_range_start
                 if (!evDate) return false
-                
-                if (filterDateStart) {
-                    const startDate = new Date(filterDateStart)
-                    if (evDate < startDate) return false
-                }
-                if (filterDateEnd) {
-                    const endDate = new Date(filterDateEnd)
-                    endDate.setHours(23, 59, 59, 999) // Include the entire end day
-                    if (evDate > endDate) return false
+
+                if (filterStart && filterEnd) {
+                    if (evDate < filterStart || evDate > filterEnd) return false
+                } else if (filterStart) {
+                    if (evDate < filterStart) return false
                 }
             }
             
             return true
         })
-    }, [evidence, filterType, filterLocation, filterDateStart, filterDateEnd])
+    }, [evidence, filterType, filterLocation, datePickerValue])
 
-    const hasActiveFilters = filterType !== 'all' || filterLocation !== 'all' || filterDateStart || filterDateEnd
+    const hasActiveFilters = filterType !== 'all' || filterLocation !== 'all' || datePickerValue.singleDate || datePickerValue.startDate || datePickerValue.endDate
     
     const clearFilters = () => {
         setFilterType('all')
         setFilterLocation('all')
-        setFilterDateStart('')
-        setFilterDateEnd('')
+        setDatePickerValue({})
     }
 
     // Show upload flow for new evidence
@@ -289,26 +286,13 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh }: MobileEvi
                     {/* Date Filter */}
                     <div>
                         <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Date Range</label>
-                        <div className="flex gap-2">
-                            <div className="flex-1">
-                                <input
-                                    type="date"
-                                    value={filterDateStart}
-                                    onChange={(e) => setFilterDateStart(e.target.value)}
-                                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm"
-                                    placeholder="From"
-                                />
-                            </div>
-                            <div className="flex-1">
-                                <input
-                                    type="date"
-                                    value={filterDateEnd}
-                                    onChange={(e) => setFilterDateEnd(e.target.value)}
-                                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm"
-                                    placeholder="To"
-                                />
-                            </div>
-                        </div>
+                        <DateRangePicker
+                            value={datePickerValue}
+                            onChange={setDatePickerValue}
+                            maxDate={getLocalDateString(new Date())}
+                            placeholder="Filter by date"
+                            className="w-full"
+                        />
                     </div>
                 </div>
             )}

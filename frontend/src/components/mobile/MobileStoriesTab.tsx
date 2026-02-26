@@ -22,12 +22,13 @@ import toast from 'react-hot-toast'
 
 interface MobileStoriesTabProps {
     initiativeId: string
+    autoAdd?: boolean
 }
 
-export default function MobileStoriesTab({ initiativeId }: MobileStoriesTabProps) {
+export default function MobileStoriesTab({ initiativeId, autoAdd }: MobileStoriesTabProps) {
     const [stories, setStories] = useState<Story[]>([])
     const [loading, setLoading] = useState(true)
-    const [showCreateFlow, setShowCreateFlow] = useState(false)
+    const [showCreateFlow, setShowCreateFlow] = useState(!!autoAdd)
     const [selectedStory, setSelectedStory] = useState<Story | null>(null)
     const [isDetailOpen, setIsDetailOpen] = useState(false)
 

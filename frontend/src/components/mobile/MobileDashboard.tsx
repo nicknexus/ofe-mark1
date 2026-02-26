@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { Plus, ChevronRight, Edit, Trash2, X, Zap, ArrowRight, Users } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { Plus, ChevronRight, Edit, Trash2, X, Zap, ArrowRight, Users, Settings } from 'lucide-react'
 import { Initiative, CreateInitiativeForm } from '../../types'
 import { apiService } from '../../services/api'
 import { useTeam } from '../../context/TeamContext'
@@ -27,6 +28,7 @@ export default function MobileDashboard({
     const [editingInitiative, setEditingInitiative] = useState<Initiative | null>(null)
     const [deleteConfirmInitiative, setDeleteConfirmInitiative] = useState<Initiative | null>(null)
     const [deleteConfirmText, setDeleteConfirmText] = useState('')
+    const [openMenuId, setOpenMenuId] = useState<string | null>(null)
     const [showUpgradeModal, setShowUpgradeModal] = useState(false)
     const [upgradeUsage, setUpgradeUsage] = useState<{ current: number; limit: number } | null>(null)
 
@@ -159,66 +161,91 @@ export default function MobileDashboard({
                     {initiatives.map((initiative) => (
                         <div
                             key={initiative.id}
-                            className="bg-white rounded-2xl border-2 border-gray-100 overflow-hidden transition-all active:border-primary-300"
+                            className="bg-white rounded-2xl border-2 border-gray-100 overflow-hidden transition-all active:border-primary-300 relative"
                         >
-                            {/* Tappable area to enter initiative */}
-                            <button
-                                onClick={() => onEnterInitiative(initiative)}
-                                className="w-full p-4 text-left active:bg-gray-50"
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center flex-shrink-0">
-                                            <img src="/Nexuslogo.png" alt="" className="w-5 h-5 object-contain" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className="font-semibold text-gray-800 truncate">
-                                                {initiative.title}
-                                            </h3>
-                                            {initiative.description && (
-                                                <p className="text-xs text-gray-500 truncate mt-0.5">
-                                                    {initiative.description}
-                                                </p>
-                                            )}
-                                        </div>
+                            <div className="p-4 flex items-center gap-3">
+                                {/* Tappable area to enter initiative */}
+                                <button
+                                    onClick={() => onEnterInitiative(initiative)}
+                                    className="flex-1 flex items-center gap-3 min-w-0 text-left active:bg-gray-50 -m-2 p-2 rounded-xl"
+                                >
+                                    <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center flex-shrink-0">
+                                        <img src="/Nexuslogo.png" alt="" className="w-5 h-5 object-contain" />
                                     </div>
-                                    <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center ml-2">
-                                        <ChevronRight className="w-4 h-4 text-gray-500" />
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-semibold text-gray-800 truncate">
+                                            {initiative.title}
+                                        </h3>
+                                        {initiative.description && (
+                                            <p className="text-xs text-gray-500 truncate mt-0.5">
+                                                {initiative.description}
+                                            </p>
+                                        )}
                                     </div>
-                                </div>
-                            </button>
-                            
-                            {/* Action buttons - Only show for owners */}
-                            {isOwner && (
-                                <div className="flex border-t border-gray-100">
+                                    <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                                </button>
+                                
+                                {/* Settings menu - Only show for owners */}
+                                {isOwner && (
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation()
-                                            setEditingInitiative(initiative)
-                                            setShowEditModal(true)
+                                            setOpenMenuId(openMenuId === initiative.id ? null : initiative.id!)
                                         }}
-                                        className="flex-1 flex items-center justify-center gap-2 py-3 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                                        className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors flex-shrink-0"
+                                        aria-label="Options"
                                     >
-                                        <Edit className="w-4 h-4" />
-                                        Edit
+                                        <Settings className="w-5 h-5" />
                                     </button>
-                                    <div className="w-px bg-gray-100" />
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            setDeleteConfirmInitiative(initiative)
-                                        }}
-                                        className="flex-1 flex items-center justify-center gap-2 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                        Delete
-                                    </button>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
                     ))}
                 </div>
             )}
+
+            {/* Settings popup - compact centered bubble */}
+            {openMenuId && (() => {
+                const initiative = initiatives.find(i => i.id === openMenuId)
+                if (!initiative) return null
+                return createPortal(
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center" onClick={() => setOpenMenuId(null)}>
+                        <div className="absolute inset-0 bg-black/20" />
+                        <div
+                            className="relative bg-white rounded-2xl shadow-2xl w-64 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+                                <p className="text-sm font-semibold text-gray-800 truncate">{initiative.title}</p>
+                            </div>
+                            <div className="py-1">
+                                <button
+                                    onClick={() => {
+                                        setEditingInitiative(initiative)
+                                        setShowEditModal(true)
+                                        setOpenMenuId(null)
+                                    }}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                                >
+                                    <Edit className="w-4 h-4 text-gray-400" />
+                                    Edit Initiative
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setDeleteConfirmInitiative(initiative)
+                                        setOpenMenuId(null)
+                                    }}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 active:bg-red-100 transition-colors"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>,
+                    document.body
+                )
+            })()}
 
             {/* Create Modal */}
             {showCreateModal && (
