@@ -173,9 +173,8 @@ export class InitiativeService {
         return data || [];
     }
 
-    static async getById(id: string, userId: string): Promise<Initiative | null> {
-        // Get the effective organization ID (owned org or team membership)
-        const organizationId = await this.getEffectiveOrganizationId(userId);
+    static async getById(id: string, userId: string, requestedOrgId?: string): Promise<Initiative | null> {
+        const organizationId = await this.getEffectiveOrganizationId(userId, requestedOrgId);
         
         if (!organizationId) {
             return null;
@@ -195,9 +194,8 @@ export class InitiativeService {
         return data;
     }
 
-    static async update(id: string, updates: Partial<Initiative>, userId: string): Promise<Initiative> {
-        // Get the effective organization ID
-        const organizationId = await this.getEffectiveOrganizationId(userId);
+    static async update(id: string, updates: Partial<Initiative>, userId: string, requestedOrgId?: string): Promise<Initiative> {
+        const organizationId = await this.getEffectiveOrganizationId(userId, requestedOrgId);
         if (!organizationId) {
             throw new Error('No organization context');
         }
@@ -242,15 +240,13 @@ export class InitiativeService {
         return data;
     }
 
-    static async delete(id: string, userId: string): Promise<void> {
-        // Check if user is a shared member (not allowed to delete)
+    static async delete(id: string, userId: string, requestedOrgId?: string): Promise<void> {
         const isShared = await this.isSharedMember(userId);
         if (isShared) {
             throw new Error('Shared members cannot delete initiatives. Contact your organization owner.');
         }
 
-        // Get the effective organization ID
-        const organizationId = await this.getEffectiveOrganizationId(userId);
+        const organizationId = await this.getEffectiveOrganizationId(userId, requestedOrgId);
         if (!organizationId) {
             throw new Error('No organization context');
         }

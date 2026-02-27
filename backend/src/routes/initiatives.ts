@@ -44,7 +44,8 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
 // Get initiative by ID
 router.get('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const initiative = await InitiativeService.getById(req.params.id, req.user!.id);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const initiative = await InitiativeService.getById(req.params.id, req.user!.id, requestedOrgId);
         if (!initiative) {
             res.status(404).json({ error: 'Initiative not found' });
             return;
@@ -58,7 +59,8 @@ router.get('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
 // Update initiative
 router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const initiative = await InitiativeService.update(req.params.id, req.body, req.user!.id);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const initiative = await InitiativeService.update(req.params.id, req.body, req.user!.id, requestedOrgId);
         res.json(initiative);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
@@ -68,7 +70,8 @@ router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
 // Delete initiative (owner only)
 router.delete('/:id', authenticateUser, requireOwnerPermission, async (req: AuthenticatedRequest, res) => {
     try {
-        await InitiativeService.delete(req.params.id, req.user!.id);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        await InitiativeService.delete(req.params.id, req.user!.id, requestedOrgId);
         res.status(204).send();
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
@@ -78,8 +81,9 @@ router.delete('/:id', authenticateUser, requireOwnerPermission, async (req: Auth
 // Get initiative dashboard (KPIs with evidence stats)
 router.get('/:id/dashboard', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
         const [initiative, kpis, evidenceStats] = await Promise.all([
-            InitiativeService.getById(req.params.id, req.user!.id),
+            InitiativeService.getById(req.params.id, req.user!.id, requestedOrgId),
             KPIService.getWithEvidence(req.user!.id, req.params.id),
             EvidenceService.getEvidenceStats(req.params.id)
         ]);
