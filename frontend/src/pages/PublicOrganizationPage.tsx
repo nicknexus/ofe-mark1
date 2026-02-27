@@ -74,6 +74,7 @@ export default function PublicOrganizationPage() {
         id: string
         name: string
         country?: string
+        initiative_slug?: string
         top: number
         left: number
     }>>([])
@@ -194,6 +195,7 @@ export default function PublicOrganizationPage() {
                 id: popupId,
                 name: randomLocation.name,
                 country: randomLocation.country,
+                initiative_slug: randomLocation.initiative_slug,
                 top,
                 left,
             }
@@ -784,20 +786,36 @@ export default function PublicOrganizationPage() {
                                     </Suspense>
                                     
                                     {/* Location Popups */}
-                                    {activePopups.map(popup => (
-                                        <div
-                                            key={popup.id}
-                                            className="absolute px-3 py-1.5 rounded-full text-white text-xs font-medium shadow-lg pointer-events-none"
-                                            style={{
-                                                top: `${popup.top}%`,
-                                                left: `${popup.left}%`,
-                                                backgroundColor: brandColor,
-                                                animation: 'fadeInOut 7s ease-in-out forwards',
-                                            }}
-                                        >
-                                            {popup.name}{popup.country ? `, ${popup.country}` : ''}
-                                        </div>
-                                    ))}
+                                    {activePopups.map(popup => {
+                                        const inner = (
+                                            <>
+                                                <MapPin className="w-3 h-3 mr-1 inline-block" />
+                                                {popup.name}{popup.country ? `, ${popup.country}` : ''}
+                                            </>
+                                        )
+                                        const style = {
+                                            top: `${popup.top}%`,
+                                            left: `${popup.left}%`,
+                                            backgroundColor: brandColor,
+                                            animation: 'fadeInOut 7s ease-in-out forwards',
+                                        }
+                                        const className = "absolute px-3 py-1.5 rounded-full text-white text-xs font-medium shadow-lg transition-all duration-200 hover:scale-105 hover:brightness-110 hover:shadow-xl"
+
+                                        return popup.initiative_slug ? (
+                                            <Link
+                                                key={popup.id}
+                                                to={`/org/${slug}/${popup.initiative_slug}?tab=locations`}
+                                                className={className + " cursor-pointer"}
+                                                style={style}
+                                            >
+                                                {inner}
+                                            </Link>
+                                        ) : (
+                                            <div key={popup.id} className={className + " pointer-events-none"} style={style}>
+                                                {inner}
+                                            </div>
+                                        )
+                                    })}
                                 </div>
                             </div>
                         </div>

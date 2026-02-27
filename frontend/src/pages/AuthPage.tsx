@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 export default function AuthPage() {
     const [searchParams] = useSearchParams()
     const [isSignUp, setIsSignUp] = useState(false)
+    const [isForgotPassword, setIsForgotPassword] = useState(false)
     const [loading, setLoading] = useState(false)
     const [formData, setFormData] = useState({
         email: '',
@@ -25,6 +26,24 @@ export default function AuthPage() {
             setIsSignUp(true)
         }
     }, [searchParams])
+
+    const handleForgotPassword = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!formData.email) {
+            toast.error('Please enter your email')
+            return
+        }
+        setLoading(true)
+        try {
+            await AuthService.resetPassword(formData.email)
+            toast.success('Password reset email sent! Check your inbox.')
+            setIsForgotPassword(false)
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Failed to send reset email')
+        } finally {
+            setLoading(false)
+        }
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -155,118 +174,166 @@ export default function AuthPage() {
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            {isSignUp && (
-                                <div>
-                                    <label className="block text-sm font-medium text-foreground mb-1">Full Name</label>
-                                    <input
-                                        type="text"
-                                        name="name"
-                                        value={formData.name}
-                                        onChange={handleInputChange}
-                                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-white/80 text-sm"
-                                        placeholder="Enter your full name"
-                                        required
-                                    />
+                        {isForgotPassword ? (
+                            <>
+                                <div className="text-center">
+                                    <h2 className="text-lg font-semibold text-foreground">Reset Password</h2>
+                                    <p className="text-sm text-muted-foreground mt-1">Enter your email and we'll send you a reset link</p>
                                 </div>
-                            )}
-
-                            <div>
-                                <label className="block text-sm font-medium text-foreground mb-1">Email</label>
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value={formData.email}
-                                    onChange={handleInputChange}
-                                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-white/80 text-sm"
-                                    placeholder="Enter your email"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-foreground mb-1">Password</label>
-                                <input
-                                    type="password"
-                                    name="password"
-                                    value={formData.password}
-                                    onChange={handleInputChange}
-                                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-white/80 text-sm"
-                                    placeholder="Enter your password"
-                                    required
-                                />
-                            </div>
-
-                            {isSignUp && (
-                                <div>
-                                    <label className="block text-sm font-medium text-foreground mb-1">Confirm Password</label>
-                                    <input
-                                        type="password"
-                                        name="confirmPassword"
-                                        value={formData.confirmPassword}
-                                        onChange={handleInputChange}
-                                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-white/80 text-sm"
-                                        placeholder="Confirm your password"
-                                        required
-                                    />
-                                </div>
-                            )}
-
-                            {isSignUp && !isFromInvite && (
-                                <div>
-                                    <label className="block text-sm font-medium text-foreground mb-1">
-                                        Organization Name <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="organization"
-                                        value={formData.organization}
-                                        onChange={handleInputChange}
-                                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-white/80 text-sm"
-                                        placeholder="Your organization name"
-                                        required
-                                    />
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        This will be your organization's public page name
-                                    </p>
-                                </div>
-                            )}
-
-                            {isSignUp && isFromInvite && (
-                                <div className="p-3 bg-primary-500/15 rounded-xl border border-primary-500/30">
-                                    <p className="text-sm text-foreground">
-                                        <strong>Signing up to join a team</strong><br />
-                                        <span className="text-muted-foreground">You'll be added to the organization that invited you. You can create your own organization later from Account Settings if needed.</span>
-                                    </p>
-                                </div>
-                            )}
-
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="w-full bg-primary-500 text-gray-800 py-2.5 px-4 rounded-xl hover:bg-primary-600 focus:ring-2 focus:ring-primary-500/30 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm"
-                            >
-                                {loading ? 'Please wait...' : (isSignUp ? 'Create Account' : 'Sign In')}
-                            </button>
-                        </form>
-
-                        <div className="text-center text-xs sm:text-sm text-muted-foreground px-2">
-                            {isSignUp ? (
-                                <p>
-                                    Already have an account?{' '}
-                                    <button type="button" onClick={() => setIsSignUp(false)} className="text-primary-500 hover:text-primary-600 font-medium">
-                                        Sign in
+                                <form onSubmit={handleForgotPassword} className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-foreground mb-1">Email</label>
+                                        <input
+                                            type="email"
+                                            name="email"
+                                            value={formData.email}
+                                            onChange={handleInputChange}
+                                            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-white/80 text-sm"
+                                            placeholder="Enter your email"
+                                            required
+                                        />
+                                    </div>
+                                    <button
+                                        type="submit"
+                                        disabled={loading}
+                                        className="w-full bg-primary-500 text-gray-800 py-2.5 px-4 rounded-xl hover:bg-primary-600 focus:ring-2 focus:ring-primary-500/30 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm"
+                                    >
+                                        {loading ? 'Sending...' : 'Send Reset Link'}
                                     </button>
-                                </p>
-                            ) : (
-                                <p>
-                                    Don't have an account?{' '}
-                                    <button type="button" onClick={() => setIsSignUp(true)} className="text-primary-500 hover:text-primary-600 font-medium">
-                                        Sign up
+                                </form>
+                                <div className="text-center text-xs sm:text-sm text-muted-foreground">
+                                    <button type="button" onClick={() => setIsForgotPassword(false)} className="text-primary-500 hover:text-primary-600 font-medium">
+                                        Back to Sign In
                                     </button>
-                                </p>
-                            )}
-                        </div>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <form onSubmit={handleSubmit} className="space-y-4">
+                                    {isSignUp && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-foreground mb-1">Full Name</label>
+                                            <input
+                                                type="text"
+                                                name="name"
+                                                value={formData.name}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-white/80 text-sm"
+                                                placeholder="Enter your full name"
+                                                required
+                                            />
+                                        </div>
+                                    )}
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-foreground mb-1">Email</label>
+                                        <input
+                                            type="email"
+                                            name="email"
+                                            value={formData.email}
+                                            onChange={handleInputChange}
+                                            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-white/80 text-sm"
+                                            placeholder="Enter your email"
+                                            required
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="block text-sm font-medium text-foreground">Password</label>
+                                            {!isSignUp && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsForgotPassword(true)}
+                                                    className="text-xs text-primary-500 hover:text-primary-600 font-medium"
+                                                >
+                                                    Forgot password?
+                                                </button>
+                                            )}
+                                        </div>
+                                        <input
+                                            type="password"
+                                            name="password"
+                                            value={formData.password}
+                                            onChange={handleInputChange}
+                                            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-white/80 text-sm"
+                                            placeholder="Enter your password"
+                                            required
+                                        />
+                                    </div>
+
+                                    {isSignUp && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-foreground mb-1">Confirm Password</label>
+                                            <input
+                                                type="password"
+                                                name="confirmPassword"
+                                                value={formData.confirmPassword}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-white/80 text-sm"
+                                                placeholder="Confirm your password"
+                                                required
+                                            />
+                                        </div>
+                                    )}
+
+                                    {isSignUp && !isFromInvite && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-foreground mb-1">
+                                                Organization Name <span className="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="organization"
+                                                value={formData.organization}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-white/80 text-sm"
+                                                placeholder="Your organization name"
+                                                required
+                                            />
+                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                This will be your organization's public page name
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {isSignUp && isFromInvite && (
+                                        <div className="p-3 bg-primary-500/15 rounded-xl border border-primary-500/30">
+                                            <p className="text-sm text-foreground">
+                                                <strong>Signing up to join a team</strong><br />
+                                                <span className="text-muted-foreground">You'll be added to the organization that invited you. You can create your own organization later from Account Settings if needed.</span>
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <button
+                                        type="submit"
+                                        disabled={loading}
+                                        className="w-full bg-primary-500 text-gray-800 py-2.5 px-4 rounded-xl hover:bg-primary-600 focus:ring-2 focus:ring-primary-500/30 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm"
+                                    >
+                                        {loading ? 'Please wait...' : (isSignUp ? 'Create Account' : 'Sign In')}
+                                    </button>
+                                </form>
+
+                                <div className="text-center text-xs sm:text-sm text-muted-foreground px-2">
+                                    {isSignUp ? (
+                                        <p>
+                                            Already have an account?{' '}
+                                            <button type="button" onClick={() => setIsSignUp(false)} className="text-primary-500 hover:text-primary-600 font-medium">
+                                                Sign in
+                                            </button>
+                                        </p>
+                                    ) : (
+                                        <p>
+                                            Don't have an account?{' '}
+                                            <button type="button" onClick={() => setIsSignUp(true)} className="text-primary-500 hover:text-primary-600 font-medium">
+                                                Sign up
+                                            </button>
+                                        </p>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     <div className="text-center text-xs text-muted-foreground px-4">

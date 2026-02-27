@@ -67,6 +67,19 @@ export class AuthService {
         return data
     }
 
+    static async resetPassword(email: string) {
+        const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${baseUrl}/reset-password`
+        })
+        if (error) throw error
+    }
+
+    static async updatePassword(newPassword: string) {
+        const { error } = await supabase.auth.updateUser({ password: newPassword })
+        if (error) throw error
+    }
+
     static async signOut() {
         // Clear cache on sign out
         apiService.clearCache()

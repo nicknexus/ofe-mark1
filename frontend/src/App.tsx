@@ -36,6 +36,7 @@ import SubscriptionExpiredPage from './pages/SubscriptionExpiredPage'
 import TeamSettingsPage from './pages/TeamSettingsPage'
 import InviteAcceptPage from './pages/InviteAcceptPage'
 import TermsOfServicePage from './pages/TermsOfServicePage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import Layout from './components/Layout'
 
 // Hook to detect mobile
@@ -156,6 +157,7 @@ function App() {
     const publicRoutes = (
         <>
             <Route path="/explore" element={<ExplorePage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/org/:slug" element={<PublicOrganizationPage />} />
             <Route path="/org/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
             <Route path="/org/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />

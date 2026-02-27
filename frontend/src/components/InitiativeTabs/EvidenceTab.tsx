@@ -121,18 +121,37 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                 })
             }
 
-            // Filter by location (via linked KPIs)
-            if (selectedLocations.length > 0) {
-                // Note: This is a simplified filter - in a real implementation,
-                // you'd need to check evidence linked to KPIs with those locations
-                // For now, we'll filter evidence that has location_id if available
-                filtered = filtered.filter(ev => {
-                    // If evidence has location_id, check if it's selected
-                    if (ev.location_id) {
-                        return selectedLocations.includes(ev.location_id)
+            // Build location map first so the location filter can use it
+            const locationMap: Record<string, string[]> = {}
+            await Promise.all(
+                filtered.map(async (ev) => {
+                    if (!ev.id) return
+                    const directLocationIds = ev.location_ids || (ev.location_id ? [ev.location_id] : [])
+                    if (directLocationIds.length > 0) {
+                        locationMap[ev.id] = directLocationIds
+                        return
                     }
-                    // Otherwise, include it (evidence might be linked via KPIs)
-                    return true
+                    try {
+                        const dataPoints = await apiService.getDataPointsForEvidence(ev.id)
+                        const dpLocationIds = dataPoints
+                            ?.filter((dp: any) => dp.location_id)
+                            .map((dp: any) => dp.location_id) || []
+                        if (dpLocationIds.length > 0) {
+                            locationMap[ev.id] = [...new Set(dpLocationIds)]
+                        }
+                    } catch (err) {
+                        // Ignore errors for individual items
+                    }
+                })
+            )
+            setEvidenceLocationMap(locationMap)
+
+            // Filter by location using the resolved location map
+            if (selectedLocations.length > 0) {
+                filtered = filtered.filter(ev => {
+                    if (!ev.id) return false
+                    const evLocationIds = locationMap[ev.id] || []
+                    return evLocationIds.some(locId => selectedLocations.includes(locId))
                 })
             }
 
@@ -150,33 +169,6 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
             }
 
             setEvidence(filtered)
-
-            // Fetch locations from linked impact claims for evidence that doesn't have direct location_ids
-            const locationMap: Record<string, string[]> = {}
-            await Promise.all(
-                filtered.map(async (ev) => {
-                    if (!ev.id) return
-                    // First use direct location_ids if available
-                    const directLocationIds = ev.location_ids || (ev.location_id ? [ev.location_id] : [])
-                    if (directLocationIds.length > 0) {
-                        locationMap[ev.id] = directLocationIds
-                        return
-                    }
-                    // Otherwise, fetch from linked data points
-                    try {
-                        const dataPoints = await apiService.getDataPointsForEvidence(ev.id)
-                        const dpLocationIds = dataPoints
-                            ?.filter((dp: any) => dp.location_id)
-                            .map((dp: any) => dp.location_id) || []
-                        if (dpLocationIds.length > 0) {
-                            locationMap[ev.id] = [...new Set(dpLocationIds)] // dedupe
-                        }
-                    } catch (err) {
-                        // Ignore errors for individual items
-                    }
-                })
-            )
-            setEvidenceLocationMap(locationMap)
         } catch (error) {
             console.error('Error loading evidence:', error)
             toast.error('Failed to load evidence')
