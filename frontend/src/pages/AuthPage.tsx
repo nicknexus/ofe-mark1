@@ -36,7 +36,7 @@ export default function AuthPage() {
         setLoading(true)
         try {
             await AuthService.resetPassword(formData.email)
-            toast.success('Password reset email sent! Check your inbox.')
+            toast.success('Password reset email sent! Check your inbox and spam folder.', { duration: 6000 })
             setIsForgotPassword(false)
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'Failed to send reset email')
@@ -200,6 +200,9 @@ export default function AuthPage() {
                                     >
                                         {loading ? 'Sending...' : 'Send Reset Link'}
                                     </button>
+                                    <p className="text-xs text-muted-foreground text-center mt-2">
+                                        Make sure to check your spam/junk folder if you don't see the email.
+                                    </p>
                                 </form>
                                 <div className="text-center text-xs sm:text-sm text-muted-foreground">
                                     <button type="button" onClick={() => setIsForgotPassword(false)} className="text-primary-500 hover:text-primary-600 font-medium">
