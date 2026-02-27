@@ -7,6 +7,7 @@ import {
 import { TeamService, InviteDetails } from '../services/team'
 import { formatDate } from '../utils'
 import { AuthService } from '../services/auth'
+import { supabase } from '../services/supabase'
 import { User } from '../types'
 import toast from 'react-hot-toast'
 
@@ -46,8 +47,10 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
         checkUser()
     }, [])
 
-    // Fetch invite details with reload fallback for post-signup timing issues
+    // Fetch invite details with retry logic for post-signup timing issues
     useEffect(() => {
+        let cancelled = false
+
         const fetchInvite = async (): Promise<void> => {
             if (!token) {
                 setError('Invalid invitation link - no token provided')
@@ -55,43 +58,45 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
                 return
             }
 
-            console.log(`[InviteAcceptPage] Fetching invite with token: ${token.substring(0, 10)}... (length: ${token.length})`)
-            
-            // Check for post-signup flag
-            const isPostSignup = sessionStorage.getItem('just_signed_up') === 'true'
-            const hasReloaded = sessionStorage.getItem('invite_page_reloaded') === 'true'
-            console.log(`[InviteAcceptPage] isPostSignup: ${isPostSignup}, hasReloaded: ${hasReloaded}`)
+            console.log(`[InviteAcceptPage] Fetching invite with token: ${token.substring(0, 10)}...`)
 
-            try {
-                const inviteDetails = await TeamService.getInviteDetails(token)
-                console.log(`[InviteAcceptPage] Successfully fetched invite for org: ${inviteDetails.organization_name}`)
-                // Clear flags on success
-                sessionStorage.removeItem('just_signed_up')
-                sessionStorage.removeItem('invite_page_reloaded')
-                setInvite(inviteDetails)
-                setLoading(false)
-            } catch (err) {
-                console.error(`[InviteAcceptPage] Error fetching invite:`, err)
-                
-                // If we haven't already reloaded, do a reload (handles post-signup timing issues)
-                if (!hasReloaded) {
-                    console.log(`[InviteAcceptPage] First failure, attempting page reload to fix timing issue...`)
-                    sessionStorage.setItem('invite_page_reloaded', 'true')
-                    sessionStorage.removeItem('just_signed_up')
-                    // Wait a moment then reload
-                    await new Promise(resolve => setTimeout(resolve, 500))
-                    window.location.reload()
-                    return
+            const maxRetries = 4
+            const delays = [0, 1000, 2000, 3000]
+
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                if (cancelled) return
+
+                if (delays[attempt] > 0) {
+                    console.log(`[InviteAcceptPage] Retry ${attempt}/${maxRetries}, waiting ${delays[attempt]}ms...`)
+                    await new Promise(r => setTimeout(r, delays[attempt]))
                 }
-                
-                // Already reloaded once, show the error (it's a real invalid invite)
-                console.log(`[InviteAcceptPage] Already reloaded once, showing error`)
-                sessionStorage.removeItem('invite_page_reloaded')
-                setError((err as Error).message)
-                setLoading(false)
+                if (cancelled) return
+
+                try {
+                    const inviteDetails = await TeamService.getInviteDetails(token)
+                    if (cancelled) return
+                    console.log(`[InviteAcceptPage] Successfully fetched invite for org: ${inviteDetails.organization_name}`)
+                    sessionStorage.removeItem('just_signed_up')
+                    sessionStorage.removeItem('invite_page_reloaded')
+                    setInvite(inviteDetails)
+                    setLoading(false)
+                    return
+                } catch (err) {
+                    console.error(`[InviteAcceptPage] Attempt ${attempt + 1} failed:`, err)
+                    if (attempt === maxRetries - 1) {
+                        if (!cancelled) {
+                            sessionStorage.removeItem('just_signed_up')
+                            sessionStorage.removeItem('invite_page_reloaded')
+                            setError((err as Error).message)
+                            setLoading(false)
+                        }
+                    }
+                }
             }
         }
         fetchInvite()
+
+        return () => { cancelled = true }
     }, [token])
 
     const handleAccept = async () => {
@@ -99,7 +104,14 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
 
         setAccepting(true)
         
-        // Retry logic for transient serverless connection issues
+        // Refresh the session to ensure the auth token is current
+        // (prevents stale token issues after signup + terms acceptance)
+        try {
+            await supabase.auth.refreshSession()
+        } catch (e) {
+            console.warn('[InviteAcceptPage] Session refresh failed, continuing anyway:', e)
+        }
+
         const maxRetries = 3
         let lastError: Error | null = null
         
@@ -109,26 +121,24 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
                 const result = await TeamService.acceptInvite(token)
                 toast.success(result.message || 'Welcome to the team!')
                 
-                // Use callback if provided, otherwise do a full page reload
-                // Full reload ensures subscription status and team context are fresh
                 if (onInviteAccepted) {
                     onInviteAccepted()
                 } else {
                     window.location.href = '/'
                 }
-                return // Success, exit
+                return
             } catch (err) {
                 lastError = err as Error
                 console.error(`[InviteAcceptPage] Accept attempt ${attempt} failed:`, err)
                 
                 if (attempt < maxRetries) {
-                    // Wait before retry (exponential backoff)
-                    await new Promise(r => setTimeout(r, 500 * attempt))
+                    await new Promise(r => setTimeout(r, 800 * attempt))
+                    // Re-refresh session on retry in case token expired between attempts
+                    try { await supabase.auth.refreshSession() } catch (_) {}
                 }
             }
         }
         
-        // All retries failed
         toast.error(lastError?.message || 'Failed to accept invitation. Please try again.')
         setAccepting(false)
     }

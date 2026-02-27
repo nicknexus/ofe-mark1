@@ -191,6 +191,7 @@ function App() {
             return (
                 <>
                     <TermsOfServicePage onAccepted={async () => {
+                        await new Promise(r => setTimeout(r, 500))
                         const updatedUser = await AuthService.getCurrentUser()
                         if (updatedUser) setUser(updatedUser)
                     }} />
@@ -302,6 +303,8 @@ function App() {
             return (
                 <>
                     <TermsOfServicePage onAccepted={async () => {
+                        // Small delay to let the session fully propagate after updateProfile
+                        await new Promise(r => setTimeout(r, 500))
                         const updatedUser = await AuthService.getCurrentUser()
                         if (updatedUser) setUser(updatedUser)
                     }} />
