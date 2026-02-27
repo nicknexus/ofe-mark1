@@ -171,29 +171,51 @@ export class TeamService {
     }
 
     /**
-     * Get invitation details by token (public - no auth required for fetching)
+     * Get invitation details by token — queries Supabase directly (no Vercel cold start)
      */
     static async getInviteDetails(token: string): Promise<InviteDetails> {
-        console.log(`[TeamService] Fetching invite details for token: ${token.substring(0, 10)}...`)
+        console.log(`[TeamService] Fetching invite directly from Supabase for token: ${token.substring(0, 10)}...`)
 
-        const response = await fetch(`${API_BASE_URL}/api/team/invite/${token}`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache'
+        // Query invite — try with org join first, fall back to invite-only
+        let invite: any = null
+
+        const { data, error } = await supabase
+            .from('team_invitations')
+            .select('id, status, expires_at, can_add_impact_claims, invited_by, organization_id, organizations(name)')
+            .eq('token', token)
+            .maybeSingle()
+
+        if (data) {
+            invite = data
+        } else {
+            // Join may fail due to RLS on organizations — fetch invite without join
+            console.log(`[TeamService] Join query failed (${error?.message}), trying without join...`)
+            const { data: inviteOnly, error: err2 } = await supabase
+                .from('team_invitations')
+                .select('id, status, expires_at, can_add_impact_claims, invited_by, organization_id')
+                .eq('token', token)
+                .maybeSingle()
+
+            if (err2 || !inviteOnly) {
+                console.error(`[TeamService] Invite not found:`, err2?.message)
+                throw new Error('Invitation not found')
             }
-        })
-
-        console.log(`[TeamService] Response status: ${response.status}`)
-
-        if (!response.ok) {
-            const error = await response.json()
-            console.error(`[TeamService] Error fetching invite:`, error)
-            throw new Error(error.error || 'Invitation not found')
+            invite = inviteOnly
         }
 
-        return response.json()
+        const isExpired = new Date(invite.expires_at) < new Date()
+        const orgName = (invite.organizations as any)?.name || 'an organization'
+
+        return {
+            id: invite.id,
+            organization_name: orgName,
+            inviter_name: undefined,
+            inviter_email: '',
+            status: isExpired && invite.status === 'pending' ? 'expired' : invite.status,
+            expires_at: invite.expires_at,
+            can_add_impact_claims: invite.can_add_impact_claims,
+            is_expired: isExpired
+        }
     }
 
     /**
