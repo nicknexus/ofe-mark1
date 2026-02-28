@@ -10,7 +10,6 @@ export class InitiativeService {
      * @param requestedOrgId - Optional: specific org ID requested by the user
      */
     static async getEffectiveOrganizationId(userId: string, requestedOrgId?: string): Promise<string | null> {
-        // If a specific org is requested, verify user has access to it
         if (requestedOrgId) {
             // Check if user owns this org
             const ownedOrg = await TeamService.getUserOwnedOrganization(userId);
@@ -18,28 +17,27 @@ export class InitiativeService {
                 return requestedOrgId;
             }
 
-            // Check if user is a team member of this org
-            const membership = await TeamService.getUserTeamMembership(userId);
-            if (membership && membership.organization_id === requestedOrgId) {
+            // Check if user is a team member of this specific org
+            const membership = await TeamService.getUserTeamMembership(userId, requestedOrgId);
+            if (membership) {
                 return requestedOrgId;
             }
 
             // User doesn't have access to requested org - fall through to default
         }
 
-        // Default behavior: check team membership first
-        const membership = await TeamService.getUserTeamMembership(userId);
-        if (membership) {
-            return membership.organization_id;
-        }
-
-        // If not a team member, check if user owns an organization
+        // Default: check if user owns an organization first
         const ownedOrg = await TeamService.getUserOwnedOrganization(userId);
         if (ownedOrg) {
             return ownedOrg.id;
         }
 
-        // User has no organization context
+        // Then check team membership
+        const membership = await TeamService.getUserTeamMembership(userId);
+        if (membership) {
+            return membership.organization_id;
+        }
+
         return null;
     }
 

@@ -211,13 +211,19 @@ export class TeamService {
 
     /**
      * Get user's team membership (where they are a shared member)
+     * If organizationId is provided, returns membership for that specific org
      */
-    static async getUserTeamMembership(userId: string): Promise<TeamMember | null> {
-        const { data, error } = await supabase
+    static async getUserTeamMembership(userId: string, organizationId?: string): Promise<TeamMember | null> {
+        let query = supabase
             .from('team_members')
             .select('*')
-            .eq('user_id', userId)
-            .maybeSingle();
+            .eq('user_id', userId);
+
+        if (organizationId) {
+            query = query.eq('organization_id', organizationId);
+        }
+
+        const { data, error } = await query.maybeSingle();
 
         if (error || !data) return null;
         return data;
