@@ -37,6 +37,7 @@ import TeamSettingsPage from './pages/TeamSettingsPage'
 import InviteAcceptPage from './pages/InviteAcceptPage'
 import TermsOfServicePage from './pages/TermsOfServicePage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import OfferCheckoutPage from './pages/OfferCheckoutPage'
 import Layout from './components/Layout'
 
 // Hook to detect mobile
@@ -158,6 +159,7 @@ function App() {
         <>
             <Route path="/explore" element={<ExplorePage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/offer/:slug" element={<OfferCheckoutPage />} />
             <Route path="/org/:slug" element={<PublicOrganizationPage />} />
             <Route path="/org/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
             <Route path="/org/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
@@ -197,6 +199,19 @@ function App() {
                     }} />
                     <Toaster position="top-center" />
                 </>
+            )
+        }
+
+        // Allow offer pages to bypass subscription gates in PWA mode
+        if (window.location.pathname.startsWith('/offer/')) {
+            return (
+                <Router>
+                    <Routes>
+                        <Route path="/offer/:slug" element={<OfferCheckoutPage />} />
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
+                    <Toaster position="top-center" />
+                </Router>
             )
         }
 
@@ -310,6 +325,20 @@ function App() {
                     }} />
                     <Toaster position="top-right" />
                 </>
+            )
+        }
+
+        // Allow offer pages to bypass subscription gates (same pattern as invite pages)
+        const isOnOfferPage = window.location.pathname.startsWith('/offer/')
+        if (isOnOfferPage) {
+            return (
+                <Router>
+                    <Routes>
+                        <Route path="/offer/:slug" element={<OfferCheckoutPage />} />
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
+                    <Toaster position="top-right" />
+                </Router>
             )
         }
 

@@ -241,6 +241,8 @@ router.post('/create-checkout-session', authenticateUser, async (req: Authentica
 
         const userId = req.user!.id;
         const userEmail = req.user!.email;
+        const { priceId } = req.body || {};
+        const finalPriceId = priceId || STRIPE_CONFIG.STARTER_PRICE_ID;
 
         // Get or create subscription to get/create stripe customer
         let subscription = await SubscriptionService.getOrCreate(userId);
@@ -270,13 +272,13 @@ router.post('/create-checkout-session', authenticateUser, async (req: Authentica
                 automatic_tax: { enabled: true },
                 customer_update: { address: 'auto' },
                 line_items: [
-                    { price: STRIPE_CONFIG.STARTER_PRICE_ID, quantity: 1 },
+                    { price: finalPriceId, quantity: 1 },
                 ],
                 mode: 'subscription',
                 success_url: `${STRIPE_CONFIG.SUCCESS_URL}?checkout=success`,
                 cancel_url: `${STRIPE_CONFIG.CANCEL_URL}?checkout=cancelled`,
-                metadata: { user_id: userId },
-                subscription_data: { metadata: { user_id: userId } },
+                metadata: { user_id: userId, plan_tier: 'starter' },
+                subscription_data: { metadata: { user_id: userId, plan_tier: 'starter' } },
             });
 
         let session;
@@ -354,14 +356,17 @@ router.post('/webhook', async (req: Request, res: Response) => {
                         : new Date().toISOString();
                     const periodEnd = stripeSubscription.current_period_end
                         ? new Date(stripeSubscription.current_period_end * 1000).toISOString()
-                        : new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(); // 28 days from now
+                        : new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString();
+
+                    const actualPriceId = stripeSubscription.items?.data?.[0]?.price?.id || STRIPE_CONFIG.STARTER_PRICE_ID;
+                    const planTier = (session.metadata?.plan_tier || 'starter') as 'starter' | 'professional' | 'enterprise';
 
                     await SubscriptionService.updateFromStripe(userId, {
                         stripe_subscription_id: stripeSubscription.id,
-                        stripe_price_id: STRIPE_CONFIG.STARTER_PRICE_ID,
+                        stripe_price_id: actualPriceId,
                         status: 'active',
-                        plan_tier: 'starter',
-                        billing_interval: 'monthly', // 4 weeks treated as monthly
+                        plan_tier: planTier,
+                        billing_interval: 'monthly',
                         current_period_start: periodStart,
                         current_period_end: periodEnd,
                     });

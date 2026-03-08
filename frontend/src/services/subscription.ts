@@ -118,7 +118,7 @@ export class SubscriptionService {
     /**
      * Create a Stripe checkout session for subscription
      */
-    static async createCheckoutSession(): Promise<{
+    static async createCheckoutSession(priceId?: string): Promise<{
         sessionId: string
         url: string
     }> {
@@ -126,7 +126,8 @@ export class SubscriptionService {
         
         const response = await fetch(`${API_BASE_URL}/api/subscription/create-checkout-session`, {
             method: 'POST',
-            headers
+            headers,
+            body: JSON.stringify(priceId ? { priceId } : {})
         })
         
         if (!response.ok) {
