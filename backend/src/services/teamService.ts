@@ -50,7 +50,7 @@ export interface UserPermissions {
 }
 
 const INVITE_EXPIRY_DAYS = 7;
-const MAX_TEAM_MEMBERS = 5; // Limit for both trial and paid plans
+const DEFAULT_TEAM_MEMBERS_LIMIT = 5;
 
 export class TeamService {
     /**
@@ -103,19 +103,33 @@ export class TeamService {
         const pendingCount = await this.getPendingInviteCount(organizationId);
         const total = memberCount + pendingCount;
 
-        if (total >= MAX_TEAM_MEMBERS) {
+        // Read limit from org owner's subscription, fall back to default
+        let limit = DEFAULT_TEAM_MEMBERS_LIMIT;
+        const ownerId = await this.getOrganizationOwnerId(organizationId);
+        if (ownerId) {
+            const { data } = await supabase
+                .from('subscriptions')
+                .select('team_members_limit')
+                .eq('user_id', ownerId)
+                .maybeSingle();
+            if (data?.team_members_limit != null) {
+                limit = data.team_members_limit;
+            }
+        }
+
+        if (total >= limit) {
             return {
                 canAdd: false,
                 current: total,
-                limit: MAX_TEAM_MEMBERS,
-                reason: `Team member limit reached (${total}/${MAX_TEAM_MEMBERS}). Remove a member or revoke a pending invite to add more.`
+                limit,
+                reason: `Team member limit reached (${total}/${limit}). Remove a member or revoke a pending invite to add more.`
             };
         }
 
         return {
             canAdd: true,
             current: total,
-            limit: MAX_TEAM_MEMBERS
+            limit
         };
     }
 
@@ -678,8 +692,8 @@ export class TeamService {
         }
 
         // Check team member limit (in case org filled up since invite was sent)
-        const memberCount = await this.getTeamMemberCount(invite.organization_id);
-        if (memberCount >= 5) { // MAX_TEAM_MEMBERS
+        const limitCheck = await this.canAddTeamMember(invite.organization_id);
+        if (!limitCheck.canAdd) {
             throw new Error('This organization has reached its team member limit. Contact the owner.');
         }
 

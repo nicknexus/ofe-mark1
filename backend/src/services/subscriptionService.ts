@@ -71,12 +71,24 @@ export class SubscriptionService {
             return existing;
         }
 
+        // Look up the user's org name
+        let orgName: string | null = null;
+        const { data: orgRow } = await supabase
+            .from('user_organizations')
+            .select('organizations(name)')
+            .eq('user_id', userId)
+            .maybeSingle();
+        if (orgRow && (orgRow as any).organizations?.name) {
+            orgName = (orgRow as any).organizations.name;
+        }
+
         // Create new subscription record with status 'none'
         const { data: newSubscription, error: createError } = await supabase
             .from('subscriptions')
             .insert([{
                 user_id: userId,
                 organization_id: organizationId || null,
+                org_name: orgName,
                 status: 'none'
             }])
             .select()
