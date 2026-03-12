@@ -47,7 +47,7 @@ router.get('/stats/by-type', authenticateUser, async (req: AuthenticatedRequest,
 // Get evidence linked to a specific data point (KPI update) - MUST come before /:id route
 router.get('/for-kpi-update/:updateId', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const evidence = await EvidenceService.getEvidenceForUpdate(req.params.updateId, req.user!.id);
+        const evidence = await EvidenceService.getEvidenceForUpdate(req.params.updateId);
         res.json(evidence);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
@@ -73,7 +73,7 @@ router.get('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
 // Get data points linked to a specific evidence
 router.get('/:id/data-points', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const dataPoints = await EvidenceService.getDataPointsForEvidence(req.params.id, req.user!.id);
+        const dataPoints = await EvidenceService.getDataPointsForEvidence(req.params.id);
         res.json(dataPoints);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
@@ -84,7 +84,7 @@ router.get('/:id/data-points', authenticateUser, async (req: AuthenticatedReques
 // Get files for a specific evidence
 router.get('/:id/files', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const files = await EvidenceService.getFilesForEvidence(req.params.id, req.user!.id);
+        const files = await EvidenceService.getFilesForEvidence(req.params.id);
         res.json(files);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });

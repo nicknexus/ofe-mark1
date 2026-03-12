@@ -94,6 +94,13 @@ export class EvidenceService {
             if (linkError2) throw new Error(`Failed to link evidence to data points: ${linkError2.message}`);
         }
 
+        // Auto-link to any existing matching impact claims not already linked
+        await this.autoLinkToMatchingUpdates(data.id, kpi_ids || [], location_ids || [], {
+            date_represented: data.date_represented,
+            date_range_start: data.date_range_start,
+            date_range_end: data.date_range_end
+        }, kpi_update_ids || [], userId);
+
         // Link to beneficiary groups if provided
         if (beneficiary_group_ids && beneficiary_group_ids.length > 0) {
             const bgLinks = beneficiary_group_ids.map(bgId => ({
@@ -338,6 +345,32 @@ export class EvidenceService {
             }
         }
 
+        // Auto-link to any existing matching impact claims not already linked
+        // Gather current state after all link updates
+        const { data: currentKpiLinks } = await supabase
+            .from('evidence_kpis')
+            .select('kpi_id')
+            .eq('evidence_id', id);
+        const currentKpiIds = (currentKpiLinks || []).map((l: any) => l.kpi_id);
+
+        const { data: currentLocLinks } = await supabase
+            .from('evidence_locations')
+            .select('location_id')
+            .eq('evidence_id', id);
+        const currentLocIds = (currentLocLinks || []).map((l: any) => l.location_id);
+
+        const { data: currentUpdateLinks } = await supabase
+            .from('evidence_kpi_updates')
+            .select('kpi_update_id')
+            .eq('evidence_id', id);
+        const alreadyLinkedIds = (currentUpdateLinks || []).map((l: any) => l.kpi_update_id);
+
+        await this.autoLinkToMatchingUpdates(id, currentKpiIds, currentLocIds, {
+            date_represented: data.date_represented,
+            date_range_start: data.date_range_start,
+            date_range_end: data.date_range_end
+        }, alreadyLinkedIds, userId);
+
         return data;
     }
 
@@ -444,7 +477,7 @@ export class EvidenceService {
         return stats;
     }
 
-    static async getEvidenceForUpdate(updateId: string, userId: string): Promise<Evidence[]> {
+    static async getEvidenceForUpdate(updateId: string): Promise<Evidence[]> {
         const { data, error } = await supabase
             .from('evidence_kpi_updates')
             .select(`
@@ -458,22 +491,18 @@ export class EvidenceService {
 
         if (error) throw new Error(`Failed to fetch evidence for update: ${error.message}`);
 
-        // Extract and filter evidence items
         const evidence = (data || [])
             .map((item: any) => item.evidence)
-            .filter(Boolean)
-            .filter((e: any) => e.user_id === userId);
+            .filter(Boolean);
 
         return evidence;
     }
 
-    static async getFilesForEvidence(evidenceId: string, userId: string): Promise<any[]> {
-        // First verify the user owns this evidence
+    static async getFilesForEvidence(evidenceId: string): Promise<any[]> {
         const { data: evidence, error: evidenceError } = await supabase
             .from('evidence')
             .select('id, file_url, file_type')
             .eq('id', evidenceId)
-            .eq('user_id', userId)
             .single();
 
         if (evidenceError || !evidence) {
@@ -519,8 +548,7 @@ export class EvidenceService {
         return files;
     }
 
-    static async getDataPointsForEvidence(evidenceId: string, userId: string): Promise<any[]> {
-        // First get all evidence_kpi_updates for this evidence
+    static async getDataPointsForEvidence(evidenceId: string): Promise<any[]> {
         const { data, error } = await supabase
             .from('evidence_kpi_updates')
             .select(`
@@ -535,16 +563,80 @@ export class EvidenceService {
 
         if (error) throw new Error(`Failed to fetch data points for evidence: ${error.message}`);
 
-        // Extract and filter data points by user_id
         const dataPoints = (data || [])
             .map((item: any) => item.kpi_updates)
             .filter(Boolean)
-            .filter((dp: any) => dp.user_id === userId)
             .map((dp: any) => ({
                 ...dp,
                 kpi: dp.kpis
             }));
 
         return dataPoints;
+    }
+
+    private static datesOverlap(
+        start1: string, end1: string | null,
+        start2: string, end2: string | null
+    ): boolean {
+        const e1 = end1 || start1
+        const e2 = end2 || start2
+        return start1 <= e2 && start2 <= e1
+    }
+
+    static async autoLinkToMatchingUpdates(
+        evidenceId: string,
+        kpiIds: string[],
+        locationIds: string[],
+        dates: { date_represented?: string; date_range_start?: string; date_range_end?: string },
+        alreadyLinkedUpdateIds: string[],
+        userId: string
+    ): Promise<void> {
+        try {
+            if (kpiIds.length === 0 || locationIds.length === 0) return
+
+            const { data: kpiUpdates } = await supabase
+                .from('kpi_updates')
+                .select('id, date_represented, date_range_start, date_range_end, location_id')
+                .in('kpi_id', kpiIds)
+
+            if (!kpiUpdates || kpiUpdates.length === 0) return
+
+            const alreadyLinked = new Set(alreadyLinkedUpdateIds)
+            const evidenceDateStart = dates.date_range_start || dates.date_represented || ''
+            const evidenceDateEnd = dates.date_range_end || null
+
+            const newLinks: { evidence_id: string; kpi_update_id: string; user_id: string }[] = []
+
+            for (const update of kpiUpdates) {
+                if (alreadyLinked.has(update.id)) continue
+
+                if (!update.location_id || !locationIds.includes(update.location_id)) continue
+
+                const updateDateStart = update.date_range_start || update.date_represented
+                const updateDateEnd = update.date_range_end || null
+
+                if (!this.datesOverlap(evidenceDateStart, evidenceDateEnd, updateDateStart, updateDateEnd)) continue
+
+                newLinks.push({
+                    evidence_id: evidenceId,
+                    kpi_update_id: update.id,
+                    user_id: userId
+                })
+            }
+
+            if (newLinks.length > 0) {
+                const { error } = await supabase
+                    .from('evidence_kpi_updates')
+                    .insert(newLinks)
+
+                if (error) {
+                    console.error('Failed to auto-link evidence to existing impact claims:', error)
+                } else {
+                    console.log(`Auto-linked evidence ${evidenceId} to ${newLinks.length} existing impact claim(s)`)
+                }
+            }
+        } catch (error) {
+            console.error('Error in autoLinkToMatchingUpdates:', error)
+        }
     }
 } 

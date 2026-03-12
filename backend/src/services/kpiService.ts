@@ -386,7 +386,7 @@ export class KPIService {
 
             for (const link of evidenceKpiLinks) {
                 const evidence = link.evidence as any
-                if (!evidence || evidence.user_id !== userId) continue
+                if (!evidence) continue
 
                 // Check date overlap
                 const evidenceDateStart = evidence.date_range_start || evidence.date_represented
@@ -586,10 +586,16 @@ export class KPIService {
             else evidence.push(ev)
         }
 
-        // Additionally fetch precise evidence-to-update links to attribute evidence per data point
-        const { data: evidenceUpdateLinks } = await supabase
-            .from('evidence_kpi_updates')
-            .select('evidence_id, kpi_update_id');
+        // Fetch precise evidence-to-update links scoped to this KPI's updates
+        const updateIds = (updates || []).map((u: any) => u.id).filter(Boolean)
+        let evidenceUpdateLinks: any[] | null = null
+        if (updateIds.length > 0) {
+            const { data } = await supabase
+                .from('evidence_kpi_updates')
+                .select('evidence_id, kpi_update_id')
+                .in('kpi_update_id', updateIds)
+            evidenceUpdateLinks = data
+        }
 
         // Helper to parse date as UTC midnight (avoids timezone issues with date-only strings)
         const parseUTCDate = (dateStr: string): Date => {
