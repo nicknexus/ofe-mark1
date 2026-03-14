@@ -237,14 +237,12 @@ export class EvidenceService {
             .from('evidence')
             .select('file_url')
             .eq('id', id)
-            .eq('user_id', userId)
             .single();
 
         const { data, error } = await supabase
             .from('evidence')
             .update({ ...evidenceData, updated_at: new Date().toISOString() })
             .eq('id', id)
-            .eq('user_id', userId)
             .select()
             .single();
 
