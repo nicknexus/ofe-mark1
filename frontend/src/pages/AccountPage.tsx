@@ -256,10 +256,13 @@ export default function AccountPage({ subscriptionStatus }: Props) {
         }
     }
 
-    const handleToggleMemberPermission = async (member: TeamMember) => {
+    const handleToggleMemberPermission = async (member: TeamMember, field: 'canAddImpactClaims' | 'canEditEvidence') => {
         setUpdatingMember(member.id)
         try {
-            await TeamService.updateMemberPermissions(member.id, !member.can_add_impact_claims)
+            const updates = field === 'canAddImpactClaims'
+                ? { canAddImpactClaims: !member.can_add_impact_claims }
+                : { canEditEvidence: !member.can_edit_evidence }
+            await TeamService.updateMemberPermissions(member.id, updates)
             toast.success('Permission updated')
             loadTeamData()
         } catch (error) {
@@ -1021,8 +1024,14 @@ function TeamsTab({
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-500">Edit Evidence</span>
+                                        <button onClick={() => handleToggleMemberPermission(member, 'canEditEvidence')} disabled={updatingMember === member.id} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${member.can_edit_evidence ? 'bg-green-500' : 'bg-gray-300'}`}>
+                                            {updatingMember === member.id ? <div className="absolute inset-0 flex items-center justify-center"><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /></div> : <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${member.can_edit_evidence ? 'translate-x-6' : 'translate-x-1'}`} />}
+                                        </button>
+                                    </div>
+                                    <div className="flex items-center gap-2">
                                         <span className="text-xs text-gray-500">Impact Claims</span>
-                                        <button onClick={() => handleToggleMemberPermission(member)} disabled={updatingMember === member.id} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${member.can_add_impact_claims ? 'bg-green-500' : 'bg-gray-300'}`}>
+                                        <button onClick={() => handleToggleMemberPermission(member, 'canAddImpactClaims')} disabled={updatingMember === member.id} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${member.can_add_impact_claims ? 'bg-green-500' : 'bg-gray-300'}`}>
                                             {updatingMember === member.id ? <div className="absolute inset-0 flex items-center justify-center"><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /></div> : <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${member.can_add_impact_claims ? 'translate-x-6' : 'translate-x-1'}`} />}
                                         </button>
                                     </div>

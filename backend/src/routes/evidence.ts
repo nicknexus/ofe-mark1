@@ -2,6 +2,7 @@ import express from 'express';
 import { AuthenticatedRequest, authenticateUser } from '../middleware/auth';
 import { EvidenceService } from '../services/evidenceService';
 import { requireOwnerPermission } from '../middleware/teamPermissions';
+import { TeamService } from '../services/teamService';
 
 const router = express.Router();
 
@@ -95,7 +96,19 @@ router.get('/:id/files', authenticateUser, async (req: AuthenticatedRequest, res
 // Update evidence
 router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const evidence = await EvidenceService.update(req.params.id, req.body, req.user!.id);
+        const userId = req.user!.id;
+        const activeOrgId = req.headers['x-organization-id'] as string | undefined;
+        const permissions = await TeamService.getUserPermissions(userId, activeOrgId);
+
+        if (!permissions.isOwner && permissions.isSharedMember && permissions.organizationId) {
+            const membership = await TeamService.getUserTeamMembership(userId, permissions.organizationId);
+            if (membership && (membership as any).can_edit_evidence === false) {
+                res.status(403).json({ error: 'You do not have permission to edit evidence. Contact your organization owner.' });
+                return;
+            }
+        }
+
+        const evidence = await EvidenceService.update(req.params.id, req.body, userId);
         res.json(evidence);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });

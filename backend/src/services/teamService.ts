@@ -21,6 +21,7 @@ export interface TeamMember {
     organization_id: string;
     user_id: string;
     can_add_impact_claims: boolean;
+    can_edit_evidence: boolean;
     invited_by?: string;
     joined_at: string;
     created_at: string;
@@ -252,6 +253,7 @@ export class TeamService {
         slug?: string;
         role: 'owner' | 'member';
         canAddImpactClaims?: boolean;
+        canEditEvidence?: boolean;
         logo_url?: string;
         brand_color?: string;
         is_public?: boolean;
@@ -265,6 +267,7 @@ export class TeamService {
             slug?: string;
             role: 'owner' | 'member';
             canAddImpactClaims?: boolean;
+            canEditEvidence?: boolean;
             logo_url?: string;
             brand_color?: string;
             is_public?: boolean;
@@ -282,6 +285,7 @@ export class TeamService {
                 slug: ownedOrg.slug,
                 role: 'owner',
                 canAddImpactClaims: true,
+                canEditEvidence: true,
                 logo_url: ownedOrg.logo_url,
                 brand_color: ownedOrg.brand_color,
                 is_public: ownedOrg.is_public,
@@ -297,6 +301,7 @@ export class TeamService {
             .select(`
                 organization_id,
                 can_add_impact_claims,
+                can_edit_evidence,
                 organizations(id, name, slug, logo_url, brand_color, statement, website_url, donation_url)
             `)
             .eq('user_id', userId);
@@ -311,6 +316,7 @@ export class TeamService {
                         slug: org.slug,
                         role: 'member',
                         canAddImpactClaims: membership.can_add_impact_claims,
+                        canEditEvidence: (membership as any).can_edit_evidence ?? true,
                         logo_url: org.logo_url,
                         brand_color: org.brand_color,
                         statement: org.statement,
@@ -347,8 +353,8 @@ export class TeamService {
         // First check if user owns an organization
         const ownedOrg = await this.getUserOwnedOrganization(userId);
 
-        // Check if user is a team member of any org
-        const membership = await this.getUserTeamMembership(userId);
+        // Check if user is a team member — scope to active org if provided
+        const membership = await this.getUserTeamMembership(userId, activeOrgId || undefined);
 
         // If activeOrgId is provided, use it to determine context
         if (activeOrgId) {
@@ -778,11 +784,15 @@ export class TeamService {
      */
     static async updateMemberPermissions(
         memberId: string,
-        canAddImpactClaims: boolean
+        updates: { canAddImpactClaims?: boolean; canEditEvidence?: boolean }
     ): Promise<TeamMember> {
+        const updateData: Record<string, boolean> = {};
+        if (updates.canAddImpactClaims !== undefined) updateData.can_add_impact_claims = updates.canAddImpactClaims;
+        if (updates.canEditEvidence !== undefined) updateData.can_edit_evidence = updates.canEditEvidence;
+
         const { data, error } = await supabase
             .from('team_members')
-            .update({ can_add_impact_claims: canAddImpactClaims })
+            .update(updateData)
             .eq('id', memberId)
             .select()
             .single();

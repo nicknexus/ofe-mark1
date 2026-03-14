@@ -8,6 +8,7 @@ interface TeamContextType {
     isOwner: boolean
     isSharedMember: boolean
     canAddImpactClaims: boolean
+    canEditEvidence: boolean
     canDelete: boolean
     organizationId?: string
     organizationName?: string
@@ -36,6 +37,7 @@ const TeamContext = createContext<TeamContextType>({
     isOwner: false,
     isSharedMember: false,
     canAddImpactClaims: false,
+    canEditEvidence: true,
     canDelete: false,
     accessibleOrganizations: [],
     activeOrganization: null,
@@ -130,6 +132,7 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
         isOwner: !isViewingAsSharedMember,
         isSharedMember: isViewingAsSharedMember,
         canAddImpactClaims: isViewingAsSharedMember ? (activeOrganization?.canAddImpactClaims ?? false) : true,
+        canEditEvidence: isViewingAsSharedMember ? (activeOrganization?.canEditEvidence ?? true) : true,
         canDelete: !isViewingAsSharedMember,
         organizationId: activeOrganization?.id || permissions?.organizationId,
         organizationName: activeOrganization?.name || permissions?.organizationName,

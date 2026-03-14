@@ -29,6 +29,7 @@ export interface TeamMember {
     organization_id: string
     user_id: string
     can_add_impact_claims: boolean
+    can_edit_evidence: boolean
     invited_by?: string
     joined_at: string
     created_at: string
@@ -81,6 +82,7 @@ export interface AccessibleOrganization {
     slug?: string
     role: 'owner' | 'member'
     canAddImpactClaims?: boolean
+    canEditEvidence?: boolean
     logo_url?: string
     brand_color?: string
     is_public?: boolean
@@ -343,13 +345,13 @@ export class TeamService {
     /**
      * Update member permissions
      */
-    static async updateMemberPermissions(memberId: string, canAddImpactClaims: boolean): Promise<TeamMember> {
+    static async updateMemberPermissions(memberId: string, updates: { canAddImpactClaims?: boolean; canEditEvidence?: boolean }): Promise<TeamMember> {
         const headers = await getAuthHeaders()
 
         const response = await fetch(`${API_BASE_URL}/api/team/members/${memberId}`, {
             method: 'PUT',
             headers,
-            body: JSON.stringify({ canAddImpactClaims })
+            body: JSON.stringify(updates)
         })
 
         if (!response.ok) {

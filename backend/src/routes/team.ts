@@ -314,10 +314,14 @@ router.get('/invitations', authenticateUser, async (req: AuthenticatedRequest, r
  */
 router.put('/members/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const { canAddImpactClaims } = req.body;
+        const { canAddImpactClaims, canEditEvidence } = req.body;
 
-        if (typeof canAddImpactClaims !== 'boolean') {
+        if (canAddImpactClaims !== undefined && typeof canAddImpactClaims !== 'boolean') {
             res.status(400).json({ error: 'canAddImpactClaims must be a boolean' });
+            return;
+        }
+        if (canEditEvidence !== undefined && typeof canEditEvidence !== 'boolean') {
+            res.status(400).json({ error: 'canEditEvidence must be a boolean' });
             return;
         }
 
@@ -328,7 +332,7 @@ router.put('/members/:id', authenticateUser, async (req: AuthenticatedRequest, r
             return;
         }
 
-        const member = await TeamService.updateMemberPermissions(req.params.id, canAddImpactClaims);
+        const member = await TeamService.updateMemberPermissions(req.params.id, { canAddImpactClaims, canEditEvidence });
         res.json(member);
     } catch (error) {
         console.error('Error updating member:', error);
