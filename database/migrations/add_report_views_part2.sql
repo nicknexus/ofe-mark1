@@ -30,5 +30,6 @@ SELECT
 FROM kpi_updates ku
 INNER JOIN kpis k ON ku.kpi_id = k.id
 LEFT JOIN locations l ON ku.location_id = l.id
-LEFT JOIN beneficiary_groups bg ON l.id = bg.location_id;
+LEFT JOIN kpi_update_beneficiary_groups kubg ON ku.id = kubg.kpi_update_id
+LEFT JOIN beneficiary_groups bg ON kubg.beneficiary_group_id = bg.id;
 

@@ -84,6 +84,7 @@ export interface KPIUpdate {
         lat: number;
         lng: number;
     }[];
+    beneficiary_group_ids?: string[];
     created_at?: string;
     updated_at?: string;
     user_id?: string;
@@ -95,7 +96,7 @@ export interface BeneficiaryGroup {
     name: string;
     description?: string;
     criteria?: Record<string, any> | null;
-    location_id: string; // Mandatory location
+    location_id?: string; // Legacy - locations now derived from linked claims/evidence
     age_range_start?: number | null; // Optional minimum age
     age_range_end?: number | null; // Optional maximum age
     total_number?: number | null; // Total number of beneficiaries in the group

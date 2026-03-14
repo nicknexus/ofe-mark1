@@ -146,6 +146,21 @@ router.get('/for-kpi-update/:updateId', authenticateUser, async (req: Authentica
     }
 })
 
+// Get derived locations for multiple beneficiary groups
+router.post('/bulk-derived-locations', authenticateUser, async (req: AuthenticatedRequest, res): Promise<void> => {
+    try {
+        const { group_ids } = req.body
+        if (!Array.isArray(group_ids) || group_ids.length === 0) {
+            res.json({})
+            return
+        }
+        const result = await BeneficiaryService.getBulkDerivedLocations(group_ids)
+        res.json(result)
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message })
+    }
+})
+
 // Update display order for multiple beneficiary groups
 router.post('/update-order', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {

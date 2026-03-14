@@ -605,6 +605,13 @@ class ApiService {
         })
     }
 
+    async getBulkDerivedLocations(groupIds: string[]): Promise<Record<string, string[]>> {
+        return this.request('/beneficiaries/bulk-derived-locations', {
+            method: 'POST',
+            body: JSON.stringify({ group_ids: groupIds })
+        })
+    }
+
     // Organizations
     async getOrganizations(): Promise<Organization[]> {
         const result = await this.request<Organization[]>('/organizations')

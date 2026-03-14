@@ -35,14 +35,15 @@ SELECT
     l.description AS location_description,
     l.latitude AS location_latitude,
     l.longitude AS location_longitude,
-    -- Beneficiary group context (via location)
+    -- Beneficiary group context (via direct junction table)
     bg.id AS beneficiary_group_id,
     bg.name AS beneficiary_group_name,
     bg.description AS beneficiary_group_description
 FROM kpi_updates ku
 INNER JOIN kpis k ON ku.kpi_id = k.id
 LEFT JOIN locations l ON ku.location_id = l.id
-LEFT JOIN beneficiary_groups bg ON l.id = bg.location_id;
+LEFT JOIN kpi_update_beneficiary_groups kubg ON ku.id = kubg.kpi_update_id
+LEFT JOIN beneficiary_groups bg ON kubg.beneficiary_group_id = bg.id;
 
 -- View: stories_with_context
 -- Joins stories with locations

@@ -365,12 +365,26 @@ export default function ExpandableKPICard({
         setIsEasyEvidenceModalOpen(true)
     }
 
+    // Ben group scoping: both unscoped = match, both scoped with overlap = match, otherwise no match
+    const beneficiaryGroupsMatch = (claimGroupIds: string[], evidenceGroupIds: string[]): boolean => {
+        const claimScoped = claimGroupIds.length > 0
+        const evidenceScoped = evidenceGroupIds.length > 0
+        if (!claimScoped && !evidenceScoped) return true
+        if (claimScoped !== evidenceScoped) return false
+        return claimGroupIds.some(id => evidenceGroupIds.includes(id))
+    }
+
     // Calculate support percentage for an impact claim based on date overlap with evidence
     const getClaimSupportPercentage = (claim: any): number => {
         if (!claim || !claim.id || !evidence || evidence.length === 0) return 0
 
-        // Find all evidence linked to this claim
+        const claimGroupIds: string[] = claim.beneficiary_group_ids || []
+
+        // Find all evidence linked to this claim AND matching ben group scope
         const linkedEvidence = evidence.filter((ev: any) => {
+            const evGroupIds: string[] = ev.beneficiary_group_ids || []
+            if (!beneficiaryGroupsMatch(claimGroupIds, evGroupIds)) return false
+
             // Check new precise linking
             if (ev.kpi_update_ids && Array.isArray(ev.kpi_update_ids)) {
                 return ev.kpi_update_ids.includes(claim.id)
@@ -436,7 +450,12 @@ export default function ExpandableKPICard({
     const getClaimEvidenceCount = (claim: any): number => {
         if (!claim || !claim.id || !evidence || evidence.length === 0) return 0
 
+        const claimGroupIds: string[] = claim.beneficiary_group_ids || []
+
         const linkedEvidence = evidence.filter((ev: any) => {
+            const evGroupIds: string[] = ev.beneficiary_group_ids || []
+            if (!beneficiaryGroupsMatch(claimGroupIds, evGroupIds)) return false
+
             if (ev.kpi_update_ids && Array.isArray(ev.kpi_update_ids)) {
                 return ev.kpi_update_ids.includes(claim.id)
             }

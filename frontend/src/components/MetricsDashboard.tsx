@@ -189,6 +189,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     const [locations, setLocations] = useState<Location[]>([])
     const [mapRefreshKey, setMapRefreshKey] = useState(0) // Key to trigger map refresh
     const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
+    const [benGroupDerivedLocations, setBenGroupDerivedLocations] = useState<Record<string, string[]>>({})
     const [updateBeneficiaryGroupsCache, setUpdateBeneficiaryGroupsCache] = useState<Record<string, string[]>>({})
 
     // Master filter state
@@ -244,11 +245,19 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
         }
     }, [initiativeId])
 
-    // Load beneficiary groups
+    // Load beneficiary groups and their derived locations
     useEffect(() => {
         if (initiativeId) {
             apiService.getBeneficiaryGroups(initiativeId)
-                .then((groups) => setBeneficiaryGroups(groups || []))
+                .then((groups) => {
+                    setBeneficiaryGroups(groups || [])
+                    const groupIds = (groups || []).map(g => g.id!).filter(Boolean)
+                    if (groupIds.length > 0) {
+                        apiService.getBulkDerivedLocations(groupIds)
+                            .then(locs => setBenGroupDerivedLocations(locs || {}))
+                            .catch(() => setBenGroupDerivedLocations({}))
+                    }
+                })
                 .catch(() => setBeneficiaryGroups([]))
         }
     }, [initiativeId])
@@ -1355,12 +1364,10 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     <div className="flex-1 min-h-0">
                         <LocationMap
                             locations={locations.filter(loc => {
-                                // If beneficiary groups are selected, only show locations that have those groups
+                                // If beneficiary groups are selected, only show locations derived from those groups
                                 if (selectedBeneficiaryGroups.length > 0) {
-                                    const locationIdsFromBeneficiaries = beneficiaryGroups
-                                        .filter(bg => selectedBeneficiaryGroups.includes(bg.id!))
-                                        .map(bg => bg.location_id)
-                                        .filter(Boolean)
+                                    const locationIdsFromBeneficiaries = selectedBeneficiaryGroups
+                                        .flatMap(bgId => benGroupDerivedLocations[bgId] || [])
                                     return locationIdsFromBeneficiaries.includes(loc.id!)
                                 }
                                 // If locations are selected, only show selected locations

@@ -1,6 +1,7 @@
 import { supabase } from '../utils/supabase';
 import { KPI, KPIUpdate, KPIWithEvidence } from '../types';
 import { InitiativeService } from './initiativeService';
+import { BeneficiaryService } from './beneficiaryService';
 
 export class KPIService {
     static async create(kpi: KPI, userId: string): Promise<KPI> {
@@ -414,6 +415,18 @@ export class KPIService {
 
             if (matchingEvidenceIds.length === 0) return
 
+            // Ben group scoping: filter by beneficiary group compatibility
+            const updateId = update.id!
+            const claimBenGroups = await BeneficiaryService.getBenGroupsForUpdates([updateId])
+            const claimGroupIds = claimBenGroups[updateId] || []
+            const evidenceBenGroups = await BeneficiaryService.getBenGroupsForEvidence(matchingEvidenceIds)
+            const benGroupFilteredIds = matchingEvidenceIds.filter(evId => {
+                const evGroupIds = evidenceBenGroups[evId] || []
+                return BeneficiaryService.beneficiaryGroupsMatch(claimGroupIds, evGroupIds)
+            })
+
+            if (benGroupFilteredIds.length === 0) return
+
             // Check which links already exist (shouldn't be any for new update, but be safe)
             const { data: existingLinks } = await supabase
                 .from('evidence_kpi_updates')
@@ -421,7 +434,7 @@ export class KPIService {
                 .eq('kpi_update_id', update.id)
 
             const existingEvidenceIds = new Set((existingLinks || []).map((l: any) => l.evidence_id))
-            const newLinks = matchingEvidenceIds
+            const newLinks = benGroupFilteredIds
                 .filter(evidenceId => !existingEvidenceIds.has(evidenceId))
                 .map(evidenceId => ({
                     evidence_id: evidenceId,
@@ -451,12 +464,17 @@ export class KPIService {
         // Fetch directly (access controlled at route level)
         const { data, error } = await supabase
             .from('kpi_updates')
-            .select('*')
+            .select('*, kpi_update_beneficiary_groups(beneficiary_group_id)')
             .eq('kpi_id', kpiId)
             .order('created_at', { ascending: false });
 
         if (error) throw new Error(`Failed to fetch KPI updates: ${error.message}`);
-        return data || [];
+
+        return (data || []).map((update: any) => ({
+            ...update,
+            beneficiary_group_ids: (update.kpi_update_beneficiary_groups || []).map((l: any) => l.beneficiary_group_id),
+            kpi_update_beneficiary_groups: undefined
+        }));
     }
 
     static async updateKPIUpdate(id: string, updates: Partial<KPIUpdate>, userId: string): Promise<KPIUpdate> {
@@ -597,6 +615,11 @@ export class KPIService {
             evidenceUpdateLinks = data
         }
 
+        // Batch-fetch ben groups for read-time scoping filter
+        const evidenceIds = evidence.map((e: any) => e.id).filter(Boolean)
+        const updateBenGroupMap = await BeneficiaryService.getBenGroupsForUpdates(updateIds)
+        const evidenceBenGroupMap = await BeneficiaryService.getBenGroupsForEvidence(evidenceIds)
+
         // Helper to parse date as UTC midnight (avoids timezone issues with date-only strings)
         const parseUTCDate = (dateStr: string): Date => {
             const [year, month, day] = dateStr.split('T')[0].split('-').map(Number);
@@ -614,9 +637,12 @@ export class KPIService {
 
             const explicitEvidence = evidence.filter((e: any) => explicitEvidenceIds.has(e.id))
 
-            // Only use explicitly linked evidence - no more implicit date matching
-            // This ensures evidence only counts toward data points it's actually linked to
-            const relevantEvidence = explicitEvidence
+            // Read-time ben group scoping: only keep evidence that's compatible with this update's groups
+            const updateGroupIds = updateBenGroupMap[update.id] || []
+            const relevantEvidence = explicitEvidence.filter((e: any) => {
+                const evGroupIds = evidenceBenGroupMap[e.id] || []
+                return BeneficiaryService.beneficiaryGroupsMatch(updateGroupIds, evGroupIds)
+            })
 
             // Calculate completion percentage for this data point
             let completionPercentage = 0;

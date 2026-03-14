@@ -232,7 +232,7 @@ export default function AddEvidenceModal({
         }, 300) // 300ms debounce
 
         return () => clearTimeout(timeoutId)
-    }, [datePickerValue, formData.kpi_ids, selectedLocationIds])
+    }, [datePickerValue, formData.kpi_ids, selectedLocationIds, selectedBeneficiaryGroupIds])
 
     const fetchMatchingImpactClaims = async () => {
         if (isFetchingMatches) return // Prevent concurrent calls
@@ -248,6 +248,16 @@ export default function AddEvidenceModal({
                     // Filter by location if any are selected - show if claim matches ANY selected location
                     if (selectedLocationIds.length > 0 && !selectedLocationIds.includes(update.location_id || '')) {
                         return false
+                    }
+
+                    // Ben group scoping: both unscoped = match, both scoped with overlap = match, else no match
+                    const claimGroupIds: string[] = (update as any).beneficiary_group_ids || []
+                    const evGroupIds = selectedBeneficiaryGroupIds
+                    const claimScoped = claimGroupIds.length > 0
+                    const evScoped = evGroupIds.length > 0
+                    if (claimScoped || evScoped) {
+                        if (claimScoped !== evScoped) return false
+                        if (!claimGroupIds.some(id => evGroupIds.includes(id))) return false
                     }
 
                     const updateDate = update.date_represented

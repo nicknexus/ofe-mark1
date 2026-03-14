@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, Users, Edit, Trash2, X, MapPin, AlertCircle, BarChart3 } from 'lucide-react'
+import { Plus, Users, Edit, Trash2, X, MapPin, BarChart3 } from 'lucide-react'
 import { apiService } from '../services/api'
 import { BeneficiaryGroup, Location } from '../types'
-import { formatDate } from '../utils'
 import toast from 'react-hot-toast'
-import LocationModal from './LocationModal'
 import BeneficiaryGroupDetailsModal from './BeneficiaryGroupDetailsModal'
 import {
     DndContext,
@@ -27,7 +25,7 @@ import { CSS } from '@dnd-kit/utilities'
 // Sortable Beneficiary Group Card Component - Simple card like StoriesTab
 function SortableBeneficiaryGroupCard({
     group,
-    location,
+    locationNames,
     ageRange,
     dataPointCount,
     onClick,
@@ -35,7 +33,7 @@ function SortableBeneficiaryGroupCard({
     onDelete,
 }: {
     group: BeneficiaryGroup
-    location: Location | null
+    locationNames: string[]
     ageRange: string | null
     dataPointCount: number
     onClick: () => void
@@ -79,10 +77,10 @@ function SortableBeneficiaryGroupCard({
                                     <span className="whitespace-nowrap">{group.total_number.toLocaleString()} beneficiaries</span>
                                 )}
                                 {ageRange && <span className="whitespace-nowrap">Age: {ageRange}</span>}
-                                {location && (
+                                {locationNames.length > 0 && (
                                     <span className="flex items-center gap-1 min-w-0 max-w-full">
                                         <MapPin className="w-3 h-3 flex-shrink-0" />
-                                        <span className="truncate">{location.name}</span>
+                                        <span className="truncate">{locationNames.join(', ')}</span>
                                     </span>
                                 )}
                             </div>
@@ -142,34 +140,11 @@ function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiativeId }:
         name: '',
         description: '',
         criteria: {} as Record<string, any>,
-        location_id: '',
         age_range_start: '' as string | number,
         age_range_end: '' as string | number,
         total_number: '' as string | number
     })
-    const [locations, setLocations] = useState<Location[]>([])
     const [loading, setLoading] = useState(false)
-    const [loadingLocations, setLoadingLocations] = useState(true)
-    const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
-
-    useEffect(() => {
-        if (isOpen && initiativeId) {
-            loadLocations()
-        }
-    }, [isOpen, initiativeId])
-
-    const loadLocations = async () => {
-        try {
-            setLoadingLocations(true)
-            const locs = await apiService.getLocations(initiativeId)
-            setLocations(locs || [])
-        } catch (error) {
-            console.error('Error loading locations:', error)
-            toast.error('Failed to load locations')
-        } finally {
-            setLoadingLocations(false)
-        }
-    }
 
     useEffect(() => {
         if (editData) {
@@ -177,7 +152,6 @@ function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiativeId }:
                 name: editData.name || '',
                 description: editData.description || '',
                 criteria: editData.criteria || {},
-                location_id: editData.location_id || '',
                 age_range_start: editData.age_range_start ?? '',
                 age_range_end: editData.age_range_end ?? '',
                 total_number: editData.total_number ?? ''
@@ -187,7 +161,6 @@ function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiativeId }:
                 name: '', 
                 description: '', 
                 criteria: {},
-                location_id: '',
                 age_range_start: '',
                 age_range_end: '',
                 total_number: ''
@@ -197,10 +170,6 @@ function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiativeId }:
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!formData.location_id) {
-            toast.error('Please select a location')
-            return
-        }
         setLoading(true)
         try {
             const submitData = {
@@ -214,7 +183,6 @@ function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiativeId }:
                 name: '', 
                 description: '', 
                 criteria: {},
-                location_id: '',
                 age_range_start: '',
                 age_range_end: '',
                 total_number: ''
@@ -252,64 +220,6 @@ function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiativeId }:
                             placeholder="e.g., Children 5-12, Women 18-35, Rural Community"
                             required
                         />
-                    </div>
-
-                    <div>
-                        <label className="label">
-                            Location <span className="text-red-500">*</span>
-                        </label>
-                        {locations.length === 0 ? (
-                            <div className="space-y-2">
-                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start space-x-2">
-                                    <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                                    <div className="flex-1">
-                                        <p className="text-sm text-yellow-800 font-medium mb-1">
-                                            Location Required
-                                        </p>
-                                        <p className="text-xs text-yellow-700">
-                                            You need to create at least one location before creating a beneficiary group. Locations help organize beneficiaries by geographic area.
-                                        </p>
-                                    </div>
-                                </div>
-                                {initiativeId && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsLocationModalOpen(true)}
-                                        className="w-full px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center space-x-2"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                        <span>Create Location</span>
-                                    </button>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="flex gap-2">
-                                <select
-                                    value={formData.location_id}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, location_id: e.target.value }))}
-                                    className="input-field flex-1"
-                                    required
-                                >
-                                    <option value="">Select a location</option>
-                                    {locations.map((location) => (
-                                        <option key={location.id} value={location.id}>
-                                            {location.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                {initiativeId && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsLocationModalOpen(true)}
-                                        className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700 flex items-center gap-1 transition-colors"
-                                        title="Add new location"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                        <span className="hidden sm:inline">Add</span>
-                                    </button>
-                                )}
-                            </div>
-                        )}
                     </div>
 
                     <div>
@@ -380,34 +290,12 @@ function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiativeId }:
                         <button
                             type="submit"
                             className="btn-primary flex-1"
-                            disabled={loading || !formData.name || !formData.location_id}
+                            disabled={loading || !formData.name}
                         >
                             {loading ? 'Saving...' : editData ? 'Update Group' : 'Create Group'}
                         </button>
                     </div>
                 </form>
-                
-                {/* Location Creation Modal */}
-                {initiativeId && (
-                    <LocationModal
-                        isOpen={isLocationModalOpen}
-                        onClose={() => setIsLocationModalOpen(false)}
-                        onSubmit={async (locationData) => {
-                            try {
-                                const newLocation = await apiService.createLocation(locationData)
-                                setLocations([...locations, newLocation])
-                                setFormData(prev => ({ ...prev, location_id: newLocation.id! }))
-                                setIsLocationModalOpen(false)
-                                toast.success('Location created successfully!')
-                            } catch (error) {
-                                const message = error instanceof Error ? error.message : 'Failed to create location'
-                                toast.error(message)
-                                throw error
-                            }
-                        }}
-                        initiativeId={initiativeId}
-                    />
-                )}
             </div>
         </div>
     )
@@ -423,6 +311,7 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
     const [selectedGroup, setSelectedGroup] = useState<BeneficiaryGroup | null>(null)
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
     const [dataPointCounts, setDataPointCounts] = useState<Record<string, number>>({})
+    const [derivedLocationIds, setDerivedLocationIds] = useState<Record<string, string[]>>({})
     const [locations, setLocations] = useState<Location[]>([])
     const [locationsMap, setLocationsMap] = useState<Record<string, Location>>({})
 
@@ -506,15 +395,18 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
             const groups = data || []
             setGroups(groups)
 
-            // Bulk load data point counts for all groups for better performance
+            // Bulk load data point counts and derived locations for all groups
             if (groups.length > 0) {
                 const groupIds = groups.map(g => g.id!).filter(Boolean)
                 try {
-                    const counts = await apiService.getBulkDataPointCounts(groupIds)
+                    const [counts, derivedLocs] = await Promise.all([
+                        apiService.getBulkDataPointCounts(groupIds),
+                        apiService.getBulkDerivedLocations(groupIds)
+                    ])
                     setDataPointCounts(counts as Record<string, number> || {})
+                    setDerivedLocationIds(derivedLocs || {})
                 } catch (error) {
-                    console.error('Error loading data point counts:', error)
-                    // Don't show error to user, just log it - counts will show as 0
+                    console.error('Error loading group metadata:', error)
                 }
             }
         } catch (error) {
@@ -629,7 +521,10 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
                     >
                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 flex-1 overflow-y-auto pr-2 min-w-0">
                             {orderedGroups.map(group => {
-                                const location = group.location_id ? locationsMap[group.location_id] : null
+                                const locIds = derivedLocationIds[group.id!] || []
+                                const locationNames = locIds
+                                    .map(id => locationsMap[id]?.name)
+                                    .filter(Boolean) as string[]
                                 const ageRange = group.age_range_start && group.age_range_end 
                                     ? `${group.age_range_start}-${group.age_range_end}`
                                     : group.age_range_start 
@@ -640,7 +535,7 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
                                     <SortableBeneficiaryGroupCard
                                         key={group.id}
                                         group={group}
-                                        location={location}
+                                        locationNames={locationNames}
                                         ageRange={ageRange}
                                         dataPointCount={dataPointCounts[group.id!] || 0}
                                         onClick={() => handleGroupClick(group)}

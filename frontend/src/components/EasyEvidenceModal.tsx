@@ -237,6 +237,10 @@ export default function EasyEvidenceModal({
                     kpi_ids: [kpi.id],
                     // Link to the specific impact claim
                     kpi_update_ids: [impactClaim.id],
+                    // Inherit ben groups from the claim so the link stays valid under scoping rules
+                    beneficiary_group_ids: impactClaim.beneficiary_group_ids?.length > 0
+                        ? impactClaim.beneficiary_group_ids
+                        : undefined,
                     initiative_id: initiativeId,
                     file_url: uploadResult.file_url,
                     // Pass file URLs and sizes as arrays for proper storage tracking

@@ -2,6 +2,7 @@ import { supabase } from '../utils/supabase'
 import { Evidence } from '../types'
 import { deleteFromSupabase } from '../utils/fileUpload'
 import { StorageService } from './storageService'
+import { BeneficiaryService } from './beneficiaryService'
 
 export class EvidenceService {
     static async create(evidence: Evidence, userId: string): Promise<Evidence> {
@@ -99,7 +100,7 @@ export class EvidenceService {
             date_represented: data.date_represented,
             date_range_start: data.date_range_start,
             date_range_end: data.date_range_end
-        }, kpi_update_ids || [], userId);
+        }, kpi_update_ids || [], userId, beneficiary_group_ids || []);
 
         // Link to beneficiary groups if provided
         if (beneficiary_group_ids && beneficiary_group_ids.length > 0) {
@@ -365,11 +366,66 @@ export class EvidenceService {
             .eq('evidence_id', id);
         const alreadyLinkedIds = (currentUpdateLinks || []).map((l: any) => l.kpi_update_id);
 
+        // Prune stale links where location, date, or ben groups no longer match
+        if (alreadyLinkedIds.length > 0) {
+            const { data: linkedUpdates } = await supabase
+                .from('kpi_updates')
+                .select('id, location_id, date_represented, date_range_start, date_range_end')
+                .in('id', alreadyLinkedIds)
+
+            const evidenceDateStart = data.date_range_start || data.date_represented || ''
+            const evidenceDateEnd = data.date_range_end || null
+
+            // Get current ben group IDs for scoping
+            const { data: currentBgLinks } = await supabase
+                .from('evidence_beneficiary_groups')
+                .select('beneficiary_group_id')
+                .eq('evidence_id', id)
+            const currentBgIds = (currentBgLinks || []).map((l: any) => l.beneficiary_group_id)
+            const updateBenGroups = await BeneficiaryService.getBenGroupsForUpdates(alreadyLinkedIds)
+
+            const staleIds = (linkedUpdates || [])
+                .filter((u: any) => {
+                    const locMatch = u.location_id && currentLocIds.includes(u.location_id)
+                    const updateStart = u.date_range_start || u.date_represented
+                    const updateEnd = u.date_range_end || null
+                    const dateMatch = this.datesOverlap(evidenceDateStart, evidenceDateEnd, updateStart, updateEnd)
+                    const bgMatch = BeneficiaryService.beneficiaryGroupsMatch(
+                        updateBenGroups[u.id] || [], currentBgIds
+                    )
+                    return !locMatch || !dateMatch || !bgMatch
+                })
+                .map((u: any) => u.id)
+
+            if (staleIds.length > 0) {
+                await supabase
+                    .from('evidence_kpi_updates')
+                    .delete()
+                    .eq('evidence_id', id)
+                    .in('kpi_update_id', staleIds)
+                console.log(`Pruned ${staleIds.length} stale evidence-claim link(s) for evidence ${id}`)
+            }
+        }
+
+        // Get updated already-linked IDs after pruning
+        const { data: freshUpdateLinks } = await supabase
+            .from('evidence_kpi_updates')
+            .select('kpi_update_id')
+            .eq('evidence_id', id)
+        const freshLinkedIds = (freshUpdateLinks || []).map((l: any) => l.kpi_update_id)
+
+        // Get current ben group IDs for auto-link scoping
+        const { data: bgLinksForAutoLink } = await supabase
+            .from('evidence_beneficiary_groups')
+            .select('beneficiary_group_id')
+            .eq('evidence_id', id)
+        const bgIdsForAutoLink = (bgLinksForAutoLink || []).map((l: any) => l.beneficiary_group_id)
+
         await this.autoLinkToMatchingUpdates(id, currentKpiIds, currentLocIds, {
             date_represented: data.date_represented,
             date_range_start: data.date_range_start,
             date_range_end: data.date_range_end
-        }, alreadyLinkedIds, userId);
+        }, freshLinkedIds, userId, bgIdsForAutoLink);
 
         return data;
     }
@@ -495,7 +551,18 @@ export class EvidenceService {
             .map((item: any) => item.evidence)
             .filter(Boolean);
 
-        return evidence;
+        // Read-time ben group scoping filter
+        const evidenceIds = evidence.map((e: any) => e.id).filter(Boolean)
+        if (evidenceIds.length === 0) return evidence
+
+        const updateBenGroups = await BeneficiaryService.getBenGroupsForUpdates([updateId])
+        const updateGroupIds = updateBenGroups[updateId] || []
+        const evidenceBenGroups = await BeneficiaryService.getBenGroupsForEvidence(evidenceIds)
+
+        return evidence.filter((e: any) => {
+            const evGroupIds = evidenceBenGroups[e.id] || []
+            return BeneficiaryService.beneficiaryGroupsMatch(updateGroupIds, evGroupIds)
+        });
     }
 
     static async getFilesForEvidence(evidenceId: string): Promise<any[]> {
@@ -571,7 +638,17 @@ export class EvidenceService {
                 kpi: dp.kpis
             }));
 
-        return dataPoints;
+        // Read-time ben group scoping: filter out claims that don't match this evidence's groups
+        if (dataPoints.length === 0) return dataPoints
+        const updateIds = dataPoints.map((dp: any) => dp.id).filter(Boolean)
+        const evidenceBenGroups = await BeneficiaryService.getBenGroupsForEvidence([evidenceId])
+        const evGroupIds = evidenceBenGroups[evidenceId] || []
+        const updateBenGroups = await BeneficiaryService.getBenGroupsForUpdates(updateIds)
+
+        return dataPoints.filter((dp: any) => {
+            const claimGroupIds = updateBenGroups[dp.id] || []
+            return BeneficiaryService.beneficiaryGroupsMatch(claimGroupIds, evGroupIds)
+        });
     }
 
     private static datesOverlap(
@@ -589,7 +666,8 @@ export class EvidenceService {
         locationIds: string[],
         dates: { date_represented?: string; date_range_start?: string; date_range_end?: string },
         alreadyLinkedUpdateIds: string[],
-        userId: string
+        userId: string,
+        evidenceBenGroupIds: string[] = []
     ): Promise<void> {
         try {
             if (kpiIds.length === 0 || locationIds.length === 0) return
@@ -605,11 +683,11 @@ export class EvidenceService {
             const evidenceDateStart = dates.date_range_start || dates.date_represented || ''
             const evidenceDateEnd = dates.date_range_end || null
 
-            const newLinks: { evidence_id: string; kpi_update_id: string; user_id: string }[] = []
+            // Candidate updates that pass date + location checks
+            const candidateUpdateIds: string[] = []
 
             for (const update of kpiUpdates) {
                 if (alreadyLinked.has(update.id)) continue
-
                 if (!update.location_id || !locationIds.includes(update.location_id)) continue
 
                 const updateDateStart = update.date_range_start || update.date_represented
@@ -617,23 +695,34 @@ export class EvidenceService {
 
                 if (!this.datesOverlap(evidenceDateStart, evidenceDateEnd, updateDateStart, updateDateEnd)) continue
 
-                newLinks.push({
-                    evidence_id: evidenceId,
-                    kpi_update_id: update.id,
-                    user_id: userId
-                })
+                candidateUpdateIds.push(update.id)
             }
 
-            if (newLinks.length > 0) {
-                const { error } = await supabase
-                    .from('evidence_kpi_updates')
-                    .insert(newLinks)
+            if (candidateUpdateIds.length === 0) return
 
-                if (error) {
-                    console.error('Failed to auto-link evidence to existing impact claims:', error)
-                } else {
-                    console.log(`Auto-linked evidence ${evidenceId} to ${newLinks.length} existing impact claim(s)`)
-                }
+            // Ben group scoping: filter by beneficiary group compatibility
+            const updateBenGroups = await BeneficiaryService.getBenGroupsForUpdates(candidateUpdateIds)
+            const filteredUpdateIds = candidateUpdateIds.filter(updateId => {
+                const updateGroupIds = updateBenGroups[updateId] || []
+                return BeneficiaryService.beneficiaryGroupsMatch(updateGroupIds, evidenceBenGroupIds)
+            })
+
+            if (filteredUpdateIds.length === 0) return
+
+            const newLinks = filteredUpdateIds.map(updateId => ({
+                evidence_id: evidenceId,
+                kpi_update_id: updateId,
+                user_id: userId
+            }))
+
+            const { error } = await supabase
+                .from('evidence_kpi_updates')
+                .insert(newLinks)
+
+            if (error) {
+                console.error('Failed to auto-link evidence to existing impact claims:', error)
+            } else {
+                console.log(`Auto-linked evidence ${evidenceId} to ${newLinks.length} existing impact claim(s)`)
             }
         } catch (error) {
             console.error('Error in autoLinkToMatchingUpdates:', error)
