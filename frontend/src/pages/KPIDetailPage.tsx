@@ -96,23 +96,12 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
 
             setDataPointsWithEvidence(updatesWithEvidence)
 
-            // Load beneficiaries in batches to avoid rate limiting
+            // Build ben group map from updates (beneficiary_group_ids now included in getUpdates response)
             const beneficiaryMap: Record<string, any[]> = {}
-            const batchSize = 2
-            for (let i = 0; i < updates.length; i += batchSize) {
-                const batch = updates.slice(i, i + batchSize)
-                await Promise.all(batch.map(async (update) => {
-                    try {
-                        const groups = await apiService.getBeneficiaryGroupsForUpdate(update.id!)
-                        beneficiaryMap[update.id!] = Array.isArray(groups) ? groups : []
-                    } catch (error) {
-                        console.error('Error loading beneficiaries for update:', update.id, error)
-                        beneficiaryMap[update.id!] = []
-                    }
-                }))
-                // Delay between batches
-                if (i + batchSize < updates.length) {
-                    await new Promise(resolve => setTimeout(resolve, 300))
+            for (const update of updates) {
+                if (update.id) {
+                    const groupIds: string[] = (update as any).beneficiary_group_ids || []
+                    beneficiaryMap[update.id] = groupIds.map(id => ({ id }))
                 }
             }
             setDataPointBeneficiaries(beneficiaryMap)

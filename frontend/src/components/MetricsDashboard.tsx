@@ -262,36 +262,16 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
         }
     }, [initiativeId])
 
-    // Load beneficiary groups for updates (cache them) - batched to avoid rate limiting
+    // Build ben group cache from kpiUpdates (beneficiary_group_ids now included in getUpdates response)
     useEffect(() => {
         if (kpiUpdates.length === 0) return
-
-        const loadBeneficiaryGroupsForUpdates = async () => {
-            const cache: Record<string, string[]> = {}
-            const updatesWithIds = kpiUpdates.filter(u => u.id)
-
-            // Process in batches of 2 with 300ms delay between batches to avoid rate limiting
-            const batchSize = 2
-            for (let i = 0; i < updatesWithIds.length; i += batchSize) {
-                const batch = updatesWithIds.slice(i, i + batchSize)
-                await Promise.all(batch.map(async (update) => {
-                    try {
-                        const groups = await apiService.getBeneficiaryGroupsForUpdate(update.id!)
-                        const groupIds = Array.isArray(groups) ? groups.map((g: any) => g.id).filter(Boolean) : []
-                        cache[update.id!] = groupIds
-                    } catch (error) {
-                        cache[update.id!] = []
-                    }
-                }))
-                // Delay between batches to avoid rate limiting
-                if (i + batchSize < updatesWithIds.length) {
-                    await new Promise(resolve => setTimeout(resolve, 300))
-                }
+        const cache: Record<string, string[]> = {}
+        for (const update of kpiUpdates) {
+            if (update.id) {
+                cache[update.id] = (update as any).beneficiary_group_ids || []
             }
-            setUpdateBeneficiaryGroupsCache(cache)
         }
-
-        loadBeneficiaryGroupsForUpdates()
+        setUpdateBeneficiaryGroupsCache(cache)
     }, [kpiUpdates])
 
     // Refresh map when kpiUpdates change (indicating updates/evidence were modified)

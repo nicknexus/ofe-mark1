@@ -558,6 +558,10 @@ export class EvidenceService {
         const updateBenGroups = await BeneficiaryService.getBenGroupsForUpdates([updateId])
         const updateGroupIds = updateBenGroups[updateId] || []
         const evidenceBenGroups = await BeneficiaryService.getBenGroupsForEvidence(evidenceIds)
+        const anyEvidenceScoped = Object.values(evidenceBenGroups).some(ids => ids.length > 0)
+
+        // Skip filtering if neither side uses ben groups
+        if (updateGroupIds.length === 0 && !anyEvidenceScoped) return evidence
 
         return evidence.filter((e: any) => {
             const evGroupIds = evidenceBenGroups[e.id] || []
@@ -641,9 +645,13 @@ export class EvidenceService {
         // Read-time ben group scoping: filter out claims that don't match this evidence's groups
         if (dataPoints.length === 0) return dataPoints
         const updateIds = dataPoints.map((dp: any) => dp.id).filter(Boolean)
-        const evidenceBenGroups = await BeneficiaryService.getBenGroupsForEvidence([evidenceId])
+        const [evidenceBenGroups, updateBenGroups] = await Promise.all([
+            BeneficiaryService.getBenGroupsForEvidence([evidenceId]),
+            BeneficiaryService.getBenGroupsForUpdates(updateIds)
+        ])
         const evGroupIds = evidenceBenGroups[evidenceId] || []
-        const updateBenGroups = await BeneficiaryService.getBenGroupsForUpdates(updateIds)
+        const anyScoped = evGroupIds.length > 0 || Object.values(updateBenGroups).some(ids => ids.length > 0)
+        if (!anyScoped) return dataPoints
 
         return dataPoints.filter((dp: any) => {
             const claimGroupIds = updateBenGroups[dp.id] || []

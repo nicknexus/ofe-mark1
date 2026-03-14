@@ -617,8 +617,14 @@ export class KPIService {
 
         // Batch-fetch ben groups for read-time scoping filter
         const evidenceIds = evidence.map((e: any) => e.id).filter(Boolean)
-        const updateBenGroupMap = await BeneficiaryService.getBenGroupsForUpdates(updateIds)
-        const evidenceBenGroupMap = await BeneficiaryService.getBenGroupsForEvidence(evidenceIds)
+        let updateBenGroupMap: Record<string, string[]> = {}
+        let evidenceBenGroupMap: Record<string, string[]> = {}
+        if (updateIds.length > 0 && evidenceIds.length > 0) {
+            ;[updateBenGroupMap, evidenceBenGroupMap] = await Promise.all([
+                BeneficiaryService.getBenGroupsForUpdates(updateIds),
+                BeneficiaryService.getBenGroupsForEvidence(evidenceIds)
+            ])
+        }
 
         // Helper to parse date as UTC midnight (avoids timezone issues with date-only strings)
         const parseUTCDate = (dateStr: string): Date => {
