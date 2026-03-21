@@ -485,20 +485,11 @@
     border-radius: 16px !important;
 }
 
-/* Fix backdrop-filter ancestors breaking Leaflet tile rendering on mobile WebKit */
-@media (max-width: 1023px) {
-    .leaflet-container {
-        -webkit-transform: translate3d(0, 0, 0);
-        transform: translate3d(0, 0, 0);
-    }
-}
-
 /* Base leaflet container styling for all maps */
 .leaflet-container {
     width: 100%;
     height: 100%;
     background-color: #F8F9FB;
-    /* Off-white to match app background */
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
@@ -531,13 +522,35 @@
     background-color: #F3F5F8;
 }
 
-/* Hide the pane backgrounds to avoid grey flashes */
 .leaflet-tile-pane {
     background-color: #F8F9FB;
 }
 
 .leaflet-overlay-pane {
     background-color: transparent;
+}
+
+/*
+ * Fix: backdrop-filter on ancestor elements breaks Leaflet tile compositing
+ * on mobile WebKit. The pane/tile-container backgrounds end up rendering
+ * ON TOP of the actual tile images. Strip those backgrounds on mobile and
+ * force each pane into its own compositing layer.
+ */
+@media (max-width: 1023px) {
+    .leaflet-tile-pane,
+    .leaflet-tile-container {
+        background-color: transparent !important;
+    }
+
+    .leaflet-tile:not(.leaflet-tile-loaded) {
+        background-color: transparent !important;
+        opacity: 0;
+    }
+
+    .leaflet-pane {
+        -webkit-transform: translate3d(0, 0, 0);
+        transform: translate3d(0, 0, 0);
+    }
 }
 
 /* Modern attribution styling */
