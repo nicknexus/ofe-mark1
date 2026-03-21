@@ -3,6 +3,7 @@ import { X, Upload, Calendar, MapPin, Users, Camera, Video, Mic, Image, FileText
 import { CreateStoryForm, Story, Location, BeneficiaryGroup } from '../types'
 import { apiService } from '../services/api'
 import { getLocalDateString } from '../utils'
+import { useUploadManager } from '../context/UploadContext'
 import DateRangePicker from './DateRangePicker'
 import LocationModal from './LocationModal'
 import toast from 'react-hot-toast'
@@ -46,6 +47,7 @@ export default function AddStoryModal({
     const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
     const [selectedBeneficiaryGroupIds, setSelectedBeneficiaryGroupIds] = useState<string[]>([])
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
+    const { queueUpload } = useUploadManager()
 
     const mediaTypes = [
         { value: 'photo', label: 'Photo', icon: Camera },
@@ -112,18 +114,7 @@ export default function AddStoryModal({
 
     const handleFileSelect = async (file: File) => {
         setSelectedFile(file)
-        setUploadProgress('Uploading...')
-
-        try {
-            const uploadResult = await apiService.uploadFile(file)
-            setFormData(prev => ({ ...prev, media_url: uploadResult.file_url }))
-            setUploadProgress('Upload complete!')
-        } catch (error) {
-            console.error('Upload error:', error)
-            toast.error('Failed to upload file')
-            setUploadProgress('')
-            setSelectedFile(null)
-        }
+        setUploadProgress('File selected — will upload on save')
     }
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -166,11 +157,52 @@ export default function AddStoryModal({
             return
         }
 
+        // If there's a file to upload, queue it in background and close modal immediately
+        if (selectedFile && !formData.media_url) {
+            const capturedFormData = { ...formData }
+            const capturedBenGroups = [...selectedBeneficiaryGroupIds]
+            const capturedEditId = editData?.id
+            const capturedOnSubmit = onSubmit
+
+            onClose()
+
+            queueUpload({
+                file: selectedFile,
+                onComplete: async (result) => {
+                    try {
+                        const submitData = {
+                            ...capturedFormData,
+                            media_url: result.file_url,
+                            beneficiary_group_ids: capturedBenGroups
+                        }
+                        if (capturedEditId) {
+                            await apiService.updateStory(capturedEditId, submitData)
+                            toast.success('Story updated successfully!')
+                        } else {
+                            await apiService.createStory(submitData)
+                            toast.success('Story created successfully!')
+                        }
+                        await capturedOnSubmit()
+                    } catch (err) {
+                        toast.error(`Failed to save story: ${err instanceof Error ? err.message : 'Unknown error'}`)
+                    }
+                },
+                onError: (error) => {
+                    if (error.message !== 'Upload cancelled') {
+                        toast.error(`Upload failed for ${selectedFile.name}`)
+                    }
+                }
+            })
+
+            return
+        }
+
+        // No file to upload — submit directly
         setLoading(true)
         try {
             const submitData = {
                 ...formData,
-                media_url: formData.media_url?.trim() || undefined, // Convert empty string to undefined
+                media_url: formData.media_url?.trim() || undefined,
                 beneficiary_group_ids: selectedBeneficiaryGroupIds
             }
 
@@ -181,7 +213,6 @@ export default function AddStoryModal({
                 await apiService.createStory(submitData)
                 toast.success('Story created successfully!')
             }
-            // Wait for stories to reload before closing modal
             await onSubmit()
             onClose()
         } catch (error: any) {
@@ -284,9 +315,9 @@ export default function AddStoryModal({
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
                                 Upload {formData.media_type === 'photo' ? 'Photo' : formData.media_type === 'video' ? 'Video' : 'Recording'} <span className="text-gray-400 font-normal">(optional)</span>
                             </label>
-                            {formData.media_url ? (
+                            {(formData.media_url || selectedFile) ? (
                                 <div className="space-y-3">
-                                    {/(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(formData.media_url) ? (
+                                    {formData.media_url && /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(formData.media_url) ? (
                                         <div className="relative w-full max-w-md mx-auto" style={{ paddingBottom: '56.25%' }}>
                                             <iframe
                                                 src={`https://www.youtube.com/embed/${(formData.media_url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) || [])[1]}`}
@@ -295,6 +326,14 @@ export default function AddStoryModal({
                                                 allowFullScreen
                                                 className="absolute inset-0 w-full h-full rounded-lg shadow-lg border-2 border-gray-200"
                                             />
+                                        </div>
+                                    ) : selectedFile && !formData.media_url ? (
+                                        <div className="w-full max-w-md mx-auto bg-gray-50 rounded-lg flex items-center justify-center p-8 border-2 border-gray-200" style={{ minHeight: '120px' }}>
+                                            <div className="text-center">
+                                                <Upload className="w-10 h-10 text-blue-500 mx-auto mb-2" />
+                                                <p className="text-sm font-medium text-gray-700">{selectedFile.name}</p>
+                                                <p className="text-xs text-gray-500 mt-1">{(selectedFile.size / 1024 / 1024).toFixed(1)} MB — will upload on save</p>
+                                            </div>
                                         </div>
                                     ) : formData.media_type === 'photo' ? (
                                         <div className="relative w-full max-w-md mx-auto">
@@ -365,7 +404,7 @@ export default function AddStoryModal({
                             )}
 
                             {/* Link inputs */}
-                            {!formData.media_url && (
+                            {!formData.media_url && !selectedFile && (
                                 <div className="mt-4 space-y-3">
                                     <div className="flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200/60 rounded-xl">
                                         <div className="w-9 h-9 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0">

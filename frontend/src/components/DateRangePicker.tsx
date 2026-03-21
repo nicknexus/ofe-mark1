@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Calendar, X } from 'lucide-react'
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths, isBefore, isAfter, startOfDay } from 'date-fns'
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths, addYears, subYears, isBefore, isAfter, startOfDay } from 'date-fns'
 import { getLocalDateString, parseLocalDate } from '../utils'
 
 interface DateRangePickerProps {
@@ -77,8 +77,8 @@ export default function DateRangePicker({
     const handleToggle = (e: React.MouseEvent<HTMLButtonElement>) => {
         if (!isOpen && buttonRef.current) {
             const rect = buttonRef.current.getBoundingClientRect()
-            // Height accounts for: header (~40px) + day labels (~30px) + 6 rows (~192px) + preview (~40px) + buttons (~50px) + padding (~32px) = ~384px
-            const dropdownHeight = 384 // Accommodate 6-row months
+            // Height accounts for: year row (~24px) + month row (~36px) + day labels (~30px) + 6 rows (~192px) + preview (~40px) + buttons (~50px) + padding (~32px) = ~404px
+            const dropdownHeight = 410
             const dropdownWidth = 280 // Approximate width of the calendar dropdown
             const padding = 8 // Padding from viewport edges
             
@@ -302,13 +302,37 @@ export default function DateRangePicker({
                         style={{
                             top: `${dropdownPosition.top}px`,
                             left: `${dropdownPosition.left}px`,
-                            height: '384px',
-                            maxHeight: `${Math.min(384, window.innerHeight - Math.max(dropdownPosition.top, 8) - 8)}px`
+                            height: '410px',
+                            maxHeight: `${Math.min(410, window.innerHeight - Math.max(dropdownPosition.top, 8) - 8)}px`
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                    {/* Header - Fixed */}
-                    <div className="flex items-center justify-between p-4 pb-2 flex-shrink-0">
+                    {/* Year nav row */}
+                    <div className="flex items-center justify-between px-4 pt-3 pb-0 flex-shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => setCurrentMonth(subYears(currentMonth, 1))}
+                            className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                            disabled={minDateObj ? isBefore(startOfMonth(subYears(currentMonth, 1)), startOfMonth(minDateObj)) : false}
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                        <span className="text-xs font-medium text-gray-400">{format(currentMonth, 'yyyy')}</span>
+                        <button
+                            type="button"
+                            onClick={() => setCurrentMonth(addYears(currentMonth, 1))}
+                            className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                            disabled={isAfter(startOfMonth(addYears(currentMonth, 1)), startOfMonth(maxDateObj))}
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                    </div>
+                    {/* Month nav row */}
+                    <div className="flex items-center justify-between px-4 pt-1 pb-2 flex-shrink-0">
                         <button
                             type="button"
                             onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
@@ -319,7 +343,7 @@ export default function DateRangePicker({
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                             </svg>
                         </button>
-                        <h3 className="font-semibold text-gray-900">{format(currentMonth, 'MMMM yyyy')}</h3>
+                        <h3 className="font-semibold text-gray-900">{format(currentMonth, 'MMMM')}</h3>
                         <button
                             type="button"
                             onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}

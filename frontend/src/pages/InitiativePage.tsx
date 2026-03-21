@@ -182,7 +182,10 @@ export default function InitiativePage() {
 
         try {
             setIsLoadingDashboard(true)
-            setLoadingState({ isLoading: true })
+            // Only show full-page loading on initial load (no dashboard yet)
+            if (!dashboard) {
+                setLoadingState({ isLoading: true })
+            }
             const data = await apiService.getInitiativeDashboard(id)
             setDashboard(data)
 

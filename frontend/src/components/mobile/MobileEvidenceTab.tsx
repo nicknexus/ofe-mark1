@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
+import { useUploadManager } from '../../context/UploadContext'
 import { 
     Plus, 
     FileText, 
@@ -769,6 +770,7 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
     const [locations, setLocations] = useState<Location[]>([])
     const [kpis, setKPIs] = useState<KPI[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const { queueUpload } = useUploadManager()
 
     // Form state
     const [formData, setFormData] = useState({
@@ -829,38 +831,57 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
             return
         }
 
+        // Build submit data
+        const submitData: any = {
+            title: formData.title,
+            description: formData.description,
+            type: formData.type,
+            initiative_id: initiativeId,
+            kpi_ids: formData.selectedKpiIds,
+            location_ids: formData.selectedLocationIds
+        }
+
+        if (formData.datePickerValue.singleDate) {
+            submitData.date_represented = formData.datePickerValue.singleDate
+        } else if (formData.datePickerValue.startDate && formData.datePickerValue.endDate) {
+            submitData.date_range_start = formData.datePickerValue.startDate
+            submitData.date_range_end = formData.datePickerValue.endDate
+            submitData.date_represented = formData.datePickerValue.startDate
+        } else {
+            submitData.date_represented = getLocalDateString(new Date())
+        }
+
+        if (formData.file) {
+            const capturedFile = formData.file
+            const capturedSubmitData = { ...submitData }
+            const capturedOnSuccess = onSuccess
+
+            onClose()
+
+            queueUpload({
+                file: capturedFile,
+                onComplete: async (result) => {
+                    try {
+                        await apiService.createEvidence({ ...capturedSubmitData, file_url: result.file_url })
+                        toast.success('Evidence added!')
+                        capturedOnSuccess()
+                    } catch (err) {
+                        toast.error(`Failed to create evidence: ${err instanceof Error ? err.message : 'Unknown error'}`)
+                    }
+                },
+                onError: (error) => {
+                    if (error.message !== 'Upload cancelled') {
+                        toast.error(`Upload failed for ${capturedFile.name}`)
+                    }
+                }
+            })
+            return
+        }
+
+        // No file — submit with URL directly
         setLoading(true)
         try {
-            let fileUrl = formData.fileUrl
-
-            // Upload file if selected
-            if (formData.file) {
-                const uploadResult = await apiService.uploadFile(formData.file)
-                fileUrl = uploadResult.file_url
-            }
-
-            // Prepare data
-            const submitData: any = {
-                title: formData.title,
-                description: formData.description,
-                type: formData.type,
-                file_url: fileUrl,
-                initiative_id: initiativeId,
-                kpi_ids: formData.selectedKpiIds,
-                location_ids: formData.selectedLocationIds
-            }
-
-            // Handle dates
-            if (formData.datePickerValue.singleDate) {
-                submitData.date_represented = formData.datePickerValue.singleDate
-            } else if (formData.datePickerValue.startDate && formData.datePickerValue.endDate) {
-                submitData.date_range_start = formData.datePickerValue.startDate
-                submitData.date_range_end = formData.datePickerValue.endDate
-                submitData.date_represented = formData.datePickerValue.startDate
-            } else {
-                submitData.date_represented = getLocalDateString(new Date())
-            }
-
+            submitData.file_url = formData.fileUrl
             await apiService.createEvidence(submitData)
             toast.success('Evidence added!')
             onSuccess()
@@ -1222,6 +1243,7 @@ function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: 
     const [locations, setLocations] = useState<Location[]>([])
     const [kpis, setKPIs] = useState<KPI[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const { queueUpload } = useUploadManager()
 
     // Initialize form with existing evidence data
     const [formData, setFormData] = useState({
@@ -1270,35 +1292,53 @@ function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: 
             return
         }
 
+        const submitData: any = {
+            title: formData.title,
+            description: formData.description,
+            type: formData.type,
+            kpi_ids: formData.selectedKpiIds,
+            location_ids: formData.selectedLocationIds
+        }
+
+        if (formData.datePickerValue.singleDate) {
+            submitData.date_represented = formData.datePickerValue.singleDate
+        } else if (formData.datePickerValue.startDate && formData.datePickerValue.endDate) {
+            submitData.date_range_start = formData.datePickerValue.startDate
+            submitData.date_range_end = formData.datePickerValue.endDate
+            submitData.date_represented = formData.datePickerValue.startDate
+        }
+
+        if (formData.file) {
+            const capturedFile = formData.file
+            const capturedSubmitData = { ...submitData }
+            const capturedEvidenceId = evidence.id!
+            const capturedOnSuccess = onSuccess
+
+            onClose()
+
+            queueUpload({
+                file: capturedFile,
+                onComplete: async (result) => {
+                    try {
+                        await apiService.updateEvidence(capturedEvidenceId, { ...capturedSubmitData, file_url: result.file_url })
+                        toast.success('Evidence updated!')
+                        capturedOnSuccess()
+                    } catch (err) {
+                        toast.error(`Failed to update evidence: ${err instanceof Error ? err.message : 'Unknown error'}`)
+                    }
+                },
+                onError: (error) => {
+                    if (error.message !== 'Upload cancelled') {
+                        toast.error(`Upload failed for ${capturedFile.name}`)
+                    }
+                }
+            })
+            return
+        }
+
         setLoading(true)
         try {
-            let fileUrl = formData.fileUrl
-
-            // Upload new file if selected
-            if (formData.file) {
-                const uploadResult = await apiService.uploadFile(formData.file)
-                fileUrl = uploadResult.file_url
-            }
-
-            // Prepare data
-            const submitData: any = {
-                title: formData.title,
-                description: formData.description,
-                type: formData.type,
-                file_url: fileUrl,
-                kpi_ids: formData.selectedKpiIds,
-                location_ids: formData.selectedLocationIds
-            }
-
-            // Handle dates
-            if (formData.datePickerValue.singleDate) {
-                submitData.date_represented = formData.datePickerValue.singleDate
-            } else if (formData.datePickerValue.startDate && formData.datePickerValue.endDate) {
-                submitData.date_range_start = formData.datePickerValue.startDate
-                submitData.date_range_end = formData.datePickerValue.endDate
-                submitData.date_represented = formData.datePickerValue.startDate
-            }
-
+            submitData.file_url = formData.fileUrl
             await apiService.updateEvidence(evidence.id!, submitData)
             toast.success('Evidence updated!')
             onSuccess()

@@ -3,6 +3,7 @@ import { X, Upload, File, Loader2, Check, Camera, FileText, MessageSquare, Dolla
 import { CreateEvidenceForm, Location } from '../types'
 import { apiService } from '../services/api'
 import { formatDate } from '../utils'
+import { useUploadManager } from '../context/UploadContext'
 import DateRangePicker from './DateRangePicker'
 import toast from 'react-hot-toast'
 
@@ -41,6 +42,7 @@ export default function EasyEvidenceModal({
     const [loadingLocation, setLoadingLocation] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const { queueUpload } = useUploadManager()
 
     const isRangeClaim = impactClaim?.date_range_start && impactClaim?.date_range_end && impactClaim.date_range_start !== impactClaim.date_range_end
     const [datePickerValue, setDatePickerValue] = useState<{ singleDate?: string; startDate?: string; endDate?: string }>({})
@@ -195,83 +197,73 @@ export default function EasyEvidenceModal({
             return
         }
 
-        // Validate all files have titles
         const invalidFiles = selectedFiles.filter(f => !f.title.trim())
         if (invalidFiles.length > 0) {
             toast.error('Please enter a title for all files')
             return
         }
 
-        setLoading(true)
         const totalFiles = selectedFiles.length
+        const filesToUpload = [...selectedFiles]
+        const capturedDatePicker = { ...datePickerValue }
+        const capturedImpactClaim = { ...impactClaim }
+        const capturedKpi = { ...kpi }
+        const capturedInitiativeId = initiativeId
+        const capturedOnBatchComplete = onBatchComplete
 
-        try {
-            // Step 1: Upload all files first
-            setUploadProgress(`Uploading ${totalFiles} file${totalFiles > 1 ? 's' : ''}...`)
-            const uploadResults: { file: typeof selectedFiles[0], result: { file_url: string, size: number } }[] = []
-            
-            for (let i = 0; i < totalFiles; i++) {
-                const fileWithType = selectedFiles[i]
-                setUploadProgress(`Uploading file ${i + 1} of ${totalFiles}...`)
-                const uploadResult = await apiService.uploadFile(fileWithType.file)
-                uploadResults.push({ file: fileWithType, result: uploadResult })
-            }
+        // Close modal immediately
+        setSelectedFiles([])
+        setUploadProgress('')
+        setCurrentStep(1)
+        setDatePickerValue({})
+        onClose()
 
-            // Step 2: Create all evidence records (without triggering parent refresh)
-            setUploadProgress(`Creating ${totalFiles} evidence record${totalFiles > 1 ? 's' : ''}...`)
-            
-            for (let i = 0; i < uploadResults.length; i++) {
-                const { file: fileWithType, result: uploadResult } = uploadResults[i]
-                setUploadProgress(`Creating evidence ${i + 1} of ${totalFiles}...`)
+        // Queue all files for background upload, create evidence records when each completes
+        let completedCount = 0
+        filesToUpload.forEach((fileWithType) => {
+            queueUpload({
+                file: fileWithType.file,
+                onComplete: async (result) => {
+                    try {
+                        const evidenceData: CreateEvidenceForm = {
+                            title: fileWithType.title.trim(),
+                            description: fileWithType.description.trim(),
+                            type: fileWithType.type,
+                            date_represented: capturedDatePicker.singleDate || capturedDatePicker.startDate || capturedImpactClaim.date_represented,
+                            date_range_start: capturedDatePicker.startDate,
+                            date_range_end: capturedDatePicker.endDate,
+                            location_ids: capturedImpactClaim.location_id ? [capturedImpactClaim.location_id] : undefined,
+                            kpi_ids: [capturedKpi.id],
+                            kpi_update_ids: [capturedImpactClaim.id],
+                            beneficiary_group_ids: capturedImpactClaim.beneficiary_group_ids?.length > 0
+                                ? capturedImpactClaim.beneficiary_group_ids
+                                : undefined,
+                            initiative_id: capturedInitiativeId,
+                            file_url: result.file_url,
+                            file_urls: [result.file_url],
+                            file_sizes: [result.size]
+                        }
 
-                const evidenceData: CreateEvidenceForm = {
-                    title: fileWithType.title.trim(),
-                    description: fileWithType.description.trim(),
-                    type: fileWithType.type,
-                    date_represented: datePickerValue.singleDate || datePickerValue.startDate || impactClaim.date_represented,
-                    date_range_start: datePickerValue.startDate,
-                    date_range_end: datePickerValue.endDate,
-                    // Use impact claim's location if available (as array for multi-location support)
-                    location_ids: impactClaim.location_id ? [impactClaim.location_id] : undefined,
-                    // Link to the KPI
-                    kpi_ids: [kpi.id],
-                    // Link to the specific impact claim
-                    kpi_update_ids: [impactClaim.id],
-                    // Inherit ben groups from the claim so the link stays valid under scoping rules
-                    beneficiary_group_ids: impactClaim.beneficiary_group_ids?.length > 0
-                        ? impactClaim.beneficiary_group_ids
-                        : undefined,
-                    initiative_id: initiativeId,
-                    file_url: uploadResult.file_url,
-                    // Pass file URLs and sizes as arrays for proper storage tracking
-                    file_urls: [uploadResult.file_url],
-                    file_sizes: [uploadResult.size]
+                        await apiService.createEvidence(evidenceData)
+                        completedCount++
+
+                        if (completedCount === totalFiles) {
+                            toast.success(`Successfully added ${totalFiles} evidence ${totalFiles === 1 ? 'item' : 'items'}!`)
+                            if (capturedOnBatchComplete) {
+                                await capturedOnBatchComplete()
+                            }
+                        }
+                    } catch (err) {
+                        toast.error(`Failed to create evidence for ${fileWithType.file.name}`)
+                    }
+                },
+                onError: (error) => {
+                    if (error.message !== 'Upload cancelled') {
+                        toast.error(`Upload failed for ${fileWithType.file.name}`)
+                    }
                 }
-
-                // Create evidence directly via API (don't trigger parent refresh)
-                await apiService.createEvidence(evidenceData)
-            }
-
-            // Step 3: Trigger single refresh after all evidence is created
-            setUploadProgress('Refreshing...')
-            if (onBatchComplete) {
-                await onBatchComplete()
-            }
-
-            setSelectedFiles([])
-            setUploadProgress('')
-            setCurrentStep(1)
-            setDatePickerValue({})
-
-            toast.success(`Successfully added ${totalFiles} evidence ${totalFiles === 1 ? 'item' : 'items'}!`)
-            onClose()
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to add evidence'
-            toast.error(message)
-        } finally {
-            setLoading(false)
-            setUploadProgress('')
-        }
+            })
+        })
     }
 
     const canProceedToStep2 = selectedFiles.length > 0

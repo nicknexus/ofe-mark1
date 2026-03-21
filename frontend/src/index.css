@@ -485,6 +485,14 @@
     border-radius: 16px !important;
 }
 
+/* Fix backdrop-filter ancestors breaking Leaflet tile rendering on mobile WebKit */
+@media (max-width: 1023px) {
+    .leaflet-container {
+        -webkit-transform: translate3d(0, 0, 0);
+        transform: translate3d(0, 0, 0);
+    }
+}
+
 /* Base leaflet container styling for all maps */
 .leaflet-container {
     width: 100%;

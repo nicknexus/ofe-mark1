@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useUploadManager } from '../../context/UploadContext'
 import { 
     Plus, 
     BookOpen, 
@@ -209,6 +210,7 @@ function MobileStoryForm({ initiativeId, onClose, onSuccess }: StoryFormProps) {
     const [locations, setLocations] = useState<Location[]>([])
     const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const { queueUpload } = useUploadManager()
 
     const [formData, setFormData] = useState({
         title: '',
@@ -240,15 +242,6 @@ function MobileStoryForm({ initiativeId, onClose, onSuccess }: StoryFormProps) {
 
     const handleFileSelect = async (file: File) => {
         setFormData(prev => ({ ...prev, file }))
-        
-        try {
-            const uploadResult = await apiService.uploadFile(file)
-            setFormData(prev => ({ ...prev, media_url: uploadResult.file_url, file: null }))
-            toast.success('File uploaded!')
-        } catch (error) {
-            toast.error('Upload failed')
-            setFormData(prev => ({ ...prev, file: null }))
-        }
     }
 
     const handleSubmit = async () => {
@@ -258,6 +251,43 @@ function MobileStoryForm({ initiativeId, onClose, onSuccess }: StoryFormProps) {
         }
         if (!formData.location_ids || formData.location_ids.length === 0) {
             toast.error('Please select at least one location')
+            return
+        }
+
+        // If there's a file to upload, queue it in background and close immediately
+        if (formData.file) {
+            const capturedFormData = { ...formData }
+            const capturedFile = formData.file
+            const capturedOnSuccess = onSuccess
+
+            onClose()
+
+            queueUpload({
+                file: capturedFile,
+                onComplete: async (result) => {
+                    try {
+                        await apiService.createStory({
+                            title: capturedFormData.title.trim(),
+                            description: capturedFormData.description.trim(),
+                            media_type: capturedFormData.media_type,
+                            media_url: result.file_url,
+                            date_represented: capturedFormData.date_represented,
+                            location_ids: capturedFormData.location_ids,
+                            beneficiary_group_ids: capturedFormData.beneficiary_group_ids,
+                            initiative_id: initiativeId
+                        })
+                        toast.success('Story created!')
+                        capturedOnSuccess()
+                    } catch (err) {
+                        toast.error(`Failed to create story: ${err instanceof Error ? err.message : 'Unknown error'}`)
+                    }
+                },
+                onError: (error) => {
+                    if (error.message !== 'Upload cancelled') {
+                        toast.error(`Upload failed for ${capturedFile.name}`)
+                    }
+                }
+            })
             return
         }
 

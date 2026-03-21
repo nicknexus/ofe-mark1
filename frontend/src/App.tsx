@@ -8,7 +8,9 @@ import { User, SubscriptionStatus } from './types'
 import { TutorialProvider } from './context/TutorialContext'
 import { StorageProvider } from './context/StorageContext'
 import { TeamProvider } from './context/TeamContext'
+import { UploadProvider } from './context/UploadContext'
 import InteractiveTutorial from './components/InteractiveTutorial'
+import FloatingUploadPanel from './components/FloatingUploadPanel'
 import TrialBanner from './components/TrialBanner'
 import MobileApp from './components/MobileApp'
 import { isStandalone as checkStandalone } from './utils/pwa'
@@ -277,20 +279,23 @@ function App() {
         return (
             <Router>
                 <div className="min-h-screen" style={{ backgroundColor: '#F9FAFB' }}>
-                    <StorageProvider>
-                        <TeamProvider>
-                            {showTrialBanner && (
-                                <TrialBanner remainingDays={subscriptionStatus.remainingTrialDays} />
-                            )}
-                            <Routes>
-                                {publicRoutes}
-                                <Route path="/*" element={
-                                    <MobileApp user={user} subscriptionStatus={subscriptionStatus} />
-                                } />
-                            </Routes>
-                            {updateAvailable && <UpdateBanner onRefresh={refreshApp} onDismiss={dismissUpdate} />}
-                        </TeamProvider>
-                    </StorageProvider>
+                    <UploadProvider>
+                        <StorageProvider>
+                            <TeamProvider>
+                                {showTrialBanner && (
+                                    <TrialBanner remainingDays={subscriptionStatus.remainingTrialDays} />
+                                )}
+                                <Routes>
+                                    {publicRoutes}
+                                    <Route path="/*" element={
+                                        <MobileApp user={user} subscriptionStatus={subscriptionStatus} />
+                                    } />
+                                </Routes>
+                                {updateAvailable && <UpdateBanner onRefresh={refreshApp} onDismiss={dismissUpdate} />}
+                            </TeamProvider>
+                        </StorageProvider>
+                        <FloatingUploadPanel />
+                    </UploadProvider>
                     <Toaster position="top-center" />
                 </div>
             </Router>
@@ -488,63 +493,69 @@ function App() {
             return (
                 <Router>
                     <div className="min-h-screen" style={{ backgroundColor: '#F9FAFB' }}>
-                        <StorageProvider>
-                            <TeamProvider>
-                                {showTrialBanner && (
-                                    <TrialBanner
-                                        remainingDays={subscriptionStatus.remainingTrialDays}
-                                    />
-                                )}
-                                <Routes>
-                                    {publicRoutes}
-                                    <Route path="/*" element={
-                                        <MobileApp user={user} subscriptionStatus={subscriptionStatus} />
-                                    } />
-                                </Routes>
-                            </TeamProvider>
-                        </StorageProvider>
+                        <UploadProvider>
+                            <StorageProvider>
+                                <TeamProvider>
+                                    {showTrialBanner && (
+                                        <TrialBanner
+                                            remainingDays={subscriptionStatus.remainingTrialDays}
+                                        />
+                                    )}
+                                    <Routes>
+                                        {publicRoutes}
+                                        <Route path="/*" element={
+                                            <MobileApp user={user} subscriptionStatus={subscriptionStatus} />
+                                        } />
+                                    </Routes>
+                                </TeamProvider>
+                            </StorageProvider>
+                            <FloatingUploadPanel />
+                        </UploadProvider>
                         <Toaster position="top-center" />
                     </div>
                 </Router>
             )
         }
 
-        // Desktop app (completely unchanged)
+        // Desktop app
         return (
             <Router>
-                <StorageProvider>
-                    <TeamProvider>
-                        <TutorialProvider>
-                            {showTrialBanner && (
-                                <TrialBanner
-                                    remainingDays={subscriptionStatus.remainingTrialDays}
-                                />
-                            )}
+                <UploadProvider>
+                    <StorageProvider>
+                        <TeamProvider>
+                            <TutorialProvider>
+                                {showTrialBanner && (
+                                    <TrialBanner
+                                        remainingDays={subscriptionStatus.remainingTrialDays}
+                                    />
+                                )}
 
-                            <Routes>
-                                {publicRoutes}
+                                <Routes>
+                                    {publicRoutes}
 
-                                {/* Invite acceptance page */}
-                                <Route path="/invite/:token" element={<InviteAcceptPage />} />
+                                    {/* Invite acceptance page */}
+                                    <Route path="/invite/:token" element={<InviteAcceptPage />} />
 
-                                {/* Authenticated routes */}
-                                <Route path="/*" element={
-                                    <Layout user={user}>
-                                        <Routes>
-                                            <Route index element={<Dashboard />} />
-                                            <Route path="initiatives/:id" element={<InitiativePage />} />
-                                            <Route path="initiatives/:id/metrics/:kpiId" element={<InitiativePage />} />
-                                            <Route path="account" element={<AccountPage subscriptionStatus={subscriptionStatus} />} />
-                                            <Route path="settings/team" element={<TeamSettingsPage />} />
-                                            <Route path="*" element={<Navigate to="/" replace />} />
-                                        </Routes>
-                                    </Layout>
-                                } />
-                            </Routes>
-                            <InteractiveTutorial />
-                        </TutorialProvider>
-                    </TeamProvider>
-                </StorageProvider>
+                                    {/* Authenticated routes */}
+                                    <Route path="/*" element={
+                                        <Layout user={user}>
+                                            <Routes>
+                                                <Route index element={<Dashboard />} />
+                                                <Route path="initiatives/:id" element={<InitiativePage />} />
+                                                <Route path="initiatives/:id/metrics/:kpiId" element={<InitiativePage />} />
+                                                <Route path="account" element={<AccountPage subscriptionStatus={subscriptionStatus} />} />
+                                                <Route path="settings/team" element={<TeamSettingsPage />} />
+                                                <Route path="*" element={<Navigate to="/" replace />} />
+                                            </Routes>
+                                        </Layout>
+                                    } />
+                                </Routes>
+                                <InteractiveTutorial />
+                            </TutorialProvider>
+                        </TeamProvider>
+                    </StorageProvider>
+                    <FloatingUploadPanel />
+                </UploadProvider>
                 <Toaster position="top-right" />
             </Router>
         )

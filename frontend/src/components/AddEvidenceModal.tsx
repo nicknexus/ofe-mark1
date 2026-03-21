@@ -3,6 +3,7 @@ import { X, Upload, Calendar, Link as LinkIcon, FileText, Camera, DollarSign, Me
 import { CreateEvidenceForm, KPI, KPIWithEvidence, Location, BeneficiaryGroup } from '../types'
 import { apiService } from '../services/api'
 import { formatDate, getLocalDateString } from '../utils'
+import { useUploadManager } from '../context/UploadContext'
 import LocationModal from './LocationModal'
 import DateRangePicker from './DateRangePicker'
 import toast from 'react-hot-toast'
@@ -47,6 +48,7 @@ export default function AddEvidenceModal({
     const [isDragOver, setIsDragOver] = useState(false)
     const [uploadProgress, setUploadProgress] = useState('')
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const { queueUpload } = useUploadManager()
 
     // State for showing matching impact claims
     const [matchingDataPoints, setMatchingDataPoints] = useState<any[]>([])
@@ -354,42 +356,15 @@ export default function AddEvidenceModal({
                 throw new Error('Please upload a file or provide a file URL')
             }
 
-            let finalFileUrl = formData.file_url
-            const fileUrls: string[] = []
-            const fileSizes: number[] = [] // Track file sizes for storage tracking
-
-            // If user selected files, upload all of them
-            if (selectedFiles.length > 0) {
-                setUploadProgress(`Uploading ${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''}...`)
-                for (let i = 0; i < selectedFiles.length; i++) {
-                    setUploadProgress(`Uploading file ${i + 1} of ${selectedFiles.length}...`)
-                    const uploadResult = await apiService.uploadFile(selectedFiles[i])
-                    fileUrls.push(uploadResult.file_url)
-                    fileSizes.push(uploadResult.size) // Store file size for storage tracking
-                    // Keep first file URL for backward compatibility
-                    if (i === 0) {
-                        finalFileUrl = uploadResult.file_url
-                    }
-                }
-                setUploadProgress('Files uploaded successfully!')
-            }
-
-            // Create evidence record with the real file URL(s) and sizes
-            let submitData: any = {
-                ...formData,
-                file_url: finalFileUrl,
-                file_urls: fileUrls.length > 0 ? fileUrls : undefined,
-                file_sizes: fileSizes.length > 0 ? fileSizes : undefined // Pass file sizes for storage tracking
-            }
+            // Build submit data (shared between immediate and background paths)
+            let submitData: any = { ...formData }
 
             // Handle date range logic
             if (datePickerValue.singleDate) {
-                // Single date selected
                 submitData.date_represented = datePickerValue.singleDate
                 submitData.date_range_start = undefined
                 submitData.date_range_end = undefined
             } else if (datePickerValue.startDate && datePickerValue.endDate) {
-                // Date range selected
                 submitData.date_range_start = datePickerValue.startDate
                 submitData.date_range_end = datePickerValue.endDate
                 submitData.date_represented = datePickerValue.startDate
@@ -397,33 +372,88 @@ export default function AddEvidenceModal({
                 throw new Error('Please select a date')
             }
 
-            // Validate at least one location is selected
             if (selectedLocationIds.length === 0) {
                 throw new Error('Please select at least one location')
             }
 
-            // Include selected impact claims for precise linking
-            // Only include kpi_update_ids if it's a new evidence or if editing and user has changed selection
             if (!editData || hasChangedDataPoints) {
                 submitData.kpi_update_ids = selectedUpdateIds
             }
-
-            // Only include kpi_ids if it's a new evidence or if editing and user has changed KPI selection
             if (!editData || hasChangedKPIs) {
                 submitData.kpi_ids = formData.kpi_ids
             }
-
             submitData.location_ids = selectedLocationIds
-
-            // Include beneficiary group links
             if (!editData || hasChangedBeneficiaryGroups) {
                 submitData.beneficiary_group_ids = selectedBeneficiaryGroupIds
             }
 
+            // If there are files to upload, queue them in background and close modal immediately
+            if (selectedFiles.length > 0) {
+                const filesToUpload = [...selectedFiles]
+                const capturedSubmitData = { ...submitData }
+                const capturedOnSubmit = onSubmit
+
+                // Close modal immediately
+                if (!editData) {
+                    setFormData({
+                        title: '',
+                        description: '',
+                        type: 'visual_proof',
+                        date_represented: getLocalDateString(new Date()),
+                        kpi_ids: preSelectedKPIId ? [preSelectedKPIId] : [],
+                        initiative_id: initiativeId
+                    })
+                    setSelectedFiles([])
+                    setDatePickerValue({ singleDate: getLocalDateString(new Date()) })
+                    setSelectedBeneficiaryGroupIds([])
+                }
+                setUploadProgress('')
+                setLoading(false)
+                onClose()
+
+                // Track completed uploads; create evidence record once all are done
+                const fileUrls: string[] = []
+                const fileSizes: number[] = []
+                let completedCount = 0
+
+                filesToUpload.forEach((file, i) => {
+                    queueUpload({
+                        file,
+                        onComplete: (result) => {
+                            fileUrls[i] = result.file_url
+                            fileSizes[i] = result.size
+                            completedCount++
+
+                            if (completedCount === filesToUpload.length) {
+                                const finalData = {
+                                    ...capturedSubmitData,
+                                    file_url: fileUrls[0],
+                                    file_urls: fileUrls,
+                                    file_sizes: fileSizes
+                                }
+                                capturedOnSubmit(finalData).then(() => {
+                                    toast.success('Evidence created successfully!')
+                                }).catch(err => {
+                                    toast.error(`Failed to create evidence: ${err instanceof Error ? err.message : 'Unknown error'}`)
+                                })
+                            }
+                        },
+                        onError: (error) => {
+                            if (error.message !== 'Upload cancelled') {
+                                toast.error(`Upload failed for ${file.name}`)
+                            }
+                        }
+                    })
+                })
+
+                return
+            }
+
+            // No files to upload — just submit directly (URL-only or edit mode)
+            submitData.file_url = formData.file_url
             setUploadProgress(editData ? 'Updating evidence record...' : 'Creating evidence record...')
             await onSubmit(submitData)
 
-            // Reset form only if creating (not editing)
             if (!editData) {
                 setFormData({
                     title: '',

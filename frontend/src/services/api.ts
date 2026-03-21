@@ -418,7 +418,13 @@ class ApiService {
     }
 
     // Evidence endpoints - Direct upload to Supabase (bypasses Vercel size limits)
-    async uploadFile(file: File): Promise<{ file_url: string; size: number }> {
+    async uploadFile(
+        file: File,
+        options?: {
+            onProgress?: (loaded: number, total: number) => void
+            abortSignal?: AbortSignal
+        }
+    ): Promise<{ file_url: string; size: number }> {
         const { data: { session } } = await supabase.auth.getSession()
 
         if (!session) {
@@ -446,18 +452,37 @@ class ApiService {
 
             const { signedUrl, filePath, publicUrl } = await signedUrlResponse.json()
 
-            // Step 2: Upload directly to Supabase Storage (bypasses Vercel!)
-            const uploadResponse = await fetch(signedUrl, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': file.type
-                },
-                body: file
-            })
+            // Step 2: Upload directly to Supabase Storage via XHR for progress tracking
+            await new Promise<void>((resolve, reject) => {
+                const xhr = new XMLHttpRequest()
 
-            if (!uploadResponse.ok) {
-                throw new Error('Direct upload to storage failed')
-            }
+                if (options?.onProgress) {
+                    xhr.upload.addEventListener('progress', (e) => {
+                        if (e.lengthComputable) {
+                            options.onProgress!(e.loaded, e.total)
+                        }
+                    })
+                }
+
+                xhr.addEventListener('load', () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        resolve()
+                    } else {
+                        reject(new Error('Direct upload to storage failed'))
+                    }
+                })
+
+                xhr.addEventListener('error', () => reject(new Error('Upload network error')))
+                xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')))
+
+                if (options?.abortSignal) {
+                    options.abortSignal.addEventListener('abort', () => xhr.abort())
+                }
+
+                xhr.open('PUT', signedUrl)
+                xhr.setRequestHeader('Content-Type', file.type)
+                xhr.send(file)
+            })
 
             // Step 3: Confirm upload with backend (for storage tracking)
             await fetch(`${API_BASE_URL}/api/upload/confirm`, {
@@ -477,6 +502,10 @@ class ApiService {
 
             return { file_url: publicUrl, size: file.size }
         } catch (error) {
+            if ((error as Error).message === 'Upload cancelled') {
+                throw error
+            }
+
             console.warn('Direct upload failed, trying fallback:', error)
 
             // Vercel has a 4.5MB body limit — only attempt fallback for small files
