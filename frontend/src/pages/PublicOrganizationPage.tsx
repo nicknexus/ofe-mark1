@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react'
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, Link } from 'react-router-dom'
 import { 
     Building2, MapPin, BarChart3, ArrowLeft, Globe, 
     BookOpen, FileText, Calendar, ChevronRight, ChevronLeft,
-    TrendingUp, Filter, ChevronDown, X, Target, Image, LineChart
+    TrendingUp, ChevronDown, X, Target, Image, LineChart
 } from 'lucide-react'
 import { 
     publicApi, 
@@ -16,6 +17,7 @@ import {
     OrganizationStats
 } from '../services/publicApi'
 import PublicLoader from '../components/public/PublicLoader'
+import DateRangePicker from '../components/DateRangePicker'
 import { formatDate } from '../utils'
 import {
     AreaChart,
@@ -68,6 +70,10 @@ export default function PublicOrganizationPage() {
     const [startDate, setStartDate] = useState<string>('')
     const [endDate, setEndDate] = useState<string>('')
     const [showInitiativeDropdown, setShowInitiativeDropdown] = useState(false)
+    const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([])
+    const [showLocationDropdown, setShowLocationDropdown] = useState(false)
+    const initiativeBtnRef = useRef<HTMLButtonElement>(null)
+    const locationBtnRef = useRef<HTMLButtonElement>(null)
     
     // Location popups state
     const [activePopups, setActivePopups] = useState<Array<{
@@ -112,11 +118,55 @@ export default function PublicOrganizationPage() {
         }
     }
 
+    // DateRangePicker value adapter
+    const datePickerValue = useMemo(() => {
+        if (startDate && endDate && startDate === endDate) return { singleDate: startDate }
+        if (startDate && endDate) return { startDate, endDate }
+        if (startDate) return { singleDate: startDate }
+        return {}
+    }, [startDate, endDate])
+
+    const handleDateChange = (value: { singleDate?: string; startDate?: string; endDate?: string }) => {
+        if (value.singleDate) {
+            setStartDate(value.singleDate)
+            setEndDate(value.singleDate)
+        } else if (value.startDate && value.endDate) {
+            setStartDate(value.startDate)
+            setEndDate(value.endDate)
+        } else {
+            setStartDate('')
+            setEndDate('')
+        }
+    }
+
+    // Initiatives that operate at any of the selected locations
+    const locationMatchedInitiativeIds = useMemo(() => {
+        if (selectedLocationIds.length === 0) return null
+        const ids = new Set<string>()
+        locations.forEach(loc => {
+            if (loc.id && selectedLocationIds.includes(loc.id) && loc.initiative_id) {
+                ids.add(loc.initiative_id)
+            }
+        })
+        return ids
+    }, [selectedLocationIds, locations])
+
+    // Locations available in the dropdown (scoped by selected initiative)
+    const dropdownLocations = useMemo(() => {
+        if (selectedInitiative !== 'all') {
+            return locations.filter(l => l.initiative_id === selectedInitiative)
+        }
+        return locations
+    }, [locations, selectedInitiative])
+
     // Filter logic
     const filteredMetrics = useMemo(() => {
         let filtered = metrics
         if (selectedInitiative !== 'all') {
             filtered = filtered.filter(m => m.initiative_id === selectedInitiative)
+        }
+        if (locationMatchedInitiativeIds) {
+            filtered = filtered.filter(m => locationMatchedInitiativeIds.has(m.initiative_id))
         }
         if (startDate || endDate) {
             filtered = filtered.filter(m => {
@@ -140,12 +190,21 @@ export default function PublicOrganizationPage() {
             })
         }
         return filtered
-    }, [metrics, selectedInitiative, startDate, endDate])
+    }, [metrics, selectedInitiative, locationMatchedInitiativeIds, startDate, endDate])
 
     const filteredStories = useMemo(() => {
         let filtered = stories
         if (selectedInitiative !== 'all') {
             filtered = filtered.filter(s => s.initiative_id === selectedInitiative)
+        }
+        if (selectedLocationIds.length > 0) {
+            filtered = filtered.filter(s => {
+                const storyLocIds = s.location_ids || s.locations?.map(l => l.id) || []
+                if (storyLocIds.length > 0) {
+                    return storyLocIds.some(id => id && selectedLocationIds.includes(id))
+                }
+                return locationMatchedInitiativeIds ? locationMatchedInitiativeIds.has(s.initiative_id) : false
+            })
         }
         if (startDate || endDate) {
             filtered = filtered.filter(s => {
@@ -156,14 +215,18 @@ export default function PublicOrganizationPage() {
             })
         }
         return filtered
-    }, [stories, selectedInitiative, startDate, endDate])
+    }, [stories, selectedInitiative, selectedLocationIds, locationMatchedInitiativeIds, startDate, endDate])
 
     const filteredLocations = useMemo(() => {
+        let filtered = locations
         if (selectedInitiative !== 'all') {
-            return locations.filter(l => l.initiative_id === selectedInitiative)
+            filtered = filtered.filter(l => l.initiative_id === selectedInitiative)
         }
-        return locations
-    }, [locations, selectedInitiative])
+        if (selectedLocationIds.length > 0) {
+            filtered = filtered.filter(l => l.id && selectedLocationIds.includes(l.id))
+        }
+        return filtered
+    }, [locations, selectedInitiative, selectedLocationIds])
     
     // Random location popups effect
     useEffect(() => {
@@ -221,11 +284,15 @@ export default function PublicOrganizationPage() {
     }, [activeView, filteredLocations])
 
     const filteredInitiatives = useMemo(() => {
+        let filtered = initiatives
         if (selectedInitiative !== 'all') {
-            return initiatives.filter(i => i.id === selectedInitiative)
+            filtered = filtered.filter(i => i.id === selectedInitiative)
         }
-        return initiatives
-    }, [initiatives, selectedInitiative])
+        if (locationMatchedInitiativeIds) {
+            filtered = filtered.filter(i => locationMatchedInitiativeIds.has(i.id))
+        }
+        return filtered
+    }, [initiatives, selectedInitiative, locationMatchedInitiativeIds])
 
     // Auto-cycle stories
     useEffect(() => {
@@ -240,13 +307,15 @@ export default function PublicOrganizationPage() {
     useEffect(() => {
         setStoryIndex(0)
         setEvidencePage(0)
-    }, [selectedInitiative, startDate, endDate])
+        setHeroInitiativePage(0)
+    }, [selectedInitiative, startDate, endDate, selectedLocationIds])
 
-    const hasActiveFilters = selectedInitiative !== 'all' || startDate || endDate
+    const hasActiveFilters = selectedInitiative !== 'all' || startDate || endDate || selectedLocationIds.length > 0
     const clearFilters = () => {
         setSelectedInitiative('all')
         setStartDate('')
         setEndDate('')
+        setSelectedLocationIds([])
     }
 
     // Current story for carousel
@@ -255,13 +324,15 @@ export default function PublicOrganizationPage() {
     // Brand color with fallback
     const brandColor = organization?.brand_color || '#c0dfa1'
     
-    // Get all impact claims (KPI updates) from metrics, filtered by initiative
     const allImpactClaims = useMemo(() => {
-        const sourceMetrics = selectedInitiative === 'all' 
+        let sourceMetrics = selectedInitiative === 'all' 
             ? metrics 
             : metrics.filter(m => m.initiative_id === selectedInitiative)
+        if (locationMatchedInitiativeIds) {
+            sourceMetrics = sourceMetrics.filter(m => locationMatchedInitiativeIds.has(m.initiative_id))
+        }
         
-        return sourceMetrics.flatMap(m => 
+        let claims = sourceMetrics.flatMap(m => 
             (m.updates || []).map(u => ({
                 ...u,
                 metricTitle: m.title,
@@ -271,13 +342,42 @@ export default function PublicOrganizationPage() {
                 category: m.category
             }))
         ).sort((a, b) => new Date(b.date_represented).getTime() - new Date(a.date_represented).getTime())
-    }, [metrics, selectedInitiative])
 
-    // Filter evidence based on selected initiative
+        if (startDate || endDate) {
+            claims = claims.filter(c => {
+                const claimDate = new Date(c.date_represented)
+                if (startDate && claimDate < new Date(startDate)) return false
+                if (endDate && claimDate > new Date(endDate + 'T23:59:59')) return false
+                return true
+            })
+        }
+        return claims
+    }, [metrics, selectedInitiative, locationMatchedInitiativeIds, startDate, endDate])
+
     const filteredEvidence = useMemo(() => {
-        if (selectedInitiative === 'all') return evidence
-        return evidence.filter(e => e.initiative_id === selectedInitiative)
-    }, [evidence, selectedInitiative])
+        let filtered = evidence
+        if (selectedInitiative !== 'all') {
+            filtered = filtered.filter(e => e.initiative_id === selectedInitiative)
+        }
+        if (selectedLocationIds.length > 0) {
+            filtered = filtered.filter(e => {
+                if (e.locations && e.locations.length > 0) {
+                    return e.locations.some(loc => selectedLocationIds.includes(loc.id))
+                }
+                return locationMatchedInitiativeIds ? locationMatchedInitiativeIds.has(e.initiative_id!) : true
+            })
+        }
+        if (startDate || endDate) {
+            filtered = filtered.filter(e => {
+                if (!e.date_represented) return true
+                const evDate = new Date(e.date_represented)
+                if (startDate && evDate < new Date(startDate)) return false
+                if (endDate && evDate > new Date(endDate + 'T23:59:59')) return false
+                return true
+            })
+        }
+        return filtered
+    }, [evidence, selectedInitiative, selectedLocationIds, locationMatchedInitiativeIds, startDate, endDate])
     
     // Evidence pagination (must be after filteredEvidence)
     const evidencePerPage = 4
@@ -471,90 +571,193 @@ export default function PublicOrganizationPage() {
                 }}
             />
             
-            {/* Compact Header */}
+            {/* Header with Filters */}
             <header className="flex-shrink-0 bg-white/60 backdrop-blur-2xl border-b border-white/40 shadow-sm z-50 relative">
-                <div className="px-3 md:px-4 py-2">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
-                            <Link to="/explore" className="flex items-center gap-1 md:gap-1.5 text-muted-foreground hover:text-accent transition-colors flex-shrink-0">
+                <div className="px-3 md:px-4 py-1.5">
+                    <div className="flex items-center gap-2">
+                        {/* Left: Nav + Org */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <Link to="/explore" className="flex items-center gap-1 text-muted-foreground hover:text-accent transition-colors flex-shrink-0">
                                 <ArrowLeft className="w-4 h-4" />
-                                <span className="text-xs font-medium hidden sm:inline">Explore</span>
                             </Link>
-                            <div className="h-5 w-px bg-gray-200 hidden sm:block" />
-                            <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg flex items-center justify-center overflow-hidden bg-white shadow-md border border-gray-200/50 flex-shrink-0">
-                                    {organization.logo_url ? (
-                                        <img src={organization.logo_url} alt={organization.name} className="w-full h-full object-cover" />
-                                    ) : (
-                                        <Building2 className="w-4 h-4 text-gray-400" />
-                                    )}
-                                </div>
-                                <div className="min-w-0">
-                                    <h1 className="text-xs md:text-sm font-semibold text-foreground truncate">{organization.name}</h1>
-                                </div>
-                            </div>
-                            
-                            {/* Initiative Filter - Inline (hidden on mobile) */}
-                            <div className="relative ml-2 md:ml-4 hidden md:block">
-                                <button
-                                    onClick={() => setShowInitiativeDropdown(!showInitiativeDropdown)}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all ${
-                                        selectedInitiative !== 'all'
-                                            ? 'bg-gray-800 text-white border-gray-800'
-                                            : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
-                                    }`}
-                                >
-                                    <Filter className="w-3 h-3" />
-                                    <span className="max-w-[120px] truncate">
-                                        {selectedInitiative === 'all' ? 'All Initiatives' : initiatives.find(i => i.id === selectedInitiative)?.title || 'Select'}
-                                    </span>
-                                    <ChevronDown className="w-3 h-3" />
-                                </button>
-                                
-                                {showInitiativeDropdown && (
-                                    <>
-                                        <div className="fixed inset-0 z-40" onClick={() => setShowInitiativeDropdown(false)} />
-                                        <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-2 max-h-64 overflow-y-auto">
-                                            <button
-                                                onClick={() => { setSelectedInitiative('all'); setShowInitiativeDropdown(false) }}
-                                                className={`w-full px-4 py-2 text-left text-sm hover:bg-accent/10 ${
-                                                    selectedInitiative === 'all' ? 'bg-accent/10 text-accent font-medium' : 'text-foreground'
-                                                }`}
-                                            >
-                                                All Initiatives
-                                            </button>
-                                            {initiatives.map(init => (
-                                                <button
-                                                    key={init.id}
-                                                    onClick={() => { setSelectedInitiative(init.id); setShowInitiativeDropdown(false) }}
-                                                    className={`w-full px-4 py-2 text-left text-sm hover:bg-accent/10 ${
-                                                        selectedInitiative === init.id ? 'bg-accent/10 text-accent font-medium' : 'text-foreground'
-                                                    }`}
-                                                >
-                                                    <span className="truncate">{init.title}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </>
+                            <div className="w-7 h-7 rounded-lg flex items-center justify-center overflow-hidden bg-white shadow-md border border-gray-200/50 flex-shrink-0">
+                                {organization.logo_url ? (
+                                    <img src={organization.logo_url} alt={organization.name} className="w-full h-full object-cover" />
+                                ) : (
+                                    <Building2 className="w-4 h-4 text-gray-400" />
                                 )}
                             </div>
-                            
+                            <h1 className="text-xs font-semibold text-foreground truncate max-w-[100px] md:max-w-[160px] hidden sm:block">{organization.name}</h1>
+                        </div>
+
+                        {/* Center: Filters */}
+                        <div className="flex items-center gap-1.5 flex-1 overflow-x-auto scrollbar-none">
+                            <button
+                                ref={initiativeBtnRef}
+                                onClick={() => { setShowInitiativeDropdown(!showInitiativeDropdown); setShowLocationDropdown(false) }}
+                                className="flex items-center pl-0 pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
+                            >
+                                <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
+                                    <Target className="w-3.5 h-3.5 text-gray-600" />
+                                </div>
+                                <span className={`ml-1.5 max-w-[90px] md:max-w-[120px] truncate ${selectedInitiative !== 'all' ? 'text-gray-900' : 'text-gray-500'}`}>
+                                    {selectedInitiative === 'all' ? 'Initiative' : initiatives.find(i => i.id === selectedInitiative)?.title || 'Select'}
+                                </span>
+                                {selectedInitiative !== 'all' ? (
+                                    <X className="w-3 h-3 text-gray-400 hover:text-gray-600 ml-1" onClick={(e) => { e.stopPropagation(); setSelectedInitiative('all') }} />
+                                ) : (
+                                    <ChevronDown className="w-3 h-3 text-gray-400 ml-0.5" />
+                                )}
+                            </button>
+
+                            <div className="flex-shrink-0">
+                                <DateRangePicker
+                                    value={datePickerValue.singleDate || datePickerValue.startDate ? datePickerValue : undefined}
+                                    onChange={handleDateChange}
+                                    placeholder="Date"
+                                    className="[&>button]:h-7 [&>button]:text-[11px] [&>button]:pr-2.5 [&>button>div]:w-7 [&>button>div]:h-7 [&>button>div>svg]:w-3.5 [&>button>div>svg]:h-3.5 [&>button>span]:ml-1.5"
+                                />
+                            </div>
+
+                            {locations.length > 0 && (
+                                <button
+                                    ref={locationBtnRef}
+                                    onClick={() => { setShowLocationDropdown(!showLocationDropdown); setShowInitiativeDropdown(false) }}
+                                    className="flex items-center pl-0 pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
+                                >
+                                    <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
+                                        <MapPin className="w-3.5 h-3.5 text-gray-600" />
+                                    </div>
+                                    <span className={`ml-1.5 max-w-[90px] md:max-w-[120px] truncate ${selectedLocationIds.length > 0 ? 'text-gray-900' : 'text-gray-500'}`}>
+                                        {selectedLocationIds.length > 0
+                                            ? `${selectedLocationIds.length} location${selectedLocationIds.length > 1 ? 's' : ''}`
+                                            : 'Location'
+                                        }
+                                    </span>
+                                    {selectedLocationIds.length > 0 ? (
+                                        <X className="w-3 h-3 text-gray-400 hover:text-gray-600 ml-1" onClick={(e) => { e.stopPropagation(); setSelectedLocationIds([]) }} />
+                                    ) : (
+                                        <ChevronDown className="w-3 h-3 text-gray-400 ml-0.5" />
+                                    )}
+                                </button>
+                            )}
+
                             {hasActiveFilters && (
-                                <button onClick={clearFilters} className="hidden md:flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                                    <X className="w-3 h-3" /> Clear
+                                <button
+                                    onClick={clearFilters}
+                                    className="flex items-center gap-0.5 px-1.5 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                                >
+                                    <X className="w-2.5 h-2.5" /> Clear
                                 </button>
                             )}
                         </div>
-                        
+
+                        {/* Right: Nexus Logo */}
                         <Link to="/" className="flex items-center gap-2 flex-shrink-0">
                             <div className="w-6 h-6 rounded-lg overflow-hidden">
                                 <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
                             </div>
-                            <span className="text-sm font-newsreader font-extralight text-foreground hidden md:block">Nexus Impacts</span>
+                            <span className="text-sm font-newsreader font-extralight text-foreground hidden lg:block">Nexus Impacts</span>
                         </Link>
                     </div>
                 </div>
             </header>
+
+            {/* Initiative Dropdown Portal */}
+            {showInitiativeDropdown && createPortal(
+                <>
+                    <div className="fixed inset-0 z-[9998]" onClick={() => setShowInitiativeDropdown(false)} />
+                    <div
+                        className="fixed w-64 bg-white rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] border border-gray-100 z-[9999] py-1 max-h-64 overflow-y-auto"
+                        style={(() => {
+                            const rect = initiativeBtnRef.current?.getBoundingClientRect()
+                            if (!rect) return {}
+                            return { top: rect.bottom + 4, left: Math.max(8, Math.min(rect.left, window.innerWidth - 272)) }
+                        })()}
+                    >
+                        <button
+                            onClick={() => { setSelectedInitiative('all'); setShowInitiativeDropdown(false) }}
+                            className={`w-full px-3 py-2 text-left text-sm hover:bg-accent/10 ${
+                                selectedInitiative === 'all' ? 'bg-accent/10 text-accent font-medium' : 'text-foreground'
+                            }`}
+                        >
+                            All Initiatives
+                        </button>
+                        {initiatives.map(init => (
+                            <button
+                                key={init.id}
+                                onClick={() => { setSelectedInitiative(init.id); setShowInitiativeDropdown(false) }}
+                                className={`w-full px-3 py-2 text-left text-sm hover:bg-accent/10 truncate ${
+                                    selectedInitiative === init.id ? 'bg-accent/10 text-accent font-medium' : 'text-foreground'
+                                }`}
+                            >
+                                {init.title}
+                            </button>
+                        ))}
+                    </div>
+                </>,
+                document.body
+            )}
+
+            {/* Location Dropdown Portal */}
+            {showLocationDropdown && createPortal(
+                <>
+                    <div className="fixed inset-0 z-[9998]" onClick={() => setShowLocationDropdown(false)} />
+                    <div
+                        className="fixed w-64 bg-white rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] border border-gray-100 z-[9999] py-1 max-h-64 overflow-y-auto"
+                        style={(() => {
+                            const rect = locationBtnRef.current?.getBoundingClientRect()
+                            if (!rect) return {}
+                            return { top: rect.bottom + 4, left: Math.max(8, Math.min(rect.left, window.innerWidth - 272)) }
+                        })()}
+                    >
+                        {selectedLocationIds.length > 0 && (
+                            <button
+                                onClick={() => setSelectedLocationIds([])}
+                                className="w-full px-3 py-2 text-left text-xs text-muted-foreground hover:bg-gray-50 border-b border-gray-100"
+                            >
+                                Clear location filter
+                            </button>
+                        )}
+                        {dropdownLocations.map(loc => {
+                            const isSelected = selectedLocationIds.includes(loc.id)
+                            return (
+                                <button
+                                    key={loc.id}
+                                    onClick={() => {
+                                        setSelectedLocationIds(prev =>
+                                            isSelected
+                                                ? prev.filter(id => id !== loc.id)
+                                                : [...prev, loc.id]
+                                        )
+                                    }}
+                                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${
+                                        isSelected ? 'bg-blue-50 font-medium' : 'hover:bg-gray-50'
+                                    }`}
+                                >
+                                    <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
+                                        isSelected ? 'bg-blue-600 border-2 border-blue-600' : 'border-2 border-gray-300 bg-white'
+                                    }`}>
+                                        {isSelected && (
+                                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        )}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <span className={`truncate block ${isSelected ? 'text-blue-700' : 'text-gray-900'}`}>{loc.name}</span>
+                                        {loc.country && <span className="text-[10px] text-gray-500">{loc.country}</span>}
+                                    </div>
+                                </button>
+                            )
+                        })}
+                        {dropdownLocations.length === 0 && (
+                            <div className="px-3 py-4 text-center text-xs text-muted-foreground">No locations available</div>
+                        )}
+                    </div>
+                </>,
+                document.body
+            )}
 
             {/* Organization Hero Section */}
             <div className="flex flex-col md:flex-row relative z-20">
