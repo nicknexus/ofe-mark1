@@ -128,17 +128,19 @@ async function syncSubscriptionFromStripe(userId: string, stripeSubscriptionId: 
         const cancelAtPeriodEnd =
             sub.cancel_at_period_end === true ||
             (!!sub.cancel_at && sub.status === 'active');
-        const periodEnd = sub.current_period_end || sub.cancel_at;
+        const item = sub.items?.data?.[0];
+        const rawPeriodStart = sub.current_period_start ?? item?.current_period_start;
+        const rawPeriodEnd = sub.current_period_end ?? item?.current_period_end ?? sub.cancel_at;
         await SubscriptionService.updateFromStripe(userId, {
             status,
             cancel_at_period_end: cancelAtPeriodEnd,
-            ...(sub.current_period_start && { current_period_start: new Date(sub.current_period_start * 1000).toISOString() }),
-            ...(periodEnd && { current_period_end: new Date(periodEnd * 1000).toISOString() }),
+            ...(rawPeriodStart && { current_period_start: new Date(rawPeriodStart * 1000).toISOString() }),
+            ...(rawPeriodEnd && { current_period_end: new Date(rawPeriodEnd * 1000).toISOString() }),
             ...(status === 'cancelled' && { cancelled_at: new Date().toISOString() }),
             ...(status === 'active' && { cancelled_at: null }),
         });
     } catch (e) {
-        console.warn('Sync from Stripe failed:', (e as Error).message);
+        console.error('Sync from Stripe failed:', (e as Error).message);
     }
 }
 
@@ -346,16 +348,18 @@ router.post('/webhook', async (req: Request, res: Response) => {
                 const userId = session.metadata?.user_id;
 
                 if (userId && session.subscription) {
-                    // Get subscription details from Stripe
                     const stripeSubscription = await stripe.subscriptions.retrieve(
                         session.subscription as string
                     ) as any;
 
-                    const periodStart = stripeSubscription.current_period_start
-                        ? new Date(stripeSubscription.current_period_start * 1000).toISOString()
+                    const item = stripeSubscription.items?.data?.[0];
+                    const rawPeriodStart = stripeSubscription.current_period_start ?? item?.current_period_start;
+                    const rawPeriodEnd = stripeSubscription.current_period_end ?? item?.current_period_end;
+                    const periodStart = rawPeriodStart
+                        ? new Date(rawPeriodStart * 1000).toISOString()
                         : new Date().toISOString();
-                    const periodEnd = stripeSubscription.current_period_end
-                        ? new Date(stripeSubscription.current_period_end * 1000).toISOString()
+                    const periodEnd = rawPeriodEnd
+                        ? new Date(rawPeriodEnd * 1000).toISOString()
                         : new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString();
 
                     const actualPriceId = stripeSubscription.items?.data?.[0]?.price?.id || STRIPE_CONFIG.STARTER_PRICE_ID;
@@ -388,12 +392,20 @@ router.post('/webhook', async (req: Request, res: Response) => {
                 if (!userId) {
                     userId = await SubscriptionService.getUserIdByStripeSubscriptionId(subscription.id) ?? undefined;
                 }
+
+                // Period dates moved to subscription item level in newer Stripe API versions
+                const item = subscription.items?.data?.[0];
+                const rawPeriodStart = subscription.current_period_start ?? item?.current_period_start;
+                const rawPeriodEnd = subscription.current_period_end ?? item?.current_period_end ?? subscription.cancel_at;
+
                 console.log('[webhook] customer.subscription.updated', {
                     subscriptionId: subscription.id,
                     status: subscription.status,
                     cancel_at_period_end: subscription.cancel_at_period_end,
                     hasUserId: !!userId,
                     metadata: subscription.metadata,
+                    rawPeriodStart,
+                    rawPeriodEnd,
                 });
                 if (userId) {
                     const status = subscription.status === 'active' ? 'active'
@@ -401,14 +413,13 @@ router.post('/webhook', async (req: Request, res: Response) => {
                             : subscription.status === 'canceled' ? 'cancelled'
                                 : 'active';
 
-                    const periodStart = subscription.current_period_start
-                        ? new Date(subscription.current_period_start * 1000).toISOString()
+                    const periodStart = rawPeriodStart
+                        ? new Date(rawPeriodStart * 1000).toISOString()
                         : undefined;
-                    const periodEnd = (subscription.current_period_end || subscription.cancel_at)
-                        ? new Date((subscription.current_period_end || subscription.cancel_at) * 1000).toISOString()
+                    const periodEnd = rawPeriodEnd
+                        ? new Date(rawPeriodEnd * 1000).toISOString()
                         : undefined;
 
-                    // Billing Portal sets cancel_at (timestamp) but can leave cancel_at_period_end false
                     const cancelAtPeriodEnd =
                         subscription.cancel_at_period_end === true ||
                         (!!subscription.cancel_at && subscription.status === 'active');
@@ -422,7 +433,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
                         ...(status === 'active' && { cancelled_at: null }),
                     });
 
-                    console.log(`✅ Subscription updated for user ${userId}: ${status}, cancel_at_period_end=${cancelAtPeriodEnd}`);
+                    console.log(`✅ Subscription updated for user ${userId}: ${status}, cancel_at_period_end=${cancelAtPeriodEnd}, periodEnd=${periodEnd}`);
                 }
                 break;
             }

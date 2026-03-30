@@ -1,6 +1,6 @@
 import { supabase } from '../utils/supabase';
 import { TeamService } from './teamService';
-import { PLAN_LIMITS } from '../utils/stripe';
+import { PLAN_LIMITS, stripe } from '../utils/stripe';
 
 export interface Subscription {
     id: string;
@@ -164,15 +164,22 @@ export class SubscriptionService {
                 break;
 
             case 'active':
-                // Check if still in paid period
                 if (subscription.current_period_end && new Date(subscription.current_period_end) > new Date()) {
                     return { hasAccess: true, reason: 'subscription_active', subscription };
                 }
-                // Period ended (webhook may have been missed) - revoke access and mark expired
-                subscription = await this.updateFromStripe(userId, {
-                    status: 'expired',
-                    cancelled_at: subscription.current_period_end || new Date().toISOString(),
-                });
+                // Period ended — try syncing from Stripe before giving up (webhook may have been missed)
+                if (subscription.stripe_subscription_id) {
+                    subscription = await this.syncFromStripeDirectly(userId, subscription.stripe_subscription_id);
+                    if (subscription.status === 'active' && subscription.current_period_end && new Date(subscription.current_period_end) > new Date()) {
+                        return { hasAccess: true, reason: 'subscription_active', subscription };
+                    }
+                }
+                if (subscription.status === 'active') {
+                    subscription = await this.updateFromStripe(userId, {
+                        status: 'expired',
+                        cancelled_at: subscription.current_period_end || new Date().toISOString(),
+                    });
+                }
                 break;
 
             case 'past_due':
@@ -187,10 +194,18 @@ export class SubscriptionService {
                 // Check inherited access
                 break;
 
-            case 'none':
             case 'expired':
+                // If there's a Stripe subscription, re-check — it may have been renewed
+                if (subscription.stripe_subscription_id) {
+                    subscription = await this.syncFromStripeDirectly(userId, subscription.stripe_subscription_id);
+                    if (subscription.status === 'active' && subscription.current_period_end && new Date(subscription.current_period_end) > new Date()) {
+                        return { hasAccess: true, reason: 'subscription_active', subscription };
+                    }
+                }
+                break;
+
+            case 'none':
             default:
-                // Check inherited access
                 break;
         }
 
@@ -424,6 +439,38 @@ export class SubscriptionService {
     static async canCreateInitiative(userId: string): Promise<boolean> {
         const usage = await this.getInitiativesUsage(userId);
         return usage.canCreate;
+    }
+
+    /**
+     * Sync subscription directly from Stripe API. Returns the updated local subscription.
+     * Falls back to returning the existing subscription if Stripe call fails.
+     */
+    static async syncFromStripeDirectly(userId: string, stripeSubscriptionId: string): Promise<Subscription> {
+        if (!stripe) {
+            return await this.getOrCreate(userId);
+        }
+        try {
+            const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId) as any;
+            const status: Subscription['status'] = sub.status === 'active' ? 'active'
+                : sub.status === 'past_due' ? 'past_due'
+                    : sub.status === 'canceled' || sub.status === 'unpaid' ? 'cancelled'
+                        : 'active';
+            const item = sub.items?.data?.[0];
+            const rawPeriodStart = sub.current_period_start ?? item?.current_period_start;
+            const rawPeriodEnd = sub.current_period_end ?? item?.current_period_end ?? sub.cancel_at;
+            const updated = await this.updateFromStripe(userId, {
+                status,
+                ...(rawPeriodStart && { current_period_start: new Date(rawPeriodStart * 1000).toISOString() }),
+                ...(rawPeriodEnd && { current_period_end: new Date(rawPeriodEnd * 1000).toISOString() }),
+                ...(status === 'cancelled' && { cancelled_at: new Date().toISOString() }),
+                ...(status === 'active' && { cancelled_at: null }),
+            });
+            console.log(`[syncFromStripeDirectly] Synced subscription for user ${userId}: status=${status}`);
+            return updated;
+        } catch (e) {
+            console.error(`[syncFromStripeDirectly] Failed for user ${userId}:`, (e as Error).message);
+            return await this.getOrCreate(userId);
+        }
     }
 
     /**
