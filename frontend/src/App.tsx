@@ -226,6 +226,44 @@ function App() {
             return <PWALoadingScreen />
         }
 
+        // Gate: Subscription check failed — show retry, not trial/signup
+        if (subscriptionStatus.reason === 'error') {
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
+                    <div className="text-center max-w-md mx-auto">
+                        <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-amber-100 flex items-center justify-center">
+                            <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                            </svg>
+                        </div>
+                        <h2 className="text-xl font-bold text-gray-900 mb-2">Connection Issue</h2>
+                        <p className="text-gray-600 mb-6">
+                            We couldn't verify your account right now. This is usually caused by a weak connection — your account is fine.
+                        </p>
+                        <button
+                            onClick={() => {
+                                setSubscriptionStatus(null)
+                                checkedUserIdRef.current = null
+                                checkSubscription(true)
+                            }}
+                            className="px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-colors shadow-lg shadow-primary-500/25"
+                        >
+                            Try Again
+                        </button>
+                        <button
+                            onClick={async () => {
+                                await AuthService.signOut()
+                                setUser(null)
+                            }}
+                            className="block mx-auto mt-4 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                        >
+                            Sign out
+                        </button>
+                    </div>
+                </div>
+            )
+        }
+
         // Gate: No subscription — check for pending invites / trial
         if (subscriptionStatus.subscription.status === 'none' && !subscriptionStatus.hasAccess) {
             if (pendingInvite === null && !checkingPendingInvite) {
@@ -393,6 +431,44 @@ function App() {
             )
         }
 
+        // Subscription check failed (network error, bad wifi, etc.) — show retry, not trial/signup
+        if (subscriptionStatus.reason === 'error') {
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                    <div className="text-center max-w-md mx-auto px-6">
+                        <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-amber-100 flex items-center justify-center">
+                            <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                            </svg>
+                        </div>
+                        <h2 className="text-xl font-bold text-gray-900 mb-2">Connection Issue</h2>
+                        <p className="text-gray-600 mb-6">
+                            We couldn't verify your account right now. This is usually caused by a weak connection — your account is fine.
+                        </p>
+                        <button
+                            onClick={() => {
+                                setSubscriptionStatus(null)
+                                checkedUserIdRef.current = null
+                                checkSubscription(true)
+                            }}
+                            className="px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-colors shadow-lg shadow-primary-500/25"
+                        >
+                            Try Again
+                        </button>
+                        <button
+                            onClick={async () => {
+                                await AuthService.signOut()
+                                setUser(null)
+                            }}
+                            className="block mx-auto mt-4 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                        >
+                            Sign out
+                        </button>
+                    </div>
+                </div>
+            )
+        }
+
         // User has no own subscription (status is 'none') but might have inherited access
         // or a pending team invitation
         if (subscriptionStatus.subscription.status === 'none') {
@@ -551,6 +627,7 @@ function App() {
                                     } />
                                 </Routes>
                                 <InteractiveTutorial />
+                                {updateAvailable && <UpdateBanner onRefresh={refreshApp} onDismiss={dismissUpdate} />}
                             </TutorialProvider>
                         </TeamProvider>
                     </StorageProvider>
