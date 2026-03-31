@@ -41,15 +41,12 @@ import StoriesTab from '../components/InitiativeTabs/StoriesTab'
 import ReportTab from '../components/InitiativeTabs/ReportTab'
 import MobileBottomNav from '../components/MobileBottomNav'
 import toast from 'react-hot-toast'
-import { useTutorial } from '../context/TutorialContext'
-
 export default function InitiativePage() {
     const [user, setUser] = useState<User | null>(null)
     const [organization, setOrganization] = useState<Organization | null>(null)
     const { id, kpiId } = useParams<{ id: string; kpiId?: string }>()
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
-    const { isActive: isTutorialActive, currentStep, advanceStep, tutorialData, setTutorialData } = useTutorial()
     const [dashboard, setDashboard] = useState<InitiativeDashboard | null>(null)
     const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: true })
     const [isLoadingDashboard, setIsLoadingDashboard] = useState(false)
@@ -75,28 +72,6 @@ export default function InitiativePage() {
 
     // Selected KPI for modals
     const [selectedKPI, setSelectedKPI] = useState<any>(null)
-
-    // Handle tutorial navigation and tab switching
-    useEffect(() => {
-        if (isTutorialActive && id) {
-            // Set initiative ID in tutorial data if not already set
-            if (!tutorialData.initiativeId) {
-                setTutorialData({ initiativeId: id })
-            }
-            
-            // Navigate to correct tab based on tutorial step
-            // Note: go-to-metrics and go-to-home steps should NOT auto-navigate - user clicks the tab
-            if ((currentStep === 'explain-locations' || currentStep === 'create-location' || currentStep === 'location-created') && activeTab !== 'location') {
-                setActiveTab('location')
-            } else if ((currentStep === 'explain-metrics' || currentStep === 'create-metric' ||
-                        currentStep === 'create-impact-claim' || currentStep === 'impact-claim-created' ||
-                        currentStep === 'explain-metric-detail' || currentStep === 'create-evidence') && activeTab !== 'metrics') {
-                setActiveTab('metrics')
-            } else if (currentStep === 'explain-home' && activeTab !== 'home') {
-                setActiveTab('home')
-            }
-        }
-    }, [isTutorialActive, currentStep, id, activeTab, tutorialData.initiativeId])
 
     // Handle URL query param for tab
     useEffect(() => {
@@ -232,12 +207,6 @@ export default function InitiativePage() {
                     return newSet
                 })
 
-                // Advance tutorial if on create-metric step
-                if (isTutorialActive && currentStep === 'create-metric') {
-                    // Advance to explain-metric-detail step
-                    advanceStep({ metricId: newKPI.id })
-                    setSelectedKPI(newKPI)
-                }
             }
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to create metric'
@@ -307,10 +276,6 @@ export default function InitiativePage() {
                 loadDashboard() // Refresh the dashboard
             }
 
-            // Advance tutorial if on create-impact-claim step (goes to impact-claim-created celebration)
-            if (isTutorialActive && currentStep === 'create-impact-claim') {
-                advanceStep({ impactClaimId: newUpdate?.id })
-            }
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to add impact claim'
             toast.error(message)
@@ -350,10 +315,6 @@ export default function InitiativePage() {
                 loadDashboard() // Refresh the dashboard
             }
 
-            // Advance tutorial if on create-evidence step (goes to go-to-home step)
-            if (isTutorialActive && currentStep === 'create-evidence') {
-                advanceStep()
-            }
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to add evidence'
             toast.error(message)

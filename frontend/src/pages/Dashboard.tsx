@@ -22,7 +22,7 @@ import { useTeam } from '../context/TeamContext'
 
 export default function Dashboard() {
     const navigate = useNavigate()
-    const { isActive: isTutorialActive, currentStep, advanceStep, startTutorial } = useTutorial()
+    const { startTutorial } = useTutorial()
     const { isOwner, isSharedMember, organizationName } = useTeam()
     const [initiatives, setInitiatives] = useState<Initiative[]>([])
     const [allKPIs, setAllKPIs] = useState<KPI[]>([])
@@ -146,12 +146,6 @@ export default function Dashboard() {
             // Only refresh initiatives, not all data
             await refreshInitiatives()
 
-            // If tutorial is active and on create-initiative step, advance to next step
-            if (isTutorialActive && currentStep === 'create-initiative' && newInitiative?.id) {
-                advanceStep({ initiativeId: newInitiative.id })
-                // Navigate to the new initiative
-                navigate(`/initiatives/${newInitiative.id}`)
-            }
         } catch (error: any) {
             // Check if it's an initiative limit error
             if (error?.code === 'INITIATIVE_LIMIT_REACHED' || error?.message?.includes('Initiative limit reached')) {
@@ -285,7 +279,6 @@ export default function Dashboard() {
                                     {isOwner && (
                                         <button
                                             onClick={() => setShowCreateModal(true)}
-                                            data-tutorial="create-initiative"
                                             className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-all duration-200 flex items-center gap-1.5 shadow-bubble-sm"
                                         >
                                             <Plus className="w-4 h-4" />

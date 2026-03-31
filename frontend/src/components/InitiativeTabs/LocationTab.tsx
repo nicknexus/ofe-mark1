@@ -7,7 +7,6 @@ import LocationMap from '../LocationMap'
 import LocationModal from '../LocationModal'
 import LocationDetailsModal from '../LocationDetailsModal'
 import toast from 'react-hot-toast'
-import { useTutorial } from '../../context/TutorialContext'
 import {
     DndContext,
     closestCenter,
@@ -131,7 +130,6 @@ interface LocationTabProps {
 
 export default function LocationTab({ onStoryClick, onMetricClick }: LocationTabProps) {
     const { id: initiativeId } = useParams<{ id: string }>()
-    const { isActive: isTutorialActive, currentStep, advanceStep } = useTutorial()
     const [locations, setLocations] = useState<Location[]>([])
     const [orderedLocations, setOrderedLocations] = useState<Location[]>([])
     const [loading, setLoading] = useState(true)
@@ -235,10 +233,6 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
             setSelectedLocation(null)
             setMapClickCoordinates(null)
 
-            // Advance tutorial if on create-location step (goes to location-created celebration)
-            if (isTutorialActive && currentStep === 'create-location') {
-                advanceStep({ locationId: newLocation?.id })
-            }
         } catch (error) {
             throw error
         }
@@ -338,7 +332,6 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
                         </div>
                         <button
                             onClick={handleAddClick}
-                            data-tutorial="add-location"
                             className="inline-flex items-center space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl sm:rounded-2xl text-sm font-medium transition-all duration-200 shadow-bubble-sm"
                         >
                             <Plus className="w-4 h-4" />

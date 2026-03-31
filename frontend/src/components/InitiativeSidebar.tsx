@@ -54,55 +54,13 @@ export default function InitiativeSidebar({
         }
     }, [])
     const tabs = [
-        {
-            id: 'home',
-            label: 'Home',
-            icon: Home,
-            description: 'Overview',
-            tutorialId: 'home-tab'
-        },
-        {
-            id: 'metrics',
-            label: 'Metrics',
-            icon: BarChart3,
-            description: 'Track metrics',
-            tutorialId: 'metrics-tab'
-        },
-        {
-            id: 'evidence',
-            label: 'Evidence',
-            icon: FileText,
-            description: 'Evidence Library',
-            tutorialId: 'evidence-tab'
-        },
-        {
-            id: 'location',
-            label: 'Location',
-            icon: MapPin,
-            description: 'Locations',
-            tutorialId: 'locations-tab'
-        },
-        {
-            id: 'beneficiaries',
-            label: 'Beneficiaries',
-            icon: Users,
-            description: 'People Management',
-            tutorialId: undefined
-        },
-        {
-            id: 'stories',
-            label: 'Stories',
-            icon: BookOpen,
-            description: 'Impact Stories',
-            tutorialId: undefined
-        },
-        {
-            id: 'report',
-            label: 'AI Report',
-            icon: Sparkles,
-            description: 'Generate Impact Report',
-            tutorialId: undefined
-        }
+        { id: 'home', label: 'Home', icon: Home, description: 'Overview' },
+        { id: 'metrics', label: 'Metrics', icon: BarChart3, description: 'Track metrics' },
+        { id: 'evidence', label: 'Evidence', icon: FileText, description: 'Evidence Library' },
+        { id: 'location', label: 'Location', icon: MapPin, description: 'Locations' },
+        { id: 'beneficiaries', label: 'Beneficiaries', icon: Users, description: 'People Management' },
+        { id: 'stories', label: 'Stories', icon: BookOpen, description: 'Impact Stories' },
+        { id: 'report', label: 'AI Report', icon: Sparkles, description: 'Generate Impact Report' }
     ]
 
     return (
@@ -142,7 +100,6 @@ export default function InitiativeSidebar({
                             <button
                                 key={tab.id}
                                 onClick={() => onTabChange(tab.id)}
-                                data-tutorial={tab.tutorialId}
                                 className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200 border-2 ${isActive
                                     ? 'border-primary-500 bg-white shadow-bubble-sm text-gray-700'
                                     : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-800'

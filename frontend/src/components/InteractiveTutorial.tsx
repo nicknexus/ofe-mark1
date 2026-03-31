@@ -1,626 +1,345 @@
-import React, { useEffect, useState, useRef } from 'react'
-import { X, ChevronRight, Sparkles, MapPin, BarChart3, TrendingUp, FileText, CheckCircle, Rocket, Home, PartyPopper } from 'lucide-react'
-import { useTutorial, TutorialStep } from '../context/TutorialContext'
-import { useNavigate, useLocation } from 'react-router-dom'
+import React, { useEffect, useState } from 'react'
+import { X, ChevronRight, ChevronLeft, Target, BarChart3, TrendingUp, FileText, Link2, Settings, Globe, Sparkles } from 'lucide-react'
+import { useTutorial } from '../context/TutorialContext'
 
-interface StepConfig {
+interface Slide {
     title: string
+    subtitle: string
     description: string
+    bullets: string[]
     icon: React.ComponentType<any>
-    targetSelector?: string
-    action: string
-    showTarget: boolean // Whether to highlight the target element
-    modalGuidance?: string
-    stayOnCurrentTab?: boolean // Don't auto-navigate, let user click
+    image?: string
 }
 
-const STEP_CONFIGS: Record<TutorialStep, StepConfig> = {
-    'welcome': {
-        title: 'Welcome to OFE! 🎉',
-        description: "Let's get you set up with your first impact tracking project. This interactive tutorial will guide you through creating your first initiative, location, metric, impact claim, and evidence.",
-        icon: Sparkles,
-        action: "Click 'Let's Go!' to begin",
-        showTarget: false
+const BRAND = '#c0dfa1'
+const BRAND_DARK = '#90b171'
+
+const SLIDES: Slide[] = [
+    {
+        title: 'Welcome to Nexus Impacts AI',
+        subtitle: '',
+        description: '',
+        bullets: [],
+        icon: Sparkles
     },
-    'explain-dashboard': {
-        title: 'Your Dashboard',
-        description: "This is your main dashboard where you can see all your initiatives at a glance. Initiatives are your main projects or programs - like 'Youth Training 2025' or 'Clean Water Project'.",
-        icon: Home,
-        action: "Click 'Next' to continue",
-        showTarget: false
+    {
+        title: 'Initiatives',
+        subtitle: 'Your Projects & Programs',
+        description: 'Initiatives are the top-level container for everything you do. Think of them as your main projects or programs.',
+        bullets: [
+            'Each initiative has its own metrics, evidence, and reports',
+            'Examples: "Youth Training 2025", "Clean Water Project"',
+            'You can run multiple initiatives at once'
+        ],
+        icon: Target,
+        image: '/initativetut.png'
     },
-    'create-initiative': {
-        title: 'Create Your Initiative',
-        description: 'Now click the "New Initiative" button to create your first project.',
-        icon: Rocket,
-        targetSelector: '[data-tutorial="create-initiative"]',
-        action: 'Click "New Initiative"',
-        showTarget: true,
-        modalGuidance: '📝 Fill in your initiative:\n\n• Title - Name your project\n  (e.g., "Youth Training 2025")\n\n• Description - What does it do?\n\nThen click "Create Initiative"'
-    },
-    'explain-locations': {
-        title: 'Locations Tab 📍',
-        description: "Welcome to the Locations tab! This is where you manage all the geographic places where your impact happens - offices, villages, schools, or any location you work in.",
-        icon: MapPin,
-        targetSelector: '[data-tutorial="locations-tab"]',
-        action: "Click 'Next' to add your first location",
-        showTarget: true
-    },
-    'create-location': {
-        title: 'Add Your First Location',
-        description: 'Click the "Add Location" button to add where your impact happens.',
-        icon: MapPin,
-        targetSelector: '[data-tutorial="add-location"]',
-        action: 'Click "Add Location"',
-        showTarget: true,
-        modalGuidance: '📍 Add your location:\n\n• Search for a place or enter coordinates\n\n• Name - Give it a clear name\n  (e.g., "Main Office", "Village A")\n\nThen click "Create"'
-    },
-    'location-created': {
-        title: 'Great Job! 🎉',
-        description: "You've created your first location! You can see all your locations on the map here. Each location can be linked to your impact claims to show exactly where your work is happening.",
-        icon: PartyPopper,
-        action: "Click 'Next' to continue",
-        showTarget: false
-    },
-    'go-to-metrics': {
-        title: 'Next: Create a Metric',
-        description: "Now let's head to the Metrics tab to define what you want to measure. Click on the Metrics tab in the sidebar.",
+    {
+        title: 'Metrics',
+        subtitle: 'What You Measure',
+        description: 'Metrics are the specific things you want to track — like "People Trained" or "Wells Built". Each metric lives inside an initiative.',
+        bullets: [
+            'Define what you\'re measuring and the unit (people, hours, etc.)',
+            'Categorise as Input, Output, or Impact',
+            'View progress over time with charts'
+        ],
         icon: BarChart3,
-        targetSelector: '[data-tutorial="metrics-tab"]',
-        action: 'Click "Metrics" tab',
-        showTarget: true,
-        stayOnCurrentTab: true
+        image: '/metricstut.png'
     },
-    'explain-metrics': {
-        title: 'Metrics Tab 📊',
-        description: "This is where you define your Key Performance Indicators (KPIs). Metrics track things like 'People Trained', 'Wells Built', or 'Meals Provided'. You can have as many metrics as you need.",
-        icon: BarChart3,
-        action: "Click 'Next' to create your first metric",
-        showTarget: false
-    },
-    'create-metric': {
-        title: 'Create Your First Metric',
-        description: 'Click "Add Metric" to define what you want to track.',
-        icon: BarChart3,
-        targetSelector: '[data-tutorial="add-metric"]',
-        action: 'Click "Add Metric"',
-        showTarget: true,
-        modalGuidance: '📊 Create your metric:\n\n• Title - What are you measuring?\n  (e.g., "People Trained")\n\n• Unit - How do you count it?\n  (e.g., "people", "hours")\n\n• Category - Input, Output, or Impact\n\nThen click "Create Metric"'
-    },
-    'explain-metric-detail': {
-        title: 'Your Metric Dashboard 📈',
-        description: "Great! You can see your impact claim in the chart now. This is your metric's progress over time. Each claim is listed below with its date, value, and location. Now let's add some evidence to prove your work!",
+    {
+        title: 'Impact Claims',
+        subtitle: 'Your Results — Linked by Date & Location',
+        description: 'Impact claims record what you actually achieved. Each claim captures a value, a date (or date range), and a location — this is how everything connects.',
+        bullets: [
+            'Record results: "50 people trained on March 15th in Nairobi"',
+            'Date and location are the link between claims and evidence',
+            'Claims stack up over time to show your total impact'
+        ],
         icon: TrendingUp,
-        action: "Click 'Next' to add evidence",
-        showTarget: false
+        image: '/impactsclaimtut.png'
     },
-    'create-impact-claim': {
-        title: 'Add an Impact Claim',
-        description: 'Impact claims record your actual results - how much you achieved, when, and where. Click "+ Impact Claim" to record your first result.',
-        icon: TrendingUp,
-        targetSelector: '[data-tutorial="add-impact-claim"]',
-        action: 'Click "+ Impact Claim"',
-        showTarget: true,
-        modalGuidance: '📈 Record your impact:\n\n• Value - How much did you achieve?\n\n• Date - When did this happen?\n\n• Location - Where did it happen?\n\n• Label - Give it a name\n\nThen click "Add Impact Claim"'
-    },
-    'impact-claim-created': {
-        title: 'Excellent! 🎯',
-        description: "You've recorded your first impact claim! You can see it displayed in your metric's chart.",
-        icon: PartyPopper,
-        action: "Click 'Next' to continue",
-        showTarget: false
-    },
-    'create-evidence': {
-        title: 'Upload Evidence',
-        description: 'Click the "Add Evidence" button on your impact claim to upload proof of your work. This will auto-link the evidence to this specific claim.',
+    {
+        title: 'Evidence',
+        subtitle: 'Prove Your Impact',
+        description: 'Evidence is the proof behind your claims — photos, documents, receipts, videos. Evidence is automatically matched to impact claims by date and location.',
+        bullets: [
+            'Upload photos, PDFs, videos, or any document',
+            'Evidence auto-links to claims with matching dates & locations',
+            'Strong evidence = credible impact reporting'
+        ],
         icon: FileText,
-        targetSelector: '[data-tutorial="quick-add-evidence"]',
-        action: 'Click "Add Evidence" on the impact claim',
-        showTarget: true,
-        modalGuidance: '📎 Add your evidence:\n\n• Upload a file or paste a link\n\n• The metric is already selected!\n\n• Add a description if you like\n\nThen click "Add Evidence"'
+        image: '/evidencetut.png'
     },
-    'go-to-home': {
-        title: 'Almost Done! 🏠',
-        description: "Great work! You've created a complete impact record. Let's head back to the Home tab to see your overall progress.",
-        icon: Home,
-        targetSelector: '[data-tutorial="home-tab"]',
-        action: 'Click "Home" tab',
-        showTarget: true,
-        stayOnCurrentTab: true
+    {
+        title: 'Account Settings',
+        subtitle: 'Your Organisation Profile',
+        description: 'Set up your organisation\'s identity in Account Settings. This information is used in your public page and AI-generated reports.',
+        bullets: [
+            'Set your mission statement and organisation description',
+            'Upload your logo and branding colours',
+            'Manage your subscription and team members'
+        ],
+        icon: Settings,
+        image: '/brandingtut.png'
     },
-    'explain-home': {
-        title: 'Your Impact Overview',
-        description: "This is your Home dashboard where you can see all your metrics at a glance. Track your overall progress, view charts, and monitor your impact across all your work. You can click any metric card to dive into details.",
-        icon: Home,
-        action: "Click 'Next' to finish",
-        showTarget: false
-    },
-    'complete': {
-        title: 'You Did It! 🎊',
-        description: "Congratulations! You've learned how to track your impact in OFE. Keep adding initiatives, metrics, claims, and evidence to build a powerful impact story. You can restart this tutorial anytime from the Dashboard.",
-        icon: CheckCircle,
-        action: 'Click "Finish" to close',
-        showTarget: false
+    {
+        title: 'Go Public',
+        subtitle: 'Share Your Impact With the World',
+        description: 'Make your initiatives public so donors, partners, and the community can see your verified impact data and stories.',
+        bullets: [
+            'Toggle any initiative to public from its settings',
+            'Get a shareable link to your public impact page',
+            'Public pages show metrics, evidence, and stories beautifully'
+        ],
+        icon: Globe,
+        image: '/publicvis.png'
     }
-}
+]
 
 export default function InteractiveTutorial() {
-    const { isActive, currentStep, advanceStep, skipTutorial, completeTutorial, tutorialData } = useTutorial()
-    const navigate = useNavigate()
-    const location = useLocation()
-    const [targetRect, setTargetRect] = useState<DOMRect | null>(null)
-    const [isModalOpen, setIsModalOpen] = useState(false)
-    const [displayedStep, setDisplayedStep] = useState<TutorialStep>(currentStep)
-    const [renderPhase, setRenderPhase] = useState<'hidden' | 'ready' | 'visible'>('hidden')
+    const { isActive, currentSlide, totalSlides, nextSlide, prevSlide, goToSlide, closeTutorial } = useTutorial()
+    const [isAnimating, setIsAnimating] = useState(false)
+    const [direction, setDirection] = useState<'left' | 'right'>('right')
+    const [displayedSlide, setDisplayedSlide] = useState(currentSlide)
 
-    // Use displayed step for rendering (this is what actually shows)
-    const stepConfig = STEP_CONFIGS[displayedStep]
-
-    /*
-     * TUTORIAL RENDERING SEQUENCE - IMPORTANT FOR FUTURE UPDATES
-     * ===========================================================
-     * 
-     * The tutorial uses a 3-phase rendering system to prevent flashing:
-     * 
-     * renderPhase: 'hidden' → 'ready' → 'visible'
-     * 
-     * - 'hidden': Component returns null, nothing is rendered
-     * - 'ready': Component renders with opacity-0 (invisible but in DOM)
-     * - 'visible': Component transitions to opacity-100 (CSS fade-in)
-     * 
-     * CRITICAL RULES:
-     * 1. The show sequence must ONLY start when displayedStep === currentStep
-     *    This prevents showing old content during step transitions.
-     * 
-     * 2. For steps with targets, we wait 500ms before looking for the element.
-     *    This allows time for tab content loaders to complete.
-     *    The app has sub-loaders that load tab content independently.
-     * 
-     * 3. The tutorial only shows once the target element is actually found.
-     *    If a tab is still loading, the target won't exist yet.
-     * 
-     * Step Transition Flow:
-     * 1. User clicks Next → currentStep changes
-     * 2. We detect displayedStep !== currentStep → set renderPhase='hidden'
-     * 3. Wait 300ms for fade-out
-     * 4. Update displayedStep to match currentStep
-     * 5. Now displayedStep === currentStep, so show sequence can begin
-     * 6. For steps WITH targets: wait 500ms, then look for target element
-     * 7. For steps WITHOUT targets: wait 100ms
-     * 8. Set renderPhase='ready' (renders invisible)
-     * 9. After 50ms, set renderPhase='visible' (CSS transition to opacity-100)
-     */
-
-    // EFFECT 1: Handle step changes and transitions
     useEffect(() => {
-        if (!isActive) {
-            setRenderPhase('hidden')
-            setDisplayedStep(currentStep)
-            setTargetRect(null)
-            return
-        }
-
-        // When step changes, hide immediately and schedule displayedStep update
-        if (displayedStep !== currentStep) {
-            setRenderPhase('hidden')
-            
-            // Wait for fade-out, then update displayedStep
+        if (currentSlide !== displayedSlide) {
+            setDirection(currentSlide > displayedSlide ? 'right' : 'left')
+            setIsAnimating(true)
             const timer = setTimeout(() => {
-                setDisplayedStep(currentStep)
-                setTargetRect(null)
-            }, 300)
-
+                setDisplayedSlide(currentSlide)
+                setIsAnimating(false)
+            }, 200)
             return () => clearTimeout(timer)
         }
-    }, [isActive, currentStep, displayedStep])
+    }, [currentSlide, displayedSlide])
 
-    // EFFECT 2: Show sequence for steps WITHOUT targets (centered cards)
-    useEffect(() => {
-        // CRITICAL: Only proceed when displayedStep has caught up to currentStep
-        // This prevents showing old content during transitions
-        if (!isActive || renderPhase !== 'hidden' || displayedStep !== currentStep) {
-            return
-        }
-        
-        const config = STEP_CONFIGS[displayedStep]
-        
-        // Only handle steps without targets here
-        if (config.showTarget && config.targetSelector) {
-            return // Handled by target finder effect below
-        }
-        
-        // No target needed - proceed to show after brief delay
-        const timer = setTimeout(() => {
-            setRenderPhase('ready')
-            // Small delay before visible to ensure opacity-0 renders first
-            setTimeout(() => setRenderPhase('visible'), 50)
-        }, 100)
-        
-        return () => clearTimeout(timer)
-    }, [isActive, displayedStep, currentStep, renderPhase])
-
-    // Detect if a modal is open
-    useEffect(() => {
-        const checkForModal = () => {
-            const modal = document.querySelector('[class*="fixed"][class*="inset-0"][class*="z-[60]"]')
-            setIsModalOpen(!!modal)
-        }
-
-        checkForModal()
-        const interval = setInterval(checkForModal, 200)
-        return () => clearInterval(interval)
-    }, [currentStep])
-
-    // EFFECT 3: Find target element and show sequence for steps WITH targets
-    useEffect(() => {
-        if (!isActive || !stepConfig.targetSelector || !stepConfig.showTarget) {
-            return
-        }
-        
-        // When already visible, just keep updating targetRect for positioning on resize/scroll
-        if (renderPhase !== 'hidden') {
-            const findTarget = () => {
-                const target = document.querySelector(stepConfig.targetSelector!)
-                if (target) {
-                    setTargetRect(target.getBoundingClientRect())
-                }
-            }
-            findTarget()
-            const interval = setInterval(findTarget, 500)
-            window.addEventListener('resize', findTarget)
-            window.addEventListener('scroll', findTarget, true)
-            return () => {
-                clearInterval(interval)
-                window.removeEventListener('resize', findTarget)
-                window.removeEventListener('scroll', findTarget, true)
-            }
-        }
-
-        // CRITICAL: Only look for target when displayedStep has caught up to currentStep
-        // This prevents showing at wrong position during transitions
-        if (displayedStep !== currentStep) {
-            return
-        }
-
-        // Hidden phase - look for target element, then trigger show sequence
-        let foundIt = false
-        let checkInterval: NodeJS.Timeout | null = null
-        
-        const findAndShow = () => {
-            if (foundIt) return true
-            
-            const target = document.querySelector(stepConfig.targetSelector!)
-            if (target) {
-                foundIt = true
-                const rect = target.getBoundingClientRect()
-                setTargetRect(rect)
-                
-                // Target found - start show sequence
-                setTimeout(() => {
-                    setRenderPhase('ready')
-                    // Small delay before visible to ensure opacity-0 renders first
-                    setTimeout(() => setRenderPhase('visible'), 50)
-                }, 100)
-                return true
-            }
-            return false
-        }
-
-        // Initial check after delay (wait for page/tab to render)
-        // Using 500ms to allow time for tab content loaders to complete
-        const initialTimer = setTimeout(() => {
-            if (!findAndShow()) {
-                // Target not found yet, keep polling
-                checkInterval = setInterval(() => {
-                    if (findAndShow() && checkInterval) {
-                        clearInterval(checkInterval)
-                    }
-                }, 200)
-            }
-        }, 500)
-
-        return () => {
-            clearTimeout(initialTimer)
-            if (checkInterval) clearInterval(checkInterval)
-        }
-    }, [isActive, displayedStep, currentStep, stepConfig.targetSelector, stepConfig.showTarget, renderPhase])
-
-    // Handle navigation based on step - but NOT for steps that say stayOnCurrentTab
-    useEffect(() => {
-        if (!isActive || !tutorialData.initiativeId) return
-        if (stepConfig.stayOnCurrentTab) return // Don't auto-navigate
-
-        const search = location.search
-
-        // Navigate to correct tab based on step
-        if ((currentStep === 'explain-locations' || currentStep === 'create-location' || currentStep === 'location-created') && 
-            !search.includes('tab=location')) {
-            navigate(`/initiatives/${tutorialData.initiativeId}?tab=location`)
-        }
-        if ((currentStep === 'explain-metrics' || currentStep === 'create-metric' || 
-             currentStep === 'create-impact-claim' || currentStep === 'impact-claim-created' ||
-             currentStep === 'explain-metric-detail' || currentStep === 'create-evidence') && 
-            !search.includes('tab=metrics')) {
-            navigate(`/initiatives/${tutorialData.initiativeId}?tab=metrics`)
-        }
-        if (currentStep === 'explain-home' && !search.includes('tab=home') && search !== '') {
-            navigate(`/initiatives/${tutorialData.initiativeId}?tab=home`)
-        }
-    }, [currentStep, isActive, tutorialData.initiativeId, navigate, location.search, stepConfig.stayOnCurrentTab])
-
-    const handleContinue = () => {
-        if (currentStep === 'complete') {
-            completeTutorial()
-        } else {
-            advanceStep()
-        }
-    }
-
-    // Handle tab click advancement
     useEffect(() => {
         if (!isActive) return
-
-        const handleClick = (e: MouseEvent) => {
-            const target = e.target as HTMLElement
-            
-            // Check if clicking metrics tab during go-to-metrics step
-            if (currentStep === 'go-to-metrics' && target.closest('[data-tutorial="metrics-tab"]')) {
-                setTimeout(() => advanceStep(), 100)
-            }
-            // Check if clicking home tab during go-to-home step
-            if (currentStep === 'go-to-home' && target.closest('[data-tutorial="home-tab"]')) {
-                setTimeout(() => advanceStep(), 100)
-            }
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'ArrowRight') nextSlide()
+            else if (e.key === 'ArrowLeft') prevSlide()
+            else if (e.key === 'Escape') closeTutorial()
         }
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [isActive, nextSlide, prevSlide, closeTutorial])
 
-        document.addEventListener('click', handleClick)
-        return () => document.removeEventListener('click', handleClick)
-    }, [isActive, currentStep, advanceStep])
-
-    // Don't render anything until ready (prevents flashing)
     if (!isActive) return null
-    if (renderPhase === 'hidden') return null
 
-    const IconComponent = stepConfig.icon
-
-    // Calculate card position - always keep on screen
-    const getCardPosition = (): React.CSSProperties | null => {
-        const cardWidth = 400
-        const cardHeight = 400
-        const padding = 24
-        const windowWidth = window.innerWidth
-        const windowHeight = window.innerHeight
-
-        // When modal is open, position in top-left
-        if (isModalOpen) {
-            return {
-                top: `${padding}px`,
-                left: `${padding}px`,
-                maxWidth: `${Math.min(cardWidth - 40, windowWidth - padding * 2)}px`
-            }
-        }
-
-        // If step needs target but we don't have it yet, return null to hide
-        if (stepConfig.showTarget && stepConfig.targetSelector && !targetRect) {
-            return null
-        }
-
-        // Center position when no target to highlight
-        if (!targetRect || !stepConfig.showTarget) {
-            return {
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                maxWidth: `${Math.min(cardWidth, windowWidth - padding * 2)}px`
-            }
-        }
-
-        // Calculate best position relative to target
-        let top: number
-        let left: number
-
-        const preferredTop = targetRect.bottom + padding
-        const preferredLeft = targetRect.left
-
-        if (preferredTop + cardHeight <= windowHeight - padding) {
-            top = preferredTop
-        } else if (targetRect.top - cardHeight - padding >= padding) {
-            top = targetRect.top - cardHeight - padding
-        } else {
-            top = Math.max(padding, (windowHeight - cardHeight) / 2)
-        }
-
-        if (preferredLeft + cardWidth <= windowWidth - padding) {
-            left = preferredLeft
-        } else {
-            left = Math.max(padding, windowWidth - cardWidth - padding)
-        }
-
-        return {
-            top: `${top}px`,
-            left: `${left}px`,
-            maxWidth: `${Math.min(cardWidth, windowWidth - padding * 2)}px`
-        }
-    }
-
-    const cardStyle = getCardPosition()
-
-    // Determine if this step has a Next button
-    const hasNextButton = !stepConfig.showTarget || displayedStep === 'complete' || 
-        displayedStep === 'explain-locations' // This one shows target but also has Next
-
-    // When modal is open, show floating guidance card
-    if (isModalOpen && stepConfig.modalGuidance) {
-        return (
-            <div 
-                className={`fixed z-[70] transition-opacity duration-300 ease-in-out ${renderPhase === 'visible' ? 'opacity-100' : 'opacity-0'}`}
-                style={{ top: 24, left: 24 }}
-            >
-                <div className="bg-white rounded-2xl shadow-2xl w-80 p-5 border-2 border-primary-300">
-                    <button
-                        onClick={skipTutorial}
-                        className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
-                    >
-                        <X className="w-4 h-4" />
-                    </button>
-
-                    <div className="flex items-center space-x-3 mb-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center flex-shrink-0">
-                            <IconComponent className="w-5 h-5 text-primary-600" />
-                        </div>
-                        <h2 className="text-base font-bold text-gray-900">{stepConfig.title}</h2>
-                    </div>
-
-                    <div className="bg-primary-50 border border-primary-200 rounded-xl p-3">
-                        <p className="text-sm text-primary-800 whitespace-pre-line leading-relaxed">
-                            {stepConfig.modalGuidance}
-                        </p>
-                    </div>
-
-                    <button
-                        onClick={skipTutorial}
-                        className="text-xs text-gray-500 hover:text-gray-700 underline mt-3"
-                    >
-                        Skip tutorial
-                    </button>
-                </div>
-            </div>
-        )
-    }
+    const slide = SLIDES[displayedSlide]
+    const Icon = slide.icon
+    const isFirst = currentSlide === 0
+    const isLast = currentSlide === totalSlides - 1
+    const isWelcome = displayedSlide === 0
 
     return (
-        <div 
-            className={`fixed inset-0 z-[55] pointer-events-none transition-opacity duration-300 ease-in-out ${renderPhase === 'visible' ? 'opacity-100' : 'opacity-0'}`}
-        >
-            {/* Overlay that blocks clicks everywhere except the highlighted target */}
-            {targetRect && stepConfig.showTarget ? (
-                <>
-                    {/* 4 overlay divs surrounding the target - creates a real hole for clicks */}
-                    {/* Top */}
-                    <div 
-                        className="absolute bg-black/50 left-0 right-0 top-0 pointer-events-auto"
-                        style={{ height: Math.max(0, targetRect.top - 12) }}
-                    />
-                    {/* Bottom */}
-                    <div 
-                        className="absolute bg-black/50 left-0 right-0 bottom-0 pointer-events-auto"
-                        style={{ top: targetRect.bottom + 12 }}
-                    />
-                    {/* Left */}
-                    <div 
-                        className="absolute bg-black/50 left-0 pointer-events-auto"
-                        style={{ 
-                            top: Math.max(0, targetRect.top - 12), 
-                            width: Math.max(0, targetRect.left - 12),
-                            height: targetRect.height + 24
-                        }}
-                    />
-                    {/* Right */}
-                    <div 
-                        className="absolute bg-black/50 right-0 pointer-events-auto"
-                        style={{ 
-                            top: Math.max(0, targetRect.top - 12), 
-                            left: targetRect.right + 12,
-                            height: targetRect.height + 24
-                        }}
-                    />
-                    {/* Subtle glow around target */}
-                    <div
-                        className="absolute rounded-xl pointer-events-none"
-                        style={{
-                            top: targetRect.top - 8,
-                            left: targetRect.left - 8,
-                            width: targetRect.width + 16,
-                            height: targetRect.height + 16,
-                            boxShadow: '0 0 20px 8px rgba(255, 255, 255, 0.4)'
-                        }}
-                    />
-                </>
-            ) : (
-                /* Full overlay when no target to highlight - blocks all clicks */
-                <div className="absolute inset-0 bg-black/50 pointer-events-auto" />
+        <div className="fixed inset-0 z-[100] flex flex-col h-dvh overflow-hidden">
+            {/* Solid background — white/gray with blurry green accents */}
+            <div className="absolute inset-0" style={{
+                background: 'linear-gradient(135deg, #ffffff 0%, #f5f6f8 40%, #f0f1f4 100%)'
+            }} />
+            <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full opacity-40 blur-[120px]" style={{ backgroundColor: BRAND }} />
+            <div className="absolute bottom-[-15%] right-[-10%] w-[50%] h-[50%] rounded-full opacity-30 blur-[100px]" style={{ backgroundColor: BRAND }} />
+            <div className="absolute top-[40%] right-[20%] w-[30%] h-[30%] rounded-full opacity-20 blur-[80px]" style={{ backgroundColor: BRAND }} />
+
+            {/* Top bar — glass, hidden on welcome slide */}
+            {!isWelcome && (
+                <div className="relative z-10 flex items-center justify-between px-5 py-3 flex-shrink-0 bg-white/60 backdrop-blur-2xl border-b border-white/40">
+                    <div className="flex items-center gap-2">
+                        {SLIDES.map((_, i) => (
+                            <button
+                                key={i}
+                                onClick={() => goToSlide(i)}
+                                className={`rounded-full transition-all duration-300 ${
+                                    i === currentSlide ? 'w-7 h-2' : 'w-2 h-2'
+                                }`}
+                                style={{
+                                    backgroundColor: i === currentSlide
+                                        ? BRAND_DARK
+                                        : i < currentSlide
+                                        ? `${BRAND_DARK}60`
+                                        : `${BRAND}80`
+                                }}
+                            />
+                        ))}
+                        <span className="ml-3 text-xs text-gray-400 font-medium">{currentSlide + 1} / {totalSlides}</span>
+                    </div>
+                    <button
+                        onClick={closeTutorial}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 bg-white/60 hover:bg-white/80 border border-gray-200/60 rounded-lg transition-all duration-200"
+                    >
+                        Skip <X className="w-3.5 h-3.5" />
+                    </button>
+                </div>
             )}
 
-            {/* Tutorial Card - only render when position is known and not mid-transition */}
-            {cardStyle && (
-            <div
-                className="absolute bg-white rounded-2xl shadow-2xl p-6 pointer-events-auto"
-                style={cardStyle}
-            >
-                <button
-                    onClick={skipTutorial}
-                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                    <X className="w-5 h-5" />
-                </button>
-
-                {/* Step indicator */}
-                <div className="flex items-center space-x-1 mb-4 flex-wrap">
-                    {Object.keys(STEP_CONFIGS).map((step, index) => (
-                        <div
-                            key={step}
-                            className={`h-1.5 rounded-full transition-all duration-300 ${
-                                index <= Object.keys(STEP_CONFIGS).indexOf(displayedStep)
-                                    ? 'bg-primary-500 w-3'
-                                    : 'bg-gray-200 w-1.5'
-                            }`}
-                        />
-                    ))}
-                </div>
-
-                {/* Icon */}
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center mb-4">
-                    <IconComponent className="w-7 h-7 text-primary-600" />
-                </div>
-
-                {/* Content */}
-                <h2 className="text-xl font-bold text-gray-900 mb-2">
-                    {stepConfig.title}
-                </h2>
-                <p className="text-gray-600 mb-4 leading-relaxed text-sm">
-                    {stepConfig.description}
-                </p>
-
-                {/* Action hint */}
-                <div className={`rounded-xl p-3 mb-5 ${
-                    stepConfig.showTarget && !hasNextButton
-                        ? 'bg-primary-50 border border-primary-200' 
-                        : 'bg-gray-50 border border-gray-200'
-                }`}>
-                    <p className={`text-sm font-medium flex items-center ${
-                        stepConfig.showTarget && !hasNextButton ? 'text-primary-700' : 'text-gray-700'
+            {/* Scrollable content area */}
+            <div className="relative z-10 flex-1 min-h-0 overflow-y-auto">
+                <div className="flex items-center justify-center min-h-full px-5 md:px-10 py-6">
+                    <div className={`w-full max-w-7xl transition-all duration-200 ease-out ${
+                        isAnimating
+                            ? `opacity-0 ${direction === 'right' ? 'translate-x-6' : '-translate-x-6'}`
+                            : 'opacity-100 translate-x-0'
                     }`}>
-                        <span className="mr-2">{stepConfig.showTarget && !hasNextButton ? '👉' : '💡'}</span>
-                        {stepConfig.action}
-                    </p>
+                        {isWelcome ? (
+                            <div className="flex flex-col items-center justify-center text-center">
+                                <p
+                                    className="text-lg sm:text-xl md:text-2xl font-newsreader font-light text-foreground mb-3"
+                                    style={{
+                                        opacity: 0,
+                                        transform: 'translateY(12px)',
+                                        animation: 'tutFadeUp 1s ease-out 0.3s forwards'
+                                    }}
+                                >
+                                    Welcome to
+                                </p>
+                                <h1
+                                    className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-newsreader font-light text-foreground leading-[1.1] whitespace-nowrap"
+                                    style={{
+                                        opacity: 0,
+                                        transform: 'translateY(16px)',
+                                        animation: 'tutFadeUp 1.2s ease-out 0.7s forwards'
+                                    }}
+                                >
+                                    Nexus Impacts{' '}
+                                    <span className="relative inline-block">
+                                        <span className="relative z-10">AI</span>
+                                        <svg className="absolute -bottom-1 md:-bottom-2 left-0 w-full" viewBox="0 0 200 12" fill="none">
+                                            <path d="M2 8C50 2 150 2 198 8" stroke="#c0dfa1" strokeWidth="4" strokeLinecap="round" />
+                                        </svg>
+                                    </span>
+                                </h1>
+                                <button
+                                    onClick={nextSlide}
+                                    className="mt-8 flex items-center gap-1.5 px-6 py-3 text-white rounded-xl transition-all duration-200 font-semibold text-sm shadow-lg hover:opacity-90"
+                                    style={{
+                                        backgroundColor: BRAND_DARK,
+                                        opacity: 0,
+                                        transform: 'translateY(12px)',
+                                        animation: 'tutFadeUp 1s ease-out 1.4s forwards'
+                                    }}
+                                >
+                                    Let's Go
+                                    <ChevronRight className="w-4 h-4" />
+                                </button>
+                                <style>{`
+                                    @keyframes tutFadeUp {
+                                        to {
+                                            opacity: 1;
+                                            transform: translateY(0);
+                                        }
+                                    }
+                                `}</style>
+                            </div>
+                        ) : (
+                            /* Content slides — two columns on lg */
+                            <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-8 lg:gap-12 items-center">
+                                <div className="order-2 lg:order-1">
+                                    <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4 shadow-md border border-white/50" style={{ backgroundColor: `${BRAND}40` }}>
+                                        <Icon className="w-5 h-5" style={{ color: BRAND_DARK }} />
+                                    </div>
+
+                                    <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 mb-1.5 tracking-tight">
+                                        {slide.title}
+                                    </h2>
+                                    <p className="text-sm md:text-base font-medium mb-4" style={{ color: BRAND_DARK }}>
+                                        {slide.subtitle}
+                                    </p>
+                                    <p className="text-sm md:text-base text-gray-500 leading-relaxed mb-5">
+                                        {slide.description}
+                                    </p>
+
+                                    <div className="space-y-2">
+                                        {slide.bullets.map((bullet, i) => (
+                                            <div key={i} className="flex items-start gap-3 bg-white/50 backdrop-blur-xl border border-white/60 rounded-xl px-4 py-2.5 shadow-sm">
+                                                <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: `${BRAND}50` }}>
+                                                    <span className="text-[10px] font-bold" style={{ color: BRAND_DARK }}>{i + 1}</span>
+                                                </div>
+                                                <p className="text-gray-500 text-sm leading-relaxed">{bullet}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {(displayedSlide === 3 || displayedSlide === 4) && (
+                                        <div className="mt-5 p-3.5 rounded-xl bg-white/40 backdrop-blur-xl border border-white/60 shadow-sm">
+                                            <div className="flex items-center gap-2 mb-1.5">
+                                                <Link2 className="w-3.5 h-3.5 text-gray-400" />
+                                                <span className="text-xs font-semibold text-gray-600">How it connects</span>
+                                            </div>
+                                            <p className="text-xs text-gray-400 leading-relaxed">
+                                                {displayedSlide === 3
+                                                    ? 'Impact claims are linked to metrics by the metric they belong to, and matched to evidence by their date and location.'
+                                                    : 'When you upload evidence with a date and location that matches an impact claim, they are automatically linked — proving your results.'}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {slide.image && (
+                                    <div className="order-1 lg:order-2">
+                                        <div className="bg-white/40 backdrop-blur-2xl border border-white/60 shadow-xl shadow-black/5 rounded-2xl overflow-hidden">
+                                            <img
+                                                key={displayedSlide}
+                                                src={slide.image}
+                                                alt={slide.title}
+                                                className="w-full h-auto object-cover opacity-0 transition-opacity duration-700 ease-out"
+                                                onLoad={(e) => { (e.target as HTMLImageElement).classList.replace('opacity-0', 'opacity-100') }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Bottom nav — glass style */}
+            <div className="relative z-10 flex items-center justify-between px-5 py-3 flex-shrink-0 bg-white/60 backdrop-blur-2xl border-t border-white/40">
+                {/* Left side — skip on welcome, back on others */}
+                <div>
+                    {isWelcome ? (
+                        <button
+                            onClick={closeTutorial}
+                            className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                            Skip tutorial
+                        </button>
+                    ) : !isFirst ? (
+                        <button
+                            onClick={prevSlide}
+                            className="flex items-center gap-1.5 px-4 py-2 text-gray-500 hover:text-gray-700 bg-white/60 hover:bg-white/80 border border-gray-200/60 rounded-xl transition-all duration-200 font-medium text-sm"
+                        >
+                            <ChevronLeft className="w-4 h-4" />
+                            Back
+                        </button>
+                    ) : <div />}
                 </div>
 
-                {/* Buttons */}
-                <div className="flex items-center justify-between">
-                    <button
-                        onClick={skipTutorial}
-                        className="text-sm text-gray-500 hover:text-gray-700 underline"
-                    >
-                        Skip tutorial
-                    </button>
-
-                    {/* Show button for explanation/celebration steps */}
-                    {hasNextButton && (
+                {/* Right side — nav button */}
+                <div>
+                    {isLast ? (
                         <button
-                            onClick={handleContinue}
-                            className="flex items-center space-x-2 px-5 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 transition-colors font-medium shadow-lg shadow-primary-500/30"
+                            onClick={closeTutorial}
+                            className="flex items-center gap-1.5 px-5 py-2 text-white rounded-xl transition-all duration-200 font-semibold text-sm shadow-lg hover:opacity-90"
+                            style={{ backgroundColor: BRAND_DARK }}
                         >
-                            <span>
-                                {displayedStep === 'complete' ? 'Finish' : 
-                                 displayedStep === 'welcome' ? "Let's Go!" : 
-                                 'Next'}
-                            </span>
+                            Get Started
+                            <ChevronRight className="w-4 h-4" />
+                        </button>
+                    ) : (
+                        <button
+                            onClick={nextSlide}
+                            className="flex items-center gap-1.5 px-5 py-2 text-white rounded-xl transition-all duration-200 font-semibold text-sm shadow-lg hover:opacity-90"
+                            style={{ backgroundColor: BRAND_DARK }}
+                        >
+                            {isFirst ? "Let's Go" : 'Next'}
                             <ChevronRight className="w-4 h-4" />
                         </button>
                     )}
                 </div>
             </div>
-            )}
         </div>
     )
 }

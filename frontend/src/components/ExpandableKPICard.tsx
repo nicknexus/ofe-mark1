@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useTutorial } from '../context/TutorialContext'
 import { useTeam } from '../context/TeamContext'
 import {
     ChevronDown,
@@ -88,9 +87,6 @@ export default function ExpandableKPICard({
     // Use provided color or default to site green
     const chartColor = metricColor || DEFAULT_METRIC_COLOR
 
-    // Tutorial hook for advancing steps
-    const { isActive: isTutorialActive, currentStep, advanceStep } = useTutorial()
-    
     // Team permissions
     const { canAddImpactClaims } = useTeam()
 
@@ -351,10 +347,6 @@ export default function ExpandableKPICard({
         setIsEasyEvidenceModalOpen(false)
         setSelectedClaimForEvidence(null)
 
-        // Advance tutorial if on create-evidence step
-        if (isTutorialActive && currentStep === 'create-evidence') {
-            advanceStep()
-        }
     }
 
     // Open easy evidence modal for a specific claim
@@ -862,12 +854,12 @@ export default function ExpandableKPICard({
                             </div>
                             <div className="flex items-center space-x-2">
                                 {canAddImpactClaims && (
-                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} data-tutorial="add-impact-claim" className="flex items-center space-x-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25">
+                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25">
                                         <Plus className="w-4 h-4" />
                                         <span>Add Impact Claim</span>
                                     </button>
                                 )}
-                                <button onClick={(e) => { e.stopPropagation(); onAddEvidence() }} data-tutorial="add-evidence" className="flex items-center space-x-2 px-4 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25">
+                                <button onClick={(e) => { e.stopPropagation(); onAddEvidence() }} className="flex items-center space-x-2 px-4 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25">
                                     <Upload className="w-4 h-4" />
                                     <span>Add Evidence</span>
                                 </button>
@@ -970,7 +962,6 @@ export default function ExpandableKPICard({
                                                                                 <button
                                                                                     type="button"
                                                                                     onClick={(e) => handleAddEvidenceForClaim(update, e)}
-                                                                                    data-tutorial="quick-add-evidence"
                                                                                     className="flex items-center gap-1 px-2 py-1 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-[10px] font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
                                                                                     title="Add supporting evidence for this claim"
                                                                                 >

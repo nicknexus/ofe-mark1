@@ -1,75 +1,30 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react'
 import { supabase } from '../services/supabase'
 
-export type TutorialStep = 
-    | 'welcome'
-    | 'explain-dashboard'
-    | 'create-initiative'
-    | 'explain-locations'
-    | 'create-location'
-    | 'location-created'
-    | 'go-to-metrics'
-    | 'explain-metrics'
-    | 'create-metric'
-    | 'create-impact-claim'
-    | 'impact-claim-created'
-    | 'explain-metric-detail'
-    | 'create-evidence'
-    | 'go-to-home'
-    | 'explain-home'
-    | 'complete'
-
-interface TutorialData {
-    initiativeId?: string
-    locationId?: string
-    metricId?: string
-    impactClaimId?: string
-}
-
 interface TutorialContextType {
     isActive: boolean
-    currentStep: TutorialStep
-    tutorialData: TutorialData
+    currentSlide: number
+    totalSlides: number
     startTutorial: () => void
-    advanceStep: (data?: Partial<TutorialData>) => void
-    skipTutorial: () => Promise<void>
-    completeTutorial: () => Promise<void>
-    setTutorialData: (data: Partial<TutorialData>) => void
+    nextSlide: () => void
+    prevSlide: () => void
+    goToSlide: (index: number) => void
+    closeTutorial: () => Promise<void>
     hasCompletedTutorial: boolean
-    isLoading: boolean
 }
 
 const TutorialContext = createContext<TutorialContextType | undefined>(undefined)
-
-const STEP_ORDER: TutorialStep[] = [
-    'welcome',
-    'explain-dashboard',
-    'create-initiative',
-    'explain-locations',
-    'create-location',
-    'location-created',
-    'go-to-metrics',
-    'explain-metrics',
-    'create-metric',
-    'create-impact-claim',
-    'impact-claim-created',
-    'explain-metric-detail',
-    'create-evidence',
-    'go-to-home',
-    'explain-home',
-    'complete'
-]
 
 interface TutorialProviderProps {
     children: ReactNode
 }
 
+const TOTAL_SLIDES = 7
+
 export function TutorialProvider({ children }: TutorialProviderProps) {
     const [isActive, setIsActive] = useState(false)
-    const [currentStep, setCurrentStep] = useState<TutorialStep>('welcome')
-    const [tutorialData, setTutorialDataState] = useState<TutorialData>({})
+    const [currentSlide, setCurrentSlide] = useState(0)
     const [hasCompletedTutorial, setHasCompletedTutorial] = useState(true)
-    const [isLoading, setIsLoading] = useState(true)
 
     useEffect(() => {
         checkTutorialStatus()
@@ -81,41 +36,35 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
             if (user) {
                 const completed = user.user_metadata?.has_completed_tutorial === true
                 setHasCompletedTutorial(completed)
-                
+
                 if (!completed) {
-                    setTimeout(() => {
+                    const timer = setTimeout(() => {
                         setIsActive(true)
-                        setCurrentStep('welcome')
-                    }, 2000)
+                        setCurrentSlide(0)
+                    }, 1500)
+                    return () => clearTimeout(timer)
                 }
             }
         } catch (error) {
             console.error('Error checking tutorial status:', error)
-        } finally {
-            setIsLoading(false)
         }
     }
 
     const startTutorial = useCallback(() => {
         setIsActive(true)
-        setCurrentStep('welcome')
-        setTutorialDataState({})
+        setCurrentSlide(0)
     }, [])
 
-    const advanceStep = useCallback((data?: Partial<TutorialData>) => {
-        if (data) {
-            setTutorialDataState(prev => ({ ...prev, ...data }))
-        }
+    const nextSlide = useCallback(() => {
+        setCurrentSlide(prev => Math.min(prev + 1, TOTAL_SLIDES - 1))
+    }, [])
 
-        const currentIndex = STEP_ORDER.indexOf(currentStep)
-        if (currentIndex < STEP_ORDER.length - 1) {
-            const nextStep = STEP_ORDER[currentIndex + 1]
-            setCurrentStep(nextStep)
-        }
-    }, [currentStep])
+    const prevSlide = useCallback(() => {
+        setCurrentSlide(prev => Math.max(prev - 1, 0))
+    }, [])
 
-    const setTutorialData = useCallback((data: Partial<TutorialData>) => {
-        setTutorialDataState(prev => ({ ...prev, ...data }))
+    const goToSlide = useCallback((index: number) => {
+        setCurrentSlide(Math.max(0, Math.min(index, TOTAL_SLIDES - 1)))
     }, [])
 
     const markTutorialComplete = async () => {
@@ -130,16 +79,9 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
         }
     }
 
-    const skipTutorial = useCallback(async () => {
+    const closeTutorial = useCallback(async () => {
         setIsActive(false)
-        setCurrentStep('welcome')
-        setTutorialDataState({})
-        await markTutorialComplete()
-    }, [])
-
-    const completeTutorial = useCallback(async () => {
-        setIsActive(false)
-        setCurrentStep('welcome')
+        setCurrentSlide(0)
         await markTutorialComplete()
     }, [])
 
@@ -147,15 +89,14 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
         <TutorialContext.Provider
             value={{
                 isActive,
-                currentStep,
-                tutorialData,
+                currentSlide,
+                totalSlides: TOTAL_SLIDES,
                 startTutorial,
-                advanceStep,
-                skipTutorial,
-                completeTutorial,
-                setTutorialData,
-                hasCompletedTutorial,
-                isLoading
+                nextSlide,
+                prevSlide,
+                goToSlide,
+                closeTutorial,
+                hasCompletedTutorial
             }}
         >
             {children}
