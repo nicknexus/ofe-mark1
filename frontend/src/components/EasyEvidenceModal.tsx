@@ -430,7 +430,7 @@ export default function EasyEvidenceModal({
                                         onChange={handleFileSelect}
                                         multiple
                                         className="hidden"
-                                        accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+                                        accept="image/*,video/*,.pdf,.doc,.docx,.txt,.csv,.xlsx"
                                     />
                                     <Upload className="w-10 h-10 mx-auto text-evidence-500 mb-2" />
                                     <p className="text-sm text-gray-700 font-medium mb-0.5">
