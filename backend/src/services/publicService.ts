@@ -897,46 +897,6 @@ export class PublicService {
             }));
         }
 
-        // Also check evidence_kpis (KPI-level evidence) as fallback
-        if (evidence.length === 0) {
-            const { data: kpiEvidenceLinks } = await supabase
-                .from('evidence_kpis')
-                .select('evidence_id')
-                .eq('kpi_id', kpi.id);
-
-            const kpiEvidenceIds = (kpiEvidenceLinks || []).map((e: any) => e.evidence_id);
-
-            if (kpiEvidenceIds.length > 0) {
-                const { data: evidenceData } = await supabase
-                    .from('evidence')
-                    .select(`
-                        id, title, description, type, file_url, date_represented, date_range_start, date_range_end, created_at,
-                        evidence_files(id, file_url, file_name, file_type, display_order),
-                        evidence_locations(locations(id, name)),
-                        evidence_kpis(kpis(id, title, category, unit_of_measurement)),
-                evidence_kpi_updates(kpi_updates(id, value, date_represented, date_range_start, date_range_end, kpi_id, kpis(id, title, unit_of_measurement)))
-                    `)
-                    .in('id', kpiEvidenceIds)
-                    .order('date_represented', { ascending: false });
-
-                evidence = (evidenceData || []).map((e: any) => ({
-                    id: e.id,
-                    title: e.title,
-                    description: e.description,
-                    type: e.type,
-                    file_url: e.file_url,
-                    files: e.evidence_files || [],
-                    date_represented: e.date_represented,
-                    date_range_start: e.date_range_start,
-                    date_range_end: e.date_range_end,
-                    locations: e.evidence_locations?.map((el: any) => el.locations).filter(Boolean) || [],
-                    kpis: e.evidence_kpis?.map((ek: any) => ek.kpis).filter(Boolean) || [],
-                    impact_claims: e.evidence_kpi_updates?.map((eu: any) => eu.kpi_updates).filter(Boolean) || [],
-                    created_at: e.created_at
-                }));
-            }
-        }
-
         return {
             id: update.id,
             value: (update as any).value,

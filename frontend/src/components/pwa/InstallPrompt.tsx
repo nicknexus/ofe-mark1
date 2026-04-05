@@ -12,9 +12,18 @@ export default function InstallPrompt({ onLogout }: InstallPromptProps) {
     const [platform, setPlatform] = useState<MobilePlatform>('other')
     const [installing, setInstalling] = useState(false)
     const [copied, setCopied] = useState(false)
+    const [hasPrompt, setHasPrompt] = useState(() => !!getDeferredInstallPrompt())
 
     useEffect(() => {
         setPlatform(getMobilePlatform())
+
+        const handler = (e: Event) => {
+            e.preventDefault()
+            ;(window as any).deferredInstallPrompt = e
+            setHasPrompt(true)
+        }
+        window.addEventListener('beforeinstallprompt', handler)
+        return () => window.removeEventListener('beforeinstallprompt', handler)
     }, [])
 
     const handleAndroidInstall = async () => {
@@ -72,7 +81,7 @@ export default function InstallPrompt({ onLogout }: InstallPromptProps) {
                     {platform === 'ios-safari' && <IOSSafariInstructions />}
                     {platform === 'ios-other' && <IOSOtherInstructions onCopyUrl={handleCopyUrl} copied={copied} />}
                     {(platform === 'android-chrome') && (
-                        <AndroidChromeInstructions onInstall={handleAndroidInstall} installing={installing} />
+                        <AndroidChromeInstructions onInstall={handleAndroidInstall} installing={installing} hasPrompt={hasPrompt} />
                     )}
                     {platform === 'android-other' && <AndroidOtherInstructions />}
                     {platform === 'other' && <GenericInstructions />}
@@ -134,9 +143,7 @@ function IOSOtherInstructions({ onCopyUrl, copied }: { onCopyUrl: () => void; co
     )
 }
 
-function AndroidChromeInstructions({ onInstall, installing }: { onInstall: () => void; installing: boolean }) {
-    const hasPrompt = !!getDeferredInstallPrompt()
-
+function AndroidChromeInstructions({ onInstall, installing, hasPrompt }: { onInstall: () => void; installing: boolean; hasPrompt: boolean }) {
     if (hasPrompt) {
         return (
             <button

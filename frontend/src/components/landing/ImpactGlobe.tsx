@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, memo, useMemo } from "react";
+import { useRef, useEffect, useState, memo, useMemo, useCallback } from "react";
 import Globe from "react-globe.gl";
 
 // Default demo locations for homepage
@@ -88,6 +88,19 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
   // Globe color based on brand color
   const globeColor = brandColor || "#c0dfa1";
 
+  // Stable callback refs so Globe doesn't re-process on every render
+  const polygonCapColorFn = useCallback(() => `${globeColor}B3`, [globeColor]);
+  const polygonSideColorFn = useCallback(() => `${globeColor}26`, [globeColor]);
+  const polygonStrokeColorFn = useCallback(() => "rgba(255, 255, 255, 0.3)", []);
+  const pointColorFn = useCallback(() => "#ffffff", []);
+  const arcColorFn = useCallback(() => "rgba(255, 255, 255, 0.6)", []);
+  const ringColorFn = useCallback(() => (t: number) => `rgba(255, 255, 255, ${0.8 - t * 0.8})`, []);
+  const labelLatFn = useCallback((d: any) => d.lat, []);
+  const labelLngFn = useCallback((d: any) => d.lng, []);
+  const labelTextFn = useCallback((d: any) => d.name, []);
+  const labelColorFn = useCallback(() => "rgba(255, 255, 255, 0.9)", []);
+  const labelsData = useMemo(() => showLabels ? pointsData : [], [showLabels, pointsData]);
+
   // Use a smaller, cached GeoJSON (110m is already the smallest)
   useEffect(() => {
     // Only fetch if not already cached in sessionStorage
@@ -113,10 +126,9 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
 
     const updateDimensions = () => {
       if (containerRef.current) {
-        setDimensions({
-          width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight,
-        });
+        const w = containerRef.current.clientWidth;
+        const h = containerRef.current.clientHeight;
+        setDimensions(prev => (prev.width === w && prev.height === h) ? prev : { width: w, height: h });
       }
     };
 
@@ -163,35 +175,34 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
           atmosphereColor={globeColor}
           atmosphereAltitude={0.2}
           polygonsData={countries.features}
-          polygonCapColor={() => `${globeColor}B3`}
-          polygonSideColor={() => `${globeColor}26`}
-          polygonStrokeColor={() => "rgba(255, 255, 255, 0.3)"}
+          polygonCapColor={polygonCapColorFn}
+          polygonSideColor={polygonSideColorFn}
+          polygonStrokeColor={polygonStrokeColorFn}
           polygonAltitude={0.006}
           pointsData={pointsData}
           pointAltitude={0.01}
           pointRadius={locations ? 0.8 : 0.5}
-          pointColor={() => "#ffffff"}
+          pointColor={pointColorFn}
           pointsMerge={false}
           arcsData={arcsData}
-          arcColor={() => "rgba(255, 255, 255, 0.6)"}
+          arcColor={arcColorFn}
           arcAltitude={0.25}
           arcStroke={0.8}
           arcDashLength={0.6}
           arcDashGap={0.3}
           arcDashAnimateTime={2500}
           ringsData={pointsData}
-          ringColor={() => (t: number) => `rgba(255, 255, 255, ${0.8 - t * 0.8})`}
+          ringColor={ringColorFn}
           ringMaxRadius={locations ? 3 : 2}
           ringPropagationSpeed={1.5}
           ringRepeatPeriod={2000}
-          // Labels for locations (only when showLabels is true)
-          labelsData={showLabels ? pointsData : []}
-          labelLat={(d: any) => d.lat}
-          labelLng={(d: any) => d.lng}
-          labelText={(d: any) => d.name}
+          labelsData={labelsData}
+          labelLat={labelLatFn}
+          labelLng={labelLngFn}
+          labelText={labelTextFn}
           labelSize={1.2}
           labelDotRadius={0.4}
-          labelColor={() => "rgba(255, 255, 255, 0.9)"}
+          labelColor={labelColorFn}
           labelResolution={2}
           labelAltitude={0.02}
         />
