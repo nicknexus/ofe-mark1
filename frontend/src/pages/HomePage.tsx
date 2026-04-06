@@ -22,7 +22,7 @@ const SectionLoader = () => (
 export default function HomePage() {
   const navigate = useNavigate();
   const handleGetStarted = () => navigate('/login');
-  
+
   return (
     <main className="min-h-screen bg-background font-figtree landing-page">
       <LandingNavbar onGetStarted={handleGetStarted} />
