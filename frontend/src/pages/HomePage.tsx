@@ -9,7 +9,6 @@ const HowItWorksSection = lazy(() => import('../components/landing/HowItWorksSec
 // const TestimonialsSection = lazy(() => import('../components/landing/TestimonialsSection'));
 const CTASection = lazy(() => import('../components/landing/CTASection'));
 const PricingSection = lazy(() => import('../components/landing/PricingSection'));
-const ContactSection = lazy(() => import('../components/landing/ContactSection'));
 const Footer = lazy(() => import('../components/landing/Footer'));
 
 // Simple loading placeholder
@@ -24,7 +23,12 @@ export default function HomePage() {
   const handleGetStarted = () => navigate('/login');
 
   return (
-    <main className="min-h-screen bg-background font-figtree landing-page">
+    <main className="relative min-h-screen bg-background font-figtree landing-page">
+      {/* Global graph-paper grid + fade */}
+      <div className="pointer-events-none fixed inset-0 z-0">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(210,220,230,0.2)_1px,transparent_1px),linear-gradient(to_bottom,rgba(210,220,230,0.2)_1px,transparent_1px)] bg-[size:60px_60px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_50%,transparent_0%,white_70%)]" />
+      </div>
       <LandingNavbar onGetStarted={handleGetStarted} />
       <HeroSection onGetStarted={handleGetStarted} />
       <Suspense fallback={<SectionLoader />}>
@@ -44,9 +48,6 @@ export default function HomePage() {
       </Suspense>
       <Suspense fallback={<SectionLoader />}>
         <PricingSection onGetStarted={handleGetStarted} />
-      </Suspense>
-      <Suspense fallback={<SectionLoader />}>
-        <ContactSection />
       </Suspense>
       <Suspense fallback={<SectionLoader />}>
         <Footer />

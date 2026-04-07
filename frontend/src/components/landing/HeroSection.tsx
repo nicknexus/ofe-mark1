@@ -20,11 +20,6 @@ const HeroSection = ({ onGetStarted }: HeroSectionProps) => {
         <div className="absolute top-[15%] right-[15%] w-16 h-16 bg-accent/15 rounded-full animate-float-delayed" />
         <div className="absolute bottom-1/4 left-[3%] w-12 h-12 bg-sage-light/40 rounded-xl rotate-45 animate-float-slow" />
         
-        {/* Subtle grid pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(210,220,230,0.2)_1px,transparent_1px),linear-gradient(to_bottom,rgba(210,220,230,0.2)_1px,transparent_1px)] bg-[size:60px_60px]" />
-        
-        {/* Radial gradient overlay */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_50%,transparent_0%,white_70%)]" />
       </div>
       
       <div className="relative z-10 max-w-7xl mx-auto px-6 w-full">

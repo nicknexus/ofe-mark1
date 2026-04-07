@@ -3,7 +3,7 @@ import { Heart as HeartPhosphor } from "phosphor-react";
 
 const Footer = () => {
   return (
-    <footer className="py-16 border-t border-border/50">
+    <footer className="relative z-10 py-16 border-t border-border/50 bg-[#f8f8f6]">
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid md:grid-cols-4 gap-12 mb-12">
           {/* Brand */}

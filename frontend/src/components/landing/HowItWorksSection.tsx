@@ -192,10 +192,6 @@ const HowItWorksSection = () => {
 
   return (
     <section id="how-it-works" className="py-24 md:py-32 relative overflow-hidden">
-      {/* Background elements */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(210,220,230,0.15)_1px,transparent_1px),linear-gradient(to_bottom,rgba(210,220,230,0.15)_1px,transparent_1px)] bg-[size:40px_40px]" />
-      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-accent/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-sage-light/20 rounded-full blur-3xl" />
       
       <div className="relative z-10 max-w-7xl mx-auto px-6">
         {/* Header */}

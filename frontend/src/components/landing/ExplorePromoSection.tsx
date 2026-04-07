@@ -339,13 +339,6 @@ const ExplorePromoSection = () => {
               Start for Free
               <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
             </Link>
-
-            <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground mt-8">
-              <div className="flex items-center gap-2">
-                <Search className="w-4 h-4 text-accent-foreground" />
-                <span>Full Transparency</span>
-              </div>
-            </div>
           </div>
 
           {/* Right — slide carousel */}
