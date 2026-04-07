@@ -325,7 +325,14 @@ function App() {
                                     <TrialBanner remainingDays={subscriptionStatus.remainingTrialDays} />
                                 )}
                                 <Routes>
-                                    {publicRoutes}
+                                    <Route path="/reset-password" element={<ResetPasswordPage />} />
+                                    <Route path="/offer/:slug" element={<OfferCheckoutPage />} />
+                                    <Route path="/org/:slug" element={<PublicOrganizationPage />} />
+                                    <Route path="/org/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
+                                    <Route path="/org/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
+                                    <Route path="/org/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
+                                    <Route path="/org/:orgSlug/:initiativeSlug/story/:storyId" element={<PublicStoryPage />} />
+                                    <Route path="/org/:orgSlug/:initiativeSlug/evidence/:evidenceId" element={<PublicEvidencePage />} />
                                     <Route path="/*" element={
                                         <MobileApp user={user} subscriptionStatus={subscriptionStatus} />
                                     } />
@@ -579,7 +586,14 @@ function App() {
                                         />
                                     )}
                                     <Routes>
-                                        {publicRoutes}
+                                        <Route path="/reset-password" element={<ResetPasswordPage />} />
+                                        <Route path="/offer/:slug" element={<OfferCheckoutPage />} />
+                                        <Route path="/org/:slug" element={<PublicOrganizationPage />} />
+                                        <Route path="/org/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
+                                        <Route path="/org/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
+                                        <Route path="/org/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
+                                        <Route path="/org/:orgSlug/:initiativeSlug/story/:storyId" element={<PublicStoryPage />} />
+                                        <Route path="/org/:orgSlug/:initiativeSlug/evidence/:evidenceId" element={<PublicEvidencePage />} />
                                         <Route path="/*" element={
                                             <MobileApp user={user} subscriptionStatus={subscriptionStatus} />
                                         } />

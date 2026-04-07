@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import {
     ArrowLeft, Target, Calendar, MapPin, FileText, ExternalLink, CheckCircle2, BarChart3,
-    ChevronLeft, ChevronRight, X
+    ChevronLeft, ChevronRight, ChevronDown, X, Camera, MessageSquare, DollarSign, Filter
 } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet'
 import L from 'leaflet'
@@ -15,10 +15,10 @@ import DateRangePicker from '../components/DateRangePicker'
 import { getLocalDateString, formatDate } from '../utils'
 
 // Category colors - matching PublicMetricPage
-const categoryConfig: Record<string, { bg: string; text: string; accent: string }> = {
-    impact: { bg: 'bg-purple-500', text: 'text-purple-600', accent: '#8b5cf6' },
-    output: { bg: 'bg-accent', text: 'text-accent', accent: '#c0dfa1' },
-    input: { bg: 'bg-blue-500', text: 'text-blue-600', accent: '#3b82f6' }
+const categoryConfig: Record<string, { bg: string; text: string; accent: string; badgeText: string }> = {
+    impact: { bg: 'bg-purple-500', text: 'text-purple-600', accent: '#8b5cf6', badgeText: 'text-white' },
+    output: { bg: 'bg-accent', text: 'text-accent', accent: '#c0dfa1', badgeText: 'text-gray-800' },
+    input: { bg: 'bg-blue-500', text: 'text-blue-600', accent: '#3b82f6', badgeText: 'text-white' }
 }
 
 // Map tile
@@ -213,13 +213,16 @@ export default function PublicImpactClaimPage() {
                 <div className="mb-5 sm:mb-8">
                     <div className="flex flex-col gap-4 sm:gap-6">
                         <div className="flex-1">
-                            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-                                <span className={`px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-full text-white ${config.bg} uppercase tracking-wide`}>
-                                    {claim.metric.category}
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+                                <span className="text-lg sm:text-xl font-bold text-gray-800">
+                                    Impact Claim
                                 </span>
-                                <span className="text-xs sm:text-sm text-gray-500 flex items-center gap-1">
-                                    <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                                    Verified Impact Claim
+                                <span className={`px-3 sm:px-4 py-1 sm:py-1.5 text-[10px] sm:text-xs font-semibold rounded-full uppercase tracking-wide border ${
+                                    claim.metric.category === 'impact' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' :
+                                    claim.metric.category === 'input' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
+                                    'bg-accent/15 text-accent-foreground border-accent/25'
+                                }`}>
+                                    {claim.metric.category}
                                 </span>
                             </div>
                             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-1 sm:mb-2">
@@ -403,12 +406,33 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
     currentFileIndex: number
     setCurrentFileIndex: (i: number | ((prev: number) => number)) => void
 }) {
-    const typeConfig: Record<string, { bg: string; label: string }> = {
-        visual_proof: { bg: 'bg-pink-100 text-pink-800', label: 'Visual Proof' },
-        documentation: { bg: 'bg-blue-100 text-blue-700', label: 'Documentation' },
-        testimony: { bg: 'bg-orange-100 text-orange-800', label: 'Testimonies' },
-        financials: { bg: 'bg-primary-100 text-primary-800', label: 'Financials' }
+    const [selectedTypes, setSelectedTypes] = useState<string[]>([])
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+
+    const typeConfig: Record<string, { bg: string; label: string; color: string; icon: any }> = {
+        visual_proof: { bg: 'bg-pink-100 text-pink-800', label: 'Visual Support', color: 'text-pink-500', icon: Camera },
+        documentation: { bg: 'bg-blue-100 text-blue-700', label: 'Documentation', color: 'text-blue-500', icon: FileText },
+        testimony: { bg: 'bg-orange-100 text-orange-800', label: 'Testimonies', color: 'text-orange-500', icon: MessageSquare },
+        financials: { bg: 'bg-primary-100 text-primary-800', label: 'Financials', color: 'text-primary-500', icon: DollarSign }
     }
+
+    const evidenceTypes = [
+        { value: 'visual_proof', label: 'Visual Support', icon: Camera },
+        { value: 'documentation', label: 'Documentation', icon: FileText },
+        { value: 'testimony', label: 'Testimonies', icon: MessageSquare },
+        { value: 'financials', label: 'Financials', icon: DollarSign }
+    ] as const
+
+    const typeCounts: Record<string, number> = {}
+    evidence.forEach(ev => { typeCounts[ev.type] = (typeCounts[ev.type] || 0) + 1 })
+
+    const toggleType = (type: string) => {
+        setSelectedTypes(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type])
+    }
+
+    const filteredEvidence = selectedTypes.length > 0
+        ? evidence.filter(ev => selectedTypes.includes(ev.type))
+        : evidence
 
     const isImageFile = (url: string) => {
         const ext = url.split('.').pop()?.toLowerCase() || ''
@@ -469,8 +493,8 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
         return []
     }
 
-    // Gallery helpers
-    const galleryItem = galleryIndex !== null ? evidence[galleryIndex] : null
+    // Gallery helpers — use filteredEvidence for navigation
+    const galleryItem = galleryIndex !== null ? filteredEvidence[galleryIndex] : null
     const galleryFiles = galleryItem ? getAllFiles(galleryItem) : []
     const galleryFile = galleryFiles[currentFileIndex] || null
 
@@ -479,15 +503,15 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
 
     const goToPrev = useCallback(() => {
         if (galleryIndex === null) return
-        setGalleryIndex(galleryIndex === 0 ? evidence.length - 1 : galleryIndex - 1)
+        setGalleryIndex(galleryIndex === 0 ? filteredEvidence.length - 1 : galleryIndex - 1)
         setCurrentFileIndex(0)
-    }, [galleryIndex, evidence.length, setGalleryIndex, setCurrentFileIndex])
+    }, [galleryIndex, filteredEvidence.length, setGalleryIndex, setCurrentFileIndex])
 
     const goToNext = useCallback(() => {
         if (galleryIndex === null) return
-        setGalleryIndex((galleryIndex + 1) % evidence.length)
+        setGalleryIndex((galleryIndex + 1) % filteredEvidence.length)
         setCurrentFileIndex(0)
-    }, [galleryIndex, evidence.length, setGalleryIndex, setCurrentFileIndex])
+    }, [galleryIndex, filteredEvidence.length, setGalleryIndex, setCurrentFileIndex])
 
     // Keyboard nav
     useEffect(() => {
@@ -521,17 +545,88 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
     return (
         <>
             <div className="bg-white/50 backdrop-blur-2xl rounded-2xl sm:rounded-3xl border border-white/60 shadow-xl shadow-black/5 overflow-hidden">
-                <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/40 flex items-center justify-between">
-                    <h2 className="font-semibold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
+                <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/40 flex items-center justify-between gap-3">
+                    <h2 className="font-semibold text-gray-800 flex items-center gap-2 text-sm sm:text-base flex-shrink-0">
                         <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
                         Supporting Evidence
                     </h2>
-                    <span className={`text-[10px] sm:text-xs font-semibold px-2 sm:px-3 py-1 rounded-full ${config.bg} text-white`}>
-                        {evidenceCount} item{evidenceCount !== 1 ? 's' : ''}
-                    </span>
+
+                    <div className="flex items-center gap-2">
+                        {/* Type filter dropdown */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+                                    selectedTypes.length > 0
+                                        ? 'bg-accent/10 text-accent border-accent/30'
+                                        : 'bg-white/60 text-gray-600 hover:bg-white/80 border-gray-200'
+                                }`}
+                            >
+                                <Filter className="w-3.5 h-3.5" />
+                                {selectedTypes.length > 0
+                                    ? `${selectedTypes.length} type${selectedTypes.length > 1 ? 's' : ''}`
+                                    : 'Filter type'
+                                }
+                                <ChevronDown className="w-3 h-3" />
+                            </button>
+
+                            {isDropdownOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
+                                    <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1 overflow-hidden">
+                                        {selectedTypes.length > 0 && (
+                                            <>
+                                                <button
+                                                    onClick={() => { setSelectedTypes([]); setIsDropdownOpen(false) }}
+                                                    className="w-full px-4 py-2 text-left text-xs text-muted-foreground hover:bg-gray-50 border-b border-gray-100"
+                                                >
+                                                    Clear filter
+                                                </button>
+                                            </>
+                                        )}
+                                        {evidenceTypes.map((type) => {
+                                            const count = typeCounts[type.value] || 0
+                                            const isSelected = selectedTypes.includes(type.value)
+                                            const TypeIcon = type.icon
+                                            return (
+                                                <label
+                                                    key={type.value}
+                                                    className={`w-full px-4 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 transition-colors cursor-pointer ${count === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={() => count > 0 && toggleType(type.value)}
+                                                        disabled={count === 0}
+                                                        className="w-4 h-4 rounded border-gray-300 text-accent focus:ring-accent"
+                                                    />
+                                                    <TypeIcon className={`w-4 h-4 ${typeConfig[type.value]?.color || 'text-gray-500'}`} />
+                                                    <span className={`flex-1 ${isSelected ? 'font-medium text-accent' : 'text-gray-700'}`}>{type.label}</span>
+                                                    <span className="text-xs text-muted-foreground">{count}</span>
+                                                </label>
+                                            )
+                                        })}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        {selectedTypes.length > 0 && (
+                            <button
+                                onClick={() => setSelectedTypes([])}
+                                className="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                <X className="w-3 h-3" /> Clear
+                            </button>
+                        )}
+
+                        <span className={`text-[10px] sm:text-xs font-semibold px-2 sm:px-3 py-1 rounded-full ${config.bg} text-white`}>
+                            {selectedTypes.length > 0 ? `${filteredEvidence.length} of ${evidenceCount}` : `${evidenceCount}`} item{(selectedTypes.length > 0 ? filteredEvidence.length : evidenceCount) !== 1 ? 's' : ''}
+                        </span>
+                    </div>
                 </div>
 
-                {evidence.length === 0 ? (
+                {filteredEvidence.length === 0 ? (
                     <div className="py-10 sm:py-16 text-center text-gray-500 px-4">
                         <FileText className="w-10 h-10 sm:w-14 sm:h-14 mx-auto mb-3 sm:mb-4 opacity-20" />
                         <p className="text-sm sm:text-lg font-medium mb-1">No evidence linked yet</p>
@@ -539,7 +634,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                     </div>
                 ) : (
                     <div className="p-3 sm:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-                        {evidence.map((ev, idx) => {
+                        {filteredEvidence.map((ev, idx) => {
                             const previewUrl = getPreviewUrl(ev)
                             const videoUrl = !previewUrl ? getVideoPreviewUrl(ev) : null
                             const fileCount = ev.files?.length || (ev.file_url ? 1 : 0)
@@ -610,7 +705,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                 <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${typeConfig[galleryItem.type]?.bg || 'bg-gray-100 text-gray-600'}`}>
                                     {typeConfig[galleryItem.type]?.label || galleryItem.type}
                                 </span>
-                                <span className="text-muted-foreground text-sm">{galleryIndex + 1} of {evidence.length}</span>
+                                <span className="text-muted-foreground text-sm">{galleryIndex + 1} of {filteredEvidence.length}</span>
                             </div>
                             <button onClick={closeGallery} className="w-9 h-9 rounded-full bg-white/60 hover:bg-white/80 border border-gray-200/50 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors shadow-sm">
                                 <X className="w-4 h-4" />
@@ -757,7 +852,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                             </button>
 
                             <div className="flex items-center gap-1.5 overflow-x-auto max-w-[50vw] scrollbar-hide px-2">
-                                {evidence.map((item, i) => {
+                                {filteredEvidence.map((item, i) => {
                                     const thumb = getPreviewUrl(item)
                                     const vidThumb = !thumb ? getVideoPreviewUrl(item) : null
                                     return (

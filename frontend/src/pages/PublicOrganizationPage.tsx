@@ -573,10 +573,10 @@ export default function PublicOrganizationPage() {
             
             {/* Header with Filters */}
             <header className="flex-shrink-0 bg-white/60 backdrop-blur-2xl border-b border-white/40 shadow-sm z-50 relative">
-                <div className="px-3 md:px-4 py-1.5">
-                    <div className="flex items-center gap-2">
+                <div className="px-2 sm:px-3 md:px-4 py-1.5">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
                         {/* Left: Nav + Org */}
-                        <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
                             <Link to="/explore" className="flex items-center gap-1 text-muted-foreground hover:text-accent transition-colors flex-shrink-0">
                                 <ArrowLeft className="w-4 h-4" />
                             </Link>
@@ -591,20 +591,20 @@ export default function PublicOrganizationPage() {
                         </div>
 
                         {/* Center: Filters */}
-                        <div className="flex items-center gap-1.5 flex-1 overflow-x-auto scrollbar-none">
+                        <div className="flex items-center gap-1 sm:gap-1.5 flex-1 min-w-0 overflow-x-auto scrollbar-none">
                             <button
                                 ref={initiativeBtnRef}
                                 onClick={() => { setShowInitiativeDropdown(!showInitiativeDropdown); setShowLocationDropdown(false) }}
-                                className="flex items-center pl-0 pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
+                                className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
                             >
                                 <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
                                     <Target className="w-3.5 h-3.5 text-gray-600" />
                                 </div>
-                                <span className={`ml-1.5 max-w-[90px] md:max-w-[120px] truncate ${selectedInitiative !== 'all' ? 'text-gray-900' : 'text-gray-500'}`}>
+                                <span className={`ml-1 sm:ml-1.5 max-w-[60px] sm:max-w-[90px] md:max-w-[120px] truncate ${selectedInitiative !== 'all' ? 'text-gray-900' : 'text-gray-500'}`}>
                                     {selectedInitiative === 'all' ? 'Initiative' : initiatives.find(i => i.id === selectedInitiative)?.title || 'Select'}
                                 </span>
                                 {selectedInitiative !== 'all' ? (
-                                    <X className="w-3 h-3 text-gray-400 hover:text-gray-600 ml-1" onClick={(e) => { e.stopPropagation(); setSelectedInitiative('all') }} />
+                                    <X className="w-3 h-3 text-gray-400 hover:text-gray-600 ml-0.5 sm:ml-1" onClick={(e) => { e.stopPropagation(); setSelectedInitiative('all') }} />
                                 ) : (
                                     <ChevronDown className="w-3 h-3 text-gray-400 ml-0.5" />
                                 )}
@@ -615,7 +615,7 @@ export default function PublicOrganizationPage() {
                                     value={datePickerValue.singleDate || datePickerValue.startDate ? datePickerValue : undefined}
                                     onChange={handleDateChange}
                                     placeholder="Date"
-                                    className="[&>button]:h-7 [&>button]:text-[11px] [&>button]:pr-2.5 [&>button>div]:w-7 [&>button>div]:h-7 [&>button>div>svg]:w-3.5 [&>button>div>svg]:h-3.5 [&>button>span]:ml-1.5"
+                                    className="[&>button]:h-7 [&>button]:text-[11px] [&>button]:pr-1.5 sm:[&>button]:pr-2.5 [&>button>div]:w-7 [&>button>div]:h-7 [&>button>div>svg]:w-3.5 [&>button>div>svg]:h-3.5 [&>button>span]:ml-1 sm:[&>button>span]:ml-1.5"
                                 />
                             </div>
 
@@ -623,19 +623,19 @@ export default function PublicOrganizationPage() {
                                 <button
                                     ref={locationBtnRef}
                                     onClick={() => { setShowLocationDropdown(!showLocationDropdown); setShowInitiativeDropdown(false) }}
-                                    className="flex items-center pl-0 pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
+                                    className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
                                 >
                                     <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
                                         <MapPin className="w-3.5 h-3.5 text-gray-600" />
                                     </div>
-                                    <span className={`ml-1.5 max-w-[90px] md:max-w-[120px] truncate ${selectedLocationIds.length > 0 ? 'text-gray-900' : 'text-gray-500'}`}>
+                                    <span className={`ml-1 sm:ml-1.5 max-w-[60px] sm:max-w-[90px] md:max-w-[120px] truncate ${selectedLocationIds.length > 0 ? 'text-gray-900' : 'text-gray-500'}`}>
                                         {selectedLocationIds.length > 0
-                                            ? `${selectedLocationIds.length} location${selectedLocationIds.length > 1 ? 's' : ''}`
+                                            ? `${selectedLocationIds.length} loc.`
                                             : 'Location'
                                         }
                                     </span>
                                     {selectedLocationIds.length > 0 ? (
-                                        <X className="w-3 h-3 text-gray-400 hover:text-gray-600 ml-1" onClick={(e) => { e.stopPropagation(); setSelectedLocationIds([]) }} />
+                                        <X className="w-3 h-3 text-gray-400 hover:text-gray-600 ml-0.5 sm:ml-1" onClick={(e) => { e.stopPropagation(); setSelectedLocationIds([]) }} />
                                     ) : (
                                         <ChevronDown className="w-3 h-3 text-gray-400 ml-0.5" />
                                     )}
@@ -653,7 +653,7 @@ export default function PublicOrganizationPage() {
                         </div>
 
                         {/* Right: Nexus Logo */}
-                        <Link to="/" className="flex items-center gap-2 flex-shrink-0">
+                        <Link to="/" className="hidden sm:flex items-center gap-2 flex-shrink-0">
                             <div className="w-6 h-6 rounded-lg overflow-hidden">
                                 <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
                             </div>

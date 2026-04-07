@@ -652,19 +652,49 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     const filteredUpdates = getFilteredUpdates()
     const filteredKPIs = getFilteredKPIs()
 
-    // Calculate x-axis interval to always show approximately 30 labels (1 month's worth)
-    // For 1 month view, show every single day
-    const getXAxisInterval = () => {
-        // Non-cumulative mode: show every month (interval 0)
-        if (!isCumulative && timeFrame === 'all') return 0
+    const getTimeSpanDays = () => {
+        if (chartData.length < 2) return 0
+        const first = chartData[0]?.fullDate
+        const last = chartData[chartData.length - 1]?.fullDate
+        if (!first || !last) return 0
+        return Math.round((last.getTime() - first.getTime()) / (1000 * 60 * 60 * 24))
+    }
 
-        // If viewing 1 month without custom date range, show all labels (every day)
+    const getXAxisInterval = () => {
         if (timeFrame === '1month' && !datePickerValue.singleDate && !datePickerValue.startDate) return 0
 
         const dataPointCount = chartData.length
-        if (dataPointCount <= 30) return 0 // Show all labels if we have 30 or fewer data points
-        // Calculate interval to show ~30 labels: interval = floor((count - 1) / 30)
-        return Math.floor((dataPointCount - 1) / 30)
+        if (dataPointCount <= 12) return 0
+
+        if (!isCumulative) {
+            if (dataPointCount <= 24) return 1
+            if (dataPointCount <= 48) return 2
+            if (dataPointCount <= 72) return 5
+            return Math.floor((dataPointCount - 1) / 12)
+        }
+
+        const spanDays = getTimeSpanDays()
+        if (spanDays <= 90) return Math.floor((dataPointCount - 1) / 30)
+        if (spanDays <= 365) return Math.floor((dataPointCount - 1) / 12)
+        if (spanDays <= 730) return Math.floor((dataPointCount - 1) / 12)
+        return Math.floor((dataPointCount - 1) / 8)
+    }
+
+    const formatXAxisTick = (dateStr: string) => {
+        const dp = chartData.find(d => d.date === dateStr)
+        if (!dp?.fullDate) return dateStr
+        const spanDays = getTimeSpanDays()
+        const d = dp.fullDate as Date
+        if (spanDays <= 60) {
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        }
+        if (spanDays <= 365) {
+            return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+        }
+        if (spanDays <= 730) {
+            return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+        }
+        return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
     }
 
     // Get top 12 KPIs for metric cards (from ordered KPIs, then filtered)
@@ -1248,6 +1278,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                         height={60}
                                         interval={getXAxisInterval()}
                                         tickMargin={8}
+                                        tickFormatter={isCumulative ? formatXAxisTick : undefined}
                                     />
                                     <YAxis
                                         stroke="#6b7280"

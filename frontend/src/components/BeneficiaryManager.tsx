@@ -589,6 +589,13 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
                     onStoryClick={onStoryClick}
                     onMetricClick={onMetricClick}
                     initiativeId={initiativeId}
+                    groupLocations={
+                        selectedGroup?.id
+                            ? (derivedLocationIds[selectedGroup.id] || [])
+                                .map(id => locationsMap[id])
+                                .filter(Boolean)
+                            : []
+                    }
                 />
             )}
 

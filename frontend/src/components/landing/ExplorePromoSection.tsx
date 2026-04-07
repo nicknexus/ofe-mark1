@@ -89,7 +89,7 @@ const slides = [
   {
     key: "stories",
     label: "Stories",
-    subtitle: "Life changing moments",
+    subtitle: "Life Changing Moments",
     icon: BookOpen,
   },
   {
@@ -101,7 +101,7 @@ const slides = [
   {
     key: "locations",
     label: "Locations",
-    subtitle: "Where impact occurs",
+    subtitle: "Where Impact Occurs",
     icon: MapPin,
   },
   {
@@ -157,7 +157,7 @@ function MetricsSlide() {
       <div className="p-4 flex-1 flex flex-col">
         <div className="flex items-baseline gap-2 mb-3 flex-shrink-0">
           <span className="text-3xl font-bold text-foreground">7,940</span>
-          <span className="text-sm text-muted-foreground">meals provided</span>
+          <span className="text-sm text-muted-foreground">Meals Provided</span>
         </div>
         <div className="flex-1">
           <ResponsiveContainer width="100%" height="100%">
@@ -302,35 +302,31 @@ const ExplorePromoSection = () => {
           {/* Left — copy + CTA */}
           <div>
             <h2 className="text-4xl sm:text-5xl lg:text-6xl font-newsreader font-light text-foreground mb-6 leading-tight">
-              The end to{" "}
+              The End to Ineffective{" "}
               <span className="relative inline-block">
-                ineffective reporting
+                Reporting
                 <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 300 12" fill="none">
                   <path d="M2 8C75 2 225 2 298 8" stroke="#c0dfa1" strokeWidth="4" strokeLinecap="round" className="animate-pulse-soft-landing" />
                 </svg>
               </span>
             </h2>
 
-            <p className="text-lg sm:text-xl text-muted-foreground max-w-lg leading-relaxed mb-8">
+            <p className="text-2xl sm:text-3xl font-newsreader font-light text-foreground max-w-lg leading-snug mb-8">
               Actively Experience...
             </p>
 
             <Link
               to="/login"
-              className="inline-flex items-center justify-center gap-2 px-8 h-14 rounded-2xl bg-accent/15 text-foreground text-lg font-medium hover:bg-accent/25 transition-all duration-300 border border-accent/30 hover:shadow-lg hover:-translate-y-0.5 group"
+              className="inline-flex items-center justify-center gap-2 px-8 h-14 rounded-2xl bg-accent text-accent-foreground text-lg font-medium hover:bg-accent/90 transition-all duration-300 border-2 border-accent/50 shadow-sage hover:shadow-md hover:-translate-y-0.5 group"
             >
-              Sign Up Free
-              <ArrowRight className="w-5 h-5 text-accent-foreground transition-transform group-hover:translate-x-1" />
+              Start for Free
+              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
             </Link>
 
             <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground mt-8">
               <div className="flex items-center gap-2">
-                <Globe className="w-4 h-4 text-accent-foreground" />
-                <span>Fast & easy reporting</span>
-              </div>
-              <div className="flex items-center gap-2">
                 <Search className="w-4 h-4 text-accent-foreground" />
-                <span>Full transparency</span>
+                <span>Full Transparency</span>
               </div>
             </div>
           </div>

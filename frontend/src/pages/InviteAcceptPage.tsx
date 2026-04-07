@@ -340,21 +340,21 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
             ) : (
                 <div className="space-y-3">
                     <Link
-                        to={`/login?redirect=${encodeURIComponent(`/invite/${token}`)}`}
-                        className="w-full px-6 py-3 bg-primary-500 hover:bg-primary-600 text-gray-800 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
-                    >
-                        <LogIn className="w-4 h-4" />
-                        Log In to Accept
-                    </Link>
-                    <div className="text-center text-sm text-muted-foreground">
-                        Don't have an account?
-                    </div>
-                    <Link
                         to={`/login?signup=true&redirect=${encodeURIComponent(`/invite/${token}`)}`}
-                        className="w-full px-6 py-3 bg-white/60 hover:bg-white/80 text-foreground font-medium rounded-xl border border-white/80 transition-colors flex items-center justify-center gap-2"
+                        className="w-full px-6 py-3 bg-primary-500 hover:bg-primary-600 text-gray-800 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
                     >
                         <UserPlus className="w-4 h-4" />
                         Sign Up to Accept
+                    </Link>
+                    <div className="text-center text-sm text-muted-foreground">
+                        Already have an account?
+                    </div>
+                    <Link
+                        to={`/login?redirect=${encodeURIComponent(`/invite/${token}`)}`}
+                        className="w-full px-6 py-3 bg-white/60 hover:bg-white/80 text-foreground font-medium rounded-xl border border-white/80 transition-colors flex items-center justify-center gap-2"
+                    >
+                        <LogIn className="w-4 h-4" />
+                        Log In to Accept
                     </Link>
                 </div>
             )}

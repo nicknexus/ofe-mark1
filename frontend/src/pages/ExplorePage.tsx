@@ -15,7 +15,11 @@ function useDebounce<T>(value: T, delay: number): T {
     return debouncedValue
 }
 
-export default function ExplorePage() {
+interface ExplorePageProps {
+    embedded?: boolean
+}
+
+export default function ExplorePage({ embedded = false }: ExplorePageProps) {
     const [searchQuery, setSearchQuery] = useState('')
     const [results, setResults] = useState<SearchResult | null>(null)
     const [loading, setLoading] = useState(false)
@@ -67,9 +71,9 @@ export default function ExplorePage() {
     }
 
     return (
-        <div className="min-h-screen font-figtree relative animate-fadeIn">
+        <div className={`${embedded ? 'min-h-0 pb-4' : 'min-h-screen'} font-figtree relative animate-fadeIn`}>
             {/* Flowing gradient background with fading grid */}
-            <div className="fixed inset-0 pointer-events-none">
+            <div className={`${embedded ? 'absolute' : 'fixed'} inset-0 pointer-events-none`}>
                 {/* Subtle grid pattern */}
                 <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(210,220,230,0.2)_1px,transparent_1px),linear-gradient(to_bottom,rgba(210,220,230,0.2)_1px,transparent_1px)] bg-[size:60px_60px]" />
 
@@ -91,9 +95,9 @@ export default function ExplorePage() {
             </div>
 
             {/* Header */}
-            <div className="relative z-10 pt-4 sm:pt-8 pb-8 sm:pb-12">
+            <div className={`relative z-10 ${embedded ? 'pt-2 pb-4' : 'pt-4 sm:pt-8 pb-8 sm:pb-12'}`}>
                 <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                    {/* Navigation */}
+                    {!embedded && (
                     <nav className="mb-6 sm:mb-12">
                         <div className="bg-white/40 backdrop-blur-2xl rounded-2xl px-4 sm:px-6 py-3 flex items-center justify-between border border-white/60 shadow-xl shadow-black/5">
                             <Link to="/" className="flex items-center gap-2 group">
@@ -117,6 +121,7 @@ export default function ExplorePage() {
                             </div>
                         </div>
                     </nav>
+                    )}
 
                     {/* Hero Section */}
                     <div className="text-center mb-8 sm:mb-12">

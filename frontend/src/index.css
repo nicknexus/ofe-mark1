@@ -665,15 +665,19 @@
     color: #374151 !important;
 }
 
-/* Dim Leaflet map when modal backdrop is present */
-.fixed.inset-0[class*="bg-black"]~* .leaflet-container,
-.fixed.inset-0[class*="bg-black"]~* .leaflet-pane,
-body:has(.fixed.inset-0[class*="bg-black"]) .leaflet-container,
-body:has(.fixed.inset-0[class*="bg-black"]) .leaflet-pane,
-body.location-modal-open .leaflet-container,
-body.location-modal-open .leaflet-pane {
+/* Dim Leaflet map when modal backdrop is present (but not maps inside the modal itself) */
+.fixed.inset-0[class*="bg-black"]~*:not(.fixed) .leaflet-container,
+.fixed.inset-0[class*="bg-black"]~*:not(.fixed) .leaflet-pane,
+body.location-modal-open .leaflet-container:not(.leaflet-map-in-modal),
+body.location-modal-open .leaflet-pane:not(.leaflet-map-in-modal .leaflet-pane) {
     filter: brightness(0.75) !important;
     transition: filter 0.2s ease-in-out;
+}
+
+/* Maps inside modals should never be dimmed */
+.fixed.inset-0 .leaflet-container,
+.fixed.inset-0 .leaflet-pane {
+    filter: none !important;
 }
 
 /* Hover effects */

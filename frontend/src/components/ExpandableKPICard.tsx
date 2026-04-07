@@ -661,19 +661,49 @@ export default function ExpandableKPICard({
 
     const chartData = generateChartData()
 
-    // Calculate x-axis interval to always show approximately 30 labels (1 month's worth)
-    // For 1 month view, show every single day
-    const getXAxisInterval = () => {
-        // Non-cumulative mode: show every month (interval 0)
-        if (!isCumulative && timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate) return 0
+    const getTimeSpanDays = () => {
+        if (chartData.length < 2) return 0
+        const first = chartData[0]?.fullDate
+        const last = chartData[chartData.length - 1]?.fullDate
+        if (!first || !last) return 0
+        return Math.round((last.getTime() - first.getTime()) / (1000 * 60 * 60 * 24))
+    }
 
-        // If viewing 1 month, show all labels (every day)
+    const getXAxisInterval = () => {
         if (timeFrame === '1month') return 0
 
         const dataPointCount = chartData.length
-        if (dataPointCount <= 30) return 0 // Show all labels if we have 30 or fewer data points
-        // Calculate interval to show ~30 labels: interval = floor((count - 1) / 30)
-        return Math.floor((dataPointCount - 1) / 30)
+        if (dataPointCount <= 12) return 0
+
+        if (!isCumulative) {
+            if (dataPointCount <= 24) return 1
+            if (dataPointCount <= 48) return 2
+            if (dataPointCount <= 72) return 5
+            return Math.floor((dataPointCount - 1) / 12)
+        }
+
+        const spanDays = getTimeSpanDays()
+        if (spanDays <= 90) return Math.floor((dataPointCount - 1) / 30)
+        if (spanDays <= 365) return Math.floor((dataPointCount - 1) / 12)
+        if (spanDays <= 730) return Math.floor((dataPointCount - 1) / 12)
+        return Math.floor((dataPointCount - 1) / 8)
+    }
+
+    const formatXAxisTick = (dateStr: string) => {
+        const dp = chartData.find(d => d.date === dateStr)
+        if (!dp?.fullDate) return dateStr
+        const spanDays = getTimeSpanDays()
+        const d = dp.fullDate as Date
+        if (spanDays <= 60) {
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        }
+        if (spanDays <= 365) {
+            return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+        }
+        if (spanDays <= 730) {
+            return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+        }
+        return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
     }
 
     // Calculate dynamic max value with headroom for the graph
@@ -904,7 +934,7 @@ export default function ExpandableKPICard({
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <LineChart data={chartData}>
                                                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                                                        <XAxis dataKey="date" stroke="#9ca3af" fontSize={10} tick={{ fill: '#9ca3af' }} angle={-45} textAnchor="end" height={50} interval={getXAxisInterval()} tickMargin={6} />
+                                                        <XAxis dataKey="date" stroke="#9ca3af" fontSize={10} tick={{ fill: '#9ca3af' }} angle={-45} textAnchor="end" height={50} interval={getXAxisInterval()} tickMargin={6} tickFormatter={isCumulative ? formatXAxisTick : undefined} />
                                                         <YAxis stroke="#9ca3af" fontSize={10} tick={{ fill: '#9ca3af' }} domain={maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax']} ticks={yTicks.length > 0 ? yTicks : undefined} tickFormatter={(value) => { if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`; if (value >= 1000) return `${(value / 1000).toFixed(1)}K`; return value.toString() }} />
                                                         <Tooltip contentStyle={{ backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '10px', padding: '8px 10px', fontSize: '11px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} formatter={(value: any) => [typeof value === 'number' ? value.toLocaleString() + (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '') : value, 'Cumulative Total']} labelFormatter={(label) => { const dp = chartData.find(d => d.date === label); return dp?.fullDate ? formatDate(dp.fullDate) : `Date: ${label}` }} cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '5 5' }} />
                                                         <Line type="monotone" dataKey="cumulative" stroke={chartColor} strokeWidth={2.5} dot={false} activeDot={{ r: 5, fill: chartColor, stroke: 'white', strokeWidth: 2 }} strokeLinecap="round" />
@@ -1490,7 +1520,7 @@ export default function ExpandableKPICard({
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <LineChart data={chartData}>
                                                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                                                        <XAxis dataKey="date" stroke="#9ca3af" fontSize={11} tick={{ fill: '#9ca3af' }} angle={-45} textAnchor="end" height={60} interval={getXAxisInterval()} tickMargin={8} />
+                                                        <XAxis dataKey="date" stroke="#9ca3af" fontSize={11} tick={{ fill: '#9ca3af' }} angle={-45} textAnchor="end" height={60} interval={getXAxisInterval()} tickMargin={8} tickFormatter={isCumulative ? formatXAxisTick : undefined} />
                                                         <YAxis stroke="#9ca3af" fontSize={11} tick={{ fill: '#9ca3af' }} domain={maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax']} ticks={yTicks.length > 0 ? yTicks : undefined} tickFormatter={(value) => { if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`; if (value >= 1000) return `${(value / 1000).toFixed(1)}K`; return value.toString() }} />
                                                         <Tooltip contentStyle={{ backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '12px', padding: '10px 12px', fontSize: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} formatter={(value: any) => { const unit = kpi.unit_of_measurement || ''; const formattedValue = typeof value === 'number' ? value.toLocaleString() + (unit ? ` ${unit}` : '') : value; return [formattedValue, 'Cumulative Total'] }} labelFormatter={(label) => { const dataPoint = chartData.find(d => d.date === label); if (dataPoint?.fullDate) { return formatDate(dataPoint.fullDate) } return `Date: ${label}` }} cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '5 5' }} />
                                                         <Line type="monotone" dataKey="cumulative" stroke={chartColor} strokeWidth={3.5} dot={false} activeDot={{ r: 6, fill: chartColor, stroke: 'white', strokeWidth: 2 }} strokeLinecap="round" />
@@ -1797,6 +1827,7 @@ export default function ExpandableKPICard({
                                                             height={60}
                                                             interval={getXAxisInterval()}
                                                             tickMargin={8}
+                                                            tickFormatter={isCumulative ? formatXAxisTick : undefined}
                                                         />
                                                         <YAxis
                                                             stroke="#6b7280"

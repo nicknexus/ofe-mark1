@@ -1,9 +1,130 @@
-import React, { useState, useEffect } from 'react'
-import { X, Users, BarChart3, FileText, Calendar, Info, Loader2, Camera, MessageSquare, DollarSign, Edit } from 'lucide-react'
-import { BeneficiaryGroup, KPIUpdate, Evidence, Story } from '../types'
+import React, { useState, useEffect, useMemo } from 'react'
+import { X, Users, BarChart3, FileText, Calendar, Info, Loader2, Camera, MessageSquare, DollarSign, Edit, MapPin } from 'lucide-react'
+import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import { BeneficiaryGroup, KPIUpdate, Evidence, Story, Location } from '../types'
 import { apiService } from '../services/api'
 import { getEvidenceTypeInfo, formatDate } from '../utils'
 import EvidencePreviewModal from './EvidencePreviewModal'
+
+delete (L.Icon.Default.prototype as any)._getIconUrl
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+})
+
+const CARTO_VOYAGER_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+const CARTO_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+const OSM_FALLBACK_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+
+function TileLayerWithFallback() {
+    const [useFallback, setUseFallback] = useState(false)
+    const map = useMap()
+    useEffect(() => {
+        if (useFallback) return
+        const testImg = new Image()
+        testImg.onerror = () => {
+            setUseFallback(true)
+        }
+        testImg.src = 'https://a.basemaps.cartocdn.com/rastertiles/voyager/0/0/0.png'
+        return () => { testImg.onerror = null }
+    }, [useFallback])
+    useEffect(() => {
+        const handleTileError = () => {
+            if (!useFallback) setUseFallback(true)
+        }
+        map.on('tileerror', handleTileError)
+        return () => { map.off('tileerror', handleTileError) }
+    }, [map, useFallback])
+    return (
+        <TileLayer
+            attribution={useFallback ? OSM_ATTRIBUTION : CARTO_ATTRIBUTION}
+            url={useFallback ? OSM_FALLBACK_URL : CARTO_VOYAGER_URL}
+            subdomains={useFallback ? ['a', 'b', 'c'] : ['a', 'b', 'c', 'd']}
+            maxZoom={20}
+        />
+    )
+}
+
+function MapResizeHandler() {
+    const map = useMap()
+    useEffect(() => {
+        const handleResize = () => {
+            setTimeout(() => map.invalidateSize(), 100)
+        }
+        window.addEventListener('resize', handleResize)
+        const container = map.getContainer()
+        const resizeObserver = new ResizeObserver(() => map.invalidateSize())
+        resizeObserver.observe(container)
+        map.invalidateSize()
+        return () => {
+            window.removeEventListener('resize', handleResize)
+            resizeObserver.disconnect()
+        }
+    }, [map])
+    return null
+}
+
+function FitBoundsToLocations({ locations }: { locations: Location[] }) {
+    const map = useMap()
+    useEffect(() => {
+        if (locations.length === 0) return
+        if (locations.length === 1) {
+            map.setView([locations[0].latitude, locations[0].longitude], 12)
+            return
+        }
+        const bounds = L.latLngBounds(locations.map(l => [l.latitude, l.longitude]))
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 })
+    }, [map, locations])
+    return null
+}
+
+function createLocationIcon() {
+    const size = 32
+    const color = '#c0dfa1'
+    return L.divIcon({
+        className: 'custom-marker',
+        html: `
+            <div style="
+                position: relative;
+                width: ${size}px;
+                height: ${size}px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+            ">
+                <div style="
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 50%;
+                    background-color: ${color};
+                    border: 3px solid white;
+                    position: relative;
+                    z-index: 10;
+                ">
+                    <div style="
+                        position: absolute;
+                        left: 50%;
+                        top: 50%;
+                        transform: translate(-50%, -50%);
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 50%;
+                        background-color: white;
+                    "></div>
+                </div>
+            </div>
+        `,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+    })
+}
+
+const locationMarkerIcon = createLocationIcon()
 
 interface BeneficiaryGroupDetailsModalProps {
     isOpen: boolean
@@ -14,6 +135,7 @@ interface BeneficiaryGroupDetailsModalProps {
     onStoryClick?: (storyId: string) => void
     refreshKey?: number
     initiativeId?: string
+    groupLocations?: Location[]
 }
 
 export default function BeneficiaryGroupDetailsModal({
@@ -25,10 +147,12 @@ export default function BeneficiaryGroupDetailsModal({
     onStoryClick,
     refreshKey,
     initiativeId,
+    groupLocations = [],
 }: BeneficiaryGroupDetailsModalProps) {
     const [kpiUpdates, setKpiUpdates] = useState<KPIUpdate[]>([])
     const [evidence, setEvidence] = useState<Evidence[]>([])
     const [stories, setStories] = useState<Story[]>([])
+    const [location, setLocation] = useState<Location | null>(null)
     const [loading, setLoading] = useState(false)
     const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null)
     const [isEvidencePreviewOpen, setIsEvidencePreviewOpen] = useState(false)
@@ -61,6 +185,37 @@ export default function BeneficiaryGroupDetailsModal({
             setStories([])
         }
     }, [isOpen, beneficiaryGroup?.id, refreshKey, initiativeId])
+
+    useEffect(() => {
+        if (!isOpen) {
+            setLocation(null)
+            return
+        }
+        if (groupLocations.length > 0) {
+            setLocation(null)
+            return
+        }
+        if (beneficiaryGroup?.location_id) {
+            apiService.getLocation(beneficiaryGroup.location_id)
+                .then(loc => setLocation(loc))
+                .catch(() => setLocation(null))
+        } else {
+            setLocation(null)
+        }
+    }, [isOpen, beneficiaryGroup?.location_id, groupLocations.length])
+
+    const mapLocations = useMemo(() => {
+        if (groupLocations.length > 0) return groupLocations
+        if (location) return [location]
+        return []
+    }, [groupLocations, location])
+
+    const mapCenter = useMemo<[number, number]>(() => {
+        if (mapLocations.length === 0) return [0, 0]
+        const avgLat = mapLocations.reduce((s, l) => s + l.latitude, 0) / mapLocations.length
+        const avgLng = mapLocations.reduce((s, l) => s + l.longitude, 0) / mapLocations.length
+        return [avgLat, avgLng]
+    }, [mapLocations])
 
     if (!isOpen || !beneficiaryGroup) return null
 
@@ -170,7 +325,7 @@ export default function BeneficiaryGroupDetailsModal({
     return (
         <>
             <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[70] animate-fade-in">
-                <div className="bubble-card max-w-7xl w-full h-[90vh] max-h-[90vh] overflow-hidden flex flex-col animate-slide-up">
+                <div className="bubble-card max-w-[95vw] w-full h-[90vh] max-h-[90vh] overflow-hidden flex flex-col animate-slide-up">
                     {/* Header */}
                     <div className="flex items-start justify-between p-6 border-b border-gray-100 flex-shrink-0">
                         <div className="flex items-start space-x-4 flex-1">
@@ -226,7 +381,7 @@ export default function BeneficiaryGroupDetailsModal({
                         </div>
                     </div>
 
-                    {/* Content - 3 Column Layout */}
+                    {/* Content - 4 Column Layout */}
                     <div className="flex-1 overflow-hidden min-h-0 p-6">
                         {loading ? (
                             <div className="flex items-center justify-center py-12">
@@ -234,7 +389,7 @@ export default function BeneficiaryGroupDetailsModal({
                                 <span className="ml-3 text-gray-600">Loading beneficiary group data...</span>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-3 gap-6 h-full">
+                            <div className="grid grid-cols-4 gap-6 h-full">
                                 {/* Left Column - Stories */}
                                 <div className="bubble-card overflow-hidden flex flex-col min-h-0 h-full">
                                     <div className="px-6 py-4 border-b border-gray-100 flex-shrink-0">
@@ -372,7 +527,7 @@ export default function BeneficiaryGroupDetailsModal({
                                     </div>
                                 </div>
 
-                                {/* Right Column - Evidence */}
+                                {/* Third Column - Evidence */}
                                 <div className="bubble-card overflow-hidden flex flex-col min-h-0 h-full">
                                     <div className="px-6 py-4 border-b border-gray-100 flex-shrink-0">
                                         <div className="flex items-center space-x-2">
@@ -396,7 +551,6 @@ export default function BeneficiaryGroupDetailsModal({
                                                     
                                                     return (
                                                         <div key={type} className={`rounded-lg border ${colors.cardBorder} overflow-hidden ${colors.cardBg}`}>
-                                                            {/* Evidence Type Card Header */}
                                                             <div className={`px-3 py-2 border-b-2 ${colors.headerBorder} shadow-sm ${colors.headerBg}`}>
                                                                 <div className="flex items-center space-x-2 min-w-0">
                                                                     <IconComponent className={`w-4 h-4 ${colors.headerIcon} flex-shrink-0`} />
@@ -411,7 +565,6 @@ export default function BeneficiaryGroupDetailsModal({
                                                                 </div>
                                                             </div>
                                                             
-                                                            {/* Evidence Items List */}
                                                             <div className={`px-3 py-1.5 space-y-1 ${evidenceList.length > 3 ? 'max-h-[150px] overflow-y-auto' : ''}`}>
                                                                 {evidenceList.map((ev, idx) => (
                                                                     <div 
@@ -443,6 +596,58 @@ export default function BeneficiaryGroupDetailsModal({
                                                         </div>
                                                     )
                                                 })}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Fourth Column - Location Map */}
+                                <div className="bubble-card overflow-hidden flex flex-col min-h-0 h-full">
+                                    <div className="px-6 py-4 border-b border-gray-100 flex-shrink-0">
+                                        <div className="flex items-center space-x-2">
+                                            <MapPin className="w-4 h-4 text-gray-600" />
+                                            <h3 className="text-sm font-semibold text-gray-900">Location</h3>
+                                            {mapLocations.length > 0 && (
+                                                <span className="status-pill">{mapLocations.length}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 min-h-0 relative overflow-hidden">
+                                        {mapLocations.length === 0 ? (
+                                            <div className="flex items-center justify-center h-full">
+                                                <div className="text-center py-8">
+                                                    <MapPin className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                                                    <p className="text-xs text-gray-500">No location linked</p>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="relative w-full h-full overflow-hidden">
+                                                <MapContainer
+                                                    center={mapCenter}
+                                                    zoom={2}
+                                                    style={{ width: '100%', height: '100%' }}
+                                                    className="leaflet-map-dashboard relative z-0"
+                                                    zoomControl={false}
+                                                    scrollWheelZoom={true}
+                                                >
+                                                    <TileLayerWithFallback />
+                                                    <MapResizeHandler />
+                                                    <FitBoundsToLocations locations={mapLocations} />
+                                                    {mapLocations.map(loc => (
+                                                        <Marker
+                                                            key={loc.id}
+                                                            position={[loc.latitude, loc.longitude]}
+                                                            icon={locationMarkerIcon}
+                                                        >
+                                                            <Tooltip direction="top" offset={[0, -16]} permanent={mapLocations.length <= 3}>
+                                                                <span className="text-xs font-medium">{loc.name}</span>
+                                                                {loc.country && (
+                                                                    <span className="text-[10px] text-gray-500 ml-1">({loc.country})</span>
+                                                                )}
+                                                            </Tooltip>
+                                                        </Marker>
+                                                    ))}
+                                                </MapContainer>
                                             </div>
                                         )}
                                     </div>

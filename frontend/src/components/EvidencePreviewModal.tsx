@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { X, Calendar, FileText, Camera, MessageSquare, DollarSign, ExternalLink, Download, Edit, BarChart3, MapPin, Trash2, ChevronLeft, ChevronRight, Eye } from 'lucide-react'
-import { Evidence, Location } from '../types'
+import { X, Calendar, FileText, Camera, MessageSquare, DollarSign, ExternalLink, Download, Edit, BarChart3, MapPin, Trash2, ChevronLeft, ChevronRight, Eye, Users } from 'lucide-react'
+import { Evidence, Location, BeneficiaryGroup } from '../types'
 import { formatDate, getEvidenceTypeInfo } from '../utils'
 import { apiService } from '../services/api'
 
@@ -32,6 +32,8 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
     const [evidenceFiles, setEvidenceFiles] = useState<EvidenceFile[]>([])
     const [loadingFiles, setLoadingFiles] = useState(false)
     const [currentFileIndex, setCurrentFileIndex] = useState(0)
+    const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
+    const [loadingBeneficiaryGroups, setLoadingBeneficiaryGroups] = useState(false)
 
     // Fetch full evidence data including location_ids when modal opens
     useEffect(() => {
@@ -52,6 +54,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
             setEvidenceFiles([])
             setCurrentFileIndex(0)
             setLocations([])
+            setBeneficiaryGroups([])
             setEvidence(null)
         }
     }, [isOpen, evidenceProp?.id])
@@ -62,6 +65,15 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
             loadLocations()
         }
     }, [evidence?.location_ids, evidence?.location_id])
+
+    // Load beneficiary groups when evidence data is available
+    useEffect(() => {
+        if (evidence?.beneficiary_group_ids?.length && evidence.initiative_id) {
+            loadBeneficiaryGroups()
+        } else {
+            setBeneficiaryGroups([])
+        }
+    }, [evidence?.beneficiary_group_ids, evidence?.initiative_id])
 
     const loadEvidenceFiles = async () => {
         if (!evidenceProp?.id) return
@@ -175,6 +187,22 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
             setLocations([])
         } finally {
             setLoadingLocations(false)
+        }
+    }
+
+    const loadBeneficiaryGroups = async () => {
+        const groupIds = evidence?.beneficiary_group_ids
+        if (!groupIds?.length || !evidence?.initiative_id) return
+        try {
+            setLoadingBeneficiaryGroups(true)
+            const allGroups = await apiService.getBeneficiaryGroups(evidence.initiative_id)
+            const linked = allGroups.filter(g => g.id && groupIds.includes(g.id))
+            setBeneficiaryGroups(linked)
+        } catch (error) {
+            console.error('Failed to load beneficiary groups:', error)
+            setBeneficiaryGroups([])
+        } finally {
+            setLoadingBeneficiaryGroups(false)
         }
     }
 
@@ -511,6 +539,38 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
                                             )}
                                         </div>
                                     </div>
+                                )}
+
+                                {/* Beneficiary Groups */}
+                                {(beneficiaryGroups.length > 0 || loadingBeneficiaryGroups) && (
+                                    <>
+                                        <div className="hidden md:block w-px h-10 bg-evidence-200/40"></div>
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-white/80 flex items-center justify-center border border-evidence-200/40">
+                                                <Users className="w-4 h-4 text-primary-600" />
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">
+                                                    {beneficiaryGroups.length > 1 ? 'Beneficiary Groups' : 'Beneficiary Group'}
+                                                </p>
+                                                {loadingBeneficiaryGroups ? (
+                                                    <div className="animate-pulse h-4 bg-gray-200 rounded w-24"></div>
+                                                ) : (
+                                                    <div className="flex flex-wrap gap-1.5 mt-0.5">
+                                                        {beneficiaryGroups.map(group => (
+                                                            <span
+                                                                key={group.id}
+                                                                className="inline-flex items-center gap-1 text-xs font-semibold text-gray-800 bg-white/80 border border-evidence-200/40 rounded-lg px-2 py-0.5"
+                                                            >
+                                                                <Users className="w-3 h-3 text-primary-500" />
+                                                                {group.name}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </>
                                 )}
                             </div>
                         </div>
