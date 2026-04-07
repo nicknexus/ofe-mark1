@@ -301,19 +301,36 @@ const ExplorePromoSection = () => {
         <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
           {/* Left — copy + CTA */}
           <div>
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-newsreader font-light text-foreground mb-6 leading-tight">
-              The End to Ineffective{" "}
-              <span className="relative inline-block">
-                Reporting
-                <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 300 12" fill="none">
-                  <path d="M2 8C75 2 225 2 298 8" stroke="#c0dfa1" strokeWidth="4" strokeLinecap="round" className="animate-pulse-soft-landing" />
-                </svg>
-              </span>
+            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-newsreader font-light text-foreground mb-12 leading-tight">
+              The end of ineffective reporting.
             </h2>
 
-            <p className="text-2xl sm:text-3xl font-newsreader font-light text-foreground max-w-lg leading-snug mb-8">
-              Actively Experience...
-            </p>
+            <div className="flex items-center gap-3 mb-14 -mt-2">
+              <p className="text-2xl sm:text-3xl font-newsreader font-light text-foreground leading-snug">
+                Actively Experience...
+              </p>
+              <svg
+                className="hidden lg:block w-64 h-10 flex-shrink-0"
+                viewBox="0 0 240 40"
+                fill="none"
+              >
+                <path
+                  d="M4 20Q110 38 216 20"
+                  stroke="#c0dfa1"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  className="animate-pulse-soft-landing"
+                />
+                <path
+                  d="M214 8L234 16L218 28"
+                  stroke="#c0dfa1"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="animate-pulse-soft-landing"
+                />
+              </svg>
+            </div>
 
             <Link
               to="/login"
@@ -368,11 +385,10 @@ const ExplorePromoSection = () => {
               {slideComponents.map((component, idx) => (
                 <div
                   key={slides[idx].key}
-                  className={`transition-all duration-500 ${
-                    idx === activeIndex
+                  className={`transition-all duration-500 ${idx === activeIndex
                       ? "opacity-100 translate-y-0 relative"
                       : "opacity-0 translate-y-4 absolute inset-0 pointer-events-none"
-                  }`}
+                    }`}
                 >
                   {component}
                 </div>
@@ -388,11 +404,10 @@ const ExplorePromoSection = () => {
                   <button
                     key={slide.key}
                     onClick={() => goTo(idx)}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-medium transition-all duration-300 ${
-                      isActive
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-medium transition-all duration-300 ${isActive
                         ? "bg-accent/20 text-foreground border border-accent/30 shadow-sm"
                         : "bg-accent/5 text-muted-foreground hover:bg-accent/10 border border-transparent"
-                    }`}
+                      }`}
                   >
                     <Icon className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">{slide.label}</span>
