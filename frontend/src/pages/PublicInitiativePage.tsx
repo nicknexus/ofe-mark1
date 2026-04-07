@@ -2154,7 +2154,8 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evide
                                 {item.impact_claims && item.impact_claims.length > 0 ? (
                                     <div className="mt-2 flex flex-wrap gap-1" onClick={e => e.stopPropagation()}>
                                         {item.impact_claims.slice(0, 2).map((claim) => {
-                                            const cat = claim.kpis?.category || 'output'
+                                            const matchedKpi = item.kpis?.find(k => k.id === claim.kpi_id)
+                                            const cat = matchedKpi?.category || 'output'
                                             const catColor = cat === 'impact' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' : cat === 'output' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                                             const label = claim.kpis?.title ? `${claim.value} ${claim.kpis.unit_of_measurement || ''}` : `${claim.value}`
                                             return (

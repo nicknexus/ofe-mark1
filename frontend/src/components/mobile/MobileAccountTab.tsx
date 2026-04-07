@@ -85,8 +85,8 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
             if (orgs && orgs.length > 0) {
                 setOrganization(orgs[0])
                 setOrgMission(orgs[0].statement || '')
-                setOrgWebsite(orgs[0].website || '')
-                setOrgDonationLink(orgs[0].donation_link || '')
+                setOrgWebsite(orgs[0].website_url || '')
+                setOrgDonationLink(orgs[0].donation_url || '')
                 setIsPublic(orgs[0].is_public || false)
                 setBrandColor(orgs[0].brand_color || '#c0dfa1')
             }
@@ -155,8 +155,8 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
         try {
             await apiService.updateOrganization(organization.id, {
                 statement: orgMission,
-                website: orgWebsite,
-                donation_link: orgDonationLink,
+                website_url: orgWebsite,
+                donation_url: orgDonationLink,
             })
             toast.success('Organization updated')
         } catch {
