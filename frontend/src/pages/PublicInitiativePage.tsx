@@ -747,7 +747,7 @@ export default function PublicInitiativePage() {
                                 {activeTab === 'stories' && <StoriesTab stories={filteredStories} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} />}
                                 {activeTab === 'locations' && <LocationsTab locations={locations || dashboard.locations} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} />}
                                 {activeTab === 'evidence' && <EvidenceTab evidence={filteredEvidence} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} />}
-                                {activeTab === 'beneficiaries' && <BeneficiariesTab beneficiaries={beneficiaries} />}
+                                {activeTab === 'beneficiaries' && <BeneficiariesTab beneficiaries={beneficiaries} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />}
                             </>
                         )}
                     </div>
@@ -2468,29 +2468,53 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evide
     )
 }
 
-function BeneficiariesTab({ beneficiaries }: { beneficiaries: PublicBeneficiaryGroup[] | null }) {
+function BeneficiariesTab({ beneficiaries, orgSlug, initiativeSlug }: { beneficiaries: PublicBeneficiaryGroup[] | null; orgSlug: string; initiativeSlug: string }) {
     if (!beneficiaries) return <LoadingState />
     if (beneficiaries.length === 0) return <EmptyState icon={Users} message="No beneficiary groups defined yet." />
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {beneficiaries.map((group) => (
-                <div key={group.id} className="glass-card p-5 rounded-2xl border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all">
-                    <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 bg-accent/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <Users className="w-6 h-6 text-accent" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-foreground mb-1">{group.name}</h3>
-                            {group.description && <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{group.description}</p>}
-                            <div className="space-y-1 text-sm text-muted-foreground">
-                                {group.total_number && <p className="font-medium text-accent">{group.total_number.toLocaleString()} beneficiaries</p>}
-                                {(group.age_range_start || group.age_range_end) && <p>Ages: {group.age_range_start || '?'} - {group.age_range_end || '?'}</p>}
-                                {group.location?.name && <p className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-accent" />{group.location.name}</p>}
+                <Link key={group.id} to={`/org/${orgSlug}/${initiativeSlug}/beneficiary/${group.id}`} className="group glass-card rounded-2xl border border-white/60 hover:border-accent/40 hover:shadow-[0_8px_30px_rgba(192,223,161,0.25)] transition-all active:scale-[0.98] overflow-hidden">
+                    <div className="p-5 pb-3">
+                        <div className="flex items-start gap-4">
+                            <div className="w-11 h-11 bg-accent/15 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-accent/25 transition-colors">
+                                <Users className="w-5 h-5 text-accent" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-foreground text-[15px] leading-snug mb-0.5 group-hover:text-accent transition-colors">{group.name}</h3>
+                                {group.description && <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">{group.description}</p>}
                             </div>
                         </div>
                     </div>
-                </div>
+
+                    {(group.total_number || group.age_range_start || group.age_range_end || group.location?.name) && (
+                        <div className="px-5 pb-3 flex flex-wrap gap-2">
+                            {group.total_number != null && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent/10 text-accent text-xs font-semibold">
+                                    <Users className="w-3 h-3" />
+                                    {group.total_number.toLocaleString()}
+                                </span>
+                            )}
+                            {(group.age_range_start || group.age_range_end) && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100/80 text-gray-600 text-xs font-medium">
+                                    Ages {group.age_range_start || '?'}–{group.age_range_end || '?'}
+                                </span>
+                            )}
+                            {group.location?.name && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100/80 text-gray-600 text-xs font-medium">
+                                    <MapPin className="w-3 h-3" />
+                                    {group.location.name}
+                                </span>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="px-5 py-3 border-t border-gray-100/60 flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground group-hover:text-accent transition-colors">View details</span>
+                        <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-accent group-hover:translate-x-0.5 transition-all" />
+                    </div>
+                </Link>
             ))}
         </div>
     )

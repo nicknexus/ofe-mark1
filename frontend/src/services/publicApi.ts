@@ -141,6 +141,45 @@ export interface PublicBeneficiaryGroup {
     display_order?: number
 }
 
+export interface PublicBeneficiaryGroupDetail {
+    id: string
+    name: string
+    description?: string
+    total_number?: number
+    age_range_start?: number
+    age_range_end?: number
+    location?: PublicLocation
+    claims: {
+        id: string
+        value: number
+        date_represented: string
+        date_range_start?: string
+        date_range_end?: string
+        label?: string
+        note?: string
+        kpi?: { id: string; title: string; unit_of_measurement: string; category: string }
+    }[]
+    evidence: (PublicEvidence & { files?: { id: string; file_url: string; file_name: string; file_type: string; display_order?: number }[] })[]
+    stories: {
+        id: string
+        title: string
+        description?: string
+        media_url?: string
+        media_type?: string
+        date_represented: string
+        locations?: { id: string; name: string }[]
+    }[]
+    locations: PublicLocation[]
+    initiative: {
+        id: string
+        title: string
+        slug: string
+        org_slug?: string
+        org_name?: string
+        brand_color?: string
+    }
+}
+
 export interface LocationDetail {
     location: PublicLocation
     stories: { id: string; title: string; description?: string; media_url?: string; media_type: string; date_represented: string }[]
@@ -342,6 +381,10 @@ class PublicApiService {
 
     async getImpactClaimDetail(orgSlug: string, initiativeSlug: string, claimId: string): Promise<PublicImpactClaimDetail> {
         return this.request<PublicImpactClaimDetail>(`/initiatives/${orgSlug}/${initiativeSlug}/claim/${claimId}`)
+    }
+
+    async getBeneficiaryGroupDetail(orgSlug: string, initiativeSlug: string, groupId: string): Promise<PublicBeneficiaryGroupDetail> {
+        return this.request<PublicBeneficiaryGroupDetail>(`/initiatives/${orgSlug}/${initiativeSlug}/beneficiary/${groupId}`)
     }
 }
 

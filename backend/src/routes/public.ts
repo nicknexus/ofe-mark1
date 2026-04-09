@@ -210,6 +210,25 @@ router.get('/initiatives/:orgSlug/:slug/beneficiaries', async (req, res) => {
     }
 });
 
+// Get beneficiary group detail (for Beneficiary Group Detail Page)
+router.get('/initiatives/:orgSlug/:initiativeSlug/beneficiary/:groupId', async (req, res) => {
+    try {
+        const detail = await PublicService.getBeneficiaryGroupDetail(
+            req.params.orgSlug,
+            req.params.initiativeSlug,
+            req.params.groupId
+        );
+        if (!detail) {
+            res.status(404).json({ error: 'Beneficiary group not found' });
+            return;
+        }
+        res.json(detail);
+    } catch (error) {
+        console.error('Get beneficiary group detail error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
 // Get single metric by slug (for Metric Detail Page)
 router.get('/initiatives/:orgSlug/:initiativeSlug/metric/:metricSlug', async (req, res) => {
     try {

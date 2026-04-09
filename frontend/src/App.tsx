@@ -33,6 +33,7 @@ import PublicMetricPage from './pages/PublicMetricPage'
 import PublicStoryPage from './pages/PublicStoryPage'
 import PublicEvidencePage from './pages/PublicEvidencePage'
 import PublicImpactClaimPage from './pages/PublicImpactClaimPage'
+import PublicBeneficiaryGroupPage from './pages/PublicBeneficiaryGroupPage'
 import ExplorePage from './pages/ExplorePage'
 import TrialActivationPage from './pages/TrialActivationPage'
 import SubscriptionExpiredPage from './pages/SubscriptionExpiredPage'
@@ -169,6 +170,7 @@ function App() {
             <Route path="/org/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
             <Route path="/org/:orgSlug/:initiativeSlug/story/:storyId" element={<PublicStoryPage />} />
             <Route path="/org/:orgSlug/:initiativeSlug/evidence/:evidenceId" element={<PublicEvidencePage />} />
+            <Route path="/org/:orgSlug/:initiativeSlug/beneficiary/:groupId" element={<PublicBeneficiaryGroupPage />} />
         </>
     )
 
@@ -333,6 +335,7 @@ function App() {
                                     <Route path="/org/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
                                     <Route path="/org/:orgSlug/:initiativeSlug/story/:storyId" element={<PublicStoryPage />} />
                                     <Route path="/org/:orgSlug/:initiativeSlug/evidence/:evidenceId" element={<PublicEvidencePage />} />
+                                    <Route path="/org/:orgSlug/:initiativeSlug/beneficiary/:groupId" element={<PublicBeneficiaryGroupPage />} />
                                     <Route path="/*" element={
                                         <MobileApp user={user} subscriptionStatus={subscriptionStatus} />
                                     } />
@@ -594,6 +597,7 @@ function App() {
                                         <Route path="/org/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
                                         <Route path="/org/:orgSlug/:initiativeSlug/story/:storyId" element={<PublicStoryPage />} />
                                         <Route path="/org/:orgSlug/:initiativeSlug/evidence/:evidenceId" element={<PublicEvidencePage />} />
+                                        <Route path="/org/:orgSlug/:initiativeSlug/beneficiary/:groupId" element={<PublicBeneficiaryGroupPage />} />
                                         <Route path="/*" element={
                                             <MobileApp user={user} subscriptionStatus={subscriptionStatus} />
                                         } />

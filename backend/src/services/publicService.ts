@@ -716,6 +716,157 @@ export class PublicService {
         }));
     }
 
+    static async getBeneficiaryGroupDetail(orgSlug: string, initiativeSlug: string, groupId: string): Promise<any | null> {
+        const initiative = await this.getInitiativeBySlug(orgSlug, initiativeSlug);
+        if (!initiative) return null;
+
+        // Fetch the beneficiary group
+        const { data: group, error: groupError } = await supabase
+            .from('beneficiary_groups')
+            .select(`
+                id, name, description, location_id, age_range_start, age_range_end, total_number, display_order, created_at,
+                locations(id, name, description, latitude, longitude)
+            `)
+            .eq('id', groupId)
+            .eq('initiative_id', initiative.id)
+            .single();
+
+        if (groupError || !group) return null;
+
+        // Fetch impact claims scoped to this group via kpi_update_beneficiary_groups
+        const { data: claimLinks } = await supabase
+            .from('kpi_update_beneficiary_groups')
+            .select(`
+                kpi_updates(
+                    id, value, date_represented, date_range_start, date_range_end,
+                    label, note, created_at, location_id,
+                    kpis(id, title, unit_of_measurement, category),
+                    locations(id, name, latitude, longitude)
+                )
+            `)
+            .eq('beneficiary_group_id', groupId);
+
+        const claims = (claimLinks || [])
+            .map((cl: any) => cl.kpi_updates)
+            .filter(Boolean)
+            .filter((u: any) => u.kpis?.id); // only claims whose KPI belongs to this initiative check below
+
+        // Fetch evidence scoped to this group via evidence_beneficiary_groups
+        const { data: evidenceLinks } = await supabase
+            .from('evidence_beneficiary_groups')
+            .select('evidence_id')
+            .eq('beneficiary_group_id', groupId);
+
+        const evidenceIds = (evidenceLinks || []).map((el: any) => el.evidence_id);
+
+        let evidence: any[] = [];
+        if (evidenceIds.length > 0) {
+            const { data: evidenceData } = await supabase
+                .from('evidence')
+                .select(`
+                    id, title, description, type, file_url, date_represented, date_range_start, date_range_end, created_at,
+                    evidence_files(id, file_url, file_name, file_type, display_order),
+                    evidence_locations(locations(id, name, latitude, longitude))
+                `)
+                .eq('initiative_id', initiative.id)
+                .in('id', evidenceIds)
+                .order('date_represented', { ascending: false });
+
+            evidence = (evidenceData || []).map((e: any) => ({
+                id: e.id,
+                title: e.title,
+                description: e.description,
+                type: e.type,
+                file_url: e.file_url,
+                files: e.evidence_files || [],
+                date_represented: e.date_represented,
+                date_range_start: e.date_range_start,
+                date_range_end: e.date_range_end,
+                locations: e.evidence_locations?.map((el: any) => el.locations).filter(Boolean) || [],
+                created_at: e.created_at
+            }));
+        }
+
+        // Fetch stories scoped to this group via story_beneficiaries
+        const { data: storyLinks } = await supabase
+            .from('story_beneficiaries')
+            .select('story_id')
+            .eq('beneficiary_group_id', groupId);
+
+        const storyIds = (storyLinks || []).map((sl: any) => sl.story_id);
+
+        let stories: any[] = [];
+        if (storyIds.length > 0) {
+            const { data: storiesData } = await supabase
+                .from('stories')
+                .select(`
+                    id, title, description, media_url, media_type, date_represented, created_at,
+                    story_locations(locations(id, name))
+                `)
+                .eq('initiative_id', initiative.id)
+                .in('id', storyIds)
+                .order('date_represented', { ascending: false });
+
+            stories = (storiesData || []).map((s: any) => ({
+                id: s.id,
+                title: s.title,
+                description: s.description,
+                media_url: s.media_url,
+                media_type: s.media_type,
+                date_represented: s.date_represented,
+                locations: s.story_locations?.map((sl: any) => sl.locations).filter(Boolean) || [],
+                created_at: s.created_at
+            }));
+        }
+
+        // Derive locations from claims + evidence
+        const locationMap = new Map<string, any>();
+        claims.forEach((c: any) => {
+            if (c.locations?.id) locationMap.set(c.locations.id, c.locations);
+        });
+        evidence.forEach((e: any) => {
+            (e.locations || []).forEach((loc: any) => {
+                if (loc?.id) locationMap.set(loc.id, loc);
+            });
+        });
+        // Fallback to group's own location
+        if (locationMap.size === 0 && (group as any).locations) {
+            const loc = (group as any).locations;
+            if (loc.id) locationMap.set(loc.id, loc);
+        }
+
+        return {
+            id: group.id,
+            name: (group as any).name,
+            description: (group as any).description,
+            total_number: (group as any).total_number,
+            age_range_start: (group as any).age_range_start,
+            age_range_end: (group as any).age_range_end,
+            location: (group as any).locations || null,
+            claims: claims.map((c: any) => ({
+                id: c.id,
+                value: c.value,
+                date_represented: c.date_represented,
+                date_range_start: c.date_range_start,
+                date_range_end: c.date_range_end,
+                label: c.label,
+                note: c.note,
+                kpi: c.kpis ? { id: c.kpis.id, title: c.kpis.title, unit_of_measurement: c.kpis.unit_of_measurement, category: c.kpis.category } : null
+            })),
+            evidence,
+            stories,
+            locations: Array.from(locationMap.values()),
+            initiative: {
+                id: initiative.id,
+                title: initiative.title,
+                slug: initiative.slug,
+                org_slug: initiative.org_slug,
+                org_name: initiative.organization_name,
+                brand_color: initiative.organization_brand_color
+            }
+        };
+    }
+
     static async getInitiativeKPIs(orgSlug: string, initiativeSlug: string): Promise<any[]> {
         const initiative = await this.getInitiativeBySlug(orgSlug, initiativeSlug);
         if (!initiative) return [];
