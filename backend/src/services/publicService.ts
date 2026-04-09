@@ -1,5 +1,6 @@
 import { supabase } from '../utils/supabase';
 import { Organization, Initiative, KPI, Evidence, Story, Location, BeneficiaryGroup } from '../types';
+import { BeneficiaryService } from './beneficiaryService';
 
 // Types for public responses (stripped of sensitive fields)
 export interface PublicOrganization {
@@ -51,6 +52,46 @@ export interface SearchResult {
 }
 
 export class PublicService {
+
+    /**
+     * Filter impact_claims on evidence by beneficiary group compatibility.
+     * Mirrors the private-side logic in EvidenceService.getDataPointsForEvidence.
+     */
+    private static async filterClaimsByBenGroups(
+        evidenceItems: any[]
+    ): Promise<any[]> {
+        if (evidenceItems.length === 0) return evidenceItems;
+
+        const evidenceIds = evidenceItems.map(e => e.id);
+        const allClaimIds = evidenceItems.flatMap(e =>
+            (e.impact_claims || []).map((c: any) => c.id).filter(Boolean)
+        );
+
+        if (allClaimIds.length === 0) return evidenceItems;
+
+        const [evidenceBenGroups, updateBenGroups] = await Promise.all([
+            BeneficiaryService.getBenGroupsForEvidence(evidenceIds),
+            BeneficiaryService.getBenGroupsForUpdates(allClaimIds)
+        ]);
+
+        return evidenceItems.map(e => {
+            const evGroupIds = evidenceBenGroups[e.id] || [];
+            const claims: any[] = e.impact_claims || [];
+
+            const anyScoped = evGroupIds.length > 0 ||
+                claims.some((c: any) => (updateBenGroups[c.id] || []).length > 0);
+            if (!anyScoped) return e;
+
+            return {
+                ...e,
+                impact_claims: claims.filter((c: any) => {
+                    const claimGroupIds = updateBenGroups[c.id] || [];
+                    return BeneficiaryService.beneficiaryGroupsMatch(claimGroupIds, evGroupIds);
+                })
+            };
+        });
+    }
+
     // ============================================
     // SEARCH
     // ============================================
@@ -635,7 +676,7 @@ export class PublicService {
 
         if (error) throw new Error(`Failed to fetch evidence: ${error.message}`);
 
-        return (data || []).map((e: any) => ({
+        const rawEvidence = (data || []).map((e: any) => ({
             id: e.id,
             title: e.title,
             description: e.description,
@@ -650,6 +691,8 @@ export class PublicService {
             impact_claims: e.evidence_kpi_updates?.map((eu: any) => eu.kpi_updates).filter(Boolean) || [],
             created_at: e.created_at
         }));
+
+        return this.filterClaimsByBenGroups(rawEvidence);
     }
 
     static async getInitiativeBeneficiaries(orgSlug: string, initiativeSlug: string): Promise<BeneficiaryGroup[]> {
@@ -778,7 +821,7 @@ export class PublicService {
                 .in('id', evidenceIds)
                 .order('date_represented', { ascending: false });
 
-            evidence = (evidenceData || []).map((e: any) => ({
+            const rawEvidence = (evidenceData || []).map((e: any) => ({
                 id: e.id,
                 title: e.title,
                 description: e.description,
@@ -793,6 +836,7 @@ export class PublicService {
                 impact_claims: e.evidence_kpi_updates?.map((eu: any) => eu.kpi_updates).filter(Boolean) || [],
                 created_at: e.created_at
             }));
+            evidence = await this.filterClaimsByBenGroups(rawEvidence);
         }
 
         const updates = kpi.kpi_updates || [];
@@ -880,7 +924,7 @@ export class PublicService {
                 .in('id', evidenceIds)
                 .order('date_represented', { ascending: false });
 
-            evidence = (evidenceData || []).map((e: any) => ({
+            const rawEvidence = (evidenceData || []).map((e: any) => ({
                 id: e.id,
                 title: e.title,
                 description: e.description,
@@ -895,6 +939,26 @@ export class PublicService {
                 impact_claims: e.evidence_kpi_updates?.map((eu: any) => eu.kpi_updates).filter(Boolean) || [],
                 created_at: e.created_at
             }));
+
+            // Filter: only keep evidence whose ben groups are compatible with this claim
+            const claimBenGroups = await BeneficiaryService.getBenGroupsForUpdates([claimId]);
+            const claimGroupIds = claimBenGroups[claimId] || [];
+            const evidenceBenGroups = await BeneficiaryService.getBenGroupsForEvidence(rawEvidence.map(e => e.id));
+
+            const anyScoped = claimGroupIds.length > 0 ||
+                Object.values(evidenceBenGroups).some(ids => ids.length > 0);
+
+            if (anyScoped) {
+                evidence = rawEvidence.filter(e => {
+                    const evGroupIds = evidenceBenGroups[e.id] || [];
+                    return BeneficiaryService.beneficiaryGroupsMatch(claimGroupIds, evGroupIds);
+                });
+            } else {
+                evidence = rawEvidence;
+            }
+
+            // Also filter impact_claims within each evidence item
+            evidence = await this.filterClaimsByBenGroups(evidence);
         }
 
         return {
@@ -1025,7 +1089,7 @@ export class PublicService {
                 category: kpi.category
             }));
 
-        return {
+        const rawResult = {
             id: evidence.id,
             title: evidence.title,
             description: evidence.description,
@@ -1047,6 +1111,9 @@ export class PublicService {
                 brand_color: initiative.organization_brand_color
             }
         };
+
+        const [filtered] = await this.filterClaimsByBenGroups([rawResult]);
+        return filtered;
     }
 
     /**
@@ -1107,7 +1174,7 @@ export class PublicService {
                 .in('id', evidenceIds)
                 .order('date_represented', { ascending: false });
 
-            evidence = (evidenceData || []).map((e: any) => ({
+            const rawEvidence = (evidenceData || []).map((e: any) => ({
                 id: e.id,
                 title: e.title,
                 description: e.description,
@@ -1119,6 +1186,7 @@ export class PublicService {
                 impact_claims: e.evidence_kpi_updates?.map((eu: any) => eu.kpi_updates).filter(Boolean) || [],
                 created_at: e.created_at
             }));
+            evidence = await this.filterClaimsByBenGroups(rawEvidence);
         }
 
         // KPI updates (impact claims) at this location
