@@ -32,6 +32,7 @@ interface LocationMapProps {
     onMetricClick?: (kpiId: string) => void // Callback for metric card click
     onStoryClick?: (storyId: string) => void // Callback for story card click
     flatTopCorners?: boolean // Remove top border radius (for dashboard)
+    hideEmptyBanner?: boolean // Hide the "No location added" banner when empty
 }
 
 // Component to handle map click events
@@ -374,6 +375,7 @@ export default function LocationMap({
     onEditClick,
     onMetricClick,
     onStoryClick,
+    hideEmptyBanner,
 }: LocationMapProps) {
     const [center, setCenter] = useState<[number, number]>([20, 0]) // [lat, lng]
     const [zoom, setZoom] = useState(2)
@@ -618,7 +620,7 @@ export default function LocationMap({
             </div>
 
             {/* No Location Banner */}
-            {locations.length === 0 && (
+            {!hideEmptyBanner && locations.length === 0 && (
                 <div className="absolute top-4 left-4 z-[100] pointer-events-none">
                     <div className="bg-white/95 backdrop-blur-sm border border-gray-300 rounded-lg px-3 py-2 shadow-lg">
                         <div className="flex items-center space-x-2">

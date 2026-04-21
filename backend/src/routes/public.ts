@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { PublicService } from '../services/publicService';
+import { OrganizationContextService } from '../services/organizationContextService';
 
 const router = Router();
 
@@ -90,6 +91,17 @@ router.get('/organizations/:slug/locations', async (req, res) => {
         res.json(locations);
     } catch (error) {
         console.error('Get org locations error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// Get organization's context & challenges (null if not set or org not public)
+router.get('/organizations/:slug/context', async (req, res) => {
+    try {
+        const context = await OrganizationContextService.getPublicBySlug(req.params.slug);
+        res.json(context);
+    } catch (error) {
+        console.error('Get org context error:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });

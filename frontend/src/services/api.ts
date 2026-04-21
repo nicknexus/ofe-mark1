@@ -15,6 +15,7 @@ import {
     CreateStoryForm,
     Story,
     Organization,
+    OrganizationContext,
     Donor,
     DonorCredit
 } from '../types'
@@ -660,6 +661,18 @@ class ApiService {
 
     async updateOrganization(id: string, data: Partial<Organization>): Promise<Organization> {
         return this.request<Organization>(`/organizations/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        })
+    }
+
+    async getOrgContext(id: string): Promise<OrganizationContext | null> {
+        return this.request<OrganizationContext | null>(`/organizations/${id}/context`)
+    }
+
+    async updateOrgContext(id: string, data: Partial<OrganizationContext>): Promise<OrganizationContext> {
+        this.clearCacheByPattern(`/organizations/${id}/context`)
+        return this.request<OrganizationContext>(`/organizations/${id}/context`, {
             method: 'PUT',
             body: JSON.stringify(data)
         })

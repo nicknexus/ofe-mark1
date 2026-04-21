@@ -9,7 +9,9 @@ import {
     Building2,
     Users,
     Check,
-    Compass
+    Compass,
+    BookOpen,
+    Eye
 } from 'lucide-react'
 import { AuthService } from '../services/auth'
 import { apiService } from '../services/api'
@@ -120,19 +122,16 @@ export default function Layout({ user, children }: LayoutProps) {
                 <header className="bg-transparent absolute top-0 left-0 right-0 z-50">
                     <div className="w-full px-4 sm:px-6">
                         <div className="flex justify-between items-center h-24">
-                            {/* Logo */}
-                            <div className="flex items-center">
-                                <Link to="/" className="flex items-center">
+                            {/* Logo + Organization Switcher (left-aligned) */}
+                            <div className="flex items-center gap-3 min-w-0">
+                                <Link to="/" className="flex items-center flex-shrink-0">
                                     <img
                                         src="/Nexuslogo.png"
                                         alt="Nexus Logo"
                                         className="h-16 w-auto"
                                     />
                                 </Link>
-                            </div>
-
-                            {/* Center: Organization Switcher */}
-                            <div className="hidden md:flex flex-col items-center justify-center absolute left-1/2 transform -translate-x-1/2" ref={orgMenuRef}>
+                                <div className="hidden md:flex flex-col items-start justify-center min-w-0" ref={orgMenuRef}>
                                 {hasMultipleOrgs ? (
                                     <div className="relative">
                                         <button
@@ -160,7 +159,7 @@ export default function Layout({ user, children }: LayoutProps) {
 
                                         {/* Org Dropdown */}
                                         {orgMenuOpen && (
-                                            <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 w-64 bg-white rounded-xl shadow-bubble-lg border border-gray-200 overflow-hidden z-50">
+                                            <div className="absolute top-full mt-2 left-0 w-64 bg-white rounded-xl shadow-bubble-lg border border-gray-200 overflow-hidden z-50">
                                                 <div className="p-2">
                                                     <p className="px-3 py-1.5 text-xs font-medium text-gray-400 uppercase tracking-wider">
                                                         Switch Organization
@@ -211,18 +210,43 @@ export default function Layout({ user, children }: LayoutProps) {
                                         )}
                                     </div>
                                 )}
+                                </div>
                             </div>
 
                             {/* Right side: Explore, Tutorial, Settings, User Profile */}
                             <div className="flex items-center gap-3">
+                                {/* Context Button */}
+                                {hasOwnOrganization && (
+                                    <Link
+                                        to="/context"
+                                        className="hidden lg:flex items-center gap-2 px-4 py-2 bg-white/80 hover:bg-white border border-gray-200 hover:border-gray-300 rounded-full transition-all duration-200 shadow-bubble-sm"
+                                        title="Context & Challenges"
+                                    >
+                                        <BookOpen className="w-4 h-4 text-gray-700" />
+                                        <span className="text-sm font-medium text-gray-700">Context</span>
+                                    </Link>
+                                )}
+
+                                {/* Public View Button - only for owners whose org is public */}
+                                {hasOwnOrganization && ownedOrganization?.is_public && ownedOrganization?.slug && (
+                                    <Link
+                                        to={`/org/${ownedOrganization.slug}`}
+                                        className="hidden lg:flex items-center gap-2 px-4 py-2 bg-white/80 hover:bg-white border border-gray-200 hover:border-gray-300 rounded-full transition-all duration-200 shadow-bubble-sm"
+                                        title="View your public organization page"
+                                    >
+                                        <Eye className="w-4 h-4 text-gray-700" />
+                                        <span className="text-sm font-medium text-gray-700">Public View</span>
+                                    </Link>
+                                )}
+
                                 {/* Explore Button */}
                                 <Link
                                     to="/explore"
-                                    className="hidden sm:flex items-center gap-2 px-4 py-2 bg-primary-50 hover:bg-primary-100 border border-primary-200 rounded-full transition-all duration-200 shadow-bubble-sm"
+                                    className="hidden lg:flex items-center gap-2 px-4 py-2 bg-white/80 hover:bg-white border border-gray-200 hover:border-gray-300 rounded-full transition-all duration-200 shadow-bubble-sm"
                                     title="Explore organizations"
                                 >
-                                    <Compass className="w-4 h-4 text-primary-600" />
-                                    <span className="text-sm font-medium text-primary-700">Explore</span>
+                                    <Compass className="w-4 h-4 text-gray-700" />
+                                    <span className="text-sm font-medium text-gray-700">Explore</span>
                                 </Link>
 
                                 {/* Tutorial Button - Circle Icon */}
@@ -289,7 +313,7 @@ export default function Layout({ user, children }: LayoutProps) {
                                 </div>
 
                                 {/* Mobile menu button */}
-                                <div className="md:hidden">
+                                <div className="lg:hidden">
                                     <button
                                         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                                         className="w-10 h-10 rounded-full bg-white/80 hover:bg-white border border-gray-200 hover:border-gray-300 flex items-center justify-center transition-all duration-200 shadow-bubble-sm"
@@ -306,7 +330,7 @@ export default function Layout({ user, children }: LayoutProps) {
 
                         {/* Mobile Navigation Menu */}
                         {mobileMenuOpen && (
-                            <div className="md:hidden border-t border-gray-200 pb-4 mt-2 bg-white/95 backdrop-blur-sm rounded-2xl shadow-bubble-lg">
+                            <div className="lg:hidden border-t border-gray-200 pb-4 mt-2 bg-white/95 backdrop-blur-sm rounded-2xl shadow-bubble-lg">
                                 <div className="pt-4 px-4 space-y-3">
                                     <Link
                                         to="/explore"
@@ -316,6 +340,26 @@ export default function Layout({ user, children }: LayoutProps) {
                                         <Compass className="w-5 h-5" />
                                         <span>Explore Organizations</span>
                                     </Link>
+                                    {hasOwnOrganization && (
+                                        <Link
+                                            to="/context"
+                                            onClick={() => setMobileMenuOpen(false)}
+                                            className="flex items-center space-x-3 px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-colors"
+                                        >
+                                            <BookOpen className="w-5 h-5" />
+                                            <span>Context &amp; Challenges</span>
+                                        </Link>
+                                    )}
+                                    {hasOwnOrganization && ownedOrganization?.is_public && ownedOrganization?.slug && (
+                                        <Link
+                                            to={`/org/${ownedOrganization.slug}`}
+                                            onClick={() => setMobileMenuOpen(false)}
+                                            className="flex items-center space-x-3 px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-colors"
+                                        >
+                                            <Eye className="w-5 h-5" />
+                                            <span>Public View</span>
+                                        </Link>
+                                    )}
                                     <button
                                         onClick={() => {
                                             handleTutorialClick()

@@ -4,7 +4,7 @@ import { useParams, Link } from 'react-router-dom'
 import { 
     Building2, MapPin, BarChart3, ArrowLeft, Globe, 
     BookOpen, FileText, Calendar, ChevronRight, ChevronLeft,
-    TrendingUp, ChevronDown, X, Target, Image, LineChart
+    TrendingUp, ChevronDown, X, Target, Image, LineChart, Compass
 } from 'lucide-react'
 import { 
     publicApi, 
@@ -14,6 +14,7 @@ import {
     PublicStory, 
     PublicLocation,
     PublicEvidence,
+    PublicStatCard,
     OrganizationStats
 } from '../services/publicApi'
 import PublicLoader from '../components/public/PublicLoader'
@@ -32,7 +33,7 @@ import {
 const ImpactGlobe = lazy(() => import('../components/landing/ImpactGlobe'))
 
 // Toggle view types for the feature area
-type FeatureView = 'globe' | 'stories' | 'initiatives' | 'graph'
+type FeatureView = 'globe' | 'stories' | 'highlights' | 'initiatives' | 'graph'
 
 // Chart colors
 const CHART_COLORS = [
@@ -54,6 +55,7 @@ export default function PublicOrganizationPage() {
     const [stories, setStories] = useState<PublicStory[]>([])
     const [locations, setLocations] = useState<PublicLocation[]>([])
     const [evidence, setEvidence] = useState<PublicEvidence[]>([])
+    const [highlightCards, setHighlightCards] = useState<PublicStatCard[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     
@@ -99,18 +101,26 @@ export default function PublicOrganizationPage() {
             if (!orgData) { setError('Organization not found'); return }
             setOrganization(orgData.organization)
             setStats(orgData.stats)
-            const [inits, mets, stors, locs, evid] = await Promise.all([
+            const [inits, mets, stors, locs, evid, ctx] = await Promise.all([
                 publicApi.getOrganizationInitiatives(slug!),
                 publicApi.getOrganizationMetrics(slug!),
                 publicApi.getOrganizationStories(slug!, 20),
                 publicApi.getOrganizationLocations(slug!),
-                publicApi.getOrganizationEvidence(slug!, 20)
+                publicApi.getOrganizationEvidence(slug!, 20),
+                publicApi.getOrganizationContext(slug!).catch(() => null)
             ])
             setInitiatives(inits)
             setMetrics(mets)
             setStories(stors)
             setLocations(locs)
             setEvidence(evid)
+            const cards = Array.isArray(ctx?.stats_and_statements) ? ctx!.stats_and_statements! : []
+            const valid = cards.filter(c =>
+                c?.type === 'stat'
+                    ? !!(c.value || '').trim()
+                    : !!((c?.title || '').trim() || (c?.description || '').trim())
+            ).slice(0, 2)
+            setHighlightCards(valid)
         } catch (err) {
             setError('Failed to load organization')
         } finally {
@@ -782,6 +792,21 @@ export default function PublicOrganizationPage() {
                             )}
                         </div>
                     </div>
+
+                    {/* Context & Challenges button (aligned with logo's left edge) */}
+                    <Link
+                        to={`/org/${slug}/context`}
+                        className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-full text-xs font-medium border shadow-sm transition-all hover:shadow-md"
+                        style={{
+                            backgroundColor: `${organization.brand_color || '#c0dfa1'}15`,
+                            borderColor: `${organization.brand_color || '#c0dfa1'}40`,
+                            color: organization.brand_color || '#c0dfa1',
+                        }}
+                        title="Context & Challenges"
+                    >
+                        <Compass className="w-3.5 h-3.5" />
+                        Context &amp; Challenges
+                    </Link>
                 </div>
                 
                 {/* Right Side - Initiatives Container (aligned with right panel) */}
@@ -865,6 +890,19 @@ export default function PublicOrganizationPage() {
                         <BookOpen className="w-3.5 h-3.5" />
                         <span>Stories</span>
                     </button>
+                    {highlightCards.length > 0 && (
+                        <button
+                            onClick={() => setActiveView('highlights')}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                                activeView === 'highlights'
+                                    ? 'bg-gray-800 text-white'
+                                    : 'bg-white/60 text-gray-600'
+                            }`}
+                        >
+                            <Compass className="w-3.5 h-3.5" />
+                            <span>Context & Challenges</span>
+                        </button>
+                    )}
                     <button
                         onClick={() => setActiveView('graph')}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
@@ -921,6 +959,23 @@ export default function PublicOrganizationPage() {
                             Stories
                         </div>
                     </div>
+                    {highlightCards.length > 0 && (
+                        <div className="group relative z-[100]">
+                            <button
+                                onClick={() => setActiveView('highlights')}
+                                className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${
+                                    activeView === 'highlights'
+                                        ? 'bg-gray-800 text-white shadow-lg scale-110'
+                                        : 'bg-white/60 backdrop-blur-lg text-gray-600 hover:bg-white/80 hover:scale-105 border border-white/60'
+                                }`}
+                            >
+                                <Compass className="w-5 h-5" />
+                            </button>
+                            <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-800 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100]">
+                                Context & Challenges
+                            </div>
+                        </div>
+                    )}
                     <div className="group relative z-[100]">
                         <button
                             onClick={() => setActiveView('graph')}
@@ -1118,6 +1173,112 @@ export default function PublicOrganizationPage() {
                                             {filteredStories.length > 10 && (
                                                 <span className="text-xs text-muted-foreground ml-1">+{filteredStories.length - 10}</span>
                                             )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Highlights View - First 2 Stats/Statements from Context */}
+                        <div className={`absolute inset-0 transition-all duration-500 ease-out ${
+                            activeView === 'highlights'
+                                ? 'opacity-100 translate-x-0 z-10'
+                                : activeView === 'globe' || activeView === 'stories'
+                                    ? 'opacity-0 translate-x-8 z-0 pointer-events-none'
+                                    : 'opacity-0 -translate-x-8 z-0 pointer-events-none'
+                        }`}>
+                            <div className="h-full flex flex-col">
+                                <div className="px-4 py-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/60">
+                                            <Compass className="w-4 h-4 text-gray-600" />
+                                        </div>
+                                        <h2 className="font-semibold text-foreground">Context & Challenges</h2>
+                                    </div>
+                                    <Link
+                                        to={`/org/${slug}/context`}
+                                        className="text-xs font-medium text-gray-600 hover:text-gray-900 flex items-center gap-1"
+                                    >
+                                        View all <ChevronRight className="w-3 h-3" />
+                                    </Link>
+                                </div>
+                                <div className="flex-1 px-4 pb-4 pt-0 overflow-hidden">
+                                    {highlightCards.length === 0 ? (
+                                        <div className="h-full flex items-center justify-center text-muted-foreground">
+                                            <div className="text-center">
+                                                <Compass className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                                                <p>No context yet</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className={`h-full grid gap-3 ${highlightCards.length === 1 ? 'grid-rows-1' : 'grid-rows-2'}`}>
+                                            {highlightCards.map((card, idx) => {
+                                                const isStat = card.type === 'stat'
+                                                const title = (card.title || '').trim()
+                                                const description = (card.description || '').trim()
+                                                const value = (card.value || '').trim()
+                                                return (
+                                                    <Link
+                                                        key={card.id || idx}
+                                                        to={`/org/${slug}/context`}
+                                                        className="group relative rounded-2xl bg-white/60 backdrop-blur-lg border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all p-4 flex flex-col overflow-hidden min-h-0"
+                                                    >
+                                                        <div
+                                                            className="absolute left-0 top-0 bottom-0 w-1"
+                                                            style={{ backgroundColor: brandColor }}
+                                                        />
+                                                        <div className="flex items-center gap-2 mb-2 pl-1">
+                                                            <span
+                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider"
+                                                                style={{ backgroundColor: `${brandColor}30`, color: '#374151' }}
+                                                            >
+                                                                {isStat ? 'Stat' : 'Statement'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex-1 min-h-0 pl-1 overflow-hidden">
+                                                            {isStat ? (
+                                                                <div className="flex flex-col h-full">
+                                                                    <div
+                                                                        className="text-3xl md:text-4xl font-bold leading-none mb-1 truncate"
+                                                                        style={{ color: brandColor, filter: 'saturate(1.2) brightness(0.8)' }}
+                                                                    >
+                                                                        {value}
+                                                                    </div>
+                                                                    {title && (
+                                                                        <h3 className="text-sm font-semibold text-foreground line-clamp-1">
+                                                                            {title}
+                                                                        </h3>
+                                                                    )}
+                                                                    {description && (
+                                                                        <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                                                                            {description}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex flex-col h-full">
+                                                                    {title && (
+                                                                        <h3 className="text-base md:text-lg font-bold text-foreground leading-snug line-clamp-2">
+                                                                            {title}
+                                                                        </h3>
+                                                                    )}
+                                                                    {description && (
+                                                                        <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                                                                            {description}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="pl-1 mt-2 flex items-center justify-between">
+                                                            <span className="text-[11px] font-medium text-gray-500 group-hover:text-gray-800 transition-colors">
+                                                                Read more
+                                                            </span>
+                                                            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-gray-800 transition-colors" />
+                                                        </div>
+                                                    </Link>
+                                                )
+                                            })}
                                         </div>
                                     )}
                                 </div>

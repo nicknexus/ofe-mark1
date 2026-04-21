@@ -15,6 +15,44 @@ export interface Organization {
     role?: 'owner' | 'admin' | 'member'; // User's role in organization (when fetched via user_organizations)
 }
 
+export type StatCardType = 'stat' | 'statement';
+
+export interface StatCard {
+    id: string;
+    type: StatCardType;
+    value?: string; // only for type='stat' (the big number/figure)
+    title: string;
+    description: string;
+    source?: string;     // display label for the source (e.g. "WHO, 2023")
+    source_url?: string; // optional URL; clicking source on card opens this
+    created_at: string; // ISO date string
+}
+
+export interface TheoryStage {
+    id: string;
+    title: string;
+    description: string;
+}
+
+export interface Strategy {
+    id: string;
+    title: string;
+    description: string;
+}
+
+export interface OrganizationContext {
+    id?: string;
+    organization_id: string;
+    problem_statement?: string;
+    stats_and_statements?: StatCard[] | null;
+    theory_of_change?: string;
+    theory_of_change_stages?: TheoryStage[] | null;
+    strategies?: Strategy[] | null;
+    additional_info?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
 export interface Initiative {
     id?: string;
     title: string;

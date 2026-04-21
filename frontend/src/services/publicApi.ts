@@ -205,6 +205,44 @@ export interface SearchResult {
     }[]
 }
 
+export type PublicStatCardType = 'stat' | 'statement'
+
+export interface PublicStatCard {
+    id: string
+    type: PublicStatCardType
+    value?: string
+    title: string
+    description: string
+    source?: string
+    source_url?: string
+    created_at: string
+}
+
+export interface PublicTheoryStage {
+    id: string
+    title: string
+    description: string
+}
+
+export interface PublicStrategy {
+    id: string
+    title: string
+    description: string
+}
+
+export interface PublicOrganizationContext {
+    id: string
+    organization_id: string
+    problem_statement?: string
+    stats_and_statements?: PublicStatCard[] | null
+    theory_of_change?: string
+    theory_of_change_stages?: PublicTheoryStage[] | null
+    strategies?: PublicStrategy[] | null
+    additional_info?: string
+    created_at?: string
+    updated_at?: string
+}
+
 export interface OrganizationStats {
     initiatives: number
     locations: number
@@ -329,6 +367,10 @@ class PublicApiService {
     async getOrganizationEvidence(orgSlug: string, limit?: number): Promise<PublicEvidence[]> {
         const params = limit ? `?limit=${limit}` : ''
         return this.request<PublicEvidence[]>(`/organizations/${orgSlug}/evidence${params}`)
+    }
+
+    async getOrganizationContext(orgSlug: string): Promise<PublicOrganizationContext | null> {
+        return this.request<PublicOrganizationContext | null>(`/organizations/${orgSlug}/context`)
     }
 
     // ============================================

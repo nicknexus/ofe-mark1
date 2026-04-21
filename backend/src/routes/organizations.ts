@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { OrganizationService } from '../services/organizationService';
+import { OrganizationContextService } from '../services/organizationContextService';
 import { SubscriptionService } from '../services/subscriptionService';
 import { TeamService } from '../services/teamService';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
@@ -330,6 +331,45 @@ router.get('/:id/dashboard', authenticateUser, async (req: AuthenticatedRequest,
         });
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// ===== CONTEXT & CHALLENGES =====
+
+// Get org context (owner only)
+router.get('/:id/context', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const context = await OrganizationContextService.getForOwner(req.params.id, req.user!.id);
+        res.json(context);
+    } catch (error) {
+        const status = (error as any).status || 500;
+        res.status(status).json({ error: (error as Error).message });
+    }
+});
+
+// Upsert org context (owner only)
+router.put('/:id/context', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const {
+            problem_statement,
+            stats_and_statements,
+            theory_of_change,
+            theory_of_change_stages,
+            strategies,
+            additional_info,
+        } = req.body || {};
+        const context = await OrganizationContextService.upsertForOwner(req.params.id, req.user!.id, {
+            problem_statement,
+            stats_and_statements: Array.isArray(stats_and_statements) ? stats_and_statements : undefined,
+            theory_of_change,
+            theory_of_change_stages: Array.isArray(theory_of_change_stages) ? theory_of_change_stages : undefined,
+            strategies: Array.isArray(strategies) ? strategies : undefined,
+            additional_info,
+        });
+        res.json(context);
+    } catch (error) {
+        const status = (error as any).status || 500;
+        res.status(status).json({ error: (error as Error).message });
     }
 });
 

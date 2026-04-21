@@ -15,6 +15,48 @@ export interface Organization {
     role?: 'owner' | 'admin' | 'member'; // User's role in organization
 }
 
+export type StatCardType = 'stat' | 'statement';
+
+export interface StatCard {
+    id: string;
+    type: StatCardType;
+    value?: string;
+    title: string;
+    description: string;
+    source?: string;
+    source_url?: string;
+    created_at: string;
+}
+
+export interface TheoryStage {
+    id: string;
+    title: string;
+    description: string;
+}
+
+export interface Strategy {
+    id: string;
+    title: string;
+    description: string;
+}
+
+export interface OrganizationContext {
+    id?: string;
+    organization_id: string;
+    problem_statement?: string;
+    stats_and_statements?: StatCard[] | null;
+    theory_of_change?: string;
+    theory_of_change_stages?: TheoryStage[] | null;
+    strategies?: Strategy[] | null;
+    additional_info?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export const MAX_STAT_CARDS = 12;
+export const MAX_THEORY_STAGES = 12;
+export const MAX_STRATEGIES = 12;
+
 export interface Initiative {
     id?: string;
     title: string;

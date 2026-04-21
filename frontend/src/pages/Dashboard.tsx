@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
     Plus,
@@ -9,10 +9,19 @@ import {
     Zap,
     X,
     ArrowRight,
-    Users
+    Users,
+    Check,
+    AlertCircle,
+    Globe,
+    Compass,
+    Sparkles,
+    BarChart3,
+    Palette,
+    Image as ImageIcon,
+    FileText
 } from 'lucide-react'
 import { apiService } from '../services/api'
-import { Initiative, LoadingState, CreateInitiativeForm, KPI, Location } from '../types'
+import { Initiative, LoadingState, CreateInitiativeForm, KPI, Location, OrganizationContext } from '../types'
 import { formatDate, truncateText } from '../utils'
 import toast from 'react-hot-toast'
 import CreateInitiativeModal from '../components/CreateInitiativeModal'
@@ -20,14 +29,200 @@ import LocationMap from '../components/LocationMap'
 import { useTutorial } from '../context/TutorialContext'
 import { useTeam } from '../context/TeamContext'
 
+// ============ Small widgets ============
+function scoreColor(pct: number): string {
+    if (pct >= 80) return '#22c55e'
+    if (pct >= 50) return '#f59e0b'
+    return '#ef4444'
+}
+
+function CompletionRing({ pct, size = 56 }: { pct: number; size?: number }) {
+    const stroke = 6
+    const r = (size - stroke) / 2
+    const c = 2 * Math.PI * r
+    const dash = (pct / 100) * c
+    const color = scoreColor(pct)
+    return (
+        <svg width={size} height={size} className="flex-shrink-0">
+            <circle cx={size / 2} cy={size / 2} r={r} stroke="#f1f5f9" strokeWidth={stroke} fill="none" />
+            <circle
+                cx={size / 2}
+                cy={size / 2}
+                r={r}
+                stroke={color}
+                strokeWidth={stroke}
+                fill="none"
+                strokeDasharray={`${dash} ${c}`}
+                strokeLinecap="round"
+                transform={`rotate(-90 ${size / 2} ${size / 2})`}
+                style={{ transition: 'stroke-dasharray 500ms ease' }}
+            />
+            <text
+                x="50%"
+                y="50%"
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={size * 0.28}
+                fontWeight={700}
+                fill="#374151"
+            >{pct}%</text>
+        </svg>
+    )
+}
+
+function PublicScoreCard({
+    score,
+    checks,
+}: {
+    score: { done: number; total: number; pct: number }
+    checks: { id: string; label: string; done: boolean; to: string }[]
+}) {
+    const [open, setOpen] = useState(false)
+    return (
+        <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-4 flex flex-col min-h-0">
+            <div className="flex items-center gap-3">
+                <CompletionRing pct={score.pct} size={48} />
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                        <Globe className="w-3.5 h-3.5 text-gray-500" />
+                        <h3 className="text-sm font-semibold text-gray-800">Public Page</h3>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">{score.done} of {score.total} complete</p>
+                </div>
+                <button
+                    onClick={() => setOpen(v => !v)}
+                    className="text-xs font-medium text-gray-500 hover:text-gray-800"
+                >
+                    {open ? 'Hide' : 'View'}
+                </button>
+            </div>
+            {open && (
+                <div className="mt-3 space-y-1 overflow-y-auto min-h-0 flex-1">
+                    {checks.map(c => (
+                        <Link
+                            key={c.id}
+                            to={c.to}
+                            className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                                c.done ? 'text-gray-400 line-through' : 'text-gray-700 hover:bg-gray-50'
+                            }`}
+                        >
+                            {c.done
+                                ? <Check className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                                : <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />}
+                            <span className="truncate flex-1">{c.label}</span>
+                            {!c.done && <ArrowRight className="w-3 h-3 text-gray-400" />}
+                        </Link>
+                    ))}
+                </div>
+            )}
+        </div>
+    )
+}
+
+function ContextScoreCard({
+    score,
+    checks,
+}: {
+    score: { done: number; total: number; pct: number }
+    checks: { id: string; label: string; done: boolean }[]
+}) {
+    const color = scoreColor(score.pct)
+    return (
+        <Link
+            to="/context"
+            className="group bg-white rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.12)] ring-1 ring-gray-900/[0.04] p-4 flex flex-col gap-2.5 hover:ring-primary-200/60 hover:-translate-y-0.5 transition-all duration-200 min-h-0"
+        >
+            <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-primary-50 ring-1 ring-primary-100/50 flex items-center justify-center">
+                    <Compass className="w-4 h-4 text-primary-600" />
+                </div>
+                <h3 className="text-[13px] font-semibold text-gray-900 tracking-tight flex-1">Context Page</h3>
+                <span className="text-[11px] font-semibold text-gray-500">{score.done}/{score.total}</span>
+                <ArrowRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all" />
+            </div>
+            <div className="w-full h-1.5 bg-gray-100/80 rounded-full overflow-hidden">
+                <div
+                    className="h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(0,0,0,0.08)]"
+                    style={{ width: `${score.pct}%`, backgroundColor: color }}
+                />
+            </div>
+            <div className="flex flex-wrap gap-1">
+                {checks.map(c => (
+                    <span
+                        key={c.id}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
+                            c.done
+                                ? 'bg-green-50 text-green-700 ring-1 ring-green-100'
+                                : 'bg-gray-50 text-gray-500 ring-1 ring-gray-100'
+                        }`}
+                        title={c.label}
+                    >
+                        {c.done ? <Check className="w-2.5 h-2.5" /> : <span className="w-1 h-1 rounded-full bg-current" />}
+                        {c.label}
+                    </span>
+                ))}
+            </div>
+        </Link>
+    )
+}
+
+function NextStepsCard({
+    steps,
+}: {
+    steps: { id: string; label: string; icon: React.ReactNode; to?: string; onClick?: () => void }[]
+}) {
+    const rowClass = "group w-full text-left flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-gradient-to-br from-white to-gray-50/40 hover:from-primary-50/40 hover:to-primary-50/10 border border-gray-100 hover:border-primary-200/70 transition-all"
+    return (
+        <div className="bg-white rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.12)] ring-1 ring-gray-900/[0.04] p-4 flex flex-col min-h-0 flex-1">
+            <div className="flex items-center gap-2.5 mb-3 flex-shrink-0">
+                <div className="w-8 h-8 rounded-xl bg-primary-50 ring-1 ring-primary-100/50 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-primary-600" />
+                </div>
+                <h3 className="text-[13px] font-semibold text-gray-900 tracking-tight">Next Steps</h3>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
+                {steps.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center py-2">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-50 to-green-100 ring-1 ring-green-200/50 flex items-center justify-center mb-2">
+                            <Check className="w-5 h-5 text-green-600" />
+                        </div>
+                        <p className="text-xs font-medium text-gray-700">All caught up!</p>
+                        <p className="text-[11px] text-gray-500 mt-0.5">Your dashboard is in great shape.</p>
+                    </div>
+                ) : (
+                    steps.map(s => {
+                        const inner = (
+                            <>
+                                <div className="w-7 h-7 rounded-lg bg-white ring-1 ring-gray-200/70 shadow-sm flex items-center justify-center text-gray-500 group-hover:text-primary-600 group-hover:ring-primary-200/70 flex-shrink-0 transition-colors">
+                                    {s.icon}
+                                </div>
+                                <span className="text-xs font-medium text-gray-700 group-hover:text-primary-700 flex-1 truncate">
+                                    {s.label}
+                                </span>
+                                <ArrowRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                            </>
+                        )
+                        return s.onClick ? (
+                            <button key={s.id} type="button" onClick={s.onClick} className={rowClass}>{inner}</button>
+                        ) : (
+                            <Link key={s.id} to={s.to || '#'} className={rowClass}>{inner}</Link>
+                        )
+                    })
+                )}
+            </div>
+        </div>
+    )
+}
+
 export default function Dashboard() {
     const navigate = useNavigate()
     const { startTutorial } = useTutorial()
-    const { isOwner, isSharedMember, organizationName } = useTeam()
+    const { isOwner, isSharedMember, organizationName, ownedOrganization } = useTeam()
     const [initiatives, setInitiatives] = useState<Initiative[]>([])
     const [allKPIs, setAllKPIs] = useState<KPI[]>([])
     const [allLocations, setAllLocations] = useState<Location[]>([])
     const [totalEvidence, setTotalEvidence] = useState<number>(0)
+    const [orgContext, setOrgContext] = useState<OrganizationContext | null>(null)
     // Organization info now comes from TeamContext
     const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: true })
     const [isLoadingStats, setIsLoadingStats] = useState(true)
@@ -42,6 +237,15 @@ export default function Dashboard() {
     // Add loading cache to prevent duplicate requests
     const [isLoadingData, setIsLoadingData] = useState(false)
     const loadingPromise = useRef<Promise<void> | null>(null)
+
+    useEffect(() => {
+        if (!isOwner || !ownedOrganization?.id) return
+        let cancelled = false
+        apiService.getOrgContext(ownedOrganization.id)
+            .then(ctx => { if (!cancelled) setOrgContext(ctx) })
+            .catch(() => { if (!cancelled) setOrgContext(null) })
+        return () => { cancelled = true }
+    }, [isOwner, ownedOrganization?.id])
 
     useEffect(() => {
         // Only load if not already loading and no promise in progress
@@ -206,6 +410,74 @@ export default function Dashboard() {
     }
 
 
+    // ============ Completeness + Next Steps (owner only) ============
+    // IMPORTANT: these hooks MUST run before any early return to preserve hook order.
+    const publicChecks = useMemo(() => {
+        const o = ownedOrganization
+        const firstInit = initiatives[0]?.id
+        return [
+            { id: 'logo',        label: 'Upload organization logo',  done: !!o?.logo_url,                         to: '/account?tab=organization' },
+            { id: 'brand',       label: 'Set brand color',           done: !!o?.brand_color,                      to: '/account?tab=branding' },
+            { id: 'statement',   label: 'Write mission statement',   done: !!(o?.statement && o.statement.trim().length > 0), to: '/account?tab=organization' },
+            { id: 'public',      label: 'Make organization public',  done: !!o?.is_public,                        to: '/account?tab=organization' },
+            { id: 'initiative',  label: 'Create an initiative',      done: initiatives.length > 0,                to: '/' },
+            { id: 'metric',      label: 'Add at least one metric',   done: allKPIs.length > 0,                    to: firstInit ? `/initiatives/${firstInit}?tab=metrics` : '/' },
+            { id: 'location',    label: 'Add at least one location', done: allLocations.length > 0,               to: firstInit ? `/initiatives/${firstInit}?tab=location` : '/' },
+            { id: 'evidence',    label: 'Add at least one evidence', done: totalEvidence > 0,                     to: firstInit ? `/initiatives/${firstInit}?tab=evidence` : '/' },
+        ]
+    }, [ownedOrganization, initiatives, allKPIs, allLocations, totalEvidence])
+
+    const publicScore = useMemo(() => {
+        const done = publicChecks.filter(c => c.done).length
+        return { done, total: publicChecks.length, pct: Math.round((done / publicChecks.length) * 100) }
+    }, [publicChecks])
+
+    const contextChecks = useMemo(() => {
+        const c = orgContext
+        const hasText = (v?: string | null) => !!(v && v.trim().length > 0)
+        const hasList = (v?: any[] | null) => Array.isArray(v) && v.length > 0
+        return [
+            { id: 'problem',    label: 'Problem Statement',    done: hasText(c?.problem_statement) },
+            { id: 'stats',      label: 'Stats & Statements',   done: hasList(c?.stats_and_statements) },
+            { id: 'theory',     label: 'Theory of Change',     done: hasText(c?.theory_of_change) || hasList(c?.theory_of_change_stages) },
+            { id: 'strategies', label: 'Strategies',           done: hasList(c?.strategies) },
+            { id: 'more',       label: 'More Context',         done: hasText(c?.additional_info) },
+        ]
+    }, [orgContext])
+
+    const contextScore = useMemo(() => {
+        const done = contextChecks.filter(c => c.done).length
+        return { done, total: contextChecks.length, pct: Math.round((done / contextChecks.length) * 100) }
+    }, [contextChecks])
+
+    const nextSteps = useMemo(() => {
+        type Step = { id: string; label: string; icon: React.ReactNode; to?: string; onClick?: () => void }
+        const steps: Step[] = []
+        const o = ownedOrganization
+        const firstInit = initiatives[0]?.id
+        if (!o?.logo_url)        steps.push({ id: 'logo',      label: 'Upload your logo',             to: '/account?tab=branding',     icon: <ImageIcon className="w-4 h-4" /> })
+        if (!o?.brand_color)     steps.push({ id: 'brand',     label: 'Pick a brand color',           to: '/account?tab=branding',     icon: <Palette className="w-4 h-4" /> })
+        if (!o?.statement)       steps.push({ id: 'statement', label: 'Add a mission statement',      to: '/account?tab=organization', icon: <FileText className="w-4 h-4" /> })
+        if (!o?.is_public)       steps.push({ id: 'public',    label: 'Publish your organization',    to: '/account?tab=account',      icon: <Globe className="w-4 h-4" /> })
+        if (initiatives.length === 0) steps.push({ id: 'initiative', label: 'Create your first initiative', onClick: () => setShowCreateModal(true), icon: <Plus className="w-4 h-4" /> })
+        initiatives.forEach((init) => {
+            const initKpis = allKPIs.filter(k => k.initiative_id === init.id)
+            if (initKpis.length === 0) steps.push({ id: `metrics-${init.id}`, label: `Add metrics to "${init.title}"`, to: `/initiatives/${init.id}?tab=metrics`, icon: <BarChart3 className="w-4 h-4" /> })
+        })
+        if (allLocations.length === 0 && firstInit) {
+            steps.push({ id: 'locations', label: 'Add locations to an initiative', to: `/initiatives/${firstInit}?tab=location`, icon: <MapPin className="w-4 h-4" /> })
+        }
+        if (totalEvidence === 0 && firstInit) {
+            steps.push({ id: 'evidence', label: 'Add evidence to an initiative', to: `/initiatives/${firstInit}?tab=evidence`, icon: <FileText className="w-4 h-4" /> })
+        }
+        if (contextScore.done < contextScore.total) {
+            steps.push({ id: 'context', label: `Finish context page (${contextScore.done}/${contextScore.total})`, to: '/context', icon: <Compass className="w-4 h-4" /> })
+        }
+        return steps.slice(0, 4)
+    }, [ownedOrganization, initiatives, allKPIs, allLocations, totalEvidence, contextScore])
+
+    const showOwnerWidgets = isOwner && !!ownedOrganization
+
     if (loadingState.isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -233,7 +505,6 @@ export default function Dashboard() {
         )
     }
 
-    // Handle location click from map - navigate to the initiative's location tab
     const handleLocationClick = (location: Location) => {
         if (location.initiative_id) {
             navigate(`/initiatives/${location.initiative_id}?tab=locations`)
@@ -248,11 +519,11 @@ export default function Dashboard() {
                     <h1 className="text-xl font-semibold text-gray-800">Your Initiatives</h1>
                 </div>
 
-                {/* Two Column Layout - fills remaining height */}
+                {/* Bento Layout - fills remaining height */}
                 <div className="flex-1 min-h-0">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-                        {/* Initiatives Module - Takes 2 columns on desktop, full width on mobile */}
-                        <div className="col-span-1 lg:col-span-2 bg-white rounded-2xl shadow-bubble border border-gray-100 overflow-hidden flex flex-col">
+                    <div className={`grid grid-cols-1 ${showOwnerWidgets ? 'lg:grid-cols-5' : 'lg:grid-cols-3'} gap-4 h-full`}>
+                        {/* Initiatives Module - narrower on desktop (2/5), full width on mobile */}
+                        <div className={`col-span-1 ${showOwnerWidgets ? 'lg:col-span-2' : 'lg:col-span-2'} bg-white rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.12)] ring-1 ring-gray-900/[0.04] overflow-hidden flex flex-col min-h-0`}>
                             {/* Team Member Banner */}
                             {isSharedMember && organizationName && (
                                 <div className="px-6 py-3 bg-purple-50 border-b border-purple-100 flex items-center gap-2">
@@ -263,10 +534,15 @@ export default function Dashboard() {
                                 </div>
                             )}
 
-                            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-                                <h2 className="text-lg font-semibold text-gray-800">
-                                    {isSharedMember ? 'Team Initiatives' : 'Your Initiatives'}
-                                </h2>
+                            <div className="px-6 py-4 border-b border-gray-100/70 bg-gradient-to-b from-gray-50/50 to-transparent flex items-center justify-between flex-shrink-0">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-xl bg-primary-50 ring-1 ring-primary-100/50 flex items-center justify-center">
+                                        <img src="/Nexuslogo.png" alt="" className="w-4 h-4 object-contain" />
+                                    </div>
+                                    <h2 className="text-[15px] font-semibold text-gray-900 tracking-tight">
+                                        {isSharedMember ? 'Team Initiatives' : 'Your Initiatives'}
+                                    </h2>
+                                </div>
                                 <div className="flex items-center gap-2">
                                     <button
                                         onClick={startTutorial}
@@ -322,11 +598,11 @@ export default function Dashboard() {
                                         )}
                                     </div>
                                 ) : (
-                                    <div className="space-y-4">
+                                    <div className="space-y-2.5">
                                         {initiatives.map((initiative) => (
                                             <div
                                                 key={initiative.id}
-                                                className="group bg-gray-50 hover:bg-gray-100 rounded-xl p-4 transition-all duration-200 relative"
+                                                className="group bg-gradient-to-br from-white to-gray-50/40 hover:from-primary-50/40 hover:to-primary-50/10 border border-gray-100 hover:border-primary-200/70 rounded-2xl p-3.5 transition-all duration-200 relative"
                                             >
                                                 <Link
                                                     to={`/initiatives/${initiative.id}`}
@@ -334,7 +610,7 @@ export default function Dashboard() {
                                                 >
                                                     <div className="flex items-start justify-between">
                                                         <div className="flex items-center space-x-3 flex-1 min-w-0">
-                                                            <div className="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center flex-shrink-0">
+                                                            <div className="w-10 h-10 rounded-xl bg-white ring-1 ring-gray-200/70 shadow-sm flex items-center justify-center flex-shrink-0 group-hover:ring-primary-200/70 transition-colors">
                                                                 <img src="/Nexuslogo.png" alt="Nexus Logo" className="w-5 h-5 object-contain" />
                                                             </div>
                                                             <div className="flex-1 min-w-0">
@@ -387,13 +663,15 @@ export default function Dashboard() {
                         </div>
 
                         {/* Locations Map Module - hidden on mobile */}
-                        <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 overflow-hidden flex flex-col hidden md:flex">
-                            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-                                <div className="flex items-center gap-2">
-                                    <MapPin className="w-5 h-5 text-primary-500" />
-                                    <h2 className="text-lg font-semibold text-gray-800">All Locations</h2>
+                        <div className={`col-span-1 ${showOwnerWidgets ? 'lg:col-span-2' : 'lg:col-span-1'} bg-white rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.12)] ring-1 ring-gray-900/[0.04] overflow-hidden hidden md:flex flex-col min-h-0`}>
+                            <div className="px-6 py-4 border-b border-gray-100/70 bg-gradient-to-b from-gray-50/50 to-transparent flex items-center justify-between flex-shrink-0">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-xl bg-primary-50 ring-1 ring-primary-100/50 flex items-center justify-center">
+                                        <MapPin className="w-4 h-4 text-primary-600" />
+                                    </div>
+                                    <h2 className="text-[15px] font-semibold text-gray-900 tracking-tight">All Locations</h2>
                                 </div>
-                                <span className="text-sm text-gray-500">
+                                <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100/70 text-gray-600">
                                     {allLocations.length} location{allLocations.length !== 1 ? 's' : ''}
                                 </span>
                             </div>
@@ -402,9 +680,18 @@ export default function Dashboard() {
                                 <LocationMap
                                     locations={allLocations}
                                     onLocationClick={handleLocationClick}
+                                    hideEmptyBanner
                                 />
                             </div>
                         </div>
+
+                        {/* Right Rail - Owner widgets (Context Score / Next Steps) */}
+                        {showOwnerWidgets && (
+                            <div className="col-span-1 hidden lg:flex flex-col gap-4 min-h-0">
+                                <ContextScoreCard score={contextScore} checks={contextChecks} />
+                                <NextStepsCard steps={nextSteps} />
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

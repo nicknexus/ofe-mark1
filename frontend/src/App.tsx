@@ -28,6 +28,8 @@ import Dashboard from './pages/Dashboard'
 import InitiativePage from './pages/InitiativePage'
 import AccountPage from './pages/AccountPage'
 import PublicOrganizationPage from './pages/PublicOrganizationPage'
+import PublicOrgContextPage from './pages/PublicOrgContextPage'
+import OrgContextPage from './pages/OrgContextPage'
 import PublicInitiativePage from './pages/PublicInitiativePage'
 import PublicMetricPage from './pages/PublicMetricPage'
 import PublicStoryPage from './pages/PublicStoryPage'
@@ -165,6 +167,7 @@ function App() {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/offer/:slug" element={<OfferCheckoutPage />} />
             <Route path="/org/:slug" element={<PublicOrganizationPage />} />
+            <Route path="/org/:slug/context" element={<PublicOrgContextPage />} />
             <Route path="/org/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
             <Route path="/org/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
             <Route path="/org/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
@@ -330,6 +333,7 @@ function App() {
                                     <Route path="/reset-password" element={<ResetPasswordPage />} />
                                     <Route path="/offer/:slug" element={<OfferCheckoutPage />} />
                                     <Route path="/org/:slug" element={<PublicOrganizationPage />} />
+                                    <Route path="/org/:slug/context" element={<PublicOrgContextPage />} />
                                     <Route path="/org/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
                                     <Route path="/org/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
                                     <Route path="/org/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
@@ -592,6 +596,7 @@ function App() {
                                         <Route path="/reset-password" element={<ResetPasswordPage />} />
                                         <Route path="/offer/:slug" element={<OfferCheckoutPage />} />
                                         <Route path="/org/:slug" element={<PublicOrganizationPage />} />
+                                        <Route path="/org/:slug/context" element={<PublicOrgContextPage />} />
                                         <Route path="/org/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
                                         <Route path="/org/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
                                         <Route path="/org/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
@@ -639,6 +644,7 @@ function App() {
                                                 <Route path="initiatives/:id" element={<InitiativePage />} />
                                                 <Route path="initiatives/:id/metrics/:kpiId" element={<InitiativePage />} />
                                                 <Route path="account" element={<AccountPage subscriptionStatus={subscriptionStatus} />} />
+                                                <Route path="context" element={<OrgContextPage />} />
                                                 <Route path="settings/team" element={<TeamSettingsPage />} />
                                                 <Route path="*" element={<Navigate to="/" replace />} />
                                             </Routes>
