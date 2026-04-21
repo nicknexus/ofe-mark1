@@ -867,7 +867,7 @@ export default function PublicOrganizationPage() {
             {/* Main Content Area - Fixed Height */}
             <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
                 {/* Mobile Toggle Tabs */}
-                <div className="md:hidden flex items-center justify-center gap-2 py-2 px-3 bg-white/40 backdrop-blur-lg border-b border-white/40 flex-shrink-0">
+                <div className="md:hidden flex items-center gap-2 py-2 px-3 bg-white/40 backdrop-blur-lg border-b border-white/40 flex-shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&>button]:flex-shrink-0">
                     <button
                         onClick={() => setActiveView('globe')}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
@@ -900,7 +900,7 @@ export default function PublicOrganizationPage() {
                             }`}
                         >
                             <Compass className="w-3.5 h-3.5" />
-                            <span>Context & Challenges</span>
+                            <span>Context</span>
                         </button>
                     )}
                     <button
