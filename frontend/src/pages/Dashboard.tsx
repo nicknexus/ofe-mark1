@@ -168,8 +168,10 @@ function ContextScoreCard({
 
 function NextStepsCard({
     steps,
+    loading,
 }: {
     steps: { id: string; label: string; icon: React.ReactNode; to?: string; onClick?: () => void }[]
+    loading?: boolean
 }) {
     const rowClass = "group w-full text-left flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-gradient-to-br from-white to-gray-50/40 hover:from-primary-50/40 hover:to-primary-50/10 border border-gray-100 hover:border-primary-200/70 transition-all"
     return (
@@ -181,7 +183,13 @@ function NextStepsCard({
                 <h3 className="text-[13px] font-semibold text-gray-900 tracking-tight">Next Steps</h3>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
-                {steps.length === 0 ? (
+                {loading ? (
+                    <>
+                        <div className="h-[38px] rounded-xl bg-gray-100/70 animate-pulse" />
+                        <div className="h-[38px] rounded-xl bg-gray-100/70 animate-pulse" />
+                        <div className="h-[38px] rounded-xl bg-gray-100/60 animate-pulse" />
+                    </>
+                ) : steps.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center py-2">
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-50 to-green-100 ring-1 ring-green-200/50 flex items-center justify-center mb-2">
                             <Check className="w-5 h-5 text-green-600" />
@@ -223,6 +231,7 @@ export default function Dashboard() {
     const [allLocations, setAllLocations] = useState<Location[]>([])
     const [totalEvidence, setTotalEvidence] = useState<number>(0)
     const [orgContext, setOrgContext] = useState<OrganizationContext | null>(null)
+    const [contextLoaded, setContextLoaded] = useState(false)
     // Organization info now comes from TeamContext
     const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: true })
     const [isLoadingStats, setIsLoadingStats] = useState(true)
@@ -241,9 +250,10 @@ export default function Dashboard() {
     useEffect(() => {
         if (!isOwner || !ownedOrganization?.id) return
         let cancelled = false
+        setContextLoaded(false)
         apiService.getOrgContext(ownedOrganization.id)
-            .then(ctx => { if (!cancelled) setOrgContext(ctx) })
-            .catch(() => { if (!cancelled) setOrgContext(null) })
+            .then(ctx => { if (!cancelled) { setOrgContext(ctx); setContextLoaded(true) } })
+            .catch(() => { if (!cancelled) { setOrgContext(null); setContextLoaded(true) } })
         return () => { cancelled = true }
     }, [isOwner, ownedOrganization?.id])
 
@@ -689,7 +699,7 @@ export default function Dashboard() {
                         {showOwnerWidgets && (
                             <div className="col-span-1 hidden lg:flex flex-col gap-4 min-h-0">
                                 <ContextScoreCard score={contextScore} checks={contextChecks} />
-                                <NextStepsCard steps={nextSteps} />
+                                <NextStepsCard steps={nextSteps} loading={isLoadingStats || !contextLoaded} />
                             </div>
                         )}
                     </div>
