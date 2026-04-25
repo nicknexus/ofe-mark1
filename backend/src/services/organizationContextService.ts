@@ -201,6 +201,12 @@ export class OrganizationContextService {
         return data || null;
     }
 
+    /**
+     * Phase 1 (full-access baseline): editing organization-context content
+     * (problem statement, theory of change, etc.) is content-level, not
+     * account-level, so team members are allowed. Org-account fields like
+     * name/branding/billing remain owner-only via OrganizationService.update.
+     */
     private static async assertOwner(orgId: string, userId: string): Promise<void> {
         const { data: org, error } = await supabase
             .from('organizations')
@@ -210,10 +216,15 @@ export class OrganizationContextService {
 
         if (error) throw new Error(`Failed to verify organization: ${error.message}`);
         if (!org) throw new Error('Organization not found');
-        if (org.owner_id !== userId) {
-            const permissionError = new Error('Permission denied - must be owner');
-            (permissionError as any).status = 403;
-            throw permissionError;
-        }
+
+        if (org.owner_id === userId) return;
+
+        const { TeamService } = await import('./teamService');
+        const membership = await TeamService.getUserTeamMembership(userId, orgId);
+        if (membership) return;
+
+        const permissionError = new Error('Permission denied - must be a member of this organization');
+        (permissionError as any).status = 403;
+        throw permissionError;
     }
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
+import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
 import {
     ArrowLeft, Target, Calendar, MapPin, FileText, ExternalLink, CheckCircle2, BarChart3,
     ChevronLeft, ChevronRight, ChevronDown, X, Camera, MessageSquare, DollarSign, Filter
@@ -64,6 +65,7 @@ export default function PublicImpactClaimPage() {
         initiativeSlug: string
         claimId: string
     }>()
+    const orgLinkBase = useOrgLinkBase()
     const [searchParams] = useSearchParams()
     const from = searchParams.get('from')
 
@@ -114,7 +116,7 @@ export default function PublicImpactClaimPage() {
                     <Target className="w-16 h-16 text-gray-300 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-gray-800 mb-3">Impact Claim Not Found</h1>
                     <p className="text-gray-500 mb-8">{error || 'This impact claim does not exist.'}</p>
-                    <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=metrics`}
+                    <Link to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=metrics`}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-xl hover:bg-gray-700 transition-colors font-medium">
                         <ArrowLeft className="w-4 h-4" /> Back to Metrics
                     </Link>
@@ -167,7 +169,7 @@ export default function PublicImpactClaimPage() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 sm:py-3">
                     <div className="flex items-center justify-between">
                         <Link
-                            to={from === 'org' ? `/org/${orgSlug}` : `/org/${orgSlug}/${initiativeSlug}/metric/${claim.metric.slug}`}
+                            to={from === 'org' ? `${orgLinkBase}/${orgSlug}` : `${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${claim.metric.slug}`}
                             className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-800 transition-colors"
                         >
                             <ArrowLeft className="w-4 h-4" />
@@ -202,8 +204,8 @@ export default function PublicImpactClaimPage() {
                         items={from === 'org' ? [
                             { label: `+${parseFloat(String(claim.value)).toLocaleString()} ${claim.metric.unit_of_measurement}` }
                         ] : [
-                            { label: claim.initiative.title, href: `/org/${orgSlug}/${initiativeSlug}?tab=metrics` },
-                            { label: claim.metric.title, href: `/org/${orgSlug}/${initiativeSlug}/metric/${claim.metric.slug}` },
+                            { label: claim.initiative.title, href: `${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=metrics` },
+                            { label: claim.metric.title, href: `${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${claim.metric.slug}` },
                             { label: `+${parseFloat(String(claim.value)).toLocaleString()} ${claim.metric.unit_of_measurement}` }
                         ]}
                     />
@@ -217,11 +219,10 @@ export default function PublicImpactClaimPage() {
                                 <span className="text-lg sm:text-xl font-bold text-gray-800">
                                     Impact Claim
                                 </span>
-                                <span className={`px-3 sm:px-4 py-1 sm:py-1.5 text-[10px] sm:text-xs font-semibold rounded-full uppercase tracking-wide border ${
-                                    claim.metric.category === 'impact' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' :
-                                    claim.metric.category === 'input' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
-                                    'bg-accent/15 text-accent-foreground border-accent/25'
-                                }`}>
+                                <span className={`px-3 sm:px-4 py-1 sm:py-1.5 text-[10px] sm:text-xs font-semibold rounded-full uppercase tracking-wide border ${claim.metric.category === 'impact' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' :
+                                        claim.metric.category === 'input' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
+                                            'bg-accent/15 text-accent-foreground border-accent/25'
+                                    }`}>
                                     {claim.metric.category}
                                 </span>
                             </div>
@@ -298,7 +299,7 @@ export default function PublicImpactClaimPage() {
                             <div className="pt-3 border-t border-gray-100">
                                 <p className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wide mb-1.5">Part of Metric</p>
                                 <Link
-                                    to={`/org/${orgSlug}/${initiativeSlug}/metric/${claim.metric.slug}`}
+                                    to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${claim.metric.slug}`}
                                     className="flex items-center gap-2 p-3 bg-white/60 border border-white/80 rounded-xl hover:bg-white/80 hover:shadow-md transition-all group"
                                 >
                                     <BarChart3 className={`w-5 h-5 ${config.text} flex-shrink-0`} />
@@ -371,10 +372,10 @@ export default function PublicImpactClaimPage() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
                         <p className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
-                            Part of <Link to={`/org/${orgSlug}/${initiativeSlug}/metric/${claim.metric.slug}`} className="text-accent hover:underline font-medium">{claim.metric.title}</Link>
-                            {' '}in <Link to={`/org/${orgSlug}/${initiativeSlug}`} className="text-accent hover:underline font-medium">{claim.initiative.title}</Link>
+                            Part of <Link to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${claim.metric.slug}`} className="text-accent hover:underline font-medium">{claim.metric.title}</Link>
+                            {' '}in <Link to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}`} className="text-accent hover:underline font-medium">{claim.initiative.title}</Link>
                         </p>
-                        <Link to={`/org/${orgSlug}`} className="text-xs sm:text-sm text-accent hover:text-accent/80 font-medium flex items-center gap-1">
+                        <Link to={`${orgLinkBase}/${orgSlug}`} className="text-xs sm:text-sm text-accent hover:text-accent/80 font-medium flex items-center gap-1">
                             <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Back to Organization
                         </Link>
                     </div>
@@ -406,6 +407,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
     currentFileIndex: number
     setCurrentFileIndex: (i: number | ((prev: number) => number)) => void
 }) {
+    const orgLinkBase = useOrgLinkBase()
     const [selectedTypes, setSelectedTypes] = useState<string[]>([])
     const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
@@ -556,11 +558,10 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                         <div className="relative">
                             <button
                                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-                                    selectedTypes.length > 0
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${selectedTypes.length > 0
                                         ? 'bg-accent/10 text-accent border-accent/30'
                                         : 'bg-white/60 text-gray-600 hover:bg-white/80 border-gray-200'
-                                }`}
+                                    }`}
                             >
                                 <Filter className="w-3.5 h-3.5" />
                                 {selectedTypes.length > 0
@@ -818,7 +819,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                                         ? formatDate(claim.date_represented)
                                                         : ''
                                                 return (
-                                                    <Link key={claim.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
+                                                    <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
                                                         <p className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors">
                                                             {claim.value} {claim.kpis?.unit_of_measurement || ''}
                                                         </p>
@@ -834,7 +835,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Linked Metrics</h3>
                                         <div className="space-y-2">
                                             {galleryItem.kpis.map((kpi) => (
-                                                <Link key={kpi.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
+                                                <Link key={kpi.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
                                                     <p className="text-sm font-medium text-foreground group-hover:text-accent transition-colors">{kpi.title}</p>
                                                 </Link>
                                             ))}

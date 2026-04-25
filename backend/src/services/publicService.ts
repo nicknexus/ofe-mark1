@@ -10,6 +10,7 @@ export interface PublicOrganization {
     description?: string;
     logo_url?: string;
     created_at?: string;
+    is_demo?: boolean; // Frontend uses this to render a DEMO banner on shared demo pages
 }
 
 export interface PublicInitiative {
@@ -102,11 +103,12 @@ export class PublicService {
             return { organizations: [], initiatives: [], locationMatches: [] };
         }
 
-        // Search organizations
+        // Search organizations (exclude demo / sandbox orgs from listing)
         const { data: orgs } = await supabase
             .from('organizations')
             .select('id, name, slug, description, logo_url, created_at')
             .eq('is_public', true)
+            .eq('is_demo', false)
             .or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
             .order('name')
             .limit(20);
@@ -117,9 +119,10 @@ export class PublicService {
             .from('initiatives')
             .select(`
                 id, title, description, region, location, slug, coordinates, created_at, organization_id,
-                organizations!inner(id, name, slug, logo_url, is_public)
+                organizations!inner(id, name, slug, logo_url, is_public, is_demo)
             `)
             .eq('organizations.is_public', true)
+            .eq('organizations.is_demo', false)
             .or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,region.ilike.%${searchTerm}%`)
             .order('title')
             .limit(20);
@@ -132,11 +135,12 @@ export class PublicService {
                 id, name, description, latitude, longitude, initiative_id,
                 initiatives!inner(
                     id, title, description, region, slug, is_public, organization_id,
-                    organizations!inner(id, name, slug, logo_url, is_public)
+                    organizations!inner(id, name, slug, logo_url, is_public, is_demo)
                 )
             `)
             .ilike('name', `%${searchTerm}%`)
             .eq('initiatives.organizations.is_public', true)
+            .eq('initiatives.organizations.is_demo', false)
             .limit(20);
 
         // Format results
@@ -211,10 +215,13 @@ export class PublicService {
     // ============================================
 
     static async getAllOrganizations(): Promise<PublicOrganization[]> {
+        // Exclude demo / sandbox orgs from the /explore listing — they are
+        // reachable only by direct share link.
         const { data, error } = await supabase
             .from('organizations')
             .select('id, name, slug, description, logo_url, brand_color, created_at')
             .eq('is_public', true)
+            .eq('is_demo', false)
             .order('name')
             .limit(100);
 
@@ -228,7 +235,7 @@ export class PublicService {
     } | null> {
         const { data: org, error } = await supabase
             .from('organizations')
-            .select('id, name, slug, description, statement, logo_url, brand_color, created_at')
+            .select('id, name, slug, description, statement, logo_url, brand_color, created_at, is_demo')
             .eq('slug', slug)
             .eq('is_public', true)
             .single();

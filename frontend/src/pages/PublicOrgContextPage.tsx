@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
 import {
     ArrowLeft, AlertTriangle, BarChart3, Lightbulb, FileText,
     Building2, Compass, ChevronRight, Workflow, ExternalLink, Target,
@@ -40,6 +41,7 @@ type ActiveDetail =
 
 export default function PublicOrgContextPage() {
     const { slug } = useParams<{ slug: string }>()
+    const orgLinkBase = useOrgLinkBase()
     const [organization, setOrganization] = useState<PublicOrganization | null>(null)
     const [context, setContext] = useState<PublicOrganizationContext | null>(null)
     const [loading, setLoading] = useState(true)
@@ -131,7 +133,7 @@ export default function PublicOrgContextPage() {
             <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-gray-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
                 <div className="max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
                     <Link
-                        to={`/org/${slug}`}
+                        to={`${orgLinkBase}/${slug}`}
                         className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0"
                     >
                         <ArrowLeft className="w-4 h-4" />
@@ -226,7 +228,7 @@ export default function PublicOrgContextPage() {
                                             Check back soon or visit their dashboard to see the impact in numbers.
                                         </p>
                                         <Link
-                                            to={`/org/${slug}`}
+                                            to={`${orgLinkBase}/${slug}`}
                                             className="inline-flex items-center gap-2 mt-6 px-5 py-2.5 text-sm font-medium text-white rounded-xl transition-all hover:shadow-lg"
                                             style={{ backgroundColor: brandColor }}
                                         >
@@ -311,7 +313,7 @@ export default function PublicOrgContextPage() {
                                 <p className="text-sm text-gray-500">Metrics, stories, and evidence from the field.</p>
                             </div>
                             <Link
-                                to={`/org/${slug}`}
+                                to={`${orgLinkBase}/${slug}`}
                                 className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white rounded-xl transition-all hover:shadow-lg flex-shrink-0"
                                 style={{ backgroundColor: brandColor }}
                             >

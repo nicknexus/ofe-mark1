@@ -23,6 +23,7 @@ export default function MobileDashboard({
     onNavigateToAccount
 }: MobileDashboardProps) {
     const { isOwner, isSharedMember, organizationName } = useTeam()
+    const canManageInitiatives = isOwner || isSharedMember
     const [showCreateModal, setShowCreateModal] = useState(false)
     const [showEditModal, setShowEditModal] = useState(false)
     const [editingInitiative, setEditingInitiative] = useState<Initiative | null>(null)
@@ -123,8 +124,8 @@ export default function MobileDashboard({
                 </p>
             </div>
 
-            {/* Create Button - Only for owners */}
-            {isOwner && (
+            {/* Create Button - any org member */}
+            {canManageInitiatives && (
                 <button
                     onClick={() => setShowCreateModal(true)}
                     className="w-full mb-6 flex items-center justify-center gap-2 px-4 py-4 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-semibold text-base transition-colors shadow-lg shadow-primary-500/25 active:scale-[0.98]"
@@ -140,21 +141,14 @@ export default function MobileDashboard({
                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <img src="/Nexuslogo.png" alt="Logo" className="w-8 h-8 object-contain" />
                     </div>
-                    {isSharedMember ? (
-                        <>
-                            <h3 className="text-lg font-semibold text-gray-800 mb-2">No Initiatives Yet</h3>
-                            <p className="text-gray-500 text-sm px-6">
-                                Contact the organization owner to create initiatives.
-                            </p>
-                        </>
-                    ) : (
-                        <>
-                            <h3 className="text-lg font-semibold text-gray-800 mb-2">Welcome to Nexus</h3>
-                            <p className="text-gray-500 text-sm px-6">
-                                Create your first initiative to start tracking impact.
-                            </p>
-                        </>
-                    )}
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                        {isSharedMember ? 'No Initiatives Yet' : 'Welcome to Nexus'}
+                    </h3>
+                    <p className="text-gray-500 text-sm px-6">
+                        {isSharedMember
+                            ? `Your organization doesn't have any initiatives yet. Tap "New Initiative" above to add one.`
+                            : 'Create your first initiative to start tracking impact.'}
+                    </p>
                 </div>
             ) : (
                 <div className="space-y-3">
@@ -184,9 +178,9 @@ export default function MobileDashboard({
                                     </div>
                                     <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
                                 </button>
-                                
-                                {/* Settings menu - Only show for owners */}
-                                {isOwner && (
+
+                                {/* Settings menu - any org member */}
+                                {canManageInitiatives && (
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation()

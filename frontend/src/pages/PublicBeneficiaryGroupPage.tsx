@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
 import {
     ArrowLeft, Users, BarChart3, FileText, MapPin, Calendar,
     BookOpen, Camera, MessageSquare, DollarSign, Info
@@ -118,6 +119,7 @@ export default function PublicBeneficiaryGroupPage() {
         initiativeSlug: string
         groupId: string
     }>()
+    const orgLinkBase = useOrgLinkBase()
 
     const [data, setData] = useState<PublicBeneficiaryGroupDetail | null>(null)
     const [loading, setLoading] = useState(true)
@@ -170,7 +172,7 @@ export default function PublicBeneficiaryGroupPage() {
                     <Users className="w-16 h-16 text-gray-300 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-gray-800 mb-3">Beneficiary Group Not Found</h1>
                     <p className="text-gray-500 mb-8">{error || 'This beneficiary group does not exist.'}</p>
-                    <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=beneficiaries`}
+                    <Link to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=beneficiaries`}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-xl hover:bg-gray-700 transition-colors font-medium">
                         <ArrowLeft className="w-4 h-4" /> Back to Beneficiaries
                     </Link>
@@ -204,7 +206,7 @@ export default function PublicBeneficiaryGroupPage() {
             <div className="sticky top-0 z-50 bg-white/60 backdrop-blur-2xl border-b border-white/40 flex-shrink-0">
                 <div className="max-w-full mx-auto px-4 sm:px-6 py-2 sm:py-3">
                     <div className="flex items-center justify-between">
-                        <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=beneficiaries`} className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-800 transition-colors">
+                        <Link to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=beneficiaries`} className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-800 transition-colors">
                             <ArrowLeft className="w-4 h-4" />
                             <span className="text-xs sm:text-sm font-medium">Back</span>
                         </Link>
@@ -226,7 +228,7 @@ export default function PublicBeneficiaryGroupPage() {
                         orgSlug={orgSlug!}
                         orgName={data.initiative.org_name || ''}
                         items={[
-                            { label: data.initiative.title, href: `/org/${orgSlug}/${initiativeSlug}?tab=beneficiaries` },
+                            { label: data.initiative.title, href: `${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=beneficiaries` },
                             { label: data.name }
                         ]}
                     />
@@ -277,7 +279,7 @@ export default function PublicBeneficiaryGroupPage() {
                                     {data.stories.map(story => (
                                         <Link
                                             key={story.id}
-                                            to={`/org/${orgSlug}/${initiativeSlug}/story/${story.id}`}
+                                            to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/story/${story.id}`}
                                             className="block bg-white/60 rounded-xl border border-white/50 overflow-hidden hover:bg-white/80 hover:shadow-md transition-all group"
                                         >
                                             {story.media_url && story.media_type === 'photo' && (
@@ -324,7 +326,7 @@ export default function PublicBeneficiaryGroupPage() {
                                         return (
                                             <Link
                                                 key={group.kpi?.id || idx}
-                                                to={slug ? `/org/${orgSlug}/${initiativeSlug}/metric/${slug}` : '#'}
+                                                to={slug ? `${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${slug}` : '#'}
                                                 className="block p-3 bg-white/60 rounded-xl border border-white/50 hover:bg-white/80 hover:shadow-md transition-all group"
                                             >
                                                 <div className="flex items-start gap-3">
@@ -384,10 +386,9 @@ export default function PublicBeneficiaryGroupPage() {
                                                     {evidenceList.map((ev, idx) => (
                                                         <Link
                                                             key={ev.id}
-                                                            to={`/org/${orgSlug}/${initiativeSlug}/evidence/${ev.id}`}
-                                                            className={`flex items-center py-1.5 px-2 rounded-md transition-all hover:bg-white/80 hover:shadow-sm ${
-                                                                idx < evidenceList.length - 1 ? `border-b ${colors.itemBorder}` : ''
-                                                            }`}
+                                                            to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/evidence/${ev.id}`}
+                                                            className={`flex items-center py-1.5 px-2 rounded-md transition-all hover:bg-white/80 hover:shadow-sm ${idx < evidenceList.length - 1 ? `border-b ${colors.itemBorder}` : ''
+                                                                }`}
                                                         >
                                                             <div className="flex items-center gap-2 min-w-0 flex-1">
                                                                 <div className={`w-1.5 h-1.5 rounded-full ${colors.dotColor} flex-shrink-0`} />

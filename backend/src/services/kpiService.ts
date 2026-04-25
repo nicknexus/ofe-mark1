@@ -4,10 +4,10 @@ import { InitiativeService } from './initiativeService';
 import { BeneficiaryService } from './beneficiaryService';
 
 export class KPIService {
-    static async create(kpi: KPI, userId: string): Promise<KPI> {
+    static async create(kpi: KPI, userId: string, requestedOrgId?: string): Promise<KPI> {
         // Verify user has access to the initiative
         if (kpi.initiative_id) {
-            const initiative = await InitiativeService.getById(kpi.initiative_id, userId);
+            const initiative = await InitiativeService.getById(kpi.initiative_id, userId, requestedOrgId);
             if (!initiative) {
                 throw new Error('Initiative not found or access denied');
             }
@@ -22,12 +22,12 @@ export class KPIService {
                 .eq('initiative_id', kpi.initiative_id)
                 .order('display_order', { ascending: false })
                 .limit(1)
-            
+
             if (existingKPIs && existingKPIs.length > 0) {
                 maxOrder = (existingKPIs[0].display_order ?? 0) + 1
             }
         }
-        
+
         const { data, error } = await supabase
             .from('kpis')
             .insert([{ ...kpi, user_id: userId, display_order: maxOrder }])
@@ -38,9 +38,12 @@ export class KPIService {
         return data;
     }
 
-    static async getAll(userId: string, initiativeId?: string): Promise<KPI[]> {
-        // If initiative_id provided, fetch directly (access controlled at route level)
+    static async getAll(userId: string, initiativeId?: string, requestedOrgId?: string): Promise<KPI[]> {
         if (initiativeId) {
+            // Authorize via initiative org context.
+            const initiative = await InitiativeService.getById(initiativeId, userId, requestedOrgId);
+            if (!initiative) return [];
+
             const { data, error } = await supabase
                 .from('kpis')
                 .select('*')
@@ -53,7 +56,7 @@ export class KPIService {
         }
 
         // No initiative specified - get all KPIs for user's accessible initiatives
-        const initiatives = await InitiativeService.getAll(userId);
+        const initiatives = await InitiativeService.getAll(userId, requestedOrgId);
         if (initiatives.length === 0) {
             return [];
         }
@@ -70,11 +73,14 @@ export class KPIService {
         return data || [];
     }
 
-    static async getWithEvidence(userId: string, initiativeId?: string): Promise<KPIWithEvidence[]> {
+    static async getWithEvidence(userId: string, initiativeId?: string, requestedOrgId?: string): Promise<KPIWithEvidence[]> {
         let query;
 
-        // If initiative_id provided, fetch directly (access controlled at route level)
         if (initiativeId) {
+            // Authorize via initiative org context.
+            const initiative = await InitiativeService.getById(initiativeId, userId, requestedOrgId);
+            if (!initiative) return [];
+
             query = supabase
                 .from('kpis')
                 .select(`
@@ -87,7 +93,7 @@ export class KPIService {
                 .eq('initiative_id', initiativeId);
         } else {
             // No initiative specified - get all for user's accessible initiatives
-            const initiatives = await InitiativeService.getAll(userId);
+            const initiatives = await InitiativeService.getAll(userId, requestedOrgId);
             if (initiatives.length === 0) {
                 return [];
             }
@@ -204,7 +210,7 @@ export class KPIService {
         return kpisWithEvidence;
     }
 
-    static async getById(id: string, userId: string): Promise<KPI | null> {
+    static async getById(id: string, userId: string, requestedOrgId?: string): Promise<KPI | null> {
         // Get the KPI first
         const { data: kpi, error } = await supabase
             .from('kpis')
@@ -219,16 +225,16 @@ export class KPIService {
 
         // Verify user has access to the initiative this KPI belongs to
         if (kpi?.initiative_id) {
-            const initiative = await InitiativeService.getById(kpi.initiative_id, userId);
+            const initiative = await InitiativeService.getById(kpi.initiative_id, userId, requestedOrgId);
             if (!initiative) return null; // No access
         }
 
         return kpi;
     }
 
-    static async update(id: string, updates: Partial<KPI>, userId: string): Promise<KPI> {
+    static async update(id: string, updates: Partial<KPI>, userId: string, requestedOrgId?: string): Promise<KPI> {
         // Verify user has access to this KPI
-        const kpi = await this.getById(id, userId);
+        const kpi = await this.getById(id, userId, requestedOrgId);
         if (!kpi) throw new Error('KPI not found or access denied');
 
         const { data, error } = await supabase
@@ -242,15 +248,10 @@ export class KPIService {
         return data;
     }
 
-    static async delete(id: string, userId: string): Promise<void> {
-        // Check if user is a shared member (not allowed to delete)
-        const isShared = await InitiativeService.isSharedMember(userId);
-        if (isShared) {
-            throw new Error('Shared members cannot delete KPIs. Contact your organization owner.');
-        }
-
-        // Verify user has access to this KPI
-        const kpi = await this.getById(id, userId);
+    static async delete(id: string, userId: string, requestedOrgId?: string): Promise<void> {
+        // Phase 1 (full-access baseline): any team member of the org can delete.
+        // getById authorizes via the org context.
+        const kpi = await this.getById(id, userId, requestedOrgId);
         if (!kpi) throw new Error('KPI not found or access denied');
 
         const { error } = await supabase
@@ -262,10 +263,16 @@ export class KPIService {
     }
 
     // KPI Updates
-    static async addUpdate(update: KPIUpdate, userId: string): Promise<KPIUpdate> {
+    static async addUpdate(update: KPIUpdate, userId: string, requestedOrgId?: string): Promise<KPIUpdate> {
         // Validate location_id is required
         if (!update.location_id || !update.location_id.trim()) {
             throw new Error('Location is required for impact claims')
+        }
+
+        // Authorize via the parent KPI's org context.
+        if (update.kpi_id) {
+            const kpi = await this.getById(update.kpi_id, userId, requestedOrgId)
+            if (!kpi) throw new Error('KPI not found or access denied')
         }
 
         // Support optional beneficiary_group_ids on creation
@@ -359,7 +366,7 @@ export class KPIService {
 
             // Build a map of evidence_id -> location_ids (combining junction table and legacy)
             const evidenceLocationMap: Record<string, string[]> = {}
-            
+
             // Add from junction table
             for (const el of (evidenceLocations || [])) {
                 if (!evidenceLocationMap[el.evidence_id]) {
@@ -367,7 +374,7 @@ export class KPIService {
                 }
                 evidenceLocationMap[el.evidence_id].push(el.location_id)
             }
-            
+
             // Add legacy location_id
             for (const ev of (evidenceWithLegacyLocation || [])) {
                 if (ev.location_id) {
@@ -460,8 +467,11 @@ export class KPIService {
         }
     }
 
-    static async getUpdates(kpiId: string, userId: string): Promise<KPIUpdate[]> {
-        // Fetch directly (access controlled at route level)
+    static async getUpdates(kpiId: string, userId: string, requestedOrgId?: string): Promise<KPIUpdate[]> {
+        // Authorize via the parent KPI's org context.
+        const kpi = await this.getById(kpiId, userId, requestedOrgId);
+        if (!kpi) return [];
+
         const { data, error } = await supabase
             .from('kpi_updates')
             .select('*, kpi_update_beneficiary_groups(beneficiary_group_id)')
@@ -477,7 +487,7 @@ export class KPIService {
         }));
     }
 
-    static async updateKPIUpdate(id: string, updates: Partial<KPIUpdate>, userId: string): Promise<KPIUpdate> {
+    static async updateKPIUpdate(id: string, updates: Partial<KPIUpdate>, userId: string, requestedOrgId?: string): Promise<KPIUpdate> {
         const { beneficiary_group_ids, ...updateData } = (updates as any)
 
         // Validate location_id is required if it's being updated
@@ -494,8 +504,8 @@ export class KPIService {
 
         if (!existingUpdate) throw new Error('KPI update not found');
 
-        // Verify user has access to the KPI
-        const kpi = await this.getById(existingUpdate.kpi_id, userId);
+        // Verify user has access to the KPI via org context.
+        const kpi = await this.getById(existingUpdate.kpi_id, userId, requestedOrgId);
         if (!kpi) throw new Error('Access denied');
 
         const { data, error } = await supabase
@@ -530,10 +540,10 @@ export class KPIService {
         }
 
         // Re-run auto-link if date or location changed (might match new evidence)
-        const dateOrLocationChanged = 
-            'date_represented' in updateData || 
-            'date_range_start' in updateData || 
-            'date_range_end' in updateData || 
+        const dateOrLocationChanged =
+            'date_represented' in updateData ||
+            'date_range_start' in updateData ||
+            'date_range_end' in updateData ||
             'location_id' in updateData
 
         if (dateOrLocationChanged) {
@@ -543,14 +553,9 @@ export class KPIService {
         return data;
     }
 
-    static async deleteUpdate(id: string, userId: string): Promise<void> {
-        // Check if user is a shared member (not allowed to delete)
-        const isShared = await InitiativeService.isSharedMember(userId);
-        if (isShared) {
-            throw new Error('Shared members cannot delete data points. Contact your organization owner.');
-        }
-
-        // Get the update first to verify access
+    static async deleteUpdate(id: string, userId: string, requestedOrgId?: string): Promise<void> {
+        // Phase 1 (full-access baseline): any team member of the org can delete.
+        // Access is verified through the parent KPI's org context below.
         const { data: existingUpdate } = await supabase
             .from('kpi_updates')
             .select('kpi_id')
@@ -559,8 +564,8 @@ export class KPIService {
 
         if (!existingUpdate) throw new Error('KPI update not found');
 
-        // Verify user has access to the KPI
-        const kpi = await this.getById(existingUpdate.kpi_id, userId);
+        // Verify user has access to the KPI via org context.
+        const kpi = await this.getById(existingUpdate.kpi_id, userId, requestedOrgId);
         if (!kpi) throw new Error('Access denied');
 
         const { error } = await supabase

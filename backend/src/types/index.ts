@@ -9,6 +9,8 @@ export interface Organization {
     logo_url?: string; // URL to organization logo image
     brand_color?: string; // Hex color for public page branding
     is_public?: boolean;
+    is_demo?: boolean; // Sandbox / mock-charity org (admin-only). Hidden from /explore + public search.
+    demo_public_share?: boolean; // When true + is_demo true, public /org/:slug page is reachable via direct link.
     owner_id?: string; // Single owner user (cascades delete when user is deleted)
     created_at?: string;
     updated_at?: string;

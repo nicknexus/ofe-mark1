@@ -22,6 +22,7 @@ router.get('/public', async (req, res) => {
             .from('organizations')
             .select('*')
             .eq('is_public', true)
+            .eq('is_demo', false)
             .order('name', { ascending: true })
             .limit(100);
 
@@ -162,7 +163,7 @@ router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
 router.post('/:id/logo', authenticateUser, upload.single('logo'), async (req: AuthenticatedRequest, res) => {
     console.log('[Logo Upload] Starting logo upload for org:', req.params.id);
     console.log('[Logo Upload] File received:', req.file ? { name: req.file.originalname, size: req.file.size, type: req.file.mimetype } : 'NO FILE');
-    
+
     try {
         if (!req.file) {
             console.log('[Logo Upload] ERROR: No file uploaded');
@@ -173,12 +174,19 @@ router.post('/:id/logo', authenticateUser, upload.single('logo'), async (req: Au
         const userId = req.user!.id;
         const orgId = req.params.id;
 
-        // Verify user owns this organization
-        const ownedOrg = await TeamService.getUserOwnedOrganization(userId);
-        if (!ownedOrg || ownedOrg.id !== orgId) {
+        // Verify user owns this specific organization (supports multi-org owners, e.g. admins with demo orgs)
+        const isOwner = await TeamService.isUserOwnerOfOrganization(userId, orgId);
+        if (!isOwner) {
             res.status(403).json({ error: 'Only the organization owner can update the logo' });
             return;
         }
+
+        // Fetch current logo_url so we can clean it up after replacement
+        const { data: ownedOrg } = await supabase
+            .from('organizations')
+            .select('logo_url')
+            .eq('id', orgId)
+            .maybeSingle();
 
         // Compress image if needed
         let finalBuffer = req.file.buffer;
@@ -233,7 +241,7 @@ router.post('/:id/logo', authenticateUser, upload.single('logo'), async (req: Au
         console.log('[Logo Upload] Public URL:', urlData.publicUrl);
 
         // Delete old logo if exists
-        if (ownedOrg.logo_url) {
+        if (ownedOrg?.logo_url) {
             try {
                 const oldUrlParts = ownedOrg.logo_url.split('/evidence-files/');
                 if (oldUrlParts.length === 2) {
@@ -267,15 +275,21 @@ router.delete('/:id/logo', authenticateUser, async (req: AuthenticatedRequest, r
         const userId = req.user!.id;
         const orgId = req.params.id;
 
-        // Verify user owns this organization
-        const ownedOrg = await TeamService.getUserOwnedOrganization(userId);
-        if (!ownedOrg || ownedOrg.id !== orgId) {
+        // Verify user owns this specific organization (supports multi-org owners)
+        const isOwner = await TeamService.isUserOwnerOfOrganization(userId, orgId);
+        if (!isOwner) {
             res.status(403).json({ error: 'Only the organization owner can delete the logo' });
             return;
         }
 
+        const { data: ownedOrg } = await supabase
+            .from('organizations')
+            .select('logo_url')
+            .eq('id', orgId)
+            .maybeSingle();
+
         // Delete logo from storage if exists
-        if (ownedOrg.logo_url) {
+        if (ownedOrg?.logo_url) {
             try {
                 const urlParts = ownedOrg.logo_url.split('/evidence-files/');
                 if (urlParts.length === 2) {

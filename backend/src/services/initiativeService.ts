@@ -11,9 +11,9 @@ export class InitiativeService {
      */
     static async getEffectiveOrganizationId(userId: string, requestedOrgId?: string): Promise<string | null> {
         if (requestedOrgId) {
-            // Check if user owns this org
-            const ownedOrg = await TeamService.getUserOwnedOrganization(userId);
-            if (ownedOrg && ownedOrg.id === requestedOrgId) {
+            // Check if user owns this specific org (covers real + demo orgs for admins)
+            const ownsRequested = await TeamService.isUserOwnerOfOrganization(userId, requestedOrgId);
+            if (ownsRequested) {
                 return requestedOrgId;
             }
 
@@ -59,23 +59,18 @@ export class InitiativeService {
             .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
     }
 
-    static async create(initiative: Initiative, userId: string): Promise<Initiative> {
-        // Check if user is a shared member - they cannot create new initiatives
-        const isShared = await this.isSharedMember(userId);
-        if (isShared) {
-            throw new Error('Team members cannot create new initiatives. Contact your organization owner.');
-        }
+    static async create(initiative: Initiative, userId: string, requestedOrgId?: string): Promise<Initiative> {
+        // Phase 1 (full-access baseline): team members can create initiatives in
+        // their active org. Owner-only restriction will be re-introduced in Phase 7.
+        let organizationId: string | null = await this.getEffectiveOrganizationId(userId, requestedOrgId);
 
-        // Get the effective organization ID (owned org or team membership)
-        let organizationId: string | null = await this.getEffectiveOrganizationId(userId);
-        
         if (!organizationId) {
             // User doesn't have an org - create one with default name
             // Use a timestamp-based name to ensure uniqueness
             const orgName = `Organization ${Date.now()}`;
             await OrganizationService.findOrCreate(orgName, userId);
             const userOrg = await OrganizationService.getUserOrganizations(userId);
-            
+
             if (!userOrg || userOrg.length === 0 || !userOrg[0].id) {
                 throw new Error('Failed to get or create organization');
             }
@@ -117,9 +112,9 @@ export class InitiativeService {
 
         const { data, error } = await supabase
             .from('initiatives')
-            .insert([{ 
-                ...initiative, 
-                user_id: userId, 
+            .insert([{
+                ...initiative,
+                user_id: userId,
                 organization_id: organizationId,
                 slug: slug,
                 is_public: initiative.is_public || false
@@ -133,16 +128,16 @@ export class InitiativeService {
                 const fallbackSlug = `${baseSlug}-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 6)}`;
                 const { data: retryData, error: retryError } = await supabase
                     .from('initiatives')
-                    .insert([{ 
-                        ...initiative, 
-                        user_id: userId, 
+                    .insert([{
+                        ...initiative,
+                        user_id: userId,
                         organization_id: organizationId,
                         slug: fallbackSlug,
                         is_public: initiative.is_public || false
                     }])
                     .select()
                     .single();
-                
+
                 if (retryError) throw new Error(`Failed to create initiative: ${retryError.message}`);
                 return retryData;
             }
@@ -154,7 +149,7 @@ export class InitiativeService {
     static async getAll(userId: string, requestedOrgId?: string): Promise<Initiative[]> {
         // Get the effective organization ID (owned org or team membership)
         const organizationId = await this.getEffectiveOrganizationId(userId, requestedOrgId);
-        
+
         if (!organizationId) {
             // User has no organization context - return empty
             return [];
@@ -173,7 +168,7 @@ export class InitiativeService {
 
     static async getById(id: string, userId: string, requestedOrgId?: string): Promise<Initiative | null> {
         const organizationId = await this.getEffectiveOrganizationId(userId, requestedOrgId);
-        
+
         if (!organizationId) {
             return null;
         }
@@ -239,11 +234,8 @@ export class InitiativeService {
     }
 
     static async delete(id: string, userId: string, requestedOrgId?: string): Promise<void> {
-        const isShared = await this.isSharedMember(userId);
-        if (isShared) {
-            throw new Error('Shared members cannot delete initiatives. Contact your organization owner.');
-        }
-
+        // Phase 1 (full-access baseline): any team member of the org can delete
+        // initiatives. Owner-only restriction will be re-introduced in Phase 7.
         const organizationId = await this.getEffectiveOrganizationId(userId, requestedOrgId);
         if (!organizationId) {
             throw new Error('No organization context');

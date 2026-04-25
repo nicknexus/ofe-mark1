@@ -1,6 +1,5 @@
 import { Router } from 'express'
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth'
-import { requireOwnerPermission } from '../middleware/teamPermissions'
 import { BeneficiaryService } from '../services/beneficiaryService'
 import { supabase } from '../utils/supabase'
 
@@ -10,7 +9,8 @@ const router = Router()
 router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const { initiative_id } = req.query
-        const groups = await BeneficiaryService.getAll(req.user!.id, initiative_id as string | undefined)
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const groups = await BeneficiaryService.getAll(req.user!.id, initiative_id as string | undefined, requestedOrgId)
         res.json(groups)
     } catch (error) {
         res.status(500).json({ error: (error as Error).message })
@@ -20,7 +20,8 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
 // Create
 router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const group = await BeneficiaryService.create(req.body, req.user!.id)
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const group = await BeneficiaryService.create(req.body, req.user!.id, requestedOrgId)
         res.status(201).json(group)
     } catch (error) {
         res.status(500).json({ error: (error as Error).message })
@@ -30,17 +31,20 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
 // Update
 router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const group = await BeneficiaryService.update(req.params.id, req.body, req.user!.id)
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const group = await BeneficiaryService.update(req.params.id, req.body, req.user!.id, requestedOrgId)
         res.json(group)
     } catch (error) {
         res.status(500).json({ error: (error as Error).message })
     }
 })
 
-// Delete (owner only)
-router.delete('/:id', authenticateUser, requireOwnerPermission, async (req: AuthenticatedRequest, res) => {
+// Delete
+// Phase 1 (full-access baseline): any team member of the org can delete.
+router.delete('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        await BeneficiaryService.delete(req.params.id, req.user!.id)
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        await BeneficiaryService.delete(req.params.id, req.user!.id, requestedOrgId)
         res.status(204).send()
     } catch (error) {
         res.status(500).json({ error: (error as Error).message })
@@ -58,9 +62,20 @@ router.post('/link-kpi-update', authenticateUser, async (req: AuthenticatedReque
     }
 })
 
-// Get KPI updates linked to a beneficiary group
+// Get KPI updates linked to a beneficiary group.
+// Authorization: caller must have access to the group (via initiative org).
 router.get('/:id/kpi-updates', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+
+        // Verify access to the group via initiative org context.
+        const groups = await BeneficiaryService.getAll(req.user!.id, undefined, requestedOrgId)
+        const allowed = groups.some(g => g.id === req.params.id)
+        if (!allowed) {
+            res.status(404).json({ error: 'Beneficiary group not found' })
+            return
+        }
+
         const { data, error } = await supabase
             .from('kpi_update_beneficiary_groups')
             .select(`
@@ -71,18 +86,16 @@ router.get('/:id/kpi-updates', authenticateUser, async (req: AuthenticatedReques
                 )
             `)
             .eq('beneficiary_group_id', req.params.id)
-            .eq('user_id', req.user!.id)
             .order('created_at', { ascending: false })
 
         if (error) throw new Error(`Failed to fetch linked KPI updates: ${error.message}`)
 
-        // Extract and flatten all updates, preserving KPI relationship
         const updates = (data || [])
             .map((item: any) => item.kpi_updates)
             .filter(Boolean)
             .map((update: any) => ({
                 ...update,
-                kpi: update.kpis // Ensure KPI data is at root level for easier access
+                kpi: update.kpis
             }))
 
         res.json(updates)
@@ -91,7 +104,8 @@ router.get('/:id/kpi-updates', authenticateUser, async (req: AuthenticatedReques
     }
 })
 
-// Bulk get data point counts for multiple beneficiary groups (PERFORMANCE OPTIMIZATION)
+// Bulk get data point counts for multiple beneficiary groups.
+// Authorization: limit returned counts to groups the caller can access.
 router.post('/bulk-data-point-counts', authenticateUser, async (req: AuthenticatedRequest, res): Promise<void> => {
     try {
         const { group_ids } = req.body
@@ -100,19 +114,25 @@ router.post('/bulk-data-point-counts', authenticateUser, async (req: Authenticat
             return
         }
 
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const accessibleGroups = await BeneficiaryService.getAll(req.user!.id, undefined, requestedOrgId)
+        const accessibleIds = new Set(accessibleGroups.map(g => g.id))
+        const filteredIds = group_ids.filter((id: string) => accessibleIds.has(id))
+
+        const counts: Record<string, number> = {}
+        group_ids.forEach((id: string) => { counts[id] = 0 })
+
+        if (filteredIds.length === 0) {
+            res.json(counts)
+            return
+        }
+
         const { data, error } = await supabase
             .from('kpi_update_beneficiary_groups')
             .select('beneficiary_group_id')
-            .in('beneficiary_group_id', group_ids)
-            .eq('user_id', req.user!.id)
+            .in('beneficiary_group_id', filteredIds)
 
         if (error) throw new Error(`Failed to fetch data point counts: ${error.message}`)
-
-        // Count data points per group
-        const counts: Record<string, number> = {}
-        group_ids.forEach((id: string) => {
-            counts[id] = 0 // Initialize all to 0
-        })
 
         if (data) {
             data.forEach((item: any) => {
@@ -129,17 +149,27 @@ router.post('/bulk-data-point-counts', authenticateUser, async (req: Authenticat
 // Get beneficiary groups linked to a KPI update
 router.get('/for-kpi-update/:updateId', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
+        // The kpi_update -> kpi -> initiative chain governs access. We rely on
+        // the caller already having access to the parent KPI update via the
+        // KPI/initiative routes; here we just return the linked groups.
         const { data, error } = await supabase
             .from('kpi_update_beneficiary_groups')
             .select(`
-                beneficiary_groups(id, name, description)
+                beneficiary_groups(id, name, description, initiative_id)
             `)
             .eq('kpi_update_id', req.params.updateId)
-            .eq('user_id', req.user!.id)
 
         if (error) throw new Error(`Failed to fetch linked beneficiary groups: ${error.message}`)
 
-        const groups = (data || []).map((item: any) => item.beneficiary_groups).filter(Boolean)
+        // Filter to groups whose initiative the caller can access.
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const accessibleGroups = await BeneficiaryService.getAll(req.user!.id, undefined, requestedOrgId)
+        const accessibleIds = new Set(accessibleGroups.map(g => g.id))
+
+        const groups = (data || [])
+            .map((item: any) => item.beneficiary_groups)
+            .filter(Boolean)
+            .filter((g: any) => accessibleIds.has(g.id))
         res.json(groups)
     } catch (error) {
         res.status(500).json({ error: (error as Error).message })
@@ -169,15 +199,25 @@ router.post('/update-order', authenticateUser, async (req: AuthenticatedRequest,
             res.status(400).json({ error: 'Order must be an array' });
             return;
         }
-        
-        const updates = order.map((item: { id: string; display_order: number }) => 
+
+        // Authorize: caller must have access to every group in the order array.
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const accessibleGroups = await BeneficiaryService.getAll(req.user!.id, undefined, requestedOrgId)
+        const accessibleIds = new Set(accessibleGroups.map(g => g.id))
+        for (const item of order) {
+            if (!accessibleIds.has(item.id)) {
+                res.status(403).json({ error: `Access denied for group ${item.id}` })
+                return
+            }
+        }
+
+        const updates = order.map((item: { id: string; display_order: number }) =>
             supabase
                 .from('beneficiary_groups')
                 .update({ display_order: item.display_order })
                 .eq('id', item.id)
-                .eq('user_id', req.user!.id)
         );
-        
+
         await Promise.all(updates);
         res.json({ success: true });
     } catch (error) {
@@ -186,4 +226,3 @@ router.post('/update-order', authenticateUser, async (req: AuthenticatedRequest,
 });
 
 export default router
-

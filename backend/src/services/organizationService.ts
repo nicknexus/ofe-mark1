@@ -52,7 +52,7 @@ export class OrganizationService {
 
         // Create new organization with owner_id
         console.log('Attempting to create organization:', { name, slug, userId, owner_id: userId });
-        
+
         const { data: newOrg, error: createError } = await supabase
             .from('organizations')
             .insert([{
@@ -79,7 +79,7 @@ export class OrganizationService {
             });
             throw new Error(`Failed to create organization: ${createError.message} (code: ${createError.code})`);
         }
-        
+
         console.log('Organization created successfully:', newOrg?.id);
 
         if (!newOrg) {
@@ -146,7 +146,7 @@ export class OrganizationService {
             .eq('owner_id', userId);
 
         if (error) throw new Error(`Failed to fetch user organization: ${error.message}`);
-        
+
         return data || [];
     }
 
@@ -203,12 +203,13 @@ export class OrganizationService {
         return data;
     }
 
-    // Search public organizations
+    // Search public organizations (excludes demo / sandbox orgs).
     static async searchPublic(query: string): Promise<Organization[]> {
         const { data, error } = await supabase
             .from('organizations')
             .select('*')
             .eq('is_public', true)
+            .eq('is_demo', false)
             .or(`name.ilike.%${query}%,description.ilike.%${query}%,slug.ilike.%${query}%`)
             .order('name', { ascending: true })
             .limit(50);

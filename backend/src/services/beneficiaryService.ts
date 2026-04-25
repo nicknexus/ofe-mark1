@@ -3,9 +3,32 @@ import { BeneficiaryGroup } from '../types'
 import { InitiativeService } from './initiativeService'
 
 export class BeneficiaryService {
-    static async getAll(userId: string, initiativeId?: string): Promise<BeneficiaryGroup[]> {
-        // If initiative_id provided, fetch directly (access controlled at route level)
+    /**
+     * Verifies the caller has access to the initiative the group belongs to.
+     */
+    private static async assertAccessByGroupId(
+        groupId: string,
+        userId: string,
+        requestedOrgId?: string
+    ): Promise<{ id: string; initiative_id: string; user_id: string } | null> {
+        const { data: row, error } = await supabase
+            .from('beneficiary_groups')
+            .select('id, initiative_id, user_id')
+            .eq('id', groupId)
+            .maybeSingle()
+        if (error) throw new Error(`Failed to fetch beneficiary group: ${error.message}`)
+        if (!row) return null
+        const initiative = await InitiativeService.getById(row.initiative_id, userId, requestedOrgId)
+        if (!initiative) return null
+        return row
+    }
+
+    static async getAll(userId: string, initiativeId?: string, requestedOrgId?: string): Promise<BeneficiaryGroup[]> {
         if (initiativeId) {
+            // Authorize via initiative org context.
+            const initiative = await InitiativeService.getById(initiativeId, userId, requestedOrgId)
+            if (!initiative) return []
+
             const { data, error } = await supabase
                 .from('beneficiary_groups')
                 .select('*')
@@ -17,8 +40,8 @@ export class BeneficiaryService {
             return data || [];
         }
 
-        // No initiative - get all for user's accessible initiatives
-        const initiatives = await InitiativeService.getAll(userId);
+        // No initiative - get all for user's accessible initiatives in active org.
+        const initiatives = await InitiativeService.getAll(userId, requestedOrgId);
         if (initiatives.length === 0) {
             return [];
         }
@@ -35,23 +58,28 @@ export class BeneficiaryService {
         return data || [];
     }
 
-    static async create(group: BeneficiaryGroup, userId: string): Promise<BeneficiaryGroup> {
-        // Get max display_order for this initiative to set the new item at the end
+    static async create(group: BeneficiaryGroup, userId: string, requestedOrgId?: string): Promise<BeneficiaryGroup> {
+        // Authorize: caller must have access to the initiative being written to.
+        if (group.initiative_id) {
+            const initiative = await InitiativeService.getById(group.initiative_id, userId, requestedOrgId)
+            if (!initiative) throw new Error('Initiative not found or access denied')
+        }
+
+        // Get max display_order across the initiative (org-wide, not user-scoped).
         let maxOrder = 0
         if (group.initiative_id) {
             const { data: existingGroups } = await supabase
                 .from('beneficiary_groups')
                 .select('display_order')
                 .eq('initiative_id', group.initiative_id)
-                .eq('user_id', userId)
                 .order('display_order', { ascending: false })
                 .limit(1)
-            
+
             if (existingGroups && existingGroups.length > 0) {
                 maxOrder = (existingGroups[0].display_order ?? 0) + 1
             }
         }
-        
+
         const { data, error } = await supabase
             .from('beneficiary_groups')
             .insert([{ ...group, user_id: userId, display_order: maxOrder }])
@@ -62,12 +90,14 @@ export class BeneficiaryService {
         return data
     }
 
-    static async update(id: string, updates: Partial<BeneficiaryGroup>, userId: string): Promise<BeneficiaryGroup> {
+    static async update(id: string, updates: Partial<BeneficiaryGroup>, userId: string, requestedOrgId?: string): Promise<BeneficiaryGroup> {
+        const access = await this.assertAccessByGroupId(id, userId, requestedOrgId)
+        if (!access) throw new Error('Beneficiary group not found or access denied')
+
         const { data, error } = await supabase
             .from('beneficiary_groups')
             .update({ ...updates, updated_at: new Date().toISOString() })
             .eq('id', id)
-            .eq('user_id', userId)
             .select()
             .single()
 
@@ -75,12 +105,15 @@ export class BeneficiaryService {
         return data
     }
 
-    static async delete(id: string, userId: string): Promise<void> {
+    static async delete(id: string, userId: string, requestedOrgId?: string): Promise<void> {
+        // Phase 1 (full-access baseline): any team member of the org can delete.
+        const access = await this.assertAccessByGroupId(id, userId, requestedOrgId)
+        if (!access) throw new Error('Beneficiary group not found or access denied')
+
         const { error } = await supabase
             .from('beneficiary_groups')
             .delete()
             .eq('id', id)
-            .eq('user_id', userId)
 
         if (error) throw new Error(`Failed to delete beneficiary group: ${error.message}`)
     }

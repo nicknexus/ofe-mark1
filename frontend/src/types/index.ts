@@ -9,6 +9,8 @@ export interface Organization {
     logo_url?: string; // URL to organization logo image
     brand_color?: string; // Hex color for public page branding
     is_public?: boolean;
+    is_demo?: boolean; // Sandbox / mock-charity org created from admin dashboard. Hidden from /explore + search.
+    demo_public_share?: boolean; // When true, demo orgs public page is reachable via direct link.
     owner_id?: string; // Single owner user (cascades delete when user is deleted)
     created_at?: string;
     updated_at?: string;
@@ -231,6 +233,7 @@ export interface User {
     has_completed_tutorial?: boolean;
     accepted_terms_of_service?: boolean;
     accepted_terms_of_service_at?: string;
+    is_admin?: boolean; // Platform admin — unlocks /admin/demos + /api/admin/*
 }
 
 export interface Subscription {

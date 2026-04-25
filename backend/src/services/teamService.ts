@@ -62,6 +62,19 @@ export class TeamService {
     }
 
     /**
+     * Returns true if the user owns or is a team member of the given org.
+     * Use this whenever you have an organization_id and need to gate access
+     * (read or write) for the application's data tables.
+     */
+    static async hasOrgAccess(userId: string, organizationId: string): Promise<boolean> {
+        if (!organizationId) return false;
+        const isOwner = await this.isUserOwnerOfOrganization(userId, organizationId);
+        if (isOwner) return true;
+        const membership = await this.getUserTeamMembership(userId, organizationId);
+        return !!membership;
+    }
+
+    /**
      * Get current team member count for an organization
      */
     static async getTeamMemberCount(organizationId: string): Promise<number> {
@@ -154,7 +167,9 @@ export class TeamService {
     }
 
     /**
-     * Get user's organization (where they are owner)
+     * Get the user's real (non-demo) owned organization.
+     * Explicitly filters out demo / sandbox orgs so that platform admins
+     * (who can own many demos) still resolve to their single real org here.
      */
     static async getUserOwnedOrganization(userId: string): Promise<{ id: string; name: string; slug?: string; logo_url?: string; brand_color?: string; is_public?: boolean; statement?: string; website_url?: string; donation_url?: string } | null> {
         console.log(`[getUserOwnedOrganization] Looking up org for user: ${userId}`);
@@ -169,6 +184,7 @@ export class TeamService {
                     .from('organizations')
                     .select('id, name, slug, owner_id, logo_url, brand_color, is_public, statement, website_url, donation_url')
                     .eq('owner_id', userId)
+                    .eq('is_demo', false)
                     .limit(1);
 
                 console.log(`[getUserOwnedOrganization] Attempt ${attempt} - Raw response:`, {
@@ -201,12 +217,12 @@ export class TeamService {
                 }
 
                 console.log(`[getUserOwnedOrganization] Found org: ${data.name} (${data.id}) on attempt ${attempt}`);
-                return { 
-                    id: data.id, 
-                    name: data.name, 
+                return {
+                    id: data.id,
+                    name: data.name,
                     slug: data.slug,
-                    logo_url: data.logo_url, 
-                    brand_color: data.brand_color, 
+                    logo_url: data.logo_url,
+                    brand_color: data.brand_color,
                     is_public: data.is_public,
                     statement: data.statement,
                     website_url: data.website_url,
@@ -222,6 +238,52 @@ export class TeamService {
             }
         }
         return null;
+    }
+
+    /**
+     * Check if a user is the owner of a specific organization.
+     * Used for multi-org ownership scenarios (e.g. admins with real + demo orgs).
+     */
+    static async isUserOwnerOfOrganization(userId: string, organizationId: string): Promise<boolean> {
+        const { data, error } = await supabase
+            .from('organizations')
+            .select('id')
+            .eq('id', organizationId)
+            .eq('owner_id', userId)
+            .maybeSingle();
+        if (error) {
+            console.error('[isUserOwnerOfOrganization] error:', error.message);
+            return false;
+        }
+        return !!data;
+    }
+
+    /**
+     * Return all organizations owned by a user (including demo / sandbox orgs).
+     * Platform admins can own many demos alongside their real org.
+     */
+    static async getAllUserOwnedOrganizations(userId: string): Promise<Array<{
+        id: string;
+        name: string;
+        slug?: string;
+        logo_url?: string;
+        brand_color?: string;
+        is_public?: boolean;
+        is_demo?: boolean;
+        demo_public_share?: boolean;
+        statement?: string;
+        website_url?: string;
+        donation_url?: string;
+    }>> {
+        const { data, error } = await supabase
+            .from('organizations')
+            .select('id, name, slug, logo_url, brand_color, is_public, is_demo, demo_public_share, statement, website_url, donation_url')
+            .eq('owner_id', userId);
+        if (error) {
+            console.error('[getAllUserOwnedOrganizations] error:', error.message);
+            return [];
+        }
+        return data || [];
     }
 
     /**
@@ -271,14 +333,16 @@ export class TeamService {
             logo_url?: string;
             brand_color?: string;
             is_public?: boolean;
+            is_demo?: boolean;
+            demo_public_share?: boolean;
             statement?: string;
             website_url?: string;
             donation_url?: string;
         }> = [];
 
-        // Get owned organization
-        const ownedOrg = await this.getUserOwnedOrganization(userId);
-        if (ownedOrg) {
+        // Get ALL owned organizations (admins can own a real org + many demos)
+        const ownedOrgs = await this.getAllUserOwnedOrganizations(userId);
+        for (const ownedOrg of ownedOrgs) {
             orgs.push({
                 id: ownedOrg.id,
                 name: ownedOrg.name,
@@ -289,6 +353,8 @@ export class TeamService {
                 logo_url: ownedOrg.logo_url,
                 brand_color: ownedOrg.brand_color,
                 is_public: ownedOrg.is_public,
+                is_demo: ownedOrg.is_demo,
+                demo_public_share: ownedOrg.demo_public_share,
                 statement: ownedOrg.statement,
                 website_url: ownedOrg.website_url,
                 donation_url: ownedOrg.donation_url
@@ -378,11 +444,16 @@ export class TeamService {
                     .eq('id', membership.organization_id)
                     .single();
 
+                // Phase 1 (full-access baseline): team members get owner-equivalent
+                // data privileges. Org-account-level edits remain owner-only via
+                // OrganizationService.update's owner_id check. Per-action
+                // restrictions (can_add_impact_claims, can_edit_evidence) will be
+                // re-introduced in Phase 7.
                 return {
                     isOwner: false,
                     isSharedMember: true,
-                    canAddImpactClaims: membership.can_add_impact_claims,
-                    canDelete: false,
+                    canAddImpactClaims: true,
+                    canDelete: true,
                     organizationId: membership.organization_id,
                     organizationName: org?.name
                 };
@@ -413,8 +484,8 @@ export class TeamService {
             return {
                 isOwner: false,
                 isSharedMember: true,
-                canAddImpactClaims: membership.can_add_impact_claims,
-                canDelete: false,
+                canAddImpactClaims: true,
+                canDelete: true,
                 organizationId: membership.organization_id,
                 organizationName: org?.name
             };

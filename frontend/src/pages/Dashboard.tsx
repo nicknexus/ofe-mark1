@@ -102,9 +102,8 @@ function PublicScoreCard({
                         <Link
                             key={c.id}
                             to={c.to}
-                            className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors ${
-                                c.done ? 'text-gray-400 line-through' : 'text-gray-700 hover:bg-gray-50'
-                            }`}
+                            className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors ${c.done ? 'text-gray-400 line-through' : 'text-gray-700 hover:bg-gray-50'
+                                }`}
                         >
                             {c.done
                                 ? <Check className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
@@ -150,11 +149,10 @@ function ContextScoreCard({
                 {checks.map(c => (
                     <span
                         key={c.id}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
-                            c.done
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${c.done
                                 ? 'bg-green-50 text-green-700 ring-1 ring-green-100'
                                 : 'bg-gray-50 text-gray-500 ring-1 ring-gray-100'
-                        }`}
+                            }`}
                         title={c.label}
                     >
                         {c.done ? <Check className="w-2.5 h-2.5" /> : <span className="w-1 h-1 rounded-full bg-current" />}
@@ -226,6 +224,9 @@ export default function Dashboard() {
     const navigate = useNavigate()
     const { startTutorial } = useTutorial()
     const { isOwner, isSharedMember, organizationName, ownedOrganization } = useTeam()
+    // Phase 1 (full-access baseline): any member of the active org can create/edit/delete
+    // initiatives. Account-level widgets (logo, branding, public toggle) remain owner-only.
+    const canManageInitiatives = isOwner || isSharedMember
     const [initiatives, setInitiatives] = useState<Initiative[]>([])
     const [allKPIs, setAllKPIs] = useState<KPI[]>([])
     const [allLocations, setAllLocations] = useState<Location[]>([])
@@ -426,14 +427,14 @@ export default function Dashboard() {
         const o = ownedOrganization
         const firstInit = initiatives[0]?.id
         return [
-            { id: 'logo',        label: 'Upload organization logo',  done: !!o?.logo_url,                         to: '/account?tab=organization' },
-            { id: 'brand',       label: 'Set brand color',           done: !!o?.brand_color,                      to: '/account?tab=branding' },
-            { id: 'statement',   label: 'Write mission statement',   done: !!(o?.statement && o.statement.trim().length > 0), to: '/account?tab=organization' },
-            { id: 'public',      label: 'Make organization public',  done: !!o?.is_public,                        to: '/account?tab=organization' },
-            { id: 'initiative',  label: 'Create an initiative',      done: initiatives.length > 0,                to: '/' },
-            { id: 'metric',      label: 'Add at least one metric',   done: allKPIs.length > 0,                    to: firstInit ? `/initiatives/${firstInit}?tab=metrics` : '/' },
-            { id: 'location',    label: 'Add at least one location', done: allLocations.length > 0,               to: firstInit ? `/initiatives/${firstInit}?tab=location` : '/' },
-            { id: 'evidence',    label: 'Add at least one evidence', done: totalEvidence > 0,                     to: firstInit ? `/initiatives/${firstInit}?tab=evidence` : '/' },
+            { id: 'logo', label: 'Upload organization logo', done: !!o?.logo_url, to: '/account?tab=organization' },
+            { id: 'brand', label: 'Set brand color', done: !!o?.brand_color, to: '/account?tab=branding' },
+            { id: 'statement', label: 'Write mission statement', done: !!(o?.statement && o.statement.trim().length > 0), to: '/account?tab=organization' },
+            { id: 'public', label: 'Make organization public', done: !!o?.is_public, to: '/account?tab=organization' },
+            { id: 'initiative', label: 'Create an initiative', done: initiatives.length > 0, to: '/' },
+            { id: 'metric', label: 'Add at least one metric', done: allKPIs.length > 0, to: firstInit ? `/initiatives/${firstInit}?tab=metrics` : '/' },
+            { id: 'location', label: 'Add at least one location', done: allLocations.length > 0, to: firstInit ? `/initiatives/${firstInit}?tab=location` : '/' },
+            { id: 'evidence', label: 'Add at least one evidence', done: totalEvidence > 0, to: firstInit ? `/initiatives/${firstInit}?tab=evidence` : '/' },
         ]
     }, [ownedOrganization, initiatives, allKPIs, allLocations, totalEvidence])
 
@@ -447,11 +448,11 @@ export default function Dashboard() {
         const hasText = (v?: string | null) => !!(v && v.trim().length > 0)
         const hasList = (v?: any[] | null) => Array.isArray(v) && v.length > 0
         return [
-            { id: 'problem',    label: 'Problem Statement',    done: hasText(c?.problem_statement) },
-            { id: 'stats',      label: 'Stats & Statements',   done: hasList(c?.stats_and_statements) },
-            { id: 'theory',     label: 'Theory of Change',     done: hasText(c?.theory_of_change) || hasList(c?.theory_of_change_stages) },
-            { id: 'strategies', label: 'Strategies',           done: hasList(c?.strategies) },
-            { id: 'more',       label: 'More Context',         done: hasText(c?.additional_info) },
+            { id: 'problem', label: 'Problem Statement', done: hasText(c?.problem_statement) },
+            { id: 'stats', label: 'Stats & Statements', done: hasList(c?.stats_and_statements) },
+            { id: 'theory', label: 'Theory of Change', done: hasText(c?.theory_of_change) || hasList(c?.theory_of_change_stages) },
+            { id: 'strategies', label: 'Strategies', done: hasList(c?.strategies) },
+            { id: 'more', label: 'More Context', done: hasText(c?.additional_info) },
         ]
     }, [orgContext])
 
@@ -465,10 +466,10 @@ export default function Dashboard() {
         const steps: Step[] = []
         const o = ownedOrganization
         const firstInit = initiatives[0]?.id
-        if (!o?.logo_url)        steps.push({ id: 'logo',      label: 'Upload your logo',             to: '/account?tab=branding',     icon: <ImageIcon className="w-4 h-4" /> })
-        if (!o?.brand_color)     steps.push({ id: 'brand',     label: 'Pick a brand color',           to: '/account?tab=branding',     icon: <Palette className="w-4 h-4" /> })
-        if (!o?.statement)       steps.push({ id: 'statement', label: 'Add a mission statement',      to: '/account?tab=organization', icon: <FileText className="w-4 h-4" /> })
-        if (!o?.is_public)       steps.push({ id: 'public',    label: 'Publish your organization',    to: '/account?tab=account',      icon: <Globe className="w-4 h-4" /> })
+        if (!o?.logo_url) steps.push({ id: 'logo', label: 'Upload your logo', to: '/account?tab=branding', icon: <ImageIcon className="w-4 h-4" /> })
+        if (!o?.brand_color) steps.push({ id: 'brand', label: 'Pick a brand color', to: '/account?tab=branding', icon: <Palette className="w-4 h-4" /> })
+        if (!o?.statement) steps.push({ id: 'statement', label: 'Add a mission statement', to: '/account?tab=organization', icon: <FileText className="w-4 h-4" /> })
+        if (!o?.is_public) steps.push({ id: 'public', label: 'Publish your organization', to: '/account?tab=account', icon: <Globe className="w-4 h-4" /> })
         if (initiatives.length === 0) steps.push({ id: 'initiative', label: 'Create your first initiative', onClick: () => setShowCreateModal(true), icon: <Plus className="w-4 h-4" /> })
         initiatives.forEach((init) => {
             const initKpis = allKPIs.filter(k => k.initiative_id === init.id)
@@ -562,7 +563,7 @@ export default function Dashboard() {
                                         <GraduationCap className="w-4 h-4" />
                                         <span className="hidden sm:inline">Tutorial</span>
                                     </button>
-                                    {isOwner && (
+                                    {canManageInitiatives && (
                                         <button
                                             onClick={() => setShowCreateModal(true)}
                                             className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-all duration-200 flex items-center gap-1.5 shadow-bubble-sm"
@@ -580,31 +581,21 @@ export default function Dashboard() {
                                         <div className="icon-bubble mx-auto mb-4">
                                             <img src="/Nexuslogo.png" alt="Nexus Logo" className="w-6 h-6 object-contain" />
                                         </div>
-                                        {isSharedMember ? (
-                                            <>
-                                                <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                                                    No Initiatives Yet
-                                                </h3>
-                                                <p className="text-gray-500 mb-6 max-w-md mx-auto text-sm">
-                                                    Your organization doesn't have any initiatives yet.
-                                                    Contact your organization owner to create one.
-                                                </p>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                                                    Welcome to OFE
-                                                </h3>
-                                                <p className="text-gray-500 mb-6 max-w-md mx-auto text-sm">
-                                                    Create your first initiative to start tracking impact.
-                                                </p>
-                                                <button
-                                                    onClick={() => setShowCreateModal(true)}
-                                                    className="px-5 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-all duration-200 shadow-bubble-sm"
-                                                >
-                                                    Create Your First Initiative
-                                                </button>
-                                            </>
+                                        <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                                            {isSharedMember ? 'No Initiatives Yet' : 'Welcome to OFE'}
+                                        </h3>
+                                        <p className="text-gray-500 mb-6 max-w-md mx-auto text-sm">
+                                            {isSharedMember
+                                                ? `Your organization doesn't have any initiatives yet. Create the first one to start tracking impact.`
+                                                : 'Create your first initiative to start tracking impact.'}
+                                        </p>
+                                        {canManageInitiatives && (
+                                            <button
+                                                onClick={() => setShowCreateModal(true)}
+                                                className="px-5 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-all duration-200 shadow-bubble-sm"
+                                            >
+                                                Create Your First Initiative
+                                            </button>
                                         )}
                                     </div>
                                 ) : (
@@ -638,8 +629,8 @@ export default function Dashboard() {
                                                     </div>
                                                 </Link>
 
-                                                {/* Action Buttons - Only show for owners */}
-                                                {isOwner && (
+                                                {/* Action Buttons - any org member */}
+                                                {canManageInitiatives && (
                                                     <div className="absolute top-2 right-8 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
                                                         <button
                                                             onClick={(e) => {

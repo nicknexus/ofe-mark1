@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
-import { 
-    ArrowLeft, BarChart3, TrendingUp, FileText, Calendar, 
+import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
+import {
+    ArrowLeft, BarChart3, TrendingUp, FileText, Calendar,
     ExternalLink, MapPin, Target, Sparkles, CheckCircle2,
     ChevronLeft, ChevronRight, X
 } from 'lucide-react'
@@ -21,12 +22,13 @@ const categoryConfig: Record<string, { bg: string; text: string; gradient: strin
 }
 
 export default function PublicMetricPage() {
-    const { orgSlug, initiativeSlug, metricSlug } = useParams<{ 
-        orgSlug: string; 
-        initiativeSlug: string; 
-        metricSlug: string 
+    const { orgSlug, initiativeSlug, metricSlug } = useParams<{
+        orgSlug: string;
+        initiativeSlug: string;
+        metricSlug: string
     }>()
-    
+    const orgLinkBase = useOrgLinkBase()
+
     const [searchParams, setSearchParams] = useSearchParams()
     const [metric, setMetric] = useState<PublicMetricDetail | null>(null)
     const [loading, setLoading] = useState(true)
@@ -49,7 +51,7 @@ export default function PublicMetricPage() {
     useEffect(() => {
         const loadMetric = async () => {
             if (!orgSlug || !initiativeSlug || !metricSlug) return
-            
+
             try {
                 setLoading(true)
                 setError(null)
@@ -62,7 +64,7 @@ export default function PublicMetricPage() {
                 setLoading(false)
             }
         }
-        
+
         loadMetric()
     }, [orgSlug, initiativeSlug, metricSlug])
 
@@ -77,7 +79,7 @@ export default function PublicMetricPage() {
                     <BarChart3 className="w-16 h-16 text-gray-300 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-gray-800 mb-3">Metric Not Found</h1>
                     <p className="text-gray-500 mb-8">{error || 'This metric does not exist.'}</p>
-                    <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=metrics`} 
+                    <Link to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=metrics`}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-xl hover:bg-gray-700 transition-colors font-medium">
                         <ArrowLeft className="w-4 h-4" /> Back to Metrics
                     </Link>
@@ -125,7 +127,7 @@ export default function PublicMetricPage() {
     return (
         <div className="min-h-screen font-figtree relative animate-fadeIn">
             {/* Flowing gradient background */}
-            <div 
+            <div
                 className="fixed inset-0 pointer-events-none"
                 style={{
                     background: `
@@ -142,7 +144,7 @@ export default function PublicMetricPage() {
             <div className="sticky top-0 z-50 bg-white/60 backdrop-blur-2xl border-b border-white/40">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 sm:py-3">
                     <div className="flex items-center justify-between">
-                        <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=metrics`} className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-800 transition-colors">
+                        <Link to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=metrics`} className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-800 transition-colors">
                             <ArrowLeft className="w-4 h-4" />
                             <span className="text-xs sm:text-sm font-medium">Back</span>
                         </Link>
@@ -167,11 +169,11 @@ export default function PublicMetricPage() {
             <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
                 {/* Breadcrumb - Hidden on mobile */}
                 <div className="hidden sm:block">
-                    <PublicBreadcrumb 
+                    <PublicBreadcrumb
                         orgSlug={orgSlug!}
                         orgName={metric.initiative.org_name || ''}
                         items={[
-                            { label: metric.initiative.title, href: `/org/${orgSlug}/${initiativeSlug}?tab=metrics` },
+                            { label: metric.initiative.title, href: `${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=metrics` },
                             { label: metric.title }
                         ]}
                     />
@@ -196,7 +198,7 @@ export default function PublicMetricPage() {
                                 <p className="text-sm sm:text-lg text-gray-600 max-w-2xl line-clamp-2 sm:line-clamp-none">{metric.description}</p>
                             )}
                         </div>
-                        
+
                         {/* Big Total Card - Full width on mobile */}
                         <div className="bg-white/70 backdrop-blur-2xl p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-xl shadow-black/10 border border-white/60 lg:min-w-[200px] lg:max-w-[240px]">
                             <p className="text-gray-500 text-xs sm:text-sm font-medium mb-0.5 sm:mb-1">Total Impact</p>
@@ -221,7 +223,7 @@ export default function PublicMetricPage() {
                                 All time
                             </span>
                         </div>
-                        
+
                         {chartData.length === 0 ? (
                             <div className="h-48 sm:h-72 flex items-center justify-center text-gray-500">
                                 <div className="text-center">
@@ -235,28 +237,28 @@ export default function PublicMetricPage() {
                                     <AreaChart data={cumulativeData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                                         <defs>
                                             <linearGradient id="colorCumulative" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor={config.accent} stopOpacity={0.3}/>
-                                                <stop offset="95%" stopColor={config.accent} stopOpacity={0.02}/>
+                                                <stop offset="5%" stopColor={config.accent} stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor={config.accent} stopOpacity={0.02} />
                                             </linearGradient>
                                         </defs>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                                        <XAxis 
-                                            dataKey="date" 
+                                        <XAxis
+                                            dataKey="date"
                                             tick={{ fontSize: 9, fill: '#94a3b8' }}
                                             axisLine={{ stroke: '#e2e8f0' }}
                                             tickLine={false}
                                             interval="preserveStartEnd"
                                         />
-                                        <YAxis 
+                                        <YAxis
                                             tick={{ fontSize: 9, fill: '#94a3b8' }}
                                             axisLine={false}
                                             tickLine={false}
-                                            tickFormatter={(value) => value >= 1000 ? `${(value/1000).toFixed(0)}k` : value.toString()}
+                                            tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value.toString()}
                                             width={35}
                                         />
-                                        <Tooltip 
-                                            contentStyle={{ 
-                                                backgroundColor: 'white', 
+                                        <Tooltip
+                                            contentStyle={{
+                                                backgroundColor: 'white',
                                                 border: 'none',
                                                 borderRadius: '12px',
                                                 boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
@@ -269,9 +271,9 @@ export default function PublicMetricPage() {
                                             ]}
                                             labelFormatter={(label) => label}
                                         />
-                                        <Area 
-                                            type="monotone" 
-                                            dataKey="cumulative" 
+                                        <Area
+                                            type="monotone"
+                                            dataKey="cumulative"
                                             stroke={config.accent}
                                             strokeWidth={2}
                                             fillOpacity={1}
@@ -291,7 +293,7 @@ export default function PublicMetricPage() {
                                 Impact Claims
                             </h2>
                         </div>
-                        
+
                         {filteredUpdates.length === 0 ? (
                             <div className="flex-1 flex items-center justify-center text-gray-500 p-4 sm:p-6">
                                 <div className="text-center">
@@ -304,8 +306,8 @@ export default function PublicMetricPage() {
                                 {[...filteredUpdates]
                                     .sort((a, b) => new Date(b.date_represented).getTime() - new Date(a.date_represented).getTime())
                                     .map((update, idx) => (
-                                    <ImpactClaimCard key={update.id || idx} update={update} unit={metric.unit_of_measurement} config={config} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />
-                                ))}
+                                        <ImpactClaimCard key={update.id || idx} update={update} unit={metric.unit_of_measurement} config={config} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />
+                                    ))}
                             </div>
                         )}
                     </div>
@@ -330,9 +332,9 @@ export default function PublicMetricPage() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
                         <p className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
-                            Part of <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=metrics`} className="text-accent hover:underline font-medium">{metric.initiative.title}</Link>
+                            Part of <Link to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=metrics`} className="text-accent hover:underline font-medium">{metric.initiative.title}</Link>
                         </p>
-                        <Link to={`/org/${orgSlug}`} className="text-xs sm:text-sm text-accent hover:text-accent/80 font-medium flex items-center gap-1">
+                        <Link to={`${orgLinkBase}/${orgSlug}`} className="text-xs sm:text-sm text-accent hover:text-accent/80 font-medium flex items-center gap-1">
                             <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Back to Organization
                         </Link>
                     </div>
@@ -343,13 +345,14 @@ export default function PublicMetricPage() {
 }
 
 // Impact Claim Card Component
-function ImpactClaimCard({ update, unit, config, orgSlug, initiativeSlug }: { 
-    update: any; 
-    unit: string; 
+function ImpactClaimCard({ update, unit, config, orgSlug, initiativeSlug }: {
+    update: any;
+    unit: string;
     config: { bg: string; text: string; gradient: string; accent: string };
     orgSlug: string;
     initiativeSlug: string;
 }) {
+    const orgLinkBase = useOrgLinkBase()
     const hasDateRange = update.date_range_start && update.date_range_end
     const displayDate = hasDateRange
         ? `${formatDate(update.date_range_start, { month: 'short', day: 'numeric' })} - ${formatDate(update.date_range_end)}`
@@ -357,7 +360,7 @@ function ImpactClaimCard({ update, unit, config, orgSlug, initiativeSlug }: {
 
     return (
         <Link
-            to={`/org/${orgSlug}/${initiativeSlug}/claim/${update.id}`}
+            to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/claim/${update.id}`}
             className="block p-3 sm:p-4 bg-white/60 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-white/50 hover:bg-white/80 hover:shadow-md hover:border-accent/30 transition-all group active:scale-[0.98]"
         >
             <div className="flex items-start justify-between gap-2 sm:gap-3">
@@ -410,13 +413,14 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
     currentFileIndex: number
     setCurrentFileIndex: (i: number | ((prev: number) => number)) => void
 }) {
+    const orgLinkBase = useOrgLinkBase()
     const typeConfig: Record<string, { bg: string; label: string }> = {
         visual_proof: { bg: 'bg-pink-100 text-pink-800', label: 'Visual Proof' },
         documentation: { bg: 'bg-blue-100 text-blue-700', label: 'Documentation' },
         testimony: { bg: 'bg-orange-100 text-orange-800', label: 'Testimonies' },
         financials: { bg: 'bg-primary-100 text-primary-800', label: 'Financials' }
     }
-    
+
     const isImageFile = (url: string) => {
         const ext = url.split('.').pop()?.toLowerCase() || ''
         return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)
@@ -584,8 +588,8 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                             </div>
                                         </div>
                                     )}
-            <div className="p-4">
-                <div className="flex items-start justify-between mb-2">
+                                    <div className="p-4">
+                                        <div className="flex items-start justify-between mb-2">
                                             <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${evTypeConfig.bg}`}>{evTypeConfig.label}</span>
                                             <span className="text-xs text-gray-500">{formatDate(ev.date_represented)}</span>
                                         </div>
@@ -595,7 +599,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                 </button>
                             )
                         })}
-                </div>
+                    </div>
                 )}
             </div>
 
@@ -729,7 +733,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                                         ? formatDate(claim.date_represented)
                                                         : ''
                                                 return (
-                                                    <Link key={claim.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
+                                                    <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
                                                         <p className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors">
                                                             {claim.value} {claim.kpis?.unit_of_measurement || ''}
                                                         </p>
@@ -745,7 +749,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Linked Metrics</h3>
                                         <div className="space-y-2">
                                             {galleryItem.kpis.map((kpi) => (
-                                                <Link key={kpi.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
+                                                <Link key={kpi.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
                                                     <p className="text-sm font-medium text-foreground group-hover:text-accent transition-colors">{kpi.title}</p>
                                                 </Link>
                                             ))}
@@ -785,8 +789,8 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                 <span className="hidden sm:inline">Next</span>
                                 <ChevronRight className="w-4 h-4" />
                             </button>
-            </div>
-        </div>
+                        </div>
+                    </div>
                 </div>,
                 document.body
             )}

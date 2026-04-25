@@ -23,6 +23,7 @@ import storageRoutes from './routes/storage';
 import subscriptionRoutes from './routes/subscription';
 import teamRoutes from './routes/team';
 import publicRoutes from './routes/public';
+import adminRoutes from './routes/admin';
 import { processStorageCleanupQueue } from './services/storageCleanupService';
 import { authenticateUser, AuthenticatedRequest } from './middleware/auth';
 
@@ -52,7 +53,7 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, X-Organization-Id, Cache-Control, Pragma');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Max-Age', '86400');
-    
+
     // Handle preflight
     if (req.method === 'OPTIONS') {
         console.log('[CORS] Preflight request for:', req.path);
@@ -169,6 +170,7 @@ app.use('/api/donor-credits', donorCreditRoutes);
 app.use('/api/storage', storageRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/team', teamRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

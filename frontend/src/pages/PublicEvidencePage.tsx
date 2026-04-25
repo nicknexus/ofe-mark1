@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
+import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
 import {
     ArrowLeft, Calendar, FileText, ChevronLeft, ChevronRight,
     Image, File, Video, Mic, ExternalLink
@@ -32,6 +33,7 @@ export default function PublicEvidencePage() {
         initiativeSlug: string
         evidenceId: string
     }>()
+    const orgLinkBase = useOrgLinkBase()
     const [searchParams] = useSearchParams()
 
     const [dateFilter, setDateFilter] = useState<{ singleDate?: string; startDate?: string; endDate?: string }>(() => {
@@ -56,8 +58,8 @@ export default function PublicEvidencePage() {
 
     // Build back URL based on referrer
     const backUrl = fromClaim && claimId
-        ? `/org/${orgSlug}/${initiativeSlug}/claim/${claimId}`
-        : `/org/${orgSlug}/${initiativeSlug}?tab=evidence`
+        ? `${orgLinkBase}/${orgSlug}/${initiativeSlug}/claim/${claimId}`
+        : `${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=evidence`
     const backLabel = fromClaim ? 'Back to Impact Claim' : 'Back'
 
     useEffect(() => {
@@ -194,13 +196,13 @@ export default function PublicEvidencePage() {
                         items={
                             fromClaim && claimId && metricSlug
                                 ? [
-                                    { label: evidence.initiative.title, href: `/org/${orgSlug}/${initiativeSlug}?tab=metrics` },
-                                    { label: metricTitle || 'Metric', href: `/org/${orgSlug}/${initiativeSlug}/metric/${metricSlug}` },
-                                    { label: claimValue ? `+${claimValue}` : 'Impact Claim', href: `/org/${orgSlug}/${initiativeSlug}/claim/${claimId}` },
+                                    { label: evidence.initiative.title, href: `${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=metrics` },
+                                    { label: metricTitle || 'Metric', href: `${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}` },
+                                    { label: claimValue ? `+${claimValue}` : 'Impact Claim', href: `${orgLinkBase}/${orgSlug}/${initiativeSlug}/claim/${claimId}` },
                                     { label: evidence.title }
                                 ]
                                 : [
-                                    { label: evidence.initiative.title, href: `/org/${orgSlug}/${initiativeSlug}?tab=evidence` },
+                                    { label: evidence.initiative.title, href: `${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=evidence` },
                                     { label: evidence.title }
                                 ]
                         }
@@ -288,8 +290,8 @@ export default function PublicEvidencePage() {
                                                     key={index}
                                                     onClick={() => setCurrentFileIndex(index)}
                                                     className={`h-1.5 sm:h-2 rounded-full transition-all ${index === currentFileIndex
-                                                            ? 'w-5 sm:w-6 bg-white'
-                                                            : 'w-1.5 sm:w-2 bg-white/50 hover:bg-white/70'
+                                                        ? 'w-5 sm:w-6 bg-white'
+                                                        : 'w-1.5 sm:w-2 bg-white/50 hover:bg-white/70'
                                                         }`}
                                                 />
                                             ))}
@@ -372,7 +374,7 @@ export default function PublicEvidencePage() {
                                         return (
                                             <Link
                                                 key={claim.id}
-                                                to={`/org/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`}
+                                                to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`}
                                                 className="block p-2.5 sm:p-3 bg-white/60 rounded-lg sm:rounded-xl border border-white/50 hover:bg-white/80 hover:shadow-md transition-all group active:scale-[0.98]"
                                             >
                                                 <p className="font-semibold text-gray-800 text-xs sm:text-sm group-hover:text-primary-600 transition-colors">
@@ -394,7 +396,7 @@ export default function PublicEvidencePage() {
                                     {evidence.linked_kpis.map((kpi) => (
                                         <Link
                                             key={kpi.id}
-                                            to={`/org/${orgSlug}/${initiativeSlug}/metric/${kpi.title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}`}
+                                            to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${kpi.title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}`}
                                             className="block p-2.5 sm:p-3 bg-white/60 rounded-lg sm:rounded-xl border border-white/50 hover:bg-white/80 hover:shadow-md transition-all group active:scale-[0.98]"
                                         >
                                             <p className="font-medium text-gray-800 text-xs sm:text-sm group-hover:text-primary-600 transition-colors truncate">
@@ -410,7 +412,7 @@ export default function PublicEvidencePage() {
                         <div className="bg-white/50 backdrop-blur-2xl rounded-xl sm:rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-3 sm:p-4 flex-shrink-0">
                             <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide mb-1">From Initiative</p>
                             <Link
-                                to={`/org/${orgSlug}/${initiativeSlug}?tab=evidence`}
+                                to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=evidence`}
                                 className="flex items-center justify-between text-gray-800 hover:text-primary-600 font-medium transition-colors group"
                             >
                                 <span className="text-xs sm:text-sm truncate">{evidence.initiative.title}</span>

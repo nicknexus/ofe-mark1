@@ -71,7 +71,7 @@ export default function AddEvidenceModal({
     const evidenceTypes = [
         { value: 'visual_proof', label: 'Visual Support', icon: Camera, description: 'Photos, videos, screenshots' },
         { value: 'documentation', label: 'Documentation', icon: FileText, description: 'Reports, forms, certificates' },
-        { value: 'testimony', label: 'Testemonies', icon: MessageSquare, description: 'Quotes, feedback, stories' },
+        { value: 'testimony', label: 'Testimonies', icon: MessageSquare, description: 'Quotes, feedback, stories' },
         { value: 'financials', label: 'Financials', icon: DollarSign, description: 'Receipts, invoices, budgets' }
     ] as const
 

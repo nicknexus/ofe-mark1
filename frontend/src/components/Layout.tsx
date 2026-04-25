@@ -11,7 +11,8 @@ import {
     Check,
     Compass,
     BookOpen,
-    Eye
+    Eye,
+    FlaskConical,
 } from 'lucide-react'
 import { AuthService } from '../services/auth'
 import { apiService } from '../services/api'
@@ -35,7 +36,7 @@ export default function Layout({ user, children }: LayoutProps) {
     const orgMenuRef = useRef<HTMLDivElement>(null)
 
     const {
-        accessibleOrganizations,
+        switcherOrganizations,
         activeOrganization,
         switchOrganization,
         hasMultipleOrgs,
@@ -43,6 +44,7 @@ export default function Layout({ user, children }: LayoutProps) {
         ownedOrganization,
         hasOwnOrganization
     } = useTeam()
+    const isDemoOrg = !!activeOrganization?.is_demo
 
     useEffect(() => {
         const loadOrganization = async () => {
@@ -132,91 +134,120 @@ export default function Layout({ user, children }: LayoutProps) {
                                     />
                                 </Link>
                                 <div className="hidden md:flex flex-col items-start justify-center min-w-0" ref={orgMenuRef}>
-                                {hasMultipleOrgs ? (
-                                    <div className="relative">
-                                        <button
-                                            onClick={() => setOrgMenuOpen(!orgMenuOpen)}
-                                            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 ${isSharedMember
+                                    {hasMultipleOrgs ? (
+                                        <div className="relative">
+                                            <button
+                                                onClick={() => setOrgMenuOpen(!orgMenuOpen)}
+                                                className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 ${isSharedMember
                                                     ? 'bg-purple-50 border border-purple-200 hover:bg-purple-100'
                                                     : 'bg-white/80 border border-gray-200 hover:bg-white'
-                                                }`}
-                                        >
-                                            {isSharedMember ? (
-                                                <Users className="w-4 h-4 text-purple-600" />
-                                            ) : (
-                                                <Building2 className="w-4 h-4 text-gray-600" />
+                                                    }`}
+                                            >
+                                                {isSharedMember ? (
+                                                    <Users className="w-4 h-4 text-purple-600" />
+                                                ) : (
+                                                    <Building2 className="w-4 h-4 text-gray-600" />
+                                                )}
+                                                <span className={`text-sm font-medium ${isSharedMember ? 'text-purple-800' : 'text-gray-900'}`}>
+                                                    {activeOrganization?.name || 'Select Organization'}
+                                                </span>
+                                                {isSharedMember && (
+                                                    <span className="text-xs bg-purple-200 text-purple-700 px-1.5 py-0.5 rounded-full">
+                                                        Team
+                                                    </span>
+                                                )}
+                                                <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${orgMenuOpen ? 'rotate-180' : ''}`} />
+                                            </button>
+
+                                            {/* Org Dropdown */}
+                                            {orgMenuOpen && (
+                                                <div className="absolute top-full mt-2 left-0 w-64 bg-white rounded-xl shadow-bubble-lg border border-gray-200 overflow-hidden z-50">
+                                                    <div className="p-2">
+                                                        <p className="px-3 py-1.5 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                                            Switch Organization
+                                                        </p>
+                                                        {switcherOrganizations.map((org) => (
+                                                            <button
+                                                                key={org.id}
+                                                                onClick={() => {
+                                                                    switchOrganization(org.id)
+                                                                    setOrgMenuOpen(false)
+                                                                }}
+                                                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${org.id === activeOrganization?.id
+                                                                    ? 'bg-primary-50 text-primary-700'
+                                                                    : 'hover:bg-gray-50 text-gray-700'
+                                                                    }`}
+                                                            >
+                                                                {org.role === 'member' ? (
+                                                                    <Users className="w-4 h-4 text-purple-500" />
+                                                                ) : (
+                                                                    <Building2 className="w-4 h-4 text-gray-500" />
+                                                                )}
+                                                                <div className="flex-1 text-left">
+                                                                    <div className="text-sm font-medium">{org.name}</div>
+                                                                    <div className="text-xs text-gray-400">
+                                                                        {org.role === 'owner' ? 'Your organization' : 'Team member'}
+                                                                    </div>
+                                                                </div>
+                                                                {org.id === activeOrganization?.id && (
+                                                                    <Check className="w-4 h-4 text-primary-500" />
+                                                                )}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
                                             )}
-                                            <span className={`text-sm font-medium ${isSharedMember ? 'text-purple-800' : 'text-gray-900'}`}>
-                                                {activeOrganization?.name || 'Select Organization'}
-                                            </span>
+                                        </div>
+                                    ) : (
+                                        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl ${isSharedMember ? 'bg-purple-50 border border-purple-200' : ''
+                                            }`}>
+                                            {isSharedMember && <Users className="w-4 h-4 text-purple-600" />}
+                                            <h1 className={`text-lg font-semibold ${isSharedMember ? 'text-purple-800' : 'text-gray-900'}`}>
+                                                {activeOrganization?.name || organization?.name}
+                                            </h1>
                                             {isSharedMember && (
                                                 <span className="text-xs bg-purple-200 text-purple-700 px-1.5 py-0.5 rounded-full">
                                                     Team
                                                 </span>
                                             )}
-                                            <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${orgMenuOpen ? 'rotate-180' : ''}`} />
+                                        </div>
+                                    )}
+                                    {/* Back to admin dash — shown only while editing a demo org.
+                                    Clicking it also flips the active org back to the user's real
+                                    org so the pill + demo context disappear on next render. */}
+                                    {isDemoOrg && user.is_admin && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const realOrg = switcherOrganizations.find(
+                                                    (o) => o.role === 'owner'
+                                                ) || switcherOrganizations[0]
+                                                if (realOrg) {
+                                                    localStorage.setItem(
+                                                        'nexus-active-org-id',
+                                                        realOrg.id
+                                                    )
+                                                } else {
+                                                    localStorage.removeItem('nexus-active-org-id')
+                                                }
+                                                // Full navigation so TeamProvider re-reads
+                                                // the active org id from localStorage.
+                                                window.location.href = '/admin/demos'
+                                            }}
+                                            className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 rounded-full text-xs font-medium transition-colors"
+                                            title="Back to admin — Demo charities"
+                                        >
+                                            <FlaskConical className="w-3.5 h-3.5" />
+                                            Back to admin
                                         </button>
-
-                                        {/* Org Dropdown */}
-                                        {orgMenuOpen && (
-                                            <div className="absolute top-full mt-2 left-0 w-64 bg-white rounded-xl shadow-bubble-lg border border-gray-200 overflow-hidden z-50">
-                                                <div className="p-2">
-                                                    <p className="px-3 py-1.5 text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                                        Switch Organization
-                                                    </p>
-                                                    {accessibleOrganizations.map((org) => (
-                                                        <button
-                                                            key={org.id}
-                                                            onClick={() => {
-                                                                switchOrganization(org.id)
-                                                                setOrgMenuOpen(false)
-                                                            }}
-                                                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${org.id === activeOrganization?.id
-                                                                    ? 'bg-primary-50 text-primary-700'
-                                                                    : 'hover:bg-gray-50 text-gray-700'
-                                                                }`}
-                                                        >
-                                                            {org.role === 'member' ? (
-                                                                <Users className="w-4 h-4 text-purple-500" />
-                                                            ) : (
-                                                                <Building2 className="w-4 h-4 text-gray-500" />
-                                                            )}
-                                                            <div className="flex-1 text-left">
-                                                                <div className="text-sm font-medium">{org.name}</div>
-                                                                <div className="text-xs text-gray-400">
-                                                                    {org.role === 'owner' ? 'Your organization' : 'Team member'}
-                                                                </div>
-                                                            </div>
-                                                            {org.id === activeOrganization?.id && (
-                                                                <Check className="w-4 h-4 text-primary-500" />
-                                                            )}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className={`flex items-center gap-2 px-4 py-2 rounded-xl ${isSharedMember ? 'bg-purple-50 border border-purple-200' : ''
-                                        }`}>
-                                        {isSharedMember && <Users className="w-4 h-4 text-purple-600" />}
-                                        <h1 className={`text-lg font-semibold ${isSharedMember ? 'text-purple-800' : 'text-gray-900'}`}>
-                                            {activeOrganization?.name || organization?.name}
-                                        </h1>
-                                        {isSharedMember && (
-                                            <span className="text-xs bg-purple-200 text-purple-700 px-1.5 py-0.5 rounded-full">
-                                                Team
-                                            </span>
-                                        )}
-                                    </div>
-                                )}
+                                    )}
                                 </div>
                             </div>
 
                             {/* Right side: Explore, Tutorial, Settings, User Profile */}
                             <div className="flex items-center gap-3">
                                 {/* Context Button */}
-                                {hasOwnOrganization && (
+                                {activeOrganization && (
                                     <Link
                                         to="/context"
                                         className="hidden lg:flex items-center gap-2 px-4 py-2 bg-white/80 hover:bg-white border border-gray-200 hover:border-gray-300 rounded-full transition-all duration-200 shadow-bubble-sm"
@@ -227,16 +258,28 @@ export default function Layout({ user, children }: LayoutProps) {
                                     </Link>
                                 )}
 
-                                {/* Public View Button - only for owners whose org is public */}
-                                {hasOwnOrganization && ownedOrganization?.is_public && ownedOrganization?.slug && (
+                                {/* Public View Button */}
+                                {isDemoOrg && activeOrganization?.slug ? (
                                     <Link
-                                        to={`/org/${ownedOrganization.slug}`}
+                                        to={`/demo/${activeOrganization.slug}`}
+                                        target="_blank"
                                         className="hidden lg:flex items-center gap-2 px-4 py-2 bg-white/80 hover:bg-white border border-gray-200 hover:border-gray-300 rounded-full transition-all duration-200 shadow-bubble-sm"
-                                        title="View your public organization page"
+                                        title="Open this demo's public page"
                                     >
                                         <Eye className="w-4 h-4 text-gray-700" />
                                         <span className="text-sm font-medium text-gray-700">Public View</span>
                                     </Link>
+                                ) : (
+                                    activeOrganization?.is_public && activeOrganization?.slug && (
+                                        <Link
+                                            to={`/org/${activeOrganization.slug}`}
+                                            className="hidden lg:flex items-center gap-2 px-4 py-2 bg-white/80 hover:bg-white border border-gray-200 hover:border-gray-300 rounded-full transition-all duration-200 shadow-bubble-sm"
+                                            title="View this organization's public page"
+                                        >
+                                            <Eye className="w-4 h-4 text-gray-700" />
+                                            <span className="text-sm font-medium text-gray-700">Public View</span>
+                                        </Link>
+                                    )
                                 )}
 
                                 {/* Explore Button */}
@@ -248,6 +291,18 @@ export default function Layout({ user, children }: LayoutProps) {
                                     <Compass className="w-4 h-4 text-gray-700" />
                                     <span className="text-sm font-medium text-gray-700">Explore</span>
                                 </Link>
+
+                                {/* Admin: Demo Charities (only for platform admins) */}
+                                {user.is_admin && (
+                                    <Link
+                                        to="/admin/demos"
+                                        className="hidden lg:flex items-center gap-2 px-4 py-2 bg-purple-50 hover:bg-purple-100 border border-purple-200 hover:border-purple-300 rounded-full transition-all duration-200 shadow-bubble-sm"
+                                        title="Admin — Demo charities"
+                                    >
+                                        <FlaskConical className="w-4 h-4 text-purple-700" />
+                                        <span className="text-sm font-medium text-purple-700">Demos</span>
+                                    </Link>
+                                )}
 
                                 {/* Tutorial Button - Circle Icon */}
                                 <button
@@ -262,10 +317,10 @@ export default function Layout({ user, children }: LayoutProps) {
                                 <Link
                                     to="/account"
                                     className="relative w-10 h-10 rounded-full bg-white/80 hover:bg-white border border-gray-200 hover:border-gray-300 flex items-center justify-center transition-all duration-200 shadow-bubble-sm"
-                                    title={hasOwnOrganization && !ownedOrganization?.is_public ? "Settings - Organization not public" : "Settings"}
+                                    title={!isDemoOrg && hasOwnOrganization && !ownedOrganization?.is_public ? "Settings - Organization not public" : "Settings"}
                                 >
                                     <Settings className="w-5 h-5 text-gray-700" />
-                                    {hasOwnOrganization && !ownedOrganization?.is_public && (
+                                    {!isDemoOrg && hasOwnOrganization && !ownedOrganization?.is_public && (
                                         <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center">!</span>
                                     )}
                                 </Link>
@@ -280,9 +335,9 @@ export default function Layout({ user, children }: LayoutProps) {
                                             <span className="text-xs font-medium text-gray-900 truncate w-full leading-tight">
                                                 {user.name || user.email}
                                             </span>
-                                            {organization && (
+                                            {(activeOrganization || organization) && (
                                                 <span className="text-[10px] text-gray-500 truncate w-full leading-tight">
-                                                    {organization.name}
+                                                    {activeOrganization?.name || organization?.name}
                                                 </span>
                                             )}
                                         </div>
@@ -340,7 +395,7 @@ export default function Layout({ user, children }: LayoutProps) {
                                         <Compass className="w-5 h-5" />
                                         <span>Explore Organizations</span>
                                     </Link>
-                                    {hasOwnOrganization && (
+                                    {activeOrganization && (
                                         <Link
                                             to="/context"
                                             onClick={() => setMobileMenuOpen(false)}
@@ -350,15 +405,27 @@ export default function Layout({ user, children }: LayoutProps) {
                                             <span>Context &amp; Challenges</span>
                                         </Link>
                                     )}
-                                    {hasOwnOrganization && ownedOrganization?.is_public && ownedOrganization?.slug && (
+                                    {isDemoOrg && activeOrganization?.slug ? (
                                         <Link
-                                            to={`/org/${ownedOrganization.slug}`}
+                                            to={`/demo/${activeOrganization.slug}`}
+                                            target="_blank"
                                             onClick={() => setMobileMenuOpen(false)}
                                             className="flex items-center space-x-3 px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-colors"
                                         >
                                             <Eye className="w-5 h-5" />
                                             <span>Public View</span>
                                         </Link>
+                                    ) : (
+                                        activeOrganization?.is_public && activeOrganization?.slug && (
+                                            <Link
+                                                to={`/org/${activeOrganization.slug}`}
+                                                onClick={() => setMobileMenuOpen(false)}
+                                                className="flex items-center space-x-3 px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-colors"
+                                            >
+                                                <Eye className="w-5 h-5" />
+                                                <span>Public View</span>
+                                            </Link>
+                                        )
                                     )}
                                     <button
                                         onClick={() => {
@@ -386,9 +453,9 @@ export default function Layout({ user, children }: LayoutProps) {
                                         <div className="text-sm font-medium text-gray-900">
                                             {user.name || user.email}
                                         </div>
-                                        {organization && (
+                                        {(activeOrganization || organization) && (
                                             <div className="text-xs text-gray-500">
-                                                {organization.name}
+                                                {activeOrganization?.name || organization?.name}
                                             </div>
                                         )}
                                         <button

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
 import {
     ArrowLeft, Calendar, MapPin, Users, FileText, BookOpen, ChevronLeft, ChevronRight
 } from 'lucide-react'
@@ -16,6 +17,7 @@ export default function PublicStoryPage() {
         storyId: string
     }>()
     const navigate = useNavigate()
+    const orgLinkBase = useOrgLinkBase()
     const [searchParams] = useSearchParams()
 
     const [dateFilter, setDateFilter] = useState<{ singleDate?: string; startDate?: string; endDate?: string }>(() => {
@@ -54,11 +56,11 @@ export default function PublicStoryPage() {
     const nextStory = currentIndex >= 0 && currentIndex < allStories.length - 1 ? allStories[currentIndex + 1] : null
 
     const goToPrev = useCallback(() => {
-        if (prevStory) navigate(`/org/${orgSlug}/${initiativeSlug}/story/${prevStory.id}`)
+        if (prevStory) navigate(`${orgLinkBase}/${orgSlug}/${initiativeSlug}/story/${prevStory.id}`)
     }, [prevStory, orgSlug, initiativeSlug, navigate])
 
     const goToNext = useCallback(() => {
-        if (nextStory) navigate(`/org/${orgSlug}/${initiativeSlug}/story/${nextStory.id}`)
+        if (nextStory) navigate(`${orgLinkBase}/${orgSlug}/${initiativeSlug}/story/${nextStory.id}`)
     }, [nextStory, orgSlug, initiativeSlug, navigate])
 
     // Keyboard navigation
@@ -96,7 +98,7 @@ export default function PublicStoryPage() {
                     <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-gray-800 mb-3">Story Not Found</h1>
                     <p className="text-gray-500 mb-8">{error || 'This story does not exist.'}</p>
-                    <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=stories`}
+                    <Link to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=stories`}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-xl hover:bg-gray-700 transition-colors font-medium">
                         <ArrowLeft className="w-4 h-4" /> Back to Stories
                     </Link>
@@ -128,7 +130,7 @@ export default function PublicStoryPage() {
             <div className="sticky top-0 z-50 bg-white/60 backdrop-blur-2xl border-b border-white/40">
                 <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
                     <div className="flex items-center justify-between">
-                        <Link to={`/org/${orgSlug}/${initiativeSlug}?tab=stories`}
+                        <Link to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=stories`}
                             className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-800 transition-colors">
                             <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
                             <span className="text-sm sm:text-base font-medium">Back</span>
@@ -157,7 +159,7 @@ export default function PublicStoryPage() {
                         orgSlug={orgSlug!}
                         orgName={story.initiative.org_name || ''}
                         items={[
-                            { label: story.initiative.title, href: `/org/${orgSlug}/${initiativeSlug}?tab=stories` },
+                            { label: story.initiative.title, href: `${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=stories` },
                             { label: story.title }
                         ]}
                     />
@@ -259,7 +261,7 @@ export default function PublicStoryPage() {
                         <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-100">
                             <p className="text-xs sm:text-sm text-gray-500 mb-1.5 sm:mb-2">From initiative:</p>
                             <Link
-                                to={`/org/${orgSlug}/${initiativeSlug}`}
+                                to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}`}
                                 className="inline-flex items-center gap-1.5 sm:gap-2 text-gray-800 hover:text-primary-600 font-medium transition-colors text-sm sm:text-base"
                             >
                                 {story.initiative.title}

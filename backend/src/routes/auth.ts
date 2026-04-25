@@ -2,10 +2,31 @@ import { Router } from 'express';
 import { supabase } from '../utils/supabase';
 import { OrganizationService } from '../services/organizationService';
 import { SubscriptionService } from '../services/subscriptionService';
+import { PlatformAdminService } from '../services/platformAdminService';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { stripe } from '../utils/stripe';
 
 const router = Router();
+
+/**
+ * GET /api/auth/me
+ * Returns the authenticated user's id + email plus platform-admin flag.
+ * The frontend uses this to gate the /admin/demos dashboard and nav link.
+ */
+router.get('/me', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const userId = req.user!.id;
+        const isAdmin = await PlatformAdminService.isAdmin(userId);
+        res.json({
+            id: userId,
+            email: req.user!.email,
+            is_admin: isAdmin,
+        });
+    } catch (error) {
+        console.error('[/api/auth/me] error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
 
 // Signup endpoint - creates user and optionally an organization
 // Organization is optional for users signing up from invite links
@@ -56,8 +77,8 @@ router.post('/signup', async (req, res) => {
                 } catch (deleteError) {
                     console.error('Failed to cleanup user after org creation failure:', deleteError);
                 }
-                res.status(500).json({ 
-                    error: `Failed to create organization: ${orgError instanceof Error ? orgError.message : 'Unknown error'}` 
+                res.status(500).json({
+                    error: `Failed to create organization: ${orgError instanceof Error ? orgError.message : 'Unknown error'}`
                 });
                 return;
             }
@@ -114,8 +135,8 @@ router.delete('/account', authenticateUser, async (req: AuthenticatedRequest, re
 
         // Require confirmation phrase
         if (confirmation !== 'DELETE MY ACCOUNT') {
-            res.status(400).json({ 
-                error: 'Please type "DELETE MY ACCOUNT" to confirm deletion' 
+            res.status(400).json({
+                error: 'Please type "DELETE MY ACCOUNT" to confirm deletion'
             });
             return;
         }
@@ -144,7 +165,7 @@ router.delete('/account', authenticateUser, async (req: AuthenticatedRequest, re
 
         if (ownedOrg) {
             console.log(`[Account Delete] User owns organization: ${ownedOrg.id}`);
-            
+
             // Get all initiatives for this organization
             const { data: initiatives } = await supabase
                 .from('initiatives')
@@ -163,10 +184,10 @@ router.delete('/account', authenticateUser, async (req: AuthenticatedRequest, re
 
                 if (kpis && kpis.length > 0) {
                     const kpiIds = kpis.map(k => k.id);
-                    
+
                     // Delete KPI updates
                     await supabase.from('kpi_updates').delete().in('kpi_id', kpiIds);
-                    
+
                     // Delete KPIs
                     await supabase.from('kpis').delete().in('id', kpiIds);
                 }
@@ -234,9 +255,9 @@ router.delete('/account', authenticateUser, async (req: AuthenticatedRequest, re
 
         console.log(`[Account Delete] Successfully deleted user: ${userId}`);
 
-        res.json({ 
-            success: true, 
-            message: 'Your account and all associated data have been permanently deleted.' 
+        res.json({
+            success: true,
+            message: 'Your account and all associated data have been permanently deleted.'
         });
     } catch (error) {
         console.error('[Account Delete] Error:', error);

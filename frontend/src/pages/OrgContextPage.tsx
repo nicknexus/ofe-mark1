@@ -138,8 +138,11 @@ function normalizeTitledList<T extends { id: string; title: string; description:
 }
 
 export default function OrgContextPage() {
-    const { activeOrganization, isOwner, loading: teamLoading } = useTeam()
+    const { activeOrganization, loading: teamLoading } = useTeam()
     const orgId = activeOrganization?.id
+    // Phase 1 (full-access baseline): any member of the active org can edit
+    // the organization context. Phase 7 may reintroduce gating.
+    const canEditContext = !!activeOrganization
 
     const [textValues, setTextValues] = useState<TextValues>(EMPTY_TEXT)
     const [initialTextValues, setInitialTextValues] = useState<TextValues>(EMPTY_TEXT)
@@ -197,7 +200,7 @@ export default function OrgContextPage() {
     }, [textValues, initialTextValues, stats, initialStats, stages, initialStages, strategies, initialStrategies])
 
     const handleSave = async () => {
-        if (!orgId || !isOwner) return
+        if (!orgId || !canEditContext) return
 
         for (const s of stats) {
             if (s.type === 'stat' && !(s.value || '').trim()) {
@@ -278,7 +281,7 @@ export default function OrgContextPage() {
     }
 
     const addStat = (type: StatCardType = 'statement') => {
-        if (!isOwner) return
+        if (!canEditContext) return
         if (stats.length >= MAX_STAT_CARDS) {
             toast.error(`You've reached the max of ${MAX_STAT_CARDS} stats`)
             return
@@ -302,7 +305,7 @@ export default function OrgContextPage() {
     }
 
     const addStage = () => {
-        if (!isOwner) return
+        if (!canEditContext) return
         if (stages.length >= MAX_THEORY_STAGES) {
             toast.error(`You've reached the max of ${MAX_THEORY_STAGES} stages`)
             return
@@ -325,7 +328,7 @@ export default function OrgContextPage() {
     }
 
     const addStrategy = () => {
-        if (!isOwner) return
+        if (!canEditContext) return
         if (strategies.length >= MAX_STRATEGIES) {
             toast.error(`You've reached the max of ${MAX_STRATEGIES} strategies`)
             return
@@ -385,11 +388,11 @@ export default function OrgContextPage() {
                     )}
                 </div>
 
-                {!isOwner && !teamLoading && (
+                {!canEditContext && !teamLoading && (
                     <div className="mb-6 flex items-center gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-100">
                         <Lock className="w-5 h-5 text-amber-600 flex-shrink-0" />
                         <div className="text-sm text-amber-900">
-                            <span className="font-medium">Read-only view.</span> Only the organization owner can edit these fields.
+                            <span className="font-medium">Read-only view.</span> Join an organization to edit these fields.
                         </div>
                     </div>
                 )}
@@ -416,12 +419,12 @@ export default function OrgContextPage() {
                                 config={TEXT_FIELDS[0]}
                                 value={textValues.problem_statement}
                                 onChange={(v) => setTextValues(vals => ({ ...vals, problem_statement: v }))}
-                                readOnly={!isOwner}
+                                readOnly={!canEditContext}
                             />
 
                             <StatsSection
                                 stats={stats}
-                                readOnly={!isOwner}
+                                readOnly={!canEditContext}
                                 atCap={statsAtCap}
                                 onAdd={addStat}
                                 onUpdate={updateStat}
@@ -434,7 +437,7 @@ export default function OrgContextPage() {
                                 textValue={textValues.theory_of_change}
                                 onTextChange={(v) => setTextValues(vals => ({ ...vals, theory_of_change: v }))}
                                 stages={stages}
-                                readOnly={!isOwner}
+                                readOnly={!canEditContext}
                                 atCap={stagesAtCap}
                                 onAdd={addStage}
                                 onUpdate={updateStage}
@@ -444,7 +447,7 @@ export default function OrgContextPage() {
 
                             <StrategiesSection
                                 strategies={strategies}
-                                readOnly={!isOwner}
+                                readOnly={!canEditContext}
                                 atCap={strategiesAtCap}
                                 onAdd={addStrategy}
                                 onUpdate={updateStrategy}
@@ -456,11 +459,11 @@ export default function OrgContextPage() {
                                 config={TEXT_FIELDS[2]}
                                 value={textValues.additional_info}
                                 onChange={(v) => setTextValues(vals => ({ ...vals, additional_info: v }))}
-                                readOnly={!isOwner}
+                                readOnly={!canEditContext}
                             />
                         </div>
 
-                        {isOwner && (
+                        {canEditContext && (
                             <div className="mt-6 flex items-center justify-between px-6 py-4 bg-white rounded-2xl shadow-bubble border border-gray-100 sticky bottom-4 z-10 backdrop-blur-sm">
                                 <p className="text-xs text-gray-500">
                                     {hasChanges ? 'You have unsaved changes' : 'All changes saved'}
@@ -729,9 +732,8 @@ function StatCardEditor({
                             <button
                                 type="button"
                                 onClick={() => onUpdate(card.id, { type: 'statement' })}
-                                className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1 ${
-                                    !isStat ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'
-                                }`}
+                                className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1 ${!isStat ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'
+                                    }`}
                             >
                                 <Quote className="w-3 h-3" />
                                 Statement
@@ -739,9 +741,8 @@ function StatCardEditor({
                             <button
                                 type="button"
                                 onClick={() => onUpdate(card.id, { type: 'stat' })}
-                                className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1 ${
-                                    isStat ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'
-                                }`}
+                                className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1 ${isStat ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'
+                                    }`}
                             >
                                 <Hash className="w-3 h-3" />
                                 Stat

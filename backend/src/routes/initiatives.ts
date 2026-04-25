@@ -4,7 +4,6 @@ import { KPIService } from '../services/kpiService';
 import { EvidenceService } from '../services/evidenceService';
 import { SubscriptionService } from '../services/subscriptionService';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
-import { requireOwnerPermission } from '../middleware/teamPermissions';
 
 const router = Router();
 
@@ -23,10 +22,11 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
 // Create initiative
 router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        // Check initiative limit
-        const usage = await SubscriptionService.getInitiativesUsage(req.user!.id);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        // Check initiative limit (org-scoped: uses owner's subscription + org count)
+        const usage = await SubscriptionService.getInitiativesUsage(req.user!.id, requestedOrgId);
         if (!usage.canCreate) {
-            res.status(403).json({ 
+            res.status(403).json({
                 error: `Initiative limit reached (${usage.current}/${usage.limit}). Upgrade your plan to create more initiatives.`,
                 code: 'INITIATIVE_LIMIT_REACHED',
                 usage
@@ -34,7 +34,7 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
             return;
         }
 
-        const initiative = await InitiativeService.create(req.body, req.user!.id);
+        const initiative = await InitiativeService.create(req.body, req.user!.id, requestedOrgId);
         res.status(201).json(initiative);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
@@ -67,8 +67,10 @@ router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     }
 });
 
-// Delete initiative (owner only)
-router.delete('/:id', authenticateUser, requireOwnerPermission, async (req: AuthenticatedRequest, res) => {
+// Delete initiative
+// Phase 1 (full-access baseline): any team member of the org can delete.
+// InitiativeService.delete authorizes via the org context.
+router.delete('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
         await InitiativeService.delete(req.params.id, req.user!.id, requestedOrgId);
@@ -84,7 +86,7 @@ router.get('/:id/dashboard', authenticateUser, async (req: AuthenticatedRequest,
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
         const [initiative, kpis, evidenceStats] = await Promise.all([
             InitiativeService.getById(req.params.id, req.user!.id, requestedOrgId),
-            KPIService.getWithEvidence(req.user!.id, req.params.id),
+            KPIService.getWithEvidence(req.user!.id, req.params.id, requestedOrgId),
             EvidenceService.getEvidenceStats(req.params.id)
         ]);
 
@@ -96,7 +98,7 @@ router.get('/:id/dashboard', authenticateUser, async (req: AuthenticatedRequest,
         const totalKPIs = kpis.length;
         const kpisWithEvidence = kpis.filter(kpi => kpi.evidence_percentage > 0).length;
         const overallEvidencePercentage = totalKPIs > 0 ? Math.round(kpisWithEvidence / totalKPIs * 100) : 0;
-        
+
         // Calculate total evidence pieces
         const totalEvidence = Object.values(evidenceStats).reduce((sum: number, count: any) => sum + (count || 0), 0);
 

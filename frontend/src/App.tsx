@@ -41,6 +41,7 @@ import TrialActivationPage from './pages/TrialActivationPage'
 import SubscriptionExpiredPage from './pages/SubscriptionExpiredPage'
 import TeamSettingsPage from './pages/TeamSettingsPage'
 import InviteAcceptPage from './pages/InviteAcceptPage'
+import AdminDemosPage from './pages/admin/AdminDemosPage'
 import TermsOfServicePage from './pages/TermsOfServicePage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import OfferCheckoutPage from './pages/OfferCheckoutPage'
@@ -174,6 +175,15 @@ function App() {
             <Route path="/org/:orgSlug/:initiativeSlug/story/:storyId" element={<PublicStoryPage />} />
             <Route path="/org/:orgSlug/:initiativeSlug/evidence/:evidenceId" element={<PublicEvidencePage />} />
             <Route path="/org/:orgSlug/:initiativeSlug/beneficiary/:groupId" element={<PublicBeneficiaryGroupPage />} />
+            {/* Demo / mockup organizations — same components, separate URL namespace. */}
+            <Route path="/demo/:slug" element={<PublicOrganizationPage />} />
+            <Route path="/demo/:slug/context" element={<PublicOrgContextPage />} />
+            <Route path="/demo/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
+            <Route path="/demo/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
+            <Route path="/demo/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
+            <Route path="/demo/:orgSlug/:initiativeSlug/story/:storyId" element={<PublicStoryPage />} />
+            <Route path="/demo/:orgSlug/:initiativeSlug/evidence/:evidenceId" element={<PublicEvidencePage />} />
+            <Route path="/demo/:orgSlug/:initiativeSlug/beneficiary/:groupId" element={<PublicBeneficiaryGroupPage />} />
         </>
     )
 
@@ -340,6 +350,14 @@ function App() {
                                     <Route path="/org/:orgSlug/:initiativeSlug/story/:storyId" element={<PublicStoryPage />} />
                                     <Route path="/org/:orgSlug/:initiativeSlug/evidence/:evidenceId" element={<PublicEvidencePage />} />
                                     <Route path="/org/:orgSlug/:initiativeSlug/beneficiary/:groupId" element={<PublicBeneficiaryGroupPage />} />
+                                    <Route path="/demo/:slug" element={<PublicOrganizationPage />} />
+                                    <Route path="/demo/:slug/context" element={<PublicOrgContextPage />} />
+                                    <Route path="/demo/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
+                                    <Route path="/demo/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
+                                    <Route path="/demo/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
+                                    <Route path="/demo/:orgSlug/:initiativeSlug/story/:storyId" element={<PublicStoryPage />} />
+                                    <Route path="/demo/:orgSlug/:initiativeSlug/evidence/:evidenceId" element={<PublicEvidencePage />} />
+                                    <Route path="/demo/:orgSlug/:initiativeSlug/beneficiary/:groupId" element={<PublicBeneficiaryGroupPage />} />
                                     <Route path="/*" element={
                                         <MobileApp user={user} subscriptionStatus={subscriptionStatus} />
                                     } />
@@ -603,6 +621,14 @@ function App() {
                                         <Route path="/org/:orgSlug/:initiativeSlug/story/:storyId" element={<PublicStoryPage />} />
                                         <Route path="/org/:orgSlug/:initiativeSlug/evidence/:evidenceId" element={<PublicEvidencePage />} />
                                         <Route path="/org/:orgSlug/:initiativeSlug/beneficiary/:groupId" element={<PublicBeneficiaryGroupPage />} />
+                                        <Route path="/demo/:slug" element={<PublicOrganizationPage />} />
+                                        <Route path="/demo/:slug/context" element={<PublicOrgContextPage />} />
+                                        <Route path="/demo/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
+                                        <Route path="/demo/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
+                                        <Route path="/demo/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
+                                        <Route path="/demo/:orgSlug/:initiativeSlug/story/:storyId" element={<PublicStoryPage />} />
+                                        <Route path="/demo/:orgSlug/:initiativeSlug/evidence/:evidenceId" element={<PublicEvidencePage />} />
+                                        <Route path="/demo/:orgSlug/:initiativeSlug/beneficiary/:groupId" element={<PublicBeneficiaryGroupPage />} />
                                         <Route path="/*" element={
                                             <MobileApp user={user} subscriptionStatus={subscriptionStatus} />
                                         } />
@@ -646,6 +672,9 @@ function App() {
                                                 <Route path="account" element={<AccountPage subscriptionStatus={subscriptionStatus} />} />
                                                 <Route path="context" element={<OrgContextPage />} />
                                                 <Route path="settings/team" element={<TeamSettingsPage />} />
+                                                {user.is_admin && (
+                                                    <Route path="admin/demos" element={<AdminDemosPage />} />
+                                                )}
                                                 <Route path="*" element={<Navigate to="/" replace />} />
                                             </Routes>
                                         </Layout>

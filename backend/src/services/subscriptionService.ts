@@ -400,21 +400,50 @@ export class SubscriptionService {
     }
 
     /**
-     * Get initiatives usage (current count vs limit)
+     * Get initiatives usage (current count vs limit) for the user's *active* org.
+     * For team members creating in a team org, the org owner's subscription is
+     * the source of truth and the count is org-scoped.
      */
-    static async getInitiativesUsage(userId: string): Promise<{
+    static async getInitiativesUsage(userId: string, requestedOrgId?: string): Promise<{
         current: number;
         limit: number | null;
         canCreate: boolean;
     }> {
-        // Get subscription to check limit
-        const subscription = await this.getOrCreate(userId);
+        // Resolve which org the user is acting in.
+        let activeOrgId: string | null = null;
+        if (requestedOrgId) {
+            const ownsRequested = await TeamService.isUserOwnerOfOrganization(userId, requestedOrgId);
+            const membership = ownsRequested
+                ? null
+                : await TeamService.getUserTeamMembership(userId, requestedOrgId);
+            if (ownsRequested || membership) activeOrgId = requestedOrgId;
+        }
+        if (!activeOrgId) {
+            const owned = await TeamService.getUserOwnedOrganization(userId);
+            if (owned) activeOrgId = owned.id;
+        }
+        if (!activeOrgId) {
+            const membership = await TeamService.getUserTeamMembership(userId);
+            if (membership) activeOrgId = membership.organization_id;
+        }
 
-        // Get current initiatives count for this user's organization
-        const { count, error } = await supabase
+        // Subscription is owned by the org owner; fall back to the current user
+        // if no org context yet (first-org flow).
+        const ownerId = activeOrgId
+            ? (await TeamService.getOrganizationOwnerId(activeOrgId)) || userId
+            : userId;
+
+        const subscription = await this.getOrCreate(ownerId);
+
+        let countQuery = supabase
             .from('initiatives')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', userId);
+            .select('*', { count: 'exact', head: true });
+        if (activeOrgId) {
+            countQuery = countQuery.eq('organization_id', activeOrgId);
+        } else {
+            countQuery = countQuery.eq('user_id', userId);
+        }
+        const { count, error } = await countQuery;
 
         if (error) {
             throw new Error(`Failed to count initiatives: ${error.message}`);
@@ -422,8 +451,6 @@ export class SubscriptionService {
 
         const currentCount = count || 0;
         const limit = subscription.initiatives_limit ?? null;
-
-        // Can create if no limit (null/undefined = unlimited) or under limit
         const canCreate = limit === null || currentCount < limit;
 
         return {

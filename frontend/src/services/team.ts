@@ -86,6 +86,8 @@ export interface AccessibleOrganization {
     logo_url?: string
     brand_color?: string
     is_public?: boolean
+    is_demo?: boolean
+    demo_public_share?: boolean
     statement?: string
     website_url?: string
     donation_url?: string

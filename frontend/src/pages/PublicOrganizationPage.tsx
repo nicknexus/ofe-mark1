@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, Link } from 'react-router-dom'
-import { 
-    Building2, MapPin, BarChart3, ArrowLeft, Globe, 
+import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
+import {
+    Building2, MapPin, BarChart3, ArrowLeft, Globe,
     BookOpen, FileText, Calendar, ChevronRight, ChevronLeft,
     TrendingUp, ChevronDown, X, Target, Image, LineChart, Compass
 } from 'lucide-react'
-import { 
-    publicApi, 
-    PublicOrganization, 
-    PublicInitiative, 
-    PublicKPI, 
-    PublicStory, 
+import {
+    publicApi,
+    PublicOrganization,
+    PublicInitiative,
+    PublicKPI,
+    PublicStory,
     PublicLocation,
     PublicEvidence,
     PublicStatCard,
@@ -48,6 +49,7 @@ function generateMetricSlug(title: string): string {
 
 export default function PublicOrganizationPage() {
     const { slug } = useParams<{ slug: string }>()
+    const orgLinkBase = useOrgLinkBase()
     const [organization, setOrganization] = useState<PublicOrganization | null>(null)
     const [stats, setStats] = useState<OrganizationStats | null>(null)
     const [initiatives, setInitiatives] = useState<PublicInitiative[]>([])
@@ -58,15 +60,15 @@ export default function PublicOrganizationPage() {
     const [highlightCards, setHighlightCards] = useState<PublicStatCard[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
-    
+
     // Feature view toggle state
     const [activeView, setActiveView] = useState<FeatureView>('globe')
-    
+
     // Story carousel state
     const [storyIndex, setStoryIndex] = useState(0)
     const [evidencePage, setEvidencePage] = useState(0)
     const [heroInitiativePage, setHeroInitiativePage] = useState(0)
-    
+
     // Filter state
     const [selectedInitiative, setSelectedInitiative] = useState<string>('all')
     const [startDate, setStartDate] = useState<string>('')
@@ -76,7 +78,7 @@ export default function PublicOrganizationPage() {
     const [showLocationDropdown, setShowLocationDropdown] = useState(false)
     const initiativeBtnRef = useRef<HTMLButtonElement>(null)
     const locationBtnRef = useRef<HTMLButtonElement>(null)
-    
+
     // Location popups state
     const [activePopups, setActivePopups] = useState<Array<{
         id: string
@@ -237,19 +239,19 @@ export default function PublicOrganizationPage() {
         }
         return filtered
     }, [locations, selectedInitiative, selectedLocationIds])
-    
+
     // Random location popups effect
     useEffect(() => {
         if (activeView !== 'globe' || filteredLocations.length === 0) return
-        
+
         const spawnPopup = () => {
             const randomLocation = filteredLocations[Math.floor(Math.random() * filteredLocations.length)]
             const popupId = `${randomLocation.id}-${Date.now()}`
-            
+
             // Position around the edges, avoiding center where globe is
             const edge = Math.floor(Math.random() * 4) // 0=top, 1=right, 2=bottom, 3=left
             let top, left
-            
+
             if (edge === 0) { // top edge
                 top = 8 + Math.random() * 12
                 left = 15 + Math.random() * 55
@@ -263,7 +265,7 @@ export default function PublicOrganizationPage() {
                 top = 20 + Math.random() * 55
                 left = 8 + Math.random() * 18
             }
-            
+
             const newPopup = {
                 id: popupId,
                 name: randomLocation.name,
@@ -272,24 +274,24 @@ export default function PublicOrganizationPage() {
                 top,
                 left,
             }
-            
+
             setActivePopups(prev => [...prev, newPopup])
-            
+
             // Remove after 7 seconds
             setTimeout(() => {
                 setActivePopups(prev => prev.filter(p => p.id !== popupId))
             }, 7000)
         }
-        
+
         // Spawn initial popups
         spawnPopup()
         setTimeout(spawnPopup, 500)
-        
+
         // Spawn new popups every 3 seconds
         const interval = setInterval(() => {
             spawnPopup()
         }, 3000)
-        
+
         return () => clearInterval(interval)
     }, [activeView, filteredLocations])
 
@@ -333,16 +335,16 @@ export default function PublicOrganizationPage() {
 
     // Brand color with fallback
     const brandColor = organization?.brand_color || '#c0dfa1'
-    
+
     const allImpactClaims = useMemo(() => {
-        let sourceMetrics = selectedInitiative === 'all' 
-            ? metrics 
+        let sourceMetrics = selectedInitiative === 'all'
+            ? metrics
             : metrics.filter(m => m.initiative_id === selectedInitiative)
         if (locationMatchedInitiativeIds) {
             sourceMetrics = sourceMetrics.filter(m => locationMatchedInitiativeIds.has(m.initiative_id))
         }
-        
-        let claims = sourceMetrics.flatMap(m => 
+
+        let claims = sourceMetrics.flatMap(m =>
             (m.updates || []).map(u => ({
                 ...u,
                 metricTitle: m.title,
@@ -388,7 +390,7 @@ export default function PublicOrganizationPage() {
         }
         return filtered
     }, [evidence, selectedInitiative, selectedLocationIds, locationMatchedInitiativeIds, startDate, endDate])
-    
+
     // Evidence pagination (must be after filteredEvidence)
     const evidencePerPage = 4
     const totalEvidencePages = Math.ceil(filteredEvidence.length / evidencePerPage)
@@ -397,10 +399,10 @@ export default function PublicOrganizationPage() {
     // Memoize globe locations - group by country to avoid clutter
     const globeLocations = useMemo(() => {
         const validLocations = filteredLocations.filter(loc => loc.latitude && loc.longitude)
-        
+
         // Group by country, use first location's coords for each country
         const countryMap = new Map<string, { lat: number; lng: number; name: string; count: number }>()
-        
+
         validLocations.forEach(loc => {
             const country = loc.country || loc.name // Fallback to location name if no country
             if (!countryMap.has(country)) {
@@ -416,7 +418,7 @@ export default function PublicOrganizationPage() {
                 existing.count++
             }
         })
-        
+
         return Array.from(countryMap.values()).map(c => ({
             lat: c.lat,
             lng: c.lng,
@@ -428,11 +430,11 @@ export default function PublicOrganizationPage() {
     const chartMetrics = useMemo(() => {
         // Group metrics by initiative
         const metricsByInitiative = new Map<string, { metrics: PublicKPI[]; initiative: PublicInitiative }>()
-        
+
         filteredMetrics.forEach(metric => {
             const init = initiatives.find(i => i.id === metric.initiative_id)
             if (!init) return
-            
+
             const existing = metricsByInitiative.get(metric.initiative_id)
             if (existing) {
                 existing.metrics.push(metric)
@@ -440,7 +442,7 @@ export default function PublicOrganizationPage() {
                 metricsByInitiative.set(metric.initiative_id, { metrics: [metric], initiative: init })
             }
         })
-        
+
         // Sort each initiative's metrics: prioritize those with actual updates, then by total_value descending
         metricsByInitiative.forEach(entry => {
             entry.metrics.sort((a, b) => {
@@ -453,16 +455,16 @@ export default function PublicOrganizationPage() {
                 return (b.total_value || 0) - (a.total_value || 0)
             })
         })
-        
+
         const initiativeCount = metricsByInitiative.size
-        
+
         // Determine metrics per initiative: 1 init = 6, 2 = 3, 3 = 2, 4+ = 1
         let metricsPerInitiative: number
         if (initiativeCount === 1) metricsPerInitiative = 6
         else if (initiativeCount === 2) metricsPerInitiative = 3
         else if (initiativeCount === 3) metricsPerInitiative = 2
         else metricsPerInitiative = 1
-        
+
         // Collect top N metrics from each initiative
         const result: { metric: PublicKPI; initiative: PublicInitiative }[] = []
         metricsByInitiative.forEach(({ metrics, initiative }) => {
@@ -470,14 +472,14 @@ export default function PublicOrganizationPage() {
                 result.push({ metric, initiative })
             })
         })
-        
+
         return result
     }, [filteredMetrics, initiatives])
 
     // Chart data: selected metrics over time (cumulative monthly, anchored to today's date)
     const initiativeChartData = useMemo(() => {
         if (chartMetrics.length === 0) return []
-        
+
         // Collect all updates with their dates
         const allUpdates: { metricId: string; value: number; date: Date }[] = []
         chartMetrics.forEach(({ metric }) => {
@@ -490,37 +492,37 @@ export default function PublicOrganizationPage() {
                 })
             })
         })
-        
+
         if (allUpdates.length === 0) return []
-        
+
         // Find the oldest update date
         const oldestDate = allUpdates.reduce((oldest, u) => u.date < oldest ? u.date : oldest, new Date())
         const now = new Date()
-        
+
         // Group updates by metric for efficient lookup
         const updatesByMetric: Record<string, Array<{ value: number; date: Date }>> = {}
         allUpdates.forEach(u => {
             if (!updatesByMetric[u.metricId]) updatesByMetric[u.metricId] = []
             updatesByMetric[u.metricId].push({ value: u.value, date: u.date })
         })
-        
+
         // Sort each metric's updates by date
         Object.values(updatesByMetric).forEach(updates => {
             updates.sort((a, b) => a.date.getTime() - b.date.getTime())
         })
-        
+
         // Calculate stop date: one month before the oldest data's month
         const stopDate = new Date(oldestDate.getFullYear(), oldestDate.getMonth() - 1, oldestDate.getDate())
-        
+
         // Generate monthly data points going backwards from today (Feb 5, Jan 5, Dec 5, etc.)
         const dataPoints: any[] = []
         const currentDate = new Date(now)
-        
+
         // Go back month by month until we're a full month before the oldest data
         while (currentDate > stopDate) {
             const label = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
             const dataPoint: any = { date: label, fullDate: new Date(currentDate) }
-            
+
             chartMetrics.forEach(({ metric }) => {
                 // Calculate cumulative total up to this date
                 const cumulative = (updatesByMetric[metric.id] || [])
@@ -529,14 +531,14 @@ export default function PublicOrganizationPage() {
                 dataPoint[metric.id] = cumulative
             })
             dataPoints.push(dataPoint)
-            
+
             // Go back one month
             currentDate.setMonth(currentDate.getMonth() - 1)
-            
+
             // Safety: limit to 24 months max
             if (dataPoints.length >= 24) break
         }
-        
+
         // Reverse so oldest is first (left side of chart)
         return dataPoints.reverse()
     }, [chartMetrics])
@@ -568,7 +570,7 @@ export default function PublicOrganizationPage() {
     return (
         <div className="min-h-screen md:h-screen flex flex-col font-figtree overflow-auto md:overflow-hidden relative animate-fadeIn">
             {/* Flowing gradient background */}
-            <div 
+            <div
                 className="fixed inset-0 pointer-events-none"
                 style={{
                     background: `
@@ -580,7 +582,7 @@ export default function PublicOrganizationPage() {
                     `
                 }}
             />
-            
+
             {/* Header with Filters */}
             <header className="flex-shrink-0 bg-white/60 backdrop-blur-2xl border-b border-white/40 shadow-sm z-50 relative">
                 <div className="px-2 sm:px-3 md:px-4 py-1.5">
@@ -687,9 +689,8 @@ export default function PublicOrganizationPage() {
                     >
                         <button
                             onClick={() => { setSelectedInitiative('all'); setShowInitiativeDropdown(false) }}
-                            className={`w-full px-3 py-2 text-left text-sm hover:bg-accent/10 ${
-                                selectedInitiative === 'all' ? 'bg-accent/10 text-accent font-medium' : 'text-foreground'
-                            }`}
+                            className={`w-full px-3 py-2 text-left text-sm hover:bg-accent/10 ${selectedInitiative === 'all' ? 'bg-accent/10 text-accent font-medium' : 'text-foreground'
+                                }`}
                         >
                             All Initiatives
                         </button>
@@ -697,9 +698,8 @@ export default function PublicOrganizationPage() {
                             <button
                                 key={init.id}
                                 onClick={() => { setSelectedInitiative(init.id); setShowInitiativeDropdown(false) }}
-                                className={`w-full px-3 py-2 text-left text-sm hover:bg-accent/10 truncate ${
-                                    selectedInitiative === init.id ? 'bg-accent/10 text-accent font-medium' : 'text-foreground'
-                                }`}
+                                className={`w-full px-3 py-2 text-left text-sm hover:bg-accent/10 truncate ${selectedInitiative === init.id ? 'bg-accent/10 text-accent font-medium' : 'text-foreground'
+                                    }`}
                             >
                                 {init.title}
                             </button>
@@ -741,13 +741,11 @@ export default function PublicOrganizationPage() {
                                                 : [...prev, loc.id]
                                         )
                                     }}
-                                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${
-                                        isSelected ? 'bg-blue-50 font-medium' : 'hover:bg-gray-50'
-                                    }`}
+                                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${isSelected ? 'bg-blue-50 font-medium' : 'hover:bg-gray-50'
+                                        }`}
                                 >
-                                    <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
-                                        isSelected ? 'bg-blue-600 border-2 border-blue-600' : 'border-2 border-gray-300 bg-white'
-                                    }`}>
+                                    <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-blue-600 border-2 border-blue-600' : 'border-2 border-gray-300 bg-white'
+                                        }`}>
                                         {isSelected && (
                                             <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -783,7 +781,7 @@ export default function PublicOrganizationPage() {
                                 <span className="text-xl md:text-3xl font-bold text-gray-400">{organization.name.charAt(0)}</span>
                             )}
                         </div>
-                        
+
                         {/* Name and Statement */}
                         <div className="flex-1 min-w-0 pt-1 md:pt-2">
                             <h1 className="text-xl md:text-3xl font-bold mb-1" style={{ color: '#465360' }}>{organization.name}</h1>
@@ -795,7 +793,7 @@ export default function PublicOrganizationPage() {
 
                     {/* Context & Challenges button (aligned with logo's left edge) */}
                     <Link
-                        to={`/org/${slug}/context`}
+                        to={`${orgLinkBase}/${slug}/context`}
                         className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-full text-xs font-medium border shadow-sm transition-all hover:shadow-md"
                         style={{
                             backgroundColor: `${organization.brand_color || '#c0dfa1'}15`,
@@ -808,7 +806,7 @@ export default function PublicOrganizationPage() {
                         Context &amp; Challenges
                     </Link>
                 </div>
-                
+
                 {/* Right Side - Initiatives Container (aligned with right panel) */}
                 <div className="flex-1 p-3 md:p-4 md:pl-2">
                     <div className="h-full overflow-hidden flex flex-col">
@@ -822,8 +820,8 @@ export default function PublicOrganizationPage() {
                             </div>
                             {filteredInitiatives.length > 4 && (
                                 <div className="flex items-center gap-1">
-                                    <button 
-                                        onClick={() => setHeroInitiativePage(p => Math.max(0, p - 1))} 
+                                    <button
+                                        onClick={() => setHeroInitiativePage(p => Math.max(0, p - 1))}
                                         disabled={heroInitiativePage === 0}
                                         className="w-6 h-6 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors"
                                     >
@@ -832,8 +830,8 @@ export default function PublicOrganizationPage() {
                                     <span className="text-xs text-muted-foreground w-10 text-center">
                                         {heroInitiativePage + 1}/{Math.ceil(filteredInitiatives.length / 4)}
                                     </span>
-                                    <button 
-                                        onClick={() => setHeroInitiativePage(p => Math.min(Math.ceil(filteredInitiatives.length / 4) - 1, p + 1))} 
+                                    <button
+                                        onClick={() => setHeroInitiativePage(p => Math.min(Math.ceil(filteredInitiatives.length / 4) - 1, p + 1))}
                                         disabled={heroInitiativePage >= Math.ceil(filteredInitiatives.length / 4) - 1}
                                         className="w-6 h-6 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors"
                                     >
@@ -845,9 +843,9 @@ export default function PublicOrganizationPage() {
                         <div className="flex-1 px-2 md:px-3 pb-2">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 h-full">
                                 {filteredInitiatives.slice(heroInitiativePage * 4, heroInitiativePage * 4 + 4).map((init) => (
-                                    <Link 
-                                        key={init.id} 
-                                        to={`/org/${slug}/${init.slug}`}
+                                    <Link
+                                        key={init.id}
+                                        to={`${orgLinkBase}/${slug}/${init.slug}`}
                                         className="p-3 bg-white/60 backdrop-blur-lg rounded-xl border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all group flex flex-col justify-center"
                                     >
                                         <h4 className="font-medium text-foreground text-xs line-clamp-2 group-hover:text-accent transition-colors">{init.title}</h4>
@@ -870,22 +868,20 @@ export default function PublicOrganizationPage() {
                 <div className="md:hidden flex items-center gap-2 py-2 px-3 bg-white/40 backdrop-blur-lg border-b border-white/40 flex-shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&>button]:flex-shrink-0">
                     <button
                         onClick={() => setActiveView('globe')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                            activeView === 'globe'
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${activeView === 'globe'
                                 ? 'bg-gray-800 text-white'
                                 : 'bg-white/60 text-gray-600'
-                        }`}
+                            }`}
                     >
                         <Globe className="w-3.5 h-3.5" />
                         <span>Globe</span>
                     </button>
                     <button
                         onClick={() => setActiveView('stories')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                            activeView === 'stories'
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${activeView === 'stories'
                                 ? 'bg-gray-800 text-white'
                                 : 'bg-white/60 text-gray-600'
-                        }`}
+                            }`}
                     >
                         <BookOpen className="w-3.5 h-3.5" />
                         <span>Stories</span>
@@ -893,11 +889,10 @@ export default function PublicOrganizationPage() {
                     {highlightCards.length > 0 && (
                         <button
                             onClick={() => setActiveView('highlights')}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                                activeView === 'highlights'
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${activeView === 'highlights'
                                     ? 'bg-gray-800 text-white'
                                     : 'bg-white/60 text-gray-600'
-                            }`}
+                                }`}
                         >
                             <Compass className="w-3.5 h-3.5" />
                             <span>Context</span>
@@ -905,22 +900,20 @@ export default function PublicOrganizationPage() {
                     )}
                     <button
                         onClick={() => setActiveView('graph')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                            activeView === 'graph'
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${activeView === 'graph'
                                 ? 'bg-gray-800 text-white'
                                 : 'bg-white/60 text-gray-600'
-                        }`}
+                            }`}
                     >
                         <LineChart className="w-3.5 h-3.5" />
                         <span>Graph</span>
                     </button>
                     <button
                         onClick={() => setActiveView('initiatives')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                            activeView === 'initiatives'
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${activeView === 'initiatives'
                                 ? 'bg-gray-800 text-white'
                                 : 'bg-white/60 text-gray-600'
-                        }`}
+                            }`}
                     >
                         <Target className="w-3.5 h-3.5" />
                         <span>List</span>
@@ -932,11 +925,10 @@ export default function PublicOrganizationPage() {
                     <div className="group relative z-[100]">
                         <button
                             onClick={() => setActiveView('globe')}
-                            className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${
-                                activeView === 'globe'
+                            className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${activeView === 'globe'
                                     ? 'bg-gray-800 text-white shadow-lg scale-110'
                                     : 'bg-white/60 backdrop-blur-lg text-gray-600 hover:bg-white/80 hover:scale-105 border border-white/60'
-                            }`}
+                                }`}
                         >
                             <Globe className="w-5 h-5" />
                         </button>
@@ -947,11 +939,10 @@ export default function PublicOrganizationPage() {
                     <div className="group relative z-[100]">
                         <button
                             onClick={() => setActiveView('stories')}
-                            className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${
-                                activeView === 'stories'
+                            className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${activeView === 'stories'
                                     ? 'bg-gray-800 text-white shadow-lg scale-110'
                                     : 'bg-white/60 backdrop-blur-lg text-gray-600 hover:bg-white/80 hover:scale-105 border border-white/60'
-                            }`}
+                                }`}
                         >
                             <BookOpen className="w-5 h-5" />
                         </button>
@@ -963,11 +954,10 @@ export default function PublicOrganizationPage() {
                         <div className="group relative z-[100]">
                             <button
                                 onClick={() => setActiveView('highlights')}
-                                className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${
-                                    activeView === 'highlights'
+                                className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${activeView === 'highlights'
                                         ? 'bg-gray-800 text-white shadow-lg scale-110'
                                         : 'bg-white/60 backdrop-blur-lg text-gray-600 hover:bg-white/80 hover:scale-105 border border-white/60'
-                                }`}
+                                    }`}
                             >
                                 <Compass className="w-5 h-5" />
                             </button>
@@ -979,11 +969,10 @@ export default function PublicOrganizationPage() {
                     <div className="group relative z-[100]">
                         <button
                             onClick={() => setActiveView('graph')}
-                            className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${
-                                activeView === 'graph'
+                            className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${activeView === 'graph'
                                     ? 'bg-gray-800 text-white shadow-lg scale-110'
                                     : 'bg-white/60 backdrop-blur-lg text-gray-600 hover:bg-white/80 hover:scale-105 border border-white/60'
-                            }`}
+                                }`}
                         >
                             <LineChart className="w-5 h-5" />
                         </button>
@@ -994,11 +983,10 @@ export default function PublicOrganizationPage() {
                     <div className="group relative z-[100]">
                         <button
                             onClick={() => setActiveView('initiatives')}
-                            className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${
-                                activeView === 'initiatives'
+                            className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${activeView === 'initiatives'
                                     ? 'bg-gray-800 text-white shadow-lg scale-110'
                                     : 'bg-white/60 backdrop-blur-lg text-gray-600 hover:bg-white/80 hover:scale-105 border border-white/60'
-                            }`}
+                                }`}
                         >
                             <Target className="w-5 h-5" />
                         </button>
@@ -1012,11 +1000,10 @@ export default function PublicOrganizationPage() {
                 <div className="w-full md:w-[45%] flex-shrink-0 pt-0 pb-2 md:pb-4 px-2 md:px-0 md:pr-2 h-[50vh] md:h-auto">
                     <div className="h-full overflow-hidden relative">
                         {/* Globe View */}
-                        <div className={`absolute inset-0 transition-all duration-500 ease-out ${
-                            activeView === 'globe' 
-                                ? 'opacity-100 translate-x-0 z-10' 
+                        <div className={`absolute inset-0 transition-all duration-500 ease-out ${activeView === 'globe'
+                                ? 'opacity-100 translate-x-0 z-10'
                                 : 'opacity-0 -translate-x-8 z-0 pointer-events-none'
-                        }`}>
+                            }`}>
                             <div className="h-full flex flex-col">
                                 <div className="px-4 py-3 flex items-center justify-between ">
                                     <div className="flex items-center gap-2">
@@ -1035,14 +1022,14 @@ export default function PublicOrganizationPage() {
                                             <div className="w-48 h-48 rounded-full bg-gradient-to-br from-accent/60 to-accent/30 animate-pulse" />
                                         </div>
                                     }>
-                                        <ImpactGlobe 
+                                        <ImpactGlobe
                                             locations={globeLocations}
                                             showLabels={true}
                                             brandColor={brandColor}
                                             enableZoom={true}
                                         />
                                     </Suspense>
-                                    
+
                                     {/* Location Popups */}
                                     {activePopups.map(popup => {
                                         const inner = (
@@ -1062,7 +1049,7 @@ export default function PublicOrganizationPage() {
                                         return popup.initiative_slug ? (
                                             <Link
                                                 key={popup.id}
-                                                to={`/org/${slug}/${popup.initiative_slug}?tab=locations`}
+                                                to={`${orgLinkBase}/${slug}/${popup.initiative_slug}?tab=locations`}
                                                 className={className + " cursor-pointer"}
                                                 style={style}
                                             >
@@ -1079,13 +1066,12 @@ export default function PublicOrganizationPage() {
                         </div>
 
                         {/* Stories View - Single Story Carousel */}
-                        <div className={`absolute inset-0 transition-all duration-500 ease-out ${
-                            activeView === 'stories' 
-                                ? 'opacity-100 translate-x-0 z-10' 
-                                : activeView === 'globe' 
+                        <div className={`absolute inset-0 transition-all duration-500 ease-out ${activeView === 'stories'
+                                ? 'opacity-100 translate-x-0 z-10'
+                                : activeView === 'globe'
                                     ? 'opacity-0 translate-x-8 z-0 pointer-events-none'
                                     : 'opacity-0 -translate-x-8 z-0 pointer-events-none'
-                        }`}>
+                            }`}>
                             <div className="h-full flex flex-col">
                                 <div className="px-4 py-3 flex items-center justify-between ">
                                     <div className="flex items-center gap-2">
@@ -1097,14 +1083,14 @@ export default function PublicOrganizationPage() {
                                     </div>
                                     {filteredStories.length > 1 && (
                                         <div className="flex items-center gap-2">
-                                            <button 
+                                            <button
                                                 onClick={() => setStoryIndex(p => p === 0 ? filteredStories.length - 1 : p - 1)}
                                                 className="w-8 h-8 rounded-lg bg-white/60 hover:bg-white/80 flex items-center justify-center transition-colors"
                                             >
                                                 <ChevronLeft className="w-4 h-4 text-gray-600" />
                                             </button>
                                             <span className="text-xs text-muted-foreground w-12 text-center">{storyIndex + 1}/{filteredStories.length}</span>
-                                            <button 
+                                            <button
                                                 onClick={() => setStoryIndex(p => (p + 1) % filteredStories.length)}
                                                 className="w-8 h-8 rounded-lg bg-white/60 hover:bg-white/80 flex items-center justify-center transition-colors"
                                             >
@@ -1122,8 +1108,8 @@ export default function PublicOrganizationPage() {
                                             </div>
                                         </div>
                                     ) : (
-                                        <Link 
-                                            to={`/org/${slug}/${currentStory.initiative_slug}?tab=stories`}
+                                        <Link
+                                            to={`${orgLinkBase}/${slug}/${currentStory.initiative_slug}?tab=stories`}
                                             className="flex-1 rounded-2xl overflow-hidden hover:shadow-lg transition-all group relative"
                                         >
                                             {currentStory.media_url && /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(currentStory.media_url) ? (
@@ -1140,10 +1126,10 @@ export default function PublicOrganizationPage() {
                                                     </div>
                                                 </div>
                                             ) : currentStory.media_url && currentStory.media_type === 'photo' ? (
-                                                <img 
-                                                    src={currentStory.media_url} 
-                                                    alt={currentStory.title} 
-                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                                                <img
+                                                    src={currentStory.media_url}
+                                                    alt={currentStory.title}
+                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                                 />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center bg-white/40">
@@ -1157,17 +1143,16 @@ export default function PublicOrganizationPage() {
                                             </div>
                                         </Link>
                                     )}
-                                    
+
                                     {/* Story Progress Dots */}
                                     {filteredStories.length > 1 && (
                                         <div className="flex justify-center gap-2 mt-3 flex-shrink-0">
                                             {filteredStories.slice(0, 10).map((_, idx) => (
-                                                <button 
-                                                    key={idx} 
+                                                <button
+                                                    key={idx}
                                                     onClick={() => setStoryIndex(idx)}
-                                                    className={`h-2 rounded-full transition-all ${
-                                                        idx === storyIndex ? 'w-6 bg-gray-800' : 'w-2 bg-gray-300 hover:bg-gray-400'
-                                                    }`} 
+                                                    className={`h-2 rounded-full transition-all ${idx === storyIndex ? 'w-6 bg-gray-800' : 'w-2 bg-gray-300 hover:bg-gray-400'
+                                                        }`}
                                                 />
                                             ))}
                                             {filteredStories.length > 10 && (
@@ -1180,13 +1165,12 @@ export default function PublicOrganizationPage() {
                         </div>
 
                         {/* Highlights View - First 2 Stats/Statements from Context */}
-                        <div className={`absolute inset-0 transition-all duration-500 ease-out ${
-                            activeView === 'highlights'
+                        <div className={`absolute inset-0 transition-all duration-500 ease-out ${activeView === 'highlights'
                                 ? 'opacity-100 translate-x-0 z-10'
                                 : activeView === 'globe' || activeView === 'stories'
                                     ? 'opacity-0 translate-x-8 z-0 pointer-events-none'
                                     : 'opacity-0 -translate-x-8 z-0 pointer-events-none'
-                        }`}>
+                            }`}>
                             <div className="h-full flex flex-col">
                                 <div className="px-4 py-3 flex items-center justify-between">
                                     <div className="flex items-center gap-2">
@@ -1196,7 +1180,7 @@ export default function PublicOrganizationPage() {
                                         <h2 className="font-semibold text-foreground">Context & Challenges</h2>
                                     </div>
                                     <Link
-                                        to={`/org/${slug}/context`}
+                                        to={`${orgLinkBase}/${slug}/context`}
                                         className="text-xs font-medium text-gray-600 hover:text-gray-900 flex items-center gap-1"
                                     >
                                         View all <ChevronRight className="w-3 h-3" />
@@ -1220,7 +1204,7 @@ export default function PublicOrganizationPage() {
                                                 return (
                                                     <Link
                                                         key={card.id || idx}
-                                                        to={`/org/${slug}/context`}
+                                                        to={`${orgLinkBase}/${slug}/context`}
                                                         className="group relative rounded-2xl bg-white/60 backdrop-blur-lg border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all p-4 flex flex-col overflow-hidden min-h-0"
                                                     >
                                                         <div
@@ -1286,11 +1270,10 @@ export default function PublicOrganizationPage() {
                         </div>
 
                         {/* Initiatives View */}
-                        <div className={`absolute inset-0 transition-all duration-500 ease-out ${
-                            activeView === 'initiatives' 
-                                ? 'opacity-100 translate-x-0 z-10' 
+                        <div className={`absolute inset-0 transition-all duration-500 ease-out ${activeView === 'initiatives'
+                                ? 'opacity-100 translate-x-0 z-10'
                                 : 'opacity-0 translate-x-8 z-0 pointer-events-none'
-                        }`}>
+                            }`}>
                             <div className="h-full flex flex-col">
                                 <div className="px-4 py-3 flex items-center justify-between ">
                                     <div className="flex items-center gap-2">
@@ -1312,9 +1295,9 @@ export default function PublicOrganizationPage() {
                                     ) : (
                                         <div className="space-y-3">
                                             {filteredInitiatives.map((init) => (
-                                                <Link 
-                                                    key={init.id} 
-                                                    to={`/org/${slug}/${init.slug}`}
+                                                <Link
+                                                    key={init.id}
+                                                    to={`${orgLinkBase}/${slug}/${init.slug}`}
                                                     className="block p-4 bg-white/60 backdrop-blur-lg rounded-xl border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all group"
                                                 >
                                                     <div className="flex items-start gap-3">
@@ -1347,11 +1330,10 @@ export default function PublicOrganizationPage() {
                         </div>
 
                         {/* Graph View */}
-                        <div className={`absolute inset-0 transition-all duration-500 ease-out ${
-                            activeView === 'graph' 
-                                ? 'opacity-100 translate-x-0 z-10' 
+                        <div className={`absolute inset-0 transition-all duration-500 ease-out ${activeView === 'graph'
+                                ? 'opacity-100 translate-x-0 z-10'
                                 : 'opacity-0 translate-x-8 z-0 pointer-events-none'
-                        }`}>
+                            }`}>
                             <div className="h-full p-4">
                                 <div className="h-full bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-2xl shadow-black/10 flex flex-col">
                                     <div className="px-4 py-3 flex items-center justify-between border-b border-white/50">
@@ -1378,13 +1360,13 @@ export default function PublicOrganizationPage() {
                                                             <defs>
                                                                 {chartInitiatives.map(({ metric }, index) => (
                                                                     <linearGradient key={metric.id} id={`gradient-${metric.id}`} x1="0" y1="0" x2="0" y2="1">
-                                                                        <stop offset="5%" stopColor={CHART_COLORS[index % CHART_COLORS.length]} stopOpacity={0.3}/>
-                                                                        <stop offset="95%" stopColor={CHART_COLORS[index % CHART_COLORS.length]} stopOpacity={0}/>
+                                                                        <stop offset="5%" stopColor={CHART_COLORS[index % CHART_COLORS.length]} stopOpacity={0.3} />
+                                                                        <stop offset="95%" stopColor={CHART_COLORS[index % CHART_COLORS.length]} stopOpacity={0} />
                                                                     </linearGradient>
                                                                 ))}
                                                             </defs>
-                                                            <XAxis 
-                                                                dataKey="date" 
+                                                            <XAxis
+                                                                dataKey="date"
                                                                 tick={{ fontSize: 10, fill: '#6b7280' }}
                                                                 tickLine={false}
                                                                 axisLine={false}
@@ -1392,11 +1374,11 @@ export default function PublicOrganizationPage() {
                                                                 textAnchor="end"
                                                                 height={50}
                                                             />
-                                                            <YAxis 
+                                                            <YAxis
                                                                 tick={{ fontSize: 10, fill: '#6b7280' }}
                                                                 tickLine={false}
                                                                 axisLine={false}
-                                                                tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}
+                                                                tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
                                                                 width={40}
                                                             />
                                                             <RechartsTooltip
@@ -1412,27 +1394,27 @@ export default function PublicOrganizationPage() {
                                                                     return [value.toLocaleString(), entry?.metric.title || name]
                                                                 }}
                                                             />
-                                                        {chartInitiatives.map(({ initiative, metric }, index) => (
-                                                            <Area
-                                                                key={metric.id}
-                                                                type="monotone"
-                                                                dataKey={metric.id}
-                                                                stroke={CHART_COLORS[index % CHART_COLORS.length]}
-                                                                strokeWidth={2}
-                                                                fill={`url(#gradient-${metric.id})`}
-                                                                dot={false}
-                                                                activeDot={{ r: 4, strokeWidth: 2 }}
-                                                            />
-                                                        ))}
-                                                    </AreaChart>
-                                                </ResponsiveContainer>
-                                            </div>
+                                                            {chartInitiatives.map(({ initiative, metric }, index) => (
+                                                                <Area
+                                                                    key={metric.id}
+                                                                    type="monotone"
+                                                                    dataKey={metric.id}
+                                                                    stroke={CHART_COLORS[index % CHART_COLORS.length]}
+                                                                    strokeWidth={2}
+                                                                    fill={`url(#gradient-${metric.id})`}
+                                                                    dot={false}
+                                                                    activeDot={{ r: 4, strokeWidth: 2 }}
+                                                                />
+                                                            ))}
+                                                        </AreaChart>
+                                                    </ResponsiveContainer>
+                                                </div>
                                                 {/* Legend */}
                                                 <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-white/30">
                                                     {chartInitiatives.map(({ initiative, metric }, index) => (
                                                         <div key={metric.id} className="flex items-center gap-2">
-                                                            <div 
-                                                                className="w-3 h-3 rounded-full" 
+                                                            <div
+                                                                className="w-3 h-3 rounded-full"
                                                                 style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
                                                             />
                                                             <span className="text-xs text-muted-foreground truncate max-w-[120px]">{metric.title}</span>
@@ -1474,9 +1456,9 @@ export default function PublicOrganizationPage() {
                                 ) : (
                                     <div className="grid grid-cols-2 gap-2">
                                         {filteredMetrics.map((metric) => (
-                                            <Link 
-                                                key={metric.id} 
-                                                to={`/org/${slug}/${metric.initiative_slug}/metric/${generateMetricSlug(metric.title)}`}
+                                            <Link
+                                                key={metric.id}
+                                                to={`${orgLinkBase}/${slug}/${metric.initiative_slug}/metric/${generateMetricSlug(metric.title)}`}
                                                 className="p-3 md:p-4 h-[100px] md:h-[19vh] rounded-xl bg-white/60 backdrop-blur-lg border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all flex flex-col justify-between"
                                             >
                                                 <div>
@@ -1515,7 +1497,7 @@ export default function PublicOrganizationPage() {
                                         {allImpactClaims.map((claim, idx) => (
                                             <Link
                                                 key={`${claim.id}-${idx}`}
-                                                to={`/org/${slug}/${claim.initiativeSlug}/claim/${claim.id}?from=org`}
+                                                to={`${orgLinkBase}/${slug}/${claim.initiativeSlug}/claim/${claim.id}?from=org`}
                                                 className="block p-3 rounded-xl bg-white/60 backdrop-blur-lg border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group"
                                             >
                                                 <div className="flex items-start justify-between gap-2">
@@ -1528,10 +1510,9 @@ export default function PublicOrganizationPage() {
                                                         <p className="text-[10px] text-muted-foreground/70 truncate">{claim.initiativeTitle}</p>
                                                     </div>
                                                     <div className="text-right flex-shrink-0">
-                                                        <span className={`px-1.5 py-0.5 text-[9px] font-semibold rounded-full ${
-                                                            claim.category === 'impact' ? 'bg-purple-100/80 text-purple-700' :
-                                                            claim.category === 'output' ? 'bg-green-100/80 text-green-700' : 'bg-blue-100/80 text-blue-700'
-                                                        }`}>{claim.category}</span>
+                                                        <span className={`px-1.5 py-0.5 text-[9px] font-semibold rounded-full ${claim.category === 'impact' ? 'bg-purple-100/80 text-purple-700' :
+                                                                claim.category === 'output' ? 'bg-green-100/80 text-green-700' : 'bg-blue-100/80 text-blue-700'
+                                                            }`}>{claim.category}</span>
                                                         <p className="text-[10px] text-muted-foreground mt-1">
                                                             {formatDate(claim.date_represented)}
                                                         </p>
@@ -1557,16 +1538,16 @@ export default function PublicOrganizationPage() {
                             </div>
                             {totalEvidencePages > 1 && (
                                 <div className="flex items-center gap-1">
-                                    <button 
-                                        onClick={() => setEvidencePage(p => Math.max(0, p - 1))} 
+                                    <button
+                                        onClick={() => setEvidencePage(p => Math.max(0, p - 1))}
                                         disabled={evidencePage === 0}
                                         className="w-6 h-6 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors"
                                     >
                                         <ChevronLeft className="w-4 h-4 text-gray-600" />
                                     </button>
                                     <span className="text-xs text-muted-foreground w-10 text-center">{evidencePage + 1}/{totalEvidencePages}</span>
-                                    <button 
-                                        onClick={() => setEvidencePage(p => Math.min(totalEvidencePages - 1, p + 1))} 
+                                    <button
+                                        onClick={() => setEvidencePage(p => Math.min(totalEvidencePages - 1, p + 1))}
                                         disabled={evidencePage >= totalEvidencePages - 1}
                                         className="w-6 h-6 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors"
                                     >
@@ -1592,9 +1573,9 @@ export default function PublicOrganizationPage() {
                                         const ytMatch = isYT && ev.file_url ? ev.file_url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) : null
                                         const ytId = ytMatch ? ytMatch[1] : null
                                         return (
-                                            <Link 
+                                            <Link
                                                 key={ev.id}
-                                                to={`/org/${slug}/${ev.initiative_slug}?tab=evidence`}
+                                                to={`${orgLinkBase}/${slug}/${ev.initiative_slug}?tab=evidence`}
                                                 className="rounded-xl overflow-hidden hover:shadow-lg transition-all group h-[80px] md:h-full"
                                             >
                                                 {isImage ? (
@@ -1618,11 +1599,11 @@ export default function PublicOrganizationPage() {
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <div 
+                                                    <div
                                                         className="w-full h-full flex flex-col items-center justify-center gap-1 md:gap-2 group-hover:scale-105 transition-transform duration-500"
                                                         style={{ backgroundColor: organization?.brand_color ? `${organization.brand_color}20` : 'rgba(100,100,100,0.1)' }}
                                                     >
-                                                        <div 
+                                                        <div
                                                             className="w-8 h-8 md:w-12 md:h-12 rounded-lg md:rounded-xl flex items-center justify-center"
                                                             style={{ backgroundColor: organization?.brand_color || '#6b7280' }}
                                                         >

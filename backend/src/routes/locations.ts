@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { LocationService } from '../services/locationService';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
-import { requireOwnerPermission } from '../middleware/teamPermissions';
 import { supabase } from '../utils/supabase';
 
 const router = Router();
@@ -10,7 +9,8 @@ const router = Router();
 router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const { initiative_id } = req.query;
-        const locations = await LocationService.getAll(req.user!.id, initiative_id as string);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const locations = await LocationService.getAll(req.user!.id, initiative_id as string, requestedOrgId);
         res.json(locations);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
@@ -20,7 +20,8 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
 // Create location
 router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const location = await LocationService.create(req.body, req.user!.id);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const location = await LocationService.create(req.body, req.user!.id, requestedOrgId);
         res.status(201).json(location);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
@@ -30,7 +31,8 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
 // Get location by ID
 router.get('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const location = await LocationService.getById(req.params.id, req.user!.id);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const location = await LocationService.getById(req.params.id, req.user!.id, requestedOrgId);
         if (!location) {
             res.status(404).json({ error: 'Location not found' });
             return;
@@ -44,17 +46,20 @@ router.get('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
 // Update location
 router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const location = await LocationService.update(req.params.id, req.body, req.user!.id);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const location = await LocationService.update(req.params.id, req.body, req.user!.id, requestedOrgId);
         res.json(location);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
     }
 });
 
-// Delete location (owner only)
-router.delete('/:id', authenticateUser, requireOwnerPermission, async (req: AuthenticatedRequest, res) => {
+// Delete location
+// Phase 1 (full-access baseline): any team member of the org can delete.
+router.delete('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        await LocationService.delete(req.params.id, req.user!.id);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        await LocationService.delete(req.params.id, req.user!.id, requestedOrgId);
         res.status(204).send();
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
@@ -64,7 +69,8 @@ router.delete('/:id', authenticateUser, requireOwnerPermission, async (req: Auth
 // Get KPI updates for a location
 router.get('/:id/kpi-updates', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const updates = await LocationService.getKPIUpdatesByLocation(req.params.id, req.user!.id);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const updates = await LocationService.getKPIUpdatesByLocation(req.params.id, req.user!.id, requestedOrgId);
         res.json(updates);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
@@ -74,7 +80,8 @@ router.get('/:id/kpi-updates', authenticateUser, async (req: AuthenticatedReques
 // Get evidence for a location
 router.get('/:id/evidence', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const evidence = await LocationService.getEvidenceByLocation(req.params.id, req.user!.id);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const evidence = await LocationService.getEvidenceByLocation(req.params.id, req.user!.id, requestedOrgId);
         res.json(evidence);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
@@ -89,15 +96,24 @@ router.post('/update-order', authenticateUser, async (req: AuthenticatedRequest,
             res.status(400).json({ error: 'Order must be an array' });
             return;
         }
-        
-        const updates = order.map((item: { id: string; display_order: number }) => 
-            supabase
-                .from('locations')
-                .update({ display_order: item.display_order })
-                .eq('id', item.id)
-                .eq('user_id', req.user!.id)
-        );
-        
+
+        // Validate access org-scoped (teammates can reorder), then update
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const allowedIds: string[] = [];
+        for (const item of order as { id: string; display_order: number }[]) {
+            const loc = await LocationService.getById(item.id, req.user!.id, requestedOrgId);
+            if (loc) allowedIds.push(item.id);
+        }
+
+        const updates = (order as { id: string; display_order: number }[])
+            .filter(item => allowedIds.includes(item.id))
+            .map(item =>
+                supabase
+                    .from('locations')
+                    .update({ display_order: item.display_order })
+                    .eq('id', item.id)
+            );
+
         await Promise.all(updates);
         res.json({ success: true });
     } catch (error) {

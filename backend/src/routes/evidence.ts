@@ -1,8 +1,6 @@
 import express from 'express';
 import { AuthenticatedRequest, authenticateUser } from '../middleware/auth';
 import { EvidenceService } from '../services/evidenceService';
-import { requireOwnerPermission } from '../middleware/teamPermissions';
-import { TeamService } from '../services/teamService';
 
 const router = express.Router();
 
@@ -94,21 +92,11 @@ router.get('/:id/files', authenticateUser, async (req: AuthenticatedRequest, res
 });
 
 // Update evidence
+// Phase 1 (full-access baseline): per-member can_edit_evidence is ignored;
+// will be re-introduced in Phase 7.
 router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const userId = req.user!.id;
-        const activeOrgId = req.headers['x-organization-id'] as string | undefined;
-        const permissions = await TeamService.getUserPermissions(userId, activeOrgId);
-
-        if (!permissions.isOwner && permissions.isSharedMember && permissions.organizationId) {
-            const membership = await TeamService.getUserTeamMembership(userId, permissions.organizationId);
-            if (membership && (membership as any).can_edit_evidence === false) {
-                res.status(403).json({ error: 'You do not have permission to edit evidence. Contact your organization owner.' });
-                return;
-            }
-        }
-
-        const evidence = await EvidenceService.update(req.params.id, req.body, userId);
+        const evidence = await EvidenceService.update(req.params.id, req.body, req.user!.id);
         res.json(evidence);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
@@ -116,8 +104,9 @@ router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     }
 });
 
-// Delete evidence (owner only)
-router.delete('/:id', authenticateUser, requireOwnerPermission, async (req: AuthenticatedRequest, res) => {
+// Delete evidence
+// Phase 1 (full-access baseline): any team member of the org can delete.
+router.delete('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         await EvidenceService.delete(req.params.id, req.user!.id);
         res.status(204).send();

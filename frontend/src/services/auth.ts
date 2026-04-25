@@ -29,7 +29,7 @@ export class AuthService {
         }
 
         const data = await response.json()
-        
+
         // If backend returned a session, set it in the client
         if (data.session) {
             await supabase.auth.setSession({
@@ -83,7 +83,7 @@ export class AuthService {
     static async signOut() {
         // Clear cache on sign out
         apiService.clearCache()
-        
+
         const { error } = await supabase.auth.signOut()
         if (error) throw error
     }
@@ -93,6 +93,24 @@ export class AuthService {
 
         if (!user) return null
 
+        // Best-effort: fetch platform-admin flag from backend.
+        // Fails silently (e.g. backend cold start, offline) — user is treated as non-admin.
+        let isAdmin = false
+        try {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (session) {
+                const resp = await fetch(`${API_URL}/api/auth/me`, {
+                    headers: { Authorization: `Bearer ${session.access_token}` },
+                })
+                if (resp.ok) {
+                    const me = await resp.json()
+                    isAdmin = !!me?.is_admin
+                }
+            }
+        } catch (err) {
+            console.warn('[AuthService] /me lookup failed:', err)
+        }
+
         return {
             id: user.id,
             email: user.email || '',
@@ -100,7 +118,8 @@ export class AuthService {
             organization: user.user_metadata?.organization,
             has_completed_tutorial: user.user_metadata?.has_completed_tutorial,
             accepted_terms_of_service: user.user_metadata?.accepted_terms_of_service,
-            accepted_terms_of_service_at: user.user_metadata?.accepted_terms_of_service_at
+            accepted_terms_of_service_at: user.user_metadata?.accepted_terms_of_service_at,
+            is_admin: isAdmin,
         }
     }
 
@@ -121,6 +140,20 @@ export class AuthService {
             }
 
             if (session?.user) {
+                // Fetch platform-admin flag best-effort.
+                let isAdmin = false
+                try {
+                    const resp = await fetch(`${API_URL}/api/auth/me`, {
+                        headers: { Authorization: `Bearer ${session.access_token}` },
+                    })
+                    if (resp.ok) {
+                        const me = await resp.json()
+                        isAdmin = !!me?.is_admin
+                    }
+                } catch (err) {
+                    console.warn('[AuthService] /me lookup failed in authStateChange:', err)
+                }
+
                 const user: User = {
                     id: session.user.id,
                     email: session.user.email || '',
@@ -128,7 +161,8 @@ export class AuthService {
                     organization: session.user.user_metadata?.organization,
                     has_completed_tutorial: session.user.user_metadata?.has_completed_tutorial,
                     accepted_terms_of_service: session.user.user_metadata?.accepted_terms_of_service,
-                    accepted_terms_of_service_at: session.user.user_metadata?.accepted_terms_of_service_at
+                    accepted_terms_of_service_at: session.user.user_metadata?.accepted_terms_of_service_at,
+                    is_admin: isAdmin,
                 }
                 callback(user)
             } else {
@@ -143,7 +177,7 @@ export class AuthService {
      */
     static async deleteAccount(confirmation: string): Promise<{ success: boolean; message: string }> {
         const { data: { session } } = await supabase.auth.getSession()
-        
+
         if (!session) {
             throw new Error('You must be logged in to delete your account')
         }

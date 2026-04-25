@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
     ArrowLeft, User as UserIcon, Mail, Building2, Save, HardDrive, Info, Clock, CreditCard, Calendar,
     Sparkles, ExternalLink, Settings, Zap, Users, ChevronRight, Plus, Rocket, Trash2, AlertTriangle, X,
-    UserPlus, RefreshCw, Send, FileText, ToggleLeft, Camera, Upload, Palette, Globe, Lock, Link, Heart
+    UserPlus, RefreshCw, Send, ToggleLeft, Camera, Upload, Palette, Globe, Lock, Link, Heart
 } from 'lucide-react'
 import { AuthService } from '../services/auth'
 import { formatDate } from '../utils'
@@ -31,7 +31,10 @@ type TabType = 'account' | 'organization' | 'teams' | 'branding' | 'storage' | '
 export default function AccountPage({ subscriptionStatus }: Props) {
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
-    const { isOwner, isSharedMember, organizationName, hasOwnOrganization, ownedOrganization, loading: teamLoading, refreshPermissions } = useTeam()
+    const { isOwner, isSharedMember, organizationName, hasOwnOrganization, ownedOrganization: realOwnedOrganization, editableOrganization, loading: teamLoading, refreshPermissions } = useTeam()
+    // `ownedOrganization` throughout this page refers to whichever org the user
+    // is currently editing — their real org, or a demo if they're inside one.
+    const ownedOrganization = editableOrganization || realOwnedOrganization
 
     // Get initial tab from URL or default to 'account'
     const initialTab = (searchParams.get('tab') as TabType) || 'account'
@@ -63,9 +66,7 @@ export default function AccountPage({ subscriptionStatus }: Props) {
     const [capacity, setCapacity] = useState<TeamCapacity | null>(null)
     const [teamLoading2, setTeamLoading2] = useState(true)
     const [inviteEmail, setInviteEmail] = useState('')
-    const [allowImpactClaims, setAllowImpactClaims] = useState(false)
     const [sending, setSending] = useState(false)
-    const [updatingMember, setUpdatingMember] = useState<string | null>(null)
     const [removingMember, setRemovingMember] = useState<string | null>(null)
     const [resendingInvite, setResendingInvite] = useState<string | null>(null)
     const [revokingInvite, setRevokingInvite] = useState<string | null>(null)
@@ -243,32 +244,15 @@ export default function AccountPage({ subscriptionStatus }: Props) {
         if (!inviteEmail.trim()) { toast.error('Please enter an email address'); return }
         setSending(true)
         try {
-            const result = await TeamService.sendInvite(inviteEmail.trim(), allowImpactClaims)
+            const result = await TeamService.sendInvite(inviteEmail.trim())
             if (result.emailSent) toast.success(`Invitation sent to ${inviteEmail}`)
             else toast.success('Invitation created, but email could not be sent.')
             setInviteEmail('')
-            setAllowImpactClaims(false)
             loadTeamData()
         } catch (error) {
             toast.error((error as Error).message)
         } finally {
             setSending(false)
-        }
-    }
-
-    const handleToggleMemberPermission = async (member: TeamMember, field: 'canAddImpactClaims' | 'canEditEvidence') => {
-        setUpdatingMember(member.id)
-        try {
-            const updates = field === 'canAddImpactClaims'
-                ? { canAddImpactClaims: !member.can_add_impact_claims }
-                : { canEditEvidence: !member.can_edit_evidence }
-            await TeamService.updateMemberPermissions(member.id, updates)
-            toast.success('Permission updated')
-            loadTeamData()
-        } catch (error) {
-            toast.error((error as Error).message)
-        } finally {
-            setUpdatingMember(null)
         }
     }
 
@@ -490,15 +474,11 @@ export default function AccountPage({ subscriptionStatus }: Props) {
                                 loading={teamLoading2}
                                 inviteEmail={inviteEmail}
                                 setInviteEmail={setInviteEmail}
-                                allowImpactClaims={allowImpactClaims}
-                                setAllowImpactClaims={setAllowImpactClaims}
                                 sending={sending}
                                 handleSendInvite={handleSendInvite}
-                                updatingMember={updatingMember}
                                 removingMember={removingMember}
                                 resendingInvite={resendingInvite}
                                 revokingInvite={revokingInvite}
-                                handleToggleMemberPermission={handleToggleMemberPermission}
                                 handleRemoveMember={handleRemoveMember}
                                 handleResendInvite={handleResendInvite}
                                 handleRevokeInvite={handleRevokeInvite}
@@ -856,8 +836,8 @@ function OrganizationTab({ organization, refreshPermissions }: { organization: a
                             onChange={(e) => setWebsiteUrl(e.target.value)}
                             placeholder="https://yourorganization.org"
                             className={`w-full px-3.5 py-2.5 border rounded-xl text-sm focus:ring-1 focus:outline-none transition-all ${!isValidUrl(websiteUrl)
-                                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                                    : 'border-gray-200 focus:border-primary-500 focus:ring-primary-500'
+                                ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                                : 'border-gray-200 focus:border-primary-500 focus:ring-primary-500'
                                 }`}
                         />
                         {!isValidUrl(websiteUrl) && (
@@ -877,8 +857,8 @@ function OrganizationTab({ organization, refreshPermissions }: { organization: a
                             onChange={(e) => setDonationUrl(e.target.value)}
                             placeholder="https://donate.yourorganization.org"
                             className={`w-full px-3.5 py-2.5 border rounded-xl text-sm focus:ring-1 focus:outline-none transition-all ${!isValidUrl(donationUrl)
-                                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                                    : 'border-gray-200 focus:border-primary-500 focus:ring-primary-500'
+                                ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                                : 'border-gray-200 focus:border-primary-500 focus:ring-primary-500'
                                 }`}
                         />
                         {!isValidUrl(donationUrl) && (
@@ -942,9 +922,9 @@ function OrganizationTab({ organization, refreshPermissions }: { organization: a
 
 function TeamsTab({
     organizationName, members, invitations, capacity, loading,
-    inviteEmail, setInviteEmail, allowImpactClaims, setAllowImpactClaims, sending, handleSendInvite,
-    updatingMember, removingMember, resendingInvite, revokingInvite,
-    handleToggleMemberPermission, handleRemoveMember, handleResendInvite, handleRevokeInvite, formatDate
+    inviteEmail, setInviteEmail, sending, handleSendInvite,
+    removingMember, resendingInvite, revokingInvite,
+    handleRemoveMember, handleResendInvite, handleRevokeInvite, formatDate
 }: any) {
     if (loading) {
         return (
@@ -982,17 +962,6 @@ function TeamsTab({
                             <label className="block text-sm font-medium text-gray-700 mb-1.5">Email Address</label>
                             <input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="colleague@example.com" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none transition-all" />
                         </div>
-                        <div className="p-3 bg-gray-50 rounded-xl space-y-2">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2"><FileText className="w-4 h-4 text-gray-500" /><span className="text-sm text-gray-700">Allow creating Impact Claims</span></div>
-                                <button type="button" onClick={() => setAllowImpactClaims(!allowImpactClaims)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${allowImpactClaims ? 'bg-primary-500' : 'bg-gray-300'}`}>
-                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${allowImpactClaims ? 'translate-x-6' : 'translate-x-1'}`} />
-                                </button>
-                            </div>
-                            <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 leading-relaxed">
-                                <strong>Warning:</strong> Impact Claims represent your organization's official reported outcomes. Only authorized administrators with full knowledge of the initiative and its supporting evidence should create them.
-                            </p>
-                        </div>
                         <button type="submit" disabled={sending || !inviteEmail.trim()} className="w-full px-4 py-2.5 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
                             {sending ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Sending...</> : <><Send className="w-4 h-4" />Send Invitation</>}
                         </button>
@@ -1023,18 +992,6 @@ function TeamsTab({
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs text-gray-500">Edit Evidence</span>
-                                        <button onClick={() => handleToggleMemberPermission(member, 'canEditEvidence')} disabled={updatingMember === member.id} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${member.can_edit_evidence ? 'bg-green-500' : 'bg-gray-300'}`}>
-                                            {updatingMember === member.id ? <div className="absolute inset-0 flex items-center justify-center"><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /></div> : <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${member.can_edit_evidence ? 'translate-x-6' : 'translate-x-1'}`} />}
-                                        </button>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs text-gray-500">Impact Claims</span>
-                                        <button onClick={() => handleToggleMemberPermission(member, 'canAddImpactClaims')} disabled={updatingMember === member.id} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${member.can_add_impact_claims ? 'bg-green-500' : 'bg-gray-300'}`}>
-                                            {updatingMember === member.id ? <div className="absolute inset-0 flex items-center justify-center"><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /></div> : <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${member.can_add_impact_claims ? 'translate-x-6' : 'translate-x-1'}`} />}
-                                        </button>
-                                    </div>
                                     <button onClick={() => handleRemoveMember(member)} disabled={removingMember === member.id} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                                         {removingMember === member.id ? <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" /> : <Trash2 className="w-4 h-4" />}
                                     </button>
@@ -1329,16 +1286,15 @@ function BillingTab({ subscriptionStatus }: { subscriptionStatus?: SubscriptionS
                         <p className="text-sm font-medium text-gray-500">Current Plan</p>
                         <p className="text-lg font-bold text-gray-900 capitalize mt-0.5">{plan === 'none' ? 'Free' : plan}</p>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        status === 'active' ? 'bg-green-100 text-green-700' :
-                        status === 'trial' ? 'bg-blue-100 text-blue-700' :
-                        status === 'canceled' ? 'bg-red-100 text-red-700' :
-                        'bg-gray-100 text-gray-600'
-                    }`}>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${status === 'active' ? 'bg-green-100 text-green-700' :
+                            status === 'trial' ? 'bg-blue-100 text-blue-700' :
+                                status === 'canceled' ? 'bg-red-100 text-red-700' :
+                                    'bg-gray-100 text-gray-600'
+                        }`}>
                         {status === 'active' ? 'Active' :
-                         status === 'trial' ? 'Trial' :
-                         status === 'canceled' ? 'Canceled' :
-                         'Inactive'}
+                            status === 'trial' ? 'Trial' :
+                                status === 'canceled' ? 'Canceled' :
+                                    'Inactive'}
                     </span>
                 </div>
             </div>

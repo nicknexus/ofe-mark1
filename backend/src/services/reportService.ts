@@ -1,8 +1,10 @@
 import { supabase } from '../utils/supabase';
+import { InitiativeService } from './initiativeService';
 
 export interface ReportDataFilters {
     initiativeId: string;
     userId: string;
+    requestedOrgId?: string;
     dateStart?: string;
     dateEnd?: string;
     kpiIds?: string[];
@@ -58,14 +60,19 @@ export interface ReportDataResponse {
 
 export class ReportService {
     static async getReportData(filters: ReportDataFilters): Promise<ReportDataResponse> {
-        const { initiativeId, userId, dateStart, dateEnd, kpiIds, locationIds, beneficiaryGroupIds, donorId } = filters;
+        const { initiativeId, userId, requestedOrgId, dateStart, dateEnd, kpiIds, locationIds, beneficiaryGroupIds, donorId } = filters;
+
+        // Authorize via initiative org context (org-scoped, not user-scoped).
+        const initiative = await InitiativeService.getById(initiativeId, userId, requestedOrgId);
+        if (!initiative) {
+            throw new Error('Initiative not found or access denied');
+        }
 
         // Build query for metrics_with_context view
         let metricsQuery = supabase
             .from('metrics_with_context')
             .select('*')
-            .eq('initiative_id', initiativeId)
-            .eq('user_id', userId);
+            .eq('initiative_id', initiativeId);
 
         // Apply date filter
         if (dateStart) {
@@ -112,8 +119,7 @@ export class ReportService {
             const { data: donorCredits, error: creditsError } = await supabase
                 .from('donor_credits')
                 .select('kpi_id, kpi_update_id, credited_value')
-                .eq('donor_id', donorId)
-                .eq('user_id', userId);
+                .eq('donor_id', donorId);
 
             if (creditsError) {
                 throw new Error(`Failed to fetch donor credits: ${creditsError.message}`);
@@ -157,7 +163,7 @@ export class ReportService {
 
         // Calculate totals grouped by KPI
         const totalsMap = new Map<string, { kpi_id: string; kpi_title: string; kpi_description: string; unit_of_measurement: string; total_value: number; count: number }>();
-        
+
         metrics.forEach((metric: any) => {
             const key = metric.kpi_id;
             if (!totalsMap.has(key)) {
@@ -198,8 +204,7 @@ export class ReportService {
         let storiesQuery = supabase
             .from('stories_with_context')
             .select('*')
-            .eq('initiative_id', initiativeId)
-            .eq('user_id', userId);
+            .eq('initiative_id', initiativeId);
 
         if (dateStart) {
             storiesQuery = storiesQuery.gte('date_represented', dateStart);
@@ -250,7 +255,7 @@ export class ReportService {
 
         // Build map points from locations and stories
         const mapPoints: Array<{ lat: number; lng: number; name: string; type: 'location' | 'story' }> = [];
-        
+
         locations.forEach(loc => {
             mapPoints.push({
                 lat: loc.latitude,

@@ -16,9 +16,11 @@ router.post('/report-data', authenticateUser, async (req: AuthenticatedRequest, 
             return;
         }
 
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
         const reportData = await ReportService.getReportData({
             initiativeId,
             userId: req.user!.id,
+            requestedOrgId,
             dateStart,
             dateEnd,
             kpiIds: Array.isArray(kpiIds) ? kpiIds : undefined,
@@ -111,18 +113,18 @@ Make the report engaging but factual.`;
             const locationIds = [...new Set(enrichedBeneficiaryGroups
                 .map((bg: any) => bg.location_id)
                 .filter((id: string) => id))];
-            
+
             // Fetch location names
             if (locationIds.length > 0) {
                 const { data: locationData } = await supabase
                     .from('locations')
                     .select('id, name')
                     .in('id', locationIds);
-                
+
                 const locationMap = new Map(
                     (locationData || []).map((loc: any) => [loc.id, loc.name])
                 );
-                
+
                 // Enrich beneficiary groups with location names
                 enrichedBeneficiaryGroups = enrichedBeneficiaryGroups.map((bg: any) => ({
                     ...bg,
@@ -135,17 +137,17 @@ Make the report engaging but factual.`;
         const beneficiaryGroupsText = enrichedBeneficiaryGroups.length > 0
             ? enrichedBeneficiaryGroups.map((bg: any) => {
                 const parts: string[] = [];
-                
+
                 // Group name (always include)
                 parts.push(bg.name);
-                
+
                 // Location
                 if (bg.location_name) {
                     parts.push(`Location: ${bg.location_name}`);
                 }
-                
+
                 // Age range
-                if (bg.age_range_start !== null && bg.age_range_start !== undefined && 
+                if (bg.age_range_start !== null && bg.age_range_start !== undefined &&
                     bg.age_range_end !== null && bg.age_range_end !== undefined) {
                     parts.push(`Age range: ${bg.age_range_start}-${bg.age_range_end}`);
                 } else if (bg.age_range_start !== null && bg.age_range_start !== undefined) {
@@ -153,21 +155,21 @@ Make the report engaging but factual.`;
                 } else if (bg.age_range_end !== null && bg.age_range_end !== undefined) {
                     parts.push(`Age: up to ${bg.age_range_end}`);
                 }
-                
+
                 // Total number
                 if (bg.total_number !== null && bg.total_number !== undefined) {
                     parts.push(`Total beneficiaries: ${bg.total_number.toLocaleString()}`);
                 }
-                
+
                 // Description (most important - include prominently)
                 const description = bg.description ? bg.description.trim() : '';
-                
+
                 // Format: Name - Location, Age, Total | Description (if available)
                 let formatted = parts.join(', ');
                 if (description) {
                     formatted += ` | ${description}`;
                 }
-                
+
                 return `- ${formatted}`;
             }).join('\n')
             : 'No beneficiary groups specified';

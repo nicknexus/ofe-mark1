@@ -1,7 +1,30 @@
 import { supabase } from '../utils/supabase'
 import { Story } from '../types'
+import { InitiativeService } from './initiativeService'
 
 export class StoryService {
+    /**
+     * Verify the user has access to the initiative the story belongs to.
+     * Returns the story row (without joins) when access is granted, otherwise
+     * throws/returns null per useThrow.
+     */
+    private static async assertAccessByStoryId(
+        storyId: string,
+        userId: string,
+        requestedOrgId?: string
+    ): Promise<{ id: string; initiative_id: string; user_id: string } | null> {
+        const { data: row, error } = await supabase
+            .from('stories')
+            .select('id, initiative_id, user_id')
+            .eq('id', storyId)
+            .maybeSingle()
+        if (error) throw new Error(`Failed to fetch story: ${error.message}`)
+        if (!row) return null
+        const initiative = await InitiativeService.getById(row.initiative_id, userId, requestedOrgId)
+        if (!initiative) return null
+        return row
+    }
+
     static async getAll(
         userId: string,
         initiativeId: string,
@@ -11,8 +34,13 @@ export class StoryService {
             startDate?: string
             endDate?: string
             search?: string
-        }
+        },
+        requestedOrgId?: string
     ): Promise<Story[]> {
+        // Authorize via the initiative's org context.
+        const initiative = await InitiativeService.getById(initiativeId, userId, requestedOrgId)
+        if (!initiative) return []
+
         let query = supabase
             .from('stories')
             .select(`
@@ -62,7 +90,10 @@ export class StoryService {
         return stories
     }
 
-    static async getById(id: string, userId: string): Promise<Story> {
+    static async getById(id: string, userId: string, requestedOrgId?: string): Promise<Story> {
+        const access = await this.assertAccessByStoryId(id, userId, requestedOrgId)
+        if (!access) throw new Error('Story not found')
+
         const { data, error } = await supabase
             .from('stories')
             .select(`
@@ -73,7 +104,6 @@ export class StoryService {
                 )
             `)
             .eq('id', id)
-            .eq('user_id', userId)
             .single()
 
         if (error) throw new Error(`Failed to fetch story: ${error.message}`)
@@ -105,8 +135,14 @@ export class StoryService {
         return story
     }
 
-    static async create(story: Partial<Story>, userId: string): Promise<Story> {
+    static async create(story: Partial<Story>, userId: string, requestedOrgId?: string): Promise<Story> {
         const { beneficiary_group_ids, location_ids, locations: _locs, location, ...storyData } = story
+
+        // Authorize: caller must have access to the initiative being written to.
+        if (storyData.initiative_id) {
+            const initiative = await InitiativeService.getById(storyData.initiative_id, userId, requestedOrgId)
+            if (!initiative) throw new Error('Initiative not found or access denied')
+        }
 
         const { data: storyRecord, error: storyError } = await supabase
             .from('stories')
@@ -151,17 +187,19 @@ export class StoryService {
             }
         }
 
-        return this.getById(storyRecord.id, userId)
+        return this.getById(storyRecord.id, userId, requestedOrgId)
     }
 
-    static async update(id: string, updates: Partial<Story>, userId: string): Promise<Story> {
+    static async update(id: string, updates: Partial<Story>, userId: string, requestedOrgId?: string): Promise<Story> {
+        const access = await this.assertAccessByStoryId(id, userId, requestedOrgId)
+        if (!access) throw new Error('Story not found or access denied')
+
         const { beneficiary_group_ids, location_ids, locations: _locs, location, ...storyData } = updates
 
         const { error: storyError } = await supabase
             .from('stories')
             .update({ ...storyData, updated_at: new Date().toISOString() })
             .eq('id', id)
-            .eq('user_id', userId)
 
         if (storyError) throw new Error(`Failed to update story: ${storyError.message}`)
 
@@ -208,15 +246,18 @@ export class StoryService {
             }
         }
 
-        return this.getById(id, userId)
+        return this.getById(id, userId, requestedOrgId)
     }
 
-    static async delete(id: string, userId: string): Promise<void> {
+    static async delete(id: string, userId: string, requestedOrgId?: string): Promise<void> {
+        // Phase 1 (full-access baseline): any team member of the org can delete.
+        const access = await this.assertAccessByStoryId(id, userId, requestedOrgId)
+        if (!access) throw new Error('Story not found or access denied')
+
         const { error } = await supabase
             .from('stories')
             .delete()
             .eq('id', id)
-            .eq('user_id', userId)
 
         if (error) throw new Error(`Failed to delete story: ${error.message}`)
     }

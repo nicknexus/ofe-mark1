@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
 import {
     ArrowLeft, Globe, BarChart3, BookOpen, MapPin,
     FileText, Users, Calendar, ChevronRight, ChevronLeft, ExternalLink, TrendingUp,
@@ -161,6 +162,7 @@ function TabTooltip({ text }: { text: string }) {
 export default function PublicInitiativePage() {
     const { orgSlug, initiativeSlug } = useParams<{ orgSlug: string; initiativeSlug: string }>()
     const navigate = useNavigate()
+    const orgLinkBase = useOrgLinkBase()
     const [searchParams] = useSearchParams()
 
     const [initiative, setInitiative] = useState<PublicInitiative | null>(null)
@@ -308,7 +310,7 @@ export default function PublicInitiativePage() {
         if (endDate) params.set('endDate', endDate)
         const queryString = params.toString()
 
-        navigate(`/org/${orgSlug}/${slug}${queryString ? `?${queryString}` : ''}`)
+        navigate(`${orgLinkBase}/${orgSlug}/${slug}${queryString ? `?${queryString}` : ''}`)
     }
 
     // Filter dashboard KPIs by date — filter each KPI's updates and recalculate totals
@@ -404,7 +406,7 @@ export default function PublicInitiativePage() {
                     <Globe className="w-16 h-16 text-muted-foreground/50 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-foreground mb-3">Initiative Not Found</h1>
                     <p className="text-muted-foreground mb-8">{error || 'This initiative does not exist.'}</p>
-                    <Link to={`/org/${orgSlug}`} className="inline-flex items-center gap-2 px-6 py-3 bg-accent text-white rounded-xl hover:bg-accent/90 transition-colors font-medium">
+                    <Link to={`${orgLinkBase}/${orgSlug}`} className="inline-flex items-center gap-2 px-6 py-3 bg-accent text-white rounded-xl hover:bg-accent/90 transition-colors font-medium">
                         <ArrowLeft className="w-4 h-4" /> Back to Organization
                     </Link>
                 </div>
@@ -446,7 +448,7 @@ export default function PublicInitiativePage() {
                     <div className="flex items-center gap-1.5 sm:gap-3">
                         {/* Left: Nav + Org */}
                         <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                            <Link to={`/org/${orgSlug}`} className="flex items-center gap-1 text-muted-foreground hover:text-accent transition-colors flex-shrink-0">
+                            <Link to={`${orgLinkBase}/${orgSlug}`} className="flex items-center gap-1 text-muted-foreground hover:text-accent transition-colors flex-shrink-0">
                                 <ArrowLeft className="w-4 h-4" />
                             </Link>
                             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center overflow-hidden bg-white shadow-md border border-gray-200/50 flex-shrink-0">
@@ -548,9 +550,8 @@ export default function PublicInitiativePage() {
                             <button
                                 key={init.id}
                                 onClick={() => handleInitiativeSwitch(init.slug)}
-                                className={`w-full px-3 py-2 text-left text-sm hover:bg-accent/10 truncate ${
-                                    init.slug === initiativeSlug ? 'bg-accent/10 text-accent font-medium' : 'text-foreground'
-                                }`}
+                                className={`w-full px-3 py-2 text-left text-sm hover:bg-accent/10 truncate ${init.slug === initiativeSlug ? 'bg-accent/10 text-accent font-medium' : 'text-foreground'
+                                    }`}
                             >
                                 {init.title}
                             </button>
@@ -592,13 +593,11 @@ export default function PublicInitiativePage() {
                                                 : [...prev, loc.id]
                                         )
                                     }}
-                                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${
-                                        isSelected ? 'bg-blue-50 font-medium' : 'hover:bg-gray-50'
-                                    }`}
+                                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${isSelected ? 'bg-blue-50 font-medium' : 'hover:bg-gray-50'
+                                        }`}
                                 >
-                                    <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
-                                        isSelected ? 'bg-blue-600 border-2 border-blue-600' : 'border-2 border-gray-300 bg-white'
-                                    }`}>
+                                    <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-blue-600 border-2 border-blue-600' : 'border-2 border-gray-300 bg-white'
+                                        }`}>
                                         {isSelected && (
                                             <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -649,7 +648,7 @@ export default function PublicInitiativePage() {
                                     </div>
                                     <div className="min-w-0">
                                         <h2 className="font-semibold text-foreground text-sm truncate">{initiative.title}</h2>
-                                        <Link to={`/org/${orgSlug}`} className="text-xs text-muted-foreground hover:text-foreground font-medium">
+                                        <Link to={`${orgLinkBase}/${orgSlug}`} className="text-xs text-muted-foreground hover:text-foreground font-medium">
                                             {initiative.organization_name}
                                         </Link>
                                     </div>
@@ -795,6 +794,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
     initiativeSlug: string;
     dateQS?: string;
 }) {
+    const orgLinkBase = useOrgLinkBase()
     const brandColor = initiative.organization_brand_color || '#c0dfa1'
     const [timeFrame, setTimeFrame] = useState<'all' | '1month' | '6months' | '1year'>('all')
     const [isCumulative, setIsCumulative] = useState(false)
@@ -1019,7 +1019,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                         return (
                             <Link
                                 key={kpi.id}
-                                to={`/org/${orgSlug}/${initiativeSlug}/metric/${metricSlug}${dateQS}`}
+                                to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}${dateQS}`}
                                 className="bg-white/60 backdrop-blur rounded-xl border border-white/80 p-3 transition-all hover:shadow-lg hover:border-accent group"
                             >
                                 <div className="flex items-center justify-between mb-1">
@@ -1392,6 +1392,7 @@ function MetricsTab({ dashboard, orgSlug, initiativeSlug, dateQS = '' }: {
     initiativeSlug: string;
     dateQS?: string;
 }) {
+    const orgLinkBase = useOrgLinkBase()
     const { kpis } = dashboard
 
     if (kpis.length === 0) {
@@ -1421,7 +1422,7 @@ function MetricsTab({ dashboard, orgSlug, initiativeSlug, dateQS = '' }: {
                 return (
                     <Link
                         key={kpi.id}
-                        to={`/org/${orgSlug}/${initiativeSlug}/metric/${metricSlug}${dateQS}`}
+                        to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}${dateQS}`}
                         className="glass-card rounded-2xl border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all overflow-hidden group cursor-pointer"
                     >
                         {/* Header */}
@@ -1481,6 +1482,7 @@ function MetricsTab({ dashboard, orgSlug, initiativeSlug, dateQS = '' }: {
 }
 
 function StoriesTab({ stories, orgSlug, initiativeSlug, dateQS = '' }: { stories: PublicStory[] | null; orgSlug: string; initiativeSlug: string; dateQS?: string }) {
+    const orgLinkBase = useOrgLinkBase()
     if (!stories) return <LoadingState />
     if (stories.length === 0) return <EmptyState icon={BookOpen} message="No stories available yet." />
 
@@ -1489,7 +1491,7 @@ function StoriesTab({ stories, orgSlug, initiativeSlug, dateQS = '' }: { stories
             {stories.map((story) => (
                 <Link
                     key={story.id}
-                    to={`/org/${orgSlug}/${initiativeSlug}/story/${story.id}${dateQS}`}
+                    to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/story/${story.id}${dateQS}`}
                     className="glass-card rounded-2xl overflow-hidden group border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all"
                 >
                     <div className="h-44 bg-gradient-to-br from-accent/10 to-accent/5 overflow-hidden">
@@ -1578,6 +1580,7 @@ function ClickableLocationMarker({ location, onClick }: { location: PublicLocati
 }
 
 function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { locations: PublicLocation[] | null; orgSlug: string; initiativeSlug: string; dateQS?: string }) {
+    const orgLinkBase = useOrgLinkBase()
     const [selectedLocation, setSelectedLocation] = useState<PublicLocation | null>(null)
     const [locationDetail, setLocationDetail] = useState<LocationDetail | null>(null)
     const [detailLoading, setDetailLoading] = useState(false)
@@ -1612,7 +1615,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { loc
     // If a location is selected, show the detail view instead of the map entirely
     if (selectedLocation) {
         const evType: Record<string, string> = { visual_proof: 'Visual Proof', documentation: 'Documentation', testimony: 'Testimonies', financials: 'Financials' }
-        const isImage = (url: string) => ['jpg','jpeg','png','gif','webp','svg'].includes(url.split('.').pop()?.toLowerCase() || '')
+        const isImage = (url: string) => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(url.split('.').pop()?.toLowerCase() || '')
         const isYTUrl = (url: string) => url ? /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(url) : false
         const getYTId = (url: string): string | null => { const m = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/); return m ? m[1] : null }
 
@@ -1667,7 +1670,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { loc
                                             <p className="text-xs text-muted-foreground">No stories here yet</p>
                                         </div>
                                     ) : locationDetail.stories.map((story) => (
-                                        <Link key={story.id} to={`/org/${orgSlug}/${initiativeSlug}/story/${story.id}${dateQS}`}
+                                        <Link key={story.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/story/${story.id}${dateQS}`}
                                             className="block rounded-xl border border-gray-100 hover:border-accent/30 p-3 transition-colors">
                                             {story.media_url && story.media_type === 'photo' && (
                                                 <img src={story.media_url} alt={story.title} loading="lazy" className="w-full h-32 object-cover rounded-lg mb-2" />
@@ -1698,7 +1701,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { loc
                                     ) : locationDetail.metrics.map((m) => {
                                         const cat = categoryConfig[m.category] || categoryConfig.output
                                         return (
-                                            <Link key={m.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${m.slug}${dateQS}`}
+                                            <Link key={m.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${m.slug}${dateQS}`}
                                                 className="block p-3 rounded-xl border border-gray-100 hover:border-accent/30 transition-colors">
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div className="min-w-0">
@@ -1735,7 +1738,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { loc
                                         const ytId = ytUrl ? getYTId(ytUrl) : null
                                         const preview = imgPreview || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : null)
                                         return (
-                                            <Link key={ev.id} to={`/org/${orgSlug}/${initiativeSlug}/evidence/${ev.id}${dateQS}`}
+                                            <Link key={ev.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/evidence/${ev.id}${dateQS}`}
                                                 className="block rounded-xl border border-gray-100 hover:border-accent/30 p-3 transition-colors">
                                                 {preview && (
                                                     <div className="relative">
@@ -1813,6 +1816,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { loc
 }
 
 function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evidence: PublicEvidence[] | null; orgSlug: string; initiativeSlug: string; dateQS?: string }) {
+    const orgLinkBase = useOrgLinkBase()
     const [displayCount, setDisplayCount] = useState(8)
     const [selectedTypes, setSelectedTypes] = useState<string[]>([])
     const [isDropdownOpen, setIsDropdownOpen] = useState(false)
@@ -2159,7 +2163,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evide
                                             const catColor = cat === 'impact' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' : cat === 'output' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                                             const label = claim.kpis?.title ? `${claim.value} ${claim.kpis.unit_of_measurement || ''}` : `${claim.value}`
                                             return (
-                                                <Link key={claim.id} to={`/org/${orgSlug}/${initiativeSlug}/claim/${claim.id}${dateQS}`} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${catColor} transition-colors`} onClick={e => e.stopPropagation()}>
+                                                <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/claim/${claim.id}${dateQS}`} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${catColor} transition-colors`} onClick={e => e.stopPropagation()}>
                                                     {claim.kpis?.title || label}
                                                 </Link>
                                             )
@@ -2173,7 +2177,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evide
                                         {item.kpis.slice(0, 2).map((kpi) => {
                                             const catColor = kpi.category === 'impact' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' : kpi.category === 'output' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                                             return (
-                                                <Link key={kpi.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}${dateQS}`} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${catColor} transition-colors`} onClick={e => e.stopPropagation()}>
+                                                <Link key={kpi.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}${dateQS}`} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${catColor} transition-colors`} onClick={e => e.stopPropagation()}>
                                                     {kpi.title}
                                                 </Link>
                                             )
@@ -2385,7 +2389,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evide
                                                         ? formatDate(claim.date_represented)
                                                         : ''
                                                 return (
-                                                    <Link key={claim.id} to={`/org/${orgSlug}/${initiativeSlug}/claim/${claim.id}${dateQS}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
+                                                    <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/claim/${claim.id}${dateQS}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
                                                         <p className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors">
                                                             {claim.value} {claim.kpis?.unit_of_measurement || ''}
                                                         </p>
@@ -2401,7 +2405,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evide
                                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Linked Metrics</h3>
                                         <div className="space-y-2">
                                             {galleryItem.kpis.map((kpi) => (
-                                                <Link key={kpi.id} to={`/org/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}${dateQS}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
+                                                <Link key={kpi.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}${dateQS}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
                                                     <p className="text-sm font-medium text-foreground group-hover:text-accent transition-colors">{kpi.title}</p>
                                                 </Link>
                                             ))}
@@ -2469,13 +2473,14 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evide
 }
 
 function BeneficiariesTab({ beneficiaries, orgSlug, initiativeSlug }: { beneficiaries: PublicBeneficiaryGroup[] | null; orgSlug: string; initiativeSlug: string }) {
+    const orgLinkBase = useOrgLinkBase()
     if (!beneficiaries) return <LoadingState />
     if (beneficiaries.length === 0) return <EmptyState icon={Users} message="No beneficiary groups defined yet." />
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {beneficiaries.map((group) => (
-                <Link key={group.id} to={`/org/${orgSlug}/${initiativeSlug}/beneficiary/${group.id}`} className="group glass-card rounded-2xl border border-white/60 hover:border-accent/40 hover:shadow-[0_8px_30px_rgba(192,223,161,0.25)] transition-all active:scale-[0.98] overflow-hidden">
+                <Link key={group.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/beneficiary/${group.id}`} className="group glass-card rounded-2xl border border-white/60 hover:border-accent/40 hover:shadow-[0_8px_30px_rgba(192,223,161,0.25)] transition-all active:scale-[0.98] overflow-hidden">
                     <div className="p-5 pb-3">
                         <div className="flex items-start gap-4">
                             <div className="w-11 h-11 bg-accent/15 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-accent/25 transition-colors">

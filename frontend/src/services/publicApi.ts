@@ -18,6 +18,7 @@ export interface PublicOrganization {
     logo_url?: string
     brand_color?: string
     created_at?: string
+    is_demo?: boolean
 }
 
 export interface PublicInitiative {

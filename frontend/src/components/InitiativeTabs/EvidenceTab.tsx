@@ -54,7 +54,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
     const evidenceTypes = [
         { value: 'visual_proof', label: 'Visual Support', icon: Camera },
         { value: 'documentation', label: 'Documentation', icon: FileText },
-        { value: 'testimony', label: 'Testemonies', icon: MessageSquare },
+        { value: 'testimony', label: 'Testimonies', icon: MessageSquare },
         { value: 'financials', label: 'Financials', icon: DollarSign }
     ] as const
 

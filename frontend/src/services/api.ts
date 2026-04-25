@@ -185,7 +185,7 @@ class ApiService {
                     try {
                         const error = JSON.parse(responseText)
                         errorMessage = error.message || error.error || `HTTP ${response.status}`
-                        
+
                         // Preserve error code and additional data for specific handling
                         const errorWithCode = new Error(errorMessage) as any
                         errorWithCode.code = error.code
@@ -248,23 +248,30 @@ class ApiService {
                 }
                 if (endpoint.includes('/kpis')) {
                     this.clearCacheByPattern('/kpis')
-                    // KPI changes also affect initiative dashboards, locations, and evidence
-                    // (backend auto-links evidence to new impact claims)
+                    // KPI changes also affect initiative dashboards, locations, evidence,
+                    // and ben group links (PUT /kpis/updates/:id may include beneficiary_group_ids,
+                    // which writes to /beneficiaries/for-kpi-update/:id).
                     this.clearCacheByPattern('/initiatives')
                     this.clearCacheByPattern('/locations')
                     this.clearCacheByPattern('/evidence')
+                    this.clearCacheByPattern('/beneficiaries')
                 }
                 if (endpoint.includes('/evidence')) {
                     this.clearCacheByPattern('/evidence')
-                    // Evidence changes also affect KPIs, initiative dashboards, and locations
+                    // Evidence changes also affect KPIs, initiative dashboards, locations,
+                    // and ben group links (evidence can be linked to ben groups).
                     this.clearCacheByPattern('/kpis')
                     this.clearCacheByPattern('/initiatives')
                     this.clearCacheByPattern('/locations')
+                    this.clearCacheByPattern('/beneficiaries')
                 }
                 if (endpoint.includes('/beneficiaries')) {
                     this.clearCacheByPattern('/beneficiaries')
-                    // Beneficiary changes may affect KPI data point counts
+                    // Beneficiary changes may affect KPI data point counts,
+                    // initiative dashboards (kpi/evidence aggregates), and evidence links.
                     this.clearCacheByPattern('/kpis')
+                    this.clearCacheByPattern('/initiatives')
+                    this.clearCacheByPattern('/evidence')
                 }
                 if (endpoint.includes('/locations')) {
                     this.clearCacheByPattern('/locations')
@@ -558,10 +565,10 @@ class ApiService {
         const result = await this.request<void>(`/evidence/${id}`, {
             method: 'DELETE'
         })
-        
+
         // Trigger storage refresh after deletion
         window.dispatchEvent(new Event('storage-updated'))
-        
+
         return result
     }
 
