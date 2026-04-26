@@ -19,10 +19,11 @@ import {
     Download,
     ExternalLink,
     Filter,
-    ChevronDown
+    ChevronDown,
+    Users
 } from 'lucide-react'
 import { apiService } from '../../services/api'
-import { Evidence, Location, KPI } from '../../types'
+import { Evidence, Location, KPI, BeneficiaryGroup } from '../../types'
 import { formatDate, getEvidenceTypeInfo, getLocalDateString } from '../../utils'
 import DateRangePicker from '../DateRangePicker'
 import toast from 'react-hot-toast'
@@ -769,6 +770,7 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
     const [loading, setLoading] = useState(false)
     const [locations, setLocations] = useState<Location[]>([])
     const [kpis, setKPIs] = useState<KPI[]>([])
+    const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
     const { queueUpload } = useUploadManager()
 
@@ -781,7 +783,8 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
         fileUrl: '',
         datePickerValue: {} as { singleDate?: string; startDate?: string; endDate?: string },
         selectedLocationIds: [] as string[],
-        selectedKpiIds: [] as string[]
+        selectedKpiIds: [] as string[],
+        selectedBeneficiaryGroupIds: [] as string[]
     })
 
     const evidenceTypes = [
@@ -792,13 +795,14 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
     ]
 
     useEffect(() => {
-        // Load locations and KPIs
         Promise.all([
             apiService.getLocations(initiativeId),
-            apiService.getKPIs(initiativeId)
-        ]).then(([locs, kpiData]) => {
+            apiService.getKPIs(initiativeId),
+            apiService.getBeneficiaryGroups(initiativeId)
+        ]).then(([locs, kpiData, bgs]) => {
             setLocations(locs || [])
             setKPIs(kpiData || [])
+            setBeneficiaryGroups((bgs as BeneficiaryGroup[]) || [])
         })
     }, [initiativeId])
 
@@ -814,6 +818,18 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
     }
 
     const handleSubmit = async () => {
+        if (formData.selectedLocationIds.length === 0) {
+            toast.error('Please select at least one location')
+            return
+        }
+        if (!formData.datePickerValue.singleDate && !(formData.datePickerValue.startDate && formData.datePickerValue.endDate)) {
+            toast.error('Please select a date')
+            return
+        }
+        if (formData.selectedKpiIds.length === 0) {
+            toast.error('Please select at least one metric')
+            return
+        }
         if (!formData.title) {
             toast.error('Please enter a title')
             return
@@ -822,23 +838,15 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
             toast.error('Please select a file or enter a URL')
             return
         }
-        if (formData.selectedLocationIds.length === 0) {
-            toast.error('Please select at least one location')
-            return
-        }
-        if (formData.selectedKpiIds.length === 0) {
-            toast.error('Please select at least one metric')
-            return
-        }
 
-        // Build submit data
         const submitData: any = {
             title: formData.title,
             description: formData.description,
             type: formData.type,
             initiative_id: initiativeId,
             kpi_ids: formData.selectedKpiIds,
-            location_ids: formData.selectedLocationIds
+            location_ids: formData.selectedLocationIds,
+            beneficiary_group_ids: formData.selectedBeneficiaryGroupIds
         }
 
         if (formData.datePickerValue.singleDate) {
@@ -896,10 +904,13 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
     const canProceed = () => {
         switch (step) {
             case 1: return !!formData.type
-            case 2: return formData.file !== null || formData.fileUrl !== ''
-            case 3: return !!formData.title
-            case 4: return formData.selectedLocationIds.length > 0
-            case 5: return formData.selectedKpiIds.length > 0
+            case 2: return formData.selectedLocationIds.length > 0 && (
+                !!formData.datePickerValue.singleDate ||
+                (!!formData.datePickerValue.startDate && !!formData.datePickerValue.endDate)
+            )
+            case 3: return formData.selectedKpiIds.length > 0
+            case 4: return true
+            case 5: return !!formData.title && (formData.file !== null || formData.fileUrl !== '')
             default: return false
         }
     }
@@ -907,9 +918,9 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
     const totalSteps = 5
 
     return (
-        <div className="fixed inset-0 bg-white z-[100] flex flex-col">
+        <div className="fixed inset-0 bg-white z-[100] flex flex-col h-[100dvh] overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-100">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 flex-shrink-0">
                 <button onClick={onClose} className="p-2 -ml-2">
                     <X className="w-5 h-5 text-gray-500" />
                 </button>
@@ -918,7 +929,7 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
             </div>
 
             {/* Progress */}
-            <div className="px-4 pt-3">
+            <div className="px-4 pt-3 flex-shrink-0">
                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                     <div 
                         className="h-full bg-evidence-500 transition-all duration-300"
@@ -928,7 +939,7 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 min-h-0 overflow-y-auto p-4">
                 {/* Step 1: Type */}
                 {step === 1 && (
                     <div className="space-y-4">
@@ -943,11 +954,12 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
                                 return (
                                     <button
                                         key={type.value}
+                                        type="button"
                                         onClick={() => setFormData(prev => ({ ...prev, type: type.value }))}
-                                        className={`p-4 rounded-2xl border-2 transition-all ${
+                                        className={`block w-full appearance-none p-4 rounded-2xl border-2 transition-colors ${
                                             isSelected 
                                                 ? 'border-evidence-500 bg-evidence-50' 
-                                                : 'border-gray-200'
+                                                : 'border-gray-200 bg-white'
                                         }`}
                                     >
                                         <Icon className={`w-8 h-8 mx-auto mb-2 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
@@ -962,72 +974,224 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
                     </div>
                 )}
 
-                {/* Step 2: Upload */}
+                {/* Step 2: Date & Location */}
                 {step === 2 && (
                     <div className="space-y-4">
                         <div className="text-center mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Upload File</h2>
-                            <p className="text-gray-500 text-sm mt-1">Select a file or paste a link</p>
-                        </div>
-                        
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            onChange={handleFileSelect}
-                            accept="image/*,video/*,.pdf,.doc,.docx"
-                            className="hidden"
-                        />
-
-                        {formData.file ? (
-                            <div className="bg-evidence-50 border-2 border-evidence-300 rounded-2xl p-4 text-center">
-                                <FileText className="w-12 h-12 text-evidence-500 mx-auto mb-2" />
-                                <p className="font-medium text-gray-800 truncate">{formData.file.name}</p>
-                                <p className="text-sm text-gray-500">
-                                    {(formData.file.size / 1024 / 1024).toFixed(2)} MB
-                                </p>
-                                <button
-                                    onClick={() => setFormData(prev => ({ ...prev, file: null }))}
-                                    className="mt-3 text-sm text-red-600 font-medium"
-                                >
-                                    Remove
-                                </button>
-                            </div>
-                        ) : (
-                            <button
-                                onClick={() => fileInputRef.current?.click()}
-                                className="w-full border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center hover:border-evidence-400 transition-colors"
-                            >
-                                <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-                                <p className="font-medium text-gray-700">Tap to select file</p>
-                                <p className="text-sm text-gray-500 mt-1">Images, PDFs, documents</p>
-                            </button>
-                        )}
-
-                        <div className="relative">
-                            <div className="absolute inset-0 flex items-center">
-                                <div className="w-full border-t border-gray-200" />
-                            </div>
-                            <div className="relative flex justify-center">
-                                <span className="bg-white px-4 text-sm text-gray-500">or</span>
-                            </div>
+                            <h2 className="text-xl font-bold text-gray-900">Date & Location</h2>
+                            <p className="text-gray-500 text-sm mt-1">When and where was this captured?</p>
                         </div>
 
-                        <input
-                            type="url"
-                            value={formData.fileUrl}
-                            onChange={(e) => setFormData(prev => ({ ...prev, fileUrl: e.target.value }))}
-                            placeholder="Paste a link (https://...)"
-                            className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm"
-                        />
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <Calendar className="w-4 h-4 inline mr-1" />
+                                Date <span className="text-red-500">*</span>
+                            </label>
+                            <DateRangePicker
+                                value={formData.datePickerValue}
+                                onChange={(value) => setFormData(prev => ({ ...prev, datePickerValue: value }))}
+                                placeholder="Select date"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <MapPin className="w-4 h-4 inline mr-1" />
+                                Location <span className="text-red-500">*</span>
+                            </label>
+                            {locations.length === 0 ? (
+                                <div className="text-center py-8 bg-gray-50 rounded-2xl">
+                                    <MapPin className="w-10 h-10 text-gray-400 mx-auto mb-2" />
+                                    <p className="text-gray-500 text-sm">No locations available</p>
+                                    <p className="text-gray-400 text-xs mt-1">Add locations in the Locations tab</p>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col gap-2">
+                                    {locations.map((location) => {
+                                        const isSelected = formData.selectedLocationIds.includes(location.id!)
+                                        return (
+                                            <button
+                                                key={location.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        selectedLocationIds: isSelected
+                                                            ? prev.selectedLocationIds.filter(id => id !== location.id)
+                                                            : [...prev.selectedLocationIds, location.id!]
+                                                    }))
+                                                }}
+                                                className={`block w-full appearance-none p-4 rounded-xl border-2 text-left transition-colors ${
+                                                    isSelected 
+                                                        ? 'border-evidence-500 bg-evidence-50' 
+                                                        : 'border-gray-200 bg-white'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <MapPin className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
+                                                        <div className="min-w-0">
+                                                            <div className="font-medium text-gray-800 truncate">{location.name}</div>
+                                                            {location.description && (
+                                                                <div className="text-xs text-gray-500 truncate">{location.description}</div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    {isSelected && (
+                                                        <Check className="w-5 h-5 text-evidence-500 flex-shrink-0 ml-2" />
+                                                    )}
+                                                </div>
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
 
-                {/* Step 3: Details */}
+                {/* Step 3: Metrics */}
                 {step === 3 && (
                     <div className="space-y-4">
                         <div className="text-center mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Details</h2>
-                            <p className="text-gray-500 text-sm mt-1">Title and date</p>
+                            <h2 className="text-xl font-bold text-gray-900">Link to Metrics</h2>
+                            <p className="text-gray-500 text-sm mt-1">What does this support?</p>
+                        </div>
+
+                        {kpis.length === 0 ? (
+                            <div className="text-center py-8 bg-gray-50 rounded-2xl">
+                                <FileText className="w-10 h-10 text-gray-400 mx-auto mb-2" />
+                                <p className="text-gray-500 text-sm">No metrics available</p>
+                                <p className="text-gray-400 text-xs mt-1">Create metrics on desktop</p>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-2">
+                                {kpis.map((kpi) => {
+                                    const isSelected = formData.selectedKpiIds.includes(kpi.id!)
+                                    return (
+                                        <button
+                                            key={kpi.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    selectedKpiIds: isSelected
+                                                        ? prev.selectedKpiIds.filter(id => id !== kpi.id)
+                                                        : [...prev.selectedKpiIds, kpi.id!]
+                                                }))
+                                            }}
+                                            className={`block w-full appearance-none p-4 rounded-xl border-2 text-left transition-colors ${
+                                                isSelected 
+                                                    ? 'border-evidence-500 bg-evidence-50' 
+                                                    : 'border-gray-200 bg-white'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="min-w-0">
+                                                    <div className="font-medium text-gray-800 truncate">{kpi.title}</div>
+                                                    {kpi.description && (
+                                                        <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">{kpi.description}</div>
+                                                    )}
+                                                </div>
+                                                {isSelected && (
+                                                    <Check className="w-5 h-5 text-evidence-500 flex-shrink-0 ml-2" />
+                                                )}
+                                            </div>
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Step 4: Beneficiaries (optional) */}
+                {step === 4 && (
+                    <div className="space-y-4">
+                        <div className="text-center mb-6">
+                            <h2 className="text-xl font-bold text-gray-900">Beneficiaries</h2>
+                            <p className="text-gray-500 text-sm mt-1">Optional — link to beneficiary groups</p>
+                        </div>
+
+                        {beneficiaryGroups.length === 0 ? (
+                            <div className="text-center py-8 bg-gray-50 rounded-2xl">
+                                <Users className="w-10 h-10 text-gray-400 mx-auto mb-2" />
+                                <p className="text-gray-500 text-sm">No beneficiary groups</p>
+                                <p className="text-gray-400 text-xs mt-1">Add them in the Beneficiaries tab</p>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex items-center justify-between text-xs">
+                                    <span className="text-gray-600 font-medium">
+                                        {formData.selectedBeneficiaryGroupIds.length} of {beneficiaryGroups.length} selected
+                                    </span>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData(prev => ({ ...prev, selectedBeneficiaryGroupIds: beneficiaryGroups.map(g => g.id!) }))}
+                                            className="px-2.5 py-1 rounded-lg border border-evidence-300 text-evidence-700 font-medium"
+                                        >
+                                            Select All
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData(prev => ({ ...prev, selectedBeneficiaryGroupIds: [] }))}
+                                            className="px-2.5 py-1 rounded-lg border border-gray-300 text-gray-600 font-medium"
+                                        >
+                                            Clear
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                    {beneficiaryGroups.map((group) => {
+                                        const isSelected = formData.selectedBeneficiaryGroupIds.includes(group.id!)
+                                        return (
+                                            <button
+                                                key={group.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        selectedBeneficiaryGroupIds: isSelected
+                                                            ? prev.selectedBeneficiaryGroupIds.filter(id => id !== group.id)
+                                                            : [...prev.selectedBeneficiaryGroupIds, group.id!]
+                                                    }))
+                                                }}
+                                                className={`block w-full appearance-none p-4 rounded-xl border-2 text-left transition-colors ${
+                                                    isSelected 
+                                                        ? 'border-evidence-500 bg-evidence-50' 
+                                                        : 'border-gray-200 bg-white'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <Users className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
+                                                        <div className="min-w-0">
+                                                            <div className="font-medium text-gray-800 truncate">{group.name}</div>
+                                                            {group.total_number != null && (
+                                                                <div className="text-xs text-gray-500">{group.total_number.toLocaleString()} beneficiaries</div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    {isSelected && (
+                                                        <Check className="w-5 h-5 text-evidence-500 flex-shrink-0 ml-2" />
+                                                    )}
+                                                </div>
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {/* Step 5: Title, Description & Upload */}
+                {step === 5 && (
+                    <div className="space-y-4">
+                        <div className="text-center mb-6">
+                            <h2 className="text-xl font-bold text-gray-900">Details & File</h2>
+                            <p className="text-gray-500 text-sm mt-1">Title, description, and file</p>
                         </div>
 
                         <div>
@@ -1058,135 +1222,70 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                <Calendar className="w-4 h-4 inline mr-1" />
-                                Date
+                                File <span className="text-red-500">*</span>
                             </label>
-                            <DateRangePicker
-                                value={formData.datePickerValue}
-                                onChange={(value) => setFormData(prev => ({ ...prev, datePickerValue: value }))}
-                                placeholder="Select date"
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                onChange={handleFileSelect}
+                                accept="image/*,video/*,.pdf,.doc,.docx"
+                                className="hidden"
+                            />
+
+                            {formData.file ? (
+                                <div className="bg-evidence-50 border-2 border-evidence-300 rounded-2xl p-4 text-center">
+                                    <FileText className="w-12 h-12 text-evidence-500 mx-auto mb-2" />
+                                    <p className="font-medium text-gray-800 truncate">{formData.file.name}</p>
+                                    <p className="text-sm text-gray-500">
+                                        {(formData.file.size / 1024 / 1024).toFixed(2)} MB
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData(prev => ({ ...prev, file: null }))}
+                                        className="mt-3 text-sm text-red-600 font-medium"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="w-full border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center hover:border-evidence-400 transition-colors"
+                                >
+                                    <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+                                    <p className="font-medium text-gray-700">Tap to select file</p>
+                                    <p className="text-sm text-gray-500 mt-1">Images, PDFs, documents</p>
+                                </button>
+                            )}
+
+                            <div className="relative my-4">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t border-gray-200" />
+                                </div>
+                                <div className="relative flex justify-center">
+                                    <span className="bg-white px-4 text-sm text-gray-500">or</span>
+                                </div>
+                            </div>
+
+                            <input
+                                type="url"
+                                value={formData.fileUrl}
+                                onChange={(e) => setFormData(prev => ({ ...prev, fileUrl: e.target.value }))}
+                                placeholder="Paste a link (https://...)"
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm"
                             />
                         </div>
-                    </div>
-                )}
-
-                {/* Step 4: Location */}
-                {step === 4 && (
-                    <div className="space-y-4">
-                        <div className="text-center mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Location</h2>
-                            <p className="text-gray-500 text-sm mt-1">Where was this captured?</p>
-                        </div>
-
-                        {locations.length === 0 ? (
-                            <div className="text-center py-8 bg-gray-50 rounded-2xl">
-                                <MapPin className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                                <p className="text-gray-500 text-sm">No locations available</p>
-                                <p className="text-gray-400 text-xs mt-1">Add locations in the Locations tab</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                {locations.map((location) => {
-                                    const isSelected = formData.selectedLocationIds.includes(location.id!)
-                                    return (
-                                        <button
-                                            key={location.id}
-                                            onClick={() => {
-                                                setFormData(prev => ({
-                                                    ...prev,
-                                                    selectedLocationIds: isSelected
-                                                        ? prev.selectedLocationIds.filter(id => id !== location.id)
-                                                        : [...prev.selectedLocationIds, location.id!]
-                                                }))
-                                            }}
-                                            className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
-                                                isSelected 
-                                                    ? 'border-evidence-500 bg-evidence-50' 
-                                                    : 'border-gray-200'
-                                            }`}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <MapPin className={`w-5 h-5 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
-                                                    <div>
-                                                        <div className="font-medium text-gray-800">{location.name}</div>
-                                                        {location.description && (
-                                                            <div className="text-xs text-gray-500">{location.description}</div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                {isSelected && (
-                                                    <Check className="w-5 h-5 text-evidence-500" />
-                                                )}
-                                            </div>
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Step 5: Metrics */}
-                {step === 5 && (
-                    <div className="space-y-4">
-                        <div className="text-center mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Link to Metrics</h2>
-                            <p className="text-gray-500 text-sm mt-1">What does this support?</p>
-                        </div>
-
-                        {kpis.length === 0 ? (
-                            <div className="text-center py-8 bg-gray-50 rounded-2xl">
-                                <FileText className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                                <p className="text-gray-500 text-sm">No metrics available</p>
-                                <p className="text-gray-400 text-xs mt-1">Create metrics on desktop</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                {kpis.map((kpi) => {
-                                    const isSelected = formData.selectedKpiIds.includes(kpi.id!)
-                                    return (
-                                        <button
-                                            key={kpi.id}
-                                            onClick={() => {
-                                                setFormData(prev => ({
-                                                    ...prev,
-                                                    selectedKpiIds: isSelected
-                                                        ? prev.selectedKpiIds.filter(id => id !== kpi.id)
-                                                        : [...prev.selectedKpiIds, kpi.id!]
-                                                }))
-                                            }}
-                                            className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
-                                                isSelected 
-                                                    ? 'border-evidence-500 bg-evidence-50' 
-                                                    : 'border-gray-200'
-                                            }`}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <div className="font-medium text-gray-800">{kpi.title}</div>
-                                                    {kpi.description && (
-                                                        <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">{kpi.description}</div>
-                                                    )}
-                                                </div>
-                                                {isSelected && (
-                                                    <Check className="w-5 h-5 text-evidence-500" />
-                                                )}
-                                            </div>
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                        )}
                     </div>
                 )}
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-gray-100 safe-area-pb">
+            <div className="p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] border-t border-gray-100 bg-white flex-shrink-0">
                 <div className="flex gap-3">
                     {step > 1 && (
                         <button
+                            type="button"
                             onClick={() => setStep(s => s - 1)}
                             className="px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium text-sm flex items-center gap-2"
                         >
@@ -1195,6 +1294,7 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
                         </button>
                     )}
                     <button
+                        type="button"
                         onClick={() => {
                             if (step < totalSteps) {
                                 setStep(s => s + 1)
@@ -1351,9 +1451,9 @@ function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: 
     }
 
     return (
-        <div className="fixed inset-0 bg-white z-[100] flex flex-col">
+        <div className="fixed inset-0 bg-white z-[100] flex flex-col h-[100dvh] overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-100">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 flex-shrink-0">
                 <button onClick={onClose} className="p-2 -ml-2">
                     <X className="w-5 h-5 text-gray-500" />
                 </button>
@@ -1362,7 +1462,7 @@ function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: 
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-6">
                 {/* Type Selection */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-3">Evidence Type</label>
@@ -1373,11 +1473,12 @@ function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: 
                             return (
                                 <button
                                     key={type.value}
+                                    type="button"
                                     onClick={() => setFormData(prev => ({ ...prev, type: type.value }))}
-                                    className={`p-3 rounded-xl border-2 transition-all ${
+                                    className={`block w-full appearance-none p-3 rounded-xl border-2 transition-colors ${
                                         isSelected 
                                             ? 'border-evidence-500 bg-evidence-50' 
-                                            : 'border-gray-200'
+                                            : 'border-gray-200 bg-white'
                                     }`}
                                 >
                                     <Icon className={`w-5 h-5 mx-auto mb-1 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
@@ -1479,12 +1580,13 @@ function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: 
                             <MapPin className="w-4 h-4 inline mr-1" />
                             Locations
                         </label>
-                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                        <div className="flex flex-col gap-2 max-h-40 overflow-y-auto">
                             {locations.map((location) => {
                                 const isSelected = formData.selectedLocationIds.includes(location.id!)
                                 return (
                                     <button
                                         key={location.id}
+                                        type="button"
                                         onClick={() => {
                                             setFormData(prev => ({
                                                 ...prev,
@@ -1493,8 +1595,8 @@ function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: 
                                                     : [...prev.selectedLocationIds, location.id!]
                                             }))
                                         }}
-                                        className={`w-full p-3 rounded-xl border text-left transition-all ${
-                                            isSelected ? 'border-evidence-500 bg-evidence-50' : 'border-gray-200'
+                                        className={`block w-full appearance-none p-3 rounded-xl border text-left transition-colors ${
+                                            isSelected ? 'border-evidence-500 bg-evidence-50' : 'border-gray-200 bg-white'
                                         }`}
                                     >
                                         <div className="flex items-center justify-between">
@@ -1515,12 +1617,13 @@ function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: 
                             <FileText className="w-4 h-4 inline mr-1" />
                             Linked Metrics
                         </label>
-                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                        <div className="flex flex-col gap-2 max-h-40 overflow-y-auto">
                             {kpis.map((kpi) => {
                                 const isSelected = formData.selectedKpiIds.includes(kpi.id!)
                                 return (
                                     <button
                                         key={kpi.id}
+                                        type="button"
                                         onClick={() => {
                                             setFormData(prev => ({
                                                 ...prev,
@@ -1529,8 +1632,8 @@ function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: 
                                                     : [...prev.selectedKpiIds, kpi.id!]
                                             }))
                                         }}
-                                        className={`w-full p-3 rounded-xl border text-left transition-all ${
-                                            isSelected ? 'border-evidence-500 bg-evidence-50' : 'border-gray-200'
+                                        className={`block w-full appearance-none p-3 rounded-xl border text-left transition-colors ${
+                                            isSelected ? 'border-evidence-500 bg-evidence-50' : 'border-gray-200 bg-white'
                                         }`}
                                     >
                                         <div className="flex items-center justify-between">
@@ -1546,15 +1649,17 @@ function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: 
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-gray-100 safe-area-pb">
+            <div className="p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] border-t border-gray-100 bg-white flex-shrink-0">
                 <div className="flex gap-3">
                     <button
+                        type="button"
                         onClick={onClose}
                         className="px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium text-sm"
                     >
                         Cancel
                     </button>
                     <button
+                        type="button"
                         onClick={handleSubmit}
                         disabled={!formData.title || loading}
                         className="flex-1 py-3 bg-evidence-500 text-white rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
