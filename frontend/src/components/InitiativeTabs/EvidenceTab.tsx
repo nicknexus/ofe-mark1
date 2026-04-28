@@ -4,6 +4,7 @@ import { Search, X, Calendar, MapPin, Users, FileText, Eye, Edit, Trash2, Plus, 
 import { apiService } from '../../services/api'
 import { Evidence, Location, BeneficiaryGroup } from '../../types'
 import { formatDate, getEvidenceTypeInfo } from '../../utils'
+import EvidenceTagsList from '../MetricTags/EvidenceTagsList'
 import DateRangePicker from '../DateRangePicker'
 import EvidencePreviewModal from '../EvidencePreviewModal'
 import DataPointPreviewModal from '../DataPointPreviewModal'
@@ -740,6 +741,11 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                                     {ev.description}
                                                 </div>
                                             )}
+                                            {Array.isArray(ev.tag_ids) && ev.tag_ids.length > 0 && (
+                                                <div className="mt-1.5">
+                                                    <EvidenceTagsList tagIds={ev.tag_ids} size="xs" visibleCap={4} />
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Type */}
@@ -897,6 +903,10 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                                 ? `${formatDate(ev.date_range_start)} - ${formatDate(ev.date_range_end)}`
                                                 : formatDate(ev.date_represented)}
                                         </p>
+
+                                        {Array.isArray(ev.tag_ids) && ev.tag_ids.length > 0 && (
+                                            <EvidenceTagsList tagIds={ev.tag_ids} size="xs" visibleCap={3} />
+                                        )}
                                     </div>
                                 </div>
                             )

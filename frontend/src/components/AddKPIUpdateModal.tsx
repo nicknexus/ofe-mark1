@@ -4,6 +4,7 @@ import { CreateKPIUpdateForm, BeneficiaryGroup, Location } from '../types'
 import { apiService } from '../services/api'
 import LocationModal from './LocationModal'
 import DateRangePicker from './DateRangePicker'
+import TagPicker from './MetricTags/TagPicker'
 import { getLocalDateString } from '../utils'
 import toast from 'react-hot-toast'
 
@@ -16,6 +17,11 @@ interface AddKPIUpdateModalProps {
     metricType: 'number' | 'percentage'
     unitOfMeasurement: string
     initiativeId?: string
+    /**
+     * Set of tag IDs allowed for this KPI (i.e. attached to the parent metric).
+     * If undefined or empty, the tag picker is hidden.
+     */
+    kpiTagIds?: string[]
     editData?: any // Optional prop for editing existing KPI update
 }
 
@@ -28,6 +34,7 @@ export default function AddKPIUpdateModal({
     metricType,
     unitOfMeasurement,
     initiativeId,
+    kpiTagIds,
     editData
 }: AddKPIUpdateModalProps) {
     const [formData, setFormData] = useState<CreateKPIUpdateForm>({
@@ -46,6 +53,7 @@ export default function AddKPIUpdateModal({
     const [loading, setLoading] = useState(false)
     const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
     const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
+    const [selectedTagId, setSelectedTagId] = useState<string | null>(null)
     const [locations, setLocations] = useState<Location[]>([])
     const [selectedLocationId, setSelectedLocationId] = useState<string>('')
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
@@ -102,6 +110,7 @@ export default function AddKPIUpdateModal({
                 })
                 setDatePickerValue(initialDateValue)
                 setSelectedLocationId(editData.location_id || '')
+                setSelectedTagId(editData.tag_id ?? null)
 
                 // Load beneficiary groups for this update
                 if (editData.id) {
@@ -126,6 +135,7 @@ export default function AddKPIUpdateModal({
                 setDatePickerValue({})
                 setSelectedGroupIds([])
                 setSelectedLocationId('')
+                setSelectedTagId(null)
             }
         }
     }, [isOpen, initiativeId, editData])
@@ -177,7 +187,8 @@ export default function AddKPIUpdateModal({
             await onSubmit({
                 ...submitData,
                 beneficiary_group_ids: selectedGroupIds,
-                location_id: selectedLocationId
+                location_id: selectedLocationId,
+                tag_id: selectedTagId,
             })
             // Only reset if creating new (not editing)
             if (!editData) {
@@ -192,6 +203,7 @@ export default function AddKPIUpdateModal({
                 setDatePickerValue({})
                 setSelectedGroupIds([])
                 setSelectedLocationId('')
+                setSelectedTagId(null)
             }
             onClose()
         } catch (error) {
@@ -336,16 +348,16 @@ export default function AddKPIUpdateModal({
 
                 {/* Form Content */}
                 <form ref={formContentRef} onSubmit={(e) => { e.preventDefault(); if (currentStep === totalSteps) handleSubmit(e); }} className="flex-1 overflow-y-auto">
-                    <div className="p-8 min-h-[400px]">
+                    <div className="p-6">
                         {/* Step 1: Value */}
                         {currentStep === 1 && (
-                            <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
-                                <div className="text-center mb-8">
-                                    <h3 className="text-2xl font-semibold text-gray-900 mb-2">{kpiTitle}</h3>
-                                    <p className="text-gray-600">Enter the measurable value for this impact claim</p>
+                            <div className="space-y-4 animate-fade-in max-w-2xl mx-auto">
+                                <div className="text-center mb-3">
+                                    <h3 className="text-xl font-semibold text-gray-900 mb-1">{kpiTitle}</h3>
+                                    <p className="text-sm text-gray-600">Enter the measurable value for this impact claim</p>
                                 </div>
-                                
-                                <div className="bg-gray-50 rounded-xl p-8 border-2 border-gray-200">
+
+                                <div className="bg-gray-50 rounded-xl p-4 border-2 border-gray-200">
                                     <div className="relative">
                                         <input
                                             type="number"
@@ -354,16 +366,16 @@ export default function AddKPIUpdateModal({
                                             onChange={handleInputChange}
                                             onFocus={handleValueFocus}
                                             onBlur={handleValueBlur}
-                                            className="input-field text-3xl font-semibold text-center py-6 transition-all duration-150 hover:border-gray-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            className="input-field text-2xl font-semibold text-center py-3 transition-all duration-150 hover:border-gray-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             placeholder="0"
                                             required
                                             min="0"
                                             step={metricType === 'percentage' ? '0.01' : '1'}
                                             max={metricType === 'percentage' ? '100' : undefined}
-                                            style={{ paddingRight: '140px' }}
+                                            style={{ paddingRight: '120px' }}
                                         />
-                                        <div className="absolute inset-y-0 right-0 flex items-center gap-3 pr-4">
-                                            <span className="text-gray-600 text-lg font-medium pointer-events-none">
+                                        <div className="absolute inset-y-0 right-0 flex items-center gap-2 pr-3">
+                                            <span className="text-gray-600 text-base font-medium pointer-events-none">
                                                 {metricType === 'percentage' ? '%' : unitOfMeasurement}
                                             </span>
                                             <div className="flex flex-col pointer-events-auto">
@@ -375,10 +387,10 @@ export default function AddKPIUpdateModal({
                                                         const newValue = Math.min((formData.value || 0) + step, max || Infinity)
                                                         setFormData(prev => ({ ...prev, value: newValue }))
                                                     }}
-                                                    className="flex items-center justify-center w-6 h-6 hover:bg-gray-200 rounded-t transition-colors border border-gray-300 border-b-0"
+                                                    className="flex items-center justify-center w-5 h-5 hover:bg-gray-200 rounded-t transition-colors border border-gray-300 border-b-0"
                                                     tabIndex={-1}
                                                 >
-                                                    <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <svg className="w-2.5 h-2.5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
                                                     </svg>
                                                 </button>
@@ -389,10 +401,10 @@ export default function AddKPIUpdateModal({
                                                         const newValue = Math.max((formData.value || 0) - step, 0)
                                                         setFormData(prev => ({ ...prev, value: newValue }))
                                                     }}
-                                                    className="flex items-center justify-center w-6 h-6 hover:bg-gray-200 rounded-b transition-colors border border-gray-300"
+                                                    className="flex items-center justify-center w-5 h-5 hover:bg-gray-200 rounded-b transition-colors border border-gray-300"
                                                     tabIndex={-1}
                                                 >
-                                                    <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <svg className="w-2.5 h-2.5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                                     </svg>
                                                 </button>
@@ -400,6 +412,20 @@ export default function AddKPIUpdateModal({
                                         </div>
                                     </div>
                                 </div>
+
+                                {Array.isArray(kpiTagIds) && kpiTagIds.length > 0 && (
+                                    <div>
+                                        <TagPicker
+                                            mode="single"
+                                            allowedTagIds={kpiTagIds}
+                                            selectedIds={selectedTagId ? [selectedTagId] : []}
+                                            onChange={(ids) => setSelectedTagId(ids[0] || null)}
+                                            label="Tag (optional)"
+                                            helperText="Pick one tag this claim belongs to."
+                                            canCreate={false}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -512,6 +538,7 @@ export default function AddKPIUpdateModal({
                                             </div>
                                         )}
                                     </div>
+
                                 </div>
                             </div>
                         )}

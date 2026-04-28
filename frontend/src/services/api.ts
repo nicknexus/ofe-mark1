@@ -17,7 +17,8 @@ import {
     Organization,
     OrganizationContext,
     Donor,
-    DonorCredit
+    DonorCredit,
+    MetricTag
 } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
@@ -255,6 +256,9 @@ class ApiService {
                     this.clearCacheByPattern('/locations')
                     this.clearCacheByPattern('/evidence')
                     this.clearCacheByPattern('/beneficiaries')
+                    // KPI mutations may attach/detach tags or claim->tag links,
+                    // so widget counts and tag detail pages must refresh.
+                    this.clearCacheByPattern('/metric-tags')
                 }
                 if (endpoint.includes('/evidence')) {
                     this.clearCacheByPattern('/evidence')
@@ -264,6 +268,8 @@ class ApiService {
                     this.clearCacheByPattern('/initiatives')
                     this.clearCacheByPattern('/locations')
                     this.clearCacheByPattern('/beneficiaries')
+                    // Evidence mutations may attach/detach tags, refresh tag widgets/details.
+                    this.clearCacheByPattern('/metric-tags')
                 }
                 if (endpoint.includes('/beneficiaries')) {
                     this.clearCacheByPattern('/beneficiaries')
@@ -275,6 +281,13 @@ class ApiService {
                 }
                 if (endpoint.includes('/locations')) {
                     this.clearCacheByPattern('/locations')
+                }
+                if (endpoint.includes('/metric-tags')) {
+                    // Tag mutations affect tag lists, kpi lists (tag_ids inline),
+                    // initiative dashboards, and any /metric-tags detail pages.
+                    this.clearCacheByPattern('/metric-tags')
+                    this.clearCacheByPattern('/kpis')
+                    this.clearCacheByPattern('/initiatives')
                 }
 
                 // Remove the mutating request from cache immediately
@@ -402,6 +415,44 @@ class ApiService {
 
     async deleteKPIUpdate(updateId: string): Promise<void> {
         return this.request<void>(`/kpis/updates/${updateId}`, {
+            method: 'DELETE'
+        })
+    }
+
+    // Metric Tags
+    async getMetricTags(withCounts = false): Promise<MetricTag[]> {
+        const result = await this.request<MetricTag[]>(`/metric-tags${withCounts ? '?with_counts=1' : ''}`)
+        return result || []
+    }
+
+    async getMetricTag(id: string): Promise<MetricTag> {
+        return this.request<MetricTag>(`/metric-tags/${id}`)
+    }
+
+    async getMetricTagDetail(id: string): Promise<{
+        tag: MetricTag
+        kpis: Array<{ id: string; title: string; unit_of_measurement: string; metric_type: 'number' | 'percentage'; initiative_id: string }>
+        claims: Array<{ id: string; kpi_id: string; value: number; date_represented: string; label?: string; location_id?: string; created_at: string }>
+    }> {
+        return this.request(`/metric-tags/${id}/detail`)
+    }
+
+    async createMetricTag(name: string): Promise<MetricTag> {
+        return this.request<MetricTag>('/metric-tags', {
+            method: 'POST',
+            body: JSON.stringify({ name })
+        })
+    }
+
+    async updateMetricTag(id: string, data: Partial<MetricTag>): Promise<MetricTag> {
+        return this.request<MetricTag>(`/metric-tags/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        })
+    }
+
+    async deleteMetricTag(id: string): Promise<void> {
+        return this.request<void>(`/metric-tags/${id}`, {
             method: 'DELETE'
         })
     }

@@ -40,6 +40,7 @@ import PublicLoader from '../components/public/PublicLoader'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import DateRangePicker from '../components/DateRangePicker'
 import { getLocalDateString, formatDate } from '../utils'
+import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 
 // Map tile configuration - matches internal app
 const CARTO_VOYAGER_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
@@ -331,7 +332,7 @@ export default function PublicInitiativePage() {
                 return true
             })
 
-            const totalValue = filtered.reduce((sum, u) => sum + (u.value || 0), 0)
+            const totalValue = aggregateKpiUpdates(filtered as any, kpi.metric_type)
             return {
                 ...kpi,
                 updates: filtered,

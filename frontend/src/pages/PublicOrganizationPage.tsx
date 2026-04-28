@@ -21,6 +21,7 @@ import {
 import PublicLoader from '../components/public/PublicLoader'
 import DateRangePicker from '../components/DateRangePicker'
 import { formatDate } from '../utils'
+import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import {
     AreaChart,
     Area,
@@ -197,7 +198,7 @@ export default function PublicOrganizationPage() {
                     if (endDate && updateDate > new Date(endDate + 'T23:59:59')) return false
                     return true
                 })
-                const newTotal = filteredUpdates.reduce((sum, u) => sum + (parseFloat(String(u.value)) || 0), 0)
+                const newTotal = aggregateKpiUpdates(filteredUpdates as any, m.metric_type)
                 return { ...m, total_value: newTotal, update_count: filteredUpdates.length }
             })
         }

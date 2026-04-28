@@ -1,6 +1,7 @@
 import { supabase } from '../utils/supabase';
 import { Organization, Initiative, KPI, Evidence, Story, Location, BeneficiaryGroup } from '../types';
 import { BeneficiaryService } from './beneficiaryService';
+import { aggregateKpiUpdates } from '../utils/kpiAggregation';
 
 // Types for public responses (stripped of sensitive fields)
 export interface PublicOrganization {
@@ -338,7 +339,7 @@ export class PublicService {
         return (data || []).map((k: any) => {
             const updates = k.kpi_updates || [];
             const totalValue = updates.length > 0
-                ? updates.reduce((sum: number, u: any) => sum + (u.value || 0), 0)
+                ? aggregateKpiUpdates(updates, k.metric_type)
                 : undefined;
 
             return {
@@ -550,7 +551,7 @@ export class PublicService {
         // Process KPIs with computed values AND include updates for charts
         const processedKpis = (kpis || []).map(kpi => {
             const updates = kpi.kpi_updates || [];
-            const totalValue = updates.reduce((sum: number, u: any) => sum + (parseFloat(u.value) || 0), 0);
+            const totalValue = aggregateKpiUpdates(updates, kpi.metric_type);
             const updateCount = updates.length;
             const evidenceCount = evidenceCounts[kpi.id] || 0;
             // Simple coverage: if there's evidence linked, estimate coverage based on evidence vs updates
@@ -895,7 +896,7 @@ export class PublicService {
         // Calculate totals and format
         return (data || []).map((k: any) => {
             const updates = k.kpi_updates || [];
-            const totalValue = updates.reduce((sum: number, u: any) => sum + (u.value || 0), 0);
+            const totalValue = aggregateKpiUpdates(updates, k.metric_type);
 
             return {
                 id: k.id,
@@ -998,7 +999,7 @@ export class PublicService {
         }
 
         const updates = kpi.kpi_updates || [];
-        const totalValue = updates.reduce((sum: number, u: any) => sum + (parseFloat(u.value) || 0), 0);
+        const totalValue = aggregateKpiUpdates(updates, kpi.metric_type);
 
         return {
             id: kpi.id,
@@ -1352,7 +1353,7 @@ export class PublicService {
             .from('kpi_updates')
             .select(`
                 id, value, date_represented, date_range_start, date_range_end, note, label,
-                kpis!inner(id, title, description, unit_of_measurement, category, initiative_id)
+                kpis!inner(id, title, description, metric_type, unit_of_measurement, category, initiative_id)
             `)
             .eq('location_id', locationId);
 
@@ -1373,26 +1374,29 @@ export class PublicService {
                 metric_category: u.kpis.category
             }));
 
-        // Unique metrics that have claims at this location
-        const metricsMap = new Map<string, any>();
+        // Unique metrics that have claims at this location.
+        // Group updates per kpi first so we can apply the right aggregation strategy.
+        const metricUpdates = new Map<string, { kpi: any; updates: any[] }>();
         (kpiUpdates || [])
             .filter((u: any) => u.kpis?.initiative_id === initiative.id)
             .forEach((u: any) => {
-                if (!metricsMap.has(u.kpis.id)) {
-                    metricsMap.set(u.kpis.id, {
-                        id: u.kpis.id,
-                        title: u.kpis.title,
-                        slug: this.generateMetricSlug(u.kpis.title),
-                        unit_of_measurement: u.kpis.unit_of_measurement,
-                        category: u.kpis.category,
-                        total_value: 0,
-                        claim_count: 0
-                    });
-                }
-                const m = metricsMap.get(u.kpis.id)!;
-                m.total_value += parseFloat(u.value) || 0;
-                m.claim_count += 1;
+                const id = u.kpis.id;
+                if (!metricUpdates.has(id)) metricUpdates.set(id, { kpi: u.kpis, updates: [] });
+                metricUpdates.get(id)!.updates.push(u);
             });
+        const metricsMap = new Map<string, any>();
+        metricUpdates.forEach(({ kpi, updates }, id) => {
+            metricsMap.set(id, {
+                id,
+                title: kpi.title,
+                slug: this.generateMetricSlug(kpi.title),
+                unit_of_measurement: kpi.unit_of_measurement,
+                category: kpi.category,
+                metric_type: kpi.metric_type,
+                total_value: aggregateKpiUpdates(updates, kpi.metric_type),
+                claim_count: updates.length
+            });
+        });
 
         return {
             location,

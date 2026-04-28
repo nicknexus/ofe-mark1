@@ -95,9 +95,24 @@ export interface KPI {
     initiative_id?: string;
     umbrella_kpi_id?: string;
     display_order?: number;
+    tag_ids?: string[];
     created_at?: string;
     updated_at?: string;
     user_id?: string;
+}
+
+export interface MetricTag {
+    id: string;
+    organization_id: string;
+    name: string;
+    color?: string | null;
+    parent_id?: string | null;
+    is_public?: boolean;
+    created_by?: string | null;
+    created_at?: string;
+    updated_at?: string;
+    metric_count?: number;
+    claim_count?: number;
 }
 
 export interface Location {
@@ -129,6 +144,7 @@ export interface KPIUpdate {
         lng: number;
     }[];
     beneficiary_group_ids?: string[];
+    tag_id?: string | null;
     created_at?: string;
     updated_at?: string;
     user_id?: string;
@@ -171,6 +187,7 @@ export interface Evidence {
     // New precise linkage to specific KPI updates (data points)
     kpi_update_ids?: string[];
     beneficiary_group_ids?: string[];
+    tag_ids?: string[];
     initiative_id?: string;
     created_at?: string;
     updated_at?: string;
@@ -290,6 +307,7 @@ export interface CreateKPIForm {
     category: 'input' | 'output' | 'impact';
     initiative_id?: string;
     umbrella_kpi_id?: string;
+    tag_ids?: string[];
 }
 
 export interface CreateKPIUpdateForm {
@@ -302,6 +320,7 @@ export interface CreateKPIUpdateForm {
     location_id?: string;
     // New: link data point to beneficiary groups at creation time
     beneficiary_group_ids?: string[];
+    tag_id?: string | null;
 }
 
 export interface CreateEvidenceForm {
@@ -321,6 +340,7 @@ export interface CreateEvidenceForm {
     // New: link evidence to specific KPI updates (data points)
     kpi_update_ids?: string[];
     beneficiary_group_ids?: string[];
+    tag_ids?: string[];
     initiative_id?: string;
 }
 

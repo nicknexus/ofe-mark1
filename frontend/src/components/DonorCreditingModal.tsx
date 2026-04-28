@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { X, AlertCircle, CheckCircle, BarChart3 } from 'lucide-react'
 import { Donor, DonorCredit, KPI, InitiativeDashboard } from '../types'
 import { apiService } from '../services/api'
+import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import toast from 'react-hot-toast'
 
 interface DonorCreditingModalProps {
@@ -91,13 +92,10 @@ export default function DonorCreditingModal({
         await Promise.all(dashboard.kpis.map(async (kpi) => {
             if (kpi.id) {
                 try {
-                    // Fetch all impact claims (kpi_updates) for this metric
                     const updates = await apiService.getKPIUpdates(kpi.id)
-                    // Sum all impact claims for this metric
-                    totals[kpi.id] = updates.reduce((sum, update) => sum + Number(update.value || 0), 0)
+                    totals[kpi.id] = aggregateKpiUpdates(updates as any, kpi.metric_type)
                 } catch (error) {
                     console.error(`Error loading updates for metric ${kpi.id}:`, error)
-                    // Fallback to total_value if available
                     totals[kpi.id] = kpi.total_value || 0
                 }
             }
@@ -299,18 +297,27 @@ export default function DonorCreditingModal({
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6">
-                    {dashboard.kpis.length === 0 ? (
-                        <div className="text-center py-12">
-                            <BarChart3 className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-                            <p className="text-gray-500">No metrics available. Create metrics first.</p>
-                        </div>
-                    ) : loadingTotals ? (
-                        <div className="flex items-center justify-center py-12">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-                        </div>
-                    ) : (
+                    {(() => {
+                        // Donor crediting is not available for percentage metrics; filter them out.
+                        const creditableKpis = dashboard.kpis.filter(k => k.metric_type !== 'percentage')
+                        if (creditableKpis.length === 0) {
+                            return (
+                                <div className="text-center py-12">
+                                    <BarChart3 className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                                    <p className="text-gray-500">No metrics available for crediting. Donor credits aren't supported for percentage metrics.</p>
+                                </div>
+                            )
+                        }
+                        if (loadingTotals) {
+                            return (
+                                <div className="flex items-center justify-center py-12">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                                </div>
+                            )
+                        }
+                        return (
                         <div className="space-y-1.5">
-                            {dashboard.kpis.map(kpi => {
+                            {creditableKpis.map(kpi => {
                                 if (!kpi.id) return null
                                 
                                 const total = metricTotals[kpi.id] || 0
@@ -375,7 +382,8 @@ export default function DonorCreditingModal({
                                 )
                             })}
                         </div>
-                    )}
+                        )
+                    })()}
                 </div>
 
                 {/* Footer */}

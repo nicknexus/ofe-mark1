@@ -26,6 +26,7 @@ import { apiService } from '../services/api'
 import { useTeam } from '../context/TeamContext'
 import { KPI, KPIUpdate, LoadingState, CreateKPIUpdateForm } from '../types'
 import { formatDate, getCategoryColor, getEvidenceTypeInfo } from '../utils'
+import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import AddKPIUpdateModal from '../components/AddKPIUpdateModal'
 import KPIEvidenceSection from '../components/KPIEvidenceSection'
 import EvidencePreviewModal from '../components/EvidencePreviewModal'
@@ -33,6 +34,8 @@ import toast from 'react-hot-toast'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import AddEvidenceModal from '../components/AddEvidenceModal'
 import EditDataPointBeneficiariesModal from '../components/EditDataPointBeneficiariesModal'
+import TagChip from '../components/MetricTags/TagChip'
+import { MetricTag } from '../types'
 
 // DataPointsList Component
 interface DataPointsListProps {
@@ -446,6 +449,7 @@ export default function KPIDetailPage() {
     const [updates, setUpdates] = useState<KPIUpdate[]>([])
     const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: true })
     const [evidenceStats, setEvidenceStats] = useState<any[]>([])
+    const [allTags, setAllTags] = useState<MetricTag[]>([])
 
     // Modal states
     const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
@@ -479,14 +483,20 @@ export default function KPIDetailPage() {
         })
         : updates
 
-    // Calculate filtered total sum
-    const filteredTotal = filteredUpdates.reduce((sum, update) => sum + update.value, 0)
+    // Calculate filtered total (sum for number metrics, mean for percentage)
+    const filteredTotal = aggregateKpiUpdates(filteredUpdates as any, kpi?.metric_type)
 
     useEffect(() => {
         if (kpiId) {
             loadKPIData()
         }
     }, [kpiId])
+
+    useEffect(() => {
+        apiService.getMetricTags().then(setAllTags).catch(() => setAllTags([]))
+    }, [])
+
+    const tagById = (id?: string | null) => id ? allTags.find(t => t.id === id) : null
 
     const loadKPIData = async () => {
         if (!kpiId) return
@@ -645,6 +655,17 @@ export default function KPIDetailPage() {
                                     <span className="text-gray-500 text-sm">
                                         {kpi.metric_type === 'percentage' ? '%' : kpi.unit_of_measurement}
                                     </span>
+                                    {Array.isArray(kpi.tag_ids) && kpi.tag_ids.length > 0 && allTags.length > 0 && (
+                                        kpi.tag_ids.map(tid => {
+                                            const t = tagById(tid)
+                                            if (!t) return null
+                                            return (
+                                                <Link key={tid} to={`/tags/${tid}`} className="contents">
+                                                    <TagChip name={t.name} size="xs" />
+                                                </Link>
+                                            )
+                                        })
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -669,9 +690,9 @@ export default function KPIDetailPage() {
                     </div>
                     <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-soft-float border border-white/60 p-4 text-center">
                         <p className="text-xl sm:text-2xl font-bold text-evidence-500">
-                            {updates.reduce((sum, update) => sum + update.value, 0)}
+                            {aggregateKpiUpdates(updates as any, kpi.metric_type)}
                         </p>
-                        <p className="text-xs sm:text-sm text-gray-500">Total {kpi.unit_of_measurement}</p>
+                        <p className="text-xs sm:text-sm text-gray-500">{kpi.metric_type === 'percentage' ? 'Average' : 'Total'} {kpi.unit_of_measurement}</p>
                     </div>
                 </div>
 
@@ -763,9 +784,9 @@ export default function KPIDetailPage() {
                                     </div>
                                     <div className="text-right">
                                         <div className="text-lg font-bold text-evidence-500">
-                                            {dateFilter.isActive ? filteredTotal : updates.reduce((sum, update) => sum + update.value, 0)}
+                                            {dateFilter.isActive ? filteredTotal : aggregateKpiUpdates(updates as any, kpi.metric_type)}
                                         </div>
-                                        <div className="text-xs text-gray-500">Total {kpi.unit_of_measurement}</div>
+                                        <div className="text-xs text-gray-500">{kpi.metric_type === 'percentage' ? 'Avg' : 'Total'} {kpi.unit_of_measurement}</div>
                                     </div>
                                 </div>
                                 {canAddImpactClaims && (
@@ -899,6 +920,8 @@ export default function KPIDetailPage() {
                 kpiId={kpi.id!}
                 metricType={kpi.metric_type}
                 unitOfMeasurement={kpi.unit_of_measurement}
+                initiativeId={initiativeId}
+                kpiTagIds={kpi.tag_ids || []}
             />
         </div>
     )

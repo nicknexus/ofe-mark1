@@ -1,7 +1,9 @@
-import React from 'react'
-import { X, Calendar, FileText, Camera, MessageSquare, DollarSign, Eye } from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { X, Calendar, FileText, Camera, MessageSquare, DollarSign, Eye, Tag as TagIcon, ChevronDown } from 'lucide-react'
 import { formatDate, getEvidenceTypeInfo } from '../utils'
-import { Evidence } from '../types'
+import { Evidence, MetricTag } from '../types'
+import EvidenceTagsList from './MetricTags/EvidenceTagsList'
+import { apiService } from '../services/api'
 
 interface AllEvidenceModalProps {
     isOpen: boolean
@@ -18,6 +20,27 @@ export default function AllEvidenceModal({
     kpi,
     onEvidenceClick
 }: AllEvidenceModalProps) {
+    const [tagFilter, setTagFilter] = useState<string>('all')
+    const [allTags, setAllTags] = useState<MetricTag[]>([])
+
+    useEffect(() => {
+        if (!isOpen) return
+        apiService.getMetricTags().then(setAllTags).catch(() => setAllTags([]))
+    }, [isOpen])
+
+    const tagsAvailableOnEvidence = useMemo(() => {
+        const ids = new Set<string>()
+        for (const ev of evidence) {
+            for (const tid of (ev.tag_ids || [])) ids.add(tid)
+        }
+        return allTags.filter(t => ids.has(t.id))
+    }, [allTags, evidence])
+
+    const filteredEvidence = useMemo(() => {
+        if (tagFilter === 'all') return evidence
+        return evidence.filter(ev => (ev.tag_ids || []).includes(tagFilter))
+    }, [evidence, tagFilter])
+
     if (!isOpen) return null
 
     // Group evidence by type
@@ -28,7 +51,7 @@ export default function AllEvidenceModal({
         financials: []
     }
 
-    evidence.forEach((ev) => {
+    filteredEvidence.forEach((ev) => {
         const type = ev.type || 'documentation'
         if (groupedByType[type]) {
             groupedByType[type].push(ev)
@@ -75,9 +98,39 @@ export default function AllEvidenceModal({
                     </button>
                 </div>
 
+                {/* Tag filter */}
+                {tagsAvailableOnEvidence.length > 0 && (
+                    <div className="px-6 pt-4 pb-2 border-b border-gray-100 flex items-center gap-2">
+                        <TagIcon className="w-4 h-4 text-gray-500" />
+                        <span className="text-xs font-medium text-gray-600">Filter by tag:</span>
+                        <div className="relative">
+                            <select
+                                value={tagFilter}
+                                onChange={(e) => setTagFilter(e.target.value)}
+                                className="pl-3 pr-8 py-1.5 text-xs font-medium border border-gray-200 rounded-lg bg-white appearance-none focus:outline-none focus:ring-2 focus:ring-primary-300"
+                            >
+                                <option value="all">All tags</option>
+                                {tagsAvailableOnEvidence.map(t => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                        </div>
+                        {tagFilter !== 'all' && (
+                            <button
+                                onClick={() => setTagFilter('all')}
+                                className="text-[11px] text-gray-500 hover:text-gray-700 ml-1"
+                            >
+                                Clear
+                            </button>
+                        )}
+                        <span className="ml-auto text-[11px] text-gray-500">{filteredEvidence.length} of {evidence.length}</span>
+                    </div>
+                )}
+
                 {/* Content */}
                 <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
-                    {evidence.length === 0 ? (
+                    {filteredEvidence.length === 0 ? (
                         <div className="text-center py-12">
                             <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                             <p className="text-gray-500">No evidence available</p>
@@ -136,6 +189,11 @@ export default function AllEvidenceModal({
                                                                     <Calendar className="w-2.5 h-2.5" />
                                                                     <span>{displayDate}</span>
                                                                 </div>
+                                                                {Array.isArray(ev.tag_ids) && ev.tag_ids.length > 0 && (
+                                                                    <div className="mt-1.5">
+                                                                        <EvidenceTagsList tagIds={ev.tag_ids} size="xs" visibleCap={4} />
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                             <div className="flex items-center gap-1.5 ml-2">
                                                                 <Eye className="w-3 h-3 text-gray-400" />

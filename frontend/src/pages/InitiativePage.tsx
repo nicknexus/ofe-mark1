@@ -22,6 +22,7 @@ import {
 import { apiService } from '../services/api'
 import { InitiativeDashboard, LoadingState, CreateKPIForm, CreateKPIUpdateForm, CreateEvidenceForm, User, Organization } from '../types'
 import { formatDate, getEvidenceColor, getCategoryColor, getEvidenceTypeInfo, getEvidenceStatus } from '../utils'
+import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import { AuthService } from '../services/auth'
 import CreateKPIModal from '../components/CreateKPIModal'
 import AddKPIUpdateModal from '../components/AddKPIUpdateModal'
@@ -132,7 +133,7 @@ export default function InitiativePage() {
         await Promise.all(kpis.map(async (kpi) => {
             try {
                 const updates = await apiService.getKPIUpdates(kpi.id)
-                totals[kpi.id] = updates.reduce((sum: number, update: any) => sum + (update.value || 0), 0)
+                totals[kpi.id] = aggregateKpiUpdates(updates as any, kpi.metric_type)
 
                 // Add KPI info to each update for context
                 updates.forEach((update: any) => {
@@ -605,6 +606,7 @@ export default function InitiativePage() {
                     metricType={selectedKPI.metric_type}
                     unitOfMeasurement={selectedKPI.unit_of_measurement}
                     initiativeId={id!}
+                    kpiTagIds={(selectedKPI as any).tag_ids || []}
                 />
             )}
 

@@ -92,9 +92,27 @@ export interface KPI {
     initiative_id?: string;
     umbrella_kpi_id?: string;
     display_order?: number;
+    // Optional list of org-global metric tag IDs attached to this KPI.
+    // Only present when explicitly fetched (not in default selects).
+    tag_ids?: string[];
     created_at?: string;
     updated_at?: string;
     user_id?: string;
+}
+
+export interface MetricTag {
+    id?: string;
+    organization_id: string;
+    name: string;
+    color?: string | null;
+    parent_id?: string | null;
+    is_public?: boolean;
+    created_by?: string | null;
+    created_at?: string;
+    updated_at?: string;
+    // Populated by service when requested.
+    metric_count?: number;
+    claim_count?: number;
 }
 
 export interface Location {
@@ -125,6 +143,9 @@ export interface KPIUpdate {
         lng: number;
     }[];
     beneficiary_group_ids?: string[];
+    // Optional single tag ID for sub-metric attribution.
+    // Only valid if tag is in the parent KPI's kpi_metric_tags set.
+    tag_id?: string | null;
     created_at?: string;
     updated_at?: string;
     user_id?: string;
@@ -169,6 +190,7 @@ export interface Evidence {
     // New precise linkage to specific KPI updates
     kpi_update_ids?: string[];
     beneficiary_group_ids?: string[];
+    tag_ids?: string[];
     initiative_id?: string;
     created_at?: string;
     updated_at?: string;

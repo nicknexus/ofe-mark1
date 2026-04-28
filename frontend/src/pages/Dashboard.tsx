@@ -26,6 +26,7 @@ import { formatDate, truncateText } from '../utils'
 import toast from 'react-hot-toast'
 import CreateInitiativeModal from '../components/CreateInitiativeModal'
 import LocationMap from '../components/LocationMap'
+import TagsWidget from '../components/MetricTags/TagsWidget'
 import { useTutorial } from '../context/TutorialContext'
 import { useTeam } from '../context/TeamContext'
 
@@ -686,14 +687,22 @@ export default function Dashboard() {
                             </div>
                         </div>
 
-                        {/* Right Rail - Owner widgets (Context Score / Next Steps) */}
+                        {/* Right Rail - Owner widgets (Context Score / Next Steps) + Tags */}
                         {showOwnerWidgets && (
                             <div className="col-span-1 hidden lg:flex flex-col gap-4 min-h-0">
                                 <ContextScoreCard score={contextScore} checks={contextChecks} />
                                 <NextStepsCard steps={nextSteps} loading={isLoadingStats || !contextLoaded} />
+                                <TagsWidget />
                             </div>
                         )}
                     </div>
+
+                    {/* Tags row for team members (no right rail) - desktop + mobile */}
+                    {!showOwnerWidgets && (
+                        <div className="mt-4">
+                            <TagsWidget compact />
+                        </div>
+                    )}
                 </div>
             </div>
 

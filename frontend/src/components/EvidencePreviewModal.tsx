@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { X, Calendar, FileText, Camera, MessageSquare, DollarSign, ExternalLink, Download, Edit, BarChart3, MapPin, Trash2, ChevronLeft, ChevronRight, Eye, Users } from 'lucide-react'
 import { Evidence, Location, BeneficiaryGroup } from '../types'
 import { formatDate, getEvidenceTypeInfo } from '../utils'
+import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import { apiService } from '../services/api'
+import EvidenceTagsList from './MetricTags/EvidenceTagsList'
 
 interface EvidenceFile {
     id: string
@@ -575,6 +577,14 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
                             </div>
                         </div>
 
+                        {/* Tags */}
+                        {Array.isArray(displayEvidence.tag_ids) && displayEvidence.tag_ids.length > 0 && (
+                            <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
+                                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Tags</p>
+                                <EvidenceTagsList tagIds={displayEvidence.tag_ids} size="sm" />
+                            </div>
+                        )}
+
                         {/* Description - Green accent */}
                         {displayEvidence.description && (
                             <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
@@ -628,7 +638,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
                                         return (
                                             <div className="space-y-3">
                                                 {Object.values(groupedByKPI).map((group, groupIndex) => {
-                                                    const total = group.dataPoints.reduce((sum, dp) => sum + (dp.value || 0), 0)
+                                                    const total = aggregateKpiUpdates(group.dataPoints as any, group.kpi?.metric_type)
                                                     
                                                     return (
                                                         <div key={group.kpi?.id || groupIndex} className="bg-gradient-to-br from-primary-50/50 to-primary-50/30 rounded-xl border border-primary-100/60 overflow-hidden">

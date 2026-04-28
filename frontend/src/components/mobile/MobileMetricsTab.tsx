@@ -14,7 +14,9 @@ import {
 import { apiService } from '../../services/api'
 import { KPI, KPIUpdate, Location, CreateKPIUpdateForm } from '../../types'
 import { formatDate, getLocalDateString } from '../../utils'
+import { aggregateKpiUpdates } from '../../utils/kpiAggregation'
 import DateRangePicker from '../DateRangePicker'
+import TagPicker from '../MetricTags/TagPicker'
 import toast from 'react-hot-toast'
 
 interface MobileMetricsTabProps {
@@ -46,7 +48,7 @@ export default function MobileMetricsTab({ initiativeId, autoAdd }: MobileMetric
                 kpiList.map(async (kpi) => {
                     try {
                         const updates = await apiService.getKPIUpdates(kpi.id!)
-                        const total = (updates || []).reduce((sum, u) => sum + (u.value || 0), 0)
+                        const total = aggregateKpiUpdates((updates || []) as any, kpi.metric_type)
                         return { ...kpi, totalValue: total, claimCount: (updates || []).length }
                     } catch {
                         return { ...kpi, totalValue: 0, claimCount: 0 }
@@ -180,7 +182,7 @@ function MobileMetricDetail({ kpi, initiativeId, onBack, autoAdd }: MetricDetail
         }
     }
 
-    const totalValue = updates.reduce((sum, u) => sum + (u.value || 0), 0)
+    const totalValue = aggregateKpiUpdates(updates as any, kpi.metric_type)
 
     if (showAddForm) {
         return (
@@ -218,7 +220,7 @@ function MobileMetricDetail({ kpi, initiativeId, onBack, autoAdd }: MetricDetail
             <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-4">
                 <div className="flex items-center justify-between">
                     <div>
-                        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Total</p>
+                        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">{kpi.metric_type === 'percentage' ? 'Average' : 'Total'}</p>
                         <p className="text-3xl font-bold text-gray-900 mt-1">
                             {totalValue.toLocaleString()}
                             {kpi.metric_type === 'percentage' ? '%' : ''}
@@ -352,6 +354,7 @@ function MobileAddClaimFlow({ kpi, initiativeId, onClose, onSuccess }: AddClaimF
         startDate?: string
         endDate?: string
     }>({})
+    const [selectedTagId, setSelectedTagId] = useState<string | null>(null)
 
     useEffect(() => {
         apiService.getLocations(initiativeId).then(locs => setLocations(locs || []))
@@ -385,6 +388,7 @@ function MobileAddClaimFlow({ kpi, initiativeId, onClose, onSuccess }: AddClaimF
                 label: formData.label.trim(),
                 note: formData.note.trim() || undefined,
                 location_id: formData.locationId,
+                tag_id: selectedTagId,
             }
             await apiService.createKPIUpdate(kpi.id!, data)
             toast.success('Impact claim added!')
@@ -550,6 +554,18 @@ function MobileAddClaimFlow({ kpi, initiativeId, onClose, onSuccess }: AddClaimF
                                 className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm resize-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 focus:outline-none"
                             />
                         </div>
+
+                        {Array.isArray((kpi as any).tag_ids) && (kpi as any).tag_ids.length > 0 && (
+                            <TagPicker
+                                mode="single"
+                                allowedTagIds={(kpi as any).tag_ids}
+                                selectedIds={selectedTagId ? [selectedTagId] : []}
+                                onChange={(ids) => setSelectedTagId(ids[0] || null)}
+                                label="Tag (optional)"
+                                helperText="Pick one sub-metric tag this claim belongs to."
+                                canCreate={false}
+                            />
+                        )}
 
                         {/* Summary */}
                         <div className="bg-gray-50 rounded-xl p-4 space-y-2">

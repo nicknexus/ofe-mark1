@@ -1,5 +1,6 @@
 import { supabase } from '../utils/supabase';
 import { InitiativeService } from './initiativeService';
+import { aggregateKpiUpdates } from '../utils/kpiAggregation';
 
 export interface ReportDataFilters {
     initiativeId: string;
@@ -30,6 +31,7 @@ export interface ReportDataResponse {
         kpi_title: string;
         kpi_description: string;
         unit_of_measurement: string;
+        metric_type: 'number' | 'percentage' | string;
         total_value: number;
         count: number;
     }>;
@@ -161,27 +163,51 @@ export class ReportService {
             }
         }
 
-        // Calculate totals grouped by KPI
-        const totalsMap = new Map<string, { kpi_id: string; kpi_title: string; kpi_description: string; unit_of_measurement: string; total_value: number; count: number }>();
+        // Calculate totals grouped by KPI. We collect raw values per KPI then
+        // run the aggregation helper so percentage metrics get averaged instead
+        // of summed. NOTE: report metrics are deduped by location/ben-group join
+        // so the same kpi_update may appear multiple times. We dedupe by metric.id
+        // (kpi_update id) before aggregating.
+        type Bucket = {
+            kpi_id: string;
+            kpi_title: string;
+            kpi_description: string;
+            unit_of_measurement: string;
+            metric_type: string;
+            updates: Map<string, { value: number; date_represented?: string }>;
+        };
+        const bucketMap = new Map<string, Bucket>();
 
         metrics.forEach((metric: any) => {
             const key = metric.kpi_id;
-            if (!totalsMap.has(key)) {
-                totalsMap.set(key, {
+            if (!bucketMap.has(key)) {
+                bucketMap.set(key, {
                     kpi_id: metric.kpi_id,
                     kpi_title: metric.kpi_title,
                     kpi_description: metric.kpi_description || '',
                     unit_of_measurement: metric.unit_of_measurement,
-                    total_value: 0,
-                    count: 0
+                    metric_type: metric.metric_type || 'number',
+                    updates: new Map()
                 });
             }
-            const total = totalsMap.get(key)!;
-            total.total_value += parseFloat(metric.value) || 0;
-            total.count += 1;
+            const bucket = bucketMap.get(key)!;
+            if (!bucket.updates.has(metric.id)) {
+                bucket.updates.set(metric.id, {
+                    value: parseFloat(metric.value) || 0,
+                    date_represented: metric.date_represented
+                });
+            }
         });
 
-        const totals = Array.from(totalsMap.values());
+        const totals = Array.from(bucketMap.values()).map(b => ({
+            kpi_id: b.kpi_id,
+            kpi_title: b.kpi_title,
+            kpi_description: b.kpi_description,
+            unit_of_measurement: b.unit_of_measurement,
+            metric_type: b.metric_type,
+            total_value: aggregateKpiUpdates(Array.from(b.updates.values()), b.metric_type),
+            count: b.updates.size
+        }));
 
         // Get distinct locations from filtered metrics
         const locationMap = new Map<string, { id: string; name: string; description?: string; latitude: number; longitude: number }>();

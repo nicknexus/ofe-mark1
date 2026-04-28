@@ -3,9 +3,11 @@ import { X, Upload, Calendar, Link as LinkIcon, FileText, Camera, DollarSign, Me
 import { CreateEvidenceForm, KPI, KPIWithEvidence, Location, BeneficiaryGroup } from '../types'
 import { apiService } from '../services/api'
 import { formatDate, getLocalDateString } from '../utils'
+import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import { useUploadManager } from '../context/UploadContext'
 import LocationModal from './LocationModal'
 import DateRangePicker from './DateRangePicker'
+import TagPicker from './MetricTags/TagPicker'
 import toast from 'react-hot-toast'
 
 interface AddEvidenceModalProps {
@@ -65,6 +67,8 @@ export default function AddEvidenceModal({
     const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
     const [selectedBeneficiaryGroupIds, setSelectedBeneficiaryGroupIds] = useState<string[]>([])
     const [hasChangedBeneficiaryGroups, setHasChangedBeneficiaryGroups] = useState(false)
+    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+    const [hasChangedTags, setHasChangedTags] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
     const totalSteps = 5
 
@@ -144,6 +148,9 @@ export default function AddEvidenceModal({
                     setSelectedBeneficiaryGroupIds(fullEvidence.beneficiary_group_ids || [])
                     setHasChangedBeneficiaryGroups(false)
 
+                    setSelectedTagIds(fullEvidence.tag_ids || [])
+                    setHasChangedTags(false)
+
                     // Store initial KPI IDs to track changes
                     setInitialKpiIds(kpiIds)
                     setHasChangedKPIs(false)
@@ -176,6 +183,8 @@ export default function AddEvidenceModal({
                     setSelectedLocationIds(editData.location_ids || (editData.location_id ? [editData.location_id] : []))
                     setSelectedBeneficiaryGroupIds(editData.beneficiary_group_ids || [])
                     setHasChangedBeneficiaryGroups(false)
+                    setSelectedTagIds(editData.tag_ids || [])
+                    setHasChangedTags(false)
                     setInitialKpiIds(kpiIds)
                     setHasChangedKPIs(false)
                     setSelectedUpdateIds([])
@@ -194,6 +203,8 @@ export default function AddEvidenceModal({
             setIsInitialFetch(true)
             setSelectedBeneficiaryGroupIds([])
             setHasChangedBeneficiaryGroups(false)
+            setSelectedTagIds([])
+            setHasChangedTags(false)
         }
     }, [editData?.id, initiativeId, isOpen])
 
@@ -299,8 +310,7 @@ export default function AddEvidenceModal({
                     // Find KPI info
                     const kpi = availableKPIs.find(k => k.id === kpiId)
                     if (kpi) {
-                        // Calculate total for this KPI
-                        const total = matchingUpdates.reduce((sum, update) => sum + update.value, 0)
+                        const total = aggregateKpiUpdates(matchingUpdates as any, kpi.metric_type)
 
                         // Add KPI info and location name to each update
                         const updatesWithKPI = matchingUpdates.map(update => {
@@ -385,6 +395,9 @@ export default function AddEvidenceModal({
             submitData.location_ids = selectedLocationIds
             if (!editData || hasChangedBeneficiaryGroups) {
                 submitData.beneficiary_group_ids = selectedBeneficiaryGroupIds
+            }
+            if (!editData || hasChangedTags) {
+                submitData.tag_ids = selectedTagIds
             }
 
             // If there are files to upload, queue them in background and close modal immediately
@@ -563,13 +576,13 @@ export default function AddEvidenceModal({
     const canProceedToNextStep = () => {
         switch (currentStep) {
             case 1:
-                return !!formData.type
+                return !!formData.type && !!(datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate)) && selectedLocationIds.length > 0
             case 2:
-                return !!(datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate)) && selectedLocationIds.length > 0
-            case 3:
                 return !!(formData.kpi_ids && formData.kpi_ids.length > 0)
+            case 3:
+                return true // Tags step is optional (can skip with no tags)
             case 4:
-                return true // Impact claims step is optional
+                return true // Beneficiaries optional
             case 5:
                 return !!formData.title && (selectedFiles.length > 0 || !!formData.file_url || (editData && editData.file_url))
             default:
@@ -590,9 +603,9 @@ export default function AddEvidenceModal({
     }
 
     const steps = [
-        { number: 1, title: 'Evidence Type' },
-        { number: 2, title: 'Date & Location' },
-        { number: 3, title: 'Metrics' },
+        { number: 1, title: 'Type & When' },
+        { number: 2, title: 'Metrics' },
+        { number: 3, title: 'Tags' },
         { number: 4, title: 'Beneficiaries' },
         { number: 5, title: 'Details & Upload' }
     ]
@@ -600,33 +613,28 @@ export default function AddEvidenceModal({
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-0 md:p-4 z-[60] animate-fade-in">
-            <div className="bg-white md:bg-white/70 md:backdrop-blur-2xl md:rounded-3xl w-full h-full md:max-w-4xl md:w-full md:max-h-[90vh] md:h-auto overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] md:border md:border-white/60 transform transition-all duration-200 ease-out animate-slide-up-fast flex flex-col">
+        <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-0 md:p-3 z-[60] animate-fade-in">
+            <div className="bg-white md:bg-white/70 md:backdrop-blur-2xl md:rounded-2xl w-full h-full md:w-[70vw] md:max-w-[1200px] md:max-h-[97vh] md:h-[97vh] overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] md:border md:border-white/60 transform transition-all duration-200 ease-out animate-slide-up-fast flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between p-4 md:p-6 border-b border-evidence-200/40 bg-gradient-to-r from-evidence-100/50 to-evidence-50/30 backdrop-blur-xl">
+                <div className="flex items-center justify-between px-4 md:px-6 py-2.5 md:py-3 border-b border-evidence-200/40 bg-gradient-to-r from-evidence-100/50 to-evidence-50/30 backdrop-blur-xl flex-shrink-0">
                     <div className="flex items-center space-x-3 flex-1 min-w-0">
-                        <div className="w-9 h-9 md:w-11 md:h-11 rounded-xl bg-evidence-500/15 backdrop-blur-sm flex items-center justify-center border border-evidence-300/30 flex-shrink-0">
-                            <FileText className="w-5 h-5 md:w-6 md:h-6 text-evidence-500" />
+                        <div className="w-8 h-8 rounded-lg bg-evidence-500/15 backdrop-blur-sm flex items-center justify-center border border-evidence-300/30 flex-shrink-0">
+                            <FileText className="w-4 h-4 text-evidence-500" />
                         </div>
-                        <div className="min-w-0">
-                            <h2 className="text-base md:text-xl font-semibold text-gray-800">
-                                {editData ? 'Edit Evidence' : 'Upload Evidence'}
-                            </h2>
-                            <p className="text-xs md:text-sm text-gray-500 mt-0.5 line-clamp-1">
-                                {editData ? 'Update your evidence' : 'Add supporting evidence'}
-                            </p>
-                        </div>
+                        <h2 className="text-sm md:text-base font-semibold text-gray-800 truncate">
+                            {editData ? 'Edit Evidence' : 'Upload Evidence'}
+                        </h2>
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 p-2 rounded-xl hover:bg-white/60 transition-all duration-200 ml-2 md:ml-4 flex-shrink-0"
+                        className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-white/60 transition-all duration-200 ml-2 md:ml-4 flex-shrink-0"
                     >
                         <X className="w-5 h-5" />
                     </button>
                 </div>
 
                 {/* Progress Steps Indicator - Simplified on mobile */}
-                <div className="px-4 md:px-6 py-3 md:py-4 border-b border-evidence-100/40 bg-white/30 backdrop-blur-xl">
+                <div className="px-4 md:px-6 py-2 md:py-3.5 border-b border-evidence-100/40 bg-white/30 backdrop-blur-xl flex-shrink-0">
                     {/* Mobile: Simple progress bar */}
                     <div className="md:hidden">
                         <div className="flex items-center justify-between mb-2">
@@ -641,35 +649,33 @@ export default function AddEvidenceModal({
                         </div>
                     </div>
                     {/* Desktop: Full step indicator */}
-                    <div className="hidden md:flex items-center justify-center">
+                    <div className="hidden md:flex items-center justify-center gap-1">
                         {steps.map((step, index) => (
                             <React.Fragment key={step.number}>
-                                <div className="flex flex-col items-center">
-                                    <div className={`flex items-center justify-center w-10 h-10 rounded-xl border-2 transition-all duration-200 ${
+                                <div className="flex items-center gap-2.5">
+                                    <div className={`flex items-center justify-center w-9 h-9 rounded-xl border-2 transition-all duration-200 ${
                                         currentStep > step.number
-                                            ? 'bg-evidence-500 border-evidence-500 text-white shadow-lg shadow-evidence-500/30'
+                                            ? 'bg-evidence-500 border-evidence-500 text-white shadow-md shadow-evidence-500/25'
                                             : currentStep === step.number
-                                            ? 'bg-evidence-500 border-evidence-500 text-white ring-4 ring-evidence-200/50 shadow-lg shadow-evidence-500/30'
+                                            ? 'bg-evidence-500 border-evidence-500 text-white ring-4 ring-evidence-200/50 shadow-md shadow-evidence-500/25'
                                             : 'bg-white/50 backdrop-blur-sm border-gray-200/60 text-gray-400'
                                     }`}>
                                         {currentStep > step.number ? (
-                                            <Check className="w-5 h-5" />
+                                            <Check className="w-4.5 h-4.5" />
                                         ) : (
                                             <span className="text-sm font-semibold">{step.number}</span>
                                         )}
                                     </div>
-                                    <div className="mt-2 text-center">
-                                        <div className={`text-xs font-medium whitespace-nowrap ${
-                                            currentStep >= step.number ? 'text-gray-700' : 'text-gray-400'
-                                        }`}>
-                                            {step.title}
-                                        </div>
+                                    <div className={`text-sm font-medium whitespace-nowrap ${
+                                        currentStep >= step.number ? 'text-gray-700' : 'text-gray-400'
+                                    }`}>
+                                        {step.title}
                                     </div>
                                 </div>
                                 {index < steps.length - 1 && (
-                                    <div className={`flex-1 h-0.5 mx-4 rounded-full transition-all duration-200 ${
+                                    <div className={`h-0.5 w-10 lg:w-16 mx-3 rounded-full transition-all duration-200 ${
                                         currentStep > step.number ? 'bg-evidence-500' : 'bg-gray-200/60'
-                                    }`} style={{ maxWidth: '120px' }} />
+                                    }`} />
                                 )}
                             </React.Fragment>
                         ))}
@@ -677,55 +683,54 @@ export default function AddEvidenceModal({
                 </div>
 
                 {/* Form Content */}
-                <form onSubmit={(e) => { e.preventDefault(); if (currentStep === totalSteps) handleSubmit(e); }} className="flex-1 overflow-y-auto">
-                    <div className="p-8 min-h-[400px]">
-                        {/* Step 1: Evidence Type */}
+                <form onSubmit={(e) => { e.preventDefault(); if (currentStep === totalSteps) handleSubmit(e); }} className="flex-1 overflow-y-auto min-h-0">
+                    <div className="px-4 md:px-6 py-4 md:py-5">
+                        {/* Step 1: Type, Date & Location */}
                         {currentStep === 1 && (
-                            <div className="space-y-6 animate-fade-in">
-                                <div className="text-center mb-8">
-                                    <h3 className="text-2xl font-semibold text-gray-900 mb-2">Select Evidence Type</h3>
-                                    <p className="text-gray-600">Choose the type of evidence you're uploading</p>
+                            <div className="space-y-4 animate-fade-in max-w-4xl mx-auto">
+                                <div className="text-center mb-1">
+                                    <h3 className="text-lg font-semibold text-gray-900">Type, When & Where</h3>
+                                    <p className="text-gray-500 text-xs">Pick the type, date, and location for this evidence</p>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4 max-w-2xl mx-auto">
-                            {evidenceTypes.map(({ value, label, icon: Icon, description }) => (
-                                <label
-                                    key={value}
-                                            className={`relative flex flex-col items-center p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
-                                                formData.type === value
-                                                    ? 'border-primary-500 bg-primary-50 shadow-lg scale-[1.02]'
-                                                    : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50 hover:shadow-md'
-                                        }`}
-                                >
-                                    <input
-                                        type="radio"
-                                        name="type"
-                                        value={value}
-                                        checked={formData.type === value}
-                                        onChange={handleInputChange}
-                                        className="sr-only"
-                                    />
-                                            <Icon className={`w-12 h-12 mb-3 ${formData.type === value ? 'text-primary-500' : 'text-gray-400'}`} />
-                                            <div className="font-semibold text-gray-900 mb-1">{label}</div>
-                                            <div className="text-xs text-gray-500 text-center">{description}</div>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-                        )}
 
-                        {/* Step 2: Date & Location */}
-                        {currentStep === 2 && (
-                            <div className="space-y-8 animate-fade-in max-w-2xl mx-auto">
-                                <div className="text-center mb-6">
-                                    <h3 className="text-2xl font-semibold text-gray-900 mb-2">When & Where</h3>
-                                    <p className="text-gray-600">Select the date and location for this evidence</p>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                        <FileText className="w-4 h-4 inline mr-1.5 text-primary-500" />
+                                        Evidence type <span className="text-red-500">*</span>
+                                    </label>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                        {evidenceTypes.map(({ value, label, icon: Icon, description }) => (
+                                            <label
+                                                key={value}
+                                                className={`relative flex items-center gap-2 p-2.5 border-2 rounded-lg cursor-pointer transition-all duration-150 ${
+                                                    formData.type === value
+                                                        ? 'border-primary-500 bg-primary-50 shadow-sm'
+                                                        : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
+                                                }`}
+                                            >
+                                                <input
+                                                    type="radio"
+                                                    name="type"
+                                                    value={value}
+                                                    checked={formData.type === value}
+                                                    onChange={handleInputChange}
+                                                    className="sr-only"
+                                                />
+                                                <Icon className={`w-5 h-5 flex-shrink-0 ${formData.type === value ? 'text-primary-500' : 'text-gray-400'}`} />
+                                                <div className="min-w-0">
+                                                    <div className="text-xs font-semibold text-gray-900 truncate">{label}</div>
+                                                    <div className="text-[10px] text-gray-500 truncate">{description}</div>
+                                                </div>
+                                            </label>
+                                        ))}
+                                    </div>
                                 </div>
-                                
-                                <div className="space-y-6">
+
+                                <div className="space-y-4">
                     <div>
-                                        <label className="block text-sm font-semibold text-gray-900 mb-3">
-                                            <Calendar className="w-5 h-5 inline mr-2 text-primary-500" />
-                                            Date this evidence represents <span className="text-red-500">*</span>
+                                        <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                            <Calendar className="w-4 h-4 inline mr-1.5 text-primary-500" />
+                                            Date <span className="text-red-500">*</span>
                         </label>
                                         <DateRangePicker
                                             value={datePickerValue}
@@ -753,26 +758,25 @@ export default function AddEvidenceModal({
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-900 mb-3">
-                                            <MapPin className="w-5 h-5 inline mr-2 text-primary-500" />
-                                            Locations <span className="text-red-500">*</span>
-                                            <span className="ml-2 text-xs font-normal text-gray-500">
-                                                ({selectedLocationIds.length} selected)
+                                        <label className="flex items-center justify-between text-sm font-semibold text-gray-900 mb-2">
+                                            <span>
+                                                <MapPin className="w-4 h-4 inline mr-1.5 text-primary-500" />
+                                                Locations <span className="text-red-500">*</span>
+                                                <span className="ml-2 text-xs font-normal text-gray-500">
+                                                    ({selectedLocationIds.length})
+                                                </span>
                                             </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsLocationModalOpen(true)}
+                                                className="px-2 py-1 border border-gray-300 rounded-md hover:bg-gray-50 text-[11px] font-medium text-gray-700 flex items-center gap-1 transition-colors"
+                                                title="Add new location"
+                                            >
+                                                <Plus className="w-3 h-3" />
+                                                <span>New</span>
+                                            </button>
                                         </label>
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between">
-                                                <p className="text-xs text-gray-500">Select all locations where this evidence applies</p>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setIsLocationModalOpen(true)}
-                                                    className="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-xs font-medium text-gray-700 flex items-center gap-1 transition-colors"
-                                                    title="Add new location"
-                                                >
-                                                    <Plus className="w-4 h-4" />
-                                                    <span>New Location</span>
-                                                </button>
-                                            </div>
+                                        <div className="space-y-2">
                                             {locations.length === 0 ? (
                                                 <div className="text-center py-6 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
                                                     <p className="text-gray-500 text-sm">No locations available.</p>
@@ -785,16 +789,16 @@ export default function AddEvidenceModal({
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-xl p-3 bg-gray-50">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-64 overflow-y-auto p-1">
                                                     {locations.map((location) => {
                                                         const isChecked = selectedLocationIds.includes(location.id!)
                                                         return (
                                                             <label
                                                                 key={location.id}
-                                                                className={`flex items-center p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                                                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors cursor-pointer ${
                                                                     isChecked
                                                                         ? 'bg-primary-50 border-primary-300'
-                                                                        : 'bg-white border-gray-200 hover:border-primary-300'
+                                                                        : 'bg-white border-gray-200 hover:border-primary-300 hover:bg-gray-50'
                                                                 }`}
                                                             >
                                                                 <input
@@ -807,14 +811,9 @@ export default function AddEvidenceModal({
                                                                                 : [...prev, location.id!]
                                                                         )
                                                                     }}
-                                                                    className="mr-3 w-4 h-4 text-primary-500 rounded border-gray-300 focus:ring-primary-500"
+                                                                    className="w-3.5 h-3.5 text-primary-500 rounded border-gray-300 focus:ring-primary-500 flex-shrink-0"
                                                                 />
-                                                                <div className="flex-1">
-                                                                    <span className="font-medium text-gray-900">{location.name}</span>
-                                                                    {location.description && (
-                                                                        <p className="text-xs text-gray-500 mt-0.5">{location.description}</p>
-                                                                    )}
-                                                                </div>
+                                                                <span className="text-sm font-medium text-gray-800 truncate">{location.name}</span>
                                                             </label>
                                                         )
                                                     })}
@@ -826,12 +825,12 @@ export default function AddEvidenceModal({
                             </div>
                         )}
 
-                        {/* Step 3: Metrics */}
-                        {currentStep === 3 && (
-                            <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
-                                <div className="text-center mb-6">
-                                    <h3 className="text-2xl font-semibold text-gray-900 mb-2">Link to Metrics</h3>
-                                    <p className="text-gray-600">Select which metrics this evidence supports</p>
+                        {/* Step 2: Metrics */}
+                        {currentStep === 2 && (
+                            <div className="space-y-3 animate-fade-in max-w-4xl mx-auto">
+                                <div className="text-center mb-1">
+                                    <h3 className="text-lg font-semibold text-gray-900">Link to Metrics</h3>
+                                    <p className="text-gray-500 text-xs">Select which metrics this evidence supports</p>
                                 </div>
                                 
                         {availableKPIs.length === 0 ? (
@@ -839,9 +838,9 @@ export default function AddEvidenceModal({
                                         <p className="text-gray-500">No metrics available. Create metrics first.</p>
                                     </div>
                                 ) : (
-                                    <div className="space-y-3">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <span className="text-sm text-gray-600">
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-gray-500">
                                                 {formData.kpi_ids?.length || 0} of {availableKPIs.length} selected
                                             </span>
                                             <button
@@ -859,12 +858,12 @@ export default function AddEvidenceModal({
                                                         setHasChangedKPIs(hasChanged)
                                                     }
                                                 }}
-                                                className="text-sm px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
+                                                className="text-[11px] px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-700 font-medium transition-colors"
                                             >
                                                 Select All
                                             </button>
                                         </div>
-                                        <div className="space-y-2 max-h-96 overflow-y-auto border border-gray-200 rounded-xl p-4 bg-gray-50">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-[60vh] overflow-y-auto p-1">
                                 {[...availableKPIs].sort((a, b) => {
                                     const aIsPreSelected = preSelectedKPIId === a.id
                                     const bIsPreSelected = preSelectedKPIId === b.id
@@ -878,11 +877,11 @@ export default function AddEvidenceModal({
                                     return (
                                     <label
                                         key={kpi.id}
-                                                        className={`flex items-center p-4 rounded-lg border-2 transition-all ${
+                                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors ${
                                                             isDisabled 
                                                                 ? 'cursor-not-allowed opacity-60 bg-white border-gray-200' 
                                                                 : isChecked
-                                                                ? 'bg-primary-50 border-primary-300 cursor-pointer hover:bg-primary-100'
+                                                                ? 'bg-primary-50 border-primary-300 cursor-pointer'
                                                                 : 'bg-white border-gray-200 hover:border-primary-300 cursor-pointer hover:bg-gray-50'
                                                         }`}
                                     >
@@ -891,23 +890,21 @@ export default function AddEvidenceModal({
                                                 checked={isChecked || isPreSelected}
                                                 onChange={() => !isDisabled && handleKPISelection(kpi.id!)}
                                                 disabled={isDisabled}
-                                                            className="mr-4 w-5 h-5 text-primary-500 rounded border-gray-300 focus:ring-primary-500"
+                                                            className="w-3.5 h-3.5 text-primary-500 rounded border-gray-300 focus:ring-primary-500 flex-shrink-0"
                                         />
-                                        <div className="flex-1">
-                                                            <div className="flex items-center space-x-3">
-                                                                <div className="font-semibold text-gray-900">{kpi.title}</div>
+                                        <div className="flex-1 min-w-0 flex items-center gap-2">
+                                            <span className="text-sm font-medium text-gray-800 truncate">{kpi.title}</span>
                                                     {isPreSelected && (
-                                                                    <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                                                                    <span className="inline-flex items-center px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-medium rounded-full flex-shrink-0">
                                                             Pre-selected
                                                         </span>
                                                     )}
                                                 {'total_updates' in kpi && kpi.total_updates > 0 && (
-                                                                    <span className="inline-flex items-center justify-center w-6 h-6 bg-primary-500 text-white text-xs font-bold rounded-full">
+                                                                    <span className="inline-flex items-center justify-center w-4 h-4 bg-primary-500 text-white text-[10px] font-bold rounded-full flex-shrink-0">
                                                         {kpi.total_updates > 99 ? '99+' : kpi.total_updates}
                                                     </span>
                                                 )}
                                             </div>
-                                        </div>
                                     </label>
                                     )
                                 })}
@@ -917,14 +914,74 @@ export default function AddEvidenceModal({
                     </div>
                         )}
 
+                        {/* Step 3: Tags (optional) */}
+                        {currentStep === 3 && (
+                            <div className="space-y-3 animate-fade-in max-w-3xl mx-auto">
+                                <div className="text-center mb-1">
+                                    <h3 className="text-lg font-semibold text-gray-900">Tags</h3>
+                                    <p className="text-gray-500 text-xs">Pick any tags to associate with this evidence. Optional.</p>
+                                </div>
+
+                                <TagPicker
+                                    mode="multi-grouped"
+                                    selectedIds={selectedTagIds}
+                                    onChange={(ids) => {
+                                        setSelectedTagIds(ids)
+                                        if (editData) setHasChangedTags(true)
+                                    }}
+                                    groups={(() => {
+                                        const selectedKpis = availableKPIs.filter(k => (formData.kpi_ids || []).includes(k.id!))
+                                        return selectedKpis.map(k => ({
+                                            metricId: k.id!,
+                                            metricTitle: k.title,
+                                            tagIds: ((k as any).tag_ids || []) as string[],
+                                        }))
+                                    })()}
+                                    canCreate={false}
+                                    helperText="Tags shown are pulled from the metrics you selected. You can skip this step."
+                                />
+
+                                {selectedTagIds.length > 0 && (() => {
+                                    const groupedIds = new Set<string>()
+                                    for (const k of availableKPIs) {
+                                        if (!(formData.kpi_ids || []).includes(k.id!)) continue
+                                        for (const tid of (((k as any).tag_ids || []) as string[])) groupedIds.add(tid)
+                                    }
+                                    const orphanIds = selectedTagIds.filter(id => !groupedIds.has(id))
+                                    if (orphanIds.length === 0) return null
+                                    return (
+                                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                                            <p className="text-xs font-medium text-amber-800 mb-2">
+                                                Other tags currently on this evidence (not on any selected metric):
+                                            </p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {orphanIds.map(tid => (
+                                                    <button
+                                                        key={tid}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setSelectedTagIds(prev => prev.filter(x => x !== tid))
+                                                            if (editData) setHasChangedTags(true)
+                                                        }}
+                                                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-full border border-amber-300"
+                                                        title="Click to remove"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )
+                                })()}
+                            </div>
+                        )}
+
                         {/* Step 4: Beneficiaries (optional) */}
                         {currentStep === 4 && (
-                            <div className="space-y-6 animate-fade-in max-w-3xl mx-auto">
-                                <div className="text-center mb-6">
-                                    <h3 className="text-2xl font-semibold text-gray-900 mb-2">Beneficiaries</h3>
-                                    <p className="text-gray-600">
-                                        Optionally link this evidence to beneficiary groups
-                                    </p>
+                            <div className="space-y-3 animate-fade-in max-w-4xl mx-auto">
+                                <div className="text-center mb-1">
+                                    <h3 className="text-lg font-semibold text-gray-900">Beneficiaries</h3>
+                                    <p className="text-gray-500 text-xs">Optionally link this evidence to beneficiary groups</p>
                                 </div>
 
                                 {beneficiaryGroups.length === 0 ? (
@@ -934,15 +991,15 @@ export default function AddEvidenceModal({
                                         <p className="text-sm text-gray-400 mt-1">You can add beneficiary groups from the Beneficiaries tab.</p>
                                     </div>
                                 ) : (
-                                    <div className="space-y-4">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-sm font-medium text-gray-700">
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-gray-500">
                                                 {selectedBeneficiaryGroupIds.length} of {beneficiaryGroups.length} selected
                                             </span>
-                                            <div className="space-x-2">
+                                            <div className="flex gap-1.5">
                                                 <button
                                                     type="button"
-                                                    className="text-sm px-4 py-2 bg-white hover:bg-blue-100 border border-blue-300 rounded-lg text-blue-700 font-medium transition-colors"
+                                                    className="text-[11px] px-2 py-1 bg-white hover:bg-blue-50 border border-blue-200 rounded-md text-blue-700 font-medium transition-colors"
                                                     onClick={() => {
                                                         setSelectedBeneficiaryGroupIds(beneficiaryGroups.map(g => g.id!))
                                                         if (editData) setHasChangedBeneficiaryGroups(true)
@@ -952,7 +1009,7 @@ export default function AddEvidenceModal({
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    className="text-sm px-4 py-2 bg-white hover:bg-blue-100 border border-blue-300 rounded-lg text-blue-700 font-medium transition-colors"
+                                                    className="text-[11px] px-2 py-1 bg-white hover:bg-gray-50 border border-gray-200 rounded-md text-gray-600 font-medium transition-colors"
                                                     onClick={() => {
                                                         setSelectedBeneficiaryGroupIds([])
                                                         if (editData) setHasChangedBeneficiaryGroups(true)
@@ -962,51 +1019,31 @@ export default function AddEvidenceModal({
                                                 </button>
                                             </div>
                                         </div>
-                                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-[60vh] overflow-y-auto p-1">
                                             {beneficiaryGroups.map((group) => {
                                                 const checked = selectedBeneficiaryGroupIds.includes(group.id!)
-                                                const locationName = locations.find(l => l.id === group.location_id)?.name
                                                 return (
-                                                    <div key={group.id} className={`bg-white rounded-lg border-2 transition-colors ${checked ? 'border-primary-400 bg-primary-50/30' : 'border-gray-200'}`}>
-                                                        <label className="flex items-start p-4 cursor-pointer hover:bg-gray-50 rounded-lg">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={checked}
-                                                                onChange={() => {
-                                                                    setSelectedBeneficiaryGroupIds(prev =>
-                                                                        checked ? prev.filter(id => id !== group.id) : [...prev, group.id!]
-                                                                    )
-                                                                    if (editData) setHasChangedBeneficiaryGroups(true)
-                                                                }}
-                                                                className="mt-1 w-5 h-5 text-primary-500 rounded border-gray-300 focus:ring-primary-500"
-                                                            />
-                                                            <div className="ml-4 flex-1 min-w-0">
-                                                                <div className="flex items-center space-x-2 mb-1">
-                                                                    <Users className="w-4 h-4 text-primary-500" />
-                                                                    <span className="font-semibold text-gray-900">{group.name}</span>
-                                                                    {group.total_number && (
-                                                                        <span className="text-xs font-medium px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
-                                                                            {group.total_number.toLocaleString()} beneficiaries
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                {group.description && (
-                                                                    <p className="text-sm text-gray-600 mb-1">{group.description}</p>
-                                                                )}
-                                                                <div className="flex items-center gap-3 text-xs text-gray-500">
-                                                                    {locationName && (
-                                                                        <span className="flex items-center">
-                                                                            <MapPin className="w-3 h-3 mr-1" />
-                                                                            {locationName}
-                                                                        </span>
-                                                                    )}
-                                                                    {group.age_range_start != null && group.age_range_end != null && (
-                                                                        <span>Ages {group.age_range_start}–{group.age_range_end}</span>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </label>
-                                                    </div>
+                                                    <label
+                                                        key={group.id}
+                                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors cursor-pointer ${
+                                                            checked
+                                                                ? 'bg-primary-50 border-primary-300'
+                                                                : 'bg-white border-gray-200 hover:border-primary-300 hover:bg-gray-50'
+                                                        }`}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={checked}
+                                                            onChange={() => {
+                                                                setSelectedBeneficiaryGroupIds(prev =>
+                                                                    checked ? prev.filter(id => id !== group.id) : [...prev, group.id!]
+                                                                )
+                                                                if (editData) setHasChangedBeneficiaryGroups(true)
+                                                            }}
+                                                            className="w-3.5 h-3.5 text-primary-500 rounded border-gray-300 focus:ring-primary-500 flex-shrink-0"
+                                                        />
+                                                        <span className="text-sm font-medium text-gray-800 truncate">{group.name}</span>
+                                                    </label>
                                                 )
                                             })}
                                         </div>
@@ -1017,10 +1054,10 @@ export default function AddEvidenceModal({
 
                         {/* Step 5: Title, Description & Upload */}
                         {currentStep === 5 && (
-                            <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
-                                <div className="text-center mb-6">
-                                    <h3 className="text-2xl font-semibold text-gray-900 mb-2">Details & Upload</h3>
-                                    <p className="text-gray-600">Add title, description, and upload your file</p>
+                            <div className="space-y-4 animate-fade-in max-w-3xl mx-auto">
+                                <div className="text-center mb-1">
+                                    <h3 className="text-lg font-semibold text-gray-900">Details & Upload</h3>
+                                    <p className="text-gray-500 text-xs">Add title, description, and upload your file</p>
                     </div>
 
                                 <div className="space-y-6">
@@ -1197,41 +1234,41 @@ export default function AddEvidenceModal({
                 </form>
 
                 {/* Navigation Footer */}
-                <div className="border-t border-evidence-100/40 p-6 bg-white/30 backdrop-blur-xl">
-                    <div className="flex items-center justify-between">
+                <div className="border-t border-evidence-100/40 px-4 md:px-6 py-2.5 bg-white/30 backdrop-blur-xl flex-shrink-0">
+                    <div className="flex items-center justify-between gap-3">
                         <button
                             type="button"
                             onClick={currentStep === 1 ? onClose : handleBack}
-                            className="flex items-center space-x-2 px-5 py-3 text-gray-600 bg-white/50 backdrop-blur-sm border border-gray-200/60 rounded-xl hover:bg-white/70 font-medium transition-all duration-200"
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 text-sm text-gray-600 bg-white/50 backdrop-blur-sm border border-gray-200/60 rounded-lg hover:bg-white/70 font-medium transition-all duration-200"
                         >
                             {currentStep === 1 ? (
                                 <>
-                                    <X className="w-5 h-5" />
+                                    <X className="w-4 h-4" />
                                     <span>Cancel</span>
                                 </>
                             ) : (
                                 <>
-                                    <ChevronLeft className="w-5 h-5" />
+                                    <ChevronLeft className="w-4 h-4" />
                                     <span>Back</span>
                                 </>
                             )}
                         </button>
 
-                        <div className="flex items-center space-x-3 relative z-10">
-                        {uploadProgress && (
-                                <div className="px-4 py-2 text-sm text-evidence-700 bg-evidence-50/80 backdrop-blur-sm rounded-xl border border-evidence-200/60">
-                                {uploadProgress}
-                            </div>
-                        )}
+                        <div className="flex items-center gap-2 relative z-10">
+                            {uploadProgress && (
+                                <div className="px-3 py-1 text-xs text-evidence-700 bg-evidence-50/80 backdrop-blur-sm rounded-lg border border-evidence-200/60">
+                                    {uploadProgress}
+                                </div>
+                            )}
                             {currentStep < totalSteps ? (
                                 <button
                                     type="button"
                                     onClick={handleNext}
                                     disabled={!canProceedToNextStep()}
-                                    className="flex items-center space-x-2 px-6 py-3 bg-evidence-500 text-white rounded-xl hover:bg-evidence-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/30 hover:shadow-xl hover:shadow-evidence-500/40 relative z-10"
+                                    className="flex items-center gap-1.5 px-4 py-1.5 text-sm bg-evidence-500 text-white rounded-lg hover:bg-evidence-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-200 shadow-md shadow-evidence-500/30 hover:shadow-lg hover:shadow-evidence-500/40 relative z-10"
                                 >
                                     <span>Next</span>
-                                    <ChevronRight className="w-5 h-5" />
+                                    <ChevronRight className="w-4 h-4" />
                                 </button>
                             ) : (
                                 <button
@@ -1241,22 +1278,22 @@ export default function AddEvidenceModal({
                                         e.preventDefault()
                                         handleSubmit(e)
                                     }}
-                                    className="flex items-center space-x-2 px-6 py-3 bg-evidence-500 text-white rounded-xl hover:bg-evidence-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/30 hover:shadow-xl hover:shadow-evidence-500/40 relative z-10"
+                                    className="flex items-center gap-1.5 px-4 py-1.5 text-sm bg-evidence-500 text-white rounded-lg hover:bg-evidence-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all duration-200 shadow-md shadow-evidence-500/30 hover:shadow-lg hover:shadow-evidence-500/40 relative z-10"
                                 >
                                     {loading ? (
                                         <>
-                                            <Loader2 className="w-5 h-5 animate-spin" />
+                                            <Loader2 className="w-4 h-4 animate-spin" />
                                             <span>Processing...</span>
                                         </>
                                     ) : (
                                         <>
                                             <span>{editData ? 'Update Evidence' : 'Add Evidence'}</span>
-                                            <Check className="w-5 h-5" />
+                                            <Check className="w-4 h-4" />
                                         </>
                                     )}
                                 </button>
-                        )}
-                    </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 

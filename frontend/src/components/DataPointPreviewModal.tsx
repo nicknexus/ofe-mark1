@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { X, Calendar, BarChart3, Edit, Trash2, MessageSquare, FileText, MapPin, Users, Camera, DollarSign, Upload, Plus, Eye } from 'lucide-react'
+import { X, Calendar, BarChart3, Edit, Trash2, MessageSquare, FileText, MapPin, Users, Camera, DollarSign, Upload, Plus, Eye, Tag as TagIcon } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { formatDate, getEvidenceTypeInfo, parseLocalDate } from '../utils'
 import { apiService } from '../services/api'
-import { Evidence, Location, BeneficiaryGroup } from '../types'
+import { Evidence, Location, BeneficiaryGroup, MetricTag } from '../types'
+import TagChip from './MetricTags/TagChip'
 
 interface DataPointPreviewModalProps {
     isOpen: boolean
@@ -31,6 +33,7 @@ export default function DataPointPreviewModal({
     const [loadingLocation, setLoadingLocation] = useState(false)
     const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
     const [loadingBeneficiaries, setLoadingBeneficiaries] = useState(false)
+    const [tag, setTag] = useState<MetricTag | null>(null)
 
     useEffect(() => {
         if (isOpen && dataPoint?.id) {
@@ -41,8 +44,16 @@ export default function DataPointPreviewModal({
                 setLocation(null)
             }
             loadBeneficiaryGroups()
+
+            if (dataPoint.tag_id) {
+                apiService.getMetricTags()
+                    .then(tags => setTag(tags.find(t => t.id === dataPoint.tag_id) || null))
+                    .catch(() => setTag(null))
+            } else {
+                setTag(null)
+            }
         }
-    }, [isOpen, dataPoint?.id, dataPoint?.location_id])
+    }, [isOpen, dataPoint?.id, dataPoint?.location_id, dataPoint?.tag_id])
 
     const loadLinkedEvidence = async () => {
         if (!dataPoint?.id) return
@@ -354,6 +365,23 @@ export default function DataPointPreviewModal({
                                 <div className="flex-1 min-w-0">
                                     <p className="text-xs font-semibold text-primary-600 mb-1 uppercase tracking-wider">Notes</p>
                                     <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{dataPoint.note}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Tag */}
+                    {tag && (
+                        <div className="bg-white rounded-xl border border-gray-100 p-4">
+                            <div className="flex items-start gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
+                                    <TagIcon className="w-4 h-4 text-primary-600" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-semibold text-primary-600 mb-2 uppercase tracking-wider">Tag</p>
+                                    <Link to={`/tags/${tag.id}`} onClick={onClose} className="contents">
+                                        <TagChip name={tag.name} size="sm" />
+                                    </Link>
                                 </div>
                             </div>
                         </div>

@@ -2,6 +2,8 @@ import { supabase } from '../utils/supabase';
 import { KPI, KPIUpdate, KPIWithEvidence } from '../types';
 import { InitiativeService } from './initiativeService';
 import { BeneficiaryService } from './beneficiaryService';
+import { MetricTagService } from './metricTagService';
+import { aggregateKpiUpdates } from '../utils/kpiAggregation';
 
 export class KPIService {
     static async create(kpi: KPI, userId: string, requestedOrgId?: string): Promise<KPI> {
@@ -28,17 +30,26 @@ export class KPIService {
             }
         }
 
+        // Strip tag_ids before insert; persist via junction after.
+        const { tag_ids, ...kpiData } = (kpi as any)
+
         const { data, error } = await supabase
             .from('kpis')
-            .insert([{ ...kpi, user_id: userId, display_order: maxOrder }])
+            .insert([{ ...kpiData, user_id: userId, display_order: maxOrder }])
             .select()
             .single();
 
         if (error) throw new Error(`Failed to create KPI: ${error.message}`);
-        return data;
+
+        if (Array.isArray(tag_ids)) {
+            await MetricTagService.replaceTagsForKpi(data.id, tag_ids, userId, requestedOrgId)
+        }
+
+        return { ...data, tag_ids: Array.isArray(tag_ids) ? tag_ids : [] };
     }
 
     static async getAll(userId: string, initiativeId?: string, requestedOrgId?: string): Promise<KPI[]> {
+        let kpis: any[] = []
         if (initiativeId) {
             // Authorize via initiative org context.
             const initiative = await InitiativeService.getById(initiativeId, userId, requestedOrgId);
@@ -52,25 +63,28 @@ export class KPIService {
                 .order('created_at', { ascending: false });
 
             if (error) throw new Error(`Failed to fetch KPIs: ${error.message}`);
-            return data || [];
+            kpis = data || [];
+        } else {
+            const initiatives = await InitiativeService.getAll(userId, requestedOrgId);
+            if (initiatives.length === 0) {
+                return [];
+            }
+
+            const initiativeIds = initiatives.map(i => i.id);
+            const { data, error } = await supabase
+                .from('kpis')
+                .select('*')
+                .in('initiative_id', initiativeIds)
+                .order('display_order', { ascending: true })
+                .order('created_at', { ascending: false });
+
+            if (error) throw new Error(`Failed to fetch KPIs: ${error.message}`);
+            kpis = data || [];
         }
 
-        // No initiative specified - get all KPIs for user's accessible initiatives
-        const initiatives = await InitiativeService.getAll(userId, requestedOrgId);
-        if (initiatives.length === 0) {
-            return [];
-        }
-
-        const initiativeIds = initiatives.map(i => i.id);
-        const { data, error } = await supabase
-            .from('kpis')
-            .select('*')
-            .in('initiative_id', initiativeIds)
-            .order('display_order', { ascending: true })
-            .order('created_at', { ascending: false });
-
-        if (error) throw new Error(`Failed to fetch KPIs: ${error.message}`);
-        return data || [];
+        if (kpis.length === 0) return [];
+        const tagMap = await MetricTagService.getTagIdsForKpis(kpis.map((k: any) => k.id))
+        return kpis.map((k: any) => ({ ...k, tag_ids: tagMap[k.id] || [] }))
     }
 
     static async getWithEvidence(userId: string, initiativeId?: string, requestedOrgId?: string): Promise<KPIWithEvidence[]> {
@@ -132,8 +146,7 @@ export class KPIService {
                 const evidenceItems = kpi.evidence_kpis?.map((ek: any) => ek.evidence).filter(Boolean) || [];
                 const updates = kpi.kpi_updates || [];
 
-                // Calculate total value from all updates
-                const total_value = updates.reduce((sum: number, update: any) => sum + (update.value || 0), 0);
+                const total_value = aggregateKpiUpdates(updates, kpi.metric_type);
 
                 // Calculate evidence type breakdown
                 const evidenceTypeStats = evidenceItems.reduce((acc: any, item: any) => {
@@ -178,8 +191,7 @@ export class KPIService {
                     ? Math.round((updatesWithEvidence.length / updates.length) * 100)
                     : 0;
 
-                // Calculate total value from all updates
-                const total_value = updates.reduce((sum: number, update: any) => sum + (update.value || 0), 0);
+                const total_value = aggregateKpiUpdates(updates, kpi.metric_type);
 
                 // Calculate evidence type breakdown (fallback)
                 const evidenceTypeStats = evidenceItems.reduce((acc: any, item: any) => {
@@ -207,7 +219,9 @@ export class KPIService {
             }
         }));
 
-        return kpisWithEvidence;
+        // Attach tag_ids in bulk.
+        const tagMap = await MetricTagService.getTagIdsForKpis(kpisWithEvidence.map((k: any) => k.id))
+        return kpisWithEvidence.map((k: any) => ({ ...k, tag_ids: tagMap[k.id] || [] }));
     }
 
     static async getById(id: string, userId: string, requestedOrgId?: string): Promise<KPI | null> {
@@ -229,7 +243,8 @@ export class KPIService {
             if (!initiative) return null; // No access
         }
 
-        return kpi;
+        const tag_ids = await MetricTagService.getTagIdsForKpi(id)
+        return { ...kpi, tag_ids };
     }
 
     static async update(id: string, updates: Partial<KPI>, userId: string, requestedOrgId?: string): Promise<KPI> {
@@ -237,14 +252,22 @@ export class KPIService {
         const kpi = await this.getById(id, userId, requestedOrgId);
         if (!kpi) throw new Error('KPI not found or access denied');
 
+        const { tag_ids, ...rest } = (updates as any)
+
         const { data, error } = await supabase
             .from('kpis')
-            .update(updates)
+            .update(rest)
             .eq('id', id)
             .select()
             .single();
 
         if (error) throw new Error(`Failed to update KPI: ${error.message}`);
+
+        if (Array.isArray(tag_ids)) {
+            // Cascades: drops orphaned claim->tag links for this KPI.
+            await MetricTagService.replaceTagsForKpi(id, tag_ids, userId, requestedOrgId)
+        }
+
         return data;
     }
 
@@ -275,8 +298,8 @@ export class KPIService {
             if (!kpi) throw new Error('KPI not found or access denied')
         }
 
-        // Support optional beneficiary_group_ids on creation
-        const { beneficiary_group_ids, ...insertData } = (update as any)
+        // Support optional beneficiary_group_ids and tag_id on creation
+        const { beneficiary_group_ids, tag_id, ...insertData } = (update as any)
 
         const { data, error } = await supabase
             .from('kpi_updates')
@@ -301,10 +324,15 @@ export class KPIService {
             if (linkError) throw new Error(`Failed to link data point to beneficiary groups: ${linkError.message}`)
         }
 
+        // Attach single tag if provided. Validates tag is on parent KPI.
+        if (tag_id !== undefined && data.kpi_id) {
+            await MetricTagService.setTagForUpdate(data.id, tag_id || null, data.kpi_id)
+        }
+
         // Auto-link existing evidence that matches this impact claim
         await this.autoLinkEvidenceToUpdate(data, userId)
 
-        return data;
+        return { ...data, tag_id: tag_id ?? null };
     }
 
     // Helper: Check if two date ranges overlap
@@ -472,6 +500,10 @@ export class KPIService {
         const kpi = await this.getById(kpiId, userId, requestedOrgId);
         if (!kpi) return [];
 
+        // Embed beneficiary groups (existing relationship that's already in the
+        // schema cache). For metric tags, run a separate batch query because
+        // the embedded join can flake when FK relationships are added after
+        // the PostgREST schema cache has loaded.
         const { data, error } = await supabase
             .from('kpi_updates')
             .select('*, kpi_update_beneficiary_groups(beneficiary_group_id)')
@@ -480,15 +512,19 @@ export class KPIService {
 
         if (error) throw new Error(`Failed to fetch KPI updates: ${error.message}`);
 
+        const updateIds = (data || []).map((u: any) => u.id).filter(Boolean)
+        const tagMap = await MetricTagService.getTagIdsForUpdates(updateIds)
+
         return (data || []).map((update: any) => ({
             ...update,
             beneficiary_group_ids: (update.kpi_update_beneficiary_groups || []).map((l: any) => l.beneficiary_group_id),
-            kpi_update_beneficiary_groups: undefined
+            tag_id: tagMap[update.id] ?? null,
+            kpi_update_beneficiary_groups: undefined,
         }));
     }
 
     static async updateKPIUpdate(id: string, updates: Partial<KPIUpdate>, userId: string, requestedOrgId?: string): Promise<KPIUpdate> {
-        const { beneficiary_group_ids, ...updateData } = (updates as any)
+        const { beneficiary_group_ids, tag_id, ...updateData } = (updates as any)
 
         // Validate location_id is required if it's being updated
         if ('location_id' in updateData && (!updateData.location_id || !updateData.location_id.trim())) {
@@ -539,6 +575,11 @@ export class KPIService {
             }
         }
 
+        // Apply tag change if provided.
+        if (tag_id !== undefined) {
+            await MetricTagService.setTagForUpdate(id, tag_id || null, data.kpi_id)
+        }
+
         // Re-run auto-link if date or location changed (might match new evidence)
         const dateOrLocationChanged =
             'date_represented' in updateData ||
@@ -550,7 +591,7 @@ export class KPIService {
             await this.autoLinkEvidenceToUpdate(data, userId)
         }
 
-        return data;
+        return { ...data, tag_id: tag_id ?? undefined };
     }
 
     static async deleteUpdate(id: string, userId: string, requestedOrgId?: string): Promise<void> {

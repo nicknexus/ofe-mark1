@@ -36,6 +36,7 @@ import { apiService } from '../services/api'
 import { Location, BeneficiaryGroup, User, Organization } from '../types'
 import { AuthService } from '../services/auth'
 import { getCategoryColor, parseLocalDate, isSameDay, compareDates, getLocalDateString, formatDate } from '../utils'
+import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import toast from 'react-hot-toast'
 
 // Sortable Metric Card Component
@@ -421,7 +422,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
 
         filteredKPIs.forEach(kpi => {
             const kpiFilteredUpdates = filteredUpdates.filter(update => update.kpi_id === kpi.id)
-            filteredTotals[kpi.id] = kpiFilteredUpdates.reduce((sum, update) => sum + (update.value || 0), 0)
+            filteredTotals[kpi.id] = aggregateKpiUpdates(kpiFilteredUpdates as any, kpi.metric_type)
         })
 
         return filteredTotals

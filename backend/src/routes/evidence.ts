@@ -23,7 +23,8 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
 // Create evidence
 router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const evidence = await EvidenceService.create(req.body, req.user!.id);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const evidence = await EvidenceService.create(req.body, req.user!.id, requestedOrgId);
         res.status(201).json(evidence);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
@@ -96,7 +97,8 @@ router.get('/:id/files', authenticateUser, async (req: AuthenticatedRequest, res
 // will be re-introduced in Phase 7.
 router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const evidence = await EvidenceService.update(req.params.id, req.body, req.user!.id);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const evidence = await EvidenceService.update(req.params.id, req.body, req.user!.id, requestedOrgId);
         res.json(evidence);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });

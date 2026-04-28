@@ -20,10 +20,12 @@ import {
     MessageSquare,
     DollarSign,
     Heart,
-    Check
+    Check,
+    Info
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
 import { getCategoryColor, parseLocalDate, isSameDay, compareDates, formatDate, getEvidenceTypeInfo, getLocalDateString } from '../utils'
+import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import DateRangePicker from './DateRangePicker'
 import EvidencePreviewModal from './EvidencePreviewModal'
 import DataPointPreviewModal from './DataPointPreviewModal'
@@ -32,6 +34,10 @@ import AddEvidenceModal from './AddEvidenceModal'
 import MetricCreditingModal from './MetricCreditingModal'
 import EasyEvidenceModal from './EasyEvidenceModal'
 import AllEvidenceModal from './AllEvidenceModal'
+import TagChip from './MetricTags/TagChip'
+import TagBreakdownStrip from './MetricTags/TagBreakdownStrip'
+import { Link } from 'react-router-dom'
+import { MetricTag } from '../types'
 import { apiService } from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -124,6 +130,8 @@ export default function ExpandableKPICard({
     const [deleteConfirmEvidence, setDeleteConfirmEvidence] = useState<any>(null)
     const [editingDataPoint, setEditingDataPoint] = useState<any>(null)
     const [evidence, setEvidence] = useState<any[]>([])
+    const [allTags, setAllTags] = useState<MetricTag[]>([])
+    const [showDescription, setShowDescription] = useState(false)
     const [loadingEvidence, setLoadingEvidence] = useState(false)
     const [updateLocations, setUpdateLocations] = useState<Record<string, any>>({})
     const [isCreditingModalOpen, setIsCreditingModalOpen] = useState(false)
@@ -152,6 +160,10 @@ export default function ExpandableKPICard({
             loadEvidence()
         }
     }, [kpi.id, initiativeId, kpiUpdates.length])
+
+    useEffect(() => {
+        apiService.getMetricTags().then(setAllTags).catch(() => setAllTags([]))
+    }, [])
 
     // Load update locations when expanded
     useEffect(() => {
@@ -740,8 +752,7 @@ export default function ExpandableKPICard({
         typeof d.cumulative === 'number' && isFinite(d.cumulative) ? d.cumulative : 0
     ).filter(v => v > 0), 0)
     
-    // Calculate total metric value
-    const totalMetricValue = kpiUpdates.reduce((sum, update) => sum + (update.value || 0), 0)
+    const totalMetricValue = aggregateKpiUpdates(kpiUpdates as any, kpi.metric_type)
 
     // Generate ticks that include the actual max value
     const generateYTicks = () => {
@@ -869,35 +880,44 @@ export default function ExpandableKPICard({
                                 <button onClick={(e) => { e.stopPropagation(); onToggleExpand() }} className="p-2.5 hover:bg-red-50 rounded-xl transition-all duration-200 border border-gray-200">
                                     <X className="w-5 h-5 text-red-500" />
                                 </button>
-                                <div className="flex items-center gap-4">
-                                    <div>
-                                        <h2 className="text-2xl font-bold text-gray-900">{kpi.title}</h2>
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                        <h2 className="text-base lg:text-xl font-bold text-gray-900 truncate">{kpi.title}</h2>
                                         {kpi.description && (
-                                            <p className="text-sm text-gray-500 line-clamp-1 max-w-lg mt-1">{kpi.description}</p>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => { e.stopPropagation(); setShowDescription(s => !s) }}
+                                                className="flex-shrink-0 w-5 h-5 inline-flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors"
+                                                title={showDescription ? 'Hide description' : 'Show description'}
+                                            >
+                                                <Info className="w-3 h-3" />
+                                            </button>
                                         )}
                                     </div>
-                                    <div className="flex items-baseline gap-2 px-4 py-2 bg-primary-50 rounded-xl border border-primary-100">
-                                        <span className="text-3xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}</span>
-                                        {kpi.unit_of_measurement && <span className="text-sm text-primary-500">{kpi.unit_of_measurement}</span>}
+                                    <div className="flex items-baseline gap-1.5 px-2.5 lg:px-3 py-1 lg:py-1.5 bg-primary-50 rounded-lg border border-primary-100 flex-shrink-0">
+                                        <span className="text-lg lg:text-2xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}</span>
+                                        {kpi.unit_of_measurement && <span className="text-[11px] lg:text-xs text-primary-500">{kpi.unit_of_measurement}</span>}
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center gap-1.5 lg:gap-2 flex-shrink-0">
                                 {canAddImpactClaims && (
-                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25">
-                                        <Plus className="w-4 h-4" />
-                                        <span>Add Impact Claim</span>
+                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center gap-1.5 px-2.5 lg:px-4 py-1.5 lg:py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg lg:rounded-xl font-semibold text-xs lg:text-sm transition-all duration-200 shadow-lg shadow-primary-500/25 whitespace-nowrap">
+                                        <Plus className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+                                        <span className="hidden sm:inline">Add Impact Claim</span>
+                                        <span className="sm:hidden">Claim</span>
                                     </button>
                                 )}
-                                <button onClick={(e) => { e.stopPropagation(); onAddEvidence() }} className="flex items-center space-x-2 px-4 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25">
-                                    <Upload className="w-4 h-4" />
-                                    <span>Add Evidence</span>
+                                <button onClick={(e) => { e.stopPropagation(); onAddEvidence() }} className="flex items-center gap-1.5 px-2.5 lg:px-4 py-1.5 lg:py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-lg lg:rounded-xl font-semibold text-xs lg:text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25 whitespace-nowrap">
+                                    <Upload className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+                                    <span className="hidden sm:inline">Add Evidence</span>
+                                    <span className="sm:hidden">Evidence</span>
                                 </button>
-                                <button onClick={(e) => { e.stopPropagation(); onEdit() }} className="p-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/60 text-gray-600 rounded-xl transition-all duration-200">
-                                    <Edit className="w-5 h-5" />
+                                <button onClick={(e) => { e.stopPropagation(); onEdit() }} className="p-1.5 lg:p-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/60 text-gray-600 rounded-lg lg:rounded-xl transition-all duration-200">
+                                    <Edit className="w-4 h-4 lg:w-5 lg:h-5" />
                                 </button>
-                                <button onClick={(e) => { e.stopPropagation(); onDelete() }} className="p-2.5 bg-red-50/80 hover:bg-red-100 text-red-500 rounded-xl transition-all duration-200">
-                                    <Trash2 className="w-5 h-5" />
+                                <button onClick={(e) => { e.stopPropagation(); onDelete() }} className="p-1.5 lg:p-2.5 bg-red-50/80 hover:bg-red-100 text-red-500 rounded-lg lg:rounded-xl transition-all duration-200">
+                                    <Trash2 className="w-4 h-4 lg:w-5 lg:h-5" />
                                 </button>
                             </div>
                         </div>
@@ -905,6 +925,16 @@ export default function ExpandableKPICard({
 
                     {/* Content - Fit to screen */}
                     <div className="flex-1 p-3 flex flex-col gap-2 max-w-[1800px] mx-auto overflow-hidden w-full min-h-0">
+                                {showDescription && kpi.description && (
+                                    <div className="flex-shrink-0 bg-white/80 backdrop-blur-xl border border-gray-100/60 rounded-xl px-3 py-2 shadow-soft-float flex items-start gap-2" onClick={(e) => e.stopPropagation()}>
+                                        <Info className="w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5" />
+                                        <p className="text-xs text-gray-600 flex-1">{kpi.description}</p>
+                                        <button type="button" onClick={() => setShowDescription(false)} className="flex-shrink-0 text-gray-400 hover:text-gray-600">
+                                            <X className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                )}
+                                <TagBreakdownStrip kpi={kpi} kpiUpdates={kpiUpdates} allTags={allTags} compact />
                                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 flex-1 min-h-0 overflow-hidden">
                                     <div className="lg:col-span-3 bg-white/80 backdrop-blur-xl border border-gray-100/60 rounded-xl p-3 flex flex-col shadow-soft-float min-h-0 overflow-hidden">
                                         <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
@@ -948,6 +978,47 @@ export default function ExpandableKPICard({
                                                 </div>
                                             )}
                                         </div>
+
+                                        {/* Stats grid - constrained to chart width */}
+                                        <div className="grid grid-cols-3 gap-2 mt-2 flex-shrink-0">
+                                            <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-2 shadow-soft-float">
+                                                <div className="flex items-center space-x-2">
+                                                    <div className="p-1.5 bg-primary-100/80 rounded-lg"><BarChart3 className="w-3.5 h-3.5 text-primary-500" /></div>
+                                                    <div className="min-w-0"><p className="text-[10px] text-gray-500 truncate">Impact Claims</p><p className="text-base font-bold text-primary-500">{kpi.total_updates}</p></div>
+                                                </div>
+                                            </div>
+                                            <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-xl p-2 shadow-soft-float">
+                                                <div className="flex items-center space-x-2">
+                                                    <div className="p-1.5 bg-evidence-100/80 rounded-lg"><FileText className="w-3.5 h-3.5 text-evidence-500" /></div>
+                                                    <div className="min-w-0"><p className="text-[10px] text-gray-500 truncate">Evidence Items</p><p className="text-base font-bold text-evidence-500">{kpi.evidence_count}</p></div>
+                                                </div>
+                                            </div>
+                                            <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-2 shadow-soft-float">
+                                                <div className="flex items-center space-x-2">
+                                                    <div className="p-1.5 bg-primary-100/80 rounded-lg"><Target className="w-3.5 h-3.5 text-primary-500" /></div>
+                                                    <div className="min-w-0"><p className="text-[10px] text-gray-500 truncate">Coverage</p><p className="text-base font-bold text-primary-500">{kpi.evidence_percentage}%</p></div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Evidence type bar - constrained to chart width */}
+                                        <div className="flex items-center justify-between gap-2 h-10 bg-white/60 backdrop-blur-sm border border-gray-100/60 rounded-lg px-3 mt-2 flex-shrink-0">
+                                            {(['visual_proof', 'documentation', 'testimony', 'financials'] as const).map((type) => {
+                                                const IconComponent = getEvidenceIcon(type)
+                                                const typeInfo = getEvidenceTypeInfo(type)
+                                                const percentage = evidenceTypePercentages[type].percentage
+                                                const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' : typeInfo.color.includes('blue') ? 'text-evidence-600' : typeInfo.color.includes('orange') ? 'text-orange-600' : typeInfo.color.includes('green') ? 'text-primary-500' : 'text-gray-600'
+                                                return (
+                                                    <div key={type} className="flex items-center gap-1.5 flex-1 min-w-0">
+                                                        <IconComponent className={`w-3.5 h-3.5 ${colorClasses} flex-shrink-0`} />
+                                                        <div className="flex flex-col items-start min-w-0 flex-1 overflow-hidden">
+                                                            <span className="text-[9px] font-medium text-gray-700 truncate w-full leading-tight">{typeInfo.label}</span>
+                                                            <span className="text-[8px] font-bold text-gray-600 leading-tight whitespace-nowrap">{percentage}%</span>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
                                     </div>
 
                                     {/* Impact Claims - Full Height */}
@@ -971,6 +1042,10 @@ export default function ExpandableKPICard({
                                                                     <div className="flex items-center space-x-1.5 mt-0.5"><Calendar className="w-2.5 h-2.5 text-gray-400" /><span className="text-[10px] text-gray-500">{update.date_range_start && update.date_range_end ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}` : formatDate(update.date_represented)}</span></div>
                                                                 </div>
                                                                 <div className="flex items-center gap-1.5">
+                                                                    {update.tag_id && allTags.length > 0 && (() => {
+                                                                        const t = allTags.find(t => t.id === update.tag_id)
+                                                                        return t ? <div onClick={(e) => e.stopPropagation()}><Link to={`/tags/${t.id}`} className="contents"><TagChip name={t.name} size="xs" /></Link></div> : null
+                                                                    })()}
                                                                     {(() => {
                                                                         const supportPercentage = getClaimSupportPercentage(update)
                                                                         const evidenceCount = getClaimEvidenceCount(update)
@@ -1031,44 +1106,6 @@ export default function ExpandableKPICard({
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-2 flex-shrink-0">
-                                    <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-2.5 shadow-soft-float">
-                                        <div className="flex items-center space-x-2">
-                                            <div className="p-1.5 bg-primary-100/80 rounded-lg"><BarChart3 className="w-4 h-4 text-primary-500" /></div>
-                                            <div><p className="text-xs text-gray-500">Impact Claims</p><p className="text-lg font-bold text-primary-500">{kpi.total_updates}</p></div>
-                                        </div>
-                                    </div>
-                                    <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-xl p-2.5 shadow-soft-float">
-                                        <div className="flex items-center space-x-2">
-                                            <div className="p-1.5 bg-evidence-100/80 rounded-lg"><FileText className="w-4 h-4 text-evidence-500" /></div>
-                                            <div><p className="text-xs text-gray-500">Evidence Items</p><p className="text-lg font-bold text-evidence-500">{kpi.evidence_count}</p></div>
-                                        </div>
-                                    </div>
-                                    <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-2.5 shadow-soft-float">
-                                        <div className="flex items-center space-x-2">
-                                            <div className="p-1.5 bg-primary-100/80 rounded-lg"><Target className="w-4 h-4 text-primary-500" /></div>
-                                            <div><p className="text-xs text-gray-500">Evidence Coverage</p><p className="text-lg font-bold text-primary-500">{kpi.evidence_percentage}%</p></div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center justify-between gap-2 h-11 bg-white/60 backdrop-blur-sm border border-gray-100/60 rounded-lg px-3 flex-shrink-0">
-                                    {(['visual_proof', 'documentation', 'testimony', 'financials'] as const).map((type) => {
-                                        const IconComponent = getEvidenceIcon(type)
-                                        const typeInfo = getEvidenceTypeInfo(type)
-                                        const percentage = evidenceTypePercentages[type].percentage
-                                        const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' : typeInfo.color.includes('blue') ? 'text-evidence-600' : typeInfo.color.includes('orange') ? 'text-orange-600' : typeInfo.color.includes('green') ? 'text-primary-500' : 'text-gray-600'
-                                        return (
-                                            <div key={type} className="flex items-center gap-1.5 flex-1 min-w-0">
-                                                <IconComponent className={`w-3.5 h-3.5 ${colorClasses} flex-shrink-0`} />
-                                                <div className="flex flex-col items-start min-w-0 flex-1 overflow-hidden">
-                                                    <span className="text-[9px] font-medium text-gray-700 truncate w-full leading-tight">{typeInfo.label}</span>
-                                                    <span className="text-[8px] font-bold text-gray-600 leading-tight whitespace-nowrap">{percentage}%</span>
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
                     </div>
                 </div>
 
@@ -1109,6 +1146,7 @@ export default function ExpandableKPICard({
                         metricType={kpi.metric_type || 'number'}
                         unitOfMeasurement={kpi.unit_of_measurement || ''}
                         initiativeId={initiativeId}
+                        kpiTagIds={(kpi as any).tag_ids || []}
                         editData={editingDataPoint}
                     />,
                     document.body
@@ -1385,16 +1423,18 @@ export default function ExpandableKPICard({
                                         <span>Add Evidence</span>
                                     </button>
                                 )}
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        setIsCreditingModalOpen(true)
-                                    }}
-                                    className="flex items-center space-x-2 px-4 py-2.5 bg-purple-100/80 hover:bg-purple-200/80 text-purple-700 rounded-xl text-sm font-medium transition-all duration-200"
-                                >
-                                    <Heart className="w-4 h-4" />
-                                    <span>Credit to Donor</span>
-                                </button>
+                                {kpi.metric_type !== 'percentage' && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            setIsCreditingModalOpen(true)
+                                        }}
+                                        className="flex items-center space-x-2 px-4 py-2.5 bg-purple-100/80 hover:bg-purple-200/80 text-purple-700 rounded-xl text-sm font-medium transition-all duration-200"
+                                    >
+                                        <Heart className="w-4 h-4" />
+                                        <span>Credit to Donor</span>
+                                    </button>
+                                )}
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation()
@@ -1488,6 +1528,8 @@ export default function ExpandableKPICard({
                                     })}
                                 </div>
 
+                                <TagBreakdownStrip kpi={kpi} kpiUpdates={kpiUpdates} allTags={allTags} />
+
                                 {/* Chart and Data Sections */}
                                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
                                     {/* Chart Section */}
@@ -1562,6 +1604,10 @@ export default function ExpandableKPICard({
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex items-center gap-2">
+                                                                    {update.tag_id && allTags.length > 0 && (() => {
+                                                                        const t = allTags.find(t => t.id === update.tag_id)
+                                                                        return t ? <div onClick={(e) => e.stopPropagation()}><Link to={`/tags/${t.id}`} className="contents"><TagChip name={t.name} size="xs" /></Link></div> : null
+                                                                    })()}
                                                                     {(() => {
                                                                         const supportPercentage = getClaimSupportPercentage(update)
                                                                         const evidenceCount = getClaimEvidenceCount(update)
@@ -1678,16 +1724,18 @@ export default function ExpandableKPICard({
                                         <span>Add Evidence</span>
                                     </button>
                                 )}
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        setIsCreditingModalOpen(true)
-                                    }}
-                                    className="flex items-center space-x-2 px-4 py-2.5 bg-purple-100/80 hover:bg-purple-200/80 text-purple-700 rounded-xl text-sm font-medium transition-all duration-200"
-                                >
-                                    <Heart className="w-4 h-4" />
-                                    <span>Credit to Donor</span>
-                                </button>
+                                {kpi.metric_type !== 'percentage' && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            setIsCreditingModalOpen(true)
+                                        }}
+                                        className="flex items-center space-x-2 px-4 py-2.5 bg-purple-100/80 hover:bg-purple-200/80 text-purple-700 rounded-xl text-sm font-medium transition-all duration-200"
+                                    >
+                                        <Heart className="w-4 h-4" />
+                                        <span>Credit to Donor</span>
+                                    </button>
+                                )}
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation()

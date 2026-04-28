@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { X, Plus, Trash2, AlertCircle, CheckCircle } from 'lucide-react'
 import { Donor, DonorCredit, KPI, KPIUpdate } from '../types'
 import { apiService } from '../services/api'
+import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import toast from 'react-hot-toast'
 
 interface MetricCreditingModalProps {
@@ -71,8 +72,8 @@ export default function MetricCreditingModal({
                 const claim = kpiUpdates.find(u => u.id === claimId)
                 return Number(claim?.value || 0) - totalCredited
             } else {
-                // For metric-level, sum all claims
-                const totalValue = kpiUpdates.reduce((sum, update) => sum + Number(update.value || 0), 0)
+                // Donor crediting is disabled for percentage metrics, but be safe.
+                const totalValue = aggregateKpiUpdates(kpiUpdates as any, kpi.metric_type)
                 return totalValue - totalCredited
             }
         } catch (error) {

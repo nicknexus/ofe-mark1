@@ -25,7 +25,10 @@ import {
 import { apiService } from '../../services/api'
 import { Evidence, Location, KPI, BeneficiaryGroup } from '../../types'
 import { formatDate, getEvidenceTypeInfo, getLocalDateString } from '../../utils'
+import { aggregateKpiUpdates } from '../../utils/kpiAggregation'
 import DateRangePicker from '../DateRangePicker'
+import TagPicker from '../MetricTags/TagPicker'
+import EvidenceTagsList from '../MetricTags/EvidenceTagsList'
 import toast from 'react-hot-toast'
 
 interface MobileEvidenceTabProps {
@@ -388,6 +391,11 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh, autoAdd }: 
                                     <p className="text-xs text-gray-500 mt-1">
                                         {formatDate(ev.date_represented)}
                                     </p>
+                                    {Array.isArray(ev.tag_ids) && ev.tag_ids.length > 0 && (
+                                        <div className="mt-1.5">
+                                            <EvidenceTagsList tagIds={ev.tag_ids} size="xs" visibleCap={3} clickable={false} />
+                                        </div>
+                                    )}
                                 </div>
                             </button>
                         )
@@ -610,6 +618,14 @@ function MobileEvidencePreview({ evidence, onClose, onEdit, onDelete }: MobileEv
                         )}
                     </div>
 
+                    {/* Tags */}
+                    {Array.isArray(evidence.tag_ids) && evidence.tag_ids.length > 0 && (
+                        <div className="bg-gray-50 rounded-xl p-4">
+                            <p className="text-xs text-gray-500 uppercase font-medium mb-2">Tags</p>
+                            <EvidenceTagsList tagIds={evidence.tag_ids} size="sm" />
+                        </div>
+                    )}
+
                     {/* Description */}
                     {evidence.description && (
                         <div className="bg-gray-50 rounded-xl p-4">
@@ -652,7 +668,7 @@ function MobileEvidencePreview({ evidence, onClose, onEdit, onDelete }: MobileEv
                                     return (
                                         <div className="space-y-2">
                                             {Object.values(groupedByKPI).map((group, groupIndex) => {
-                                                const total = group.dataPoints.reduce((sum, dp) => sum + (dp.value || 0), 0)
+                                                const total = aggregateKpiUpdates(group.dataPoints as any, group.kpi?.metric_type)
                                                 return (
                                                     <div key={group.kpi?.id || groupIndex} className="bg-primary-50 rounded-xl p-3">
                                                         <div className="flex items-center justify-between mb-2">
@@ -784,7 +800,8 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
         datePickerValue: {} as { singleDate?: string; startDate?: string; endDate?: string },
         selectedLocationIds: [] as string[],
         selectedKpiIds: [] as string[],
-        selectedBeneficiaryGroupIds: [] as string[]
+        selectedBeneficiaryGroupIds: [] as string[],
+        selectedTagIds: [] as string[]
     })
 
     const evidenceTypes = [
@@ -846,7 +863,8 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
             initiative_id: initiativeId,
             kpi_ids: formData.selectedKpiIds,
             location_ids: formData.selectedLocationIds,
-            beneficiary_group_ids: formData.selectedBeneficiaryGroupIds
+            beneficiary_group_ids: formData.selectedBeneficiaryGroupIds,
+            tag_ids: formData.selectedTagIds
         }
 
         if (formData.datePickerValue.singleDate) {
@@ -903,13 +921,13 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
 
     const canProceed = () => {
         switch (step) {
-            case 1: return !!formData.type
-            case 2: return formData.selectedLocationIds.length > 0 && (
+            case 1: return !!formData.type && formData.selectedLocationIds.length > 0 && (
                 !!formData.datePickerValue.singleDate ||
                 (!!formData.datePickerValue.startDate && !!formData.datePickerValue.endDate)
             )
-            case 3: return formData.selectedKpiIds.length > 0
-            case 4: return true
+            case 2: return formData.selectedKpiIds.length > 0
+            case 3: return true // tags optional
+            case 4: return true // beneficiaries optional
             case 5: return !!formData.title && (formData.file !== null || formData.fileUrl !== '')
             default: return false
         }
@@ -940,46 +958,42 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
 
             {/* Content */}
             <div className="flex-1 min-h-0 overflow-y-auto p-4">
-                {/* Step 1: Type */}
+                {/* Step 1: Type + Date + Location */}
                 {step === 1 && (
-                    <div className="space-y-4">
-                        <div className="text-center mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Evidence Type</h2>
-                            <p className="text-gray-500 text-sm mt-1">What kind of evidence?</p>
+                    <div className="space-y-5">
+                        <div className="text-center mb-2">
+                            <h2 className="text-xl font-bold text-gray-900">Type, When & Where</h2>
+                            <p className="text-gray-500 text-sm mt-1">Type of evidence, date, and location</p>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            {evidenceTypes.map((type) => {
-                                const Icon = type.icon
-                                const isSelected = formData.type === type.value
-                                return (
-                                    <button
-                                        key={type.value}
-                                        type="button"
-                                        onClick={() => setFormData(prev => ({ ...prev, type: type.value }))}
-                                        className={`block w-full appearance-none p-4 rounded-2xl border-2 transition-colors ${
-                                            isSelected 
-                                                ? 'border-evidence-500 bg-evidence-50' 
-                                                : 'border-gray-200 bg-white'
-                                        }`}
-                                    >
-                                        <Icon className={`w-8 h-8 mx-auto mb-2 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
-                                        <div className={`font-semibold text-sm ${isSelected ? 'text-evidence-600' : 'text-gray-700'}`}>
-                                            {type.label}
-                                        </div>
-                                        <div className="text-xs text-gray-500 mt-1">{type.description}</div>
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    </div>
-                )}
 
-                {/* Step 2: Date & Location */}
-                {step === 2 && (
-                    <div className="space-y-4">
-                        <div className="text-center mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Date & Location</h2>
-                            <p className="text-gray-500 text-sm mt-1">When and where was this captured?</p>
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
+                                Type <span className="text-red-500">*</span>
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {evidenceTypes.map((type) => {
+                                    const Icon = type.icon
+                                    const isSelected = formData.type === type.value
+                                    return (
+                                        <button
+                                            key={type.value}
+                                            type="button"
+                                            onClick={() => setFormData(prev => ({ ...prev, type: type.value }))}
+                                            className={`flex items-center gap-2 p-2.5 rounded-xl border-2 transition-colors text-left ${
+                                                isSelected
+                                                    ? 'border-evidence-500 bg-evidence-50'
+                                                    : 'border-gray-200 bg-white'
+                                            }`}
+                                        >
+                                            <Icon className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
+                                            <div className="min-w-0">
+                                                <div className={`text-xs font-semibold truncate ${isSelected ? 'text-evidence-600' : 'text-gray-700'}`}>{type.label}</div>
+                                                <div className="text-[10px] text-gray-500 truncate">{type.description}</div>
+                                            </div>
+                                        </button>
+                                    )
+                                })}
+                            </div>
                         </div>
 
                         <div>
@@ -1032,9 +1046,6 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
                                                         <MapPin className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
                                                         <div className="min-w-0">
                                                             <div className="font-medium text-gray-800 truncate">{location.name}</div>
-                                                            {location.description && (
-                                                                <div className="text-xs text-gray-500 truncate">{location.description}</div>
-                                                            )}
                                                         </div>
                                                     </div>
                                                     {isSelected && (
@@ -1050,8 +1061,8 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
                     </div>
                 )}
 
-                {/* Step 3: Metrics */}
-                {step === 3 && (
+                {/* Step 2: Metrics */}
+                {step === 2 && (
                     <div className="space-y-4">
                         <div className="text-center mb-6">
                             <h2 className="text-xl font-bold text-gray-900">Link to Metrics</h2>
@@ -1089,9 +1100,6 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
                                             <div className="flex items-center justify-between">
                                                 <div className="min-w-0">
                                                     <div className="font-medium text-gray-800 truncate">{kpi.title}</div>
-                                                    {kpi.description && (
-                                                        <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">{kpi.description}</div>
-                                                    )}
                                                 </div>
                                                 {isSelected && (
                                                     <Check className="w-5 h-5 text-evidence-500 flex-shrink-0 ml-2" />
@@ -1102,6 +1110,27 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
                                 })}
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* Step 3: Tags (optional) */}
+                {step === 3 && (
+                    <div className="space-y-4">
+                        <div className="text-center mb-2">
+                            <h2 className="text-xl font-bold text-gray-900">Tags</h2>
+                            <p className="text-gray-500 text-sm mt-1">Optional — pull from selected metrics</p>
+                        </div>
+
+                        <TagPicker
+                            mode="multi-grouped"
+                            selectedIds={formData.selectedTagIds}
+                            onChange={(ids) => setFormData(prev => ({ ...prev, selectedTagIds: ids }))}
+                            groups={kpis
+                                .filter(k => formData.selectedKpiIds.includes(k.id!))
+                                .map(k => ({ metricId: k.id!, metricTitle: k.title, tagIds: ((k as any).tag_ids || []) as string[] }))}
+                            canCreate={false}
+                            helperText="Tags shown are pulled from the metrics you selected. You can skip this step."
+                        />
                     </div>
                 )}
 
@@ -1168,9 +1197,6 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
                                                         <Users className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
                                                         <div className="min-w-0">
                                                             <div className="font-medium text-gray-800 truncate">{group.name}</div>
-                                                            {group.total_number != null && (
-                                                                <div className="text-xs text-gray-500">{group.total_number.toLocaleString()} beneficiaries</div>
-                                                            )}
                                                         </div>
                                                     </div>
                                                     {isSelected && (
@@ -1358,7 +1384,8 @@ function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: 
             endDate: evidence.date_range_end
         } as { singleDate?: string; startDate?: string; endDate?: string },
         selectedLocationIds: evidence.location_ids || (evidence.location_id ? [evidence.location_id] : []),
-        selectedKpiIds: evidence.kpi_ids || []
+        selectedKpiIds: evidence.kpi_ids || [],
+        selectedTagIds: evidence.tag_ids || []
     })
 
     const evidenceTypes: { value: EvidenceType; label: string; icon: typeof Camera; description: string }[] = [
@@ -1397,7 +1424,8 @@ function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: 
             description: formData.description,
             type: formData.type,
             kpi_ids: formData.selectedKpiIds,
-            location_ids: formData.selectedLocationIds
+            location_ids: formData.selectedLocationIds,
+            tag_ids: formData.selectedTagIds
         }
 
         if (formData.datePickerValue.singleDate) {
@@ -1646,6 +1674,21 @@ function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: 
                         </div>
                     </div>
                 )}
+
+                {/* Tags */}
+                <div>
+                    <TagPicker
+                        mode="multi-grouped"
+                        selectedIds={formData.selectedTagIds}
+                        onChange={(ids) => setFormData(prev => ({ ...prev, selectedTagIds: ids }))}
+                        groups={kpis
+                            .filter(k => formData.selectedKpiIds.includes(k.id!))
+                            .map(k => ({ metricId: k.id!, metricTitle: k.title, tagIds: ((k as any).tag_ids || []) as string[] }))}
+                        canCreate={false}
+                        label="Tags"
+                        helperText="Pulled from the linked metrics. Optional."
+                    />
+                </div>
             </div>
 
             {/* Footer */}

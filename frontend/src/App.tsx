@@ -26,6 +26,8 @@ import HomePage from './pages/HomePage'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
 import InitiativePage from './pages/InitiativePage'
+import TagDetailPage from './pages/TagDetailPage'
+import AllTagsPage from './pages/AllTagsPage'
 import AccountPage from './pages/AccountPage'
 import PublicOrganizationPage from './pages/PublicOrganizationPage'
 import PublicOrgContextPage from './pages/PublicOrgContextPage'
@@ -669,6 +671,8 @@ function App() {
                                                 <Route index element={<Dashboard />} />
                                                 <Route path="initiatives/:id" element={<InitiativePage />} />
                                                 <Route path="initiatives/:id/metrics/:kpiId" element={<InitiativePage />} />
+                                                <Route path="tags" element={<AllTagsPage />} />
+                                                <Route path="tags/:id" element={<TagDetailPage />} />
                                                 <Route path="account" element={<AccountPage subscriptionStatus={subscriptionStatus} />} />
                                                 <Route path="context" element={<OrgContextPage />} />
                                                 <Route path="settings/team" element={<TeamSettingsPage />} />

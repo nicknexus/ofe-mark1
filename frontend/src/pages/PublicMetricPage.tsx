@@ -13,6 +13,7 @@ import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
 import DateRangePicker from '../components/DateRangePicker'
 import { getLocalDateString, formatDate } from '../utils'
+import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 
 // Category colors
 const categoryConfig: Record<string, { bg: string; text: string; gradient: string; accent: string }> = {
@@ -101,7 +102,7 @@ export default function PublicMetricPage() {
 
     const filteredUpdates = (metric.updates || []).filter(u => isInDateRange(u.date_represented))
     const filteredEvidence = (metric.evidence || []).filter(e => isInDateRange(e.date_represented))
-    const filteredTotal = filteredUpdates.reduce((sum, u) => sum + (parseFloat(String(u.value)) || 0), 0)
+    const filteredTotal = aggregateKpiUpdates(filteredUpdates as any, metric.metric_type)
 
     // Prepare chart data (sorted by date)
     const chartData = [...filteredUpdates]

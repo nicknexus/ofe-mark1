@@ -3,11 +3,12 @@ import { Evidence } from '../types'
 import { deleteFromSupabase } from '../utils/fileUpload'
 import { StorageService } from './storageService'
 import { BeneficiaryService } from './beneficiaryService'
+import { MetricTagService } from './metricTagService'
 
 export class EvidenceService {
-    static async create(evidence: Evidence, userId: string): Promise<Evidence> {
+    static async create(evidence: Evidence, userId: string, requestedOrgId?: string): Promise<Evidence> {
         // Extract linkage fields and file_urls/file_sizes before inserting into evidence table
-        const { kpi_ids, kpi_update_ids, file_urls, file_sizes, location_ids, beneficiary_group_ids, ...evidenceData } = evidence;
+        const { kpi_ids, kpi_update_ids, file_urls, file_sizes, location_ids, beneficiary_group_ids, tag_ids, ...evidenceData } = evidence as any;
 
         const { data, error } = await supabase
             .from('evidence')
@@ -19,7 +20,7 @@ export class EvidenceService {
 
         // Insert multiple locations into evidence_locations junction table if provided
         if (location_ids && location_ids.length > 0) {
-            const locationLinks = location_ids.map(locationId => ({
+            const locationLinks = (location_ids as string[]).map((locationId: string) => ({
                 evidence_id: data.id,
                 location_id: locationId,
                 user_id: userId
@@ -37,14 +38,14 @@ export class EvidenceService {
 
         // Insert multiple files into evidence_files table if provided
         if (file_urls && file_urls.length > 0) {
-            const evidenceFiles = file_urls.map((fileUrl, index) => {
+            const evidenceFiles = (file_urls as string[]).map((fileUrl: string, index: number) => {
                 // Extract filename from URL
                 const fileName = fileUrl.split('/').pop() || `file-${index + 1}`
                 // Try to determine file type from extension
                 const extension = fileName.split('.').pop()?.toLowerCase() || ''
                 const fileType = extension || 'unknown'
                 // Get file size if provided (for storage tracking)
-                const fileSize = file_sizes?.[index] || 0
+                const fileSize = (file_sizes as number[] | undefined)?.[index] || 0
                 
                 return {
                     evidence_id: data.id,
@@ -68,7 +69,7 @@ export class EvidenceService {
 
         // Legacy: Link to KPIs if provided
         if (kpi_ids && kpi_ids.length > 0) {
-            const kpiLinks = kpi_ids.map(kpiId => ({
+            const kpiLinks = (kpi_ids as string[]).map((kpiId: string) => ({
                 evidence_id: data.id,
                 kpi_id: kpiId
             }));
@@ -82,7 +83,7 @@ export class EvidenceService {
 
         // New: Link to specific KPI updates (data points) if provided
         if (kpi_update_ids && kpi_update_ids.length > 0) {
-            const updateLinks = kpi_update_ids.map(updateId => ({
+            const updateLinks = (kpi_update_ids as string[]).map((updateId: string) => ({
                 evidence_id: data.id,
                 kpi_update_id: updateId,
                 user_id: userId
@@ -104,7 +105,7 @@ export class EvidenceService {
 
         // Link to beneficiary groups if provided
         if (beneficiary_group_ids && beneficiary_group_ids.length > 0) {
-            const bgLinks = beneficiary_group_ids.map(bgId => ({
+            const bgLinks = beneficiary_group_ids.map((bgId: string) => ({
                 evidence_id: data.id,
                 beneficiary_group_id: bgId
             }));
@@ -118,7 +119,11 @@ export class EvidenceService {
             }
         }
 
-        return data;
+        if (Array.isArray(tag_ids)) {
+            await MetricTagService.setTagsForEvidence(data.id, tag_ids, userId, requestedOrgId)
+        }
+
+        return { ...data, tag_ids: Array.isArray(tag_ids) ? tag_ids : [] };
     }
 
     static async getAll(initiativeId?: string, kpiId?: string, beneficiaryGroupId?: string): Promise<Evidence[]> {
@@ -194,8 +199,11 @@ export class EvidenceService {
                 beneficiary_group_ids
             };
         });
-        
-        return transformedData;
+
+        // Hydrate tag_ids in bulk (separate query — robust against PostgREST schema cache).
+        const evidenceIds = transformedData.map((e: any) => e.id).filter(Boolean)
+        const tagMap = await MetricTagService.getTagIdsForEvidences(evidenceIds)
+        return transformedData.map((e: any) => ({ ...e, tag_ids: tagMap[e.id] || [] }));
     }
 
     static async getById(id: string): Promise<Evidence | null> {
@@ -223,14 +231,15 @@ export class EvidenceService {
             const kpi_update_ids = data.evidence_kpi_updates?.map((link: any) => link.kpi_update_id).filter(Boolean) || [];
             const location_ids = data.evidence_locations?.map((link: any) => link.location_id).filter(Boolean) || [];
             const beneficiary_group_ids = data.evidence_beneficiary_groups?.map((link: any) => link.beneficiary_group_id).filter(Boolean) || [];
-            return { ...data, kpi_ids, kpi_update_ids, location_ids, beneficiary_group_ids };
+            const tag_ids = await MetricTagService.getTagIdsForEvidence(data.id)
+            return { ...data, kpi_ids, kpi_update_ids, location_ids, beneficiary_group_ids, tag_ids };
         }
         return data;
     }
 
-    static async update(id: string, evidence: Partial<Evidence>, userId: string): Promise<Evidence> {
+    static async update(id: string, evidence: Partial<Evidence>, userId: string, requestedOrgId?: string): Promise<Evidence> {
         // Extract linkage fields for separate handling
-        const { kpi_ids, kpi_update_ids, location_ids, beneficiary_group_ids, ...evidenceData } = evidence;
+        const { kpi_ids, kpi_update_ids, location_ids, beneficiary_group_ids, tag_ids, ...evidenceData } = evidence as any;
 
         // Get existing evidence to check if file_url is changing
         const { data: existingEvidence } = await supabase
@@ -264,7 +273,7 @@ export class EvidenceService {
 
             // Add new links
             if (kpi_ids.length > 0) {
-                const kpiLinks = kpi_ids.map(kpiId => ({
+                const kpiLinks = (kpi_ids as string[]).map((kpiId: string) => ({
                     evidence_id: id,
                     kpi_id: kpiId
                 }));
@@ -286,7 +295,7 @@ export class EvidenceService {
                 .eq('evidence_id', id);
 
             if (kpi_update_ids.length > 0) {
-                const updateLinks = kpi_update_ids.map(updateId => ({
+                const updateLinks = (kpi_update_ids as string[]).map((updateId: string) => ({
                     evidence_id: id,
                     kpi_update_id: updateId,
                     user_id: userId
@@ -309,7 +318,7 @@ export class EvidenceService {
                 .eq('evidence_id', id);
 
             if (location_ids.length > 0) {
-                const locationLinks = location_ids.map(locationId => ({
+                const locationLinks = (location_ids as string[]).map((locationId: string) => ({
                     evidence_id: id,
                     location_id: locationId,
                     user_id: userId
@@ -331,7 +340,7 @@ export class EvidenceService {
                 .eq('evidence_id', id);
 
             if (beneficiary_group_ids.length > 0) {
-                const bgLinks = beneficiary_group_ids.map(bgId => ({
+                const bgLinks = beneficiary_group_ids.map((bgId: string) => ({
                     evidence_id: id,
                     beneficiary_group_id: bgId
                 }));
@@ -342,6 +351,10 @@ export class EvidenceService {
 
                 if (bgError) throw new Error(`Failed to update evidence beneficiary group links: ${bgError.message}`);
             }
+        }
+
+        if (Array.isArray(tag_ids)) {
+            await MetricTagService.setTagsForEvidence(id, tag_ids, userId, requestedOrgId)
         }
 
         // Auto-link to any existing matching impact claims not already linked

@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { CreateKPIForm } from '../types'
+import TagPicker from './MetricTags/TagPicker'
 
 interface CreateKPIModalProps {
     isOpen: boolean
@@ -23,17 +24,24 @@ export default function CreateKPIModal({
         metric_type: editData?.metric_type || 'number',
         unit_of_measurement: editData?.unit_of_measurement || '',
         category: editData?.category || 'output',
-        initiative_id: initiativeId
+        initiative_id: initiativeId,
+        tag_ids: Array.isArray(editData?.tag_ids) ? editData.tag_ids : []
     })
+    const [tagIds, setTagIds] = useState<string[]>(Array.isArray(editData?.tag_ids) ? editData.tag_ids : [])
     const [loading, setLoading] = useState(false)
+
+    useEffect(() => {
+        if (editData) {
+            setTagIds(Array.isArray(editData?.tag_ids) ? editData.tag_ids : [])
+        }
+    }, [editData])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
 
         try {
-            await onSubmit(formData)
-            // Reset form only if creating (not editing)
+            await onSubmit({ ...formData, tag_ids: tagIds })
             if (!editData) {
                 setFormData({
                     title: '',
@@ -41,8 +49,10 @@ export default function CreateKPIModal({
                     metric_type: 'number',
                     unit_of_measurement: '',
                     category: 'output',
-                    initiative_id: initiativeId
+                    initiative_id: initiativeId,
+                    tag_ids: []
                 })
+                setTagIds([])
             }
             onClose()
         } finally {
@@ -182,6 +192,16 @@ export default function CreateKPIModal({
                                 </label>
                             ))}
                         </div>
+                    </div>
+
+                    <div className="border-t border-gray-200/60 pt-5">
+                        <TagPicker
+                            mode="multi"
+                            selectedIds={tagIds}
+                            onChange={setTagIds}
+                            label="Metric Tags (optional)"
+                            helperText="Tags act as sub-metrics. Attach the ones impact claims on this metric will be grouped under (e.g. Grade 1, Grade 2)."
+                        />
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3 pt-4">
