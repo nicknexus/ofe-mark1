@@ -1,6 +1,7 @@
 import { supabase } from '../utils/supabase'
 import { Story } from '../types'
 import { InitiativeService } from './initiativeService'
+import { MetricTagService } from './metricTagService'
 
 export class StoryService {
     /**
@@ -31,6 +32,7 @@ export class StoryService {
         filters?: {
             locationIds?: string[]
             beneficiaryGroupIds?: string[]
+            tagIds?: string[]
             startDate?: string
             endDate?: string
             search?: string
@@ -87,6 +89,19 @@ export class StoryService {
             })
         }
 
+        // Hydrate tag_ids for the returned stories.
+        const storyIds = stories.map((s: Story) => s.id!).filter(Boolean) as string[]
+        const tagMap = await MetricTagService.getTagIdsForStories(storyIds)
+        stories = stories.map((s: Story) => ({ ...s, tag_ids: tagMap[s.id!] || [] }))
+
+        // Filter by tag(s) — story must have at least one of the selected tags.
+        if (filters?.tagIds && filters.tagIds.length > 0) {
+            stories = stories.filter((story: Story) => {
+                const ids = story.tag_ids || []
+                return ids.some(id => filters.tagIds!.includes(id))
+            })
+        }
+
         return stories
     }
 
@@ -109,7 +124,9 @@ export class StoryService {
         if (error) throw new Error(`Failed to fetch story: ${error.message}`)
         if (!data) throw new Error('Story not found')
 
-        return this.transformStory(data)
+        const story = this.transformStory(data)
+        story.tag_ids = await MetricTagService.getTagIdsForStory(id)
+        return story
     }
 
     private static transformStory(data: any): Story {
@@ -136,7 +153,7 @@ export class StoryService {
     }
 
     static async create(story: Partial<Story>, userId: string, requestedOrgId?: string): Promise<Story> {
-        const { beneficiary_group_ids, location_ids, locations: _locs, location, ...storyData } = story
+        const { beneficiary_group_ids, location_ids, locations: _locs, location, tag_ids, ...storyData } = story
 
         // Authorize: caller must have access to the initiative being written to.
         if (storyData.initiative_id) {
@@ -187,6 +204,16 @@ export class StoryService {
             }
         }
 
+        // Persist metric tags (multi-tag, additive filter dimension).
+        if (Array.isArray(tag_ids)) {
+            try {
+                await MetricTagService.setTagsForStory(storyRecord.id, tag_ids, userId, requestedOrgId)
+            } catch (err) {
+                await supabase.from('stories').delete().eq('id', storyRecord.id)
+                throw err
+            }
+        }
+
         return this.getById(storyRecord.id, userId, requestedOrgId)
     }
 
@@ -194,7 +221,7 @@ export class StoryService {
         const access = await this.assertAccessByStoryId(id, userId, requestedOrgId)
         if (!access) throw new Error('Story not found or access denied')
 
-        const { beneficiary_group_ids, location_ids, locations: _locs, location, ...storyData } = updates
+        const { beneficiary_group_ids, location_ids, locations: _locs, location, tag_ids, ...storyData } = updates
 
         const { error: storyError } = await supabase
             .from('stories')
@@ -244,6 +271,11 @@ export class StoryService {
 
                 if (linkError) throw new Error(`Failed to update beneficiary group links: ${linkError.message}`)
             }
+        }
+
+        // Update tag links if provided. Undefined → leave alone; [] → clear all.
+        if (tag_ids !== undefined) {
+            await MetricTagService.setTagsForStory(id, tag_ids, userId, requestedOrgId)
         }
 
         return this.getById(id, userId, requestedOrgId)

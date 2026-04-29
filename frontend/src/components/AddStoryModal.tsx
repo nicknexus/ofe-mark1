@@ -6,6 +6,7 @@ import { getLocalDateString } from '../utils'
 import { useUploadManager } from '../context/UploadContext'
 import DateRangePicker from './DateRangePicker'
 import LocationModal from './LocationModal'
+import TagPicker from './MetricTags/TagPicker'
 import toast from 'react-hot-toast'
 
 interface AddStoryModalProps {
@@ -31,6 +32,7 @@ export default function AddStoryModal({
         date_represented: getLocalDateString(new Date()),
         location_ids: [],
         beneficiary_group_ids: [],
+        tag_ids: [],
         initiative_id: initiativeId
     })
     const [datePickerValue, setDatePickerValue] = useState<{
@@ -46,6 +48,7 @@ export default function AddStoryModal({
     const [locations, setLocations] = useState<Location[]>([])
     const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
     const [selectedBeneficiaryGroupIds, setSelectedBeneficiaryGroupIds] = useState<string[]>([])
+    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
     const { queueUpload } = useUploadManager()
 
@@ -80,10 +83,12 @@ export default function AddStoryModal({
                 date_represented: editData.date_represented || getLocalDateString(new Date()),
                 location_ids: editData.location_ids || (editData.location_id ? [editData.location_id] : []),
                 beneficiary_group_ids: editData.beneficiary_group_ids || [],
+                tag_ids: editData.tag_ids || [],
                 initiative_id: initiativeId
             })
             setDatePickerValue({ singleDate: editData.date_represented })
             setSelectedBeneficiaryGroupIds(editData.beneficiary_group_ids || [])
+            setSelectedTagIds(editData.tag_ids || [])
         } else {
             // Reset for new story
             setFormData({
@@ -94,10 +99,12 @@ export default function AddStoryModal({
                 date_represented: getLocalDateString(new Date()),
                 location_ids: [],
                 beneficiary_group_ids: [],
+                tag_ids: [],
                 initiative_id: initiativeId
             })
             setDatePickerValue({})
             setSelectedBeneficiaryGroupIds([])
+            setSelectedTagIds([])
             setSelectedFile(null)
             setUploadProgress('')
         }
@@ -161,6 +168,7 @@ export default function AddStoryModal({
         if (selectedFile && !formData.media_url) {
             const capturedFormData = { ...formData }
             const capturedBenGroups = [...selectedBeneficiaryGroupIds]
+            const capturedTagIds = [...selectedTagIds]
             const capturedEditId = editData?.id
             const capturedOnSubmit = onSubmit
 
@@ -173,7 +181,8 @@ export default function AddStoryModal({
                         const submitData = {
                             ...capturedFormData,
                             media_url: result.file_url,
-                            beneficiary_group_ids: capturedBenGroups
+                            beneficiary_group_ids: capturedBenGroups,
+                            tag_ids: capturedTagIds
                         }
                         if (capturedEditId) {
                             await apiService.updateStory(capturedEditId, submitData)
@@ -203,7 +212,8 @@ export default function AddStoryModal({
             const submitData = {
                 ...formData,
                 media_url: formData.media_url?.trim() || undefined,
-                beneficiary_group_ids: selectedBeneficiaryGroupIds
+                beneficiary_group_ids: selectedBeneficiaryGroupIds,
+                tag_ids: selectedTagIds
             }
 
             if (editData?.id) {
@@ -534,6 +544,17 @@ export default function AddStoryModal({
                                 </div>
                             )}
                         </div>
+                    </div>
+
+                    {/* Tags */}
+                    <div>
+                        <TagPicker
+                            mode="multi"
+                            selectedIds={selectedTagIds}
+                            onChange={setSelectedTagIds}
+                            label="Tags (Optional)"
+                            helperText="Tag this story so it shows up when filtering by tag."
+                        />
                     </div>
 
                     {/* Actions */}

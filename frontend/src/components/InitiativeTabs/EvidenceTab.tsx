@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Search, X, Calendar, MapPin, Users, FileText, Eye, Edit, Trash2, Plus, Camera, MessageSquare, DollarSign, ChevronDown, List, Grid } from 'lucide-react'
+import { Search, X, Calendar, MapPin, Users, FileText, Eye, Edit, Trash2, Plus, Camera, MessageSquare, DollarSign, ChevronDown, List, Grid, Tag as TagIcon } from 'lucide-react'
 import { apiService } from '../../services/api'
-import { Evidence, Location, BeneficiaryGroup } from '../../types'
+import { Evidence, Location, BeneficiaryGroup, MetricTag } from '../../types'
 import { formatDate, getEvidenceTypeInfo } from '../../utils'
 import EvidenceTagsList from '../MetricTags/EvidenceTagsList'
 import DateRangePicker from '../DateRangePicker'
@@ -42,15 +42,20 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
     const [selectedLocations, setSelectedLocations] = useState<string[]>([])
     const [selectedBeneficiaryGroups, setSelectedBeneficiaryGroups] = useState<string[]>([])
     const [selectedEvidenceTypes, setSelectedEvidenceTypes] = useState<string[]>([])
+    const [selectedTags, setSelectedTags] = useState<string[]>([])
+    const [allTags, setAllTags] = useState<MetricTag[]>([])
     const [showLocationPicker, setShowLocationPicker] = useState(false)
     const [showBeneficiaryPicker, setShowBeneficiaryPicker] = useState(false)
     const [showEvidenceTypePicker, setShowEvidenceTypePicker] = useState(false)
+    const [showTagPicker, setShowTagPicker] = useState(false)
     const locationButtonRef = useRef<HTMLButtonElement>(null)
     const beneficiaryButtonRef = useRef<HTMLButtonElement>(null)
     const evidenceTypeButtonRef = useRef<HTMLButtonElement>(null)
+    const tagButtonRef = useRef<HTMLButtonElement>(null)
     const [locationDropdownPosition, setLocationDropdownPosition] = useState({ top: 0, left: 0 })
     const [beneficiaryDropdownPosition, setBeneficiaryDropdownPosition] = useState({ top: 0, left: 0 })
     const [evidenceTypeDropdownPosition, setEvidenceTypeDropdownPosition] = useState({ top: 0, left: 0 })
+    const [tagDropdownPosition, setTagDropdownPosition] = useState({ top: 0, left: 0 })
 
     const evidenceTypes = [
         { value: 'visual_proof', label: 'Visual Support', icon: Camera },
@@ -65,15 +70,18 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
             Promise.all([
                 apiService.getLocations(initiativeId),
                 apiService.getBeneficiaryGroups(initiativeId),
-                apiService.getKPIs(initiativeId)
-            ]).then(([locs, groups, kpis]) => {
+                apiService.getKPIs(initiativeId),
+                apiService.getMetricTags()
+            ]).then(([locs, groups, kpis, tags]) => {
                 setLocations(locs || [])
                 setBeneficiaryGroups(groups || [])
                 setAvailableKPIs(kpis || [])
+                setAllTags(tags || [])
             }).catch(() => {
                 setLocations([])
                 setBeneficiaryGroups([])
                 setAvailableKPIs([])
+                setAllTags([])
             })
         }
     }, [initiativeId])
@@ -81,7 +89,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
     // Load evidence with filters
     useEffect(() => {
         loadEvidence()
-    }, [initiativeId, selectedLocations, selectedBeneficiaryGroups, selectedEvidenceTypes, datePickerValue, searchQuery])
+    }, [initiativeId, selectedLocations, selectedBeneficiaryGroups, selectedEvidenceTypes, selectedTags, datePickerValue, searchQuery])
 
     const loadEvidence = async () => {
         if (!initiativeId) return
@@ -159,6 +167,14 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                 filtered = filtered.filter(ev => {
                     const evBgIds = ev.beneficiary_group_ids || []
                     return evBgIds.some(bgId => selectedBeneficiaryGroups.includes(bgId))
+                })
+            }
+
+            // Filter by tag
+            if (selectedTags.length > 0) {
+                filtered = filtered.filter(ev => {
+                    const evTagIds = ev.tag_ids || []
+                    return evTagIds.some(tid => selectedTags.includes(tid))
                 })
             }
 
@@ -266,13 +282,24 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
         }
     }, [showEvidenceTypePicker])
 
+    useEffect(() => {
+        if (showTagPicker && tagButtonRef.current) {
+            const rect = tagButtonRef.current.getBoundingClientRect()
+            setTagDropdownPosition({
+                top: rect.bottom + 4,
+                left: rect.left
+            })
+        }
+    }, [showTagPicker])
+
     const hasActiveFilters = selectedLocations.length > 0 || selectedBeneficiaryGroups.length > 0 ||
-        selectedEvidenceTypes.length > 0 || datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate)
+        selectedEvidenceTypes.length > 0 || selectedTags.length > 0 || datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate)
 
     const clearFilters = () => {
         setSelectedLocations([])
         setSelectedBeneficiaryGroups([])
         setSelectedEvidenceTypes([])
+        setSelectedTags([])
         setDatePickerValue({})
     }
 
@@ -524,6 +551,100 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                                         className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
                                                     />
                                                     <span className="text-xs text-gray-700 truncate flex-1">{group.name}</span>
+                                                </label>
+                                            ))}
+                                        </>
+                                    )}
+                                </div>
+                            </>,
+                            document.body
+                        )}
+                    </div>
+
+                    {/* Tag Filter */}
+                    <div className="relative">
+                        <button
+                            ref={tagButtonRef}
+                            onClick={() => setShowTagPicker(!showTagPicker)}
+                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${selectedTags.length > 0
+                                ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
+                                : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                                }`}
+                        >
+                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedTags.length > 0
+                                ? 'bg-primary-100 border-primary-500'
+                                : 'bg-gray-100 border-gray-200'
+                                }`}>
+                                <TagIcon className={`w-5 h-5 ${selectedTags.length > 0
+                                    ? 'text-primary-500'
+                                    : 'text-gray-600'
+                                    }`} />
+                            </div>
+                            <span className="ml-3">
+                                {selectedTags.length === 0
+                                    ? 'Tag'
+                                    : selectedTags.length === 1
+                                        ? allTags.find(t => t.id === selectedTags[0])?.name || '1 tag'
+                                        : `${selectedTags.length} tags`}
+                            </span>
+                            {selectedTags.length > 0 && (
+                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
+                                    {selectedTags.length}
+                                </span>
+                            )}
+                            <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showTagPicker ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {showTagPicker && tagButtonRef.current && createPortal(
+                            <>
+                                <div
+                                    className="fixed inset-0 z-[9998]"
+                                    onClick={() => setShowTagPicker(false)}
+                                />
+                                <div
+                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
+                                    style={{
+                                        top: `${tagDropdownPosition.top}px`,
+                                        left: `${tagDropdownPosition.left}px`
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    {allTags.length === 0 ? (
+                                        <p className="text-xs text-gray-500">No tags available</p>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-xs font-semibold text-gray-700">Select Tags</span>
+                                                {selectedTags.length > 0 && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            setSelectedTags([])
+                                                        }}
+                                                        className="text-xs text-blue-600 hover:text-blue-800"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {allTags.map((tag) => (
+                                                <label
+                                                    key={tag.id}
+                                                    className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedTags.includes(tag.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setSelectedTags([...selectedTags, tag.id])
+                                                            } else {
+                                                                setSelectedTags(selectedTags.filter(id => id !== tag.id))
+                                                            }
+                                                        }}
+                                                        className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
+                                                    />
+                                                    <span className="text-xs text-gray-700 truncate flex-1">{tag.name}</span>
                                                 </label>
                                             ))}
                                         </>

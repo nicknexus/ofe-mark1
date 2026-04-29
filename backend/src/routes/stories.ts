@@ -7,7 +7,7 @@ const router = Router()
 // List stories (with filters)
 router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const { initiative_id, location_id, beneficiary_group_id, start_date, end_date, search } = req.query
+        const { initiative_id, location_id, beneficiary_group_id, tag_id, start_date, end_date, search } = req.query
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined
 
         if (!initiative_id) {
@@ -23,6 +23,10 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
         if (beneficiary_group_id) {
             const groupIds = Array.isArray(beneficiary_group_id) ? beneficiary_group_id : [beneficiary_group_id]
             filters.beneficiaryGroupIds = groupIds.filter(Boolean)
+        }
+        if (tag_id) {
+            const tagIds = Array.isArray(tag_id) ? tag_id : [tag_id]
+            filters.tagIds = tagIds.filter(Boolean)
         }
         if (start_date) {
             filters.startDate = start_date as string

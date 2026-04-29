@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Search, X, MapPin, Users, Calendar, ChevronDown } from 'lucide-react'
+import { Plus, Search, X, MapPin, Users, Calendar, ChevronDown, Tag as TagIcon } from 'lucide-react'
 import { apiService } from '../../services/api'
-import { Story, Location, BeneficiaryGroup } from '../../types'
+import { Story, Location, BeneficiaryGroup, MetricTag } from '../../types'
 import { formatDate } from '../../utils'
 import StoryCard from '../StoryCard'
 import AddStoryModal from '../AddStoryModal'
@@ -38,12 +38,17 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
     }>({})
     const [selectedLocations, setSelectedLocations] = useState<string[]>([])
     const [selectedBeneficiaryGroups, setSelectedBeneficiaryGroups] = useState<string[]>([])
+    const [selectedTags, setSelectedTags] = useState<string[]>([])
+    const [allTags, setAllTags] = useState<MetricTag[]>([])
     const [showLocationPicker, setShowLocationPicker] = useState(false)
     const [showBeneficiaryPicker, setShowBeneficiaryPicker] = useState(false)
+    const [showTagPicker, setShowTagPicker] = useState(false)
     const locationButtonRef = useRef<HTMLButtonElement>(null)
     const beneficiaryButtonRef = useRef<HTMLButtonElement>(null)
+    const tagButtonRef = useRef<HTMLButtonElement>(null)
     const [locationDropdownPosition, setLocationDropdownPosition] = useState({ top: 0, left: 0 })
     const [beneficiaryDropdownPosition, setBeneficiaryDropdownPosition] = useState({ top: 0, left: 0 })
+    const [tagDropdownPosition, setTagDropdownPosition] = useState({ top: 0, left: 0 })
 
     // Load locations and beneficiary groups
     useEffect(() => {
@@ -61,10 +66,17 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
         }
     }, [initiativeId])
 
+    // Load org-wide metric tags for the tag filter.
+    useEffect(() => {
+        apiService.getMetricTags()
+            .then((tags) => setAllTags(tags || []))
+            .catch(() => setAllTags([]))
+    }, [])
+
     // Load stories with filters
     useEffect(() => {
         loadStories()
-    }, [initiativeId, selectedLocations, selectedBeneficiaryGroups, datePickerValue, searchQuery])
+    }, [initiativeId, selectedLocations, selectedBeneficiaryGroups, selectedTags, datePickerValue, searchQuery])
 
     // Open story when initialStoryId is provided (only once)
     const [hasOpenedInitialStory, setHasOpenedInitialStory] = useState(false)
@@ -96,6 +108,9 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
             }
             if (selectedBeneficiaryGroups.length > 0) {
                 filters.beneficiaryGroupIds = selectedBeneficiaryGroups
+            }
+            if (selectedTags.length > 0) {
+                filters.tagIds = selectedTags
             }
             if (datePickerValue.startDate) {
                 filters.startDate = datePickerValue.startDate
@@ -177,12 +192,24 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
         }
     }, [showBeneficiaryPicker])
 
-    const hasActiveFilters = selectedLocations.length > 0 || selectedBeneficiaryGroups.length > 0 || 
+    useEffect(() => {
+        if (showTagPicker && tagButtonRef.current) {
+            const rect = tagButtonRef.current.getBoundingClientRect()
+            setTagDropdownPosition({
+                top: rect.bottom + 4,
+                left: rect.left
+            })
+        }
+    }, [showTagPicker])
+
+    const hasActiveFilters = selectedLocations.length > 0 || selectedBeneficiaryGroups.length > 0 ||
+        selectedTags.length > 0 ||
         datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate)
 
     const clearFilters = () => {
         setSelectedLocations([])
         setSelectedBeneficiaryGroups([])
+        setSelectedTags([])
         setDatePickerValue({})
     }
 
@@ -242,6 +269,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                                 })
                                 setShowLocationPicker(!showLocationPicker)
                                 setShowBeneficiaryPicker(false)
+                                setShowTagPicker(false)
                             }}
                             className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${
                                 selectedLocations.length > 0
@@ -270,6 +298,40 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                         </button>
                     </div>
 
+                    {/* Tag Filter */}
+                    <div className="relative">
+                        <button
+                            ref={tagButtonRef}
+                            onClick={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect()
+                                setTagDropdownPosition({ top: rect.bottom + 4, left: rect.left })
+                                setShowTagPicker(!showTagPicker)
+                                setShowLocationPicker(false)
+                                setShowBeneficiaryPicker(false)
+                            }}
+                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${
+                                selectedTags.length > 0
+                                    ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
+                                    : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                            }`}
+                        >
+                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                                selectedTags.length > 0
+                                    ? 'bg-primary-100 border-primary-500'
+                                    : 'bg-gray-100 border-gray-200'
+                            }`}>
+                                <TagIcon className={`w-5 h-5 ${selectedTags.length > 0 ? 'text-primary-500' : 'text-gray-600'}`} />
+                            </div>
+                            <span className="ml-3">Tag</span>
+                            {selectedTags.length > 0 && (
+                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
+                                    {selectedTags.length}
+                                </span>
+                            )}
+                            <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showTagPicker ? 'rotate-180' : ''}`} />
+                        </button>
+                    </div>
+
                     {/* Beneficiary Filter */}
                     <div className="relative">
                         <button
@@ -282,6 +344,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                                 })
                                 setShowBeneficiaryPicker(!showBeneficiaryPicker)
                                 setShowLocationPicker(false)
+                                setShowTagPicker(false)
                             }}
                             className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${
                                 selectedBeneficiaryGroups.length > 0
@@ -378,6 +441,54 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                     document.body
                 )}
 
+                {/* Tag Dropdown */}
+                {showTagPicker && createPortal(
+                    <>
+                        <div className="fixed inset-0 z-[9998]" onClick={() => setShowTagPicker(false)} />
+                        <div
+                            className="fixed bg-white border border-gray-100 rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
+                            style={{ top: `${tagDropdownPosition.top}px`, left: `${tagDropdownPosition.left}px` }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {allTags.length === 0 ? (
+                                <p className="text-xs text-gray-500">No tags available</p>
+                            ) : (
+                                <>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs font-semibold text-gray-700">Select Tags</span>
+                                        {selectedTags.length > 0 && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setSelectedTags([]) }}
+                                                className="text-xs text-blue-600 hover:text-blue-800"
+                                            >
+                                                Clear
+                                            </button>
+                                        )}
+                                    </div>
+                                    {allTags.map((tag) => (
+                                        <label
+                                            key={tag.id}
+                                            className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedTags.includes(tag.id)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) setSelectedTags([...selectedTags, tag.id])
+                                                    else setSelectedTags(selectedTags.filter(id => id !== tag.id))
+                                                }}
+                                                className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
+                                            />
+                                            <span className="text-xs text-gray-700 truncate flex-1">{tag.name}</span>
+                                        </label>
+                                    ))}
+                                </>
+                            )}
+                        </div>
+                    </>,
+                    document.body
+                )}
+
                 {/* Beneficiary Dropdown */}
                 {showBeneficiaryPicker && createPortal(
                     <>
@@ -454,16 +565,14 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                         </button>
                     </div>
                 ) : (
-                    <div className="flex justify-center">
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-0.5 gap-y-0 max-w-7xl items-stretch">
-                            {stories.map((story) => (
-                                <StoryCard
-                                    key={story.id}
-                                    story={story}
-                                    onView={handleViewStory}
-                                />
-                            ))}
-                        </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
+                        {stories.map((story) => (
+                            <StoryCard
+                                key={story.id}
+                                story={story}
+                                onView={handleViewStory}
+                            />
+                        ))}
                     </div>
                 )}
                     </div>

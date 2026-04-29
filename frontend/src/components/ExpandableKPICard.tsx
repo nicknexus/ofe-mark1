@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useTeam } from '../context/TeamContext'
 import {
@@ -36,8 +36,9 @@ import EasyEvidenceModal from './EasyEvidenceModal'
 import AllEvidenceModal from './AllEvidenceModal'
 import TagChip from './MetricTags/TagChip'
 import TagBreakdownStrip from './MetricTags/TagBreakdownStrip'
+import KPIFilterBar from './KPIFilterBar'
 import { Link } from 'react-router-dom'
-import { MetricTag } from '../types'
+import { MetricTag, Location, BeneficiaryGroup } from '../types'
 import { apiService } from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -138,6 +139,57 @@ export default function ExpandableKPICard({
     const [selectedClaimForEvidence, setSelectedClaimForEvidence] = useState<any>(null)
     const [isEasyEvidenceModalOpen, setIsEasyEvidenceModalOpen] = useState(false)
     const [isAllEvidenceModalOpen, setIsAllEvidenceModalOpen] = useState(false)
+
+    // Filter bar state for the expanded view (date is shared with timeFrame logic above).
+    const [filterLocations, setFilterLocations] = useState<string[]>([])
+    const [filterTags, setFilterTags] = useState<string[]>([])
+    const [filterBeneficiaryGroups, setFilterBeneficiaryGroups] = useState<string[]>([])
+    const [filterAllLocations, setFilterAllLocations] = useState<Location[]>([])
+    const [filterAllBeneficiaryGroups, setFilterAllBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
+
+    useEffect(() => {
+        if (!isExpanded || !initiativeId) return
+        let active = true
+        Promise.all([
+            apiService.getLocations(initiativeId),
+            apiService.getBeneficiaryGroups(initiativeId),
+        ]).then(([locs, groups]) => {
+            if (!active) return
+            setFilterAllLocations(locs || [])
+            setFilterAllBeneficiaryGroups((groups || []) as BeneficiaryGroup[])
+        }).catch(() => {
+            if (!active) return
+            setFilterAllLocations([])
+            setFilterAllBeneficiaryGroups([])
+        })
+        return () => { active = false }
+    }, [isExpanded, initiativeId])
+
+    // Tags available on this metric only.
+    const filterAvailableTags = useMemo(() => {
+        const ids = new Set((kpi.tag_ids || []) as string[])
+        return allTags.filter(t => ids.has(t.id))
+    }, [allTags, kpi.tag_ids])
+
+    const filteredKpiUpdates = useMemo(() => {
+        if (!Array.isArray(kpiUpdates)) return []
+        return kpiUpdates.filter((u: any) => {
+            if (filterLocations.length > 0 && !filterLocations.includes(u.location_id || '')) return false
+            if (filterTags.length > 0 && !filterTags.includes(u.tag_id || '')) return false
+            if (filterBeneficiaryGroups.length > 0) {
+                const ids: string[] = u.beneficiary_group_ids || []
+                if (!ids.some(id => filterBeneficiaryGroups.includes(id))) return false
+            }
+            return true
+        })
+    }, [kpiUpdates, filterLocations, filterTags, filterBeneficiaryGroups])
+
+    const clearAllFilters = () => {
+        setFilterLocations([])
+        setFilterTags([])
+        setFilterBeneficiaryGroups([])
+        setDatePickerValue({})
+    }
 
 
     const handleDataPointClick = (update: any) => {
@@ -490,12 +542,12 @@ export default function ExpandableKPICard({
 
     // Generate cumulative data for this specific KPI
     const generateChartData = () => {
-        if (!kpiUpdates || kpiUpdates.length === 0) {
+        if (!filteredKpiUpdates || filteredKpiUpdates.length === 0) {
             return []
         }
 
         // Sort updates by effective date (end date for ranges, date_represented otherwise)
-        const sortedUpdates = [...kpiUpdates].sort((a, b) =>
+        const sortedUpdates = [...filteredKpiUpdates].sort((a, b) =>
             getEffectiveDate(a).getTime() - getEffectiveDate(b).getTime()
         )
 
@@ -934,7 +986,23 @@ export default function ExpandableKPICard({
                                         </button>
                                     </div>
                                 )}
-                                <TagBreakdownStrip kpi={kpi} kpiUpdates={kpiUpdates} allTags={allTags} compact />
+                                <div className="flex-shrink-0">
+                                    <KPIFilterBar
+                                        locations={filterAllLocations}
+                                        beneficiaryGroups={filterAllBeneficiaryGroups}
+                                        tags={filterAvailableTags}
+                                        selectedLocations={filterLocations}
+                                        onLocationsChange={setFilterLocations}
+                                        selectedBeneficiaryGroups={filterBeneficiaryGroups}
+                                        onBeneficiaryGroupsChange={setFilterBeneficiaryGroups}
+                                        selectedTags={filterTags}
+                                        onTagsChange={setFilterTags}
+                                        datePickerValue={datePickerValue}
+                                        onDatePickerChange={setDatePickerValue}
+                                        onClearAll={clearAllFilters}
+                                    />
+                                </div>
+                                <TagBreakdownStrip kpi={kpi} kpiUpdates={filteredKpiUpdates} allTags={allTags} compact />
                                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 flex-1 min-h-0 overflow-hidden">
                                     <div className="lg:col-span-3 bg-white/80 backdrop-blur-xl border border-gray-100/60 rounded-xl p-3 flex flex-col shadow-soft-float min-h-0 overflow-hidden">
                                         <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
@@ -943,7 +1011,6 @@ export default function ExpandableKPICard({
                                                 <p className="text-[10px] lg:text-xs text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals'}</p>
                                             </div>
                                             <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
-                                                <DateRangePicker value={datePickerValue} onChange={setDatePickerValue} maxDate={getLocalDateString(new Date())} placeholder="Date" className="w-auto text-[10px] lg:text-xs" />
                                                 {timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
                                                     <div className="flex items-center bg-gray-100 rounded-md lg:rounded-lg p-0.5">
                                                         <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
@@ -960,7 +1027,7 @@ export default function ExpandableKPICard({
                                             </div>
                                         </div>
                                         <div className="flex-1 min-h-[100px] flex items-center justify-center">
-                                            {kpiUpdates && kpiUpdates.length > 0 ? (
+                                            {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <LineChart data={chartData}>
                                                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -974,7 +1041,7 @@ export default function ExpandableKPICard({
                                                 <div className="h-full flex flex-col items-center justify-center text-gray-500">
                                                     <BarChart3 className="w-10 h-10 mb-3 opacity-50" />
                                                     <h4 className="text-base font-semibold text-gray-700 mb-1">No Data Yet</h4>
-                                                    <p className="text-xs text-center max-w-xs">Add data to see your activity over time</p>
+                                                    <p className="text-xs text-center max-w-xs">{kpiUpdates && kpiUpdates.length > 0 ? 'No data matches the active filters' : 'Add data to see your activity over time'}</p>
                                                 </div>
                                             )}
                                         </div>
@@ -1023,14 +1090,14 @@ export default function ExpandableKPICard({
 
                                     {/* Impact Claims - Full Height */}
                                     <div className="lg:col-span-2 flex flex-col min-h-0 overflow-hidden">
-                                        {kpiUpdates && kpiUpdates.length > 0 ? (
+                                        {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
                                             <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-3 shadow-soft-float flex flex-col flex-1 min-h-0">
                                                 <div className="flex items-center justify-between mb-2 flex-shrink-0">
-                                                    <h5 className="text-sm font-semibold text-gray-800">Impact Claims ({kpiUpdates.length})</h5>
+                                                    <h5 className="text-sm font-semibold text-gray-800">Impact Claims ({filteredKpiUpdates.length})</h5>
                                                     {canAddImpactClaims && <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25"><Plus className="w-4 h-4" /><span>Add Impact Claim</span></button>}
                                                 </div>
                                                 <div className="flex-1 overflow-y-auto space-y-1 pr-1 min-h-0">
-                                                    {[...kpiUpdates].sort((a, b) => {
+                                                    {[...filteredKpiUpdates].sort((a, b) => {
                                                         const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
                                                         const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
                                                         return dateB - dateA
@@ -1528,7 +1595,22 @@ export default function ExpandableKPICard({
                                     })}
                                 </div>
 
-                                <TagBreakdownStrip kpi={kpi} kpiUpdates={kpiUpdates} allTags={allTags} />
+                                <KPIFilterBar
+                                    locations={filterAllLocations}
+                                    beneficiaryGroups={filterAllBeneficiaryGroups}
+                                    tags={filterAvailableTags}
+                                    selectedLocations={filterLocations}
+                                    onLocationsChange={setFilterLocations}
+                                    selectedBeneficiaryGroups={filterBeneficiaryGroups}
+                                    onBeneficiaryGroupsChange={setFilterBeneficiaryGroups}
+                                    selectedTags={filterTags}
+                                    onTagsChange={setFilterTags}
+                                    datePickerValue={datePickerValue}
+                                    onDatePickerChange={setDatePickerValue}
+                                    onClearAll={clearAllFilters}
+                                />
+
+                                <TagBreakdownStrip kpi={kpi} kpiUpdates={filteredKpiUpdates} allTags={allTags} />
 
                                 {/* Chart and Data Sections */}
                                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
@@ -1540,7 +1622,6 @@ export default function ExpandableKPICard({
                                                 <p className="text-xs lg:text-sm text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals over time'}</p>
                                             </div>
                                             <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
-                                                <DateRangePicker value={datePickerValue} onChange={setDatePickerValue} maxDate={getLocalDateString(new Date())} placeholder="Date" className="w-auto" />
                                                 {timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
                                                     <div className="flex items-center bg-gray-100 rounded-md lg:rounded-lg p-0.5">
                                                         <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
@@ -1558,7 +1639,7 @@ export default function ExpandableKPICard({
                                         </div>
 
                                         <div className="flex-1 h-64 flex items-center justify-center">
-                                            {kpiUpdates && kpiUpdates.length > 0 ? (
+                                            {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <LineChart data={chartData}>
                                                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -1572,7 +1653,7 @@ export default function ExpandableKPICard({
                                                 <div className="h-full flex flex-col items-center justify-center text-gray-500">
                                                     <BarChart3 className="w-12 h-12 mb-4 opacity-50" />
                                                     <h4 className="text-lg font-semibold text-gray-700 mb-2">No Data Yet</h4>
-                                                    <p className="text-sm text-center max-w-xs">Come back when you add data to see your activity over time</p>
+                                                    <p className="text-sm text-center max-w-xs">{kpiUpdates && kpiUpdates.length > 0 ? 'No data matches the active filters' : 'Come back when you add data to see your activity over time'}</p>
                                                 </div>
                                             )}
                                         </div>
@@ -1580,16 +1661,16 @@ export default function ExpandableKPICard({
 
                                     {/* Impact Claims - Full Height */}
                                     <div className="lg:col-span-2 flex flex-col">
-                                        {kpiUpdates && kpiUpdates.length > 0 ? (
+                                        {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
                                             <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-2xl p-4 shadow-soft-float flex flex-col flex-1 max-h-[calc(100vh-400px)]">
                                                 <div className="flex items-center justify-between mb-3 flex-shrink-0">
-                                                    <h5 className="text-base font-semibold text-gray-800">Impact Claims ({kpiUpdates.length})</h5>
+                                                    <h5 className="text-base font-semibold text-gray-800">Impact Claims ({filteredKpiUpdates.length})</h5>
                                                     <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25">
                                                         <Plus className="w-4 h-4" /><span>Add</span>
                                                     </button>
                                                 </div>
                                                 <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
-                                                    {[...kpiUpdates].sort((a, b) => {
+                                                    {[...filteredKpiUpdates].sort((a, b) => {
                                                         const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
                                                         const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
                                                         return dateB - dateA
@@ -1833,6 +1914,23 @@ export default function ExpandableKPICard({
                                     })}
                                 </div>
 
+                                <KPIFilterBar
+                                    locations={filterAllLocations}
+                                    beneficiaryGroups={filterAllBeneficiaryGroups}
+                                    tags={filterAvailableTags}
+                                    selectedLocations={filterLocations}
+                                    onLocationsChange={setFilterLocations}
+                                    selectedBeneficiaryGroups={filterBeneficiaryGroups}
+                                    onBeneficiaryGroupsChange={setFilterBeneficiaryGroups}
+                                    selectedTags={filterTags}
+                                    onTagsChange={setFilterTags}
+                                    datePickerValue={datePickerValue}
+                                    onDatePickerChange={setDatePickerValue}
+                                    onClearAll={clearAllFilters}
+                                />
+
+                                <TagBreakdownStrip kpi={kpi} kpiUpdates={filteredKpiUpdates} allTags={allTags} />
+
                                 {/* Chart and Data Sections - 3/5 chart + 2/5 data/evidence */}
                                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
                                     {/* Chart Section - 3/5 width */}
@@ -1843,7 +1941,6 @@ export default function ExpandableKPICard({
                                                 <p className="text-xs lg:text-sm text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals over time'}</p>
                                             </div>
                                             <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
-                                                <DateRangePicker value={datePickerValue} onChange={setDatePickerValue} maxDate={getLocalDateString(new Date())} placeholder="Date" className="w-auto" />
                                                 {timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
                                                     <div className="flex items-center bg-gray-100 rounded-md lg:rounded-lg p-0.5">
                                                         <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
@@ -1861,7 +1958,7 @@ export default function ExpandableKPICard({
                                         </div>
 
                                         <div className="flex-1 h-64 flex items-center justify-center">
-                                            {kpiUpdates && kpiUpdates.length > 0 ? (
+                                            {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <LineChart data={chartData}>
                                                         <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
@@ -1932,7 +2029,7 @@ export default function ExpandableKPICard({
                                                     <BarChart3 className="w-12 h-12 mb-4 opacity-50" />
                                                     <h4 className="text-lg font-semibold text-gray-700 mb-2">No Data Yet</h4>
                                                     <p className="text-sm text-center max-w-xs">
-                                                        Come back when you add data to see your activity over time
+                                                        {kpiUpdates && kpiUpdates.length > 0 ? 'No data matches the active filters' : 'Come back when you add data to see your activity over time'}
                                                     </p>
                                                 </div>
                                             )}
@@ -1941,10 +2038,10 @@ export default function ExpandableKPICard({
 
                                     {/* Impact Claims - Full Height */}
                                     <div className="lg:col-span-2 flex flex-col">
-                                        {kpiUpdates && kpiUpdates.length > 0 ? (
+                                        {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
                                             <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-2xl p-4 shadow-soft-float flex flex-col flex-1 max-h-[calc(100vh-400px)]">
                                                 <div className="flex items-center justify-between mb-3 flex-shrink-0">
-                                                    <h5 className="text-base font-semibold text-gray-800">Impact Claims ({kpiUpdates.length})</h5>
+                                                    <h5 className="text-base font-semibold text-gray-800">Impact Claims ({filteredKpiUpdates.length})</h5>
                                                     <div className="flex items-center space-x-3">
                                                         <div className="flex items-center space-x-2 text-sm text-gray-500">
                                                             <BarChart3 className="w-4 h-4" />
@@ -1963,7 +2060,7 @@ export default function ExpandableKPICard({
                                                     </div>
                                                 </div>
                                                 <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
-                                                    {[...kpiUpdates].sort((a, b) => {
+                                                    {[...filteredKpiUpdates].sort((a, b) => {
                                                         const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
                                                         const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
                                                         return dateB - dateA

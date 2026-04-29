@@ -350,6 +350,64 @@ export class MetricTagService {
     }
 
     /**
+     * Replace the set of tags attached to a story (multi-tag). Same shape as
+     * setTagsForEvidence — independent of any other story link. Tag ids are
+     * validated against the org.
+     */
+    static async setTagsForStory(storyId: string, tagIds: string[], userId: string, requestedOrgId?: string): Promise<void> {
+        const orgId = await this.getOrgId(userId, requestedOrgId)
+        if (!orgId) throw new Error('No organization context')
+
+        if (tagIds.length > 0) {
+            const { data: validTags } = await supabase
+                .from('metric_tags')
+                .select('id')
+                .eq('organization_id', orgId)
+                .in('id', tagIds)
+            const validIds = new Set((validTags || []).map((t: any) => t.id))
+            const invalid = tagIds.filter(id => !validIds.has(id))
+            if (invalid.length > 0) {
+                throw new Error(`Invalid metric tag IDs: ${invalid.join(', ')}`)
+            }
+        }
+
+        await supabase.from('story_metric_tags').delete().eq('story_id', storyId)
+
+        if (tagIds.length > 0) {
+            const links = tagIds.map(tag_id => ({ story_id: storyId, tag_id }))
+            const { error } = await supabase.from('story_metric_tags').insert(links)
+            if (error) throw new Error(`Failed to attach tags to story: ${error.message}`)
+        }
+    }
+
+    static async getTagIdsForStory(storyId: string): Promise<string[]> {
+        const { data, error } = await supabase
+            .from('story_metric_tags')
+            .select('tag_id')
+            .eq('story_id', storyId)
+        if (error) throw new Error(`Failed to fetch story tags: ${error.message}`)
+        return (data || []).map((r: any) => r.tag_id)
+    }
+
+    /**
+     * Bulk fetch tag_ids per story row.
+     */
+    static async getTagIdsForStories(storyIds: string[]): Promise<Record<string, string[]>> {
+        const map: Record<string, string[]> = {}
+        for (const id of storyIds) map[id] = []
+        if (storyIds.length === 0) return map
+        const { data } = await supabase
+            .from('story_metric_tags')
+            .select('story_id, tag_id')
+            .in('story_id', storyIds)
+        for (const row of (data || [])) {
+            if (!map[row.story_id]) map[row.story_id] = []
+            map[row.story_id].push(row.tag_id)
+        }
+        return map
+    }
+
+    /**
      * Detail data for a single tag: list of KPIs attached and their claim totals
      * scoped to claims tagged with this tag.
      */
@@ -387,7 +445,17 @@ export class MetricTagService {
             .map((l: any) => l.evidence)
             .filter(Boolean)
 
-        // Authorize: only return KPIs/evidence whose initiative the caller can access.
+        // Stories tagged with this tag.
+        const { data: storyLinks } = await supabase
+            .from('story_metric_tags')
+            .select('story_id, stories(id, title, description, media_url, media_type, date_represented, initiative_id, location_id, created_at)')
+            .eq('tag_id', tagId)
+
+        const stories = (storyLinks || [])
+            .map((l: any) => l.stories)
+            .filter(Boolean)
+
+        // Authorize: only return KPIs/evidence/stories whose initiative the caller can access.
         const accessibleInitiativeIds = new Set(
             (await InitiativeService.getAll(userId, requestedOrgId)).map((i: any) => i.id)
         )
@@ -395,12 +463,14 @@ export class MetricTagService {
         const accessibleKpiIds = new Set(accessibleKpis.map((k: any) => k.id))
         const accessibleClaims = claims.filter((c: any) => accessibleKpiIds.has(c.kpi_id))
         const accessibleEvidence = evidence.filter((e: any) => accessibleInitiativeIds.has(e.initiative_id))
+        const accessibleStories = stories.filter((s: any) => accessibleInitiativeIds.has(s.initiative_id))
 
         return {
             tag,
             kpis: accessibleKpis,
             claims: accessibleClaims,
             evidence: accessibleEvidence,
+            stories: accessibleStories,
         }
     }
 }

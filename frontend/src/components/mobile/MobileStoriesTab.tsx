@@ -19,6 +19,8 @@ import { Story, Location, BeneficiaryGroup } from '../../types'
 import { formatDate, getLocalDateString } from '../../utils'
 import DateRangePicker from '../DateRangePicker'
 import StoryDetailModal from '../StoryDetailModal'
+import TagPicker from '../MetricTags/TagPicker'
+import EvidenceTagsList from '../MetricTags/EvidenceTagsList'
 import toast from 'react-hot-toast'
 
 interface MobileStoriesTabProps {
@@ -174,6 +176,11 @@ export default function MobileStoriesTab({ initiativeId, autoAdd }: MobileStorie
                                     <p className="text-xs text-gray-500 mt-1">
                                         {formatDate(story.date_represented)}
                                     </p>
+                                    {story.tag_ids && story.tag_ids.length > 0 && (
+                                        <div className="mt-1.5">
+                                            <EvidenceTagsList tagIds={story.tag_ids} visibleCap={3} clickable={false} size="xs" />
+                                        </div>
+                                    )}
                                 </div>
                             </button>
                         )
@@ -220,7 +227,8 @@ function MobileStoryForm({ initiativeId, onClose, onSuccess }: StoryFormProps) {
         file: null as File | null,
         date_represented: getLocalDateString(new Date()),
         location_ids: [] as string[],
-        beneficiary_group_ids: [] as string[]
+        beneficiary_group_ids: [] as string[],
+        tag_ids: [] as string[]
     })
 
     const mediaTypes = [
@@ -274,6 +282,7 @@ function MobileStoryForm({ initiativeId, onClose, onSuccess }: StoryFormProps) {
                             date_represented: capturedFormData.date_represented,
                             location_ids: capturedFormData.location_ids,
                             beneficiary_group_ids: capturedFormData.beneficiary_group_ids,
+                            tag_ids: capturedFormData.tag_ids,
                             initiative_id: initiativeId
                         })
                         toast.success('Story created!')
@@ -301,6 +310,7 @@ function MobileStoryForm({ initiativeId, onClose, onSuccess }: StoryFormProps) {
                 date_represented: formData.date_represented,
                 location_ids: formData.location_ids,
                 beneficiary_group_ids: formData.beneficiary_group_ids,
+                tag_ids: formData.tag_ids,
                 initiative_id: initiativeId
             })
             toast.success('Story created!')
@@ -558,6 +568,17 @@ function MobileStoryForm({ initiativeId, onClose, onSuccess }: StoryFormProps) {
                         </div>
                     </div>
                 )}
+
+                {/* Tags (optional) */}
+                <div>
+                    <TagPicker
+                        mode="multi"
+                        selectedIds={formData.tag_ids}
+                        onChange={(ids) => setFormData(prev => ({ ...prev, tag_ids: ids }))}
+                        label="Tags (optional)"
+                        helperText="Tag this story so it shows up when filtering by tag."
+                    />
+                </div>
             </div>
 
             {/* Footer */}

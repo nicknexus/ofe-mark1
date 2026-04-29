@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Tag as TagIcon, Trash2, Edit2, Check, X, FileText, Camera, MessageSquare, DollarSign } from 'lucide-react'
+import { ArrowLeft, Tag as TagIcon, Trash2, Edit2, Check, X, FileText, Camera, MessageSquare, DollarSign, Image as ImageIcon, Video, Mic, BookOpen } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { apiService } from '../services/api'
-import { MetricTag, Evidence } from '../types'
+import { MetricTag, Evidence, Story } from '../types'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import EvidencePreviewModal from '../components/EvidencePreviewModal'
+import StoryDetailModal from '../components/StoryDetailModal'
 import { formatDate, getEvidenceTypeInfo } from '../utils'
 
 interface TagDetail {
@@ -27,6 +28,7 @@ interface TagDetail {
         created_at: string
     }>
     evidence?: Evidence[]
+    stories?: Story[]
 }
 
 export default function TagDetailPage() {
@@ -37,6 +39,7 @@ export default function TagDetailPage() {
     const [editing, setEditing] = useState(false)
     const [editName, setEditName] = useState('')
     const [previewEvidence, setPreviewEvidence] = useState<Evidence | null>(null)
+    const [previewStory, setPreviewStory] = useState<Story | null>(null)
 
     const load = async () => {
         if (!id) return
@@ -69,9 +72,11 @@ export default function TagDetailPage() {
 
     const deleteTag = async () => {
         if (!id || !data) return
-        const total = (data.kpis.length || 0) + (data.claims.length || 0)
+        const evCount = Array.isArray(data.evidence) ? data.evidence.length : 0
+        const stCount = Array.isArray(data.stories) ? data.stories.length : 0
+        const total = (data.kpis.length || 0) + (data.claims.length || 0) + evCount + stCount
         const msg = total > 0
-            ? `Delete tag "${data.tag.name}"?\n\nIt's currently attached to ${data.kpis.length} metric(s) and ${data.claims.length} claim(s). They will become untagged but keep all their data.`
+            ? `Delete tag "${data.tag.name}"?\n\nIt's currently attached to ${data.kpis.length} metric(s), ${data.claims.length} claim(s), ${evCount} evidence, and ${stCount} stor${stCount === 1 ? 'y' : 'ies'}. They will become untagged but keep all their data.`
             : `Delete tag "${data.tag.name}"?`
         if (!window.confirm(msg)) return
         try {
@@ -113,6 +118,12 @@ export default function TagDetailPage() {
     }, {})
 
     const evidence = Array.isArray(data.evidence) ? data.evidence : []
+    const stories = Array.isArray(data.stories) ? [...data.stories] : []
+    stories.sort((a, b) => {
+        const ad = a.date_represented || ''
+        const bd = b.date_represented || ''
+        return bd.localeCompare(ad)
+    })
     const kpiTitleById = new Map(data.kpis.map(k => [k.id, k.title]))
 
     // Group evidence by metric. An evidence item can support multiple KPIs;
@@ -138,6 +149,16 @@ export default function TagDetailPage() {
             case 'testimony': return MessageSquare
             case 'financials': return DollarSign
             default: return FileText
+        }
+    }
+
+    const getStoryIcon = (mediaType?: string) => {
+        switch (mediaType) {
+            case 'photo': return ImageIcon
+            case 'video': return Video
+            case 'recording': return Mic
+            case 'text': return FileText
+            default: return BookOpen
         }
     }
 
@@ -175,6 +196,7 @@ export default function TagDetailPage() {
                                     <p className="text-xs text-gray-500 mt-0.5">
                                         {data.kpis.length} metric{data.kpis.length !== 1 ? 's' : ''} · {data.claims.length} claim{data.claims.length !== 1 ? 's' : ''}
                                         {Array.isArray(data.evidence) && data.evidence.length > 0 && ` · ${data.evidence.length} evidence`}
+                                        {Array.isArray(data.stories) && data.stories.length > 0 && ` · ${data.stories.length} stor${data.stories.length === 1 ? 'y' : 'ies'}`}
                                     </p>
                                 </div>
                             )}
@@ -303,6 +325,40 @@ export default function TagDetailPage() {
                         </div>
                     </div>
                 )}
+
+                {stories.length > 0 && (
+                    <div className="mt-6 bg-white rounded-2xl ring-1 ring-gray-900/[0.04] shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.12)] overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-b from-gray-50/50 to-transparent flex items-center justify-between">
+                            <h2 className="text-sm font-semibold text-gray-900">Stories with this tag</h2>
+                            <span className="text-xs text-gray-500">{stories.length} item{stories.length !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div className="px-6 py-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {stories.map(s => {
+                                    const Icon = getStoryIcon(s.media_type)
+                                    return (
+                                        <button
+                                            key={s.id}
+                                            type="button"
+                                            onClick={() => setPreviewStory(s)}
+                                            className="text-left bg-white rounded-xl border border-gray-200 hover:border-primary-300 hover:bg-primary-50/30 transition-all p-3 flex gap-3 items-start"
+                                        >
+                                            <div className="p-2 rounded-lg bg-blue-100 text-blue-700 flex-shrink-0">
+                                                <Icon className="w-4 h-4" />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-sm font-semibold text-gray-900 truncate">{s.title || 'Untitled'}</p>
+                                                <p className="text-[11px] text-gray-500 mt-0.5">
+                                                    {s.date_represented ? formatDate(s.date_represented) : ''}
+                                                </p>
+                                            </div>
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {previewEvidence && (
@@ -310,6 +366,16 @@ export default function TagDetailPage() {
                     isOpen={!!previewEvidence}
                     onClose={() => setPreviewEvidence(null)}
                     evidence={previewEvidence}
+                />
+            )}
+
+            {previewStory && (
+                <StoryDetailModal
+                    isOpen={!!previewStory}
+                    onClose={() => setPreviewStory(null)}
+                    story={previewStory}
+                    onEdit={() => { /* read-only on tag detail */ }}
+                    onDelete={() => { /* read-only on tag detail */ }}
                 />
             )}
         </div>

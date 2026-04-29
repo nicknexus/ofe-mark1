@@ -282,12 +282,20 @@ class ApiService {
                 if (endpoint.includes('/locations')) {
                     this.clearCacheByPattern('/locations')
                 }
+                if (endpoint.includes('/stories')) {
+                    this.clearCacheByPattern('/stories')
+                    // Story mutations may attach/detach tags, refresh tag widgets/details.
+                    this.clearCacheByPattern('/metric-tags')
+                }
                 if (endpoint.includes('/metric-tags')) {
                     // Tag mutations affect tag lists, kpi lists (tag_ids inline),
-                    // initiative dashboards, and any /metric-tags detail pages.
+                    // initiative dashboards, evidence and stories (tag chips), and
+                    // any /metric-tags detail pages.
                     this.clearCacheByPattern('/metric-tags')
                     this.clearCacheByPattern('/kpis')
                     this.clearCacheByPattern('/initiatives')
+                    this.clearCacheByPattern('/evidence')
+                    this.clearCacheByPattern('/stories')
                 }
 
                 // Remove the mutating request from cache immediately
@@ -433,6 +441,8 @@ class ApiService {
         tag: MetricTag
         kpis: Array<{ id: string; title: string; unit_of_measurement: string; metric_type: 'number' | 'percentage'; initiative_id: string }>
         claims: Array<{ id: string; kpi_id: string; value: number; date_represented: string; label?: string; location_id?: string; created_at: string }>
+        evidence?: Array<{ id: string; title: string; description?: string; type: string; file_url?: string; file_urls?: string[]; date_represented: string; initiative_id: string; kpi_ids?: string[]; location_id?: string; created_at: string }>
+        stories?: Array<{ id: string; title: string; description?: string; media_url?: string; media_type: 'photo' | 'video' | 'recording' | 'text'; date_represented: string; initiative_id: string; location_id?: string; created_at: string }>
     }> {
         return this.request(`/metric-tags/${id}/detail`)
     }
@@ -817,6 +827,7 @@ class ApiService {
     async getStories(initiativeId: string, filters?: {
         locationIds?: string[];
         beneficiaryGroupIds?: string[];
+        tagIds?: string[];
         startDate?: string;
         endDate?: string;
         search?: string;
@@ -828,6 +839,9 @@ class ApiService {
         }
         if (filters?.beneficiaryGroupIds?.length) {
             filters.beneficiaryGroupIds.forEach(id => params.append('beneficiary_group_id', id))
+        }
+        if (filters?.tagIds?.length) {
+            filters.tagIds.forEach(id => params.append('tag_id', id))
         }
         if (filters?.startDate) {
             params.append('start_date', filters.startDate)

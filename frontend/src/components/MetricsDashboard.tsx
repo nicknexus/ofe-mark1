@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
-import { TrendingUp, Target, BarChart3, Calendar, FileText, Filter, ChevronDown, X, MapPin, ExternalLink, Plus, Users, GripVertical, Settings, Upload } from 'lucide-react'
+import { TrendingUp, Target, BarChart3, Calendar, FileText, Filter, ChevronDown, X, MapPin, ExternalLink, Plus, Users, GripVertical, Upload } from 'lucide-react'
 import { useTeam } from '../context/TeamContext'
 import { createPortal } from 'react-dom'
 import {
@@ -201,14 +200,19 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     }>({})
     const [selectedLocations, setSelectedLocations] = useState<string[]>([])
     const [selectedBeneficiaryGroups, setSelectedBeneficiaryGroups] = useState<string[]>([])
+    const [selectedTags, setSelectedTags] = useState<string[]>([])
+    const [allTags, setAllTags] = useState<{ id: string; name: string }[]>([])
     const [showLocationPicker, setShowLocationPicker] = useState(false)
     const [showBeneficiaryPicker, setShowBeneficiaryPicker] = useState(false)
+    const [showTagPicker, setShowTagPicker] = useState(false)
     const [showMetricsPicker, setShowMetricsPicker] = useState(false)
     const locationButtonRef = React.useRef<HTMLButtonElement>(null)
     const beneficiaryButtonRef = React.useRef<HTMLButtonElement>(null)
+    const tagButtonRef = React.useRef<HTMLButtonElement>(null)
     const metricsButtonRef = React.useRef<HTMLButtonElement>(null)
     const [locationDropdownPosition, setLocationDropdownPosition] = useState({ top: 0, left: 0 })
     const [beneficiaryDropdownPosition, setBeneficiaryDropdownPosition] = useState({ top: 0, left: 0 })
+    const [tagDropdownPosition, setTagDropdownPosition] = useState({ top: 0, left: 0 })
     const [metricsDropdownPosition, setMetricsDropdownPosition] = useState({ top: 0, left: 0 })
     const [userMenuOpen, setUserMenuOpen] = useState(false)
     const userMenuRef = useRef<HTMLDivElement>(null)
@@ -245,6 +249,13 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                 .catch(() => setLocations([]))
         }
     }, [initiativeId])
+
+    // Load metric tags (org-wide)
+    useEffect(() => {
+        apiService.getMetricTags()
+            .then((tags) => setAllTags((tags || []).map((t: any) => ({ id: t.id, name: t.name }))))
+            .catch(() => setAllTags([]))
+    }, [])
 
     // Load beneficiary groups and their derived locations
     useEffect(() => {
@@ -393,6 +404,14 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                 const updateGroupIds = updateBeneficiaryGroupsCache[update.id] || []
                 // Check if update is linked to any of the selected beneficiary groups
                 return updateGroupIds.some(groupId => selectedBeneficiaryGroups.includes(groupId))
+            })
+        }
+
+        // Filter by metric tag(s) - claim's tag_id must match one of the selected tags
+        if (selectedTags.length > 0) {
+            filtered = filtered.filter(update => {
+                const tagId = (update as any).tag_id
+                return tagId && selectedTags.includes(tagId)
             })
         }
 
@@ -801,22 +820,23 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setShowMetricsPicker(!showMetricsPicker)
                                 setShowLocationPicker(false)
                                 setShowBeneficiaryPicker(false)
+                                setShowTagPicker(false)
                             }}
-                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm whitespace-nowrap shrink-0 ${visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
+                            className={`flex items-center pl-0 pr-3 h-8 rounded-r-full rounded-l-full text-xs font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm whitespace-nowrap shrink-0 ${visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
                                 ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
                                 : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
                                 }`}
                         >
-                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center shrink-0 ${visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
+                            <div className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 ${visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
                                 ? 'bg-primary-100 border-primary-500'
                                 : 'bg-gray-100 border-gray-200'
                                 }`}>
-                                <Filter className={`w-5 h-5 ${visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
+                                <Filter className={`w-4 h-4 ${visibleKPIs.size > 0 && visibleKPIs.size < kpis.length
                                     ? 'text-primary-500'
                                     : 'text-gray-600'
                                     }`} />
                             </div>
-                            <span className="ml-3">Metrics</span>
+                            <span className="ml-2">Metrics</span>
                             {visibleKPIs.size > 0 && visibleKPIs.size < kpis.length && (
                                 <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
                                     {visibleKPIs.size}
@@ -895,22 +915,23 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 setShowLocationPicker(!showLocationPicker)
                                 setShowMetricsPicker(false)
                                 setShowBeneficiaryPicker(false)
+                                setShowTagPicker(false)
                             }}
-                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm whitespace-nowrap shrink-0 ${selectedLocations.length > 0
+                            className={`flex items-center pl-0 pr-3 h-8 rounded-r-full rounded-l-full text-xs font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm whitespace-nowrap shrink-0 ${selectedLocations.length > 0
                                 ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
                                 : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
                                 }`}
                         >
-                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center shrink-0 ${selectedLocations.length > 0
+                            <div className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 ${selectedLocations.length > 0
                                 ? 'bg-primary-100 border-primary-500'
                                 : 'bg-gray-100 border-gray-200'
                                 }`}>
-                                <MapPin className={`w-5 h-5 ${selectedLocations.length > 0
+                                <MapPin className={`w-4 h-4 ${selectedLocations.length > 0
                                     ? 'text-primary-500'
                                     : 'text-gray-600'
                                     }`} />
                             </div>
-                            <span className="ml-3">Location</span>
+                            <span className="ml-2">Location</span>
                             {selectedLocations.length > 0 && (
                                 <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
                                     {selectedLocations.length}
@@ -977,6 +998,85 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                         )}
                     </div>
 
+                    {/* Tag Filter */}
+                    <div className="relative shrink-0">
+                        <button
+                            ref={tagButtonRef}
+                            onClick={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect()
+                                setTagDropdownPosition({ top: rect.bottom + 4, left: rect.left })
+                                setShowTagPicker(!showTagPicker)
+                                setShowLocationPicker(false)
+                                setShowBeneficiaryPicker(false)
+                                setShowMetricsPicker(false)
+                            }}
+                            className={`flex items-center pl-0 pr-3 h-8 rounded-r-full rounded-l-full text-xs font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm whitespace-nowrap shrink-0 ${selectedTags.length > 0
+                                ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
+                                : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+                                }`}
+                        >
+                            <div className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 ${selectedTags.length > 0
+                                ? 'bg-primary-100 border-primary-500'
+                                : 'bg-gray-100 border-gray-200'
+                                }`}>
+                                <Filter className={`w-4 h-4 ${selectedTags.length > 0 ? 'text-primary-500' : 'text-gray-600'}`} />
+                            </div>
+                            <span className="ml-2">Tag</span>
+                            {selectedTags.length > 0 && (
+                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
+                                    {selectedTags.length}
+                                </span>
+                            )}
+                            <ChevronDown className={`w-3 h-3 transition-transform ${showTagPicker ? 'rotate-180' : ''}`} />
+                        </button>
+                        {showTagPicker && createPortal(
+                            <>
+                                <div className="fixed inset-0 z-[9998]" onClick={() => setShowTagPicker(false)} />
+                                <div
+                                    className="fixed bg-white border border-gray-200 rounded-lg shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-2 min-w-[200px] max-h-64 overflow-y-auto"
+                                    style={{ top: `${tagDropdownPosition.top}px`, left: `${tagDropdownPosition.left}px` }}
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    {allTags.length === 0 ? (
+                                        <p className="text-xs text-gray-500">No tags available</p>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-xs font-semibold text-gray-700">Select Tags</span>
+                                                {selectedTags.length > 0 && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setSelectedTags([]) }}
+                                                        className="text-xs text-blue-600 hover:text-blue-800"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {allTags.map((tag) => (
+                                                <label
+                                                    key={tag.id}
+                                                    className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedTags.includes(tag.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) setSelectedTags([...selectedTags, tag.id])
+                                                            else setSelectedTags(selectedTags.filter(id => id !== tag.id))
+                                                        }}
+                                                        className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
+                                                    />
+                                                    <span className="text-xs text-gray-700 truncate flex-1">{tag.name}</span>
+                                                </label>
+                                            ))}
+                                        </>
+                                    )}
+                                </div>
+                            </>,
+                            document.body
+                        )}
+                    </div>
+
                     {/* Beneficiary Groups Filter */}
                     <div className="relative shrink-0">
                         <button
@@ -989,23 +1089,24 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                 })
                                 setShowBeneficiaryPicker(!showBeneficiaryPicker)
                                 setShowLocationPicker(false)
+                                setShowTagPicker(false)
                                 setShowMetricsPicker(false)
                             }}
-                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm whitespace-nowrap shrink-0 ${selectedBeneficiaryGroups.length > 0
+                            className={`flex items-center pl-0 pr-3 h-8 rounded-r-full rounded-l-full text-xs font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm whitespace-nowrap shrink-0 ${selectedBeneficiaryGroups.length > 0
                                 ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
                                 : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
                                 }`}
                         >
-                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center shrink-0 ${selectedBeneficiaryGroups.length > 0
+                            <div className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 ${selectedBeneficiaryGroups.length > 0
                                 ? 'bg-primary-100 border-primary-500'
                                 : 'bg-gray-100 border-gray-200'
                                 }`}>
-                                <Users className={`w-5 h-5 ${selectedBeneficiaryGroups.length > 0
+                                <Users className={`w-4 h-4 ${selectedBeneficiaryGroups.length > 0
                                     ? 'text-primary-500'
                                     : 'text-gray-600'
                                     }`} />
                             </div>
-                            <span className="ml-3">Groups</span>
+                            <span className="ml-2">Groups</span>
                             {selectedBeneficiaryGroups.length > 0 && (
                                 <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
                                     {selectedBeneficiaryGroups.length}
@@ -1072,23 +1173,9 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                         )}
                     </div>
 
-                    {/* Clear All Filters */}
-                    {(datePickerValue.singleDate || datePickerValue.startDate || datePickerValue.endDate || selectedLocations.length > 0 || selectedBeneficiaryGroups.length > 0) && (
-                        <button
-                            onClick={() => {
-                                setDatePickerValue({})
-                                setSelectedLocations([])
-                                setSelectedBeneficiaryGroups([])
-                            }}
-                            className="flex items-center space-x-1 px-2 py-1 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded text-xs font-medium transition-colors border border-gray-200"
-                        >
-                            <X className="w-3 h-3" />
-                            <span>Clear</span>
-                        </button>
-                    )}
                 </div>
 
-                {/* Right side: Add Impact Claim, Add Evidence, Settings and User Profile */}
+                {/* Right side: Add Impact Claim, Add Evidence, and User Profile */}
                 <div className="flex items-center gap-3 shrink-0">
                     {/* Add Impact Claim Button */}
                     {onAddImpactClaim && canAddImpactClaims && (
@@ -1110,18 +1197,6 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             <span>Evidence</span>
                         </button>
                     )}
-                    {/* Settings Button - Circle Icon */}
-                    <Link
-                        to="/account"
-                        className="relative w-10 h-10 rounded-full bg-white/80 hover:bg-white border border-gray-200 hover:border-gray-300 flex items-center justify-center transition-all duration-200 shadow-bubble-sm"
-                        title={hasOwnOrganization && !ownedOrganization?.is_public ? "Settings - Organization not public" : "Settings"}
-                    >
-                        <Settings className="w-5 h-5 text-gray-700" />
-                        {hasOwnOrganization && !ownedOrganization?.is_public && (
-                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center">!</span>
-                        )}
-                    </Link>
-
                     {/* User Profile with Organization and Dropdown */}
                     {user && (
                         <div className="hidden md:block relative" ref={userMenuRef}>

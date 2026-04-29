@@ -789,13 +789,13 @@ export default function AddEvidenceModal({
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-64 overflow-y-auto p-1">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto p-1">
                                                     {locations.map((location) => {
                                                         const isChecked = selectedLocationIds.includes(location.id!)
                                                         return (
                                                             <label
                                                                 key={location.id}
-                                                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors cursor-pointer ${
+                                                                className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border-2 transition-colors cursor-pointer ${
                                                                     isChecked
                                                                         ? 'bg-primary-50 border-primary-300'
                                                                         : 'bg-white border-gray-200 hover:border-primary-300 hover:bg-gray-50'
@@ -811,9 +811,9 @@ export default function AddEvidenceModal({
                                                                                 : [...prev, location.id!]
                                                                         )
                                                                     }}
-                                                                    className="w-3.5 h-3.5 text-primary-500 rounded border-gray-300 focus:ring-primary-500 flex-shrink-0"
+                                                                    className="w-4 h-4 text-primary-500 rounded border-gray-300 focus:ring-primary-500 flex-shrink-0"
                                                                 />
-                                                                <span className="text-sm font-medium text-gray-800 truncate">{location.name}</span>
+                                                                <span className="text-base font-medium text-gray-800 truncate">{location.name}</span>
                                                             </label>
                                                         )
                                                     })}
@@ -863,7 +863,7 @@ export default function AddEvidenceModal({
                                                 Select All
                                             </button>
                                         </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-[60vh] overflow-y-auto p-1">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[60vh] overflow-y-auto p-1">
                                 {[...availableKPIs].sort((a, b) => {
                                     const aIsPreSelected = preSelectedKPIId === a.id
                                     const bIsPreSelected = preSelectedKPIId === b.id
@@ -877,7 +877,7 @@ export default function AddEvidenceModal({
                                     return (
                                     <label
                                         key={kpi.id}
-                                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors ${
+                                                        className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border-2 transition-colors ${
                                                             isDisabled 
                                                                 ? 'cursor-not-allowed opacity-60 bg-white border-gray-200' 
                                                                 : isChecked
@@ -890,10 +890,10 @@ export default function AddEvidenceModal({
                                                 checked={isChecked || isPreSelected}
                                                 onChange={() => !isDisabled && handleKPISelection(kpi.id!)}
                                                 disabled={isDisabled}
-                                                            className="w-3.5 h-3.5 text-primary-500 rounded border-gray-300 focus:ring-primary-500 flex-shrink-0"
+                                                            className="w-4 h-4 text-primary-500 rounded border-gray-300 focus:ring-primary-500 flex-shrink-0"
                                         />
                                         <div className="flex-1 min-w-0 flex items-center gap-2">
-                                            <span className="text-sm font-medium text-gray-800 truncate">{kpi.title}</span>
+                                            <span className="text-base font-medium text-gray-800 truncate">{kpi.title}</span>
                                                     {isPreSelected && (
                                                                     <span className="inline-flex items-center px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-medium rounded-full flex-shrink-0">
                                                             Pre-selected
@@ -1019,13 +1019,13 @@ export default function AddEvidenceModal({
                                                 </button>
                                             </div>
                                         </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-[60vh] overflow-y-auto p-1">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[60vh] overflow-y-auto p-1">
                                             {beneficiaryGroups.map((group) => {
                                                 const checked = selectedBeneficiaryGroupIds.includes(group.id!)
                                                 return (
                                                     <label
                                                         key={group.id}
-                                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors cursor-pointer ${
+                                                        className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border-2 transition-colors cursor-pointer ${
                                                             checked
                                                                 ? 'bg-primary-50 border-primary-300'
                                                                 : 'bg-white border-gray-200 hover:border-primary-300 hover:bg-gray-50'
@@ -1040,9 +1040,9 @@ export default function AddEvidenceModal({
                                                                 )
                                                                 if (editData) setHasChangedBeneficiaryGroups(true)
                                                             }}
-                                                            className="w-3.5 h-3.5 text-primary-500 rounded border-gray-300 focus:ring-primary-500 flex-shrink-0"
+                                                            className="w-4 h-4 text-primary-500 rounded border-gray-300 focus:ring-primary-500 flex-shrink-0"
                                                         />
-                                                        <span className="text-sm font-medium text-gray-800 truncate">{group.name}</span>
+                                                        <span className="text-base font-medium text-gray-800 truncate">{group.name}</span>
                                                     </label>
                                                 )
                                             })}

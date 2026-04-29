@@ -211,6 +211,7 @@ export interface Story {
     locations?: Location[]; // Populated when fetching multiple locations
     beneficiary_group_ids?: string[]; // Array of linked beneficiary group IDs
     beneficiary_groups?: BeneficiaryGroup[]; // Populated when fetching
+    tag_ids?: string[]; // Metric tags attached to this story (multi-tag, additive filter dimension)
     created_at?: string;
     updated_at?: string;
     user_id?: string;

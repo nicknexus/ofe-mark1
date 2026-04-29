@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
-import { X, Edit, Trash2, MapPin, Calendar, Users, Image, Video, Mic, FileText } from 'lucide-react'
+import { X, Edit, Trash2, MapPin, Calendar, Users, Image, Video, Mic, FileText, Tag as TagIcon } from 'lucide-react'
 import { Story } from '../types'
 import { formatDate } from '../utils'
+import EvidenceTagsList from './MetricTags/EvidenceTagsList'
 
 interface StoryDetailModalProps {
     isOpen: boolean
@@ -54,8 +55,8 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
                                 </div>
                             </div>
                         ) : story.media_url && story.media_url.trim() ? (
-                            <div className="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-lg">
-                                {/(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(story.media_url) ? (
+                            /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(story.media_url) ? (
+                                <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden shadow-lg">
                                     <iframe
                                         src={`https://www.youtube.com/embed/${(story.media_url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) || [])[1]}`}
                                         title="YouTube video"
@@ -63,20 +64,26 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
                                         allowFullScreen
                                         className="w-full h-full"
                                     />
-                                ) : story.media_type === 'photo' && !imageError ? (
+                                </div>
+                            ) : story.media_type === 'photo' && !imageError ? (
+                                <div className="relative w-full bg-black/95 rounded-lg overflow-hidden shadow-lg flex items-center justify-center">
                                     <img
                                         src={story.media_url}
                                         alt={story.title}
-                                        className="w-full h-full object-cover"
+                                        className="w-full max-h-[65vh] object-contain"
                                         onError={handleImageError}
                                     />
-                                ) : story.media_type === 'video' ? (
+                                </div>
+                            ) : story.media_type === 'video' ? (
+                                <div className="relative w-full bg-black rounded-lg overflow-hidden shadow-lg flex items-center justify-center">
                                     <video
                                         src={story.media_url}
-                                        className="w-full h-full object-cover"
+                                        className="w-full max-h-[65vh] object-contain"
                                         controls
                                     />
-                                ) : (
+                                </div>
+                            ) : (
+                                <div className="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-lg">
                                     <div className="w-full h-full flex items-center justify-center bg-gray-200">
                                         <div className="text-center p-4">
                                             <div className="w-16 h-16 bg-gray-300 rounded-full mx-auto mb-3 flex items-center justify-center">
@@ -85,8 +92,8 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
                                             <p className="text-sm text-gray-600">Audio Recording</p>
                                         </div>
                                     </div>
-                                )}
-                            </div>
+                                </div>
+                            )
                         ) : (
                             <div className="relative w-full aspect-video bg-gradient-to-br from-primary-100 to-primary-200 rounded-lg flex items-center justify-center">
                                 <div className="text-center p-6">
@@ -160,6 +167,17 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
                                                 </span>
                                             ))}
                                         </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Tags */}
+                            {story.tag_ids && story.tag_ids.length > 0 && (
+                                <div className="flex items-start space-x-3 md:col-span-2">
+                                    <TagIcon className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Tags</p>
+                                        <EvidenceTagsList tagIds={story.tag_ids} visibleCap={8} clickable size="sm" />
                                     </div>
                                 </div>
                             )}
