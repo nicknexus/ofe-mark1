@@ -118,4 +118,20 @@ router.get('/:id/dashboard', authenticateUser, async (req: AuthenticatedRequest,
     }
 });
 
+// Batch: all KPI updates for every metric in the initiative.
+// Replaces N parallel /kpis/:id/updates requests on InitiativePage load.
+router.get('/:id/kpi-updates', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const updatesByKpi = await KPIService.getUpdatesForInitiative(
+            req.params.id,
+            req.user!.id,
+            requestedOrgId
+        );
+        res.json(updatesByKpi);
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
 export default router; 

@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { apiService } from './api'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -98,19 +99,7 @@ export class TeamService {
      * Get current user's permissions
      */
     static async getPermissions(): Promise<UserPermissions> {
-        const headers = await getAuthHeaders()
-
-        const response = await fetch(`${API_BASE_URL}/api/team/permissions`, {
-            method: 'GET',
-            headers
-        })
-
-        if (!response.ok) {
-            const error = await response.json()
-            throw new Error(error.error || 'Failed to get permissions')
-        }
-
-        return response.json()
+        return apiService.requestCached<UserPermissions>('/team/permissions')
     }
 
     /**
@@ -132,21 +121,17 @@ export class TeamService {
     }
 
     /**
-     * Get all organizations the user can access
+     * Get all organizations the user can access.
+     * Routed through apiService so it benefits from cache + in-flight dedup
+     * — multiple components used to fire this request in parallel on every
+     * mount, generating duplicate /team/organizations calls.
      */
     static async getAccessibleOrganizations(): Promise<AccessibleOrganization[]> {
-        const headers = await getAuthHeaders()
-
-        const response = await fetch(`${API_BASE_URL}/api/team/organizations`, {
-            method: 'GET',
-            headers
-        })
-
-        if (!response.ok) {
+        try {
+            return await apiService.requestCached<AccessibleOrganization[]>('/team/organizations')
+        } catch {
             return []
         }
-
-        return response.json()
     }
 
     /**

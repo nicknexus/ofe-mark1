@@ -114,15 +114,17 @@ export default function TagsWidget({ compact }: TagsWidgetProps) {
                         <p className="text-xs text-gray-400 mt-1">Create tags to break metrics into sub-groups</p>
                     </div>
                 ) : (
-                    <div className="flex flex-wrap gap-2">
-                        {tags.map(tag => (
-                            <Link key={tag.id} to={`/tags/${tag.id}`} className="contents">
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition-colors cursor-pointer">
-                                    <TagIcon className="w-3 h-3 text-gray-400" />
-                                    <span className="truncate max-w-[140px]">{tag.name}</span>
-                                    <span className="ml-0.5 px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-white text-gray-500 border border-gray-200">
-                                        {(tag.metric_count ?? 0)}m / {(tag.claim_count ?? 0)}c
-                                    </span>
+                    <div className="grid grid-cols-2 gap-1.5">
+                        {tags.slice(0, 4).map(tag => (
+                            <Link
+                                key={tag.id}
+                                to={`/tags/${tag.id}`}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-full border bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition-colors min-w-0"
+                            >
+                                <TagIcon className="w-2.5 h-2.5 text-gray-400 flex-shrink-0" />
+                                <span className="truncate">{tag.name}</span>
+                                <span className="ml-auto px-1 py-0.5 text-[9px] font-semibold rounded-full bg-white text-gray-500 border border-gray-200 flex-shrink-0">
+                                    {(tag.metric_count ?? 0)}m/{(tag.claim_count ?? 0)}c
                                 </span>
                             </Link>
                         ))}

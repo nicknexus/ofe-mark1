@@ -495,6 +495,50 @@ export class KPIService {
         }
     }
 
+    /**
+     * Batch: returns updates for every KPI in the given initiative as a map
+     * keyed by kpi_id. Eliminates the N+1 fan-out the frontend used to do
+     * (one /kpis/:id/updates request per KPI) — single round trip now.
+     */
+    static async getUpdatesForInitiative(
+        initiativeId: string,
+        userId: string,
+        requestedOrgId?: string
+    ): Promise<Record<string, KPIUpdate[]>> {
+        // Reuse getAll for org-scoped authorization on the initiative + KPI list.
+        const kpis = await this.getAll(userId, initiativeId, requestedOrgId);
+        if (kpis.length === 0) return {};
+
+        const kpiIds = kpis.map(k => k.id!).filter(Boolean) as string[];
+
+        const { data, error } = await supabase
+            .from('kpi_updates')
+            .select('*, kpi_update_beneficiary_groups(beneficiary_group_id)')
+            .in('kpi_id', kpiIds)
+            .order('created_at', { ascending: false });
+
+        if (error) throw new Error(`Failed to fetch KPI updates: ${error.message}`);
+
+        const updateIds = (data || []).map((u: any) => u.id).filter(Boolean);
+        const tagMap = await MetricTagService.getTagIdsForUpdates(updateIds);
+
+        const grouped: Record<string, KPIUpdate[]> = {};
+        for (const id of kpiIds) grouped[id] = [];
+
+        for (const update of (data || [])) {
+            const u: any = update;
+            const enriched = {
+                ...u,
+                beneficiary_group_ids: (u.kpi_update_beneficiary_groups || []).map((l: any) => l.beneficiary_group_id),
+                tag_id: tagMap[u.id] ?? null,
+                kpi_update_beneficiary_groups: undefined,
+            };
+            if (grouped[u.kpi_id]) grouped[u.kpi_id].push(enriched);
+        }
+
+        return grouped;
+    }
+
     static async getUpdates(kpiId: string, userId: string, requestedOrgId?: string): Promise<KPIUpdate[]> {
         // Authorize via the parent KPI's org context.
         const kpi = await this.getById(kpiId, userId, requestedOrgId);

@@ -23,6 +23,13 @@ import {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
+// Toggle chatty per-request console logs. Off by default — they were a meaningful
+// source of dev-tools jank when the app fans out 20+ requests on navigation.
+// Enable in the browser console with: localStorage.setItem('DEBUG_API_LOG', '1')
+const DEBUG_API_LOG = (() => {
+    try { return typeof localStorage !== 'undefined' && localStorage.getItem('DEBUG_API_LOG') === '1' } catch { return false }
+})()
+
 class ApiService {
     private requestCache = new Map<string, { promise: Promise<any>, timestamp: number }>()
     private readonly CACHE_DURATION = 60000 // 1 minute for GET requests (better performance)
@@ -151,7 +158,7 @@ class ApiService {
         if (method === 'GET') {
             const cached = this.requestCache.get(cacheKey)
             if (cached && (now - cached.timestamp) < this.CACHE_DURATION) {
-                console.log(`Using cached result for: ${cacheKey}`)
+                if (DEBUG_API_LOG) console.log(`Using cached result for: ${cacheKey}`)
                 return cached.promise
             }
         }
@@ -159,7 +166,7 @@ class ApiService {
         // Check if the same request is already in flight
         const inFlight = this.requestCache.get(cacheKey)
         if (inFlight && (now - inFlight.timestamp) < 5000) { // 5 second deduplication window
-            console.log(`Request already in flight: ${cacheKey}`)
+            if (DEBUG_API_LOG) console.log(`Request already in flight: ${cacheKey}`)
             return inFlight.promise
         }
 
@@ -317,6 +324,15 @@ class ApiService {
     }
 
     // Public method to clear cache for specific patterns (useful for components)
+    /**
+     * Public escape hatch for other service modules (auth/team/subscription)
+     * to share this client's cache + dedup + retry + auth-header logic instead
+     * of issuing their own raw fetch() calls.
+     */
+    public requestCached<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+        return this.request<T>(endpoint, options)
+    }
+
     public clearCache(pattern?: string) {
         if (pattern) {
             this.clearCacheByPattern(pattern)
@@ -408,6 +424,16 @@ class ApiService {
     async getKPIUpdates(kpiId: string): Promise<KPIUpdate[]> {
         const result = await this.request<KPIUpdate[]>(`/kpis/${kpiId}/updates`)
         return result || []
+    }
+
+    /**
+     * Batch: returns updates for every KPI in an initiative as a map keyed
+     * by kpi_id. Replaces N parallel /kpis/:id/updates requests on
+     * InitiativePage load — single round trip now.
+     */
+    async getKPIUpdatesForInitiative(initiativeId: string): Promise<Record<string, KPIUpdate[]>> {
+        const result = await this.request<Record<string, KPIUpdate[]>>(`/initiatives/${initiativeId}/kpi-updates`)
+        return result || {}
     }
 
     async getKPIEvidenceByDates(kpiId: string): Promise<any[]> {

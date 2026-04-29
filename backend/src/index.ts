@@ -98,11 +98,15 @@ app.use(express.urlencoded({ extended: true }));
 // Serve static files from uploads directory (disabled for serverless)
 // app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
-// Request logging for debugging
-app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - Origin: ${req.headers.origin || 'none'}`);
-    next();
-});
+// Request logging for debugging.
+// Set VERBOSE_REQUEST_LOG=1 to enable per-request logs. In production this is
+// extremely noisy and meaningfully impacts I/O (stdout) when traffic spikes.
+if (process.env.VERBOSE_REQUEST_LOG === '1') {
+    app.use((req, res, next) => {
+        console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - Origin: ${req.headers.origin || 'none'}`);
+        next();
+    });
+}
 
 // Environment check endpoint
 app.get('/', (req, res) => {

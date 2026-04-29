@@ -128,29 +128,46 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                 })
             }
 
-            // Build location map first so the location filter can use it
+            // Build location map. Modern evidence has inline location_ids;
+            // for legacy evidence without inline links we'd previously fan
+            // out one /data-points request per item (N+1) which dominated
+            // the tab's load time. Cap concurrency and only do the fallback
+            // when actually needed for filtering.
             const locationMap: Record<string, string[]> = {}
-            await Promise.all(
-                filtered.map(async (ev) => {
-                    if (!ev.id) return
-                    const directLocationIds = ev.location_ids || (ev.location_id ? [ev.location_id] : [])
-                    if (directLocationIds.length > 0) {
-                        locationMap[ev.id] = directLocationIds
-                        return
-                    }
-                    try {
-                        const dataPoints = await apiService.getDataPointsForEvidence(ev.id)
-                        const dpLocationIds = dataPoints
-                            ?.filter((dp: any) => dp.location_id)
-                            .map((dp: any) => dp.location_id) || []
-                        if (dpLocationIds.length > 0) {
-                            locationMap[ev.id] = [...new Set(dpLocationIds)]
+            const needsFallback: { id: string }[] = []
+
+            for (const ev of filtered) {
+                if (!ev.id) continue
+                const directLocationIds = ev.location_ids || (ev.location_id ? [ev.location_id] : [])
+                if (directLocationIds.length > 0) {
+                    locationMap[ev.id] = directLocationIds
+                } else {
+                    needsFallback.push({ id: ev.id })
+                }
+            }
+
+            // Only fetch data points for legacy items, and only when the user
+            // actually has a location filter active (otherwise we're computing
+            // a map nothing reads). Cap to 5 concurrent calls.
+            if (needsFallback.length > 0 && selectedLocations.length > 0) {
+                const CONCURRENCY = 5
+                for (let i = 0; i < needsFallback.length; i += CONCURRENCY) {
+                    const batch = needsFallback.slice(i, i + CONCURRENCY)
+                    await Promise.all(batch.map(async ({ id }) => {
+                        try {
+                            const dataPoints = await apiService.getDataPointsForEvidence(id)
+                            const dpLocationIds = dataPoints
+                                ?.filter((dp: any) => dp.location_id)
+                                .map((dp: any) => dp.location_id) || []
+                            if (dpLocationIds.length > 0) {
+                                locationMap[id] = [...new Set(dpLocationIds)]
+                            }
+                        } catch {
+                            // ignore; legacy item just won't filter by location
                         }
-                    } catch (err) {
-                        // Ignore errors for individual items
-                    }
-                })
-            )
+                    }))
+                }
+            }
             setEvidenceLocationMap(locationMap)
 
             // Filter by location using the resolved location map

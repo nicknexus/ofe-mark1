@@ -126,31 +126,50 @@ export default function InitiativePage() {
     }, [kpiId, dashboard])
 
     const loadKPITotals = async (kpis: any[]) => {
-        const totals: Record<string, number> = {}
-        const allUpdates: any[] = []
+        if (!id || kpis.length === 0) {
+            setKpiTotals({})
+            setAllKPIUpdates([])
+            return
+        }
 
-        // Load updates for each KPI and calculate totals
-        await Promise.all(kpis.map(async (kpi) => {
-            try {
-                const updates = await apiService.getKPIUpdates(kpi.id)
+        const buildFromGrouped = (grouped: Record<string, any[]>) => {
+            const totals: Record<string, number> = {}
+            const allUpdates: any[] = []
+            for (const kpi of kpis) {
+                const updates = grouped[kpi.id] || []
                 totals[kpi.id] = aggregateKpiUpdates(updates as any, kpi.metric_type)
-
-                // Add KPI info to each update for context
-                updates.forEach((update: any) => {
+                for (const update of updates) {
                     allUpdates.push({
                         ...update,
                         kpi_title: kpi.title,
                         kpi_unit: kpi.unit_of_measurement
                     })
-                })
-            } catch (error) {
-                console.warn(`Failed to load updates for KPI ${kpi.id}:`, error)
-                totals[kpi.id] = 0
+                }
+            }
+            setKpiTotals(totals)
+            setAllKPIUpdates(allUpdates)
+        }
+
+        // Try the single-round-trip batch endpoint first.
+        try {
+            const grouped = await apiService.getKPIUpdatesForInitiative(id)
+            buildFromGrouped(grouped)
+            return
+        } catch (error) {
+            console.warn('Batch KPI updates failed, falling back to per-KPI loop:', error)
+        }
+
+        // Fallback: original per-KPI loop. Slower but guaranteed to work.
+        const grouped: Record<string, any[]> = {}
+        await Promise.all(kpis.map(async (kpi) => {
+            try {
+                grouped[kpi.id] = await apiService.getKPIUpdates(kpi.id)
+            } catch (err) {
+                console.warn(`Failed to load updates for KPI ${kpi.id}:`, err)
+                grouped[kpi.id] = []
             }
         }))
-
-        setKpiTotals(totals)
-        setAllKPIUpdates(allUpdates)
+        buildFromGrouped(grouped)
     }
 
     const loadDashboard = async () => {

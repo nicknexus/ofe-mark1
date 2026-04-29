@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { SubscriptionStatus, Subscription } from '../types'
+import { apiService } from './api'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -18,22 +19,13 @@ async function getAuthHeaders() {
 
 export class SubscriptionService {
     /**
-     * Get current subscription status and access rights
+     * Get current subscription status and access rights.
+     * Cached / deduped via apiService — App.tsx calls this on mount and on
+     * org switches, and several components read from it. Without dedup we
+     * were firing it 2-3x in parallel.
      */
     static async getStatus(): Promise<SubscriptionStatus> {
-        const headers = await getAuthHeaders()
-        
-        const response = await fetch(`${API_BASE_URL}/api/subscription/status`, {
-            method: 'GET',
-            headers
-        })
-        
-        if (!response.ok) {
-            const error = await response.json()
-            throw new Error(error.error || 'Failed to get subscription status')
-        }
-        
-        return response.json()
+        return apiService.requestCached<SubscriptionStatus>('/subscription/status')
     }
     
     /**
@@ -68,19 +60,7 @@ export class SubscriptionService {
         remainingTrialDays: number | null
         features: { name: string; included: boolean }[]
     }> {
-        const headers = await getAuthHeaders()
-        
-        const response = await fetch(`${API_BASE_URL}/api/subscription/details`, {
-            method: 'GET',
-            headers
-        })
-        
-        if (!response.ok) {
-            const error = await response.json()
-            throw new Error(error.error || 'Failed to get subscription details')
-        }
-        
-        return response.json()
+        return apiService.requestCached('/subscription/details')
     }
 
     /**
@@ -146,19 +126,7 @@ export class SubscriptionService {
         limit: number | null
         canCreate: boolean
     }> {
-        const headers = await getAuthHeaders()
-        
-        const response = await fetch(`${API_BASE_URL}/api/subscription/initiatives-usage`, {
-            method: 'GET',
-            headers
-        })
-        
-        if (!response.ok) {
-            const error = await response.json()
-            throw new Error(error.error || 'Failed to get initiatives usage')
-        }
-        
-        return response.json()
+        return apiService.requestCached('/subscription/initiatives-usage')
     }
 
     /**

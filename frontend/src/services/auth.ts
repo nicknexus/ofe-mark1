@@ -53,6 +53,7 @@ export class AuthService {
     static async signIn(email: string, password: string) {
         // Clear cache before signin to prevent showing old user's data
         apiService.clearCache()
+        AuthService.invalidateUserCache()
 
         const { data, error } = await supabase.auth.signInWithPassword({
             email,
@@ -63,6 +64,7 @@ export class AuthService {
 
         // Clear cache again after signin to ensure fresh data
         apiService.clearCache()
+        AuthService.invalidateUserCache()
 
         return data
     }
@@ -83,10 +85,14 @@ export class AuthService {
     static async signOut() {
         // Clear cache on sign out
         apiService.clearCache()
+        AuthService.invalidateUserCache()
 
         const { error } = await supabase.auth.signOut()
         if (error) throw error
     }
+
+    /** No-op kept for backwards compatibility with sign-in/out flows. */
+    static invalidateUserCache() {}
 
     static async getCurrentUser(): Promise<User | null> {
         const { data: { user } } = await supabase.auth.getUser()
@@ -134,8 +140,10 @@ export class AuthService {
 
     static onAuthStateChange(callback: (user: User | null) => void) {
         return supabase.auth.onAuthStateChange(async (event, session) => {
-            // Clear cache on auth state changes (sign in, sign out, token refresh)
-            if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+            // Identity change → wipe data cache. Token refresh keeps the
+            // same user, so we leave data cache intact (avoids a full refetch
+            // every hour when the token quietly rotates).
+            if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
                 apiService.clearCache()
             }
 
