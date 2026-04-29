@@ -281,6 +281,14 @@ class ApiService {
                 }
                 if (endpoint.includes('/locations')) {
                     this.clearCacheByPattern('/locations')
+                    // Linking/unlinking locations changes which locations show in
+                    // an initiative's tab and may change initiative dashboard
+                    // counts. Also evidence/stories/kpis cards display location
+                    // names, so refresh those too.
+                    this.clearCacheByPattern('/initiatives')
+                    this.clearCacheByPattern('/evidence')
+                    this.clearCacheByPattern('/stories')
+                    this.clearCacheByPattern('/kpis')
                 }
                 if (endpoint.includes('/stories')) {
                     this.clearCacheByPattern('/stories')
@@ -784,6 +792,11 @@ class ApiService {
         return result || []
     }
 
+    // Convenience: all org-wide locations (for the global picker)
+    async getOrgLocations(): Promise<Location[]> {
+        return this.getLocations()
+    }
+
     async getLocation(id: string): Promise<Location> {
         return this.request<Location>(`/locations/${id}`)
     }
@@ -812,6 +825,19 @@ class ApiService {
         return this.request<void>('/locations/update-order', {
             method: 'POST',
             body: JSON.stringify({ order })
+        })
+    }
+
+    async linkLocationToInitiative(locationId: string, initiativeId: string): Promise<void> {
+        return this.request<void>(`/locations/${locationId}/link`, {
+            method: 'POST',
+            body: JSON.stringify({ initiative_id: initiativeId }),
+        })
+    }
+
+    async unlinkLocationFromInitiative(locationId: string, initiativeId: string): Promise<void> {
+        return this.request<void>(`/locations/${locationId}/link/${initiativeId}`, {
+            method: 'DELETE',
         })
     }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { X, MapPin, Save, Search, Loader2 } from 'lucide-react'
+import { X, MapPin, Save, Search, Loader2, ChevronDown } from 'lucide-react'
 import { Location } from '../types'
 import { debounce } from '../utils'
 
@@ -24,7 +24,8 @@ interface LocationModalProps {
     onClose: () => void
     onSubmit: (location: Partial<Location>) => Promise<void>
     initialLocation?: Location | null
-    initiativeId: string
+    /** When omitted, the location is created org-wide (not auto-linked to any initiative). */
+    initiativeId?: string
     initialCoordinates?: [number, number] | null
 }
 
@@ -50,6 +51,7 @@ export default function LocationModal({
     const [searchResults, setSearchResults] = useState<NominatimResult[]>([])
     const [isSearching, setIsSearching] = useState(false)
     const [showResults, setShowResults] = useState(false)
+    const [showCoords, setShowCoords] = useState(false)
     const searchRef = useRef<HTMLDivElement>(null)
 
     // Add/remove body class to dim map when modal is open
@@ -207,7 +209,7 @@ export default function LocationModal({
             }
 
             await onSubmit({
-                initiative_id: initiativeId,
+                ...(initiativeId ? { initiative_id: initiativeId } : {}),
                 name: formData.name.trim(),
                 description: formData.description.trim() || undefined,
                 latitude: lat,
@@ -224,170 +226,188 @@ export default function LocationModal({
 
     if (!isOpen) return null
 
+    const hasCoords = formData.latitude && formData.longitude
+
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[200] animate-fade-in">
-            <div className="bg-white rounded-2xl max-w-md w-full shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] transform transition-all duration-200 ease-out animate-slide-up-fast">
+            <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] border border-gray-100 animate-slide-up-fast">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-primary-100">
-                    <div className="flex items-center space-x-3">
-                        <div className="p-2 bg-primary-100 rounded-lg">
-                            <MapPin className="w-5 h-5 text-primary-500" />
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-primary-50 flex items-center justify-center">
+                            <MapPin className="w-4 h-4 text-primary-500" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-semibold text-gray-900">
-                                {initialLocation ? 'Edit Location' : 'Add Location'}
+                            <h2 className="text-base font-semibold text-gray-900">
+                                {initialLocation ? 'Edit Location' : 'New Location'}
                             </h2>
-                            <p className="text-sm text-gray-500">
-                                {initialLocation ? 'Update location details' : 'Search for a place or enter coordinates'}
+                            <p className="text-xs text-gray-500">
+                                {initialLocation ? 'Update details' : 'Search a place or click on the map'}
                             </p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors duration-150"
+                        className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
                     >
                         <X className="w-5 h-5" />
                     </button>
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    {error && (
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                            <p className="text-sm text-red-700">{error}</p>
-                        </div>
-                    )}
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto min-h-0">
+                    <div className="px-5 py-4 space-y-4">
+                        {error && (
+                            <div className="bg-red-50 border border-red-100 rounded-xl p-3">
+                                <p className="text-sm text-red-700">{error}</p>
+                            </div>
+                        )}
 
-                    {/* Address Search */}
-                    <div className="relative" ref={searchRef}>
-                        <label className="label">
-                            <Search className="w-4 h-4 inline mr-2" />
-                            Search for a Place
-                        </label>
-                        <div className="relative">
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => handleSearchChange(e.target.value)}
-                                onFocus={() => setShowResults(true)}
-                                className="input-field pl-10 transition-all duration-150 hover:border-gray-400"
-                                placeholder="e.g., Central Park, New York or 123 Main St, London"
-                            />
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            {isSearching && (
-                                <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />
+                        {/* Address Search */}
+                        <div className="relative" ref={searchRef}>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                                Search a place
+                            </label>
+                            <div className="relative">
+                                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => handleSearchChange(e.target.value)}
+                                    onFocus={() => setShowResults(true)}
+                                    className="w-full pl-10 pr-9 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder:text-gray-400"
+                                    placeholder="e.g. Central Park, New York"
+                                />
+                                {isSearching && (
+                                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />
+                                )}
+                            </div>
+
+                            {/* Search Results Dropdown */}
+                            {showResults && searchResults.length > 0 && (
+                                <div className="absolute z-50 w-full mt-1.5 bg-white border border-gray-100 rounded-xl shadow-[0_12px_32px_-10px_rgba(0,0,0,0.18)] max-h-60 overflow-y-auto">
+                                    {searchResults.map((result) => (
+                                        <button
+                                            key={result.place_id}
+                                            type="button"
+                                            onClick={() => handleSelectResult(result)}
+                                            className="w-full text-left px-3.5 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-b-0"
+                                        >
+                                            <div className="font-medium text-gray-900 text-sm truncate">
+                                                {result.display_name.split(',')[0]}
+                                            </div>
+                                            <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+                                                {result.display_name}
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
                             )}
                         </div>
 
-                        {/* Search Results Dropdown */}
-                        {showResults && searchResults.length > 0 && (
-                            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                                {searchResults.map((result) => (
-                                    <button
-                                        key={result.place_id}
-                                        type="button"
-                                        onClick={() => handleSelectResult(result)}
-                                        className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
-                                    >
-                                        <div className="font-medium text-gray-900 text-sm">
-                                            {result.display_name.split(',')[0]}
-                                        </div>
-                                        <div className="text-xs text-gray-500 mt-1 line-clamp-2">
-                                            {result.display_name}
-                                        </div>
-                                        <div className="text-xs text-gray-400 mt-1">
-                                            {result.lat}, {result.lon}
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                        {/* Name */}
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                                Name <span className="text-red-500 normal-case">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={formData.name}
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder:text-gray-400"
+                                placeholder="e.g. Main Office"
+                                required
+                            />
+                        </div>
 
-                    {/* Name */}
-                    <div>
-                        <label className="label">
-                            Name <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                            type="text"
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            className="input-field transition-all duration-150 hover:border-gray-400"
-                            placeholder="e.g., Main Office, School Campus A"
-                            required
-                        />
-                    </div>
+                        {/* Description */}
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                                Description
+                            </label>
+                            <textarea
+                                value={formData.description}
+                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none placeholder:text-gray-400"
+                                rows={2}
+                                placeholder="Optional"
+                            />
+                        </div>
 
-                    {/* Description */}
-                    <div>
-                        <label className="label">Description</label>
-                        <textarea
-                            value={formData.description}
-                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            className="input-field resize-none"
-                            rows={3}
-                            placeholder="Optional description or additional details..."
-                        />
-                    </div>
-
-                    {/* Coordinates */}
-                    <div>
-                        <label className="label text-sm text-gray-600 mb-2 block">
-                            Coordinates (auto-filled when selecting a place, or enter manually)
-                        </label>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="label text-xs">
-                                    Latitude <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="number"
-                                    step="any"
-                                    value={formData.latitude}
-                                    onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
-                                    className="input-field transition-all duration-150 hover:border-gray-400"
-                                    placeholder="e.g., 40.7128"
-                                    required
-                                    min="-90"
-                                    max="90"
-                                />
-                            </div>
-                            <div>
-                                <label className="label text-xs">
-                                    Longitude <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="number"
-                                    step="any"
-                                    value={formData.longitude}
-                                    onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
-                                    className="input-field transition-all duration-150 hover:border-gray-400"
-                                    placeholder="e.g., -74.0060"
-                                    required
-                                    min="-180"
-                                    max="180"
-                                />
-                            </div>
+                        {/* Coordinates - collapsible advanced */}
+                        <div className="border border-gray-100 rounded-xl bg-gray-50/40">
+                            <button
+                                type="button"
+                                onClick={() => setShowCoords(s => !s)}
+                                className="w-full flex items-center justify-between px-3.5 py-2.5 text-left"
+                            >
+                                <div className="min-w-0">
+                                    <p className="text-xs font-semibold text-gray-700">Coordinates</p>
+                                    {hasCoords ? (
+                                        <p className="text-[11px] text-gray-500 mt-0.5 font-mono truncate">
+                                            {parseFloat(formData.latitude).toFixed(5)}, {parseFloat(formData.longitude).toFixed(5)}
+                                        </p>
+                                    ) : (
+                                        <p className="text-[11px] text-gray-500 mt-0.5">Auto-filled from search, or enter manually</p>
+                                    )}
+                                </div>
+                                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${showCoords ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showCoords && (
+                                <div className="px-3.5 pb-3 grid grid-cols-2 gap-2.5">
+                                    <div>
+                                        <label className="block text-[11px] font-medium text-gray-500 mb-1">Latitude</label>
+                                        <input
+                                            type="number"
+                                            step="any"
+                                            value={formData.latitude}
+                                            onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                            placeholder="40.7128"
+                                            required
+                                            min="-90"
+                                            max="90"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[11px] font-medium text-gray-500 mb-1">Longitude</label>
+                                        <input
+                                            type="number"
+                                            step="any"
+                                            value={formData.longitude}
+                                            onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                            placeholder="-74.0060"
+                                            required
+                                            min="-180"
+                                            max="180"
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
                     {/* Actions */}
-                    <div className="flex space-x-3 pt-4">
+                    <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end gap-2 flex-shrink-0 bg-gray-50/40">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-all duration-150 hover:shadow-md disabled:opacity-50"
                             disabled={loading}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-primary-500 to-primary-600 border border-transparent rounded-lg hover:from-primary-600 hover:to-primary-700 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 hover:shadow-lg transform hover:scale-[1.02] flex items-center justify-center space-x-2"
                             disabled={loading}
+                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-colors shadow-bubble-sm disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                            <Save className="w-4 h-4" />
+                            {loading ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Save className="w-4 h-4" />
+                            )}
                             <span>{loading ? 'Saving...' : initialLocation ? 'Update' : 'Create'}</span>
                         </button>
                     </div>

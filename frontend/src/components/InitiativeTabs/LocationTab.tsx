@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { MapPin, Plus, Edit, Trash2, AlertCircle, GripVertical } from 'lucide-react'
+import { MapPin, Plus, Edit, Trash2, AlertCircle, GripVertical, Link2Off } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { Location } from '../../types'
 import { apiService } from '../../services/api'
 import LocationMap from '../LocationMap'
 import LocationModal from '../LocationModal'
 import LocationDetailsModal from '../LocationDetailsModal'
+import AddLocationPickerModal from '../AddLocationPickerModal'
 import toast from 'react-hot-toast'
 import {
     DndContext,
@@ -31,6 +32,7 @@ function SortableLocationCard({
     selectedLocationId,
     onListItemClick,
     onEditClick,
+    onUnlinkClick,
     onDeleteClick,
     locationCardRefs,
     country
@@ -39,6 +41,7 @@ function SortableLocationCard({
     selectedLocationId: string | null
     onListItemClick: (location: Location) => void
     onEditClick: (location: Location, e: React.MouseEvent) => void
+    onUnlinkClick: (e: React.MouseEvent) => void
     onDeleteClick: (e: React.MouseEvent) => void
     locationCardRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>
     country?: string | null
@@ -96,6 +99,7 @@ function SortableLocationCard({
                             e.stopPropagation()
                             onEditClick(location, e)
                         }}
+                        title="Edit"
                         className="p-1 text-gray-400 hover:text-primary-500 transition-colors rounded"
                     >
                         <Edit className="w-3.5 h-3.5" />
@@ -103,8 +107,19 @@ function SortableLocationCard({
                     <button
                         onClick={(e) => {
                             e.stopPropagation()
+                            onUnlinkClick(e)
+                        }}
+                        title="Remove from this initiative"
+                        className="p-1 text-gray-400 transition-colors rounded hover:text-[#d97706]"
+                    >
+                        <Link2Off className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
                             onDeleteClick(e)
                         }}
+                        title="Delete (org-wide)"
                         className="p-1 text-gray-400 hover:text-red-500 transition-colors rounded"
                     >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -112,13 +127,10 @@ function SortableLocationCard({
                 </div>
             </div>
             {location.description && (
-                <p className="text-xs text-gray-500 mb-1.5 line-clamp-2">
+                <p className="text-xs text-gray-500 line-clamp-2">
                     {location.description}
                 </p>
             )}
-            <div className="text-xs text-gray-400">
-                {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
-            </div>
         </div>
     )
 }
@@ -134,11 +146,13 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
     const [orderedLocations, setOrderedLocations] = useState<Location[]>([])
     const [loading, setLoading] = useState(true)
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const [isPickerOpen, setIsPickerOpen] = useState(false)
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
     const [selectedLocation, setSelectedLocation] = useState<Location | null>(null)
     const [detailsLocation, setDetailsLocation] = useState<Location | null>(null)
     const [mapClickCoordinates, setMapClickCoordinates] = useState<[number, number] | null>(null)
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+    const [unlinkConfirmId, setUnlinkConfirmId] = useState<string | null>(null)
     const locationCardRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
     // Initialize ordered locations from state, sorted by display_order
@@ -263,6 +277,19 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
         }
     }
 
+    const handleUnlinkLocation = async (id: string) => {
+        if (!initiativeId) return
+        try {
+            await apiService.unlinkLocationFromInitiative(id, initiativeId)
+            toast.success('Removed from this initiative')
+            await loadLocations()
+            setUnlinkConfirmId(null)
+        } catch (error) {
+            toast.error('Failed to remove location')
+            console.error(error)
+        }
+    }
+
     const handleMapClick = (coordinates: [number, number]) => {
         setMapClickCoordinates(coordinates)
         setSelectedLocation(null)
@@ -276,6 +303,12 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
     }
 
     const handleAddClick = () => {
+        setSelectedLocation(null)
+        setMapClickCoordinates(null)
+        setIsPickerOpen(true)
+    }
+
+    const handleCreateNewFromPicker = () => {
         setSelectedLocation(null)
         setMapClickCoordinates(null)
         setIsModalOpen(true)
@@ -403,6 +436,10 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
                                                 selectedLocationId={selectedLocation?.id || null}
                                                 onListItemClick={handleListItemClick}
                                                 onEditClick={handleEditClick}
+                                                onUnlinkClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setUnlinkConfirmId(location.id!)
+                                                }}
                                                 onDeleteClick={(e) => {
                                                     e.stopPropagation()
                                                     setDeleteConfirmId(location.id!)
@@ -452,6 +489,59 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
                 initialCoordinates={mapClickCoordinates}
             />
 
+            {/* Add Location Picker (existing global OR create new) */}
+            <AddLocationPickerModal
+                isOpen={isPickerOpen}
+                onClose={() => setIsPickerOpen(false)}
+                initiativeId={initiativeId}
+                excludeIds={locations.map(l => l.id!).filter(Boolean)}
+                onCreateNew={handleCreateNewFromPicker}
+                onLinked={() => {
+                    loadLocations()
+                }}
+            />
+
+            {/* Unlink Confirmation */}
+            {unlinkConfirmId && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-bubble-lg border border-gray-100">
+                        <div className="flex items-start space-x-4 mb-6">
+                            <div className="icon-bubble">
+                                <Link2Off className="w-5 h-5" style={{ color: '#d97706' }} />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-1">Remove from initiative</h3>
+                                <p className="text-sm text-gray-500">The location stays in your organization and other initiatives that use it.</p>
+                            </div>
+                        </div>
+
+                        <p className="text-gray-600 mb-6 text-sm">
+                            Remove{' '}
+                            <strong className="text-gray-800">
+                                "{locations.find((l) => l.id === unlinkConfirmId)?.name}"
+                            </strong>
+                            {' '}from this initiative? Existing claims, evidence, and stories that already link to this location stay linked — they just won't be filtered to this initiative anymore via the locations tab.
+                        </p>
+
+                        <div className="flex space-x-3">
+                            <button
+                                onClick={() => setUnlinkConfirmId(null)}
+                                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-all duration-200"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => handleUnlinkLocation(unlinkConfirmId)}
+                                style={{ backgroundColor: '#d97706', color: '#ffffff' }}
+                                className="flex-1 px-4 py-2.5 text-sm font-medium rounded-2xl transition-all duration-200 shadow-bubble-sm hover:brightness-110"
+                            >
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Delete Confirmation */}
             {deleteConfirmId && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
@@ -467,15 +557,14 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
                         </div>
 
                         <p className="text-gray-600 mb-2 text-sm">
-                            Are you sure you want to delete{' '}
+                            Permanently delete{' '}
                             <strong className="text-gray-800">
                                 "{locations.find((l) => l.id === deleteConfirmId)?.name}"
                             </strong>
-                            ?
+                            {' '}from your organization?
                         </p>
                         <p className="text-xs text-gray-500 mb-6">
-                            Impact claims linked to this location will remain but won't be associated with a
-                            location anymore.
+                            This removes the location from every initiative that uses it. Existing impact claims, evidence, and stories linked here will keep their data but lose the location reference. To just remove it from this initiative, use the unlink button instead.
                         </p>
 
                         <div className="flex space-x-3">

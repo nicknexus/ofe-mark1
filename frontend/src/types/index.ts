@@ -117,7 +117,9 @@ export interface MetricTag {
 
 export interface Location {
     id?: string;
-    initiative_id: string;
+    organization_id?: string;
+    initiative_id?: string | null;
+    initiative_ids?: string[];
     name: string;
     description?: string;
     latitude: number;

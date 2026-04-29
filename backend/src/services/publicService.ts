@@ -128,20 +128,21 @@ export class PublicService {
             .order('title')
             .limit(20);
 
-        // Search locations (returns initiatives that have matching locations)
-        // If org is public, all its initiatives/locations are visible
+        // Search locations (returns initiatives that have matching locations).
+        // Locations are org-global now; we join through initiative_locations to
+        // surface the initiatives each matching location is linked to.
         const { data: locs } = await supabase
             .from('locations')
             .select(`
-                id, name, description, latitude, longitude, initiative_id,
-                initiatives!inner(
-                    id, title, description, region, slug, is_public, organization_id,
-                    organizations!inner(id, name, slug, logo_url, is_public, is_demo)
+                id, name, description, latitude, longitude,
+                initiative_locations(
+                    initiatives(
+                        id, title, description, region, slug, is_public, organization_id,
+                        organizations!inner(id, name, slug, logo_url, is_public, is_demo)
+                    )
                 )
             `)
             .ilike('name', `%${searchTerm}%`)
-            .eq('initiatives.organizations.is_public', true)
-            .eq('initiatives.organizations.is_demo', false)
             .limit(20);
 
         // Format results
@@ -169,32 +170,43 @@ export class PublicService {
             organization_logo_url: i.organizations?.logo_url
         }));
 
-        const locationMatches = (locs || []).map((l: any) => ({
-            location: {
-                id: l.id,
-                name: l.name,
-                description: l.description,
-                latitude: l.latitude,
-                longitude: l.longitude,
-                initiative_id: l.initiative_id
-            },
-            initiative: {
-                id: l.initiatives.id,
-                title: l.initiatives.title,
-                description: l.initiatives.description,
-                region: l.initiatives.region,
-                slug: l.initiatives.slug,
-                organization_id: l.initiatives.organization_id,
-                org_slug: l.initiatives.organizations?.slug,
-                organization_logo_url: l.initiatives.organizations?.logo_url
-            },
-            organization: {
-                id: l.initiatives.organizations?.id,
-                name: l.initiatives.organizations?.name,
-                slug: l.initiatives.organizations?.slug,
-                logo_url: l.initiatives.organizations?.logo_url
+        // A location can now be linked to multiple initiatives. Flatten so each
+        // (location, initiative) pair shows once, only for public non-demo orgs.
+        const locationMatches: any[] = [];
+        for (const l of (locs || [])) {
+            const links: any[] = (l as any).initiative_locations || [];
+            for (const link of links) {
+                const i = link?.initiatives;
+                const o = i?.organizations;
+                if (!i || !o || !o.is_public || o.is_demo) continue;
+                locationMatches.push({
+                    location: {
+                        id: l.id,
+                        name: l.name,
+                        description: l.description,
+                        latitude: l.latitude,
+                        longitude: l.longitude,
+                        initiative_id: i.id,
+                    },
+                    initiative: {
+                        id: i.id,
+                        title: i.title,
+                        description: i.description,
+                        region: i.region,
+                        slug: i.slug,
+                        organization_id: i.organization_id,
+                        org_slug: o.slug,
+                        organization_logo_url: o.logo_url,
+                    },
+                    organization: {
+                        id: o.id,
+                        name: o.name,
+                        slug: o.slug,
+                        logo_url: o.logo_url,
+                    },
+                });
             }
-        }));
+        }
 
         // Deduplicate location matches by initiative
         const seenInitiatives = new Set<string>();
@@ -255,10 +267,11 @@ export class PublicService {
         let kpiCount = 0;
 
         if (initiativeIds.length > 0) {
+            // Locations are org-global now; count by organization_id directly.
             const { count: locCount } = await supabase
                 .from('locations')
                 .select('id', { count: 'exact', head: true })
-                .in('initiative_id', initiativeIds);
+                .eq('organization_id', org.id);
             locationCount = locCount || 0;
 
             const { count: storCount } = await supabase
@@ -408,32 +421,51 @@ export class PublicService {
     }
 
     static async getOrganizationLocations(orgSlug: string): Promise<any[]> {
+        // Resolve org by slug (must be public)
+        const { data: org } = await supabase
+            .from('organizations')
+            .select('id, slug, is_public')
+            .eq('slug', orgSlug)
+            .eq('is_public', true)
+            .single();
+        if (!org) return [];
+
         const { data, error } = await supabase
             .from('locations')
             .select(`
-                id, name, description, latitude, longitude, country, initiative_id,
-                initiatives!inner(id, slug, title, organization_id,
-                    organizations!inner(slug, is_public)
+                id, name, description, latitude, longitude, country, display_order, initiative_id,
+                initiative_locations(
+                    initiatives(id, slug, title)
                 )
             `)
-            .eq('initiatives.organizations.slug', orgSlug)
-            .eq('initiatives.organizations.is_public', true)
-            .order('name');
+            .eq('organization_id', org.id)
+            .order('display_order', { ascending: true })
+            .order('name', { ascending: true });
 
         if (error) throw new Error(`Failed to fetch locations: ${error.message}`);
 
-        return (data || []).map((l: any) => ({
-            id: l.id,
-            name: l.name,
-            description: l.description,
-            latitude: l.latitude,
-            longitude: l.longitude,
-            country: l.country,
-            initiative_id: l.initiative_id,
-            initiative_slug: l.initiatives?.slug,
-            initiative_title: l.initiatives?.title,
-            org_slug: l.initiatives?.organizations?.slug
-        }));
+        return (data || []).map((l: any) => {
+            const links: any[] = l.initiative_locations || [];
+            const initiatives = links.map(link => link?.initiatives).filter(Boolean);
+            const initiativeIds = initiatives.map((i: any) => i.id);
+            // Keep legacy fields populated with the first linked initiative for
+            // older client code paths that still read singular initiative_id.
+            const first = initiatives[0];
+            return {
+                id: l.id,
+                name: l.name,
+                description: l.description,
+                latitude: l.latitude,
+                longitude: l.longitude,
+                country: l.country,
+                display_order: l.display_order,
+                initiative_id: first?.id || l.initiative_id || null,
+                initiative_ids: initiativeIds,
+                initiative_slug: first?.slug,
+                initiative_title: first?.title,
+                org_slug: org.slug,
+            };
+        });
     }
 
     static async getOrganizationEvidence(orgSlug: string, limit?: number): Promise<any[]> {
@@ -586,12 +618,21 @@ export class PublicService {
 
         console.log('[Dashboard] Processed KPIs:', processedKpis.length);
 
-        // Get locations
-        const { data: locations } = await supabase
-            .from('locations')
-            .select('id, name, description, latitude, longitude, display_order')
-            .eq('initiative_id', initiative.id)
-            .order('display_order');
+        // Get locations linked to this initiative via initiative_locations
+        const { data: locLinks } = await supabase
+            .from('initiative_locations')
+            .select('location_id')
+            .eq('initiative_id', initiative.id);
+        const locIds = (locLinks || []).map((r: any) => r.location_id);
+        let locations: any[] = [];
+        if (locIds.length > 0) {
+            const { data: locs } = await supabase
+                .from('locations')
+                .select('id, name, description, latitude, longitude, display_order')
+                .in('id', locIds)
+                .order('display_order');
+            locations = locs || [];
+        }
 
         // Get evidence count
         const { count: evidenceCount } = await supabase
@@ -656,10 +697,17 @@ export class PublicService {
         const initiative = await this.getInitiativeBySlug(orgSlug, initiativeSlug);
         if (!initiative) return [];
 
+        const { data: links } = await supabase
+            .from('initiative_locations')
+            .select('location_id')
+            .eq('initiative_id', initiative.id);
+        const ids = (links || []).map((r: any) => r.location_id);
+        if (ids.length === 0) return [];
+
         const { data, error } = await supabase
             .from('locations')
             .select('id, name, description, latitude, longitude, display_order, created_at, initiative_id')
-            .eq('initiative_id', initiative.id)
+            .in('id', ids)
             .order('display_order');
 
         if (error) throw new Error(`Failed to fetch locations: ${error.message}`);
@@ -1282,12 +1330,20 @@ export class PublicService {
         const initiative = await this.getInitiativeBySlug(orgSlug, initiativeSlug);
         if (!initiative) return null;
 
-        // Fetch the location
+        // Fetch the location, ensuring it's actually linked to this initiative
+        // (initiative_locations is the source of truth post-migration).
+        const { data: link } = await supabase
+            .from('initiative_locations')
+            .select('location_id')
+            .eq('initiative_id', initiative.id)
+            .eq('location_id', locationId)
+            .single();
+        if (!link) return null;
+
         const { data: location, error: locError } = await supabase
             .from('locations')
             .select('id, name, description, latitude, longitude')
             .eq('id', locationId)
-            .eq('initiative_id', initiative.id)
             .single();
 
         if (locError || !location) return null;

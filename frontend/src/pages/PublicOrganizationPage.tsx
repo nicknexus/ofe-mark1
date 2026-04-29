@@ -152,14 +152,25 @@ export default function PublicOrganizationPage() {
         }
     }
 
+    // Helper: a location is in an initiative if either initiative_ids array
+    // includes it (post-migration source of truth) or the legacy initiative_id matches.
+    const locationLinkedToInitiative = (loc: typeof locations[number], initiativeId: string) => {
+        if (loc.initiative_ids && loc.initiative_ids.length > 0) {
+            return loc.initiative_ids.includes(initiativeId)
+        }
+        return loc.initiative_id === initiativeId
+    }
+
     // Initiatives that operate at any of the selected locations
     const locationMatchedInitiativeIds = useMemo(() => {
         if (selectedLocationIds.length === 0) return null
         const ids = new Set<string>()
         locations.forEach(loc => {
-            if (loc.id && selectedLocationIds.includes(loc.id) && loc.initiative_id) {
-                ids.add(loc.initiative_id)
-            }
+            if (!loc.id || !selectedLocationIds.includes(loc.id)) return
+            const linked = (loc.initiative_ids && loc.initiative_ids.length > 0)
+                ? loc.initiative_ids
+                : (loc.initiative_id ? [loc.initiative_id] : [])
+            linked.forEach(id => ids.add(id))
         })
         return ids
     }, [selectedLocationIds, locations])
@@ -167,7 +178,7 @@ export default function PublicOrganizationPage() {
     // Locations available in the dropdown (scoped by selected initiative)
     const dropdownLocations = useMemo(() => {
         if (selectedInitiative !== 'all') {
-            return locations.filter(l => l.initiative_id === selectedInitiative)
+            return locations.filter(l => locationLinkedToInitiative(l, selectedInitiative))
         }
         return locations
     }, [locations, selectedInitiative])
@@ -233,7 +244,7 @@ export default function PublicOrganizationPage() {
     const filteredLocations = useMemo(() => {
         let filtered = locations
         if (selectedInitiative !== 'all') {
-            filtered = filtered.filter(l => l.initiative_id === selectedInitiative)
+            filtered = filtered.filter(l => locationLinkedToInitiative(l, selectedInitiative))
         }
         if (selectedLocationIds.length > 0) {
             filtered = filtered.filter(l => l.id && selectedLocationIds.includes(l.id))

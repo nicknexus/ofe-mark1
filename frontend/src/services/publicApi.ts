@@ -77,6 +77,7 @@ export interface PublicLocation {
     longitude: number
     country?: string
     initiative_id?: string
+    initiative_ids?: string[]
     initiative_slug?: string
     initiative_title?: string
     org_slug?: string

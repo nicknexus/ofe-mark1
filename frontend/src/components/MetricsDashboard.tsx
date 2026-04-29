@@ -30,6 +30,7 @@ import {
     Legend
 } from 'recharts'
 import LocationMap from './LocationMap'
+import AllLocationsModal from './AllLocationsModal'
 import DateRangePicker from './DateRangePicker'
 import { apiService } from '../services/api'
 import { Location, BeneficiaryGroup, User, Organization } from '../types'
@@ -201,6 +202,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     const [selectedLocations, setSelectedLocations] = useState<string[]>([])
     const [selectedBeneficiaryGroups, setSelectedBeneficiaryGroups] = useState<string[]>([])
     const [selectedTags, setSelectedTags] = useState<string[]>([])
+    const [showAllLocationsModal, setShowAllLocationsModal] = useState(false)
     const [allTags, setAllTags] = useState<{ id: string; name: string }[]>([])
     const [showLocationPicker, setShowLocationPicker] = useState(false)
     const [showBeneficiaryPicker, setShowBeneficiaryPicker] = useState(false)
@@ -1438,15 +1440,16 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                 <div className="lg:col-span-2 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.18)] border border-gray-100 p-4 flex flex-col relative min-h-0 overflow-hidden">
                     <div className="flex items-center justify-between mb-3 flex-shrink-0">
                         <h3 className="text-sm font-semibold text-gray-800">Locations</h3>
-                        {onNavigateToLocations && (
+                        <div className="flex items-center gap-1.5">
                             <button
-                                onClick={onNavigateToLocations}
+                                onClick={() => setShowAllLocationsModal(true)}
                                 className="flex items-center space-x-1 px-2.5 py-1 bg-primary-50 hover:bg-primary-100 text-primary-600 rounded-lg text-xs font-medium transition-all duration-200"
+                                title="View all org locations"
                             >
                                 <ExternalLink className="w-3 h-3" />
                                 <span>View All</span>
                             </button>
-                        )}
+                        </div>
                     </div>
                     <div className="flex-1 min-h-0">
                         <LocationMap
@@ -1569,6 +1572,19 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     </div>
                 </div>
             )}
+
+            {/* All Locations modal (org-wide) */}
+            <AllLocationsModal
+                isOpen={showAllLocationsModal}
+                onClose={() => {
+                    setShowAllLocationsModal(false)
+                    if (initiativeId) {
+                        apiService.getLocations(initiativeId)
+                            .then((locs) => setLocations(locs || []))
+                            .catch(() => { })
+                    }
+                }}
+            />
         </div>
     )
 }

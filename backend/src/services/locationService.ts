@@ -3,71 +3,137 @@ import { Location } from '../types';
 import { InitiativeService } from './initiativeService';
 
 export class LocationService {
-    static async create(location: Location, userId: string, requestedOrgId?: string): Promise<Location> {
-        // Authorize: caller must have access to the initiative being written to.
-        if (location.initiative_id) {
-            const initiative = await InitiativeService.getById(location.initiative_id, userId, requestedOrgId)
-            if (!initiative) throw new Error('Initiative not found or access denied')
+    // ---------- helpers ----------
+
+    private static async assertInitiativeAccess(initiativeId: string, userId: string, requestedOrgId?: string) {
+        const initiative = await InitiativeService.getById(initiativeId, userId, requestedOrgId);
+        if (!initiative) throw new Error('Initiative not found or access denied');
+        return initiative;
+    }
+
+    private static async assertLocationAccess(locationId: string, userId: string, requestedOrgId?: string) {
+        const location = await this.getById(locationId, userId, requestedOrgId);
+        if (!location) throw new Error('Location not found or access denied');
+        return location;
+    }
+
+    private static async hydrateInitiativeIds(locations: any[]): Promise<Location[]> {
+        if (locations.length === 0) return [];
+        const ids = locations.map(l => l.id);
+        const { data: links, error } = await supabase
+            .from('initiative_locations')
+            .select('initiative_id, location_id')
+            .in('location_id', ids);
+        if (error) throw new Error(`Failed to fetch initiative links: ${error.message}`);
+
+        const byLoc = new Map<string, string[]>();
+        (links || []).forEach((row: any) => {
+            const arr = byLoc.get(row.location_id) || [];
+            arr.push(row.initiative_id);
+            byLoc.set(row.location_id, arr);
+        });
+
+        return locations.map(l => ({ ...l, initiative_ids: byLoc.get(l.id) || [] }));
+    }
+
+    // ---------- CRUD ----------
+
+    static async create(location: Partial<Location>, userId: string, requestedOrgId?: string): Promise<Location> {
+        const organizationId = await InitiativeService.getEffectiveOrganizationId(userId, requestedOrgId);
+        if (!organizationId) throw new Error('No organization context');
+
+        // If caller wants the new location auto-linked to a specific initiative,
+        // verify access to that initiative first.
+        const linkInitiativeId = location.initiative_id || null;
+        if (linkInitiativeId) {
+            await this.assertInitiativeAccess(linkInitiativeId, userId, requestedOrgId);
         }
 
-        // Get max display_order across the initiative (org-wide).
-        let maxOrder = 0
-        if (location.initiative_id) {
-            const { data: existingLocations } = await supabase
-                .from('locations')
-                .select('display_order')
-                .eq('initiative_id', location.initiative_id)
-                .order('display_order', { ascending: false })
-                .limit(1)
-
-            if (existingLocations && existingLocations.length > 0) {
-                maxOrder = (existingLocations[0].display_order ?? 0) + 1
-            }
+        // Org-wide max display_order
+        let displayOrder = 0;
+        const { data: existingLocations } = await supabase
+            .from('locations')
+            .select('display_order')
+            .eq('organization_id', organizationId)
+            .order('display_order', { ascending: false })
+            .limit(1);
+        if (existingLocations && existingLocations.length > 0) {
+            displayOrder = (existingLocations[0].display_order ?? 0) + 1;
         }
+
+        const insertPayload: any = {
+            organization_id: organizationId,
+            initiative_id: linkInitiativeId,
+            user_id: userId,
+            name: location.name,
+            description: location.description,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            country: (location as any).country,
+            display_order: displayOrder,
+        };
 
         const { data, error } = await supabase
             .from('locations')
-            .insert([{ ...location, user_id: userId, display_order: maxOrder }])
+            .insert([insertPayload])
             .select()
             .single();
 
         if (error) throw new Error(`Failed to create location: ${error.message}`);
-        return data;
+
+        // If created in the context of an initiative, also create the junction link
+        if (linkInitiativeId && data?.id) {
+            await supabase
+                .from('initiative_locations')
+                .insert([{ initiative_id: linkInitiativeId, location_id: data.id }])
+                .then(() => undefined);
+        }
+
+        const [hydrated] = await this.hydrateInitiativeIds([data]);
+        return hydrated;
     }
 
     static async getAll(userId: string, initiativeId?: string, requestedOrgId?: string): Promise<Location[]> {
+        const organizationId = await InitiativeService.getEffectiveOrganizationId(userId, requestedOrgId);
+        if (!organizationId) return [];
+
         if (initiativeId) {
-            // Authorize via initiative org context.
-            const initiative = await InitiativeService.getById(initiativeId, userId, requestedOrgId)
-            if (!initiative) return []
+            // Verify access to the initiative
+            const initiative = await InitiativeService.getById(initiativeId, userId, requestedOrgId);
+            if (!initiative) return [];
+
+            // Locations linked to this initiative via initiative_locations
+            const { data: links, error: linksError } = await supabase
+                .from('initiative_locations')
+                .select('location_id')
+                .eq('initiative_id', initiativeId);
+            if (linksError) throw new Error(`Failed to fetch initiative locations: ${linksError.message}`);
+
+            const locationIds = (links || []).map((l: any) => l.location_id);
+            if (locationIds.length === 0) return [];
 
             const { data, error } = await supabase
                 .from('locations')
                 .select('*')
-                .eq('initiative_id', initiativeId)
+                .in('id', locationIds)
+                .eq('organization_id', organizationId)
                 .order('display_order', { ascending: true })
                 .order('created_at', { ascending: false });
-
             if (error) throw new Error(`Failed to fetch locations: ${error.message}`);
-            return data || [];
+
+            return this.hydrateInitiativeIds(data || []);
         }
 
-        // No initiative - get all for user's accessible initiatives in the active org
-        const initiatives = await InitiativeService.getAll(userId, requestedOrgId);
-        if (initiatives.length === 0) {
-            return [];
-        }
-
-        const initiativeIds = initiatives.map(i => i.id);
+        // No initiative filter: return all org locations
         const { data, error } = await supabase
             .from('locations')
             .select('*')
-            .in('initiative_id', initiativeIds)
+            .eq('organization_id', organizationId)
             .order('display_order', { ascending: true })
             .order('created_at', { ascending: false });
-
         if (error) throw new Error(`Failed to fetch locations: ${error.message}`);
-        return data || [];
+
+        return this.hydrateInitiativeIds(data || []);
     }
 
     static async getById(id: string, userId: string, requestedOrgId?: string): Promise<Location | null> {
@@ -81,38 +147,42 @@ export class LocationService {
             if (error.code === 'PGRST116') return null;
             throw new Error(`Failed to fetch location: ${error.message}`);
         }
+        if (!data) return null;
 
-        // Org-scoped access: verify user can access the parent initiative
-        // (covers org owners, team members, and demo orgs owned by admins).
-        if (data?.initiative_id) {
-            const initiative = await InitiativeService.getById(data.initiative_id, userId, requestedOrgId);
-            if (!initiative) return null;
-        } else if (data?.user_id !== userId) {
-            // Orphan location with no initiative: only the creator can see it.
-            return null;
+        // Org-scoped access: caller must belong to the location's org
+        const organizationId = await InitiativeService.getEffectiveOrganizationId(userId, requestedOrgId);
+        if (!organizationId || organizationId !== data.organization_id) {
+            // Fall back: also accept if user belongs to that org via some other path
+            // (matches how InitiativeService.getById resolves access).
+            const altOrgId = await InitiativeService.getEffectiveOrganizationId(userId, data.organization_id);
+            if (altOrgId !== data.organization_id) return null;
         }
 
-        return data;
+        const [hydrated] = await this.hydrateInitiativeIds([data]);
+        return hydrated;
     }
 
     static async update(id: string, location: Partial<Location>, userId: string, requestedOrgId?: string): Promise<Location> {
-        const existing = await this.getById(id, userId, requestedOrgId);
-        if (!existing) throw new Error('Location not found or access denied');
+        await this.assertLocationAccess(id, userId, requestedOrgId);
+
+        // Don't allow callers to mutate ownership/scope columns through update
+        const { organization_id, user_id, initiative_id, initiative_ids, id: _id, created_at, ...safe } = location as any;
 
         const { data, error } = await supabase
             .from('locations')
-            .update(location)
+            .update(safe)
             .eq('id', id)
             .select()
             .single();
 
         if (error) throw new Error(`Failed to update location: ${error.message}`);
-        return data;
+
+        const [hydrated] = await this.hydrateInitiativeIds([data]);
+        return hydrated;
     }
 
     static async delete(id: string, userId: string, requestedOrgId?: string): Promise<void> {
-        const existing = await this.getById(id, userId, requestedOrgId);
-        if (!existing) throw new Error('Location not found or access denied');
+        await this.assertLocationAccess(id, userId, requestedOrgId);
 
         const { error } = await supabase
             .from('locations')
@@ -122,11 +192,44 @@ export class LocationService {
         if (error) throw new Error(`Failed to delete location: ${error.message}`);
     }
 
-    // Get KPI updates linked to a location
+    // ---------- Initiative linking ----------
+
+    static async linkToInitiative(locationId: string, initiativeId: string, userId: string, requestedOrgId?: string): Promise<void> {
+        // Both must be accessible to caller and live in the same org
+        const location = await this.assertLocationAccess(locationId, userId, requestedOrgId);
+        const initiative = await this.assertInitiativeAccess(initiativeId, userId, requestedOrgId);
+
+        if ((initiative as any).organization_id !== location.organization_id) {
+            throw new Error('Cannot link location to an initiative in a different organization');
+        }
+
+        const { error } = await supabase
+            .from('initiative_locations')
+            .upsert(
+                [{ initiative_id: initiativeId, location_id: locationId }],
+                { onConflict: 'initiative_id,location_id', ignoreDuplicates: true }
+            );
+
+        if (error) throw new Error(`Failed to link location to initiative: ${error.message}`);
+    }
+
+    static async unlinkFromInitiative(locationId: string, initiativeId: string, userId: string, requestedOrgId?: string): Promise<void> {
+        await this.assertLocationAccess(locationId, userId, requestedOrgId);
+        await this.assertInitiativeAccess(initiativeId, userId, requestedOrgId);
+
+        const { error } = await supabase
+            .from('initiative_locations')
+            .delete()
+            .eq('initiative_id', initiativeId)
+            .eq('location_id', locationId);
+
+        if (error) throw new Error(`Failed to unlink location from initiative: ${error.message}`);
+    }
+
+    // ---------- Connected entities ----------
+
     static async getKPIUpdatesByLocation(locationId: string, userId: string, requestedOrgId?: string): Promise<any[]> {
-        // Verify access via the location's initiative (org-scoped)
-        const location = await this.getById(locationId, userId, requestedOrgId);
-        if (!location) return [];
+        await this.assertLocationAccess(locationId, userId, requestedOrgId);
 
         const { data, error } = await supabase
             .from('kpi_updates')
@@ -138,18 +241,11 @@ export class LocationService {
             .order('date_represented', { ascending: false });
 
         if (error) throw new Error(`Failed to fetch KPI updates for location: ${error.message}`);
-
-        // Restrict to KPI updates whose KPI lives in the same initiative as the location.
-        const rows = (data || []).filter((row: any) =>
-            row?.kpis?.initiative_id && row.kpis.initiative_id === location.initiative_id
-        );
-        return rows;
+        return data || [];
     }
 
-    // Get evidence linked to a location (via evidence_locations junction table)
     static async getEvidenceByLocation(locationId: string, userId: string, requestedOrgId?: string): Promise<any[]> {
-        const location = await this.getById(locationId, userId, requestedOrgId);
-        if (!location) return [];
+        await this.assertLocationAccess(locationId, userId, requestedOrgId);
 
         const { data: junctionData, error: junctionError } = await supabase
             .from('evidence_locations')
@@ -165,11 +261,9 @@ export class LocationService {
 
         if (junctionError) throw new Error(`Failed to fetch evidence for location: ${junctionError.message}`);
 
-        // Restrict to evidence in the same initiative as the location (org-scoped access).
         const evidenceItems = (junctionData || [])
             .map((item: any) => item.evidence)
-            .filter(Boolean)
-            .filter((ev: any) => ev.initiative_id && ev.initiative_id === location.initiative_id);
+            .filter(Boolean);
 
         evidenceItems.sort((a: any, b: any) => {
             const dateA = a.date_represented ? new Date(a.date_represented).getTime() : 0;
@@ -180,4 +274,3 @@ export class LocationService {
         return evidenceItems;
     }
 }
-

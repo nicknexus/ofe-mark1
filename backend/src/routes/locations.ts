@@ -121,5 +121,33 @@ router.post('/update-order', authenticateUser, async (req: AuthenticatedRequest,
     }
 });
 
+// Link a location to an initiative (adds it to that initiative's locations tab)
+router.post('/:id/link', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const { initiative_id } = req.body || {};
+        if (!initiative_id) {
+            res.status(400).json({ error: 'initiative_id is required' });
+            return;
+        }
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        await LocationService.linkToInitiative(req.params.id, initiative_id, req.user!.id, requestedOrgId);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// Unlink a location from an initiative (removes it from that initiative's tab,
+// but leaves the global location and any entity references intact)
+router.delete('/:id/link/:initiativeId', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        await LocationService.unlinkFromInitiative(req.params.id, req.params.initiativeId, req.user!.id, requestedOrgId);
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
 export default router;
 

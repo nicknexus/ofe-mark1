@@ -216,8 +216,8 @@ router.delete('/account', authenticateUser, async (req: AuthenticatedRequest, re
                     await supabase.from('stories').delete().in('id', storyIds);
                 }
 
-                // Delete locations
-                await supabase.from('locations').delete().in('initiative_id', initiativeIds);
+                // Delete locations (org-scoped now; initiative_locations cascades automatically)
+                await supabase.from('locations').delete().eq('organization_id', ownedOrg.id);
 
                 // Delete beneficiary groups
                 await supabase.from('beneficiary_groups').delete().in('initiative_id', initiativeIds);

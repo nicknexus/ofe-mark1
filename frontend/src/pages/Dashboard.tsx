@@ -26,7 +26,9 @@ import { formatDate, truncateText } from '../utils'
 import toast from 'react-hot-toast'
 import CreateInitiativeModal from '../components/CreateInitiativeModal'
 import LocationMap from '../components/LocationMap'
+import AllLocationsModal from '../components/AllLocationsModal'
 import TagsWidget from '../components/MetricTags/TagsWidget'
+import { ExternalLink } from 'lucide-react'
 import { useTutorial } from '../context/TutorialContext'
 import { useTeam } from '../context/TeamContext'
 
@@ -238,6 +240,7 @@ export default function Dashboard() {
     const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: true })
     const [isLoadingStats, setIsLoadingStats] = useState(true)
     const [showCreateModal, setShowCreateModal] = useState(false)
+    const [showAllLocationsModal, setShowAllLocationsModal] = useState(false)
     const [showEditModal, setShowEditModal] = useState(false)
     const [deleteConfirmInitiative, setDeleteConfirmInitiative] = useState<Initiative | null>(null)
     const [deleteConfirmText, setDeleteConfirmText] = useState('')
@@ -672,10 +675,28 @@ export default function Dashboard() {
                                         <MapPin className="w-4 h-4 text-primary-600" />
                                     </div>
                                     <h2 className="text-[15px] font-semibold text-gray-900 tracking-tight">All Locations</h2>
+                                    <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100/70 text-gray-600">
+                                        {allLocations.length}
+                                    </span>
                                 </div>
-                                <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100/70 text-gray-600">
-                                    {allLocations.length} location{allLocations.length !== 1 ? 's' : ''}
-                                </span>
+                                <div className="flex items-center gap-1.5">
+                                    <button
+                                        onClick={() => setShowAllLocationsModal(true)}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 hover:bg-primary-100 text-primary-700 rounded-lg text-xs font-medium transition-all"
+                                        title="View all org locations"
+                                    >
+                                        <ExternalLink className="w-3 h-3" />
+                                        <span>View All</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setShowAllLocationsModal(true)}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-xs font-medium transition-all shadow-bubble-sm"
+                                        title="Add location"
+                                    >
+                                        <Plus className="w-3 h-3" />
+                                        <span>Add</span>
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="flex-1 min-h-0 rounded-b-2xl overflow-hidden">
@@ -707,6 +728,17 @@ export default function Dashboard() {
             </div>
 
             {/* Modals */}
+            <AllLocationsModal
+                isOpen={showAllLocationsModal}
+                onClose={async () => {
+                    setShowAllLocationsModal(false)
+                    try {
+                        const fresh = await apiService.getOrgLocations()
+                        setAllLocations(fresh)
+                    } catch { /* noop */ }
+                }}
+            />
+
             {showCreateModal && (
                 <CreateInitiativeModal
                     isOpen={showCreateModal}
