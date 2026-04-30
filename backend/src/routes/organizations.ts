@@ -365,6 +365,7 @@ router.get('/:id/context', authenticateUser, async (req: AuthenticatedRequest, r
 router.put('/:id/context', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const {
+            featured_video_url,
             problem_statement,
             stats_and_statements,
             theory_of_change,
@@ -373,6 +374,7 @@ router.put('/:id/context', authenticateUser, async (req: AuthenticatedRequest, r
             additional_info,
         } = req.body || {};
         const context = await OrganizationContextService.upsertForOwner(req.params.id, req.user!.id, {
+            featured_video_url,
             problem_statement,
             stats_and_statements: Array.isArray(stats_and_statements) ? stats_and_statements : undefined,
             theory_of_change,

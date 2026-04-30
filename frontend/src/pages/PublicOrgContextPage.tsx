@@ -11,6 +11,7 @@ import {
 } from '../services/publicApi'
 import PublicLoader from '../components/public/PublicLoader'
 import ContextDetailModal, { formatAddedDate } from '../components/public/ContextDetailModal'
+import { parseVideoUrl } from '../utils/videoEmbed'
 
 type TextSectionKey = 'problem_statement' | 'additional_info'
 
@@ -100,9 +101,10 @@ export default function PublicOrgContextPage() {
     const problemBody = (context?.problem_statement || '').trim()
     const theoryBody = (context?.theory_of_change || '').trim()
     const additionalBody = (context?.additional_info || '').trim()
+    const featuredVideo = useMemo(() => parseVideoUrl(context?.featured_video_url), [context?.featured_video_url])
 
     const hasAnyContent =
-        !!problemBody || !!theoryBody || !!additionalBody ||
+        !!featuredVideo || !!problemBody || !!theoryBody || !!additionalBody ||
         statCards.length > 0 || stages.length > 0 || strategies.length > 0
 
     if (loading) return <PublicLoader message="Loading context..." />
@@ -208,6 +210,27 @@ export default function PublicOrgContextPage() {
                         </div>
                     </div>
                 </section>
+
+                {/* Featured Video */}
+                {featuredVideo && (
+                    <section className="pb-8 md:pb-10">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                            <div className="relative rounded-3xl overflow-hidden border border-gray-100 bg-black shadow-sm">
+                                <div className="relative w-full aspect-video">
+                                    <iframe
+                                        src={featuredVideo.embedUrl}
+                                        title={`${organization.name} featured video`}
+                                        className="absolute inset-0 w-full h-full"
+                                        frameBorder={0}
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                        allowFullScreen
+                                        loading="lazy"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                )}
 
                 {/* Sections */}
                 <section>

@@ -45,6 +45,7 @@ export interface Strategy {
 export interface OrganizationContext {
     id?: string;
     organization_id: string;
+    featured_video_url?: string;
     problem_statement?: string;
     stats_and_statements?: StatCard[] | null;
     theory_of_change?: string;

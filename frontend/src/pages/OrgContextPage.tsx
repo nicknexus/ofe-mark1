@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import {
     Compass, Save, AlertTriangle, Lightbulb, BarChart3, FileText,
     ExternalLink, Lock, Plus, Trash2, ArrowUp, ArrowDown, Hash, Quote, Workflow, Target,
-    ChevronDown, Check, ArrowLeft,
+    ChevronDown, Check, ArrowLeft, Video,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { apiService } from '../services/api'
@@ -12,6 +12,7 @@ import {
     OrganizationContext, StatCard, StatCardType, TheoryStage, Strategy,
     MAX_STAT_CARDS, MAX_THEORY_STAGES, MAX_STRATEGIES,
 } from '../types'
+import { parseVideoUrl } from '../utils/videoEmbed'
 
 type TextField = 'problem_statement' | 'theory_of_change' | 'additional_info'
 
@@ -144,6 +145,8 @@ export default function OrgContextPage() {
     // the organization context. Phase 7 may reintroduce gating.
     const canEditContext = !!activeOrganization
 
+    const [featuredVideoUrl, setFeaturedVideoUrl] = useState('')
+    const [initialFeaturedVideoUrl, setInitialFeaturedVideoUrl] = useState('')
     const [textValues, setTextValues] = useState<TextValues>(EMPTY_TEXT)
     const [initialTextValues, setInitialTextValues] = useState<TextValues>(EMPTY_TEXT)
     const [stats, setStats] = useState<StatCard[]>([])
@@ -171,6 +174,9 @@ export default function OrgContextPage() {
                 const nextStats = normalizeStats(data?.stats_and_statements)
                 const nextStages = normalizeTitledList<TheoryStage>(data?.theory_of_change_stages)
                 const nextStrategies = normalizeTitledList<Strategy>(data?.strategies)
+                const nextVideo = data?.featured_video_url || ''
+                setFeaturedVideoUrl(nextVideo)
+                setInitialFeaturedVideoUrl(nextVideo)
                 setTextValues(nextText)
                 setInitialTextValues(nextText)
                 setStats(nextStats)
@@ -194,10 +200,11 @@ export default function OrgContextPage() {
     const hasChanges = useMemo(() => {
         const textDirty = TEXT_FIELDS.some(f => textValues[f.key] !== initialTextValues[f.key])
         return textDirty
+            || featuredVideoUrl.trim() !== initialFeaturedVideoUrl.trim()
             || !statsEqual(stats, initialStats)
             || !titledListEqual(stages, initialStages)
             || !titledListEqual(strategies, initialStrategies)
-    }, [textValues, initialTextValues, stats, initialStats, stages, initialStages, strategies, initialStrategies])
+    }, [featuredVideoUrl, initialFeaturedVideoUrl, textValues, initialTextValues, stats, initialStats, stages, initialStages, strategies, initialStrategies])
 
     const handleSave = async () => {
         if (!orgId || !canEditContext) return
@@ -207,6 +214,12 @@ export default function OrgContextPage() {
                 toast.error('Every stat card needs a number/value. Fill it in or switch it to a statement.')
                 return
             }
+        }
+
+        const trimmedVideoUrl = featuredVideoUrl.trim()
+        if (trimmedVideoUrl && !parseVideoUrl(trimmedVideoUrl)) {
+            toast.error('Featured video must be a YouTube or Vimeo URL.')
+            return
         }
 
         setSaving(true)
@@ -248,6 +261,7 @@ export default function OrgContextPage() {
                 .slice(0, MAX_STRATEGIES)
 
             const payload: Partial<OrganizationContext> = {
+                featured_video_url: trimmedVideoUrl,
                 problem_statement: textValues.problem_statement.trim(),
                 theory_of_change: textValues.theory_of_change.trim(),
                 additional_info: textValues.additional_info.trim(),
@@ -261,9 +275,12 @@ export default function OrgContextPage() {
                 theory_of_change: saved.theory_of_change || '',
                 additional_info: saved.additional_info || '',
             }
+            const nextVideo = saved.featured_video_url || ''
             const nextStats = normalizeStats(saved.stats_and_statements)
             const nextStages = normalizeTitledList<TheoryStage>(saved.theory_of_change_stages)
             const nextStrategies = normalizeTitledList<Strategy>(saved.strategies)
+            setFeaturedVideoUrl(nextVideo)
+            setInitialFeaturedVideoUrl(nextVideo)
             setTextValues(nextText)
             setInitialTextValues(nextText)
             setStats(nextStats)
@@ -415,6 +432,12 @@ export default function OrgContextPage() {
                 ) : (
                     <>
                         <div className="space-y-4">
+                            <FeaturedVideoCard
+                                value={featuredVideoUrl}
+                                onChange={setFeaturedVideoUrl}
+                                readOnly={!canEditContext}
+                            />
+
                             <TextCard
                                 config={TEXT_FIELDS[0]}
                                 value={textValues.problem_statement}
@@ -561,6 +584,65 @@ function SectionShell({
                 </div>
             )}
         </div>
+    )
+}
+
+function FeaturedVideoCard({
+    value,
+    onChange,
+    readOnly,
+}: {
+    value: string
+    onChange: (v: string) => void
+    readOnly: boolean
+}) {
+    const trimmed = value.trim()
+    const parsed = parseVideoUrl(trimmed)
+    const complete = !!parsed
+    const showError = trimmed.length > 0 && !parsed
+    return (
+        <SectionShell
+            icon={Video}
+            accent="bg-purple-50 text-purple-600"
+            title="Featured Video"
+            description="Optional. A YouTube or Vimeo link shown at the top of your public context page."
+            complete={complete}
+        >
+            <div className="pt-3 space-y-3">
+                <input
+                    type="url"
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    placeholder="https://youtube.com/watch?v=... or https://vimeo.com/..."
+                    readOnly={readOnly}
+                    className={`w-full px-4 py-3 border rounded-xl text-sm text-gray-800 focus:ring-1 focus:outline-none transition-all read-only:bg-gray-50 read-only:cursor-not-allowed ${
+                        showError
+                            ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500'
+                            : 'border-gray-200 focus:border-primary-500 focus:ring-primary-500'
+                    }`}
+                />
+                {showError && (
+                    <p className="text-xs text-rose-600">Only YouTube or Vimeo links are supported.</p>
+                )}
+                {parsed && (
+                    <div className="rounded-xl overflow-hidden border border-gray-200 bg-black">
+                        <div className="relative w-full aspect-video">
+                            <iframe
+                                src={parsed.embedUrl}
+                                title="Featured video preview"
+                                className="absolute inset-0 w-full h-full"
+                                frameBorder={0}
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                allowFullScreen
+                            />
+                        </div>
+                    </div>
+                )}
+                {!trimmed && (
+                    <p className="text-xs text-gray-400">Leave blank to hide the video on your public page.</p>
+                )}
+            </div>
+        </SectionShell>
     )
 }
 

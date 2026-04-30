@@ -14,12 +14,33 @@ const MAX_STRATEGIES = 12;
 type TextField = typeof TEXT_FIELDS[number];
 
 interface UpsertInput {
+    featured_video_url?: string;
     problem_statement?: string;
     stats_and_statements?: StatCard[] | null;
     theory_of_change?: string;
     theory_of_change_stages?: TheoryStage[] | null;
     strategies?: Strategy[] | null;
     additional_info?: string;
+}
+
+const YT_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be']);
+const VIMEO_HOSTS = new Set(['vimeo.com', 'www.vimeo.com', 'player.vimeo.com']);
+
+function sanitizeFeaturedVideoUrl(raw: unknown): string {
+    if (typeof raw !== 'string') return '';
+    const trimmed = raw.trim();
+    if (!trimmed) return '';
+    const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    let parsed: URL;
+    try {
+        parsed = new URL(withScheme);
+    } catch {
+        return '';
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+    const host = parsed.hostname.toLowerCase();
+    if (!YT_HOSTS.has(host) && !VIMEO_HOSTS.has(host)) return '';
+    return parsed.toString();
 }
 
 function randomId(): string {
@@ -156,6 +177,9 @@ export class OrganizationContextService {
             if (field in input) {
                 payload[field] = input[field] ?? null;
             }
+        }
+        if ('featured_video_url' in input) {
+            payload.featured_video_url = sanitizeFeaturedVideoUrl(input.featured_video_url) || null;
         }
         if ('stats_and_statements' in input) {
             payload.stats_and_statements = sanitizeStatCards(input.stats_and_statements);
