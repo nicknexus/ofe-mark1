@@ -33,6 +33,13 @@ interface LocationMapProps {
     onStoryClick?: (storyId: string) => void // Callback for story card click
     flatTopCorners?: boolean // Remove top border radius (for dashboard)
     hideEmptyBanner?: boolean // Hide the "No location added" banner when empty
+    /**
+     * When true, the map auto-fits its viewport to the bounding box of all
+     * provided locations on first render and whenever the location set
+     * changes. Use for the org dashboard map and the initiative home tab
+     * map; leave off for views where the user pans manually.
+     */
+    autoFit?: boolean
 }
 
 // Component to handle map click events
@@ -68,6 +75,51 @@ function MapViewUpdater({ center, zoom }: { center: [number, number]; zoom: numb
     useEffect(() => {
         map.setView(center, zoom)
     }, [map, center, zoom])
+    return null
+}
+
+// Auto-fit the viewport to the bounding box of the supplied locations.
+// Re-runs whenever the location IDs change (so adding/removing/swapping
+// locations re-frames the map) but not on every parent re-render.
+function MapAutoFit({ locations, enabled }: { locations: Location[]; enabled: boolean }) {
+    const map = useMap()
+
+    // Stable signature: order-independent set of "id:lat,lng" pairs. Avoids
+    // refitting when other parts of a Location object (name, etc.) change.
+    const signature = useMemo(() => {
+        return locations
+            .filter(l => typeof l.latitude === 'number' && typeof l.longitude === 'number')
+            .map(l => `${l.id}:${l.latitude},${l.longitude}`)
+            .sort()
+            .join('|')
+    }, [locations])
+
+    useEffect(() => {
+        if (!enabled) return
+        const valid = locations.filter(
+            l => typeof l.latitude === 'number' && typeof l.longitude === 'number'
+        )
+        if (valid.length === 0) return
+
+        if (valid.length === 1) {
+            // Single point: zoom out enough to show regional context (~country/state level).
+            map.setView([valid[0].latitude, valid[0].longitude], 8, { animate: true })
+            return
+        }
+
+        const bounds = L.latLngBounds(valid.map(l => [l.latitude, l.longitude] as [number, number]))
+        // maxZoom keeps clustered points framed at regional level instead of
+        // street-level; padding keeps markers off the edges.
+        map.fitBounds(bounds, {
+            padding: [60, 60],
+            maxZoom: 9,
+            animate: true,
+        })
+        // signature changes whenever the *set* of locations changes; map
+        // identity doesn't change so it's safe to depend on.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [signature, enabled])
+
     return null
 }
 
@@ -376,6 +428,7 @@ export default function LocationMap({
     onMetricClick,
     onStoryClick,
     hideEmptyBanner,
+    autoFit,
 }: LocationMapProps) {
     const [center, setCenter] = useState<[number, number]>([20, 0]) // [lat, lng]
     const [zoom, setZoom] = useState(2)
@@ -467,7 +520,12 @@ export default function LocationMap({
                 <MapResizeHandler />
                 <TileLayerWithFallback />
                 <MapClickHandler onMapClick={onMapClick} onMapClickPosition={handleMapClickWithPosition} />
-                <MapViewUpdater center={center} zoom={zoom} />
+                {/* When autoFit is on, MapAutoFit takes over framing. Otherwise
+                    MapViewUpdater drives the view from local center/zoom state. */}
+                {autoFit
+                    ? <MapAutoFit locations={locations} enabled={true} />
+                    : <MapViewUpdater center={center} zoom={zoom} />
+                }
 
                 {locations.map((location) => {
                     const isHovered = hoveredLocationId === location.id

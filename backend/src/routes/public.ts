@@ -106,6 +106,17 @@ router.get('/organizations/:slug/context', async (req, res) => {
     }
 });
 
+// Get organization's tag catalog (org-global, used by all public pages)
+router.get('/organizations/:slug/tags', async (req, res) => {
+    try {
+        const tags = await PublicService.getOrganizationTags(req.params.slug);
+        res.json(tags);
+    } catch (error) {
+        console.error('Get org tags error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
 // Get organization's evidence (aggregated from all initiatives)
 router.get('/organizations/:slug/evidence', async (req, res) => {
     try {

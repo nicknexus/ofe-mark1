@@ -5,9 +5,10 @@ import {
     ArrowLeft, Calendar, FileText, ChevronLeft, ChevronRight,
     Image, File, Video, Mic, ExternalLink
 } from 'lucide-react'
-import { publicApi, PublicEvidenceDetail } from '../services/publicApi'
+import { publicApi, PublicEvidenceDetail, PublicMetricTag } from '../services/publicApi'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
+import PublicTagChip from '../components/public/PublicTagChip'
 import DateRangePicker from '../components/DateRangePicker'
 import { getLocalDateString, formatDate } from '../utils'
 
@@ -52,6 +53,7 @@ export default function PublicEvidencePage() {
     const claimValue = searchParams.get('claimValue')
 
     const [evidence, setEvidence] = useState<PublicEvidenceDetail | null>(null)
+    const [tags, setTags] = useState<PublicMetricTag[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [currentFileIndex, setCurrentFileIndex] = useState(0)
@@ -72,8 +74,12 @@ export default function PublicEvidencePage() {
         try {
             setLoading(true)
             setError(null)
-            const data = await publicApi.getEvidenceDetail(orgSlug!, initiativeSlug!, evidenceId!)
+            const [data, orgTags] = await Promise.all([
+                publicApi.getEvidenceDetail(orgSlug!, initiativeSlug!, evidenceId!),
+                publicApi.getOrganizationTags(orgSlug!).catch(() => []),
+            ])
             setEvidence(data)
+            setTags(orgTags)
         } catch (err) {
             console.error('Error loading evidence:', err)
             setError('Failed to load evidence')
@@ -81,6 +87,12 @@ export default function PublicEvidencePage() {
             setLoading(false)
         }
     }
+
+    const tagsById = React.useMemo(() => {
+        const m = new Map<string, PublicMetricTag>()
+        tags.forEach(t => m.set(t.id, t))
+        return m
+    }, [tags])
 
     if (loading) {
         return <PublicLoader message="Loading evidence..." />
@@ -342,6 +354,16 @@ export default function PublicEvidencePage() {
                                 <p className="text-gray-600 text-xs sm:text-sm mb-2 sm:mb-3 line-clamp-2">{evidence.description}</p>
                             )}
 
+                            {evidence.tag_ids && evidence.tag_ids.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mb-2 sm:mb-3">
+                                    {evidence.tag_ids.map(id => {
+                                        const t = tagsById.get(id)
+                                        if (!t) return null
+                                        return <PublicTagChip key={id} name={t.name} size="xs" />
+                                    })}
+                                </div>
+                            )}
+
                             {/* Date */}
                             <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-gray-500">
                                 <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -382,6 +404,11 @@ export default function PublicEvidencePage() {
                                                 </p>
                                                 <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">{metricTitle}</p>
                                                 {dateLabel && <p className="text-[10px] text-gray-400 mt-0.5">{dateLabel}</p>}
+                                                {claim.tag_id && tagsById.get(claim.tag_id) && (
+                                                    <div className="mt-1" onClick={(e) => e.preventDefault()}>
+                                                        <PublicTagChip name={tagsById.get(claim.tag_id)!.name} size="xs" />
+                                                    </div>
+                                                )}
                                             </Link>
                                         )
                                     })}

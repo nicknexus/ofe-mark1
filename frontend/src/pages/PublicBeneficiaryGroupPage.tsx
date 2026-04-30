@@ -8,9 +8,11 @@ import {
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { publicApi, PublicBeneficiaryGroupDetail } from '../services/publicApi'
+import { publicApi, PublicBeneficiaryGroupDetail, PublicMetricTag } from '../services/publicApi'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
+import PublicTagFilter from '../components/public/PublicTagFilter'
+import PublicTagChip from '../components/public/PublicTagChip'
 import { formatDate } from '../utils'
 
 const CARTO_VOYAGER_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
@@ -122,6 +124,8 @@ export default function PublicBeneficiaryGroupPage() {
     const orgLinkBase = useOrgLinkBase()
 
     const [data, setData] = useState<PublicBeneficiaryGroupDetail | null>(null)
+    const [tags, setTags] = useState<PublicMetricTag[]>([])
+    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
@@ -135,28 +139,72 @@ export default function PublicBeneficiaryGroupPage() {
             .finally(() => setLoading(false))
     }, [orgSlug, initiativeSlug, groupId])
 
+    useEffect(() => {
+        if (orgSlug) {
+            publicApi.getOrganizationTags(orgSlug).then(setTags).catch(() => setTags([]))
+        }
+    }, [orgSlug])
+
+    const tagsById = useMemo(() => new Map(tags.map(t => [t.id, t])), [tags])
+
+    // Tags actually used on this page's content — drives the dropdown.
+    const groupTagIds = useMemo(() => {
+        if (!data) return new Set<string>()
+        const set = new Set<string>()
+        data.claims.forEach(c => { if (c.tag_id) set.add(c.tag_id) })
+        data.evidence.forEach(e => (e.tag_ids || []).forEach(id => set.add(id)))
+        data.stories.forEach(s => (s.tag_ids || []).forEach(id => set.add(id)))
+        return set
+    }, [data])
+
+    const groupTags = useMemo(() => tags.filter(t => groupTagIds.has(t.id)), [tags, groupTagIds])
+
+    const tagMatchSingle = (id?: string | null) => {
+        if (selectedTagIds.length === 0) return true
+        if (!id) return false
+        return selectedTagIds.includes(id)
+    }
+    const tagMatchAny = (ids?: string[] | null) => {
+        if (selectedTagIds.length === 0) return true
+        if (!ids || ids.length === 0) return false
+        return ids.some(i => selectedTagIds.includes(i))
+    }
+
+    const filteredStories = useMemo(
+        () => data ? data.stories.filter(s => tagMatchAny(s.tag_ids)) : [],
+        [data, selectedTagIds]
+    )
+    const filteredClaims = useMemo(
+        () => data ? data.claims.filter(c => tagMatchSingle(c.tag_id)) : [],
+        [data, selectedTagIds]
+    )
+    const filteredEvidence = useMemo(
+        () => data ? data.evidence.filter(e => tagMatchAny(e.tag_ids)) : [],
+        [data, selectedTagIds]
+    )
+
     const metricsByKPI = useMemo(() => {
         if (!data) return {}
         const map: Record<string, { kpi: any; claims: any[]; total: number }> = {}
-        data.claims.forEach(c => {
+        filteredClaims.forEach(c => {
             const kpiId = c.kpi?.id || 'unknown'
             if (!map[kpiId]) map[kpiId] = { kpi: c.kpi, claims: [], total: 0 }
             map[kpiId].claims.push(c)
             map[kpiId].total += (c.value || 0)
         })
         return map
-    }, [data])
+    }, [data, filteredClaims])
 
     const evidenceByType = useMemo(() => {
         if (!data) return {}
         const map: Record<string, typeof data.evidence> = {}
-        data.evidence.forEach(e => {
+        filteredEvidence.forEach(e => {
             const type = e.type || 'other'
             if (!map[type]) map[type] = []
             map[type].push(e)
         })
         return map
-    }, [data])
+    }, [data, filteredEvidence])
 
     const mapLocations = useMemo(() => {
         if (!data) return []
@@ -210,6 +258,11 @@ export default function PublicBeneficiaryGroupPage() {
                             <ArrowLeft className="w-4 h-4" />
                             <span className="text-xs sm:text-sm font-medium">Back</span>
                         </Link>
+                        <PublicTagFilter
+                            tags={groupTags}
+                            selectedTagIds={selectedTagIds}
+                            onChange={setSelectedTagIds}
+                        />
                         <Link to="/" className="flex items-center gap-2">
                             <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center overflow-hidden">
                                 <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
@@ -265,18 +318,18 @@ export default function PublicBeneficiaryGroupPage() {
                             <div className="flex items-center gap-2">
                                 <BookOpen className="w-4 h-4 text-gray-600" />
                                 <h3 className="text-sm font-semibold text-gray-900">Stories</h3>
-                                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">{data.stories.length}</span>
+                                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">{filteredStories.length}</span>
                             </div>
                         </div>
                         <div className="flex-1 overflow-y-auto p-3">
-                            {data.stories.length === 0 ? (
+                            {filteredStories.length === 0 ? (
                                 <div className="text-center py-8">
                                     <BookOpen className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                                     <p className="text-xs text-gray-500">No stories for this group</p>
                                 </div>
                             ) : (
                                 <div className="space-y-2">
-                                    {data.stories.map(story => (
+                                    {filteredStories.map(story => (
                                         <Link
                                             key={story.id}
                                             to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/story/${story.id}`}
@@ -290,6 +343,23 @@ export default function PublicBeneficiaryGroupPage() {
                                             <div className="p-3">
                                                 <h4 className="text-sm font-semibold text-gray-900 line-clamp-2 group-hover:text-gray-700">{story.title}</h4>
                                                 {story.description && <p className="text-xs text-gray-600 line-clamp-2 mt-1">{story.description}</p>}
+                                                {story.tag_ids && story.tag_ids.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1 mt-2" onClick={(e) => e.preventDefault()}>
+                                                        {story.tag_ids.slice(0, 3).map(id => {
+                                                            const t = tagsById.get(id)
+                                                            if (!t) return null
+                                                            return (
+                                                                <PublicTagChip
+                                                                    key={id}
+                                                                    name={t.name}
+                                                                    size="xs"
+                                                                    selected={selectedTagIds.includes(id)}
+                                                                    onClick={() => setSelectedTagIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
+                                                                />
+                                                            )
+                                                        })}
+                                                    </div>
+                                                )}
                                                 <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-2">
                                                     <Calendar className="w-3 h-3" />
                                                     <span>{formatDate(story.date_represented)}</span>
@@ -340,6 +410,27 @@ export default function PublicBeneficiaryGroupPage() {
                                                             <span className="text-xs text-gray-500">{group.kpi?.unit_of_measurement || ''}</span>
                                                         </div>
                                                         <p className="text-xs text-gray-400 mt-1">{group.claims.length} {group.claims.length === 1 ? 'impact claim' : 'impact claims'}</p>
+                                                        {(() => {
+                                                            const ids = Array.from(new Set(group.claims.map((c: any) => c.tag_id).filter(Boolean))) as string[]
+                                                            if (ids.length === 0) return null
+                                                            return (
+                                                                <div className="flex flex-wrap gap-1 mt-1.5" onClick={(e) => e.preventDefault()}>
+                                                                    {ids.slice(0, 3).map(id => {
+                                                                        const t = tagsById.get(id)
+                                                                        if (!t) return null
+                                                                        return (
+                                                                            <PublicTagChip
+                                                                                key={id}
+                                                                                name={t.name}
+                                                                                size="xs"
+                                                                                selected={selectedTagIds.includes(id)}
+                                                                                onClick={() => setSelectedTagIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
+                                                                            />
+                                                                        )
+                                                                    })}
+                                                                </div>
+                                                            )
+                                                        })()}
                                                     </div>
                                                 </div>
                                             </Link>
@@ -356,7 +447,7 @@ export default function PublicBeneficiaryGroupPage() {
                             <div className="flex items-center gap-2">
                                 <FileText className="w-4 h-4 text-gray-600" />
                                 <h3 className="text-sm font-semibold text-gray-900">Evidence</h3>
-                                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">{data.evidence.length}</span>
+                                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">{filteredEvidence.length}</span>
                             </div>
                         </div>
                         <div className="flex-1 overflow-y-auto p-3">
@@ -395,6 +486,23 @@ export default function PublicBeneficiaryGroupPage() {
                                                                 <div className="min-w-0 flex-1">
                                                                     <p className="text-xs font-medium text-gray-900 truncate">{ev.title}</p>
                                                                     {ev.description && <p className="text-[10px] text-gray-500 mt-0.5 line-clamp-1">{ev.description}</p>}
+                                                                    {ev.tag_ids && ev.tag_ids.length > 0 && (
+                                                                        <div className="flex flex-wrap gap-1 mt-1" onClick={(e) => e.preventDefault()}>
+                                                                            {ev.tag_ids.slice(0, 2).map(id => {
+                                                                                const t = tagsById.get(id)
+                                                                                if (!t) return null
+                                                                                return (
+                                                                                    <PublicTagChip
+                                                                                        key={id}
+                                                                                        name={t.name}
+                                                                                        size="xs"
+                                                                                        selected={selectedTagIds.includes(id)}
+                                                                                        onClick={() => setSelectedTagIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
+                                                                                    />
+                                                                                )
+                                                                            })}
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         </Link>

@@ -5,7 +5,7 @@ import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
 import {
     Building2, MapPin, BarChart3, ArrowLeft, Globe,
     BookOpen, FileText, Calendar, ChevronRight, ChevronLeft,
-    TrendingUp, ChevronDown, X, Target, Image, LineChart, Compass
+    TrendingUp, ChevronDown, X, Target, Image, LineChart, Compass, ArrowRight
 } from 'lucide-react'
 import {
     publicApi,
@@ -16,9 +16,12 @@ import {
     PublicLocation,
     PublicEvidence,
     PublicStatCard,
+    PublicMetricTag,
     OrganizationStats
 } from '../services/publicApi'
 import PublicLoader from '../components/public/PublicLoader'
+import PublicTagFilter from '../components/public/PublicTagFilter'
+import PublicTagChip from '../components/public/PublicTagChip'
 import DateRangePicker from '../components/DateRangePicker'
 import { formatDate } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
@@ -58,6 +61,12 @@ export default function PublicOrganizationPage() {
     const [stories, setStories] = useState<PublicStory[]>([])
     const [locations, setLocations] = useState<PublicLocation[]>([])
     const [evidence, setEvidence] = useState<PublicEvidence[]>([])
+    const [tags, setTags] = useState<PublicMetricTag[]>([])
+    const tagsById = useMemo(() => {
+        const map = new Map<string, PublicMetricTag>()
+        for (const t of tags) map.set(t.id, t)
+        return map
+    }, [tags])
     const [highlightCards, setHighlightCards] = useState<PublicStatCard[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -77,6 +86,7 @@ export default function PublicOrganizationPage() {
     const [showInitiativeDropdown, setShowInitiativeDropdown] = useState(false)
     const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([])
     const [showLocationDropdown, setShowLocationDropdown] = useState(false)
+    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
     const initiativeBtnRef = useRef<HTMLButtonElement>(null)
     const locationBtnRef = useRef<HTMLButtonElement>(null)
 
@@ -104,19 +114,21 @@ export default function PublicOrganizationPage() {
             if (!orgData) { setError('Organization not found'); return }
             setOrganization(orgData.organization)
             setStats(orgData.stats)
-            const [inits, mets, stors, locs, evid, ctx] = await Promise.all([
+            const [inits, mets, stors, locs, evid, ctx, tgs] = await Promise.all([
                 publicApi.getOrganizationInitiatives(slug!),
                 publicApi.getOrganizationMetrics(slug!),
                 publicApi.getOrganizationStories(slug!, 20),
                 publicApi.getOrganizationLocations(slug!),
                 publicApi.getOrganizationEvidence(slug!, 20),
-                publicApi.getOrganizationContext(slug!).catch(() => null)
+                publicApi.getOrganizationContext(slug!).catch(() => null),
+                publicApi.getOrganizationTags(slug!).catch(() => [])
             ])
             setInitiatives(inits)
             setMetrics(mets)
             setStories(stors)
             setLocations(locs)
             setEvidence(evid)
+            setTags(tgs)
             const cards = Array.isArray(ctx?.stats_and_statements) ? ctx!.stats_and_statements! : []
             const valid = cards.filter(c =>
                 c?.type === 'stat'
@@ -183,6 +195,20 @@ export default function PublicOrganizationPage() {
         return locations
     }, [locations, selectedInitiative])
 
+    // Helpers: tag intersection. A claim/evidence/story matches the tag
+    // filter if any of its tag ids is selected. Metrics match if the metric
+    // itself or any of its updates is tagged with a selected id.
+    const tagMatchesAny = (ids: string[] | undefined | null) => {
+        if (selectedTagIds.length === 0) return true
+        if (!ids || ids.length === 0) return false
+        return ids.some(id => selectedTagIds.includes(id))
+    }
+    const tagMatchesSingle = (id: string | undefined | null) => {
+        if (selectedTagIds.length === 0) return true
+        if (!id) return false
+        return selectedTagIds.includes(id)
+    }
+
     // Filter logic
     const filteredMetrics = useMemo(() => {
         let filtered = metrics
@@ -191,6 +217,22 @@ export default function PublicOrganizationPage() {
         }
         if (locationMatchedInitiativeIds) {
             filtered = filtered.filter(m => locationMatchedInitiativeIds.has(m.initiative_id))
+        }
+        if (selectedTagIds.length > 0) {
+            // Keep metrics that either carry the tag themselves, or have at
+            // least one update tagged with one of the selected ids.
+            filtered = filtered.filter(m => {
+                if (tagMatchesAny(m.tag_ids)) return true
+                return (m.updates || []).some(u => tagMatchesSingle(u.tag_id))
+            })
+            // Recompute totals using only matching updates so dashboard
+            // numbers reflect "tagged X" totals.
+            filtered = filtered.map(m => {
+                const matching = (m.updates || []).filter(u => tagMatchesSingle(u.tag_id))
+                if (matching.length === 0) return m
+                const newTotal = aggregateKpiUpdates(matching as any, m.metric_type)
+                return { ...m, total_value: newTotal, update_count: matching.length, updates: matching }
+            })
         }
         if (startDate || endDate) {
             filtered = filtered.filter(m => {
@@ -214,7 +256,7 @@ export default function PublicOrganizationPage() {
             })
         }
         return filtered
-    }, [metrics, selectedInitiative, locationMatchedInitiativeIds, startDate, endDate])
+    }, [metrics, selectedInitiative, locationMatchedInitiativeIds, startDate, endDate, selectedTagIds])
 
     const filteredStories = useMemo(() => {
         let filtered = stories
@@ -230,6 +272,9 @@ export default function PublicOrganizationPage() {
                 return locationMatchedInitiativeIds ? locationMatchedInitiativeIds.has(s.initiative_id) : false
             })
         }
+        if (selectedTagIds.length > 0) {
+            filtered = filtered.filter(s => tagMatchesAny(s.tag_ids))
+        }
         if (startDate || endDate) {
             filtered = filtered.filter(s => {
                 const storyDate = new Date(s.date_represented)
@@ -239,7 +284,7 @@ export default function PublicOrganizationPage() {
             })
         }
         return filtered
-    }, [stories, selectedInitiative, selectedLocationIds, locationMatchedInitiativeIds, startDate, endDate])
+    }, [stories, selectedInitiative, selectedLocationIds, locationMatchedInitiativeIds, startDate, endDate, selectedTagIds])
 
     const filteredLocations = useMemo(() => {
         let filtered = locations
@@ -332,14 +377,15 @@ export default function PublicOrganizationPage() {
         setStoryIndex(0)
         setEvidencePage(0)
         setHeroInitiativePage(0)
-    }, [selectedInitiative, startDate, endDate, selectedLocationIds])
+    }, [selectedInitiative, startDate, endDate, selectedLocationIds, selectedTagIds])
 
-    const hasActiveFilters = selectedInitiative !== 'all' || startDate || endDate || selectedLocationIds.length > 0
+    const hasActiveFilters = selectedInitiative !== 'all' || startDate || endDate || selectedLocationIds.length > 0 || selectedTagIds.length > 0
     const clearFilters = () => {
         setSelectedInitiative('all')
         setStartDate('')
         setEndDate('')
         setSelectedLocationIds([])
+        setSelectedTagIds([])
     }
 
     // Current story for carousel
@@ -363,9 +409,13 @@ export default function PublicOrganizationPage() {
                 metricUnit: m.unit_of_measurement,
                 initiativeTitle: m.initiative_title,
                 initiativeSlug: m.initiative_slug,
-                category: m.category
+                category: m.category,
             }))
         ).sort((a, b) => new Date(b.date_represented).getTime() - new Date(a.date_represented).getTime())
+
+        if (selectedTagIds.length > 0) {
+            claims = claims.filter(c => tagMatchesSingle(c.tag_id))
+        }
 
         if (startDate || endDate) {
             claims = claims.filter(c => {
@@ -376,7 +426,7 @@ export default function PublicOrganizationPage() {
             })
         }
         return claims
-    }, [metrics, selectedInitiative, locationMatchedInitiativeIds, startDate, endDate])
+    }, [metrics, selectedInitiative, locationMatchedInitiativeIds, startDate, endDate, selectedTagIds])
 
     const filteredEvidence = useMemo(() => {
         let filtered = evidence
@@ -391,6 +441,9 @@ export default function PublicOrganizationPage() {
                 return locationMatchedInitiativeIds ? locationMatchedInitiativeIds.has(e.initiative_id!) : true
             })
         }
+        if (selectedTagIds.length > 0) {
+            filtered = filtered.filter(e => tagMatchesAny(e.tag_ids))
+        }
         if (startDate || endDate) {
             filtered = filtered.filter(e => {
                 if (!e.date_represented) return true
@@ -401,7 +454,7 @@ export default function PublicOrganizationPage() {
             })
         }
         return filtered
-    }, [evidence, selectedInitiative, selectedLocationIds, locationMatchedInitiativeIds, startDate, endDate])
+    }, [evidence, selectedInitiative, selectedLocationIds, locationMatchedInitiativeIds, startDate, endDate, selectedTagIds])
 
     // Evidence pagination (must be after filteredEvidence)
     const evidencePerPage = 4
@@ -666,6 +719,13 @@ export default function PublicOrganizationPage() {
                                 </button>
                             )}
 
+                            <PublicTagFilter
+                                tags={tags}
+                                selectedTagIds={selectedTagIds}
+                                onChange={setSelectedTagIds}
+                                onOpenChange={(open) => { if (open) { setShowInitiativeDropdown(false); setShowLocationDropdown(false) } }}
+                            />
+
                             {hasActiveFilters && (
                                 <button
                                     onClick={clearFilters}
@@ -803,20 +863,35 @@ export default function PublicOrganizationPage() {
                         </div>
                     </div>
 
-                    {/* Context & Challenges button (aligned with logo's left edge) */}
-                    <Link
-                        to={`${orgLinkBase}/${slug}/context`}
-                        className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-full text-xs font-medium border shadow-sm transition-all hover:shadow-md"
-                        style={{
-                            backgroundColor: `${organization.brand_color || '#c0dfa1'}15`,
-                            borderColor: `${organization.brand_color || '#c0dfa1'}40`,
-                            color: organization.brand_color || '#c0dfa1',
-                        }}
-                        title="Context & Challenges"
-                    >
-                        <Compass className="w-3.5 h-3.5" />
-                        Context &amp; Challenges
-                    </Link>
+                    {/* Context & Challenges button.
+                        Modern pill: white surface for guaranteed text contrast,
+                        brand color is used only as an accent (icon bubble + soft
+                        shadow) so it never blends into a pastel brand. Subtle
+                        ring + shadow give it definition; an arrow slides in on
+                        hover for affordance. */}
+                    {(() => {
+                        const brand = organization.brand_color || '#c0dfa1'
+                        return (
+                            <Link
+                                to={`${orgLinkBase}/${slug}/context`}
+                                className="group inline-flex items-center gap-2 mt-3 pl-1 pr-3.5 py-1 rounded-full text-xs font-semibold text-gray-900 bg-white shadow-sm transition-all hover:shadow-md hover:-translate-y-px"
+                                style={{
+                                    border: `1.5px solid ${brand}`,
+                                    boxShadow: `0 1px 2px rgba(15,23,42,0.06), 0 4px 14px -8px ${brand}80`,
+                                }}
+                                title="Context & Challenges"
+                            >
+                                <span
+                                    className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ring-1 ring-black/[0.04]"
+                                    style={{ backgroundColor: brand }}
+                                >
+                                    <Compass className="w-3 h-3 text-white" strokeWidth={2.5} />
+                                </span>
+                                <span>Context &amp; Challenges</span>
+                                <ArrowRight className="w-3 h-3 text-gray-400 -ml-1 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                            </Link>
+                        )
+                    })()}
                 </div>
 
                 {/* Right Side - Initiatives Container (aligned with right panel) */}
@@ -1520,6 +1595,16 @@ export default function PublicOrganizationPage() {
                                                         </div>
                                                         <p className="text-xs text-muted-foreground truncate mt-0.5">{claim.metricTitle}</p>
                                                         <p className="text-[10px] text-muted-foreground/70 truncate">{claim.initiativeTitle}</p>
+                                                        {claim.tag_id && tagsById.get(claim.tag_id) && (
+                                                            <div className="mt-1 flex">
+                                                                <PublicTagChip
+                                                                    name={tagsById.get(claim.tag_id)!.name}
+                                                                    size="xs"
+                                                                    onClick={() => setSelectedTagIds(prev => prev.includes(claim.tag_id!) ? prev.filter(x => x !== claim.tag_id!) : [...prev, claim.tag_id!])}
+                                                                    selected={selectedTagIds.includes(claim.tag_id)}
+                                                                />
+                                                            </div>
+                                                        )}
                                                     </div>
                                                     <div className="text-right flex-shrink-0">
                                                         <span className={`px-1.5 py-0.5 text-[9px] font-semibold rounded-full ${claim.category === 'impact' ? 'bg-purple-100/80 text-purple-700' :

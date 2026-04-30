@@ -1483,6 +1483,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             initiativeId={initiativeId}
                             onMetricClick={onMetricCardClick}
                             onStoryClick={onStoryClick}
+                            autoFit
                         />
                     </div>
                 </div>

@@ -4,9 +4,10 @@ import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
 import {
     ArrowLeft, Calendar, MapPin, Users, FileText, BookOpen, ChevronLeft, ChevronRight
 } from 'lucide-react'
-import { publicApi, PublicStoryDetail, PublicStory } from '../services/publicApi'
+import { publicApi, PublicStoryDetail, PublicStory, PublicMetricTag } from '../services/publicApi'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
+import PublicTagChip from '../components/public/PublicTagChip'
 import DateRangePicker from '../components/DateRangePicker'
 import { getLocalDateString, formatDate } from '../utils'
 
@@ -29,6 +30,7 @@ export default function PublicStoryPage() {
     })
 
     const [story, setStory] = useState<PublicStoryDetail | null>(null)
+    const [tags, setTags] = useState<PublicMetricTag[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
@@ -77,8 +79,12 @@ export default function PublicStoryPage() {
         try {
             setLoading(true)
             setError(null)
-            const data = await publicApi.getStoryDetail(orgSlug!, initiativeSlug!, storyId!)
+            const [data, orgTags] = await Promise.all([
+                publicApi.getStoryDetail(orgSlug!, initiativeSlug!, storyId!),
+                publicApi.getOrganizationTags(orgSlug!).catch(() => []),
+            ])
             setStory(data)
+            setTags(orgTags)
         } catch (err) {
             console.error('Error loading story:', err)
             setError('Failed to load story')
@@ -207,6 +213,16 @@ export default function PublicStoryPage() {
                     <div className="p-4 sm:p-8">
                         {/* Title */}
                         <h1 className="text-xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">{story.title}</h1>
+
+                        {story.tag_ids && story.tag_ids.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mb-3 sm:mb-4">
+                                {story.tag_ids.map(id => {
+                                    const t = tags.find(tt => tt.id === id)
+                                    if (!t) return null
+                                    return <PublicTagChip key={id} name={t.name} size="sm" />
+                                })}
+                            </div>
+                        )}
 
                         {/* Meta */}
                         <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6 pb-4 sm:pb-6 border-b border-gray-100">

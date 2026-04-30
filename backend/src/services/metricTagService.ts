@@ -18,7 +18,10 @@ export class MetricTagService {
             .from('metric_tags')
             .select('*')
             .eq('organization_id', orgId)
-            .order('name', { ascending: true })
+            // Org-wide drag order is the canonical sort. Falls back to created_at
+            // for tags that pre-date the column being populated.
+            .order('display_order', { ascending: true })
+            .order('created_at', { ascending: true })
 
         if (error) throw new Error(`Failed to fetch metric tags: ${error.message}`)
         return data || []
@@ -35,7 +38,8 @@ export class MetricTagService {
             .from('metric_tags')
             .select('*')
             .eq('organization_id', orgId)
-            .order('name', { ascending: true })
+            .order('display_order', { ascending: true })
+            .order('created_at', { ascending: true })
 
         if (error) throw new Error(`Failed to fetch metric tags: ${error.message}`)
         if (!tags || tags.length === 0) return []
@@ -99,12 +103,23 @@ export class MetricTagService {
 
         if (existing) return existing
 
+        // New tags drop at the bottom of the org list.
+        const { data: lastRow } = await supabase
+            .from('metric_tags')
+            .select('display_order')
+            .eq('organization_id', orgId)
+            .order('display_order', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        const nextOrder = ((lastRow as any)?.display_order ?? 0) + 1
+
         const { data, error } = await supabase
             .from('metric_tags')
             .insert([{
                 organization_id: orgId,
                 name: cleanName,
                 created_by: userId,
+                display_order: nextOrder,
             }])
             .select()
             .single()
@@ -171,11 +186,32 @@ export class MetricTagService {
             }
         }
 
-        // Replace links.
+        // Preserve existing per-metric order for tags that survive the replace,
+        // and append newly-added tags at the bottom of the metric strip.
+        const { data: existingLinks } = await supabase
+            .from('kpi_metric_tags')
+            .select('tag_id, display_order')
+            .eq('kpi_id', kpiId)
+
+        const existingOrderByTag = new Map<string, number>(
+            (existingLinks || []).map((l: any) => [l.tag_id, l.display_order ?? 0])
+        )
+        const maxExistingOrder = (existingLinks || []).reduce(
+            (max: number, l: any) => Math.max(max, l.display_order ?? 0),
+            0
+        )
+
         await supabase.from('kpi_metric_tags').delete().eq('kpi_id', kpiId)
 
         if (tagIds.length > 0) {
-            const links = tagIds.map(tag_id => ({ kpi_id: kpiId, tag_id }))
+            let nextOrder = maxExistingOrder
+            const links = tagIds.map(tag_id => {
+                if (existingOrderByTag.has(tag_id)) {
+                    return { kpi_id: kpiId, tag_id, display_order: existingOrderByTag.get(tag_id)! }
+                }
+                nextOrder += 1
+                return { kpi_id: kpiId, tag_id, display_order: nextOrder }
+            })
             const { error } = await supabase.from('kpi_metric_tags').insert(links)
             if (error) throw new Error(`Failed to attach tags to KPI: ${error.message}`)
         }
@@ -217,21 +253,39 @@ export class MetricTagService {
     static async getTagIdsForKpi(kpiId: string): Promise<string[]> {
         const { data, error } = await supabase
             .from('kpi_metric_tags')
-            .select('tag_id')
+            .select('tag_id, display_order')
             .eq('kpi_id', kpiId)
+            .order('display_order', { ascending: true })
         if (error) throw new Error(`Failed to fetch KPI tags: ${error.message}`)
         return (data || []).map((r: any) => r.tag_id)
     }
 
     /**
-     * Bulk fetch tag_ids per kpi.
+     * Bulk fetch tag_ids per kpi. Orders within each kpi by per-metric
+     * display_order so the breakdown strip is stable across renders.
      */
+    /**
+     * Lookup org-wide display_order for a set of tag ids. Used to sort
+     * tag chip arrays (evidence/story) consistently across the public side.
+     */
+    private static async getOrgOrderForTagIds(tagIds: string[]): Promise<Map<string, number>> {
+        const m = new Map<string, number>()
+        if (tagIds.length === 0) return m
+        const { data } = await supabase
+            .from('metric_tags')
+            .select('id, display_order')
+            .in('id', tagIds)
+        for (const r of (data || [])) m.set(r.id, r.display_order ?? 0)
+        return m
+    }
+
     static async getTagIdsForKpis(kpiIds: string[]): Promise<Record<string, string[]>> {
         if (kpiIds.length === 0) return {}
         const { data } = await supabase
             .from('kpi_metric_tags')
-            .select('kpi_id, tag_id')
+            .select('kpi_id, tag_id, display_order')
             .in('kpi_id', kpiIds)
+            .order('display_order', { ascending: true })
         const map: Record<string, string[]> = {}
         for (const id of kpiIds) map[id] = []
         for (const row of (data || [])) {
@@ -342,11 +396,17 @@ export class MetricTagService {
             .from('evidence_metric_tags')
             .select('evidence_id, tag_id')
             .in('evidence_id', evidenceIds)
+        const tagIds = Array.from(new Set((data || []).map((r: any) => r.tag_id)))
+        const orderByTag = await this.getOrgOrderForTagIds(tagIds)
+        const grouped: Record<string, string[]> = { ...map }
         for (const row of (data || [])) {
-            if (!map[row.evidence_id]) map[row.evidence_id] = []
-            map[row.evidence_id].push(row.tag_id)
+            if (!grouped[row.evidence_id]) grouped[row.evidence_id] = []
+            grouped[row.evidence_id].push(row.tag_id)
         }
-        return map
+        for (const k of Object.keys(grouped)) {
+            grouped[k].sort((a, b) => (orderByTag.get(a) ?? 0) - (orderByTag.get(b) ?? 0))
+        }
+        return grouped
     }
 
     /**
@@ -400,11 +460,17 @@ export class MetricTagService {
             .from('story_metric_tags')
             .select('story_id, tag_id')
             .in('story_id', storyIds)
+        const tagIds = Array.from(new Set((data || []).map((r: any) => r.tag_id)))
+        const orderByTag = await this.getOrgOrderForTagIds(tagIds)
+        const grouped: Record<string, string[]> = { ...map }
         for (const row of (data || [])) {
-            if (!map[row.story_id]) map[row.story_id] = []
-            map[row.story_id].push(row.tag_id)
+            if (!grouped[row.story_id]) grouped[row.story_id] = []
+            grouped[row.story_id].push(row.tag_id)
         }
-        return map
+        for (const k of Object.keys(grouped)) {
+            grouped[k].sort((a, b) => (orderByTag.get(a) ?? 0) - (orderByTag.get(b) ?? 0))
+        }
+        return grouped
     }
 
     /**
@@ -472,5 +538,67 @@ export class MetricTagService {
             evidence: accessibleEvidence,
             stories: accessibleStories,
         }
+    }
+
+    /**
+     * Persist a new org-wide order for the caller's tags. Only tags that
+     * actually belong to the active org are written — any foreign IDs are
+     * silently dropped.
+     */
+    static async reorder(
+        order: { id: string; display_order: number }[],
+        userId: string,
+        requestedOrgId?: string
+    ): Promise<void> {
+        const orgId = await this.getOrgId(userId, requestedOrgId)
+        if (!orgId) throw new Error('No organization context')
+
+        const ids = order.map(o => o.id)
+        if (ids.length === 0) return
+
+        const { data: validTags } = await supabase
+            .from('metric_tags')
+            .select('id')
+            .eq('organization_id', orgId)
+            .in('id', ids)
+        const valid = new Set((validTags || []).map((t: any) => t.id))
+
+        const updates = order
+            .filter(o => valid.has(o.id))
+            .map(o =>
+                supabase
+                    .from('metric_tags')
+                    .update({ display_order: o.display_order })
+                    .eq('id', o.id)
+            )
+        await Promise.all(updates)
+    }
+
+    /**
+     * Persist a new per-metric tag order. Only updates rows whose tag is
+     * currently attached to the kpi — anything else is dropped silently.
+     */
+    static async reorderForKpi(
+        kpiId: string,
+        order: { tag_id: string; display_order: number }[]
+    ): Promise<void> {
+        if (order.length === 0) return
+
+        const { data: existing } = await supabase
+            .from('kpi_metric_tags')
+            .select('tag_id')
+            .eq('kpi_id', kpiId)
+        const valid = new Set((existing || []).map((l: any) => l.tag_id))
+
+        const updates = order
+            .filter(o => valid.has(o.tag_id))
+            .map(o =>
+                supabase
+                    .from('kpi_metric_tags')
+                    .update({ display_order: o.display_order })
+                    .eq('kpi_id', kpiId)
+                    .eq('tag_id', o.tag_id)
+            )
+        await Promise.all(updates)
     }
 }

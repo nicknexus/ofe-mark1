@@ -1,16 +1,18 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
 import {
     ArrowLeft, BarChart3, TrendingUp, FileText, Calendar,
     ExternalLink, MapPin, Target, Sparkles, CheckCircle2,
-    ChevronLeft, ChevronRight, X
+    ChevronLeft, ChevronRight, ChevronDown, X, Users
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
-import { publicApi, PublicMetricDetail, PublicEvidence } from '../services/publicApi'
+import { publicApi, PublicMetricDetail, PublicEvidence, PublicMetricTag } from '../services/publicApi'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
+import PublicTagFilter from '../components/public/PublicTagFilter'
+import PublicTagChip from '../components/public/PublicTagChip'
 import DateRangePicker from '../components/DateRangePicker'
 import { getLocalDateString, formatDate } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
@@ -32,6 +34,14 @@ export default function PublicMetricPage() {
 
     const [searchParams, setSearchParams] = useSearchParams()
     const [metric, setMetric] = useState<PublicMetricDetail | null>(null)
+    const [tags, setTags] = useState<PublicMetricTag[]>([])
+    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+    const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([])
+    const [selectedBenGroupIds, setSelectedBenGroupIds] = useState<string[]>([])
+    const [showLocationDropdown, setShowLocationDropdown] = useState(false)
+    const [showBenDropdown, setShowBenDropdown] = useState(false)
+    const locationBtnRef = useRef<HTMLButtonElement>(null)
+    const benBtnRef = useRef<HTMLButtonElement>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
@@ -69,6 +79,12 @@ export default function PublicMetricPage() {
         loadMetric()
     }, [orgSlug, initiativeSlug, metricSlug])
 
+    useEffect(() => {
+        if (orgSlug) {
+            publicApi.getOrganizationTags(orgSlug).then(setTags).catch(() => setTags([]))
+        }
+    }, [orgSlug])
+
     if (loading) {
         return <PublicLoader message="Loading metric..." />
     }
@@ -100,9 +116,85 @@ export default function PublicMetricPage() {
         return d === filterStart
     }
 
-    const filteredUpdates = (metric.updates || []).filter(u => isInDateRange(u.date_represented))
-    const filteredEvidence = (metric.evidence || []).filter(e => isInDateRange(e.date_represented))
+    const tagsById = new Map(tags.map(t => [t.id, t]))
+    // Restrict the dropdown to tags actually used on this metric (its tag_ids
+    // plus any tag attached to one of its claims/evidence).
+    const metricTagIds = new Set<string>([
+        ...(metric.tag_ids || []),
+        ...(metric.updates || []).map(u => u.tag_id).filter(Boolean) as string[],
+        ...(metric.evidence || []).flatMap(e => e.tag_ids || []),
+    ])
+    const metricTags = tags.filter(t => metricTagIds.has(t.id))
+
+    const tagMatchSingle = (id?: string | null) => {
+        if (selectedTagIds.length === 0) return true
+        if (!id) return false
+        return selectedTagIds.includes(id)
+    }
+    const tagMatchAny = (ids?: string[] | null) => {
+        if (selectedTagIds.length === 0) return true
+        if (!ids || ids.length === 0) return false
+        return ids.some(i => selectedTagIds.includes(i))
+    }
+
+    // Available locations and beneficiary groups for filter dropdowns. Pulled
+    // from the claims + evidence so the dropdown only ever offers options
+    // that will actually filter something in this metric.
+    const availableLocations = (() => {
+        const map = new Map<string, { id: string; name: string }>()
+        ;(metric.updates || []).forEach(u => {
+            if (u.location_id && u.location?.name) map.set(u.location_id, { id: u.location_id, name: u.location.name })
+        })
+        ;(metric.evidence || []).forEach(e => {
+            (e.locations || []).forEach(l => { if (l.id) map.set(l.id, { id: l.id, name: l.name }) })
+        })
+        return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
+    })()
+    const availableBenGroups = (() => {
+        const map = new Map<string, { id: string; name: string }>()
+        ;(metric.updates || []).forEach(u => {
+            (u.beneficiary_groups || []).forEach(b => { if (b.id) map.set(b.id, { id: b.id, name: b.name }) })
+        })
+        ;(metric.evidence || []).forEach(e => {
+            (e.beneficiary_groups || []).forEach(b => { if (b.id) map.set(b.id, { id: b.id, name: b.name }) })
+        })
+        return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
+    })()
+
+    const locationMatchSingle = (id?: string | null) => {
+        if (selectedLocationIds.length === 0) return true
+        if (!id) return false
+        return selectedLocationIds.includes(id)
+    }
+    const locationMatchAny = (locs?: { id: string }[] | null) => {
+        if (selectedLocationIds.length === 0) return true
+        if (!locs || locs.length === 0) return false
+        return locs.some(l => selectedLocationIds.includes(l.id))
+    }
+    const benMatchAny = (groups?: { id: string }[] | null) => {
+        if (selectedBenGroupIds.length === 0) return true
+        if (!groups || groups.length === 0) return false
+        return groups.some(g => selectedBenGroupIds.includes(g.id))
+    }
+
+    const filteredUpdates = (metric.updates || [])
+        .filter(u => isInDateRange(u.date_represented))
+        .filter(u => tagMatchSingle(u.tag_id))
+        .filter(u => locationMatchSingle(u.location_id))
+        .filter(u => benMatchAny(u.beneficiary_groups))
+    const filteredEvidence = (metric.evidence || [])
+        .filter(e => isInDateRange(e.date_represented))
+        .filter(e => tagMatchAny(e.tag_ids))
+        .filter(e => locationMatchAny(e.locations))
+        .filter(e => benMatchAny(e.beneficiary_groups))
     const filteredTotal = aggregateKpiUpdates(filteredUpdates as any, metric.metric_type)
+    const hasActiveFilters = !!(filterStart || selectedTagIds.length || selectedLocationIds.length || selectedBenGroupIds.length)
+    const clearAllFilters = () => {
+        setDateFilter({})
+        setSelectedTagIds([])
+        setSelectedLocationIds([])
+        setSelectedBenGroupIds([])
+    }
 
     // Prepare chart data (sorted by date)
     const chartData = [...filteredUpdates]
@@ -149,13 +241,73 @@ export default function PublicMetricPage() {
                             <ArrowLeft className="w-4 h-4" />
                             <span className="text-xs sm:text-sm font-medium">Back</span>
                         </Link>
-                        <DateRangePicker
-                            value={dateFilter}
-                            onChange={setDateFilter}
-                            maxDate={getLocalDateString(new Date())}
-                            placeholder="Filter by date"
-                            className="w-auto"
-                        />
+                        <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0 justify-center overflow-x-auto scrollbar-none px-2">
+                            <div className="flex-shrink-0">
+                                <DateRangePicker
+                                    value={dateFilter}
+                                    onChange={setDateFilter}
+                                    maxDate={getLocalDateString(new Date())}
+                                    placeholder="Date"
+                                    className="[&>button]:h-7 [&>button]:text-[11px] [&>button]:pr-1.5 sm:[&>button]:pr-2.5 [&>button>div]:w-7 [&>button>div]:h-7 [&>button>div>svg]:w-3.5 [&>button>div>svg]:h-3.5 [&>button>span]:ml-1 sm:[&>button>span]:ml-1.5"
+                                />
+                            </div>
+
+                            {availableLocations.length > 0 && (
+                                <button
+                                    ref={locationBtnRef}
+                                    onClick={() => { setShowLocationDropdown(!showLocationDropdown); setShowBenDropdown(false) }}
+                                    className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
+                                >
+                                    <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
+                                        <MapPin className="w-3.5 h-3.5 text-gray-600" />
+                                    </div>
+                                    <span className={`ml-1 sm:ml-1.5 max-w-[60px] sm:max-w-[90px] md:max-w-[120px] truncate ${selectedLocationIds.length > 0 ? 'text-gray-900' : 'text-gray-500'}`}>
+                                        {selectedLocationIds.length > 0 ? `${selectedLocationIds.length} loc.` : 'Location'}
+                                    </span>
+                                    {selectedLocationIds.length > 0 ? (
+                                        <X className="w-3 h-3 text-gray-400 hover:text-gray-600 ml-0.5 sm:ml-1" onClick={(e) => { e.stopPropagation(); setSelectedLocationIds([]) }} />
+                                    ) : (
+                                        <ChevronDown className="w-3 h-3 text-gray-400 ml-0.5" />
+                                    )}
+                                </button>
+                            )}
+
+                            <PublicTagFilter
+                                tags={metricTags}
+                                selectedTagIds={selectedTagIds}
+                                onChange={setSelectedTagIds}
+                                onOpenChange={(open) => { if (open) { setShowLocationDropdown(false); setShowBenDropdown(false) } }}
+                            />
+
+                            {availableBenGroups.length > 0 && (
+                                <button
+                                    ref={benBtnRef}
+                                    onClick={() => { setShowBenDropdown(!showBenDropdown); setShowLocationDropdown(false) }}
+                                    className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
+                                >
+                                    <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
+                                        <Users className="w-3.5 h-3.5 text-gray-600" />
+                                    </div>
+                                    <span className={`ml-1 sm:ml-1.5 max-w-[60px] sm:max-w-[90px] md:max-w-[120px] truncate ${selectedBenGroupIds.length > 0 ? 'text-gray-900' : 'text-gray-500'}`}>
+                                        {selectedBenGroupIds.length > 0 ? `${selectedBenGroupIds.length} group${selectedBenGroupIds.length === 1 ? '' : 's'}` : 'Beneficiary'}
+                                    </span>
+                                    {selectedBenGroupIds.length > 0 ? (
+                                        <X className="w-3 h-3 text-gray-400 hover:text-gray-600 ml-0.5 sm:ml-1" onClick={(e) => { e.stopPropagation(); setSelectedBenGroupIds([]) }} />
+                                    ) : (
+                                        <ChevronDown className="w-3 h-3 text-gray-400 ml-0.5" />
+                                    )}
+                                </button>
+                            )}
+
+                            {hasActiveFilters && (
+                                <button
+                                    onClick={clearAllFilters}
+                                    className="flex items-center gap-0.5 px-1.5 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                                >
+                                    <X className="w-2.5 h-2.5" /> Clear
+                                </button>
+                            )}
+                        </div>
                         <Link to="/" className="flex items-center gap-2">
                             <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center overflow-hidden">
                                 <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
@@ -197,6 +349,23 @@ export default function PublicMetricPage() {
                             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-1 sm:mb-2">{metric.title}</h1>
                             {metric.description && (
                                 <p className="text-sm sm:text-lg text-gray-600 max-w-2xl line-clamp-2 sm:line-clamp-none">{metric.description}</p>
+                            )}
+                            {metric.tag_ids && metric.tag_ids.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 mt-2 sm:mt-3">
+                                    {metric.tag_ids.map(id => {
+                                        const t = tagsById.get(id)
+                                        if (!t) return null
+                                        return (
+                                            <PublicTagChip
+                                                key={id}
+                                                name={t.name}
+                                                size="sm"
+                                                selected={selectedTagIds.includes(id)}
+                                                onClick={() => setSelectedTagIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
+                                            />
+                                        )
+                                    })}
+                                </div>
                             )}
                         </div>
 
@@ -307,7 +476,17 @@ export default function PublicMetricPage() {
                                 {[...filteredUpdates]
                                     .sort((a, b) => new Date(b.date_represented).getTime() - new Date(a.date_represented).getTime())
                                     .map((update, idx) => (
-                                        <ImpactClaimCard key={update.id || idx} update={update} unit={metric.unit_of_measurement} config={config} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />
+                                        <ImpactClaimCard
+                                            key={update.id || idx}
+                                            update={update}
+                                            unit={metric.unit_of_measurement}
+                                            config={config}
+                                            orgSlug={orgSlug!}
+                                            initiativeSlug={initiativeSlug!}
+                                            tag={update.tag_id ? tagsById.get(update.tag_id) : undefined}
+                                            selectedTagIds={selectedTagIds}
+                                            onToggleTag={(id) => setSelectedTagIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
+                                        />
                                     ))}
                             </div>
                         )}
@@ -325,8 +504,99 @@ export default function PublicMetricPage() {
                     setCurrentFileIndex={setCurrentFileIndex}
                     orgSlug={orgSlug!}
                     initiativeSlug={initiativeSlug!}
+                    tagsById={tagsById}
+                    selectedTagIds={selectedTagIds}
+                    onToggleTag={(id) => setSelectedTagIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
                 />
             </div>
+
+            {/* Location Dropdown Portal */}
+            {showLocationDropdown && createPortal(
+                <>
+                    <div className="fixed inset-0 z-[9998]" onClick={() => setShowLocationDropdown(false)} />
+                    <div
+                        className="fixed w-64 bg-white rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] border border-gray-100 z-[9999] py-1 max-h-72 overflow-y-auto"
+                        style={(() => {
+                            const rect = locationBtnRef.current?.getBoundingClientRect()
+                            if (!rect) return {}
+                            return { top: rect.bottom + 4, left: Math.max(8, Math.min(rect.left, window.innerWidth - 272)) }
+                        })()}
+                    >
+                        {selectedLocationIds.length > 0 && (
+                            <button
+                                onClick={() => setSelectedLocationIds([])}
+                                className="w-full px-3 py-2 text-left text-xs text-muted-foreground hover:bg-gray-50 border-b border-gray-100"
+                            >
+                                Clear location filter
+                            </button>
+                        )}
+                        {availableLocations.map(l => {
+                            const isSelected = selectedLocationIds.includes(l.id)
+                            return (
+                                <button
+                                    key={l.id}
+                                    onClick={() => setSelectedLocationIds(prev => isSelected ? prev.filter(x => x !== l.id) : [...prev, l.id])}
+                                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${isSelected ? 'bg-gray-50 font-medium' : 'hover:bg-gray-50'}`}
+                                >
+                                    <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-gray-900 border-2 border-gray-900' : 'border-2 border-gray-300 bg-white'}`}>
+                                        {isSelected && (
+                                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        )}
+                                    </div>
+                                    <span className={`truncate block ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>{l.name}</span>
+                                </button>
+                            )
+                        })}
+                    </div>
+                </>,
+                document.body
+            )}
+
+            {/* Beneficiary Group Dropdown Portal */}
+            {showBenDropdown && createPortal(
+                <>
+                    <div className="fixed inset-0 z-[9998]" onClick={() => setShowBenDropdown(false)} />
+                    <div
+                        className="fixed w-64 bg-white rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] border border-gray-100 z-[9999] py-1 max-h-72 overflow-y-auto"
+                        style={(() => {
+                            const rect = benBtnRef.current?.getBoundingClientRect()
+                            if (!rect) return {}
+                            return { top: rect.bottom + 4, left: Math.max(8, Math.min(rect.left, window.innerWidth - 272)) }
+                        })()}
+                    >
+                        {selectedBenGroupIds.length > 0 && (
+                            <button
+                                onClick={() => setSelectedBenGroupIds([])}
+                                className="w-full px-3 py-2 text-left text-xs text-muted-foreground hover:bg-gray-50 border-b border-gray-100"
+                            >
+                                Clear beneficiary filter
+                            </button>
+                        )}
+                        {availableBenGroups.map(g => {
+                            const isSelected = selectedBenGroupIds.includes(g.id)
+                            return (
+                                <button
+                                    key={g.id}
+                                    onClick={() => setSelectedBenGroupIds(prev => isSelected ? prev.filter(x => x !== g.id) : [...prev, g.id])}
+                                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${isSelected ? 'bg-gray-50 font-medium' : 'hover:bg-gray-50'}`}
+                                >
+                                    <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-gray-900 border-2 border-gray-900' : 'border-2 border-gray-300 bg-white'}`}>
+                                        {isSelected && (
+                                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        )}
+                                    </div>
+                                    <span className={`truncate block ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>{g.name}</span>
+                                </button>
+                            )
+                        })}
+                    </div>
+                </>,
+                document.body
+            )}
 
             {/* Footer */}
             <div className="relative z-10 border-t border-white/40 bg-white/40 backdrop-blur-xl mt-8 sm:mt-12">
@@ -346,12 +616,15 @@ export default function PublicMetricPage() {
 }
 
 // Impact Claim Card Component
-function ImpactClaimCard({ update, unit, config, orgSlug, initiativeSlug }: {
+function ImpactClaimCard({ update, unit, config, orgSlug, initiativeSlug, tag, selectedTagIds, onToggleTag }: {
     update: any;
     unit: string;
     config: { bg: string; text: string; gradient: string; accent: string };
     orgSlug: string;
     initiativeSlug: string;
+    tag?: PublicMetricTag;
+    selectedTagIds?: string[];
+    onToggleTag?: (id: string) => void;
 }) {
     const orgLinkBase = useOrgLinkBase()
     const hasDateRange = update.date_range_start && update.date_range_end
@@ -385,6 +658,16 @@ function ImpactClaimCard({ update, unit, config, orgSlug, initiativeSlug }: {
                     <span>{update.location.name}</span>
                 </div>
             )}
+            {tag && (
+                <div className="mt-1.5 sm:mt-2 flex">
+                    <PublicTagChip
+                        name={tag.name}
+                        size="xs"
+                        selected={selectedTagIds?.includes(tag.id)}
+                        onClick={onToggleTag ? () => onToggleTag(tag.id) : undefined}
+                    />
+                </div>
+            )}
             {update.note && (
                 <p className="mt-1.5 sm:mt-2 text-[10px] sm:text-xs text-gray-500 line-clamp-2 italic">"{update.note}"</p>
             )}
@@ -403,7 +686,7 @@ function generateMetricSlug(title: string): string {
 }
 
 // ===== Evidence Gallery Section =====
-function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex, setGalleryIndex, currentFileIndex, setCurrentFileIndex, orgSlug, initiativeSlug }: {
+function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex, setGalleryIndex, currentFileIndex, setCurrentFileIndex, orgSlug, initiativeSlug, tagsById, selectedTagIds, onToggleTag }: {
     evidence: PublicEvidence[]
     evidenceCount: number
     config: { bg: string; text: string; gradient: string; accent: string }
@@ -413,6 +696,9 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
     initiativeSlug: string
     currentFileIndex: number
     setCurrentFileIndex: (i: number | ((prev: number) => number)) => void
+    tagsById?: Map<string, PublicMetricTag>
+    selectedTagIds?: string[]
+    onToggleTag?: (id: string) => void
 }) {
     const orgLinkBase = useOrgLinkBase()
     const typeConfig: Record<string, { bg: string; label: string }> = {
@@ -596,6 +882,26 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                         </div>
                                         <h3 className="font-semibold text-gray-800 text-sm mb-1 group-hover:text-accent transition-colors">{ev.title}</h3>
                                         {ev.description && <p className="text-xs text-gray-500 line-clamp-2">{ev.description}</p>}
+                                        {tagsById && ev.tag_ids && ev.tag_ids.length > 0 && (
+                                            <div className="mt-2 flex flex-wrap gap-1" onClick={e => e.stopPropagation()}>
+                                                {ev.tag_ids.slice(0, 3).map(id => {
+                                                    const t = tagsById.get(id)
+                                                    if (!t) return null
+                                                    return (
+                                                        <PublicTagChip
+                                                            key={id}
+                                                            name={t.name}
+                                                            size="xs"
+                                                            selected={selectedTagIds?.includes(id)}
+                                                            onClick={onToggleTag ? () => onToggleTag(id) : undefined}
+                                                        />
+                                                    )
+                                                })}
+                                                {ev.tag_ids.length > 3 && (
+                                                    <span className="text-[10px] text-gray-500 px-1">+{ev.tag_ids.length - 3}</span>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </button>
                             )

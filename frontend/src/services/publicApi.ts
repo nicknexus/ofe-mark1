@@ -37,6 +37,13 @@ export interface PublicInitiative {
     organization_brand_color?: string
 }
 
+export interface PublicMetricTag {
+    id: string
+    name: string
+    color?: string | null
+    display_order?: number
+}
+
 export interface PublicKPI {
     id: string
     title: string
@@ -55,6 +62,7 @@ export interface PublicKPI {
     update_count?: number
     evidence_count?: number
     evidence_percentage?: number
+    tag_ids?: string[]
 }
 
 export interface PublicKPIUpdate {
@@ -65,8 +73,10 @@ export interface PublicKPIUpdate {
     date_range_end?: string
     location_id?: string
     location?: PublicLocation
+    beneficiary_groups?: { id: string; name: string }[]
     note?: string
     label?: string
+    tag_id?: string | null
 }
 
 export interface PublicLocation {
@@ -101,6 +111,7 @@ export interface PublicStory {
     org_slug?: string
     beneficiary_groups?: PublicBeneficiaryGroup[]
     created_at?: string
+    tag_ids?: string[]
 }
 
 export interface PublicEvidenceFile {
@@ -126,9 +137,11 @@ export interface PublicEvidence {
     initiative_title?: string
     org_slug?: string
     locations?: { id: string; name: string }[]
+    beneficiary_groups?: { id: string; name: string }[]
     kpis?: { id: string; title: string; category?: string; unit_of_measurement?: string }[]
-    impact_claims?: { id: string; value: number; date_represented?: string; date_range_start?: string; date_range_end?: string; kpi_id?: string; kpis?: { id: string; title: string; unit_of_measurement?: string } }[]
+    impact_claims?: { id: string; value: number; date_represented?: string; date_range_start?: string; date_range_end?: string; kpi_id?: string; kpis?: { id: string; title: string; unit_of_measurement?: string }; tag_id?: string | null }[]
     created_at?: string
+    tag_ids?: string[]
 }
 
 export interface PublicBeneficiaryGroup {
@@ -159,6 +172,7 @@ export interface PublicBeneficiaryGroupDetail {
         date_range_end?: string
         label?: string
         note?: string
+        tag_id?: string | null
         kpi?: { id: string; title: string; unit_of_measurement: string; category: string }
     }[]
     evidence: (PublicEvidence & { files?: { id: string; file_url: string; file_name: string; file_type: string; display_order?: number }[] })[]
@@ -170,6 +184,7 @@ export interface PublicBeneficiaryGroupDetail {
         media_type?: string
         date_represented: string
         locations?: { id: string; name: string }[]
+        tag_ids?: string[]
     }[]
     locations: PublicLocation[]
     initiative: {
@@ -184,11 +199,12 @@ export interface PublicBeneficiaryGroupDetail {
 
 export interface LocationDetail {
     location: PublicLocation
-    stories: { id: string; title: string; description?: string; media_url?: string; media_type: string; date_represented: string }[]
+    stories: { id: string; title: string; description?: string; media_url?: string; media_type: string; date_represented: string; tag_ids?: string[] }[]
     evidence: PublicEvidence[]
     claims: {
         id: string; value: number; date_represented: string; date_range_start?: string; date_range_end?: string;
-        note?: string; label?: string; metric_title: string; metric_slug: string; metric_unit: string; metric_category: string
+        note?: string; label?: string; metric_title: string; metric_slug: string; metric_unit: string; metric_category: string;
+        tag_id?: string | null
     }[]
     metrics: {
         id: string; title: string; slug: string; unit_of_measurement: string; category: string;
@@ -375,6 +391,10 @@ class PublicApiService {
         return this.request<PublicOrganizationContext | null>(`/organizations/${orgSlug}/context`)
     }
 
+    async getOrganizationTags(orgSlug: string): Promise<PublicMetricTag[]> {
+        return this.request<PublicMetricTag[]>(`/organizations/${orgSlug}/tags`)
+    }
+
     // ============================================
     // Initiatives (Advanced View)
     // ============================================
@@ -444,6 +464,7 @@ export interface PublicMetricDetail {
     display_order?: number
     total_value: number
     update_count: number
+    tag_ids?: string[]
     updates: PublicKPIUpdate[]
     evidence: PublicEvidence[]
     evidence_count: number
@@ -469,6 +490,7 @@ export interface PublicStoryDetail {
     location?: PublicLocation
     locations?: PublicLocation[]
     beneficiary_groups?: PublicBeneficiaryGroup[]
+    tag_ids?: string[]
     initiative: {
         id: string
         title: string
@@ -512,7 +534,9 @@ export interface PublicEvidenceDetail {
         date_range_end?: string
         kpi_id?: string
         kpis?: { id: string; title: string; unit_of_measurement?: string }
+        tag_id?: string | null
     }>
+    tag_ids?: string[]
     initiative: {
         id: string
         title: string
@@ -531,6 +555,7 @@ export interface PublicImpactClaimDetail {
     date_range_end?: string
     note?: string
     label?: string
+    tag_id?: string | null
     location?: {
         id: string
         name: string
@@ -545,6 +570,7 @@ export interface PublicImpactClaimDetail {
         unit_of_measurement: string
         category: 'input' | 'output' | 'impact'
         slug: string
+        tag_ids?: string[]
     }
     evidence: PublicEvidence[]
     evidence_count: number

@@ -1,6 +1,7 @@
 import { supabase } from '../utils/supabase';
 import { Organization, Initiative, KPI, Evidence, Story, Location, BeneficiaryGroup } from '../types';
 import { BeneficiaryService } from './beneficiaryService';
+import { MetricTagService } from './metricTagService';
 import { aggregateKpiUpdates } from '../utils/kpiAggregation';
 
 // Types for public responses (stripped of sensitive fields)
@@ -349,7 +350,18 @@ export class PublicService {
 
         if (error) throw new Error(`Failed to fetch metrics: ${error.message}`);
 
-        return (data || []).map((k: any) => {
+        const rows = data || [];
+        const kpiIds = rows.map((k: any) => k.id);
+        const allUpdateIds = rows.flatMap((k: any) => (k.kpi_updates || []).map((u: any) => u.id));
+
+        // Batch-hydrate tag ids for KPIs and their updates so the public
+        // payload mirrors the private one without N+1 queries.
+        const [tagsByKpi, tagByUpdate] = await Promise.all([
+            MetricTagService.getTagIdsForKpis(kpiIds),
+            MetricTagService.getTagIdsForUpdates(allUpdateIds),
+        ]);
+
+        return rows.map((k: any) => {
             const updates = k.kpi_updates || [];
             const totalValue = updates.length > 0
                 ? aggregateKpiUpdates(updates, k.metric_type)
@@ -369,10 +381,12 @@ export class PublicService {
                 org_slug: k.initiatives?.organizations?.slug,
                 total_value: totalValue,
                 update_count: updates.length,
+                tag_ids: tagsByKpi[k.id] || [],
                 updates: updates.map((u: any) => ({
                     id: u.id,
                     value: u.value,
-                    date_represented: u.date_represented
+                    date_represented: u.date_represented,
+                    tag_id: tagByUpdate[u.id] || null,
                 }))
             };
         });
@@ -400,7 +414,10 @@ export class PublicService {
 
         if (error) throw new Error(`Failed to fetch stories: ${error.message}`);
 
-        return (data || []).map((s: any) => {
+        const rows = data || [];
+        const tagsByStory = await MetricTagService.getTagIdsForStories(rows.map((s: any) => s.id));
+
+        return rows.map((s: any) => {
             const locations = (s.story_locations || []).map((sl: any) => sl.locations).filter(Boolean);
             return {
                 id: s.id,
@@ -415,7 +432,8 @@ export class PublicService {
                 initiative_id: s.initiative_id,
                 initiative_slug: s.initiatives?.slug,
                 initiative_title: s.initiatives?.title,
-                org_slug: s.initiatives?.organizations?.slug
+                org_slug: s.initiatives?.organizations?.slug,
+                tag_ids: tagsByStory[s.id] || [],
             };
         });
     }
@@ -490,7 +508,10 @@ export class PublicService {
 
         if (error) throw new Error(`Failed to fetch evidence: ${error.message}`);
 
-        return (data || []).map((e: any) => ({
+        const rows = data || [];
+        const tagsByEv = await MetricTagService.getTagIdsForEvidences(rows.map((e: any) => e.id));
+
+        return rows.map((e: any) => ({
             id: e.id,
             title: e.title,
             description: e.description,
@@ -501,7 +522,8 @@ export class PublicService {
             initiative_id: e.initiative_id,
             initiative_slug: e.initiatives?.slug,
             initiative_title: e.initiatives?.title,
-            org_slug: e.initiatives?.organizations?.slug
+            org_slug: e.initiatives?.organizations?.slug,
+            tag_ids: tagsByEv[e.id] || [],
         }));
     }
 
@@ -580,6 +602,14 @@ export class PublicService {
             }
         }
 
+        // Batch-hydrate tag ids for KPIs and updates so chart bodies and
+        // breakdown UI on the public side don't have to poll per-row.
+        const allUpdateIds = (kpis || []).flatMap((k: any) => (k.kpi_updates || []).map((u: any) => u.id));
+        const [tagsByKpi, tagByUpdate] = await Promise.all([
+            MetricTagService.getTagIdsForKpis(kpiIds),
+            MetricTagService.getTagIdsForUpdates(allUpdateIds),
+        ]);
+
         // Process KPIs with computed values AND include updates for charts
         const processedKpis = (kpis || []).map(kpi => {
             const updates = kpi.kpi_updates || [];
@@ -603,6 +633,7 @@ export class PublicService {
                 update_count: updateCount,
                 evidence_count: evidenceCount,
                 evidence_percentage: evidencePercentage,
+                tag_ids: tagsByKpi[kpi.id] || [],
                 // Include updates array for charts
                 updates: updates.map((u: any) => ({
                     id: u.id,
@@ -611,7 +642,8 @@ export class PublicService {
                     date_range_start: u.date_range_start,
                     date_range_end: u.date_range_end,
                     location_id: u.location_id,
-                    note: u.note
+                    note: u.note,
+                    tag_id: tagByUpdate[u.id] || null,
                 }))
             };
         });
@@ -675,7 +707,10 @@ export class PublicService {
 
         if (error) throw new Error(`Failed to fetch stories: ${error.message}`);
 
-        return (data || []).map((s: any) => {
+        const rows = data || [];
+        const tagsByStory = await MetricTagService.getTagIdsForStories(rows.map((s: any) => s.id));
+
+        return rows.map((s: any) => {
             const locations = (s.story_locations || []).map((sl: any) => sl.locations).filter(Boolean);
             return {
                 id: s.id,
@@ -688,7 +723,8 @@ export class PublicService {
                 locations,
                 location: locations[0] || undefined,
                 beneficiary_groups: s.story_beneficiaries?.map((sb: any) => sb.beneficiary_groups).filter(Boolean) || [],
-                created_at: s.created_at
+                created_at: s.created_at,
+                tag_ids: tagsByStory[s.id] || [],
             };
         });
     }
@@ -732,7 +768,18 @@ export class PublicService {
 
         if (error) throw new Error(`Failed to fetch evidence: ${error.message}`);
 
-        const rawEvidence = (data || []).map((e: any) => ({
+        const rows = data || [];
+        const evidenceIds = rows.map((e: any) => e.id);
+        const allClaimIds = rows.flatMap((e: any) =>
+            (e.evidence_kpi_updates || []).map((eu: any) => eu.kpi_updates?.id).filter(Boolean)
+        );
+
+        const [tagsByEv, tagByClaim] = await Promise.all([
+            MetricTagService.getTagIdsForEvidences(evidenceIds),
+            MetricTagService.getTagIdsForUpdates(allClaimIds),
+        ]);
+
+        const rawEvidence = rows.map((e: any) => ({
             id: e.id,
             title: e.title,
             description: e.description,
@@ -744,8 +791,12 @@ export class PublicService {
             date_range_end: e.date_range_end,
             locations: e.evidence_locations?.map((el: any) => el.locations).filter(Boolean) || [],
             kpis: e.evidence_kpis?.map((ek: any) => ek.kpis).filter(Boolean) || [],
-            impact_claims: e.evidence_kpi_updates?.map((eu: any) => eu.kpi_updates).filter(Boolean) || [],
-            created_at: e.created_at
+            impact_claims: (e.evidence_kpi_updates || [])
+                .map((eu: any) => eu.kpi_updates)
+                .filter(Boolean)
+                .map((c: any) => ({ ...c, tag_id: tagByClaim[c.id] || null })),
+            created_at: e.created_at,
+            tag_ids: tagsByEv[e.id] || [],
         }));
 
         return this.filterClaimsByBenGroups(rawEvidence);
@@ -891,6 +942,16 @@ export class PublicService {
             if (loc.id) locationMap.set(loc.id, loc);
         }
 
+        // Hydrate tag ids on claims, evidence, and stories so the
+        // beneficiary detail page can show + filter by tag without extra calls.
+        const [tagByClaim, tagsByEv, tagsByStory] = await Promise.all([
+            MetricTagService.getTagIdsForUpdates(claims.map((c: any) => c.id)),
+            MetricTagService.getTagIdsForEvidences(evidence.map((e: any) => e.id)),
+            MetricTagService.getTagIdsForStories(stories.map((s: any) => s.id)),
+        ]);
+        const evidenceWithTags = evidence.map((e: any) => ({ ...e, tag_ids: tagsByEv[e.id] || [] }));
+        const storiesWithTags = stories.map((s: any) => ({ ...s, tag_ids: tagsByStory[s.id] || [] }));
+
         return {
             id: group.id,
             name: (group as any).name,
@@ -907,10 +968,11 @@ export class PublicService {
                 date_range_end: c.date_range_end,
                 label: c.label,
                 note: c.note,
+                tag_id: tagByClaim[c.id] || null,
                 kpi: c.kpis ? { id: c.kpis.id, title: c.kpis.title, unit_of_measurement: c.kpis.unit_of_measurement, category: c.kpis.category } : null
             })),
-            evidence,
-            stories,
+            evidence: evidenceWithTags,
+            stories: storiesWithTags,
             locations: Array.from(locationMap.values()),
             initiative: {
                 id: initiative.id,
@@ -941,8 +1003,16 @@ export class PublicService {
 
         if (error) throw new Error(`Failed to fetch KPIs: ${error.message}`);
 
+        const rows = data || [];
+        const kpiIds = rows.map((k: any) => k.id);
+        const allUpdateIds = rows.flatMap((k: any) => (k.kpi_updates || []).map((u: any) => u.id));
+        const [tagsByKpi, tagByUpdate] = await Promise.all([
+            MetricTagService.getTagIdsForKpis(kpiIds),
+            MetricTagService.getTagIdsForUpdates(allUpdateIds),
+        ]);
+
         // Calculate totals and format
-        return (data || []).map((k: any) => {
+        return rows.map((k: any) => {
             const updates = k.kpi_updates || [];
             const totalValue = aggregateKpiUpdates(updates, k.metric_type);
 
@@ -954,9 +1024,11 @@ export class PublicService {
                 unit_of_measurement: k.unit_of_measurement,
                 category: k.category,
                 display_order: k.display_order,
+                tag_ids: tagsByKpi[k.id] || [],
                 updates: updates.map((u: any) => ({
                     ...u,
-                    location: u.locations
+                    location: u.locations,
+                    tag_id: tagByUpdate[u.id] || null,
                 })),
                 total_value: totalValue,
                 update_count: updates.length
@@ -992,7 +1064,7 @@ export class PublicService {
             .from('kpis')
             .select(`
                 id, title, description, metric_type, unit_of_measurement, category, display_order,
-                kpi_updates(id, value, date_represented, date_range_start, date_range_end, location_id, note, locations(id, name))
+                kpi_updates(id, value, date_represented, date_range_start, date_range_end, location_id, note, locations(id, name), kpi_update_beneficiary_groups(beneficiary_groups(id, name)))
             `)
             .eq('initiative_id', initiative.id)
             .order('display_order');
@@ -1022,11 +1094,21 @@ export class PublicService {
                     id, title, description, type, file_url, date_represented, date_range_start, date_range_end, created_at,
                     evidence_files(id, file_url, file_name, file_type, display_order),
                     evidence_locations(locations(id, name)),
+                    evidence_beneficiary_groups(beneficiary_groups(id, name)),
                     evidence_kpis(kpis(id, title, category, unit_of_measurement)),
                 evidence_kpi_updates(kpi_updates(id, value, date_represented, date_range_start, date_range_end, kpi_id, kpis(id, title, unit_of_measurement)))
                 `)
                 .in('id', evidenceIds)
                 .order('date_represented', { ascending: false });
+
+            const evIds = (evidenceData || []).map((e: any) => e.id);
+            const allClaimIds = (evidenceData || []).flatMap((e: any) =>
+                (e.evidence_kpi_updates || []).map((eu: any) => eu.kpi_updates?.id).filter(Boolean)
+            );
+            const [tagsByEv, tagByEvClaim] = await Promise.all([
+                MetricTagService.getTagIdsForEvidences(evIds),
+                MetricTagService.getTagIdsForUpdates(allClaimIds),
+            ]);
 
             const rawEvidence = (evidenceData || []).map((e: any) => ({
                 id: e.id,
@@ -1039,15 +1121,28 @@ export class PublicService {
                 date_range_start: e.date_range_start,
                 date_range_end: e.date_range_end,
                 locations: e.evidence_locations?.map((el: any) => el.locations).filter(Boolean) || [],
+                beneficiary_groups: (e.evidence_beneficiary_groups || [])
+                    .map((b: any) => b.beneficiary_groups)
+                    .filter(Boolean),
                 kpis: e.evidence_kpis?.map((ek: any) => ek.kpis).filter(Boolean) || [],
-                impact_claims: e.evidence_kpi_updates?.map((eu: any) => eu.kpi_updates).filter(Boolean) || [],
-                created_at: e.created_at
+                impact_claims: (e.evidence_kpi_updates || [])
+                    .map((eu: any) => eu.kpi_updates)
+                    .filter(Boolean)
+                    .map((c: any) => ({ ...c, tag_id: tagByEvClaim[c.id] || null })),
+                created_at: e.created_at,
+                tag_ids: tagsByEv[e.id] || [],
             }));
             evidence = await this.filterClaimsByBenGroups(rawEvidence);
         }
 
         const updates = kpi.kpi_updates || [];
         const totalValue = aggregateKpiUpdates(updates, kpi.metric_type);
+
+        // Tags for the metric itself + per-claim tag ids.
+        const [kpiTagIds, tagByUpdate] = await Promise.all([
+            MetricTagService.getTagIdsForKpi(kpi.id),
+            MetricTagService.getTagIdsForUpdates(updates.map((u: any) => u.id)),
+        ]);
 
         return {
             id: kpi.id,
@@ -1060,6 +1155,7 @@ export class PublicService {
             display_order: kpi.display_order,
             total_value: totalValue,
             update_count: updates.length,
+            tag_ids: kpiTagIds,
             updates: updates.map((u: any) => ({
                 id: u.id,
                 value: u.value,
@@ -1067,7 +1163,12 @@ export class PublicService {
                 date_range_start: u.date_range_start,
                 date_range_end: u.date_range_end,
                 note: u.note,
-                location: u.locations
+                location: u.locations,
+                location_id: u.location_id,
+                beneficiary_groups: (u.kpi_update_beneficiary_groups || [])
+                    .map((b: any) => b.beneficiary_groups)
+                    .filter(Boolean),
+                tag_id: tagByUpdate[u.id] || null,
             })),
             evidence,
             evidence_count: evidence.length,
@@ -1131,6 +1232,15 @@ export class PublicService {
                 .in('id', evidenceIds)
                 .order('date_represented', { ascending: false });
 
+            const evIds = (evidenceData || []).map((e: any) => e.id);
+            const allClaimIds = (evidenceData || []).flatMap((e: any) =>
+                (e.evidence_kpi_updates || []).map((eu: any) => eu.kpi_updates?.id).filter(Boolean)
+            );
+            const [tagsByEv, tagByEvClaim] = await Promise.all([
+                MetricTagService.getTagIdsForEvidences(evIds),
+                MetricTagService.getTagIdsForUpdates(allClaimIds),
+            ]);
+
             const rawEvidence = (evidenceData || []).map((e: any) => ({
                 id: e.id,
                 title: e.title,
@@ -1143,8 +1253,12 @@ export class PublicService {
                 date_range_end: e.date_range_end,
                 locations: e.evidence_locations?.map((el: any) => el.locations).filter(Boolean) || [],
                 kpis: e.evidence_kpis?.map((ek: any) => ek.kpis).filter(Boolean) || [],
-                impact_claims: e.evidence_kpi_updates?.map((eu: any) => eu.kpi_updates).filter(Boolean) || [],
-                created_at: e.created_at
+                impact_claims: (e.evidence_kpi_updates || [])
+                    .map((eu: any) => eu.kpi_updates)
+                    .filter(Boolean)
+                    .map((c: any) => ({ ...c, tag_id: tagByEvClaim[c.id] || null })),
+                created_at: e.created_at,
+                tag_ids: tagsByEv[e.id] || [],
             }));
 
             // Filter: only keep evidence whose ben groups are compatible with this claim
@@ -1168,6 +1282,12 @@ export class PublicService {
             evidence = await this.filterClaimsByBenGroups(evidence);
         }
 
+        // Tags for this claim + parent metric.
+        const [claimTagId, kpiTagIds] = await Promise.all([
+            MetricTagService.getTagIdForUpdate(claimId),
+            MetricTagService.getTagIdsForKpi(kpi.id),
+        ]);
+
         return {
             id: update.id,
             value: (update as any).value,
@@ -1177,13 +1297,15 @@ export class PublicService {
             note: (update as any).note,
             label: (update as any).label,
             location: (update as any).locations || null,
+            tag_id: claimTagId,
             metric: {
                 id: kpi.id,
                 title: kpi.title,
                 description: kpi.description,
                 unit_of_measurement: kpi.unit_of_measurement,
                 category: kpi.category,
-                slug: this.generateMetricSlug(kpi.title)
+                slug: this.generateMetricSlug(kpi.title),
+                tag_ids: kpiTagIds,
             },
             evidence,
             evidence_count: evidence.length,
@@ -1237,6 +1359,7 @@ export class PublicService {
         }
 
         const storyLocations = (story.story_locations || []).map((sl: any) => sl.locations).filter(Boolean);
+        const storyTagIds = await MetricTagService.getTagIdsForStory(storyId);
 
         return {
             id: story.id,
@@ -1249,6 +1372,7 @@ export class PublicService {
             locations: storyLocations,
             location: storyLocations[0] || undefined,
             beneficiary_groups: beneficiaryGroups,
+            tag_ids: storyTagIds,
             initiative: {
                 id: initiative.id,
                 title: initiative.title,
@@ -1296,6 +1420,15 @@ export class PublicService {
                 category: kpi.category
             }));
 
+        const linkedClaims = (evidence.evidence_kpi_updates || [])
+            .map((eu: any) => eu.kpi_updates)
+            .filter(Boolean);
+
+        const [evTagIds, tagByEvClaim] = await Promise.all([
+            MetricTagService.getTagIdsForEvidence(evidenceId),
+            MetricTagService.getTagIdsForUpdates(linkedClaims.map((c: any) => c.id)),
+        ]);
+
         const rawResult = {
             id: evidence.id,
             title: evidence.title,
@@ -1307,8 +1440,9 @@ export class PublicService {
             date_range_start: evidence.date_range_start,
             date_range_end: evidence.date_range_end,
             created_at: evidence.created_at,
+            tag_ids: evTagIds,
             linked_kpis: linkedKpis,
-            impact_claims: (evidence.evidence_kpi_updates || []).map((eu: any) => eu.kpi_updates).filter(Boolean),
+            impact_claims: linkedClaims.map((c: any) => ({ ...c, tag_id: tagByEvClaim[c.id] || null })),
             initiative: {
                 id: initiative.id,
                 title: initiative.title,
@@ -1389,6 +1523,15 @@ export class PublicService {
                 .in('id', evidenceIds)
                 .order('date_represented', { ascending: false });
 
+            const evIds = (evidenceData || []).map((e: any) => e.id);
+            const allEvClaimIds = (evidenceData || []).flatMap((e: any) =>
+                (e.evidence_kpi_updates || []).map((eu: any) => eu.kpi_updates?.id).filter(Boolean)
+            );
+            const [tagsByEv, tagByEvClaim] = await Promise.all([
+                MetricTagService.getTagIdsForEvidences(evIds),
+                MetricTagService.getTagIdsForUpdates(allEvClaimIds),
+            ]);
+
             const rawEvidence = (evidenceData || []).map((e: any) => ({
                 id: e.id,
                 title: e.title,
@@ -1398,8 +1541,12 @@ export class PublicService {
                 files: e.evidence_files || [],
                 date_represented: e.date_represented,
                 kpis: e.evidence_kpis?.map((ek: any) => ek.kpis).filter(Boolean) || [],
-                impact_claims: e.evidence_kpi_updates?.map((eu: any) => eu.kpi_updates).filter(Boolean) || [],
-                created_at: e.created_at
+                impact_claims: (e.evidence_kpi_updates || [])
+                    .map((eu: any) => eu.kpi_updates)
+                    .filter(Boolean)
+                    .map((c: any) => ({ ...c, tag_id: tagByEvClaim[c.id] || null })),
+                created_at: e.created_at,
+                tag_ids: tagsByEv[e.id] || [],
             }));
             evidence = await this.filterClaimsByBenGroups(rawEvidence);
         }
@@ -1413,22 +1560,27 @@ export class PublicService {
             `)
             .eq('location_id', locationId);
 
-        // Filter to only this initiative's KPIs and build response
-        const claims = (kpiUpdates || [])
-            .filter((u: any) => u.kpis?.initiative_id === initiative.id)
-            .map((u: any) => ({
-                id: u.id,
-                value: u.value,
-                date_represented: u.date_represented,
-                date_range_start: u.date_range_start,
-                date_range_end: u.date_range_end,
-                note: u.note,
-                label: u.label,
-                metric_title: u.kpis.title,
-                metric_slug: this.generateMetricSlug(u.kpis.title),
-                metric_unit: u.kpis.unit_of_measurement,
-                metric_category: u.kpis.category
-            }));
+        // Filter to only this initiative's KPIs and hydrate tag ids on each claim
+        const claimsRaw = (kpiUpdates || []).filter((u: any) => u.kpis?.initiative_id === initiative.id);
+        const tagByClaim = await MetricTagService.getTagIdsForUpdates(claimsRaw.map((u: any) => u.id));
+        const claims = claimsRaw.map((u: any) => ({
+            id: u.id,
+            value: u.value,
+            date_represented: u.date_represented,
+            date_range_start: u.date_range_start,
+            date_range_end: u.date_range_end,
+            note: u.note,
+            label: u.label,
+            tag_id: tagByClaim[u.id] || null,
+            metric_title: u.kpis.title,
+            metric_slug: this.generateMetricSlug(u.kpis.title),
+            metric_unit: u.kpis.unit_of_measurement,
+            metric_category: u.kpis.category
+        }));
+
+        // Tag ids for stories at this location.
+        const storyTags = await MetricTagService.getTagIdsForStories((stories || []).map((s: any) => s.id));
+        const storiesWithTags = (stories || []).map((s: any) => ({ ...s, tag_ids: storyTags[s.id] || [] }));
 
         // Unique metrics that have claims at this location.
         // Group updates per kpi first so we can apply the right aggregation strategy.
@@ -1456,7 +1608,7 @@ export class PublicService {
 
         return {
             location,
-            stories: stories || [],
+            stories: storiesWithTags,
             evidence,
             claims,
             metrics: Array.from(metricsMap.values()),
@@ -1467,5 +1619,35 @@ export class PublicService {
                 org_slug: initiative.org_slug
             }
         };
+    }
+
+    // ============================================
+    // METRIC TAGS (public read-only)
+    // ============================================
+
+    /**
+     * Org-global tag list for a public org. Returns id/name/color/display_order
+     * sorted by the same org-wide order users set on the private side.
+     * No public/private gating on individual tags in v1 — all org tags are
+     * visible whenever the org itself is public.
+     */
+    static async getOrganizationTags(orgSlug: string): Promise<any[]> {
+        const { data: org } = await supabase
+            .from('organizations')
+            .select('id, slug, is_public')
+            .eq('slug', orgSlug)
+            .eq('is_public', true)
+            .single();
+        if (!org) return [];
+
+        const { data, error } = await supabase
+            .from('metric_tags')
+            .select('id, name, color, display_order')
+            .eq('organization_id', org.id)
+            .order('display_order', { ascending: true })
+            .order('created_at', { ascending: true });
+
+        if (error) throw new Error(`Failed to fetch metric tags: ${error.message}`);
+        return data || [];
     }
 }

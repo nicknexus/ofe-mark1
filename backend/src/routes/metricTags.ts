@@ -82,4 +82,21 @@ router.delete('/:id', authenticateUser, async (req: AuthenticatedRequest, res) =
     }
 })
 
+// Persist a new org-wide order for tags.
+// Body: { order: { id: string, display_order: number }[] }
+router.post('/update-order', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const { order } = req.body
+        if (!Array.isArray(order)) {
+            res.status(400).json({ error: 'Order must be an array' })
+            return
+        }
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        await MetricTagService.reorder(order, req.user!.id, requestedOrgId)
+        res.json({ success: true })
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message })
+    }
+})
+
 export default router

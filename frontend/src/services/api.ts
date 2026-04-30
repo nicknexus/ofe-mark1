@@ -501,6 +501,27 @@ class ApiService {
         })
     }
 
+    /**
+     * Persist a new org-wide order for tags. Used by AllTagsPage drag-drop.
+     */
+    async updateMetricTagsOrder(order: { id: string; display_order: number }[]): Promise<void> {
+        return this.request<void>('/metric-tags/update-order', {
+            method: 'POST',
+            body: JSON.stringify({ order })
+        })
+    }
+
+    /**
+     * Persist per-metric tag order. Used by the TagBreakdownStrip drag-drop
+     * on the expanded metric page.
+     */
+    async updateKpiTagOrder(kpiId: string, order: { tag_id: string; display_order: number }[]): Promise<void> {
+        return this.request<void>(`/kpis/${kpiId}/tag-order`, {
+            method: 'POST',
+            body: JSON.stringify({ order })
+        })
+    }
+
     // Evidence
     async getEvidence(initiativeId?: string, kpiId?: string): Promise<Evidence[]> {
         const params = new URLSearchParams()

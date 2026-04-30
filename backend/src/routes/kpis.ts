@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { KPIService } from '../services/kpiService';
+import { MetricTagService } from '../services/metricTagService';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 
 const router = Router();
@@ -163,6 +164,28 @@ router.post('/update-order', authenticateUser, async (req: AuthenticatedRequest,
         );
 
         await Promise.all(updates);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// Persist a per-metric tag order. Authorizes via the parent KPI's org context.
+// Body: { order: { tag_id: string, display_order: number }[] }
+router.post('/:id/tag-order', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const { order } = req.body;
+        if (!Array.isArray(order)) {
+            res.status(400).json({ error: 'Order must be an array' });
+            return;
+        }
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const kpi = await KPIService.getById(req.params.id, req.user!.id, requestedOrgId);
+        if (!kpi) {
+            res.status(404).json({ error: 'KPI not found' });
+            return;
+        }
+        await MetricTagService.reorderForKpi(req.params.id, order);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });

@@ -33,11 +33,14 @@ import {
     PublicLocation,
     PublicEvidence,
     PublicBeneficiaryGroup,
+    PublicMetricTag,
     InitiativeDashboard,
     LocationDetail
 } from '../services/publicApi'
 import PublicLoader from '../components/public/PublicLoader'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
+import PublicTagFilter from '../components/public/PublicTagFilter'
+import PublicTagChip from '../components/public/PublicTagChip'
 import DateRangePicker from '../components/DateRangePicker'
 import { getLocalDateString, formatDate } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
@@ -189,6 +192,15 @@ export default function PublicInitiativePage() {
     const [showLocationDropdown, setShowLocationDropdown] = useState(false)
     const locationBtnRef = React.useRef<HTMLButtonElement>(null)
 
+    // Tag filter
+    const [tags, setTags] = useState<PublicMetricTag[]>([])
+    const tagsById = useMemo(() => {
+        const map = new Map<string, PublicMetricTag>()
+        for (const t of tags) map.set(t.id, t)
+        return map
+    }, [tags])
+    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+
     // Date filter state - initialize from URL params
     const [dateFilter, setDateFilter] = useState<{ singleDate?: string; startDate?: string; endDate?: string }>(() => {
         const s = searchParams.get('startDate')
@@ -228,6 +240,31 @@ export default function PublicInitiativePage() {
             publicApi.getOrganizationInitiatives(orgSlug).then(setAllInitiatives).catch(console.error)
         }
     }, [orgSlug])
+
+    // Load org-wide tag catalog so the tag filter and chips know names/colors.
+    useEffect(() => {
+        if (orgSlug) {
+            publicApi.getOrganizationTags(orgSlug).then(setTags).catch(() => setTags([]))
+        }
+    }, [orgSlug])
+
+    // Tags actually present on this initiative's content (KPIs/stories/evidence).
+    // Limits the dropdown to relevant tags rather than the whole org catalog.
+    const initiativeTagIds = useMemo(() => {
+        const set = new Set<string>()
+        for (const k of dashboard?.kpis || []) {
+            for (const id of k.tag_ids || []) set.add(id)
+            for (const u of k.updates || []) if (u.tag_id) set.add(u.tag_id)
+        }
+        for (const s of stories || []) for (const id of s.tag_ids || []) set.add(id)
+        for (const e of evidence || []) for (const id of e.tag_ids || []) set.add(id)
+        return set
+    }, [dashboard, stories, evidence])
+
+    const initiativeTags = useMemo(
+        () => tags.filter(t => initiativeTagIds.has(t.id)),
+        [tags, initiativeTagIds]
+    )
 
     const loadInitiative = async (isSwitch = false) => {
         try {
@@ -285,11 +322,23 @@ export default function PublicInitiativePage() {
     }
 
     // Filter helpers
-    const hasActiveFilters = startDate || endDate || selectedLocationIds.length > 0
+    const hasActiveFilters = startDate || endDate || selectedLocationIds.length > 0 || selectedTagIds.length > 0
 
     const clearFilters = () => {
         setDateFilter({})
         setSelectedLocationIds([])
+        setSelectedTagIds([])
+    }
+
+    const tagMatchesAny = (ids: string[] | undefined | null) => {
+        if (selectedTagIds.length === 0) return true
+        if (!ids || ids.length === 0) return false
+        return ids.some(id => selectedTagIds.includes(id))
+    }
+    const tagMatchesSingle = (id: string | undefined | null) => {
+        if (selectedTagIds.length === 0) return true
+        if (!id) return false
+        return selectedTagIds.includes(id)
     }
 
     // Locations available for the dropdown (from dashboard or loaded locations)
@@ -314,21 +363,22 @@ export default function PublicInitiativePage() {
         navigate(`${orgLinkBase}/${orgSlug}/${slug}${queryString ? `?${queryString}` : ''}`)
     }
 
-    // Filter dashboard KPIs by date — filter each KPI's updates and recalculate totals
+    // Filter dashboard KPIs by date + tag — filter each KPI's updates and recalculate totals
     const filteredDashboard = useMemo(() => {
         if (!dashboard) return null
-        if (!startDate && !endDate) return dashboard
+        if (!startDate && !endDate && selectedTagIds.length === 0) return dashboard
 
         const sd = startDate ? new Date(startDate) : null
         const ed = endDate ? new Date(endDate + 'T23:59:59') : null
 
-        const filteredKpis = dashboard.kpis.map(kpi => {
+        let filteredKpis = dashboard.kpis.map(kpi => {
             if (!kpi.updates || kpi.updates.length === 0) return kpi
 
             const filtered = kpi.updates.filter(u => {
                 const d = new Date(u.date_represented)
                 if (sd && d < sd) return false
                 if (ed && d > ed) return false
+                if (selectedTagIds.length > 0 && !tagMatchesSingle(u.tag_id)) return false
                 return true
             })
 
@@ -341,10 +391,19 @@ export default function PublicInitiativePage() {
             }
         })
 
-        return { ...dashboard, kpis: filteredKpis }
-    }, [dashboard, startDate, endDate])
+        if (selectedTagIds.length > 0) {
+            // Drop KPIs that have neither matching tags nor matching updates so
+            // the metrics list reflects the filter instead of zeroed-out cards.
+            filteredKpis = filteredKpis.filter(kpi => {
+                if (tagMatchesAny(kpi.tag_ids)) return true
+                return (kpi.updates || []).length > 0
+            })
+        }
 
-    // Filter stories by date + location
+        return { ...dashboard, kpis: filteredKpis }
+    }, [dashboard, startDate, endDate, selectedTagIds])
+
+    // Filter stories by date + location + tags
     const filteredStories = useMemo(() => {
         if (!stories) return null
         let filtered = stories
@@ -354,6 +413,10 @@ export default function PublicInitiativePage() {
                 const storyLocIds = s.locations?.map((l: any) => l.id) || (s.location?.id ? [s.location.id] : [])
                 return storyLocIds.some((id: string) => selectedLocationIds.includes(id))
             })
+        }
+
+        if (selectedTagIds.length > 0) {
+            filtered = filtered.filter(s => tagMatchesAny(s.tag_ids))
         }
 
         if (startDate || endDate) {
@@ -366,9 +429,9 @@ export default function PublicInitiativePage() {
         }
 
         return filtered
-    }, [stories, startDate, endDate, selectedLocationIds])
+    }, [stories, startDate, endDate, selectedLocationIds, selectedTagIds])
 
-    // Filter evidence by date + location
+    // Filter evidence by date + location + tags
     const filteredEvidence = useMemo(() => {
         if (!evidence) return null
         let filtered = evidence
@@ -382,6 +445,10 @@ export default function PublicInitiativePage() {
             })
         }
 
+        if (selectedTagIds.length > 0) {
+            filtered = filtered.filter(e => tagMatchesAny(e.tag_ids))
+        }
+
         if (startDate || endDate) {
             filtered = filtered.filter(e => {
                 if (!e.date_represented) return true
@@ -393,7 +460,7 @@ export default function PublicInitiativePage() {
         }
 
         return filtered
-    }, [evidence, startDate, endDate, selectedLocationIds])
+    }, [evidence, startDate, endDate, selectedLocationIds, selectedTagIds])
 
     // Early returns for initial loading/error states must come before accessing dashboard
     if (initialLoading && !initiative) {
@@ -468,15 +535,15 @@ export default function PublicInitiativePage() {
                             <button
                                 ref={initiativeBtnRef}
                                 onClick={() => { setShowInitiativeDropdown(!showInitiativeDropdown); setShowLocationDropdown(false) }}
-                                className="flex items-center pl-0 pr-1.5 sm:pr-3 h-7 sm:h-9 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] sm:text-xs font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
+                                className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
                             >
-                                <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
-                                    <Target className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600" />
+                                <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
+                                    <Target className="w-3.5 h-3.5 text-gray-600" />
                                 </div>
-                                <span className="ml-1 sm:ml-2 max-w-[60px] sm:max-w-[100px] md:max-w-[140px] truncate text-gray-900">
+                                <span className="ml-1 sm:ml-1.5 max-w-[60px] sm:max-w-[90px] md:max-w-[120px] truncate text-gray-900">
                                     {initiative.title}
                                 </span>
-                                <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-400 ml-0.5 sm:ml-1" />
+                                <ChevronDown className="w-3 h-3 text-gray-400 ml-0.5" />
                             </button>
 
                             {/* Date Range Picker */}
@@ -486,7 +553,7 @@ export default function PublicInitiativePage() {
                                     onChange={setDateFilter}
                                     maxDate={getLocalDateString(new Date())}
                                     placeholder="Date"
-                                    className="[&>button]:h-7 sm:[&>button]:h-9 [&>button]:text-[11px] sm:[&>button]:text-xs [&>button]:pr-1.5 sm:[&>button]:pr-3 [&>button>div]:w-7 sm:[&>button>div]:w-9 [&>button>div]:h-7 sm:[&>button>div]:h-9 [&>button>div>svg]:w-3.5 sm:[&>button>div>svg]:w-4 [&>button>div>svg]:h-3.5 sm:[&>button>div>svg]:h-4 [&>button>span]:ml-1 sm:[&>button>span]:ml-2"
+                                    className="[&>button]:h-7 [&>button]:text-[11px] [&>button]:pr-1.5 sm:[&>button]:pr-2.5 [&>button>div]:w-7 [&>button>div]:h-7 [&>button>div>svg]:w-3.5 [&>button>div>svg]:h-3.5 [&>button>span]:ml-1 sm:[&>button>span]:ml-1.5"
                                 />
                             </div>
 
@@ -495,31 +562,38 @@ export default function PublicInitiativePage() {
                                 <button
                                     ref={locationBtnRef}
                                     onClick={() => { setShowLocationDropdown(!showLocationDropdown); setShowInitiativeDropdown(false) }}
-                                    className="flex items-center pl-0 pr-1.5 sm:pr-3 h-7 sm:h-9 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] sm:text-xs font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
+                                    className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
                                 >
-                                    <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
-                                        <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600" />
+                                    <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
+                                        <MapPin className="w-3.5 h-3.5 text-gray-600" />
                                     </div>
-                                    <span className={`ml-1 sm:ml-2 max-w-[60px] sm:max-w-[100px] md:max-w-[140px] truncate ${selectedLocationIds.length > 0 ? 'text-gray-900' : 'text-gray-500'}`}>
+                                    <span className={`ml-1 sm:ml-1.5 max-w-[60px] sm:max-w-[90px] md:max-w-[120px] truncate ${selectedLocationIds.length > 0 ? 'text-gray-900' : 'text-gray-500'}`}>
                                         {selectedLocationIds.length > 0
                                             ? `${selectedLocationIds.length} loc.`
                                             : 'Location'
                                         }
                                     </span>
                                     {selectedLocationIds.length > 0 ? (
-                                        <X className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-400 hover:text-gray-600 ml-0.5 sm:ml-1" onClick={(e) => { e.stopPropagation(); setSelectedLocationIds([]) }} />
+                                        <X className="w-3 h-3 text-gray-400 hover:text-gray-600 ml-0.5 sm:ml-1" onClick={(e) => { e.stopPropagation(); setSelectedLocationIds([]) }} />
                                     ) : (
-                                        <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-400 ml-0.5 sm:ml-1" />
+                                        <ChevronDown className="w-3 h-3 text-gray-400 ml-0.5" />
                                     )}
                                 </button>
                             )}
 
+                            <PublicTagFilter
+                                tags={initiativeTags}
+                                selectedTagIds={selectedTagIds}
+                                onChange={setSelectedTagIds}
+                                onOpenChange={(open) => { if (open) { setShowInitiativeDropdown(false); setShowLocationDropdown(false) } }}
+                            />
+
                             {hasActiveFilters && (
                                 <button
                                     onClick={clearFilters}
-                                    className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-1 sm:py-1.5 text-[10px] sm:text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                                    className="flex items-center gap-0.5 px-1.5 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
                                 >
-                                    <X className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> Clear
+                                    <X className="w-2.5 h-2.5" /> Clear
                                 </button>
                             )}
                         </div>
@@ -742,11 +816,11 @@ export default function PublicInitiativePage() {
                             </div>
                         ) : (
                             <>
-                                {activeTab === 'overview' && filteredDashboard && <InitiativeOverviewTab initiative={initiative} dashboard={filteredDashboard} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} />}
-                                {activeTab === 'metrics' && filteredDashboard && <MetricsTab dashboard={filteredDashboard} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} />}
-                                {activeTab === 'stories' && <StoriesTab stories={filteredStories} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} />}
+                                {activeTab === 'overview' && filteredDashboard && <InitiativeOverviewTab initiative={initiative} dashboard={filteredDashboard} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} tagsById={tagsById} onTagClick={(id) => setSelectedTagIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])} selectedTagIds={selectedTagIds} />}
+                                {activeTab === 'metrics' && filteredDashboard && <MetricsTab dashboard={filteredDashboard} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} tagsById={tagsById} onTagClick={(id) => setSelectedTagIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])} selectedTagIds={selectedTagIds} />}
+                                {activeTab === 'stories' && <StoriesTab stories={filteredStories} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} tagsById={tagsById} onTagClick={(id) => setSelectedTagIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])} selectedTagIds={selectedTagIds} />}
                                 {activeTab === 'locations' && <LocationsTab locations={locations || dashboard.locations} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} />}
-                                {activeTab === 'evidence' && <EvidenceTab evidence={filteredEvidence} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} />}
+                                {activeTab === 'evidence' && <EvidenceTab evidence={filteredEvidence} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} tagsById={tagsById} onTagClick={(id) => setSelectedTagIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])} selectedTagIds={selectedTagIds} />}
                                 {activeTab === 'beneficiaries' && <BeneficiariesTab beneficiaries={beneficiaries} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} />}
                             </>
                         )}
@@ -788,12 +862,15 @@ const CATEGORY_COLORS = {
 }
 
 // Initiative Overview - Modern dashboard with multi-line chart like MetricsDashboard
-function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug, dateQS = '' }: {
+function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug, dateQS = '', tagsById, onTagClick, selectedTagIds }: {
     initiative: PublicInitiative;
     dashboard: InitiativeDashboard;
     orgSlug: string;
     initiativeSlug: string;
     dateQS?: string;
+    tagsById?: Map<string, PublicMetricTag>;
+    onTagClick?: (id: string) => void;
+    selectedTagIds?: string[];
 }) {
     const orgLinkBase = useOrgLinkBase()
     const brandColor = initiative.organization_brand_color || '#c0dfa1'
@@ -1387,11 +1464,14 @@ function generateMetricSlug(title: string): string {
 }
 
 // Metrics Tab - Shows all metrics with links to detail pages
-function MetricsTab({ dashboard, orgSlug, initiativeSlug, dateQS = '' }: {
+function MetricsTab({ dashboard, orgSlug, initiativeSlug, dateQS = '', tagsById, onTagClick, selectedTagIds }: {
     dashboard: InitiativeDashboard;
     orgSlug: string;
     initiativeSlug: string;
     dateQS?: string;
+    tagsById?: Map<string, PublicMetricTag>;
+    onTagClick?: (id: string) => void;
+    selectedTagIds?: string[];
 }) {
     const orgLinkBase = useOrgLinkBase()
     const { kpis } = dashboard
@@ -1451,6 +1531,27 @@ function MetricsTab({ dashboard, orgSlug, initiativeSlug, dateQS = '' }: {
                                 <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{kpi.description}</p>
                             )}
 
+                            {tagsById && kpi.tag_ids && kpi.tag_ids.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mb-3" onClick={(e) => e.preventDefault()}>
+                                    {kpi.tag_ids.slice(0, 5).map(id => {
+                                        const t = tagsById.get(id)
+                                        if (!t) return null
+                                        return (
+                                            <PublicTagChip
+                                                key={id}
+                                                name={t.name}
+                                                size="xs"
+                                                selected={selectedTagIds?.includes(id)}
+                                                onClick={onTagClick ? () => onTagClick(id) : undefined}
+                                            />
+                                        )
+                                    })}
+                                    {kpi.tag_ids.length > 5 && (
+                                        <span className="text-[10px] text-muted-foreground px-1">+{kpi.tag_ids.length - 5}</span>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Main Value */}
                             <div className="mb-4">
                                 <div className="flex items-baseline gap-2">
@@ -1482,7 +1583,15 @@ function MetricsTab({ dashboard, orgSlug, initiativeSlug, dateQS = '' }: {
     )
 }
 
-function StoriesTab({ stories, orgSlug, initiativeSlug, dateQS = '' }: { stories: PublicStory[] | null; orgSlug: string; initiativeSlug: string; dateQS?: string }) {
+function StoriesTab({ stories, orgSlug, initiativeSlug, dateQS = '', tagsById, onTagClick, selectedTagIds }: {
+    stories: PublicStory[] | null
+    orgSlug: string
+    initiativeSlug: string
+    dateQS?: string
+    tagsById?: Map<string, PublicMetricTag>
+    onTagClick?: (id: string) => void
+    selectedTagIds?: string[]
+}) {
     const orgLinkBase = useOrgLinkBase()
     if (!stories) return <LoadingState />
     if (stories.length === 0) return <EmptyState icon={BookOpen} message="No stories available yet." />
@@ -1520,6 +1629,26 @@ function StoriesTab({ stories, orgSlug, initiativeSlug, dateQS = '' }: { stories
                     <div className="p-4">
                         <h3 className="font-semibold text-foreground mb-2 group-hover:text-accent transition-colors">{story.title}</h3>
                         {story.description && <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{story.description}</p>}
+                        {tagsById && story.tag_ids && story.tag_ids.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-2" onClick={(e) => e.preventDefault()}>
+                                {story.tag_ids.slice(0, 4).map(id => {
+                                    const t = tagsById.get(id)
+                                    if (!t) return null
+                                    return (
+                                        <PublicTagChip
+                                            key={id}
+                                            name={t.name}
+                                            size="xs"
+                                            selected={selectedTagIds?.includes(id)}
+                                            onClick={onTagClick ? () => onTagClick(id) : undefined}
+                                        />
+                                    )
+                                })}
+                                {story.tag_ids.length > 4 && (
+                                    <span className="text-[10px] text-muted-foreground px-1">+{story.tag_ids.length - 4}</span>
+                                )}
+                            </div>
+                        )}
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-accent" />{formatDate(story.date_represented)}</span>
                             {(story.locations?.length || story.location?.name) && (
@@ -1816,7 +1945,15 @@ function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { loc
     )
 }
 
-function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evidence: PublicEvidence[] | null; orgSlug: string; initiativeSlug: string; dateQS?: string }) {
+function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById, onTagClick, selectedTagIds }: {
+    evidence: PublicEvidence[] | null
+    orgSlug: string
+    initiativeSlug: string
+    dateQS?: string
+    tagsById?: Map<string, PublicMetricTag>
+    onTagClick?: (id: string) => void
+    selectedTagIds?: string[]
+}) {
     const orgLinkBase = useOrgLinkBase()
     const [displayCount, setDisplayCount] = useState(8)
     const [selectedTypes, setSelectedTypes] = useState<string[]>([])
@@ -2155,6 +2292,26 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '' }: { evide
                                 </div>
                                 <h3 className="font-semibold text-foreground text-sm mb-1 group-hover:text-accent transition-colors">{item.title}</h3>
                                 {item.description && <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{item.description}</p>}
+                                {tagsById && item.tag_ids && item.tag_ids.length > 0 && (
+                                    <div className="mt-1 mb-2 flex flex-wrap gap-1" onClick={e => e.stopPropagation()}>
+                                        {item.tag_ids.slice(0, 4).map(id => {
+                                            const t = tagsById.get(id)
+                                            if (!t) return null
+                                            return (
+                                                <PublicTagChip
+                                                    key={id}
+                                                    name={t.name}
+                                                    size="xs"
+                                                    selected={selectedTagIds?.includes(id)}
+                                                    onClick={onTagClick ? () => onTagClick(id) : undefined}
+                                                />
+                                            )
+                                        })}
+                                        {item.tag_ids.length > 4 && (
+                                            <span className="text-[10px] text-muted-foreground px-1">+{item.tag_ids.length - 4}</span>
+                                        )}
+                                    </div>
+                                )}
                                 {/* Impact Claims */}
                                 {item.impact_claims && item.impact_claims.length > 0 ? (
                                     <div className="mt-2 flex flex-wrap gap-1" onClick={e => e.stopPropagation()}>

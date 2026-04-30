@@ -9,9 +9,10 @@ import {
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { publicApi, PublicImpactClaimDetail, PublicEvidence } from '../services/publicApi'
+import { publicApi, PublicImpactClaimDetail, PublicEvidence, PublicMetricTag } from '../services/publicApi'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
+import PublicTagChip from '../components/public/PublicTagChip'
 import DateRangePicker from '../components/DateRangePicker'
 import { getLocalDateString, formatDate } from '../utils'
 
@@ -78,6 +79,7 @@ export default function PublicImpactClaimPage() {
     })
 
     const [claim, setClaim] = useState<PublicImpactClaimDetail | null>(null)
+    const [tags, setTags] = useState<PublicMetricTag[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
@@ -92,8 +94,12 @@ export default function PublicImpactClaimPage() {
             try {
                 setLoading(true)
                 setError(null)
-                const data = await publicApi.getImpactClaimDetail(orgSlug, initiativeSlug, claimId)
+                const [data, orgTags] = await Promise.all([
+                    publicApi.getImpactClaimDetail(orgSlug, initiativeSlug, claimId),
+                    publicApi.getOrganizationTags(orgSlug).catch(() => []),
+                ])
                 setClaim(data)
+                setTags(orgTags)
             } catch (err) {
                 console.error('Error loading impact claim:', err)
                 setError('Failed to load impact claim')
@@ -126,6 +132,7 @@ export default function PublicImpactClaimPage() {
     }
 
     const config = categoryConfig[claim.metric.category] || categoryConfig.output
+    const tagsById = new Map<string, PublicMetricTag>(tags.map(t => [t.id, t]))
     const brandColor = claim.initiative.brand_color || '#c0dfa1'
 
     const hasDateRange = claim.date_range_start && claim.date_range_end
@@ -231,6 +238,11 @@ export default function PublicImpactClaimPage() {
                             </h1>
                             {claim.metric.description && (
                                 <p className="text-sm sm:text-lg text-gray-600 max-w-2xl line-clamp-2 sm:line-clamp-none">{claim.metric.description}</p>
+                            )}
+                            {claim.tag_id && tagsById.get(claim.tag_id) && (
+                                <div className="mt-2">
+                                    <PublicTagChip name={tagsById.get(claim.tag_id)!.name} size="sm" />
+                                </div>
                             )}
                         </div>
 
@@ -364,6 +376,7 @@ export default function PublicImpactClaimPage() {
                     setCurrentFileIndex={setCurrentFileIndex}
                     orgSlug={orgSlug!}
                     initiativeSlug={initiativeSlug!}
+                    tagsById={tagsById}
                 />
             </div>
 
@@ -396,7 +409,7 @@ function generateMetricSlug(title: string): string {
 }
 
 // ===== Evidence Gallery Section =====
-function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex, setGalleryIndex, currentFileIndex, setCurrentFileIndex, orgSlug, initiativeSlug }: {
+function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex, setGalleryIndex, currentFileIndex, setCurrentFileIndex, orgSlug, initiativeSlug, tagsById }: {
     evidence: PublicEvidence[]
     evidenceCount: number
     config: { bg: string; text: string; accent: string }
@@ -406,6 +419,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
     initiativeSlug: string
     currentFileIndex: number
     setCurrentFileIndex: (i: number | ((prev: number) => number)) => void
+    tagsById?: Map<string, PublicMetricTag>
 }) {
     const orgLinkBase = useOrgLinkBase()
     const [selectedTypes, setSelectedTypes] = useState<string[]>([])
@@ -681,6 +695,15 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                         </div>
                                         <h3 className="font-semibold text-gray-800 text-sm mb-1 group-hover:text-accent transition-colors">{ev.title}</h3>
                                         {ev.description && <p className="text-xs text-gray-500 line-clamp-2">{ev.description}</p>}
+                                        {tagsById && (ev as any).tag_ids && (ev as any).tag_ids.length > 0 && (
+                                            <div className="flex flex-wrap gap-1 mt-1.5">
+                                                {(ev as any).tag_ids.slice(0, 3).map((id: string) => {
+                                                    const t = tagsById.get(id)
+                                                    if (!t) return null
+                                                    return <PublicTagChip key={id} name={t.name} size="xs" />
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 </button>
                             )

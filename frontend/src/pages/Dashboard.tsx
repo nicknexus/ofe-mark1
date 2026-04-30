@@ -704,6 +704,7 @@ export default function Dashboard() {
                                     locations={allLocations}
                                     onLocationClick={handleLocationClick}
                                     hideEmptyBanner
+                                    autoFit
                                 />
                             </div>
                         </div>
