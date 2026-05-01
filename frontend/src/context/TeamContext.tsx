@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { TeamService, UserPermissions, AccessibleOrganization } from '../services/team'
+import { apiService } from '../services/api'
 
 interface TeamContextType {
     permissions: UserPermissions | null
@@ -60,6 +62,7 @@ const TeamContext = createContext<TeamContextType>({
 const ACTIVE_ORG_STORAGE_KEY = 'nexus-active-org-id'
 
 export function TeamProvider({ children }: { children: React.ReactNode }) {
+    const navigate = useNavigate()
     const [permissions, setPermissions] = useState<UserPermissions | null>(null)
     const [accessibleOrganizations, setAccessibleOrganizations] = useState<AccessibleOrganization[]>([])
     const [activeOrgId, setActiveOrgId] = useState<string | null>(() => {
@@ -123,13 +126,22 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
 
     const switchOrganization = useCallback((orgId: string) => {
         const org = accessibleOrganizations.find(o => o.id === orgId)
-        if (org) {
-            setActiveOrgId(orgId)
-            localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, orgId)
-            // Reload the page to refresh all data for new org context
-            window.location.reload()
+        if (!org) return
+        if (orgId === activeOrgId) return
+
+        // Flush every cached payload. Cache keys include the active org id, so
+        // future requests will repopulate cleanly under the new org. Pages that
+        // depend on `activeOrganization?.id` will re-fetch automatically.
+        apiService.clearCache()
+        localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, orgId)
+        setActiveOrgId(orgId)
+        // Most internal routes are org-scoped (initiative ids, metric slugs,
+        // location ids belong to the previous org). Land the user on the
+        // dashboard so they don't get a 404 / forbidden after the switch.
+        if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+            navigate('/', { replace: true })
         }
-    }, [accessibleOrganizations])
+    }, [accessibleOrganizations, activeOrgId, navigate])
 
     const activeOrganization = accessibleOrganizations.find(o => o.id === activeOrgId) || null
     // Real (non-demo) owned org — this is what the app treats as "my organization".

@@ -79,8 +79,12 @@ class ApiService {
         // Get user ID to include in cache key so different users don't share cache
         const { data: { session } } = await supabase.auth.getSession()
         const userId = session?.user?.id || 'anonymous'
+        // Active org id is part of the key — switching orgs must not return
+        // another org's payload from the in-memory cache. Backend already scopes
+        // by `X-Organization-Id`, this just keeps the client cache honest.
+        const activeOrgId = localStorage.getItem('nexus-active-org-id') || 'no-org'
 
-        return `${userId}:${options.method || 'GET'}:${endpoint}:${JSON.stringify(options.body || {})}`
+        return `${userId}:${activeOrgId}:${options.method || 'GET'}:${endpoint}:${JSON.stringify(options.body || {})}`
     }
 
     private async sleep(ms: number): Promise<void> {

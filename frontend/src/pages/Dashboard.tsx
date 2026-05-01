@@ -226,7 +226,12 @@ function NextStepsCard({
 export default function Dashboard() {
     const navigate = useNavigate()
     const { startTutorial } = useTutorial()
-    const { isOwner, isSharedMember, organizationName, ownedOrganization } = useTeam()
+    const { isOwner, isSharedMember, organizationName, ownedOrganization, activeOrganization } = useTeam()
+    // Phase 1 (full-access baseline): team members see the full dashboard, including
+    // the right rail (Context Score / Next Steps / Tags). All of those read from
+    // activeOrganization so a team member sees the org they're scoped into, not a
+    // missing ownedOrganization.
+    const dashboardOrg = activeOrganization || ownedOrganization
     // Phase 1 (full-access baseline): any member of the active org can create/edit/delete
     // initiatives. Account-level widgets (logo, branding, public toggle) remain owner-only.
     const canManageInitiatives = isOwner || isSharedMember
@@ -253,22 +258,36 @@ export default function Dashboard() {
     const loadingPromise = useRef<Promise<void> | null>(null)
 
     useEffect(() => {
-        if (!isOwner || !ownedOrganization?.id) return
+        if (!dashboardOrg?.id) return
         let cancelled = false
         setContextLoaded(false)
-        apiService.getOrgContext(ownedOrganization.id)
+        apiService.getOrgContext(dashboardOrg.id)
             .then(ctx => { if (!cancelled) { setOrgContext(ctx); setContextLoaded(true) } })
             .catch(() => { if (!cancelled) { setOrgContext(null); setContextLoaded(true) } })
         return () => { cancelled = true }
-    }, [isOwner, ownedOrganization?.id])
+    }, [dashboardOrg?.id])
+
+    // Trigger initial load AND re-trigger on org switch. dashboardOrg?.id
+    // is the active org (or owner fallback) — switching orgs flips this and we
+    // want a fresh data fetch under the new scope.
+    useEffect(() => {
+        if (!dashboardOrg?.id) return
+        // Reset stale lists immediately so the UI doesn't show the previous
+        // org's data while the new fetch is in flight.
+        setInitiatives([])
+        setAllKPIs([])
+        setAllLocations([])
+        setTotalEvidence(0)
+        setOrgContext(null)
+        setContextLoaded(false)
+        setIsLoadingStats(true)
+        // Drop any in-flight promise from the previous org so loadAllData's
+        // dedupe guard doesn't return the old promise to the new effect.
+        loadingPromise.current = null
+        loadingPromise.current = loadAllData()
+    }, [dashboardOrg?.id])
 
     useEffect(() => {
-        // Only load if not already loading and no promise in progress
-        if (!isLoadingData && !loadingPromise.current) {
-            loadingPromise.current = loadAllData()
-        }
-
-        // Listen for tutorial trigger from header
         const handleShowTutorial = () => {
             startTutorial()
         }
@@ -468,7 +487,7 @@ export default function Dashboard() {
     const nextSteps = useMemo(() => {
         type Step = { id: string; label: string; icon: React.ReactNode; to?: string; onClick?: () => void }
         const steps: Step[] = []
-        const o = ownedOrganization
+        const o = dashboardOrg
         const firstInit = initiatives[0]?.id
         if (!o?.logo_url) steps.push({ id: 'logo', label: 'Upload your logo', to: '/account?tab=branding', icon: <ImageIcon className="w-4 h-4" /> })
         if (!o?.brand_color) steps.push({ id: 'brand', label: 'Pick a brand color', to: '/account?tab=branding', icon: <Palette className="w-4 h-4" /> })
@@ -489,9 +508,10 @@ export default function Dashboard() {
             steps.push({ id: 'context', label: `Finish context page (${contextScore.done}/${contextScore.total})`, to: '/context', icon: <Compass className="w-4 h-4" /> })
         }
         return steps.slice(0, 4)
-    }, [ownedOrganization, initiatives, allKPIs, allLocations, totalEvidence, contextScore])
+    }, [dashboardOrg, initiatives, allKPIs, allLocations, totalEvidence, contextScore])
 
-    const showOwnerWidgets = isOwner && !!ownedOrganization
+    // Right rail is shown whenever there's an active org context — owner or team member.
+    const showOwnerWidgets = !!dashboardOrg
 
     if (loadingState.isLoading) {
         return (
