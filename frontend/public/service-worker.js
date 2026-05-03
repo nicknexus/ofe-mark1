@@ -13,6 +13,9 @@ const NETWORK_ONLY_PATTERNS = [
     /stripe\.com/,
     /googleapis\.com\/auth/,
     /accounts\.google\.com/,
+    // Embed widget assets — always fetch fresh so widget changes propagate.
+    /\/embed\.js(\?|$)/,
+    /\/embed\//,
 ]
 
 function isNetworkOnly(url) {

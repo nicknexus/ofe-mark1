@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
     ArrowLeft, User as UserIcon, Mail, Building2, Save, HardDrive, Info, Clock, CreditCard, Calendar,
     Sparkles, ExternalLink, Settings, Zap, Users, ChevronRight, Plus, Rocket, Trash2, AlertTriangle, X,
-    UserPlus, RefreshCw, Send, ToggleLeft, Camera, Upload, Palette, Globe, Lock, Link, Heart
+    UserPlus, RefreshCw, Send, ToggleLeft, Camera, Upload, Palette, Globe, Lock, Link, Heart, Code2, Copy
 } from 'lucide-react'
 import { AuthService } from '../services/auth'
 import { formatDate } from '../utils'
@@ -26,7 +26,7 @@ interface Props {
     subscriptionStatus?: SubscriptionStatus | null
 }
 
-type TabType = 'account' | 'organization' | 'teams' | 'branding' | 'storage' | 'billing' | 'danger'
+type TabType = 'account' | 'organization' | 'teams' | 'branding' | 'widget' | 'storage' | 'billing' | 'danger'
 
 export default function AccountPage({ subscriptionStatus }: Props) {
     const navigate = useNavigate()
@@ -381,6 +381,7 @@ export default function AccountPage({ subscriptionStatus }: Props) {
         { id: 'organization' as TabType, label: 'Organization', icon: Building2, requiresOrg: true },
         { id: 'teams' as TabType, label: 'Teams', icon: Users, requiresOrg: true },
         { id: 'branding' as TabType, label: 'Branding', icon: Palette, requiresOrg: true },
+        { id: 'widget' as TabType, label: 'Embed Widget', icon: Code2, requiresOrg: true },
         { id: 'storage' as TabType, label: 'Storage', icon: HardDrive },
         { id: 'billing' as TabType, label: 'Billing', icon: CreditCard },
         { id: 'danger' as TabType, label: 'Delete Account', icon: Trash2, danger: true },
@@ -498,6 +499,13 @@ export default function AccountPage({ subscriptionStatus }: Props) {
                                 handleLogoUpload={handleLogoUpload}
                                 handleDeleteLogo={handleDeleteLogo}
                                 onBrandColorChange={handleBrandColorChange}
+                            />
+                        )}
+
+                        {activeTab === 'widget' && hasOwnOrganization && (
+                            <WidgetTab
+                                orgSlug={ownedOrganization?.slug}
+                                isPublic={ownedOrganization?.is_public}
                             />
                         )}
 
@@ -1378,5 +1386,204 @@ function DangerTab({ hasOwnOrganization, showDeleteModal, setShowDeleteModal, de
                 </div>
             )}
         </>
+    )
+}
+
+// ============================================
+// Widget Tab — embeddable widget for donor sites
+// ============================================
+function WidgetTab({ orgSlug, isPublic }: { orgSlug?: string; isPublic?: boolean }) {
+    const [initiatives, setInitiatives] = useState<number>(1)
+    const [metrics, setMetrics] = useState<number>(3)
+    const [maxWidth, setMaxWidth] = useState<number>(640)
+    const [copied, setCopied] = useState<'snippet' | 'iframe' | null>(null)
+    const previewRef = useRef<HTMLIFrameElement>(null)
+
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.nexusimpacts.ai'
+    const previewSrc = orgSlug
+        ? `${origin}/embed/${orgSlug}?initiatives=${initiatives}&metrics=${metrics}`
+        : ''
+
+    // Auto-grow the preview iframe in response to its postMessage events.
+    useEffect(() => {
+        function onMessage(ev: MessageEvent) {
+            if (!previewRef.current || ev.source !== previewRef.current.contentWindow) return
+            const data: any = ev.data
+            if (!data || data.type !== 'nexus:embed:height') return
+            if (typeof data.height !== 'number') return
+            previewRef.current.style.height = `${data.height}px`
+        }
+        window.addEventListener('message', onMessage)
+        return () => window.removeEventListener('message', onMessage)
+    }, [])
+
+    const snippet = orgSlug
+        ? `<div data-nexus-widget data-org="${orgSlug}" data-initiatives="${initiatives}" data-metrics="${metrics}"${maxWidth !== 640 ? ` data-max-width="${maxWidth}"` : ''}></div>
+<script src="${origin}/embed.js" async></script>`
+        : ''
+
+    const iframeSnippet = orgSlug
+        ? `<iframe src="${previewSrc}" style="width:100%;max-width:${maxWidth}px;border:0;height:600px" loading="lazy" title="Nexus Impacts widget"></iframe>`
+        : ''
+
+    function copy(text: string, kind: 'snippet' | 'iframe') {
+        navigator.clipboard.writeText(text).then(() => {
+            setCopied(kind)
+            toast.success('Copied to clipboard')
+            window.setTimeout(() => setCopied(null), 1500)
+        })
+    }
+
+    if (!orgSlug) {
+        return (
+            <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-8 text-center">
+                <p className="text-sm text-gray-600">Set up your organization first to enable the embed widget.</p>
+            </div>
+        )
+    }
+
+    return (
+        <div className="space-y-6">
+            {/* Intro */}
+            <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
+                <div className="flex items-start gap-3 mb-4">
+                    <div className="p-2 bg-primary-50 rounded-xl"><Code2 className="w-5 h-5 text-primary-600" /></div>
+                    <div className="flex-1">
+                        <h2 className="text-lg font-semibold text-gray-800">Embed Widget</h2>
+                        <p className="text-sm text-gray-500 mt-0.5">
+                            Give donors a live, branded snapshot of your impact to drop into their websites,
+                            newsletters, or fundraising pages. Updates automatically as your data changes.
+                        </p>
+                    </div>
+                </div>
+
+                {!isPublic && (
+                    <div className="flex items-start gap-2 px-3 py-2.5 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-900">
+                        <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                        <div>
+                            Your organization isn't public yet. The widget can only render when your public profile is enabled.
+                            Toggle it on under the <span className="font-medium">Account</span> tab.
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Configuration */}
+            <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
+                <h3 className="text-sm font-semibold text-gray-800 mb-4">Customize</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Initiatives</label>
+                        <select
+                            value={initiatives}
+                            onChange={e => setInitiatives(parseInt(e.target.value, 10))}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none"
+                        >
+                            <option value={1}>1 (compact)</option>
+                            <option value={2}>2</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Hero metrics</label>
+                        <select
+                            value={metrics}
+                            onChange={e => setMetrics(parseInt(e.target.value, 10))}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none"
+                        >
+                            <option value={2}>2</option>
+                            <option value={3}>3</option>
+                            <option value={4}>4</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Max width (px)</label>
+                        <input
+                            type="number"
+                            min={320}
+                            max={1024}
+                            step={20}
+                            value={maxWidth}
+                            onChange={e => setMaxWidth(parseInt(e.target.value, 10) || 640)}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Live preview */}
+            <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-semibold text-gray-800">Live preview</h3>
+                    <a
+                        href={previewSrc}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-gray-500 hover:text-gray-800 inline-flex items-center gap-1"
+                    >
+                        Open in new tab <ExternalLink className="w-3 h-3" />
+                    </a>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4 sm:p-6 flex justify-center">
+                    <div style={{ width: '100%', maxWidth: `${maxWidth}px` }}>
+                        <iframe
+                            ref={previewRef}
+                            src={previewSrc}
+                            title="Widget preview"
+                            style={{
+                                width: '100%',
+                                height: 320,
+                                border: 0,
+                                borderRadius: 16,
+                                background: '#fff',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(15,23,42,0.06)',
+                                transition: 'height 200ms ease',
+                            }}
+                            referrerPolicy="no-referrer-when-downgrade"
+                            loading="lazy"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Copy snippet */}
+            <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
+                <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-gray-800">Drop-in snippet</h3>
+                    <button
+                        onClick={() => copy(snippet, 'snippet')}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                    >
+                        <Copy className="w-3.5 h-3.5" />
+                        {copied === 'snippet' ? 'Copied!' : 'Copy'}
+                    </button>
+                </div>
+                <p className="text-xs text-gray-500 mb-3">
+                    Paste this anywhere in the donor's HTML. The widget auto-resizes to its content; nothing else required.
+                </p>
+                <pre className="bg-gray-900 text-gray-100 text-xs leading-relaxed font-mono rounded-xl p-4 overflow-x-auto whitespace-pre-wrap break-all">
+{snippet}
+                </pre>
+            </div>
+
+            {/* Iframe fallback */}
+            <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
+                <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-gray-800">Plain iframe (no script)</h3>
+                    <button
+                        onClick={() => copy(iframeSnippet, 'iframe')}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                    >
+                        <Copy className="w-3.5 h-3.5" />
+                        {copied === 'iframe' ? 'Copied!' : 'Copy'}
+                    </button>
+                </div>
+                <p className="text-xs text-gray-500 mb-3">
+                    Use this if the donor's site (e.g. Squarespace, Wix) blocks third-party scripts. The widget won't auto-resize, so set a fixed height that fits your content.
+                </p>
+                <pre className="bg-gray-900 text-gray-100 text-xs leading-relaxed font-mono rounded-xl p-4 overflow-x-auto whitespace-pre-wrap break-all">
+{iframeSnippet}
+                </pre>
+            </div>
+        </div>
     )
 }

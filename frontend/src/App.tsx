@@ -47,6 +47,7 @@ import AdminDemosPage from './pages/admin/AdminDemosPage'
 import TermsOfServicePage from './pages/TermsOfServicePage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import OfferCheckoutPage from './pages/OfferCheckoutPage'
+import EmbedPage from './pages/EmbedPage'
 import Layout from './components/Layout'
 
 // Hook to detect mobile
@@ -168,6 +169,7 @@ function App() {
         <>
             <Route path="/explore" element={<ExplorePage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/embed/:slug" element={<EmbedPage />} />
             <Route path="/offer/:slug" element={<OfferCheckoutPage />} />
             <Route path="/org/:slug" element={<PublicOrganizationPage />} />
             <Route path="/org/:slug/context" element={<PublicOrgContextPage />} />
@@ -188,6 +190,21 @@ function App() {
             <Route path="/demo/:orgSlug/:initiativeSlug/beneficiary/:groupId" element={<PublicBeneficiaryGroupPage />} />
         </>
     )
+
+    // ─── EMBED WIDGET ──────────────────────────────────────────────────
+    // The embeddable widget renders inside an iframe on third-party sites and
+    // must bypass all auth/subscription/PWA gating. Keep this above every
+    // other branch so it loads instantly regardless of session state.
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/embed/')) {
+        return (
+            <Router>
+                <Routes>
+                    <Route path="/embed/:slug" element={<EmbedPage />} />
+                    <Route path="*" element={<EmbedPage />} />
+                </Routes>
+            </Router>
+        )
+    }
 
     // ─── PWA STANDALONE MODE ───────────────────────────────────────────
     if (standalone) {
@@ -344,6 +361,7 @@ function App() {
                                 <Routes>
                                     <Route path="/reset-password" element={<ResetPasswordPage />} />
                                     <Route path="/offer/:slug" element={<OfferCheckoutPage />} />
+                                    <Route path="/embed/:slug" element={<EmbedPage />} />
                                     <Route path="/org/:slug" element={<PublicOrganizationPage />} />
                                     <Route path="/org/:slug/context" element={<PublicOrgContextPage />} />
                                     <Route path="/org/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
