@@ -1,12 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
-import { ArrowRight, MapPin } from 'lucide-react'
+import { useParams } from 'react-router-dom'
+import { ArrowRight, Heart, ShieldCheck } from 'lucide-react'
 import {
     publicApi,
     PublicOrganization,
-    PublicInitiative,
     PublicKPI,
-    PublicLocation,
+    PublicStory,
     OrganizationStats,
 } from '../services/publicApi'
 
@@ -34,19 +33,30 @@ function readableOn(hex: string): string {
     return L > 0.55 ? '#111827' : '#ffffff'
 }
 
+// Synthesise a "stat card" for padding when an org has fewer than 4 metrics with totals.
+type StatCard = {
+    id: string
+    value: string
+    label: string
+}
+
+function metricToCard(m: PublicKPI): StatCard {
+    return {
+        id: m.id,
+        value: m.metric_type === 'percentage'
+            ? `${Math.round(m.total_value || 0)}%`
+            : formatBig(m.total_value || 0),
+        label: m.unit_of_measurement || m.title,
+    }
+}
+
 export default function EmbedPage() {
     const { slug } = useParams<{ slug: string }>()
-    const [searchParams] = useSearchParams()
-
-    // ── Configuration from query params (set by embed.js bootstrapper) ──
-    const initiativeCount = Math.min(2, Math.max(1, parseInt(searchParams.get('initiatives') || '1', 10) || 1))
-    const metricCount = Math.min(4, Math.max(2, parseInt(searchParams.get('metrics') || '3', 10) || 3))
 
     const [org, setOrg] = useState<PublicOrganization | null>(null)
     const [stats, setStats] = useState<OrganizationStats | null>(null)
-    const [initiatives, setInitiatives] = useState<PublicInitiative[]>([])
     const [metrics, setMetrics] = useState<PublicKPI[]>([])
-    const [locations, setLocations] = useState<PublicLocation[]>([])
+    const [stories, setStories] = useState<PublicStory[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const rootRef = useRef<HTMLDivElement>(null)
@@ -59,18 +69,16 @@ export default function EmbedPage() {
         async function load() {
             try {
                 setLoading(true)
-                const [orgRes, inits, mets, locs] = await Promise.all([
+                const [orgRes, mets, sts] = await Promise.all([
                     publicApi.getOrganization(slug!),
-                    publicApi.getOrganizationInitiatives(slug!),
                     publicApi.getOrganizationMetrics(slug!),
-                    publicApi.getOrganizationLocations(slug!).catch(() => [] as PublicLocation[]),
+                    publicApi.getOrganizationStories(slug!, 6).catch(() => [] as PublicStory[]),
                 ])
                 if (cancelled) return
                 setOrg(orgRes.organization)
                 setStats(orgRes.stats)
-                setInitiatives(inits)
                 setMetrics(mets)
-                setLocations(locs)
+                setStories(sts)
             } catch (err: any) {
                 if (cancelled) return
                 setError(err?.message || 'Failed to load')
@@ -109,54 +117,43 @@ export default function EmbedPage() {
             window.removeEventListener('load', onLoad)
             window.clearInterval(interval)
         }
-    }, [slug, loading, initiatives.length, metrics.length])
+    }, [slug, loading, metrics.length, stories.length])
 
-    // ── Computed: hero stats (top metrics by total_value, fallback to org stats) ──
-    const heroMetrics = useMemo(() => {
-        const sorted = [...metrics]
+    // ── Build exactly 4 hero stat cards. Real metrics first, padded with org stats. ──
+    const heroCards = useMemo<StatCard[]>(() => {
+        const real = [...metrics]
             .filter(m => (m.total_value || 0) > 0)
             .sort((a, b) => (b.total_value || 0) - (a.total_value || 0))
-            .slice(0, metricCount)
-        return sorted
-    }, [metrics, metricCount])
+            .slice(0, 4)
+            .map(metricToCard)
 
-    // ── Featured initiatives (most recently created) ──
-    const featuredInitiatives = useMemo(() => {
-        const sorted = [...initiatives].sort((a, b) => {
-            const da = a.created_at ? new Date(a.created_at).getTime() : 0
-            const db = b.created_at ? new Date(b.created_at).getTime() : 0
-            return db - da
-        })
-        return sorted.slice(0, initiativeCount)
-    }, [initiatives, initiativeCount])
+        if (real.length >= 4 || !stats) return real
 
-    // For each featured initiative, grab its top 2 metrics
-    const initiativeTopMetrics = useMemo(() => {
-        const map = new Map<string, PublicKPI[]>()
-        for (const init of featuredInitiatives) {
-            const top = metrics
-                .filter(m => m.initiative_id === init.id && (m.total_value || 0) > 0)
-                .sort((a, b) => (b.total_value || 0) - (a.total_value || 0))
-                .slice(0, 2)
-            map.set(init.id, top)
+        const padding: StatCard[] = []
+        if (stats.initiatives > 0) padding.push({ id: 'pad-init', value: String(stats.initiatives), label: stats.initiatives === 1 ? 'Initiative' : 'Initiatives' })
+        if (stats.locations > 0) padding.push({ id: 'pad-loc', value: String(stats.locations), label: stats.locations === 1 ? 'Location' : 'Locations' })
+        if (stats.stories > 0) padding.push({ id: 'pad-st', value: String(stats.stories), label: stats.stories === 1 ? 'Story' : 'Stories' })
+        if (stats.kpis > 0) padding.push({ id: 'pad-kpi', value: String(stats.kpis), label: stats.kpis === 1 ? 'Metric' : 'Metrics' })
+
+        const out = [...real]
+        for (const p of padding) {
+            if (out.length >= 4) break
+            out.push(p)
         }
-        return map
-    }, [featuredInitiatives, metrics])
+        return out
+    }, [metrics, stats])
+
+    // ── Pick up to 3 stories with a photo first, then any other recent story. ──
+    const featuredStories = useMemo(() => {
+        const withPhoto = stories.filter(s => s.media_url && s.media_type === 'photo')
+        const others = stories.filter(s => !(s.media_url && s.media_type === 'photo'))
+        return [...withPhoto, ...others].slice(0, 3)
+    }, [stories])
 
     const brand = org?.brand_color || '#c0dfa1'
     const brandText = readableOn(brand)
-    // CTAs link out to the live public page on whatever origin this embed is being
-    // served from (so dev → localhost, prod → www.nexusimpacts.ai, future custom
-    // domain → that domain). Always opens at the top of the donor's tab.
     const siteOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://www.nexusimpacts.ai'
     const publicUrl = org ? `${siteOrigin}/org/${org.slug}` : '#'
-
-    // Derive country count for the locations strip.
-    const countryCount = useMemo(() => {
-        const set = new Set<string>()
-        for (const l of locations) if (l.country) set.add(l.country)
-        return set.size
-    }, [locations])
 
     // ── Render ──
     if (error) {
@@ -169,175 +166,258 @@ export default function EmbedPage() {
 
     if (loading || !org) {
         return (
-            <div ref={rootRef} className="min-h-[280px] flex items-center justify-center p-6 bg-white">
-                <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin" />
+            <div ref={rootRef} className="min-h-[320px] flex items-center justify-center p-6 bg-white">
+                <div className="w-7 h-7 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin" />
             </div>
         )
     }
 
+    // Soft brand-tinted background that adapts to the org's brand colour.
+    const widgetBg = `linear-gradient(135deg, ${brand}10 0%, ${brand}05 60%, #ffffff 100%)`
+
     return (
-        <div ref={rootRef} className="bg-white text-gray-900 antialiased">
-            <div className="max-w-[640px] mx-auto p-4 sm:p-5">
-                {/* Header */}
-                <div className="flex items-center gap-3">
-                    {org.logo_url ? (
-                        <img
-                            src={org.logo_url}
-                            alt={org.name}
-                            className="w-10 h-10 rounded-lg object-cover bg-gray-50 flex-shrink-0"
-                        />
-                    ) : (
-                        <div
-                            className="w-10 h-10 rounded-lg flex items-center justify-center font-semibold text-base flex-shrink-0"
-                            style={{ backgroundColor: brand, color: brandText }}
-                        >
-                            {org.name.charAt(0).toUpperCase()}
-                        </div>
-                    )}
-                    <div className="min-w-0">
-                        <div className="text-[15px] font-semibold leading-tight truncate">{org.name}</div>
-                        {org.statement && (
-                            <div className="text-[12px] text-gray-500 leading-snug line-clamp-1 mt-0.5">
-                                {org.statement}
+        <div
+            ref={rootRef}
+            className="text-gray-900 antialiased"
+            style={{ background: widgetBg }}
+        >
+            <div className="w-full px-5 py-5 sm:px-7 sm:py-7">
+
+                {/* ── Top bar: org branding (left) | Nexus Impacts (right) ── */}
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <a
+                        href={publicUrl}
+                        target="_top"
+                        rel="noopener"
+                        className="flex items-center gap-2.5 group min-w-0"
+                    >
+                        {org.logo_url ? (
+                            <img
+                                src={org.logo_url}
+                                alt={org.name}
+                                className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl object-cover bg-white flex-shrink-0"
+                            />
+                        ) : (
+                            <div
+                                className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center font-semibold text-base sm:text-lg flex-shrink-0"
+                                style={{ backgroundColor: brand, color: brandText }}
+                            >
+                                {org.name.charAt(0).toUpperCase()}
                             </div>
                         )}
-                    </div>
-                </div>
-
-                {/* Brand-coloured underline */}
-                <div className="mt-3 h-[3px] rounded-full" style={{ backgroundColor: brand }} />
-
-                {/* Hero stats */}
-                {heroMetrics.length > 0 && (
-                    <div className={`mt-4 grid gap-2 ${heroMetrics.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
-                        {heroMetrics.map(m => (
-                            <div
-                                key={m.id}
-                                className="rounded-xl px-3 py-3 border border-gray-100 bg-gray-50/60"
-                            >
-                                <div className="text-[20px] font-bold leading-none tabular-nums" style={{ color: brand, filter: 'saturate(1.2) brightness(0.85)' }}>
-                                    {m.metric_type === 'percentage'
-                                        ? `${Math.round(m.total_value || 0)}%`
-                                        : formatBig(m.total_value || 0)}
-                                </div>
-                                <div className="mt-1 text-[11px] text-gray-600 leading-tight line-clamp-2">
-                                    {m.unit_of_measurement || m.title}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {/* Initiatives */}
-                {featuredInitiatives.length > 0 && (
-                    <div className="mt-4 space-y-2.5">
-                        {featuredInitiatives.map(init => {
-                            const top = initiativeTopMetrics.get(init.id) || []
-                            return (
-                                <a
-                                    key={init.id}
-                                    href={`${siteOrigin}/org/${org.slug}/${init.slug}`}
-                                    target="_top"
-                                    rel="noopener"
-                                    className="block group rounded-xl border border-gray-100 bg-white hover:border-gray-200 transition-colors overflow-hidden"
-                                >
-                                    <div className="flex">
-                                        {/* Brand strip */}
-                                        <div className="w-1.5 flex-shrink-0" style={{ backgroundColor: brand }} />
-                                        <div className="p-3 flex-1 min-w-0">
-                                            <div className="flex items-start gap-2">
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="text-[13px] font-semibold leading-snug truncate">
-                                                        {init.title}
-                                                    </div>
-                                                    {init.description && (
-                                                        <div className="mt-0.5 text-[11.5px] text-gray-500 leading-snug line-clamp-2">
-                                                            {init.description}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all flex-shrink-0 mt-0.5" />
-                                            </div>
-                                            {top.length > 0 && (
-                                                <div className="mt-2 flex flex-wrap gap-1.5">
-                                                    {top.map(m => (
-                                                        <span
-                                                            key={m.id}
-                                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"
-                                                            style={{ backgroundColor: `${brand}25`, color: '#1f2937' }}
-                                                        >
-                                                            <span className="font-semibold tabular-nums" style={{ color: brand, filter: 'saturate(1.2) brightness(0.7)' }}>
-                                                                {m.metric_type === 'percentage'
-                                                                    ? `${Math.round(m.total_value || 0)}%`
-                                                                    : formatBig(m.total_value || 0)}
-                                                            </span>
-                                                            <span className="text-gray-700">{m.unit_of_measurement || m.title}</span>
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </a>
-                            )
-                        })}
-                    </div>
-                )}
-
-                {/* Locations summary */}
-                {locations.length > 0 && (
-                    <div className="mt-3 flex items-center gap-1.5 text-[11.5px] text-gray-500">
-                        <MapPin className="w-3.5 h-3.5" style={{ color: brand }} />
-                        <span>
-                            Active in {locations.length} location{locations.length === 1 ? '' : 's'}
-                            {countryCount > 1 ? ` across ${countryCount} countries` : ''}
+                        <span className="text-[16px] sm:text-[18px] font-semibold tracking-tight text-gray-900 truncate group-hover:underline">
+                            {org.name}
                         </span>
-                    </div>
-                )}
+                    </a>
 
-                {/* CTA */}
-                <a
-                    href={publicUrl}
-                    target="_top"
-                    rel="noopener"
-                    className="mt-4 group inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-all hover:shadow-md"
-                    style={{
-                        backgroundColor: brand,
-                        color: brandText,
-                        boxShadow: `0 1px 0 ${brand}, 0 4px 12px ${brand}30`,
-                    }}
-                >
-                    View full impact
-                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
-                </a>
-
-                {/* Nexus Impacts attribution — wordmark with logo, with a hairline divider */}
-                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-center">
                     <a
                         href="https://nexusimpacts.ai"
                         target="_top"
                         rel="noopener"
-                        className="inline-flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors group"
+                        className="inline-flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors group flex-shrink-0"
                     >
-                        <span className="text-[10px] uppercase tracking-[0.08em] text-gray-400">Powered by</span>
                         <img
                             src="/Nexuslogo.png"
                             alt=""
-                            className="w-5 h-5 object-contain opacity-80 group-hover:opacity-100 transition-opacity"
+                            className="w-7 h-7 object-contain opacity-95 group-hover:opacity-100 transition-opacity"
                         />
-                        <span className="text-[14px] font-newsreader font-extralight tracking-tight">
+                        <span className="text-[17px] sm:text-[19px] font-newsreader font-extralight tracking-tight">
                             Nexus Impacts
                         </span>
                     </a>
                 </div>
 
-                {/* Debug-only stats fallback when no metric totals are available */}
-                {heroMetrics.length === 0 && stats && (
-                    <div className="hidden">
-                        {/* Reserved for future fallback hero. */}
-                        {stats.kpis} {stats.locations} {stats.stories} {stats.initiatives}
+                {/* ── Body: left intro column | right metrics + stories column ── */}
+                <div className="mt-6 sm:mt-8 grid grid-cols-1 md:grid-cols-12 gap-6 sm:gap-8">
+
+                    {/* LEFT: headline + description + CTA — vertically centred, content centred */}
+                    <div className="md:col-span-4 flex flex-col items-center text-center md:justify-center">
+                        <h2 className="text-[28px] sm:text-[34px] leading-[1.05] font-semibold tracking-tight text-gray-900">
+                            Real Impact.
+                            <br />
+                            <span style={{ color: brand, filter: 'saturate(1.15) brightness(0.92)' }}>
+                                Real Change.
+                            </span>
+                            <Heart
+                                className="inline-block ml-1.5 align-baseline"
+                                style={{ width: 20, height: 20, color: brand, fill: brand, filter: 'saturate(1.15) brightness(0.92)' }}
+                            />
+                        </h2>
+
+                        {org.statement && (
+                            <p className="mt-4 text-[15px] sm:text-[15.5px] leading-relaxed text-gray-600 max-w-[34ch]">
+                                {org.statement}
+                            </p>
+                        )}
+
+                        <a
+                            href={publicUrl}
+                            target="_top"
+                            rel="noopener"
+                            className="mt-6 group inline-flex items-center gap-2 rounded-full px-5 py-3 text-[12.5px] font-semibold uppercase tracking-[0.08em] transition-all hover:shadow-lg"
+                            style={{
+                                backgroundColor: '#0f172a',
+                                color: '#ffffff',
+                                boxShadow: `0 6px 20px ${brand}35`,
+                            }}
+                        >
+                            See our full impact
+                            <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+                        </a>
+
+                        <a
+                            href="https://nexusimpacts.ai"
+                            target="_top"
+                            rel="noopener"
+                            className="mt-3 text-[11px] text-gray-400 hover:text-gray-700 transition-colors"
+                        >
+                            Powered by Nexus Impacts
+                        </a>
                     </div>
-                )}
+
+                    {/* RIGHT: 4 metric cards + 3 stories */}
+                    <div className="md:col-span-8 flex flex-col gap-5">
+
+                        {/* Metric cards: auto-fits 1–4 columns based on available width. */}
+                        {heroCards.length > 0 && (
+                            <div
+                                className="grid gap-2.5 sm:gap-3"
+                                style={{
+                                    gridTemplateColumns: `repeat(auto-fit, minmax(120px, 1fr))`,
+                                }}
+                            >
+                                {heroCards.map(c => (
+                                    <div
+                                        key={c.id}
+                                        className="rounded-2xl bg-white border border-gray-100 px-3 py-4 sm:py-5 text-center shadow-sm"
+                                    >
+                                        <div
+                                            className="text-[22px] sm:text-[26px] font-bold leading-none tabular-nums tracking-tight"
+                                            style={{ color: '#0f172a' }}
+                                        >
+                                            {c.value}
+                                        </div>
+                                        <div className="mt-1.5 text-[11px] sm:text-[12px] leading-tight text-gray-600 line-clamp-3">
+                                            {c.label}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Stories section */}
+                        {featuredStories.length > 0 && (
+                            <div>
+                                <div className="flex items-center justify-between gap-3 mb-2.5">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                        <Heart
+                                            className="flex-shrink-0"
+                                            style={{ width: 14, height: 14, color: brand, fill: brand, filter: 'saturate(1.15) brightness(0.92)' }}
+                                        />
+                                        <span className="text-[13px] sm:text-[14px] font-semibold tracking-tight text-gray-900 truncate">
+                                            Real Stories. Real Impact.
+                                        </span>
+                                    </div>
+                                    <a
+                                        href={publicUrl}
+                                        target="_top"
+                                        rel="noopener"
+                                        className="inline-flex items-center gap-1 text-[10.5px] sm:text-[11px] uppercase tracking-[0.08em] font-semibold whitespace-nowrap transition-colors"
+                                        style={{ color: brand, filter: 'saturate(1.15) brightness(0.85)' }}
+                                    >
+                                        View all stories
+                                        <ArrowRight className="w-3 h-3" />
+                                    </a>
+                                </div>
+
+                                <div className={`grid gap-2.5 sm:gap-3 ${
+                                    featuredStories.length === 1 ? 'grid-cols-1' :
+                                    featuredStories.length === 2 ? 'grid-cols-2' :
+                                    'grid-cols-1 sm:grid-cols-3'
+                                }`}>
+                                    {featuredStories.map(s => (
+                                        <a
+                                            key={s.id}
+                                            href={publicUrl}
+                                            target="_top"
+                                            rel="noopener"
+                                            className="group block rounded-2xl overflow-hidden bg-white border border-gray-100 shadow-sm hover:shadow-md transition-shadow"
+                                        >
+                                            {s.media_url && s.media_type === 'photo' ? (
+                                                <div className="aspect-[4/3] overflow-hidden bg-gray-100">
+                                                    <img
+                                                        src={s.media_url}
+                                                        alt={s.title}
+                                                        className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                                                        loading="lazy"
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div
+                                                    className="aspect-[4/3] flex items-center justify-center"
+                                                    style={{ background: `linear-gradient(135deg, ${brand}40, ${brand}15)` }}
+                                                >
+                                                    <Heart
+                                                        style={{ width: 28, height: 28, color: brand, fill: brand, filter: 'saturate(1.15) brightness(0.92)' }}
+                                                    />
+                                                </div>
+                                            )}
+                                            <div className="p-3">
+                                                <div className="text-[12.5px] font-semibold leading-snug text-gray-900 line-clamp-2">
+                                                    {s.title}
+                                                </div>
+                                                {s.description && (
+                                                    <div className="mt-1 text-[11.5px] leading-snug text-gray-600 line-clamp-2">
+                                                        {s.description}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Bottom transparency strip ── */}
+            <div
+                className="px-5 py-3.5 sm:px-7 sm:py-4 flex items-center justify-between gap-4 flex-wrap border-t"
+                style={{
+                    backgroundColor: `${brand}10`,
+                    borderColor: `${brand}25`,
+                }}
+            >
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div
+                        className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: `${brand}30` }}
+                    >
+                        <ShieldCheck
+                            className="w-4 h-4"
+                            style={{ color: brand, filter: 'saturate(1.15) brightness(0.85)' }}
+                        />
+                    </div>
+                    <div className="min-w-0">
+                        <div className="text-[12px] sm:text-[12.5px] font-semibold text-gray-900 leading-tight">
+                            Transparency you can trust. Impact you can see.
+                        </div>
+                        <div className="text-[11px] text-gray-600 leading-tight mt-0.5">
+                            All impact data is verified and updated in real time.
+                        </div>
+                    </div>
+                </div>
+                <a
+                    href="https://nexusimpacts.ai"
+                    target="_top"
+                    rel="noopener"
+                    className="inline-flex items-center gap-1 text-[11px] sm:text-[11.5px] font-semibold uppercase tracking-[0.06em] whitespace-nowrap transition-colors hover:underline"
+                    style={{ color: brand, filter: 'saturate(1.15) brightness(0.85)' }}
+                >
+                    Learn more
+                    <ArrowRight className="w-3 h-3" />
+                </a>
             </div>
         </div>
     )

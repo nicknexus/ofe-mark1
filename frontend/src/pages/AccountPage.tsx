@@ -1393,44 +1393,63 @@ function DangerTab({ hasOwnOrganization, showDeleteModal, setShowDeleteModal, de
 // Widget Tab — embeddable widget for donor sites
 // ============================================
 function WidgetTab({ orgSlug, isPublic }: { orgSlug?: string; isPublic?: boolean }) {
-    const [initiatives, setInitiatives] = useState<number>(1)
-    const [metrics, setMetrics] = useState<number>(3)
-    const [maxWidth, setMaxWidth] = useState<number>(640)
-    const [copied, setCopied] = useState<'snippet' | 'iframe' | null>(null)
+    const [copied, setCopied] = useState(false)
+    const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop')
     const previewRef = useRef<HTMLIFrameElement>(null)
+    const previewWrapRef = useRef<HTMLDivElement>(null)
+    const [scale, setScale] = useState(1)
 
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.nexusimpacts.ai'
-    const previewSrc = orgSlug
-        ? `${origin}/embed/${orgSlug}?initiatives=${initiatives}&metrics=${metrics}`
-        : ''
+    const previewSrc = orgSlug ? `${origin}/embed/${orgSlug}` : ''
 
     // Auto-grow the preview iframe in response to its postMessage events.
+    // Track the natural (pre-scale) height so we can resize the visible wrapper.
+    const [naturalHeight, setNaturalHeight] = useState(420)
     useEffect(() => {
         function onMessage(ev: MessageEvent) {
             if (!previewRef.current || ev.source !== previewRef.current.contentWindow) return
             const data: any = ev.data
             if (!data || data.type !== 'nexus:embed:height') return
             if (typeof data.height !== 'number') return
+            setNaturalHeight(data.height)
             previewRef.current.style.height = `${data.height}px`
         }
         window.addEventListener('message', onMessage)
         return () => window.removeEventListener('message', onMessage)
     }, [])
 
+    // Width of the natural iframe (matches what donors see) per mode.
+    // Desktop: render wide so the proportions match a real donor's site.
+    // Mobile: standard phone width.
+    const naturalWidth = previewMode === 'desktop' ? 1200 : 380
+
+    // Scale the rendered iframe down to fit the preview wrap. Forces the desktop
+    // preview to feel "wide & short" instead of "narrow & tall".
+    useEffect(() => {
+        const wrap = previewWrapRef.current
+        if (!wrap) return
+        const apply = () => {
+            const w = wrap.getBoundingClientRect().width
+            // Always scale down so the desktop layout fits horizontally even when
+            // the account panel is narrow.
+            setScale(Math.min(1, w / naturalWidth))
+        }
+        apply()
+        const ro = new ResizeObserver(apply)
+        ro.observe(wrap)
+        return () => ro.disconnect()
+    }, [naturalWidth])
+
     const snippet = orgSlug
-        ? `<div data-nexus-widget data-org="${orgSlug}" data-initiatives="${initiatives}" data-metrics="${metrics}"${maxWidth !== 640 ? ` data-max-width="${maxWidth}"` : ''}></div>
+        ? `<div data-nexus-widget data-org="${orgSlug}"></div>
 <script src="${origin}/embed.js" async></script>`
         : ''
 
-    const iframeSnippet = orgSlug
-        ? `<iframe src="${previewSrc}" style="width:100%;max-width:${maxWidth}px;border:0;height:600px" loading="lazy" title="Nexus Impacts widget"></iframe>`
-        : ''
-
-    function copy(text: string, kind: 'snippet' | 'iframe') {
-        navigator.clipboard.writeText(text).then(() => {
-            setCopied(kind)
+    function copySnippet() {
+        navigator.clipboard.writeText(snippet).then(() => {
+            setCopied(true)
             toast.success('Copied to clipboard')
-            window.setTimeout(() => setCopied(null), 1500)
+            window.setTimeout(() => setCopied(false), 1500)
         })
     }
 
@@ -1468,120 +1487,102 @@ function WidgetTab({ orgSlug, isPublic }: { orgSlug?: string; isPublic?: boolean
                 )}
             </div>
 
-            {/* Configuration */}
-            <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
-                <h3 className="text-sm font-semibold text-gray-800 mb-4">Customize</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Initiatives</label>
-                        <select
-                            value={initiatives}
-                            onChange={e => setInitiatives(parseInt(e.target.value, 10))}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none"
-                        >
-                            <option value={1}>1 (compact)</option>
-                            <option value={2}>2</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Hero metrics</label>
-                        <select
-                            value={metrics}
-                            onChange={e => setMetrics(parseInt(e.target.value, 10))}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none"
-                        >
-                            <option value={2}>2</option>
-                            <option value={3}>3</option>
-                            <option value={4}>4</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Max width (px)</label>
-                        <input
-                            type="number"
-                            min={320}
-                            max={1024}
-                            step={20}
-                            value={maxWidth}
-                            onChange={e => setMaxWidth(parseInt(e.target.value, 10) || 640)}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none"
-                        />
-                    </div>
-                </div>
-            </div>
-
             {/* Live preview */}
             <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
                     <h3 className="text-sm font-semibold text-gray-800">Live preview</h3>
-                    <a
-                        href={previewSrc}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-gray-500 hover:text-gray-800 inline-flex items-center gap-1"
-                    >
-                        Open in new tab <ExternalLink className="w-3 h-3" />
-                    </a>
+                    <div className="flex items-center gap-2">
+                        <div className="inline-flex items-center bg-gray-100 rounded-lg p-0.5">
+                            <button
+                                onClick={() => setPreviewMode('desktop')}
+                                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${previewMode === 'desktop' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'
+                                    }`}
+                            >
+                                Desktop
+                            </button>
+                            <button
+                                onClick={() => setPreviewMode('mobile')}
+                                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${previewMode === 'mobile' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'
+                                    }`}
+                            >
+                                Mobile
+                            </button>
+                        </div>
+                        <a
+                            href={previewSrc}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-gray-500 hover:text-gray-800 inline-flex items-center gap-1 ml-1"
+                        >
+                            Open <ExternalLink className="w-3 h-3" />
+                        </a>
+                    </div>
                 </div>
-                <div className="bg-gray-50 rounded-xl p-4 sm:p-6 flex justify-center">
-                    <div style={{ width: '100%', maxWidth: `${maxWidth}px` }}>
+                <div
+                    ref={previewWrapRef}
+                    className="bg-gray-50 rounded-xl p-3 sm:p-4 overflow-hidden flex justify-center"
+                    style={{
+                        // The wrap is exactly as tall as the scaled iframe + padding,
+                        // so the desktop preview reads as wide-and-short, not vertical.
+                        height: naturalHeight * scale + 32,
+                        transition: 'height 200ms ease',
+                    }}
+                >
+                    <div
+                        style={{
+                            width: naturalWidth * scale,
+                            height: naturalHeight * scale,
+                            position: 'relative',
+                        }}
+                    >
                         <iframe
                             ref={previewRef}
                             src={previewSrc}
                             title="Widget preview"
                             style={{
-                                width: '100%',
-                                height: 320,
+                                width: naturalWidth,
+                                height: naturalHeight,
                                 border: 0,
-                                borderRadius: 16,
+                                borderRadius: 20,
                                 background: '#fff',
-                                boxShadow: '0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(15,23,42,0.06)',
-                                transition: 'height 200ms ease',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.04), 0 12px 32px rgba(15,23,42,0.08)',
+                                transform: `scale(${scale})`,
+                                transformOrigin: 'top left',
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
                             }}
                             referrerPolicy="no-referrer-when-downgrade"
                             loading="lazy"
                         />
                     </div>
                 </div>
+                <p className="mt-2 text-[11px] text-gray-400 text-center">
+                    {previewMode === 'desktop'
+                        ? `Shown at ${Math.round(scale * 100)}% of desktop size — donors see it full-size on their site.`
+                        : 'Mobile preview at native width.'}
+                </p>
             </div>
 
             {/* Copy snippet */}
             <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
-                <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-gray-800">Drop-in snippet</h3>
+                <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+                    <div>
+                        <h3 className="text-sm font-semibold text-gray-800">Drop-in snippet</h3>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                            Paste this anywhere in your donor's HTML. The widget auto-resizes to its content.
+                        </p>
+                    </div>
                     <button
-                        onClick={() => copy(snippet, 'snippet')}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                        onClick={copySnippet}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-gray-900 hover:bg-gray-800 rounded-lg transition-colors"
                     >
                         <Copy className="w-3.5 h-3.5" />
-                        {copied === 'snippet' ? 'Copied!' : 'Copy'}
+                        {copied ? 'Copied!' : 'Copy snippet'}
                     </button>
                 </div>
-                <p className="text-xs text-gray-500 mb-3">
-                    Paste this anywhere in the donor's HTML. The widget auto-resizes to its content; nothing else required.
-                </p>
                 <pre className="bg-gray-900 text-gray-100 text-xs leading-relaxed font-mono rounded-xl p-4 overflow-x-auto whitespace-pre-wrap break-all">
 {snippet}
-                </pre>
-            </div>
-
-            {/* Iframe fallback */}
-            <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
-                <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-gray-800">Plain iframe (no script)</h3>
-                    <button
-                        onClick={() => copy(iframeSnippet, 'iframe')}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                    >
-                        <Copy className="w-3.5 h-3.5" />
-                        {copied === 'iframe' ? 'Copied!' : 'Copy'}
-                    </button>
-                </div>
-                <p className="text-xs text-gray-500 mb-3">
-                    Use this if the donor's site (e.g. Squarespace, Wix) blocks third-party scripts. The widget won't auto-resize, so set a fixed height that fits your content.
-                </p>
-                <pre className="bg-gray-900 text-gray-100 text-xs leading-relaxed font-mono rounded-xl p-4 overflow-x-auto whitespace-pre-wrap break-all">
-{iframeSnippet}
                 </pre>
             </div>
         </div>

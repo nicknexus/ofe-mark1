@@ -35,6 +35,7 @@
             border-radius: 16px;
             padding: 16px;
         }
+        section.full { grid-column: 1 / -1; }
         h2 { margin: 0 0 12px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
         .filler {
             color: #475569;
@@ -50,39 +51,31 @@
     </header>
 
     <main>
-        <section>
-            <h2>Default widget</h2>
-            <!-- Drop-in placeholder — replace data-org with any public org slug. -->
+        <section class="full">
+            <h2>Full-width drop-in</h2>
+            <!-- This is exactly what a donor would paste. -->
             <div data-nexus-widget data-org="be-humanitarian"></div>
         </section>
 
         <section>
-            <h2>2 initiatives, 4 metrics, narrower</h2>
-            <div
-                data-nexus-widget
-                data-org="be-humanitarian"
-                data-initiatives="2"
-                data-metrics="4"
-                data-max-width="420"
-            ></div>
+            <h2>Inside a narrow column (mobile-like)</h2>
+            <div data-nexus-widget data-org="be-humanitarian"></div>
         </section>
 
         <section>
             <h2>Some surrounding content</h2>
             <p class="filler">
-                This block proves the widget plays nicely with arbitrary host markup. The widget
-                should auto-resize to its content, with no scrollbars and no CSS bleeding either way.
-            </p>
-            <p class="filler">
-                Try resizing the browser window — the widget tracks the column width.
+                This proves the widget plays nicely with arbitrary host markup. It auto-resizes to its
+                content (no scrollbars), and the layout collapses to a single column inside narrow
+                containers. Resize the browser window to watch it reflow.
             </p>
         </section>
 
-        <section>
-            <h2>Plain iframe fallback</h2>
+        <section class="full">
+            <h2>Plain iframe fallback (works on Squarespace Personal plan)</h2>
             <iframe
-                src="http://localhost:3000/embed/be-humanitarian?initiatives=1&metrics=3"
-                style="width:100%;max-width:640px;border:0;height:600px;border-radius:16px;background:#fff"
+                src="http://localhost:3000/embed/be-humanitarian"
+                style="width:100%;border:0;height:560px;border-radius:16px;background:#fff"
                 loading="lazy"
                 title="Nexus Impacts widget"
             ></iframe>

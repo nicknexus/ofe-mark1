@@ -5,21 +5,16 @@
  *   <div data-nexus-widget data-org="my-org-slug"></div>
  *   <script src="https://www.nexusimpacts.ai/embed.js" async></script>
  *
- * Optional attributes on the placeholder div:
- *   data-org          (required) Org slug, e.g. "acme-foundation"
- *   data-initiatives  Number of initiatives to feature, 1 or 2 (default: 1)
- *   data-metrics      Number of hero metrics, 2-4 (default: 3)
- *   data-max-width    Max widget width in px (default: 640)
- *   data-min-height   Initial min-height in px while loading (default: 320)
- *
- * The iframe auto-resizes to its content via postMessage, so the widget
+ * The widget always fills the width of the container it's dropped into and
+ * adapts its layout (4-up metrics + 3-up stories on desktop, stacked on
+ * mobile) automatically. Auto-resizes height via postMessage so the iframe
  * never has internal scrollbars.
  */
 (function () {
     'use strict';
 
     // ── Detect base URL from the script's own src so dev (localhost) and
-    //    prod (app.nexusimpacts.ai) both work without configuration. ──
+    //    prod (www.nexusimpacts.ai) both work without configuration. ──
     function getBase() {
         try {
             var s = document.currentScript;
@@ -40,56 +35,44 @@
     var BASE = getBase();
     var initialised = new WeakSet();
 
-    function buildSrc(el) {
-        var slug = el.getAttribute('data-org');
-        if (!slug) return null;
-        var params = new URLSearchParams();
-        var initiatives = el.getAttribute('data-initiatives');
-        var metrics = el.getAttribute('data-metrics');
-        if (initiatives) params.set('initiatives', initiatives);
-        if (metrics) params.set('metrics', metrics);
-        var qs = params.toString();
-        return BASE + '/embed/' + encodeURIComponent(slug) + (qs ? '?' + qs : '');
+    function buildSrc(slug) {
+        return BASE + '/embed/' + encodeURIComponent(slug);
     }
 
     function mount(el) {
         if (initialised.has(el)) return;
-        var src = buildSrc(el);
-        if (!src) {
+        var slug = el.getAttribute('data-org');
+        if (!slug) {
             console.warn('[nexus-widget] missing data-org attribute on', el);
             return;
         }
         initialised.add(el);
 
-        var maxWidth = parseInt(el.getAttribute('data-max-width') || '640', 10) || 640;
-        var minHeight = parseInt(el.getAttribute('data-min-height') || '320', 10) || 320;
-        var slug = el.getAttribute('data-org') || '';
-
-        // Wrapper to enforce max-width while allowing host CSS to constrain its parent.
+        // Wrapper isolates the widget visually from host CSS while still
+        // filling whatever container the donor placed it in.
         var wrap = document.createElement('div');
         wrap.style.cssText = [
             'all: initial',
             'display: block',
             'width: 100%',
-            'max-width: ' + maxWidth + 'px',
             'margin: 0 auto',
             'box-sizing: border-box',
-            'border-radius: 16px',
+            'border-radius: 20px',
             'overflow: hidden',
             'background: #ffffff',
-            'box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(15,23,42,0.06)'
+            'box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 12px 32px rgba(15,23,42,0.08)'
         ].join(';');
 
         var iframe = document.createElement('iframe');
-        iframe.src = src;
-        iframe.title = 'Nexus Impacts widget';
+        iframe.src = buildSrc(slug);
+        iframe.title = 'Nexus Impacts — ' + slug;
         iframe.loading = 'lazy';
         iframe.referrerPolicy = 'no-referrer-when-downgrade';
         iframe.setAttribute('allowtransparency', 'true');
         iframe.setAttribute('frameborder', '0');
         iframe.style.cssText = [
             'width: 100%',
-            'height: ' + minHeight + 'px',
+            'height: 480px',
             'border: 0',
             'display: block',
             'background: #ffffff',
@@ -100,18 +83,15 @@
         el.innerHTML = '';
         el.appendChild(wrap);
 
-        // ── Resize handler: listen for height messages from this iframe only. ──
+        // ── Resize handler: trust only messages from this iframe + our origin. ──
         function onMessage(ev) {
-            // Only trust messages from our origin.
             if (!ev || !ev.source || ev.source !== iframe.contentWindow) return;
             try {
-                var originOk = ev.origin === BASE;
-                if (!originOk) return;
+                if (ev.origin !== BASE) return;
             } catch (_) { return; }
             var data = ev.data;
             if (!data || data.type !== 'nexus:embed:height') return;
             if (typeof data.height !== 'number' || data.height < 50) return;
-            // If the widget says it belongs to a specific slug, make sure it matches ours.
             if (data.slug && slug && data.slug !== slug) return;
             iframe.style.height = data.height + 'px';
         }
