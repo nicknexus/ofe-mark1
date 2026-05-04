@@ -100,12 +100,6 @@ class ApiService {
             try {
                 return await requestFn()
             } catch (error: any) {
-                const is429Error = error.message?.includes('Too Many Requests') ||
-                    error.message?.includes('Rate Limit Exceeded') ||
-                    error.message?.includes('429') ||
-                    error.status === 429 ||
-                    (error.response && error.response.status === 429)
-
                 // Connection refused (server not running) - don't retry
                 const isConnectionRefused = error.message?.includes('Failed to fetch') &&
                     (error.name === 'TypeError' || error.constructor?.name === 'TypeError')
@@ -120,14 +114,17 @@ class ApiService {
                     error.message?.includes('Failed to fetch')
                 )
 
-                // Only retry on 429 (rate limit) or transient network errors
-                // Don't retry on connection refused (server not running)
-                if (attempt === maxRetries || (!is429Error && !isNetworkError)) {
+                // Retry only on transient network errors. Do NOT retry on 429:
+                // the rate-limit window is measured in seconds-to-minutes, so a
+                // sub-second exponential backoff is guaranteed to fail and just
+                // burns more quota, deepening the hole. Surface the 429 to the
+                // caller so it can show a friendly "try again in a moment" toast.
+                if (attempt === maxRetries || !isNetworkError) {
                     throw error
                 }
 
-                const delay = baseDelay * Math.pow(2, attempt) // Exponential backoff
-                console.log(`Rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries + 1})`)
+                const delay = baseDelay * Math.pow(2, attempt)
+                console.log(`Network error, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries + 1})`)
                 await this.sleep(delay)
             }
         }

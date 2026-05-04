@@ -78,7 +78,26 @@ export default function EmbedPage() {
     const [stories, setStories] = useState<PublicStory[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [isMobile, setIsMobile] = useState(false)
+    const [mobileStoryIdx, setMobileStoryIdx] = useState(0)
+    // Bumping this nonce when the user manually moves the mobile carousel
+    // (via swipe or dot tap) restarts the 10s rotation timer so the focused
+    // story doesn't snap to the next one a moment later.
+    const [rotateNonce, setRotateNonce] = useState(0)
+    const touchStartXRef = useRef<number | null>(null)
+    const touchDeltaXRef = useRef(0)
     const rootRef = useRef<HTMLDivElement>(null)
+
+    // Track the embed viewport so on mobile we can collapse the 3-up story grid
+    // into a single rotating story (the other two cycle in via a 10s timer).
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+        const mq = window.matchMedia('(max-width: 639px)')
+        const update = () => setIsMobile(mq.matches)
+        update()
+        mq.addEventListener('change', update)
+        return () => mq.removeEventListener('change', update)
+    }, [])
 
     // ── Load data ──
     useEffect(() => {
@@ -205,6 +224,44 @@ export default function EmbedPage() {
         return [...withVisual, ...others].slice(0, 3)
     }, [stories])
 
+    // Auto-rotate the single-card mobile story view every 10s. No-ops on
+    // desktop (where all stories are visible) or when there's only one story.
+    // Restarts when the user manually navigates (rotateNonce bump).
+    useEffect(() => {
+        if (!isMobile) return
+        if (featuredStories.length <= 1) return
+        setMobileStoryIdx(i => (i >= featuredStories.length ? 0 : i))
+        const id = window.setInterval(() => {
+            setMobileStoryIdx(i => (i + 1) % featuredStories.length)
+        }, 10000)
+        return () => window.clearInterval(id)
+    }, [isMobile, featuredStories.length, rotateNonce])
+
+    // Manually advance/retreat the mobile carousel (used by swipe + dots).
+    const goToStory = (next: number) => {
+        if (featuredStories.length === 0) return
+        const len = featuredStories.length
+        setMobileStoryIdx(((next % len) + len) % len)
+        setRotateNonce(n => n + 1)
+    }
+
+    function handleTouchStart(e: React.TouchEvent) {
+        touchStartXRef.current = e.touches[0]?.clientX ?? null
+        touchDeltaXRef.current = 0
+    }
+    function handleTouchMove(e: React.TouchEvent) {
+        if (touchStartXRef.current == null) return
+        touchDeltaXRef.current = (e.touches[0]?.clientX ?? touchStartXRef.current) - touchStartXRef.current
+    }
+    function handleTouchEnd() {
+        const dx = touchDeltaXRef.current
+        touchStartXRef.current = null
+        touchDeltaXRef.current = 0
+        // 40px threshold filters out incidental finger drift on taps.
+        if (Math.abs(dx) < 40) return
+        goToStory(mobileStoryIdx + (dx < 0 ? 1 : -1))
+    }
+
     const brand = org?.brand_color || '#c0dfa1'
     const brandText = readableOn(brand)
     const siteOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://www.nexusimpacts.ai'
@@ -273,11 +330,13 @@ export default function EmbedPage() {
                         </span>
                     </a>
 
+                    {/* Top-right Nexus brand: desktop only. On mobile we move it
+                         below the transparency strip for a cleaner header. */}
                     <a
                         href="https://nexusimpacts.ai"
                         target="_top"
                         rel="noopener"
-                        className="inline-flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors group flex-shrink-0"
+                        className="hidden sm:inline-flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors group flex-shrink-0"
                     >
                         <img
                             src="/Nexuslogo.png"
@@ -409,12 +468,24 @@ export default function EmbedPage() {
                                     </a>
                                 </div>
 
-                                <div className={`grid gap-2.5 sm:gap-3 ${
-                                    featuredStories.length === 1 ? 'grid-cols-1' :
-                                    featuredStories.length === 2 ? 'grid-cols-2' :
-                                    'grid-cols-1 sm:grid-cols-3'
-                                }`}>
-                                    {featuredStories.map(s => (
+                                {(() => {
+                                    const isMobileCarousel = isMobile && featuredStories.length > 1
+                                    const visible = isMobileCarousel
+                                        ? [featuredStories[mobileStoryIdx % featuredStories.length]]
+                                        : featuredStories
+                                    return (
+                                <div
+                                    className={`grid gap-2.5 sm:gap-3 ${
+                                        visible.length === 1 ? 'grid-cols-1' :
+                                        visible.length === 2 ? 'grid-cols-2' :
+                                        'grid-cols-1 sm:grid-cols-3'
+                                    }`}
+                                    onTouchStart={isMobileCarousel ? handleTouchStart : undefined}
+                                    onTouchMove={isMobileCarousel ? handleTouchMove : undefined}
+                                    onTouchEnd={isMobileCarousel ? handleTouchEnd : undefined}
+                                    style={isMobileCarousel ? { touchAction: 'pan-y' } : undefined}
+                                >
+                                    {visible.map(s => (
                                         <a
                                             key={s.id}
                                             href={storyUrl(s)}
@@ -483,6 +554,27 @@ export default function EmbedPage() {
                                         </a>
                                     ))}
                                 </div>
+                                    )
+                                })()}
+
+                                {/* Mobile-only dots: show how many stories are in the rotation. */}
+                                {isMobile && featuredStories.length > 1 && (
+                                    <div className="mt-3 flex items-center justify-center gap-1.5">
+                                        {featuredStories.map((_, i) => (
+                                            <button
+                                                key={i}
+                                                type="button"
+                                                onClick={() => goToStory(i)}
+                                                aria-label={`Show story ${i + 1}`}
+                                                className="h-1.5 rounded-full transition-all"
+                                                style={{
+                                                    width: i === mobileStoryIdx ? 18 : 6,
+                                                    backgroundColor: i === mobileStoryIdx ? brand : `${brand}40`,
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -524,6 +616,24 @@ export default function EmbedPage() {
                     <ArrowRight className="w-3 h-3" />
                 </a>
             </div>
+
+            {/* ── Mobile-only Nexus brand strip (the desktop version sits in
+                 the top-right header). Centred and slightly understated. ── */}
+            <a
+                href="https://nexusimpacts.ai"
+                target="_top"
+                rel="noopener"
+                className="sm:hidden flex items-center justify-center gap-2 px-5 py-3 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+                <img
+                    src="/Nexuslogo.png"
+                    alt=""
+                    className="w-5 h-5 object-contain opacity-90"
+                />
+                <span className="text-[14px] font-newsreader font-extralight tracking-tight">
+                    Nexus Impacts
+                </span>
+            </a>
         </div>
     )
 }

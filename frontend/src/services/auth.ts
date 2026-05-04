@@ -91,31 +91,56 @@ export class AuthService {
         if (error) throw error
     }
 
-    /** No-op kept for backwards compatibility with sign-in/out flows. */
-    static invalidateUserCache() {}
+    /** Short cache + in-flight dedupe for the platform-admin lookup. The
+     *  flag changes very rarely (only when an admin promotes/demotes a user)
+     *  so a 60s TTL is fine, and dedupe means N components mounting at the
+     *  same time only fire one request. */
+    private static adminFlagCache: { userId: string; isAdmin: boolean; ts: number } | null = null
+    private static adminFlagInflight: Promise<boolean> | null = null
+    private static readonly ADMIN_FLAG_TTL_MS = 60_000
+
+    static invalidateUserCache() {
+        this.adminFlagCache = null
+        this.adminFlagInflight = null
+    }
+
+    private static async fetchAdminFlag(userId: string): Promise<boolean> {
+        const now = Date.now()
+        const cached = this.adminFlagCache
+        if (cached && cached.userId === userId && now - cached.ts < this.ADMIN_FLAG_TTL_MS) {
+            return cached.isAdmin
+        }
+        if (this.adminFlagInflight) return this.adminFlagInflight
+
+        const inflight = (async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession()
+                if (!session) return false
+                const resp = await fetch(`${API_URL}/api/auth/me`, {
+                    headers: { Authorization: `Bearer ${session.access_token}` },
+                })
+                if (!resp.ok) return false
+                const me = await resp.json()
+                const isAdmin = !!me?.is_admin
+                this.adminFlagCache = { userId, isAdmin, ts: Date.now() }
+                return isAdmin
+            } catch (err) {
+                console.warn('[AuthService] /me lookup failed:', err)
+                return false
+            } finally {
+                this.adminFlagInflight = null
+            }
+        })()
+        this.adminFlagInflight = inflight
+        return inflight
+    }
 
     static async getCurrentUser(): Promise<User | null> {
         const { data: { user } } = await supabase.auth.getUser()
 
         if (!user) return null
 
-        // Best-effort: fetch platform-admin flag from backend.
-        // Fails silently (e.g. backend cold start, offline) — user is treated as non-admin.
-        let isAdmin = false
-        try {
-            const { data: { session } } = await supabase.auth.getSession()
-            if (session) {
-                const resp = await fetch(`${API_URL}/api/auth/me`, {
-                    headers: { Authorization: `Bearer ${session.access_token}` },
-                })
-                if (resp.ok) {
-                    const me = await resp.json()
-                    isAdmin = !!me?.is_admin
-                }
-            }
-        } catch (err) {
-            console.warn('[AuthService] /me lookup failed:', err)
-        }
+        const isAdmin = await this.fetchAdminFlag(user.id)
 
         return {
             id: user.id,
@@ -145,22 +170,13 @@ export class AuthService {
             // every hour when the token quietly rotates).
             if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
                 apiService.clearCache()
+                AuthService.invalidateUserCache()
             }
 
             if (session?.user) {
-                // Fetch platform-admin flag best-effort.
-                let isAdmin = false
-                try {
-                    const resp = await fetch(`${API_URL}/api/auth/me`, {
-                        headers: { Authorization: `Bearer ${session.access_token}` },
-                    })
-                    if (resp.ok) {
-                        const me = await resp.json()
-                        isAdmin = !!me?.is_admin
-                    }
-                } catch (err) {
-                    console.warn('[AuthService] /me lookup failed in authStateChange:', err)
-                }
+                // Reuse the cached admin flag so a token refresh (which fires
+                // this listener) doesn't re-hit /api/auth/me on every rotation.
+                const isAdmin = await AuthService.fetchAdminFlag(session.user.id)
 
                 const user: User = {
                     id: session.user.id,

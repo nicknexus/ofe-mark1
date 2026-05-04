@@ -174,35 +174,97 @@ export default function PublicStoryPage() {
                 {/* Story Card */}
                 <div className="bg-white/50 backdrop-blur-2xl rounded-2xl sm:rounded-3xl border border-white/60 shadow-2xl shadow-black/10 overflow-hidden">
                     {/* Media */}
-                    {story.media_url && /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(story.media_url) ? (
-                        <div className="w-full aspect-video bg-black">
-                            <iframe
-                                src={`https://www.youtube.com/embed/${(story.media_url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) || [])[1]}`}
-                                title="YouTube video"
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                allowFullScreen
-                                className="w-full h-full"
-                            />
-                        </div>
-                    ) : null}
-                    {story.media_url && story.media_type === 'photo' && !/(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(story.media_url) && (
-                        <div className="w-full min-h-[150px] sm:min-h-[200px] max-h-[50vh] sm:max-h-[70vh] bg-transparent flex items-center justify-center overflow-hidden">
-                            <img
-                                src={story.media_url}
-                                alt={story.title}
-                                className="max-w-full max-h-[50vh] sm:max-h-[70vh] object-contain"
-                            />
-                        </div>
-                    )}
-                    {story.media_type === 'video' && story.media_url && !/(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(story.media_url) && (
-                        <div className="w-full aspect-video bg-black">
-                            <video
-                                src={story.media_url}
-                                controls
-                                className="w-full h-full"
-                            />
-                        </div>
-                    )}
+                    {(() => {
+                        const url = story.media_url
+                        if (!url) {
+                            if (story.media_type === 'text') {
+                                return (
+                                    <div className="w-full h-32 sm:h-48 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
+                                        <FileText className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300" />
+                                    </div>
+                                )
+                            }
+                            return null
+                        }
+
+                        const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+                        if (ytMatch) {
+                            return (
+                                <div className="w-full aspect-video bg-black">
+                                    <iframe
+                                        src={`https://www.youtube.com/embed/${ytMatch[1]}`}
+                                        title="YouTube video"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowFullScreen
+                                        className="w-full h-full"
+                                    />
+                                </div>
+                            )
+                        }
+
+                        // Vimeo: render the player iframe rather than a <video> tag
+                        // (a Vimeo URL isn't a direct video file).
+                        const vimeoMatch = url.match(/(?:vimeo\.com\/(?:video\/)?)(\d+)(?:\/([a-zA-Z0-9]+))?/)
+                        if (vimeoMatch) {
+                            const vid = vimeoMatch[1]
+                            const hash = vimeoMatch[2]
+                            const vimeoSrc = `https://player.vimeo.com/video/${vid}${hash ? `?h=${hash}` : ''}`
+                            return (
+                                <div className="w-full aspect-video bg-black">
+                                    <iframe
+                                        src={vimeoSrc}
+                                        title="Vimeo video"
+                                        allow="autoplay; fullscreen; picture-in-picture; clipboard-write"
+                                        allowFullScreen
+                                        className="w-full h-full"
+                                    />
+                                </div>
+                            )
+                        }
+
+                        if (story.media_type === 'photo') {
+                            return (
+                                <div className="w-full min-h-[150px] sm:min-h-[200px] max-h-[50vh] sm:max-h-[70vh] bg-transparent flex items-center justify-center overflow-hidden">
+                                    <img
+                                        src={url}
+                                        alt={story.title}
+                                        className="max-w-full max-h-[50vh] sm:max-h-[70vh] object-contain"
+                                    />
+                                </div>
+                            )
+                        }
+
+                        if (story.media_type === 'video') {
+                            // Self-uploaded video: playsInline lets it play in
+                            // place on iOS Safari (otherwise it tries to enter
+                            // fullscreen and often silently fails). preload=
+                            // metadata pulls the first frame for a poster.
+                            return (
+                                <div className="w-full aspect-video bg-black">
+                                    <video
+                                        src={url}
+                                        controls
+                                        playsInline
+                                        preload="metadata"
+                                        className="w-full h-full"
+                                    >
+                                        <source src={url} />
+                                        Your browser doesn't support this video format.
+                                    </video>
+                                </div>
+                            )
+                        }
+
+                        if (story.media_type === 'recording') {
+                            return (
+                                <div className="w-full p-6 bg-gradient-to-br from-gray-50 to-white border-b border-gray-100">
+                                    <audio src={url} controls className="w-full" />
+                                </div>
+                            )
+                        }
+
+                        return null
+                    })()}
                     {story.media_type === 'text' && !story.media_url && (
                         <div className="w-full h-32 sm:h-48 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
                             <FileText className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300" />

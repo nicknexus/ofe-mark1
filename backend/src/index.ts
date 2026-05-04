@@ -79,8 +79,26 @@ app.use(cors({
 // Rate limiting - disabled in development to avoid hitting limits during hot reloading
 if (process.env.NODE_ENV === 'production') {
     const limiter = rateLimit({
-        windowMs: 15 * 60 * 1000, // 15 minutes
-        max: 100 // limit each IP to 100 requests per windowMs
+        // 1-minute rolling window keeps the limiter responsive (a temporary
+        // burst doesn't lock the user out for 15 minutes) and the absolute
+        // ceiling is high enough that a real SPA session can't reasonably hit
+        // it without behaving abusively.
+        windowMs: 60 * 1000,
+        max: 300,
+        standardHeaders: true,
+        legacyHeaders: false,
+        // Health checks and per-navigation session-validation endpoints get
+        // hit on basically every page load. Counting them against the
+        // limiter is what turns a normal session into a 429 storm — the
+        // request volume is a property of the SPA, not abuse.
+        skip: (req) => (
+            req.path === '/api/health'
+            || req.path === '/api/auth/me'
+            || req.path === '/api/subscription/status'
+        ),
+        // Public-facing widget/embed and public org pages are anonymous and
+        // hit by donor sites; rate-limit them separately if abuse appears,
+        // not via this user-session limiter.
     });
     app.use(limiter);
 }

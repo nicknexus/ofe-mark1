@@ -407,6 +407,36 @@ export default function PublicOrganizationPage() {
         deepLinkApplied.current = true
     }, [loading, stories, searchParams])
 
+    // Initial load behaviour: show the globe for the first 10 seconds, then
+    // auto-switch to stories. The timer is cancelled the moment the user picks
+    // any view (see `chooseView` below). Skipped entirely when a deep-link
+    // specified a view.
+    const autoSwitchTimerRef = useRef<number | null>(null)
+    useEffect(() => {
+        if (loading) return
+        if (searchParams.get('view')) return
+        autoSwitchTimerRef.current = window.setTimeout(() => {
+            autoSwitchTimerRef.current = null
+            setActiveView(prev => (prev === 'globe' ? 'stories' : prev))
+        }, 10000)
+        return () => {
+            if (autoSwitchTimerRef.current) {
+                window.clearTimeout(autoSwitchTimerRef.current)
+                autoSwitchTimerRef.current = null
+            }
+        }
+    }, [loading, searchParams])
+
+    // User-driven view change: cancel the pending auto-switch immediately so
+    // we never override their click a second later.
+    const chooseView = (v: FeatureView) => {
+        if (autoSwitchTimerRef.current) {
+            window.clearTimeout(autoSwitchTimerRef.current)
+            autoSwitchTimerRef.current = null
+        }
+        setActiveView(v)
+    }
+
     const hasActiveFilters = selectedInitiative !== 'all' || startDate || endDate || selectedLocationIds.length > 0 || selectedTagIds.length > 0
     const clearFilters = () => {
         setSelectedInitiative('all')
@@ -982,7 +1012,7 @@ export default function PublicOrganizationPage() {
                 {/* Mobile Toggle Tabs */}
                 <div className="md:hidden flex items-center gap-2 py-2 px-3 bg-white/40 backdrop-blur-lg border-b border-white/40 flex-shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&>button]:flex-shrink-0">
                     <button
-                        onClick={() => setActiveView('globe')}
+                        onClick={() => chooseView('globe')}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${activeView === 'globe'
                                 ? 'bg-gray-800 text-white'
                                 : 'bg-white/60 text-gray-600'
@@ -992,7 +1022,7 @@ export default function PublicOrganizationPage() {
                         <span>Globe</span>
                     </button>
                     <button
-                        onClick={() => setActiveView('stories')}
+                        onClick={() => chooseView('stories')}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${activeView === 'stories'
                                 ? 'bg-gray-800 text-white'
                                 : 'bg-white/60 text-gray-600'
@@ -1003,7 +1033,7 @@ export default function PublicOrganizationPage() {
                     </button>
                     {highlightCards.length > 0 && (
                         <button
-                            onClick={() => setActiveView('highlights')}
+                            onClick={() => chooseView('highlights')}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${activeView === 'highlights'
                                     ? 'bg-gray-800 text-white'
                                     : 'bg-white/60 text-gray-600'
@@ -1014,7 +1044,7 @@ export default function PublicOrganizationPage() {
                         </button>
                     )}
                     <button
-                        onClick={() => setActiveView('graph')}
+                        onClick={() => chooseView('graph')}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${activeView === 'graph'
                                 ? 'bg-gray-800 text-white'
                                 : 'bg-white/60 text-gray-600'
@@ -1024,7 +1054,7 @@ export default function PublicOrganizationPage() {
                         <span>Graph</span>
                     </button>
                     <button
-                        onClick={() => setActiveView('initiatives')}
+                        onClick={() => chooseView('initiatives')}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${activeView === 'initiatives'
                                 ? 'bg-gray-800 text-white'
                                 : 'bg-white/60 text-gray-600'
@@ -1039,7 +1069,7 @@ export default function PublicOrganizationPage() {
                 <div className="hidden md:flex w-16 flex-shrink-0 flex-col items-center py-4 gap-4 relative z-30">
                     <div className="group relative z-[100]">
                         <button
-                            onClick={() => setActiveView('globe')}
+                            onClick={() => chooseView('globe')}
                             className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${activeView === 'globe'
                                     ? 'bg-gray-800 text-white shadow-lg scale-110'
                                     : 'bg-white/60 backdrop-blur-lg text-gray-600 hover:bg-white/80 hover:scale-105 border border-white/60'
@@ -1053,7 +1083,7 @@ export default function PublicOrganizationPage() {
                     </div>
                     <div className="group relative z-[100]">
                         <button
-                            onClick={() => setActiveView('stories')}
+                            onClick={() => chooseView('stories')}
                             className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${activeView === 'stories'
                                     ? 'bg-gray-800 text-white shadow-lg scale-110'
                                     : 'bg-white/60 backdrop-blur-lg text-gray-600 hover:bg-white/80 hover:scale-105 border border-white/60'
@@ -1068,7 +1098,7 @@ export default function PublicOrganizationPage() {
                     {highlightCards.length > 0 && (
                         <div className="group relative z-[100]">
                             <button
-                                onClick={() => setActiveView('highlights')}
+                                onClick={() => chooseView('highlights')}
                                 className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${activeView === 'highlights'
                                         ? 'bg-gray-800 text-white shadow-lg scale-110'
                                         : 'bg-white/60 backdrop-blur-lg text-gray-600 hover:bg-white/80 hover:scale-105 border border-white/60'
@@ -1083,7 +1113,7 @@ export default function PublicOrganizationPage() {
                     )}
                     <div className="group relative z-[100]">
                         <button
-                            onClick={() => setActiveView('graph')}
+                            onClick={() => chooseView('graph')}
                             className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${activeView === 'graph'
                                     ? 'bg-gray-800 text-white shadow-lg scale-110'
                                     : 'bg-white/60 backdrop-blur-lg text-gray-600 hover:bg-white/80 hover:scale-105 border border-white/60'
@@ -1097,7 +1127,7 @@ export default function PublicOrganizationPage() {
                     </div>
                     <div className="group relative z-[100]">
                         <button
-                            onClick={() => setActiveView('initiatives')}
+                            onClick={() => chooseView('initiatives')}
                             className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${activeView === 'initiatives'
                                     ? 'bg-gray-800 text-white shadow-lg scale-110'
                                     : 'bg-white/60 backdrop-blur-lg text-gray-600 hover:bg-white/80 hover:scale-105 border border-white/60'
@@ -1132,18 +1162,26 @@ export default function PublicOrganizationPage() {
                                     </span>
                                 </div>
                                 <div className="flex-1 relative overflow-hidden">
-                                    <Suspense fallback={
-                                        <div className="w-full h-full flex items-center justify-center">
-                                            <div className="w-48 h-48 rounded-full bg-gradient-to-br from-accent/60 to-accent/30 animate-pulse" />
-                                        </div>
-                                    }>
-                                        <ImpactGlobe
-                                            locations={globeLocations}
-                                            showLabels={true}
-                                            brandColor={brandColor}
-                                            enableZoom={true}
-                                        />
-                                    </Suspense>
+                                    {/* Mount the globe only when its view is active. The
+                                        component is heavy (Three.js scene + animation
+                                        loop) so leaving it mounted in the background
+                                        burns CPU/GPU even when invisible. */}
+                                    {activeView === 'globe' ? (
+                                        <Suspense fallback={
+                                            <div className="w-full h-full flex items-center justify-center">
+                                                <div className="w-48 h-48 rounded-full bg-gradient-to-br from-accent/60 to-accent/30 animate-pulse" />
+                                            </div>
+                                        }>
+                                            <ImpactGlobe
+                                                locations={globeLocations}
+                                                showLabels={true}
+                                                brandColor={brandColor}
+                                                enableZoom={true}
+                                            />
+                                        </Suspense>
+                                    ) : (
+                                        <div className="w-full h-full" />
+                                    )}
 
                                     {/* Location Popups */}
                                     {activePopups.map(popup => {
@@ -1227,30 +1265,61 @@ export default function PublicOrganizationPage() {
                                             to={`${orgLinkBase}/${slug}/${currentStory.initiative_slug}?tab=stories`}
                                             className="flex-1 rounded-2xl overflow-hidden hover:shadow-lg transition-all group relative"
                                         >
-                                            {currentStory.media_url && /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(currentStory.media_url) ? (
-                                                <div className="relative w-full h-full">
-                                                    <img
-                                                        src={`https://img.youtube.com/vi/${(currentStory.media_url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) || [])[1]}/hqdefault.jpg`}
-                                                        alt={currentStory.title}
-                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                                    />
-                                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                        <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
-                                                            <svg className="w-5 h-5 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                                            {(() => {
+                                                const url = currentStory.media_url
+                                                if (url && /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(url)) {
+                                                    const ytId = (url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) || [])[1]
+                                                    return (
+                                                        <div className="relative w-full h-full">
+                                                            <img
+                                                                src={`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`}
+                                                                alt={currentStory.title}
+                                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                            />
+                                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                                <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
+                                                                    <svg className="w-5 h-5 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                                                                </div>
+                                                            </div>
                                                         </div>
+                                                    )
+                                                }
+                                                if (url && currentStory.media_type === 'photo') {
+                                                    return (
+                                                        <img
+                                                            src={url}
+                                                            alt={currentStory.title}
+                                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                        />
+                                                    )
+                                                }
+                                                if (url && currentStory.media_type === 'video') {
+                                                    // Self-uploaded video: render a muted <video> with preload=metadata
+                                                    // so the browser paints the first frame as a thumbnail. Click is
+                                                    // captured by the parent <Link>; overlay stays pointer-events:none.
+                                                    return (
+                                                        <div className="relative w-full h-full bg-black">
+                                                            <video
+                                                                src={`${url}#t=0.5`}
+                                                                muted
+                                                                playsInline
+                                                                preload="metadata"
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                                <div className="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
+                                                                    <svg className="w-5 h-5 text-gray-900 ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                }
+                                                return (
+                                                    <div className="w-full h-full flex items-center justify-center bg-white/40">
+                                                        <FileText className="w-16 h-16 text-gray-300" />
                                                     </div>
-                                                </div>
-                                            ) : currentStory.media_url && currentStory.media_type === 'photo' ? (
-                                                <img
-                                                    src={currentStory.media_url}
-                                                    alt={currentStory.title}
-                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center bg-white/40">
-                                                    <FileText className="w-16 h-16 text-gray-300" />
-                                                </div>
-                                            )}
+                                                )
+                                            })()}
                                             {/* Overlay with title */}
                                             <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 via-black/40 to-transparent">
                                                 <span className="text-xs font-medium text-white/80 mb-1 block">{currentStory.initiative_title}</span>
