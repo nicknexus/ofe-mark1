@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
 import {
     Building2, MapPin, BarChart3, ArrowLeft, Globe,
@@ -53,6 +53,7 @@ function generateMetricSlug(title: string): string {
 
 export default function PublicOrganizationPage() {
     const { slug } = useParams<{ slug: string }>()
+    const [searchParams] = useSearchParams()
     const orgLinkBase = useOrgLinkBase()
     const [organization, setOrganization] = useState<PublicOrganization | null>(null)
     const [stats, setStats] = useState<OrganizationStats | null>(null)
@@ -363,14 +364,18 @@ export default function PublicOrganizationPage() {
         return filtered
     }, [initiatives, selectedInitiative, locationMatchedInitiativeIds])
 
-    // Auto-cycle stories
+    // Auto-cycle stories. When a story is deep-linked (?story=...), we hold
+    // off auto-rotation so the focused story stays put instead of rotating
+    // past the user.
+    const hasStoryDeepLink = !!searchParams.get('story')
     useEffect(() => {
         if (filteredStories.length <= 1) return
+        if (hasStoryDeepLink) return
         const interval = setInterval(() => {
             setStoryIndex(prev => (prev + 1) % filteredStories.length)
-        }, 6000)
+        }, 10000)
         return () => clearInterval(interval)
-    }, [filteredStories.length])
+    }, [filteredStories.length, hasStoryDeepLink])
 
     // Reset indices when filters change
     useEffect(() => {
@@ -378,6 +383,29 @@ export default function PublicOrganizationPage() {
         setEvidencePage(0)
         setHeroInitiativePage(0)
     }, [selectedInitiative, startDate, endDate, selectedLocationIds, selectedTagIds])
+
+    // Deep-link: open a specific feature view and/or focus a specific story when
+    // arriving via ?view=stories&story=<id> (used by the embed widget so that
+    // clicking a widget story pops it up in the carousel rather than navigating
+    // to the standalone story page).
+    const deepLinkApplied = useRef(false)
+    useEffect(() => {
+        if (deepLinkApplied.current) return
+        if (loading || stories.length === 0) return
+        const view = searchParams.get('view') as FeatureView | null
+        const storyParam = searchParams.get('story')
+        if (view && ['globe', 'stories', 'highlights', 'initiatives', 'graph'].includes(view)) {
+            setActiveView(view)
+        }
+        if (storyParam) {
+            const idx = stories.findIndex(s => s.id === storyParam)
+            if (idx >= 0) {
+                setStoryIndex(idx)
+                if (!view) setActiveView('stories')
+            }
+        }
+        deepLinkApplied.current = true
+    }, [loading, stories, searchParams])
 
     const hasActiveFilters = selectedInitiative !== 'all' || startDate || endDate || selectedLocationIds.length > 0 || selectedTagIds.length > 0
     const clearFilters = () => {

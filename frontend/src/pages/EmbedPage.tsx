@@ -6,7 +6,6 @@ import {
     PublicOrganization,
     PublicKPI,
     PublicStory,
-    OrganizationStats,
 } from '../services/publicApi'
 import { getVideoThumbnailUrl, parseVideoUrl } from '../utils/videoEmbed'
 
@@ -75,7 +74,6 @@ export default function EmbedPage() {
     const { slug } = useParams<{ slug: string }>()
 
     const [org, setOrg] = useState<PublicOrganization | null>(null)
-    const [stats, setStats] = useState<OrganizationStats | null>(null)
     const [metrics, setMetrics] = useState<PublicKPI[]>([])
     const [stories, setStories] = useState<PublicStory[]>([])
     const [loading, setLoading] = useState(true)
@@ -97,7 +95,6 @@ export default function EmbedPage() {
                 ])
                 if (cancelled) return
                 setOrg(orgRes.organization)
-                setStats(orgRes.stats)
                 setMetrics(mets)
                 setStories(sts)
             } catch (err: any) {
@@ -165,29 +162,14 @@ export default function EmbedPage() {
         }
     }, [slug, loading, metrics.length, stories.length])
 
-    // ── Build exactly 4 hero stat cards. Real metrics first, padded with org stats. ──
+    // ── Hero stat cards: real metrics only, top 4 by value. No filler stats. ──
     const heroCards = useMemo<StatCard[]>(() => {
-        const real = [...metrics]
+        return [...metrics]
             .filter(m => (m.total_value || 0) > 0)
             .sort((a, b) => (b.total_value || 0) - (a.total_value || 0))
             .slice(0, 4)
             .map(metricToCard)
-
-        if (real.length >= 4 || !stats) return real
-
-        const padding: StatCard[] = []
-        if (stats.initiatives > 0) padding.push({ id: 'pad-init', value: String(stats.initiatives), label: stats.initiatives === 1 ? 'Initiative' : 'Initiatives' })
-        if (stats.locations > 0) padding.push({ id: 'pad-loc', value: String(stats.locations), label: stats.locations === 1 ? 'Location' : 'Locations' })
-        if (stats.stories > 0) padding.push({ id: 'pad-st', value: String(stats.stories), label: stats.stories === 1 ? 'Story' : 'Stories' })
-        if (stats.kpis > 0) padding.push({ id: 'pad-kpi', value: String(stats.kpis), label: stats.kpis === 1 ? 'Metric' : 'Metrics' })
-
-        const out = [...real]
-        for (const p of padding) {
-            if (out.length >= 4) break
-            out.push(p)
-        }
-        return out
-    }, [metrics, stats])
+    }, [metrics])
 
     // Decide what visual to render for a story: a photo, a derived video
     // thumbnail (YouTube), a direct video file (first frame via <video>), or
@@ -227,6 +209,14 @@ export default function EmbedPage() {
     const brandText = readableOn(brand)
     const siteOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://www.nexusimpacts.ai'
     const publicUrl = org ? `${siteOrigin}/org/${org.slug}` : '#'
+
+    // Per-story deep-link: open the public org page with the stories carousel
+    // active and the clicked story focused. The org page reads ?view=stories&
+    // story=<id> and pops that story up in the highlight carousel.
+    function storyUrl(s: PublicStory): string {
+        if (!org) return '#'
+        return `${publicUrl}?view=stories&story=${encodeURIComponent(s.id)}`
+    }
 
     // ── Render ──
     if (error) {
@@ -427,7 +417,7 @@ export default function EmbedPage() {
                                     {featuredStories.map(s => (
                                         <a
                                             key={s.id}
-                                            href={publicUrl}
+                                            href={storyUrl(s)}
                                             target="_top"
                                             rel="noopener"
                                             className="group block rounded-2xl overflow-hidden bg-white border border-gray-100 shadow-sm hover:shadow-md transition-shadow"
