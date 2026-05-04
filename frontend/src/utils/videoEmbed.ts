@@ -78,3 +78,19 @@ export function parseVideoUrl(raw: string | null | undefined): ParsedVideo | nul
 export function isValidVideoUrl(raw: string | null | undefined): boolean {
     return parseVideoUrl(raw) !== null
 }
+
+/**
+ * Best-effort thumbnail URL for an embedded video.
+ * - YouTube returns synchronously (img.youtube.com).
+ * - Vimeo can't be derived without an API call, so we return null and let the
+ *   caller fall back to a placeholder or a <video> first-frame.
+ */
+export function getVideoThumbnailUrl(raw: string | null | undefined): string | null {
+    const parsed = parseVideoUrl(raw)
+    if (!parsed) return null
+    if (parsed.provider === 'youtube') {
+        // hqdefault is universally available; maxresdefault sometimes 404s.
+        return `https://img.youtube.com/vi/${parsed.id}/hqdefault.jpg`
+    }
+    return null
+}

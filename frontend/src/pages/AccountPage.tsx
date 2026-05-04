@@ -1423,21 +1423,30 @@ function WidgetTab({ orgSlug, isPublic }: { orgSlug?: string; isPublic?: boolean
     // Mobile: standard phone width.
     const naturalWidth = previewMode === 'desktop' ? 1200 : 380
 
-    // Scale the rendered iframe down to fit the preview wrap. Forces the desktop
-    // preview to feel "wide & short" instead of "narrow & tall".
+    // Scale the rendered iframe down to fit the preview wrap. Reads computed
+    // padding from the wrap so it stays correct across breakpoints (p-3 / p-4)
+    // and any future styling tweaks — no hard-coded magic numbers.
     useEffect(() => {
         const wrap = previewWrapRef.current
         if (!wrap) return
         const apply = () => {
-            const w = wrap.getBoundingClientRect().width
-            // Always scale down so the desktop layout fits horizontally even when
-            // the account panel is narrow.
-            setScale(Math.min(1, w / naturalWidth))
+            const cs = window.getComputedStyle(wrap)
+            const pl = parseFloat(cs.paddingLeft) || 0
+            const pr = parseFloat(cs.paddingRight) || 0
+            const inner = wrap.clientWidth - pl - pr
+            // Tiny safety margin to absorb sub-pixel rounding + iframe shadow.
+            const usable = Math.max(0, inner - 12)
+            setScale(Math.min(1, usable / naturalWidth))
         }
         apply()
         const ro = new ResizeObserver(apply)
         ro.observe(wrap)
-        return () => ro.disconnect()
+        // Recompute after layout paints (covers fonts/images causing reflow).
+        const raf = requestAnimationFrame(apply)
+        return () => {
+            ro.disconnect()
+            cancelAnimationFrame(raf)
+        }
     }, [naturalWidth])
 
     const snippet = orgSlug

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { ArrowRight, Heart, ShieldCheck } from 'lucide-react'
+import { ArrowRight, ShieldCheck, Play } from 'lucide-react'
 import {
     publicApi,
     PublicOrganization,
@@ -8,6 +8,7 @@ import {
     PublicStory,
     OrganizationStats,
 } from '../services/publicApi'
+import { getVideoThumbnailUrl, parseVideoUrl } from '../utils/videoEmbed'
 
 // Compact format for big numbers: 1.2K, 3.4M, etc.
 function formatBig(n: number): string {
@@ -46,8 +47,28 @@ function metricToCard(m: PublicKPI): StatCard {
         value: m.metric_type === 'percentage'
             ? `${Math.round(m.total_value || 0)}%`
             : formatBig(m.total_value || 0),
-        label: m.unit_of_measurement || m.title,
+        label: m.title || m.unit_of_measurement || '',
     }
+}
+
+// Small "play" overlay that signals a story has video content.
+function PlayBadge({ brand }: { brand: string }) {
+    return (
+        <>
+            <div
+                className="absolute inset-0 pointer-events-none"
+                style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,0.35) 100%)' }}
+            />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div
+                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shadow-md"
+                    style={{ backgroundColor: brand, color: readableOn(brand) }}
+                >
+                    <Play className="w-4 h-4 sm:w-[18px] sm:h-[18px] ml-0.5" fill="currentColor" />
+                </div>
+            </div>
+        </>
+    )
 }
 
 export default function EmbedPage() {
@@ -91,6 +112,31 @@ export default function EmbedPage() {
             cancelled = true
         }
     }, [slug])
+
+    // ── Strip the main app's Nexus-green radial backgrounds so only the
+    //    org's brand colour shows through (otherwise green bleeds in around
+    //    the widget when viewed directly at /embed/<slug>). Also hide any
+    //    document-level scrollbars — the parent iframe auto-resizes via
+    //    postMessage, so internal scrolling is never needed. ──
+    useEffect(() => {
+        if (typeof document === 'undefined') return
+        const root = document.getElementById('root')
+        const html = document.documentElement
+        const prevBodyBg = document.body.style.background
+        const prevRootBg = root?.style.background ?? ''
+        const prevHtmlOverflow = html.style.overflow
+        const prevBodyOverflow = document.body.style.overflow
+        document.body.style.background = '#ffffff'
+        if (root) root.style.background = '#ffffff'
+        html.style.overflow = 'hidden'
+        document.body.style.overflow = 'hidden'
+        return () => {
+            document.body.style.background = prevBodyBg
+            if (root) root.style.background = prevRootBg
+            html.style.overflow = prevHtmlOverflow
+            document.body.style.overflow = prevBodyOverflow
+        }
+    }, [])
 
     // ── Auto-resize: tell the parent window how tall we are. ──
     useEffect(() => {
@@ -143,11 +189,38 @@ export default function EmbedPage() {
         return out
     }, [metrics, stats])
 
-    // ── Pick up to 3 stories with a photo first, then any other recent story. ──
+    // Decide what visual to render for a story: a photo, a derived video
+    // thumbnail (YouTube), a direct video file (first frame via <video>), or
+    // a brand-tinted placeholder when nothing renders.
+    type StoryVisual =
+        | { kind: 'photo'; url: string }
+        | { kind: 'video-thumb'; url: string }
+        | { kind: 'video-file'; url: string }
+        | { kind: 'placeholder' }
+
+    function getStoryVisual(s: PublicStory): StoryVisual {
+        if (s.media_type === 'photo' && s.media_url) {
+            return { kind: 'photo', url: s.media_url }
+        }
+        if (s.media_type === 'video' && s.media_url) {
+            const ytThumb = getVideoThumbnailUrl(s.media_url)
+            if (ytThumb) return { kind: 'video-thumb', url: ytThumb }
+            // If it's a recognised hosted video (e.g. Vimeo) we can't derive a
+            // thumbnail without an API call — fall through to placeholder.
+            if (parseVideoUrl(s.media_url)) return { kind: 'placeholder' }
+            // Otherwise treat it as a direct file URL and render a muted
+            // <video> element to show its first frame.
+            return { kind: 'video-file', url: s.media_url }
+        }
+        return { kind: 'placeholder' }
+    }
+
+    // ── Pick up to 3 stories with renderable visuals first. ──
     const featuredStories = useMemo(() => {
-        const withPhoto = stories.filter(s => s.media_url && s.media_type === 'photo')
-        const others = stories.filter(s => !(s.media_url && s.media_type === 'photo'))
-        return [...withPhoto, ...others].slice(0, 3)
+        const visualKind = (s: PublicStory) => getStoryVisual(s).kind
+        const withVisual = stories.filter(s => visualKind(s) !== 'placeholder')
+        const others = stories.filter(s => visualKind(s) === 'placeholder')
+        return [...withVisual, ...others].slice(0, 3)
     }, [stories])
 
     const brand = org?.brand_color || '#c0dfa1'
@@ -238,10 +311,6 @@ export default function EmbedPage() {
                             <span style={{ color: brand, filter: 'saturate(1.15) brightness(0.92)' }}>
                                 Real Change.
                             </span>
-                            <Heart
-                                className="inline-block ml-1.5 align-baseline"
-                                style={{ width: 20, height: 20, color: brand, fill: brand, filter: 'saturate(1.15) brightness(0.92)' }}
-                            />
                         </h2>
 
                         {org.statement && (
@@ -287,20 +356,40 @@ export default function EmbedPage() {
                                 }}
                             >
                                 {heroCards.map(c => (
-                                    <div
+                                    <a
                                         key={c.id}
-                                        className="rounded-2xl bg-white border border-gray-100 px-3 py-4 sm:py-5 text-center shadow-sm"
+                                        href={publicUrl}
+                                        target="_top"
+                                        rel="noopener"
+                                        className="group rounded-2xl bg-white border border-gray-100 overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex flex-col"
                                     >
+                                        {/* Number section */}
+                                        <div className="px-3 py-4 sm:py-5 flex items-center justify-center flex-1">
+                                            <span
+                                                className="text-[24px] sm:text-[28px] font-bold leading-none tabular-nums tracking-tight"
+                                                style={{ color: brand, filter: 'saturate(1.15) brightness(0.85)' }}
+                                            >
+                                                {c.value}
+                                            </span>
+                                        </div>
+                                        {/* Title section — tinted brand band, fixed height for 2 lines */}
                                         <div
-                                            className="text-[22px] sm:text-[26px] font-bold leading-none tabular-nums tracking-tight"
-                                            style={{ color: '#0f172a' }}
+                                            className="px-2.5 text-center border-t flex items-center justify-center"
+                                            style={{
+                                                backgroundColor: `${brand}15`,
+                                                borderColor: `${brand}25`,
+                                                minHeight: 50,
+                                                height: 50,
+                                            }}
                                         >
-                                            {c.value}
+                                            <span
+                                                className="text-[11.5px] sm:text-[12.5px] font-semibold text-gray-800 line-clamp-2"
+                                                style={{ lineHeight: 1.25 }}
+                                            >
+                                                {c.label}
+                                            </span>
                                         </div>
-                                        <div className="mt-1.5 text-[11px] sm:text-[12px] leading-tight text-gray-600 line-clamp-3">
-                                            {c.label}
-                                        </div>
-                                    </div>
+                                    </a>
                                 ))}
                             </div>
                         )}
@@ -309,10 +398,10 @@ export default function EmbedPage() {
                         {featuredStories.length > 0 && (
                             <div>
                                 <div className="flex items-center justify-between gap-3 mb-2.5">
-                                    <div className="flex items-center gap-1.5 min-w-0">
-                                        <Heart
-                                            className="flex-shrink-0"
-                                            style={{ width: 14, height: 14, color: brand, fill: brand, filter: 'saturate(1.15) brightness(0.92)' }}
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <span
+                                            className="inline-block w-1 h-4 rounded-full flex-shrink-0"
+                                            style={{ backgroundColor: brand, filter: 'saturate(1.15) brightness(0.92)' }}
                                         />
                                         <span className="text-[13px] sm:text-[14px] font-semibold tracking-tight text-gray-900 truncate">
                                             Real Stories. Real Impact.
@@ -343,25 +432,54 @@ export default function EmbedPage() {
                                             rel="noopener"
                                             className="group block rounded-2xl overflow-hidden bg-white border border-gray-100 shadow-sm hover:shadow-md transition-shadow"
                                         >
-                                            {s.media_url && s.media_type === 'photo' ? (
-                                                <div className="aspect-[4/3] overflow-hidden bg-gray-100">
-                                                    <img
-                                                        src={s.media_url}
-                                                        alt={s.title}
-                                                        className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
-                                                        loading="lazy"
+                                            {(() => {
+                                                const v = getStoryVisual(s)
+                                                if (v.kind === 'photo') {
+                                                    return (
+                                                        <div className="aspect-[4/3] overflow-hidden bg-gray-100">
+                                                            <img
+                                                                src={v.url}
+                                                                alt={s.title}
+                                                                className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                                                                loading="lazy"
+                                                            />
+                                                        </div>
+                                                    )
+                                                }
+                                                if (v.kind === 'video-thumb') {
+                                                    return (
+                                                        <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
+                                                            <img
+                                                                src={v.url}
+                                                                alt={s.title}
+                                                                className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                                                                loading="lazy"
+                                                            />
+                                                            <PlayBadge brand={brand} />
+                                                        </div>
+                                                    )
+                                                }
+                                                if (v.kind === 'video-file') {
+                                                    return (
+                                                        <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
+                                                            <video
+                                                                src={`${v.url}#t=0.5`}
+                                                                muted
+                                                                playsInline
+                                                                preload="metadata"
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                            <PlayBadge brand={brand} />
+                                                        </div>
+                                                    )
+                                                }
+                                                return (
+                                                    <div
+                                                        className="aspect-[4/3]"
+                                                        style={{ background: `linear-gradient(135deg, ${brand}40, ${brand}15)` }}
                                                     />
-                                                </div>
-                                            ) : (
-                                                <div
-                                                    className="aspect-[4/3] flex items-center justify-center"
-                                                    style={{ background: `linear-gradient(135deg, ${brand}40, ${brand}15)` }}
-                                                >
-                                                    <Heart
-                                                        style={{ width: 28, height: 28, color: brand, fill: brand, filter: 'saturate(1.15) brightness(0.92)' }}
-                                                    />
-                                                </div>
-                                            )}
+                                                )
+                                            })()}
                                             <div className="p-3">
                                                 <div className="text-[12.5px] font-semibold leading-snug text-gray-900 line-clamp-2">
                                                     {s.title}
@@ -402,9 +520,6 @@ export default function EmbedPage() {
                     <div className="min-w-0">
                         <div className="text-[12px] sm:text-[12.5px] font-semibold text-gray-900 leading-tight">
                             Transparency you can trust. Impact you can see.
-                        </div>
-                        <div className="text-[11px] text-gray-600 leading-tight mt-0.5">
-                            All impact data is verified and updated in real time.
                         </div>
                     </div>
                 </div>
