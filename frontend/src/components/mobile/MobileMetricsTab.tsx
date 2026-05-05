@@ -449,7 +449,6 @@ function MobileAddClaimFlow({ kpi, initiativeId, onClose, onSuccess }: AddClaimF
                                     placeholder="0"
                                     min="0"
                                     step={kpi.metric_type === 'percentage' ? '0.01' : '1'}
-                                    max={kpi.metric_type === 'percentage' ? '100' : undefined}
                                     autoFocus
                                     className="w-full text-center text-4xl font-bold py-6 border-2 border-gray-200 rounded-2xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 focus:outline-none transition-colors"
                                 />

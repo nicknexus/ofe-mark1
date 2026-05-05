@@ -395,7 +395,6 @@ export default function AddKPIUpdateModalWithMetricSelection({
                                             required
                                             min="0"
                                             step={metricType === 'percentage' ? '0.01' : '1'}
-                                            max={metricType === 'percentage' ? '100' : undefined}
                                             style={{ paddingRight: '140px' }}
                                         />
                                         <div className="absolute inset-y-0 right-0 flex items-center gap-3 pr-4">
@@ -407,8 +406,7 @@ export default function AddKPIUpdateModalWithMetricSelection({
                                                     type="button"
                                                     onClick={() => {
                                                         const step = metricType === 'percentage' ? 0.01 : 1
-                                                        const max = metricType === 'percentage' ? 100 : undefined
-                                                        const newValue = Math.min((formData.value || 0) + step, max || Infinity)
+                                                        const newValue = (formData.value || 0) + step
                                                         setFormData(prev => ({ ...prev, value: newValue }))
                                                     }}
                                                     className="flex items-center justify-center w-6 h-6 hover:bg-gray-200 rounded-t transition-colors border border-gray-300 border-b-0"

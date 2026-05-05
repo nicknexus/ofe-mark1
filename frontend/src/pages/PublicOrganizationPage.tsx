@@ -465,6 +465,7 @@ export default function PublicOrganizationPage() {
                 ...u,
                 metricTitle: m.title,
                 metricUnit: m.unit_of_measurement,
+                metricType: m.metric_type,
                 initiativeTitle: m.initiative_title,
                 initiativeSlug: m.initiative_slug,
                 category: m.category,
@@ -521,32 +522,13 @@ export default function PublicOrganizationPage() {
 
     // Memoize globe locations - group by country to avoid clutter
     const globeLocations = useMemo(() => {
-        const validLocations = filteredLocations.filter(loc => loc.latitude && loc.longitude)
-
-        // Group by country, use first location's coords for each country
-        const countryMap = new Map<string, { lat: number; lng: number; name: string; count: number }>()
-
-        validLocations.forEach(loc => {
-            const country = loc.country || loc.name // Fallback to location name if no country
-            if (!countryMap.has(country)) {
-                countryMap.set(country, {
-                    lat: loc.latitude,
-                    lng: loc.longitude,
-                    name: country,
-                    count: 1
-                })
-            } else {
-                // Increment count for this country
-                const existing = countryMap.get(country)!
-                existing.count++
-            }
-        })
-
-        return Array.from(countryMap.values()).map(c => ({
-            lat: c.lat,
-            lng: c.lng,
-            name: c.count > 1 ? `${c.name} (${c.count})` : c.name,
-        }))
+        return filteredLocations
+            .filter(loc => loc.latitude && loc.longitude)
+            .map(loc => ({
+                lat: loc.latitude,
+                lng: loc.longitude,
+                name: loc.country ? `${loc.name}, ${loc.country}` : loc.name,
+            }))
     }, [filteredLocations])
 
     // Determine how many metrics to show per initiative (aim for ~6 total)
@@ -1646,10 +1628,10 @@ export default function PublicOrganizationPage() {
                                                 className="p-3 md:p-4 h-[100px] md:h-[19vh] rounded-xl bg-white/60 backdrop-blur-lg border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all flex flex-col justify-between"
                                             >
                                                 <div>
-                                                    <span className="text-2xl md:text-4xl font-bold text-foreground">{metric.total_value?.toLocaleString() || '—'}</span>
-                                                    <span className="text-xs md:text-sm text-muted-foreground ml-1">{metric.unit_of_measurement}</span>
+                                                    <span className="text-2xl md:text-4xl font-bold text-foreground">{metric.total_value?.toLocaleString() || '—'}{metric.metric_type === 'percentage' ? '%' : ''}</span>
+                                                    {metric.metric_type !== 'percentage' && <span className="text-xs md:text-sm text-muted-foreground ml-1">{metric.unit_of_measurement}</span>}
                                                 </div>
-                                                <h4 className="font-normal text-muted-foreground text-xs md:text-sm line-clamp-2 leading-snug">{metric.title}</h4>
+                                                <h4 className="font-normal text-muted-foreground text-xs md:text-sm line-clamp-2 leading-snug">{metric.title}{metric.metric_type === 'percentage' ? ' (avg)' : ''}</h4>
                                             </Link>
                                         ))}
                                     </div>
@@ -1687,8 +1669,8 @@ export default function PublicOrganizationPage() {
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-lg font-bold text-foreground group-hover:text-accent transition-colors">{claim.value?.toLocaleString()}</span>
-                                                            <span className="text-xs text-muted-foreground">{claim.metricUnit}</span>
+                                                            <span className="text-lg font-bold text-foreground group-hover:text-accent transition-colors">{claim.value?.toLocaleString()}{claim.metricType === 'percentage' ? '%' : ''}</span>
+                                                            {claim.metricType !== 'percentage' && <span className="text-xs text-muted-foreground">{claim.metricUnit}</span>}
                                                         </div>
                                                         <p className="text-xs text-muted-foreground truncate mt-0.5">{claim.metricTitle}</p>
                                                         <p className="text-[10px] text-muted-foreground/70 truncate">{claim.initiativeTitle}</p>

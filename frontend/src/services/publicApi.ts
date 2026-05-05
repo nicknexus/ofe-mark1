@@ -138,8 +138,8 @@ export interface PublicEvidence {
     org_slug?: string
     locations?: { id: string; name: string }[]
     beneficiary_groups?: { id: string; name: string }[]
-    kpis?: { id: string; title: string; category?: string; unit_of_measurement?: string }[]
-    impact_claims?: { id: string; value: number; date_represented?: string; date_range_start?: string; date_range_end?: string; kpi_id?: string; kpis?: { id: string; title: string; unit_of_measurement?: string }; tag_id?: string | null }[]
+    kpis?: { id: string; title: string; category?: string; unit_of_measurement?: string; metric_type?: 'number' | 'percentage' }[]
+    impact_claims?: { id: string; value: number; date_represented?: string; date_range_start?: string; date_range_end?: string; kpi_id?: string; kpis?: { id: string; title: string; unit_of_measurement?: string; metric_type?: 'number' | 'percentage' }; tag_id?: string | null }[]
     created_at?: string
     tag_ids?: string[]
 }
@@ -208,7 +208,7 @@ export interface LocationDetail {
     }[]
     metrics: {
         id: string; title: string; slug: string; unit_of_measurement: string; category: string;
-        total_value: number; claim_count: number
+        total_value: number; claim_count: number; metric_type?: 'number' | 'percentage'
     }[]
     initiative: { id: string; title: string; slug: string; org_slug: string }
 }
@@ -534,7 +534,7 @@ export interface PublicEvidenceDetail {
         date_range_start?: string
         date_range_end?: string
         kpi_id?: string
-        kpis?: { id: string; title: string; unit_of_measurement?: string }
+        kpis?: { id: string; title: string; unit_of_measurement?: string; metric_type?: 'number' | 'percentage' }
         tag_id?: string | null
     }>
     tag_ids?: string[]
@@ -572,6 +572,7 @@ export interface PublicImpactClaimDetail {
         category: 'input' | 'output' | 'impact'
         slug: string
         tag_ids?: string[]
+        metric_type?: 'number' | 'percentage'
     }
     evidence: PublicEvidence[]
     evidence_count: number

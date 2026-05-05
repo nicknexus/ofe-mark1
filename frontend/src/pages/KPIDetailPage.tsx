@@ -690,9 +690,9 @@ export default function KPIDetailPage() {
                     </div>
                     <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-soft-float border border-white/60 p-4 text-center">
                         <p className="text-xl sm:text-2xl font-bold text-evidence-500">
-                            {aggregateKpiUpdates(updates as any, kpi.metric_type)}
+                            {aggregateKpiUpdates(updates as any, kpi.metric_type)}{kpi.metric_type === 'percentage' ? '%' : ''}
                         </p>
-                        <p className="text-xs sm:text-sm text-gray-500">{kpi.metric_type === 'percentage' ? 'Average' : 'Total'} {kpi.unit_of_measurement}</p>
+                        <p className="text-xs sm:text-sm text-gray-500">{kpi.metric_type === 'percentage' ? 'Average' : `Total ${kpi.unit_of_measurement || ''}`}</p>
                     </div>
                 </div>
 
@@ -784,9 +784,9 @@ export default function KPIDetailPage() {
                                     </div>
                                     <div className="text-right">
                                         <div className="text-lg font-bold text-evidence-500">
-                                            {dateFilter.isActive ? filteredTotal : aggregateKpiUpdates(updates as any, kpi.metric_type)}
+                                            {dateFilter.isActive ? filteredTotal : aggregateKpiUpdates(updates as any, kpi.metric_type)}{kpi.metric_type === 'percentage' ? '%' : ''}
                                         </div>
-                                        <div className="text-xs text-gray-500">{kpi.metric_type === 'percentage' ? 'Avg' : 'Total'} {kpi.unit_of_measurement}</div>
+                                        <div className="text-xs text-gray-500">{kpi.metric_type === 'percentage' ? 'Avg' : `Total ${kpi.unit_of_measurement || ''}`}</div>
                                     </div>
                                 </div>
                                 {canAddImpactClaims && (

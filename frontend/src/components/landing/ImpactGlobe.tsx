@@ -16,11 +16,11 @@ const defaultLocations = [
 ];
 
 const defaultArcs = [
-  { startLat: 6.5244, startLng: 3.3792, endLat: 28.6139, endLng: 77.209 },
-  { startLat: -1.2921, startLng: 36.8219, endLat: 23.8103, endLng: 90.4125 },
-  { startLat: -23.5505, startLng: -46.6333, endLat: 14.5995, endLng: 120.9842 },
-  { startLat: -4.4419, startLng: 15.2663, endLat: -6.2088, endLng: 106.8456 },
-  { startLat: 30.0444, startLng: 31.2357, endLat: 19.4326, endLng: -99.1332 },
+  { startLat: 6.5244, startLng: 3.3792, endLat: 28.6139, endLng: 77.209, altitude: 0.25, dashLength: 0.5, animateTime: 2500 },
+  { startLat: -1.2921, startLng: 36.8219, endLat: 23.8103, endLng: 90.4125, altitude: 0.25, dashLength: 0.5, animateTime: 2500 },
+  { startLat: -23.5505, startLng: -46.6333, endLat: 14.5995, endLng: 120.9842, altitude: 0.25, dashLength: 0.5, animateTime: 2500 },
+  { startLat: -4.4419, startLng: 15.2663, endLat: -6.2088, endLng: 106.8456, altitude: 0.25, dashLength: 0.5, animateTime: 2500 },
+  { startLat: 30.0444, startLng: 31.2357, endLat: 19.4326, endLng: -99.1332, altitude: 0.25, dashLength: 0.5, animateTime: 2500 },
 ];
 
 // Location type for custom locations
@@ -58,9 +58,28 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
     return defaultLocations;
   }, [locations]);
 
+  // Detect when locations are all clustered tightly together (or only 1 pin).
+  // In that case pin-to-pin arcs would just be ugly vertical bumps, so we replace
+  // them with two "globe-loop" arcs that sweep around the planet and back to the cluster.
+  const isClustered = useMemo(() => {
+    if (!locations || locations.length === 0) return false;
+    if (locations.length === 1) return true;
+    const lats = locations.map(l => l.lat);
+    const lngs = locations.map(l => l.lng);
+    const latSpan = Math.max(...lats) - Math.min(...lats);
+    const lngSpan = Math.max(...lngs) - Math.min(...lngs);
+    return latSpan < 3 && lngSpan < 3;
+  }, [locations]);
+
   // Generate arcs between locations (connect sequential pairs for custom, use defaults otherwise)
   const arcsData = useMemo(() => {
-    if (locations && locations.length > 1) {
+    if (locations && locations.length > 0) {
+      // Clustered or single-pin case: skip arcs entirely — the radiating rings/halo
+      // around each pin carry the visual on their own without ugly vertical bumps
+      // or directional "beams" shooting off into space.
+      if (isClustered) {
+        return [];
+      }
       const arcs = [];
       for (let i = 0; i < Math.min(locations.length - 1, 5); i++) {
         arcs.push({
@@ -68,19 +87,22 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
           startLng: locations[i].lng,
           endLat: locations[i + 1].lat,
           endLng: locations[i + 1].lng,
+          altitude: 0.25,
+          dashLength: 0.5,
+          animateTime: 2500,
         });
       }
       return arcs;
     }
     return defaultArcs;
-  }, [locations]);
+  }, [locations, isClustered]);
 
   // Calculate initial point of view based on locations
   const initialPov = useMemo(() => {
     if (locations && locations.length > 0) {
       const avgLat = locations.reduce((sum, loc) => sum + loc.lat, 0) / locations.length;
       const avgLng = locations.reduce((sum, loc) => sum + loc.lng, 0) / locations.length;
-      return { lat: avgLat, lng: avgLng, altitude: 2.2 };
+      return { lat: avgLat, lng: avgLng, altitude: 1.8 };
     }
     return { lat: 20, lng: 0, altitude: 2.5 };
   }, [locations]);
@@ -88,18 +110,40 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
   // Globe color based on brand color
   const globeColor = brandColor || "#c0dfa1";
 
+  // Convert hex (#rrggbb) to {r,g,b}; fallback to brand-ish green if invalid
+  const brandRgb = useMemo(() => {
+    const hex = (globeColor || "").replace('#', '');
+    if (hex.length === 6) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      if ([r, g, b].every(n => Number.isFinite(n))) return { r, g, b };
+    }
+    return { r: 192, g: 223, b: 161 };
+  }, [globeColor]);
+
   // Stable callback refs so Globe doesn't re-process on every render
-  const polygonCapColorFn = useCallback(() => `${globeColor}B3`, [globeColor]);
+  const polygonCapColorFn = useCallback(() => `${globeColor}99`, [globeColor]);
   const polygonSideColorFn = useCallback(() => `${globeColor}26`, [globeColor]);
   const polygonStrokeColorFn = useCallback(() => "rgba(255, 255, 255, 0.3)", []);
-  const pointColorFn = useCallback(() => "#ffffff", []);
-  const arcColorFn = useCallback(() => "rgba(255, 255, 255, 0.6)", []);
-  const ringColorFn = useCallback(() => (t: number) => `rgba(255, 255, 255, ${0.8 - t * 0.8})`, []);
+  const pointColorFn = useCallback(() => globeColor, [globeColor]);
+  const arcColorFn = useCallback(() => ["rgba(255, 255, 255, 0.55)", "rgba(255, 255, 255, 0.05)"], []);
+  const ringColorFn = useCallback(() => (t: number) => `rgba(${brandRgb.r}, ${brandRgb.g}, ${brandRgb.b}, ${0.9 - t * 0.9})`, [brandRgb]);
   const labelLatFn = useCallback((d: any) => d.lat, []);
   const labelLngFn = useCallback((d: any) => d.lng, []);
   const labelTextFn = useCallback((d: any) => d.name, []);
   const labelColorFn = useCallback(() => "rgba(255, 255, 255, 0.9)", []);
   const labelsData = useMemo(() => showLabels ? pointsData : [], [showLabels, pointsData]);
+
+  // Track altitude so labels can shrink as the user zooms in.
+  const [altitude, setAltitude] = useState<number>(2.5);
+  const handleZoom = useCallback((pov: { lat: number; lng: number; altitude: number }) => {
+    setAltitude(pov.altitude);
+  }, []);
+  // Linear-ish mapping: at the default load altitude (~1.3) labels read at ~0.9;
+  // when the user zooms in (altitude → ~0.1) labels shrink to ~0.35.
+  const labelSize = Math.max(0.35, Math.min(1.4, altitude * 0.7));
+  const labelDotRadius = Math.max(0.18, Math.min(0.5, altitude * 0.28));
 
   // Use a smaller, cached GeoJSON (110m is already the smallest)
   useEffect(() => {
@@ -144,9 +188,14 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
 
   useEffect(() => {
     if (globeRef.current && dimensions.width > 0) {
-      globeRef.current.controls().autoRotate = true;
-      globeRef.current.controls().autoRotateSpeed = locations ? 0.3 : 0.5;
-      globeRef.current.controls().enableZoom = enableZoom;
+      const controls = globeRef.current.controls();
+      controls.autoRotate = true;
+      controls.autoRotateSpeed = locations ? 0.3 : 0.5;
+      controls.enableZoom = enableZoom;
+      // Allow much closer zoom-in for dense regions; default minDistance keeps users far away.
+      // Globe radius is 100; minDistance 105 lets users get within ~5% of surface.
+      controls.minDistance = 105;
+      controls.maxDistance = 600;
 
       // Only set initial POV once
       if (!hasSetInitialPov.current) {
@@ -180,17 +229,17 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
           polygonStrokeColor={polygonStrokeColorFn}
           polygonAltitude={0.006}
           pointsData={pointsData}
-          pointAltitude={0.01}
-          pointRadius={locations ? 0.8 : 0.5}
+          pointAltitude={locations ? 0.015 : 0.01}
+          pointRadius={locations ? 0.6 : 0.5}
           pointColor={pointColorFn}
           pointsMerge={false}
           arcsData={arcsData}
           arcColor={arcColorFn}
-          arcAltitude={0.25}
-          arcStroke={0.8}
-          arcDashLength={0.6}
-          arcDashGap={0.3}
-          arcDashAnimateTime={2500}
+          arcAltitude={(d: any) => d.altitude ?? 0.25}
+          arcStroke={0.4}
+          arcDashLength={(d: any) => d.dashLength ?? 0.5}
+          arcDashGap={0.4}
+          arcDashAnimateTime={(d: any) => d.animateTime ?? 2500}
           ringsData={pointsData}
           ringColor={ringColorFn}
           ringMaxRadius={locations ? 3 : 2}
@@ -200,11 +249,12 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
           labelLat={labelLatFn}
           labelLng={labelLngFn}
           labelText={labelTextFn}
-          labelSize={1.2}
-          labelDotRadius={0.4}
+          labelSize={labelSize}
+          labelDotRadius={labelDotRadius}
           labelColor={labelColorFn}
           labelResolution={2}
           labelAltitude={0.02}
+          onZoom={handleZoom}
         />
       )}
     </div>

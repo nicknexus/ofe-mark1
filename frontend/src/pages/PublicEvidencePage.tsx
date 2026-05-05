@@ -400,7 +400,7 @@ export default function PublicEvidencePage() {
                                                 className="block p-2.5 sm:p-3 bg-white/60 rounded-lg sm:rounded-xl border border-white/50 hover:bg-white/80 hover:shadow-md transition-all group active:scale-[0.98]"
                                             >
                                                 <p className="font-semibold text-gray-800 text-xs sm:text-sm group-hover:text-primary-600 transition-colors">
-                                                    {claim.value} {claim.kpis?.unit_of_measurement || ''}
+                                                    {claim.value}{claim.kpis?.metric_type === 'percentage' ? '%' : ` ${claim.kpis?.unit_of_measurement || ''}`}
                                                 </p>
                                                 <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">{metricTitle}</p>
                                                 {dateLabel && <p className="text-[10px] text-gray-400 mt-0.5">{dateLabel}</p>}

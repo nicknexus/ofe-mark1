@@ -23,7 +23,7 @@ import {
     Check,
     Info
 } from 'lucide-react'
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, ReferenceLine } from 'recharts'
 import { getCategoryColor, parseLocalDate, isSameDay, compareDates, formatDate, getEvidenceTypeInfo, getLocalDateString } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import DateRangePicker from './DateRangePicker'
@@ -540,6 +540,11 @@ export default function ExpandableKPICard({
         return parseLocalDate(update.date_represented)
     }
 
+    // Percentage metrics get a different chart treatment: monthly-only,
+    // per-month mean, range claims contribute to every overlapping month.
+    const isPercentageMetric = kpi.metric_type === 'percentage'
+    const effectiveIsCumulative = isCumulative && !isPercentageMetric
+
     // Generate cumulative data for this specific KPI
     const generateChartData = () => {
         if (!filteredKpiUpdates || filteredKpiUpdates.length === 0) {
@@ -627,10 +632,87 @@ export default function ExpandableKPICard({
         // Generate time series data with proper spacing
         const data: Array<{
             date: string;
-            cumulative: number;
+            cumulative: number | null;
             value: number;
             fullDate: Date;
+            claimCount?: number;
         }> = []
+
+        // Percentage metrics: month-by-month percentage line.
+        // Range claims contribute their value to every month they overlap.
+        // Single-date claims OVERRIDE the range value for their month
+        // (multiple single-date claims in the same month are averaged).
+        // Multiple overlapping range claims in the same month are also averaged.
+        // Months with no claim data render null and the line connects across them.
+        if (isPercentageMetric) {
+            const monthly: Record<string, { singleSum: number; singleCount: number; rangeSum: number; rangeCount: number; date: Date }> = {}
+            const ensureBucket = (cursor: Date) => {
+                const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`
+                if (!monthly[key]) monthly[key] = { singleSum: 0, singleCount: 0, rangeSum: 0, rangeCount: 0, date: new Date(cursor) }
+                return key
+            }
+
+            filteredUpdates.forEach(update => {
+                const value = Number(update.value || 0)
+                if (!Number.isFinite(value)) return
+
+                const isRange = !!(update.date_range_start && update.date_range_end)
+                if (isRange) {
+                    const claimStart = parseLocalDate(update.date_range_start)
+                    const claimEnd = parseLocalDate(update.date_range_end)
+                    claimStart.setHours(0, 0, 0, 0)
+                    claimEnd.setHours(0, 0, 0, 0)
+                    const cursor = new Date(claimStart.getFullYear(), claimStart.getMonth(), 1)
+                    const stop = new Date(claimEnd.getFullYear(), claimEnd.getMonth(), 1)
+                    while (cursor.getTime() <= stop.getTime()) {
+                        const key = ensureBucket(cursor)
+                        monthly[key].rangeSum += value
+                        monthly[key].rangeCount += 1
+                        cursor.setMonth(cursor.getMonth() + 1)
+                    }
+                } else {
+                    const claimDate = parseLocalDate(update.date_represented)
+                    claimDate.setHours(0, 0, 0, 0)
+                    const cursor = new Date(claimDate.getFullYear(), claimDate.getMonth(), 1)
+                    const key = ensureBucket(cursor)
+                    monthly[key].singleSum += value
+                    monthly[key].singleCount += 1
+                }
+            })
+
+            // Walk every month in the visible window, plus one buffer month before
+            // the first claim so the chart breathes a little on the left.
+            const firstMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
+            firstMonth.setMonth(firstMonth.getMonth() - 1)
+            const lastMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1)
+            const cursor = new Date(firstMonth)
+            while (cursor.getTime() <= lastMonth.getTime()) {
+                const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`
+                const monthName = cursor.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                const bucket = monthly[key]
+                let monthValue: number | null = null
+                let claimCount = 0
+                if (bucket) {
+                    if (bucket.singleCount > 0) {
+                        monthValue = bucket.singleSum / bucket.singleCount
+                        claimCount = bucket.singleCount
+                    } else if (bucket.rangeCount > 0) {
+                        monthValue = bucket.rangeSum / bucket.rangeCount
+                        claimCount = bucket.rangeCount
+                    }
+                }
+                data.push({
+                    date: monthName,
+                    cumulative: monthValue,
+                    value: monthValue ?? 0,
+                    fullDate: new Date(cursor),
+                    claimCount,
+                })
+                cursor.setMonth(cursor.getMonth() + 1)
+            }
+
+            return data
+        }
 
         // Non-cumulative mode: group by month (only when timeFrame is 'all' and no date picker)
         if (!isCumulative && timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate) {
@@ -725,6 +807,19 @@ export default function ExpandableKPICard({
 
     const chartData = generateChartData()
 
+    // Aggregate value (mean for percentage, sum for number metrics) — used by the
+    // headline pill, the chart's reference line, and the chart tooltip.
+    const totalMetricValue = aggregateKpiUpdates(kpiUpdates as any, kpi.metric_type)
+
+    // Patch the overall average onto every percentage data point. We render an
+    // invisible "ghost" line bound to this field so Recharts' tooltip activates
+    // at every X position — even over months with no claim data.
+    if (isPercentageMetric) {
+        for (const d of chartData) {
+            (d as any).average = totalMetricValue
+        }
+    }
+
     const getTimeSpanDays = () => {
         if (chartData.length < 2) return 0
         const first = chartData[0]?.fullDate
@@ -733,13 +828,38 @@ export default function ExpandableKPICard({
         return Math.round((last.getTime() - first.getTime()) / (1000 * 60 * 60 * 24))
     }
 
+    // Custom tooltip for percentage metrics: always shows the overall average
+    // plus the hovered month's value (or "No data" for empty months).
+    const PercentageTooltip = ({ active, payload, label }: any) => {
+        if (!active || !payload || !payload.length) return null
+        const dp = chartData.find(d => d.date === label)
+        const dateLabel = dp?.fullDate ? formatDate(dp.fullDate) : (label || '')
+        const monthVal = (dp as any)?.cumulative as number | null | undefined
+        const claimCount = (dp as any)?.claimCount ?? 0
+        return (
+            <div style={{ backgroundColor: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(8px)', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '10px 12px', fontSize: '12px', boxShadow: '0 8px 24px rgba(15,23,42,0.08)', minWidth: 160 }}>
+                <div style={{ fontWeight: 500, color: '#475569', marginBottom: 6 }}>{dateLabel}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                    <span style={{ color: '#94a3b8' }}>This month</span>
+                    <span style={{ fontWeight: 500, color: '#0f172a' }}>
+                        {typeof monthVal === 'number' ? `${Math.round(monthVal)}% · ${claimCount} claim${claimCount === 1 ? '' : 's'}` : 'No data'}
+                    </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 6, paddingTop: 6, borderTop: '1px dashed #e2e8f0' }}>
+                    <span style={{ color: chartColor, opacity: 0.85, fontWeight: 500 }}>Overall avg</span>
+                    <span style={{ fontWeight: 600, color: chartColor }}>{Math.round(totalMetricValue)}%</span>
+                </div>
+            </div>
+        )
+    }
+
     const getXAxisInterval = () => {
         if (timeFrame === '1month') return 0
 
         const dataPointCount = chartData.length
         if (dataPointCount <= 12) return 0
 
-        if (!isCumulative) {
+        if (!effectiveIsCumulative) {
             if (dataPointCount <= 24) return 1
             if (dataPointCount <= 48) return 2
             if (dataPointCount <= 72) return 5
@@ -803,8 +923,25 @@ export default function ExpandableKPICard({
     const actualMaxValue = Math.max(...chartData.map(d =>
         typeof d.cumulative === 'number' && isFinite(d.cumulative) ? d.cumulative : 0
     ).filter(v => v > 0), 0)
-    
-    const totalMetricValue = aggregateKpiUpdates(kpiUpdates as any, kpi.metric_type)
+
+    // Percentage metrics get their own Y-axis: floor 0-100, extend upward to the
+    // next multiple of 100 if any visible value exceeds 100 (e.g. 350% → 0-400).
+    const percentageYMax = (() => {
+        if (!isPercentageMetric || chartData.length === 0) return 100
+        let maxValue = 100
+        chartData.forEach(d => {
+            if (typeof d.cumulative === 'number' && isFinite(d.cumulative) && d.cumulative > maxValue) {
+                maxValue = d.cumulative
+            }
+        })
+        if (maxValue <= 100) return 100
+        return Math.ceil(maxValue / 100) * 100
+    })()
+    const percentageYTicks = (() => {
+        if (!isPercentageMetric) return [] as number[]
+        const step = percentageYMax / 4
+        return [0, step, step * 2, step * 3, percentageYMax]
+    })()
 
     // Generate ticks that include the actual max value
     const generateYTicks = () => {
@@ -946,9 +1083,12 @@ export default function ExpandableKPICard({
                                             </button>
                                         )}
                                     </div>
-                                    <div className="flex items-baseline gap-1.5 px-2.5 lg:px-3 py-1 lg:py-1.5 bg-primary-50 rounded-lg border border-primary-100 flex-shrink-0">
-                                        <span className="text-lg lg:text-2xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}</span>
-                                        {kpi.unit_of_measurement && <span className="text-[11px] lg:text-xs text-primary-500">{kpi.unit_of_measurement}</span>}
+                                    <div className="flex flex-col items-end flex-shrink-0">
+                                        <div className="flex items-baseline gap-0.5 px-2.5 lg:px-3 py-1 lg:py-1.5 bg-primary-50 rounded-lg border border-primary-100">
+                                            <span className="text-lg lg:text-2xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}{isPercentageMetric ? '%' : ''}</span>
+                                            {!isPercentageMetric && kpi.unit_of_measurement && <span className="text-[11px] lg:text-xs text-primary-500 ml-1">{kpi.unit_of_measurement}</span>}
+                                        </div>
+                                        {isPercentageMetric && <span className="text-[10px] lg:text-[11px] uppercase tracking-wide text-gray-400 mt-0.5">Average</span>}
                                     </div>
                                 </div>
                             </div>
@@ -1007,11 +1147,11 @@ export default function ExpandableKPICard({
                                     <div className="lg:col-span-3 bg-white/80 backdrop-blur-xl border border-gray-100/60 rounded-xl p-3 flex flex-col shadow-soft-float min-h-0 overflow-hidden">
                                         <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
                                             <div className="flex-shrink-0 min-w-0">
-                                                <h5 className="text-sm lg:text-base font-semibold text-gray-900 truncate">{isCumulative ? 'Cumulative Progress' : 'Monthly Progress'}</h5>
-                                                <p className="text-[10px] lg:text-xs text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals'}</p>
+                                                <h5 className="text-sm lg:text-base font-semibold text-gray-900 truncate">{isPercentageMetric ? 'Percentage Over Time' : (isCumulative ? 'Cumulative Progress' : 'Monthly Progress')}</h5>
+                                                {!isPercentageMetric && <p className="text-[10px] lg:text-xs text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals'}</p>}
                                             </div>
                                             <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
-                                                {timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
+                                                {!isPercentageMetric && timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
                                                     <div className="flex items-center bg-gray-100 rounded-md lg:rounded-lg p-0.5">
                                                         <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
                                                         <button onClick={() => setIsCumulative(true)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
@@ -1029,12 +1169,22 @@ export default function ExpandableKPICard({
                                         <div className="flex-1 min-h-[100px] flex items-center justify-center">
                                             {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
                                                 <ResponsiveContainer width="100%" height="100%">
-                                                    <LineChart data={chartData}>
-                                                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                                                        <XAxis dataKey="date" stroke="#9ca3af" fontSize={10} tick={{ fill: '#9ca3af' }} angle={-45} textAnchor="end" height={50} interval={getXAxisInterval()} tickMargin={6} tickFormatter={isCumulative ? formatXAxisTick : undefined} />
-                                                        <YAxis stroke="#9ca3af" fontSize={10} tick={{ fill: '#9ca3af' }} domain={maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax']} ticks={yTicks.length > 0 ? yTicks : undefined} tickFormatter={(value) => { if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`; if (value >= 1000) return `${(value / 1000).toFixed(1)}K`; return value.toString() }} />
-                                                        <Tooltip contentStyle={{ backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '10px', padding: '8px 10px', fontSize: '11px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} formatter={(value: any) => [typeof value === 'number' ? value.toLocaleString() + (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '') : value, 'Cumulative Total']} labelFormatter={(label) => { const dp = chartData.find(d => d.date === label); return dp?.fullDate ? formatDate(dp.fullDate) : `Date: ${label}` }} cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '5 5' }} />
-                                                        <Line type="monotone" dataKey="cumulative" stroke={chartColor} strokeWidth={2.5} dot={false} activeDot={{ r: 5, fill: chartColor, stroke: 'white', strokeWidth: 2 }} strokeLinecap="round" />
+                                                    <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                                                        <CartesianGrid vertical={false} stroke="#f1f5f9" strokeDasharray="3 3" />
+                                                        <XAxis dataKey="date" stroke="#cbd5e1" fontSize={10} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} angle={-45} textAnchor="end" height={50} interval={getXAxisInterval()} tickMargin={6} tickFormatter={effectiveIsCumulative ? formatXAxisTick : undefined} />
+                                                        <YAxis stroke="#cbd5e1" fontSize={10} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} domain={isPercentageMetric ? [0, percentageYMax] : (maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax'])} ticks={isPercentageMetric ? percentageYTicks : (yTicks.length > 0 ? yTicks : undefined)} tickFormatter={isPercentageMetric ? ((value: any) => `${Math.round(value)}%`) : ((value) => { if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`; if (value >= 1000) return `${(value / 1000).toFixed(1)}K`; return value.toString() })} />
+                                                        {isPercentageMetric ? (
+                                                            <Tooltip content={<PercentageTooltip />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                                                        ) : (
+                                                            <Tooltip contentStyle={{ backgroundColor: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(8px)', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '8px 12px', fontSize: '11px', boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }} formatter={(value: any) => [typeof value === 'number' ? value.toLocaleString() + (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '') : value, 'Cumulative Total']} labelFormatter={(label) => { const dp = chartData.find(d => d.date === label); return dp?.fullDate ? formatDate(dp.fullDate) : `Date: ${label}` }} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                                                        )}
+                                                        {isPercentageMetric && totalMetricValue > 0 && (
+                                                            <ReferenceLine y={totalMetricValue} stroke={chartColor} strokeOpacity={0.5} strokeWidth={1.25} strokeDasharray="5 4" ifOverflow="extendDomain" />
+                                                        )}
+                                                        {isPercentageMetric && (
+                                                            <Line type="monotone" dataKey="average" stroke="transparent" dot={false} activeDot={false} isAnimationActive={false} legendType="none" />
+                                                        )}
+                                                        <Line type="monotone" dataKey="cumulative" stroke={chartColor} strokeWidth={2.25} dot={isPercentageMetric ? { r: 2.5, fill: chartColor, strokeWidth: 0 } : false} activeDot={{ r: 4, fill: chartColor, stroke: 'white', strokeWidth: 1.5 }} strokeLinecap="round" connectNulls={isPercentageMetric} />
                                                     </LineChart>
                                                 </ResponsiveContainer>
                                             ) : (
@@ -1105,7 +1255,7 @@ export default function ExpandableKPICard({
                                                         <div key={update.id || index} className="border border-gray-100/80 rounded-lg bg-white/60 hover:bg-primary-50/50 hover:border-primary-200 cursor-pointer transition-all duration-200 p-2" onClick={() => handleDataPointClick(update)}>
                                                             <div className="flex items-center justify-between">
                                                                 <div className="min-w-0 flex-1">
-                                                                    <span className="text-xs font-semibold text-primary-600">{update.value?.toLocaleString()} {kpi.unit_of_measurement}</span>
+                                                                    <span className="text-xs font-semibold text-primary-600">{update.value?.toLocaleString()}{isPercentageMetric ? '%' : (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '')}</span>
                                                                     <div className="flex items-center space-x-1.5 mt-0.5"><Calendar className="w-2.5 h-2.5 text-gray-400" /><span className="text-[10px] text-gray-500">{update.date_range_start && update.date_range_end ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}` : formatDate(update.date_represented)}</span></div>
                                                                 </div>
                                                                 <div className="flex items-center gap-1.5">
@@ -1459,9 +1609,12 @@ export default function ExpandableKPICard({
                                         <h2 className="text-xl font-bold text-gray-800">{kpi.title}</h2>
                                         <p className="text-sm text-gray-500">{kpi.description}</p>
                                     </div>
-                                    <div className="flex items-baseline gap-1.5 px-3 py-1.5 bg-primary-50 rounded-xl border border-primary-100">
-                                        <span className="text-2xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}</span>
-                                        {kpi.unit_of_measurement && <span className="text-xs text-primary-500">{kpi.unit_of_measurement}</span>}
+                                    <div className="flex flex-col items-end">
+                                        <div className="flex items-baseline gap-0.5 px-3 py-1.5 bg-primary-50 rounded-xl border border-primary-100">
+                                            <span className="text-2xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}{isPercentageMetric ? '%' : ''}</span>
+                                            {!isPercentageMetric && kpi.unit_of_measurement && <span className="text-xs text-primary-500 ml-1">{kpi.unit_of_measurement}</span>}
+                                        </div>
+                                        {isPercentageMetric && <span className="text-[11px] uppercase tracking-wide text-gray-400 mt-0.5">Average</span>}
                                     </div>
                                 </div>
                             </div>
@@ -1618,11 +1771,11 @@ export default function ExpandableKPICard({
                                     <div className="lg:col-span-3 bg-white/80 backdrop-blur-xl border border-gray-100/60 rounded-2xl p-4 flex flex-col shadow-soft-float">
                                         <div className="flex items-center justify-between mb-4 gap-2">
                                             <div className="flex-shrink-0 min-w-0">
-                                                <h5 className="text-base lg:text-lg font-semibold text-gray-900 truncate">{isCumulative ? 'Cumulative Progress' : 'Monthly Progress'}</h5>
-                                                <p className="text-xs lg:text-sm text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals over time'}</p>
+                                                <h5 className="text-base lg:text-lg font-semibold text-gray-900 truncate">{isPercentageMetric ? 'Percentage Over Time' : (isCumulative ? 'Cumulative Progress' : 'Monthly Progress')}</h5>
+                                                {!isPercentageMetric && <p className="text-xs lg:text-sm text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals over time'}</p>}
                                             </div>
                                             <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
-                                                {timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
+                                                {!isPercentageMetric && timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
                                                     <div className="flex items-center bg-gray-100 rounded-md lg:rounded-lg p-0.5">
                                                         <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
                                                         <button onClick={() => setIsCumulative(true)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
@@ -1641,12 +1794,22 @@ export default function ExpandableKPICard({
                                         <div className="flex-1 h-64 flex items-center justify-center">
                                             {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
                                                 <ResponsiveContainer width="100%" height="100%">
-                                                    <LineChart data={chartData}>
-                                                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                                                        <XAxis dataKey="date" stroke="#9ca3af" fontSize={11} tick={{ fill: '#9ca3af' }} angle={-45} textAnchor="end" height={60} interval={getXAxisInterval()} tickMargin={8} tickFormatter={isCumulative ? formatXAxisTick : undefined} />
-                                                        <YAxis stroke="#9ca3af" fontSize={11} tick={{ fill: '#9ca3af' }} domain={maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax']} ticks={yTicks.length > 0 ? yTicks : undefined} tickFormatter={(value) => { if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`; if (value >= 1000) return `${(value / 1000).toFixed(1)}K`; return value.toString() }} />
-                                                        <Tooltip contentStyle={{ backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '12px', padding: '10px 12px', fontSize: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} formatter={(value: any) => { const unit = kpi.unit_of_measurement || ''; const formattedValue = typeof value === 'number' ? value.toLocaleString() + (unit ? ` ${unit}` : '') : value; return [formattedValue, 'Cumulative Total'] }} labelFormatter={(label) => { const dataPoint = chartData.find(d => d.date === label); if (dataPoint?.fullDate) { return formatDate(dataPoint.fullDate) } return `Date: ${label}` }} cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '5 5' }} />
-                                                        <Line type="monotone" dataKey="cumulative" stroke={chartColor} strokeWidth={3.5} dot={false} activeDot={{ r: 6, fill: chartColor, stroke: 'white', strokeWidth: 2 }} strokeLinecap="round" />
+                                                    <LineChart data={chartData} margin={{ top: 12, right: 20, left: 0, bottom: 0 }}>
+                                                        <CartesianGrid vertical={false} stroke="#f1f5f9" strokeDasharray="3 3" />
+                                                        <XAxis dataKey="date" stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} angle={-45} textAnchor="end" height={60} interval={getXAxisInterval()} tickMargin={8} tickFormatter={effectiveIsCumulative ? formatXAxisTick : undefined} />
+                                                        <YAxis stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} domain={isPercentageMetric ? [0, percentageYMax] : (maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax'])} ticks={isPercentageMetric ? percentageYTicks : (yTicks.length > 0 ? yTicks : undefined)} tickFormatter={isPercentageMetric ? ((value: any) => `${Math.round(value)}%`) : ((value) => { if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`; if (value >= 1000) return `${(value / 1000).toFixed(1)}K`; return value.toString() })} />
+                                                        {isPercentageMetric ? (
+                                                            <Tooltip content={<PercentageTooltip />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                                                        ) : (
+                                                            <Tooltip contentStyle={{ backgroundColor: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(8px)', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '10px 12px', fontSize: '12px', boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }} formatter={(value: any) => { const unit = kpi.unit_of_measurement || ''; const formattedValue = typeof value === 'number' ? value.toLocaleString() + (unit ? ` ${unit}` : '') : value; return [formattedValue, 'Cumulative Total'] }} labelFormatter={(label) => { const dataPoint = chartData.find(d => d.date === label); if (dataPoint?.fullDate) { return formatDate(dataPoint.fullDate) } return `Date: ${label}` }} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                                                        )}
+                                                        {isPercentageMetric && totalMetricValue > 0 && (
+                                                            <ReferenceLine y={totalMetricValue} stroke={chartColor} strokeOpacity={0.5} strokeWidth={1.25} strokeDasharray="5 4" ifOverflow="extendDomain" />
+                                                        )}
+                                                        {isPercentageMetric && (
+                                                            <Line type="monotone" dataKey="average" stroke="transparent" dot={false} activeDot={false} isAnimationActive={false} legendType="none" />
+                                                        )}
+                                                        <Line type="monotone" dataKey="cumulative" stroke={chartColor} strokeWidth={2.25} dot={isPercentageMetric ? { r: 2.5, fill: chartColor, strokeWidth: 0 } : false} activeDot={{ r: 4, fill: chartColor, stroke: 'white', strokeWidth: 1.5 }} strokeLinecap="round" connectNulls={isPercentageMetric} />
                                                     </LineChart>
                                                 </ResponsiveContainer>
                                             ) : (
@@ -1678,7 +1841,7 @@ export default function ExpandableKPICard({
                                                         <div key={update.id || index} className="border border-gray-100/80 rounded-xl bg-white/60 hover:bg-primary-50/50 hover:border-primary-200 cursor-pointer transition-all duration-200 p-2.5" onClick={() => handleDataPointClick(update)}>
                                                             <div className="flex items-center justify-between">
                                                                 <div className="min-w-0 flex-1">
-                                                                    <span className="text-sm font-semibold text-primary-600">{update.value?.toLocaleString()} {kpi.unit_of_measurement}</span>
+                                                                    <span className="text-sm font-semibold text-primary-600">{update.value?.toLocaleString()}{isPercentageMetric ? '%' : (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '')}</span>
                                                                     <div className="flex items-center space-x-2 mt-0.5">
                                                                         <Calendar className="w-3 h-3 text-gray-400" />
                                                                         <span className="text-xs text-gray-500">{update.date_range_start && update.date_range_end ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}` : formatDate(update.date_represented)}</span>
@@ -1774,9 +1937,12 @@ export default function ExpandableKPICard({
                                         <h2 className="text-xl font-bold text-gray-800">{kpi.title}</h2>
                                         <p className="text-sm text-gray-500">{kpi.description}</p>
                                     </div>
-                                    <div className="flex items-baseline gap-1.5 px-3 py-1.5 bg-primary-50 rounded-xl border border-primary-100">
-                                        <span className="text-2xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}</span>
-                                        {kpi.unit_of_measurement && <span className="text-xs text-primary-500">{kpi.unit_of_measurement}</span>}
+                                    <div className="flex flex-col items-end">
+                                        <div className="flex items-baseline gap-0.5 px-3 py-1.5 bg-primary-50 rounded-xl border border-primary-100">
+                                            <span className="text-2xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}{isPercentageMetric ? '%' : ''}</span>
+                                            {!isPercentageMetric && kpi.unit_of_measurement && <span className="text-xs text-primary-500 ml-1">{kpi.unit_of_measurement}</span>}
+                                        </div>
+                                        {isPercentageMetric && <span className="text-[11px] uppercase tracking-wide text-gray-400 mt-0.5">Average</span>}
                                     </div>
                                 </div>
                             </div>
@@ -1937,11 +2103,11 @@ export default function ExpandableKPICard({
                                     <div className="lg:col-span-3 bg-white/80 backdrop-blur-xl border border-gray-100/60 rounded-2xl p-4 flex flex-col shadow-soft-float">
                                         <div className="flex items-center justify-between mb-4 gap-2">
                                             <div className="flex-shrink-0 min-w-0">
-                                                <h5 className="text-base lg:text-lg font-semibold text-gray-900 truncate">{isCumulative ? 'Cumulative Progress' : 'Monthly Progress'}</h5>
-                                                <p className="text-xs lg:text-sm text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals over time'}</p>
+                                                <h5 className="text-base lg:text-lg font-semibold text-gray-900 truncate">{isPercentageMetric ? 'Percentage Over Time' : (isCumulative ? 'Cumulative Progress' : 'Monthly Progress')}</h5>
+                                                {!isPercentageMetric && <p className="text-xs lg:text-sm text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals over time'}</p>}
                                             </div>
                                             <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
-                                                {timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
+                                                {!isPercentageMetric && timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
                                                     <div className="flex items-center bg-gray-100 rounded-md lg:rounded-lg p-0.5">
                                                         <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
                                                         <button onClick={() => setIsCumulative(true)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
@@ -1960,67 +2126,96 @@ export default function ExpandableKPICard({
                                         <div className="flex-1 h-64 flex items-center justify-center">
                                             {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
                                                 <ResponsiveContainer width="100%" height="100%">
-                                                    <LineChart data={chartData}>
-                                                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                                                    <LineChart data={chartData} margin={{ top: 12, right: 20, left: 0, bottom: 0 }}>
+                                                        <CartesianGrid vertical={false} stroke="#f1f5f9" strokeDasharray="3 3" />
                                                         <XAxis
                                                             dataKey="date"
-                                                            stroke="#6b7280"
+                                                            stroke="#cbd5e1"
                                                             fontSize={11}
-                                                            tick={{ fill: '#6b7280' }}
+                                                            tickLine={false}
+                                                            axisLine={false}
+                                                            tick={{ fill: '#94a3b8' }}
                                                             angle={-45}
                                                             textAnchor="end"
                                                             height={60}
                                                             interval={getXAxisInterval()}
                                                             tickMargin={8}
-                                                            tickFormatter={isCumulative ? formatXAxisTick : undefined}
+                                                            tickFormatter={effectiveIsCumulative ? formatXAxisTick : undefined}
                                                         />
                                                         <YAxis
-                                                            stroke="#6b7280"
+                                                            stroke="#cbd5e1"
                                                             fontSize={11}
-                                                            tick={{ fill: '#6b7280' }}
-                                                            domain={maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax']}
-                                                            ticks={yTicks.length > 0 ? yTicks : undefined}
-                                                            tickFormatter={(value) => {
+                                                            tickLine={false}
+                                                            axisLine={false}
+                                                            tick={{ fill: '#94a3b8' }}
+                                                            domain={isPercentageMetric ? [0, percentageYMax] : (maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax'])}
+                                                            ticks={isPercentageMetric ? percentageYTicks : (yTicks.length > 0 ? yTicks : undefined)}
+                                                            tickFormatter={isPercentageMetric ? ((value: any) => `${Math.round(value)}%`) : ((value) => {
                                                                 if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
                                                                 if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
                                                                 return value.toString()
-                                                            }}
+                                                            })}
                                                         />
-                                                        <Tooltip
-                                                            contentStyle={{
-                                                                backgroundColor: 'rgba(255,255,255,0.95)',
-                                                                backdropFilter: 'blur(8px)',
-                                                                border: '1px solid rgba(0,0,0,0.05)',
-                                                                borderRadius: '12px',
-                                                                padding: '10px 12px',
-                                                                fontSize: '12px',
-                                                                boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
-                                                            }}
-                                                            formatter={(value: any, name: string) => {
-                                                                const unit = kpi.unit_of_measurement || ''
-                                                                const formattedValue = typeof value === 'number'
-                                                                    ? value.toLocaleString() + (unit ? ` ${unit}` : '')
-                                                                    : value
-                                                                return [formattedValue, 'Cumulative Total']
-                                                            }}
-                                                            labelFormatter={(label) => {
-                                                                // Find the actual date from chartData
-                                                                const dataPoint = chartData.find(d => d.date === label)
-                                                                if (dataPoint?.fullDate) {
-                                                                    return formatDate(dataPoint.fullDate)
-                                                                }
-                                                                return `Date: ${label}`
-                                                            }}
-                                                            cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '5 5' }}
-                                                        />
+                                                        {isPercentageMetric ? (
+                                                            <Tooltip content={<PercentageTooltip />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                                                        ) : (
+                                                            <Tooltip
+                                                                contentStyle={{
+                                                                    backgroundColor: 'rgba(255,255,255,0.98)',
+                                                                    backdropFilter: 'blur(8px)',
+                                                                    border: '1px solid #f1f5f9',
+                                                                    borderRadius: '12px',
+                                                                    padding: '10px 12px',
+                                                                    fontSize: '12px',
+                                                                    boxShadow: '0 8px 24px rgba(15,23,42,0.08)'
+                                                                }}
+                                                                formatter={(value: any) => {
+                                                                    const unit = kpi.unit_of_measurement || ''
+                                                                    const formattedValue = typeof value === 'number'
+                                                                        ? value.toLocaleString() + (unit ? ` ${unit}` : '')
+                                                                        : value
+                                                                    return [formattedValue, 'Cumulative Total']
+                                                                }}
+                                                                labelFormatter={(label) => {
+                                                                    const dataPoint = chartData.find(d => d.date === label)
+                                                                    if (dataPoint?.fullDate) {
+                                                                        return formatDate(dataPoint.fullDate)
+                                                                    }
+                                                                    return `Date: ${label}`
+                                                                }}
+                                                                cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }}
+                                                            />
+                                                        )}
+                                                        {isPercentageMetric && totalMetricValue > 0 && (
+                                                            <ReferenceLine
+                                                                y={totalMetricValue}
+                                                                stroke={chartColor}
+                                                                strokeOpacity={0.5}
+                                                                strokeWidth={1.25}
+                                                                strokeDasharray="5 4"
+                                                                ifOverflow="extendDomain"
+                                                            />
+                                                        )}
+                                                        {isPercentageMetric && (
+                                                            <Line
+                                                                type="monotone"
+                                                                dataKey="average"
+                                                                stroke="transparent"
+                                                                dot={false}
+                                                                activeDot={false}
+                                                                isAnimationActive={false}
+                                                                legendType="none"
+                                                            />
+                                                        )}
                                                         <Line
                                                             type="monotone"
                                                             dataKey="cumulative"
                                                             stroke={chartColor}
-                                                            strokeWidth={3.5}
-                                                            dot={false}
-                                                            activeDot={{ r: 6, fill: chartColor, stroke: 'white', strokeWidth: 2 }}
+                                                            strokeWidth={2.25}
+                                                            dot={isPercentageMetric ? { r: 2.5, fill: chartColor, strokeWidth: 0 } : false}
+                                                            activeDot={{ r: 4, fill: chartColor, stroke: 'white', strokeWidth: 1.5 }}
                                                             strokeLinecap="round"
+                                                            connectNulls={isPercentageMetric}
                                                         />
                                                     </LineChart>
                                                 </ResponsiveContainer>
@@ -2082,7 +2277,7 @@ export default function ExpandableKPICard({
                                                                     <div className="min-w-0 flex-1">
                                                                         <div className="flex items-center space-x-2">
                                                                             <span className="text-sm font-semibold text-primary-600">
-                                                                                {update.value?.toLocaleString()} {kpi.unit_of_measurement}
+                                                                                {update.value?.toLocaleString()}{isPercentageMetric ? '%' : (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '')}
                                                                             </span>
                                                                         </div>
                                                                         <div className="flex items-center space-x-2 mt-0.5">

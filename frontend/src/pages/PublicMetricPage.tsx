@@ -7,14 +7,14 @@ import {
     ExternalLink, MapPin, Target, Sparkles, CheckCircle2,
     ChevronLeft, ChevronRight, ChevronDown, X, Users
 } from 'lucide-react'
-import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
+import { AreaChart, Area, LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, ReferenceLine } from 'recharts'
 import { publicApi, PublicMetricDetail, PublicEvidence, PublicMetricTag } from '../services/publicApi'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
 import PublicTagFilter from '../components/public/PublicTagFilter'
 import PublicTagChip from '../components/public/PublicTagChip'
 import DateRangePicker from '../components/DateRangePicker'
-import { getLocalDateString, formatDate } from '../utils'
+import { getLocalDateString, formatDate, parseLocalDate } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 
 // Category colors
@@ -217,6 +217,114 @@ export default function PublicMetricPage() {
     // Brand color from initiative/organization data
     const brandColor = metric.initiative.brand_color || '#c0dfa1'
 
+    // Percentage-mode chart data (per-month, range claims spread, single overrides)
+    const isPercentage = metric.metric_type === 'percentage'
+    const percentageChartData = (() => {
+        if (!isPercentage || filteredUpdates.length === 0) return [] as Array<{ date: string; fullDate: Date; value: number | null; claimCount: number; average: number }>
+        const monthly: Record<string, { singleSum: number; singleCount: number; rangeSum: number; rangeCount: number }> = {}
+        const ensure = (key: string) => {
+            if (!monthly[key]) monthly[key] = { singleSum: 0, singleCount: 0, rangeSum: 0, rangeCount: 0 }
+            return monthly[key]
+        }
+        let earliest: Date | null = null
+        let latest: Date | null = null
+        const bumpRange = (d: Date) => {
+            if (!earliest || d < earliest) earliest = new Date(d)
+            if (!latest || d > latest) latest = new Date(d)
+        }
+        filteredUpdates.forEach((u: any) => {
+            const value = Number(u.value || 0)
+            if (!Number.isFinite(value)) return
+            if (u.date_range_start && u.date_range_end) {
+                const cs = parseLocalDate(u.date_range_start); cs.setHours(0, 0, 0, 0)
+                const ce = parseLocalDate(u.date_range_end); ce.setHours(0, 0, 0, 0)
+                bumpRange(cs); bumpRange(ce)
+                const cursor = new Date(cs.getFullYear(), cs.getMonth(), 1)
+                const stop = new Date(ce.getFullYear(), ce.getMonth(), 1)
+                while (cursor.getTime() <= stop.getTime()) {
+                    const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`
+                    const b = ensure(key)
+                    b.rangeSum += value
+                    b.rangeCount += 1
+                    cursor.setMonth(cursor.getMonth() + 1)
+                }
+            } else {
+                const d = parseLocalDate(u.date_represented); d.setHours(0, 0, 0, 0)
+                bumpRange(d)
+                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+                const b = ensure(key)
+                b.singleSum += value
+                b.singleCount += 1
+            }
+        })
+        if (!earliest || !latest) return []
+        // Buffer one month before earliest
+        const start = new Date((earliest as Date).getFullYear(), (earliest as Date).getMonth(), 1)
+        start.setMonth(start.getMonth() - 1)
+        const end = new Date((latest as Date).getFullYear(), (latest as Date).getMonth(), 1)
+        const result: Array<{ date: string; fullDate: Date; value: number | null; claimCount: number; average: number }> = []
+        const overallAvg = Number(filteredTotal) || 0
+        const cursor = new Date(start)
+        while (cursor.getTime() <= end.getTime()) {
+            const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`
+            const b = monthly[key]
+            let v: number | null = null
+            let claimCount = 0
+            if (b) {
+                if (b.singleCount > 0) { v = b.singleSum / b.singleCount; claimCount = b.singleCount }
+                else if (b.rangeCount > 0) { v = b.rangeSum / b.rangeCount; claimCount = b.rangeCount }
+            }
+            result.push({
+                date: cursor.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+                fullDate: new Date(cursor),
+                value: v,
+                claimCount,
+                average: typeof overallAvg === 'number' ? overallAvg : 0
+            })
+            cursor.setMonth(cursor.getMonth() + 1)
+        }
+        return result
+    })()
+    const percentageOverallAvg = isPercentage ? (Number(filteredTotal) || 0) : 0
+    const percentageYMax = (() => {
+        if (!isPercentage) return 100
+        let max = 100
+        percentageChartData.forEach(d => {
+            if (typeof d.value === 'number' && d.value > max) max = d.value
+        })
+        if (percentageOverallAvg > max) max = percentageOverallAvg
+        return Math.ceil(max / 100) * 100
+    })()
+    const percentageYTicks = (() => {
+        if (!isPercentage) return [] as number[]
+        const step = percentageYMax / 4
+        return [0, step, step * 2, step * 3, percentageYMax]
+    })()
+
+    // Tooltip for percentage metric: this-month + overall avg, always visible
+    const PercentageTooltip = ({ active, label }: any) => {
+        if (!active) return null
+        const dp = percentageChartData.find(d => d.date === label)
+        const dateLabel = dp?.fullDate ? formatDate(dp.fullDate) : (label || '')
+        const monthVal = dp?.value
+        const claimCount = dp?.claimCount ?? 0
+        return (
+            <div style={{ backgroundColor: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(8px)', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '10px 12px', fontSize: '12px', boxShadow: '0 8px 24px rgba(15,23,42,0.08)', minWidth: 160 }}>
+                <div style={{ fontWeight: 500, color: '#475569', marginBottom: 6 }}>{dateLabel}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                    <span style={{ color: '#94a3b8' }}>This month</span>
+                    <span style={{ fontWeight: 500, color: '#0f172a' }}>
+                        {typeof monthVal === 'number' ? `${Math.round(monthVal)}% · ${claimCount} claim${claimCount === 1 ? '' : 's'}` : 'No data'}
+                    </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 6, paddingTop: 6, borderTop: '1px dashed #e2e8f0' }}>
+                    <span style={{ color: config.accent, opacity: 0.85, fontWeight: 500 }}>Overall avg</span>
+                    <span style={{ fontWeight: 600, color: config.accent }}>{Math.round(percentageOverallAvg)}%</span>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="min-h-screen font-figtree relative animate-fadeIn">
             {/* Flowing gradient background */}
@@ -371,11 +479,11 @@ export default function PublicMetricPage() {
 
                         {/* Big Total Card - Full width on mobile */}
                         <div className="bg-white/70 backdrop-blur-2xl p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-xl shadow-black/10 border border-white/60 lg:min-w-[200px] lg:max-w-[240px]">
-                            <p className="text-gray-500 text-xs sm:text-sm font-medium mb-0.5 sm:mb-1">Total Impact</p>
+                            <p className="text-gray-500 text-xs sm:text-sm font-medium mb-0.5 sm:mb-1">{metric.metric_type === 'percentage' ? 'Average' : 'Total Impact'}</p>
                             <p className={`text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight ${config.text}`}>
-                                {(filterStart ? filteredTotal : metric.total_value).toLocaleString()}
+                                {(filterStart ? filteredTotal : metric.total_value).toLocaleString()}{metric.metric_type === 'percentage' ? '%' : ''}
                             </p>
-                            <p className="text-gray-500 text-xs sm:text-sm mt-0.5 sm:mt-1">{metric.unit_of_measurement}</p>
+                            <p className="text-gray-500 text-xs sm:text-sm mt-0.5 sm:mt-1">{metric.metric_type === 'percentage' ? 'across all claims' : metric.unit_of_measurement}</p>
                         </div>
                     </div>
                 </div>
@@ -387,7 +495,7 @@ export default function PublicMetricPage() {
                         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/40 flex items-center justify-between">
                             <h2 className="font-semibold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
                                 <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
-                                Cumulative Progress
+                                {isPercentage ? 'Percentage Over Time' : 'Cumulative Progress'}
                             </h2>
                             <span className="text-[10px] sm:text-xs text-gray-500 bg-white/60 px-2 sm:px-3 py-1 rounded-full">
                                 All time
@@ -404,52 +512,109 @@ export default function PublicMetricPage() {
                         ) : (
                             <div className="h-48 sm:h-72 p-2 sm:p-4">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={cumulativeData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                        <defs>
-                                            <linearGradient id="colorCumulative" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor={config.accent} stopOpacity={0.3} />
-                                                <stop offset="95%" stopColor={config.accent} stopOpacity={0.02} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                                        <XAxis
-                                            dataKey="date"
-                                            tick={{ fontSize: 9, fill: '#94a3b8' }}
-                                            axisLine={{ stroke: '#e2e8f0' }}
-                                            tickLine={false}
-                                            interval="preserveStartEnd"
-                                        />
-                                        <YAxis
-                                            tick={{ fontSize: 9, fill: '#94a3b8' }}
-                                            axisLine={false}
-                                            tickLine={false}
-                                            tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value.toString()}
-                                            width={35}
-                                        />
-                                        <Tooltip
-                                            contentStyle={{
-                                                backgroundColor: 'white',
-                                                border: 'none',
-                                                borderRadius: '12px',
-                                                boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
-                                                padding: '8px 12px',
-                                                fontSize: '12px'
-                                            }}
-                                            formatter={(value: number) => [
-                                                `${value.toLocaleString()} ${metric.unit_of_measurement}`,
-                                                'Total'
-                                            ]}
-                                            labelFormatter={(label) => label}
-                                        />
-                                        <Area
-                                            type="monotone"
-                                            dataKey="cumulative"
-                                            stroke={config.accent}
-                                            strokeWidth={2}
-                                            fillOpacity={1}
-                                            fill="url(#colorCumulative)"
-                                        />
-                                    </AreaChart>
+                                    {isPercentage ? (
+                                        <LineChart data={percentageChartData} margin={{ top: 12, right: 20, left: 0, bottom: 0 }}>
+                                            <CartesianGrid vertical={false} stroke="#f1f5f9" strokeDasharray="3 3" />
+                                            <XAxis
+                                                dataKey="date"
+                                                stroke="#cbd5e1"
+                                                fontSize={10}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tick={{ fill: '#94a3b8' }}
+                                                interval="preserveStartEnd"
+                                            />
+                                            <YAxis
+                                                stroke="#cbd5e1"
+                                                fontSize={10}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tick={{ fill: '#94a3b8' }}
+                                                domain={[0, percentageYMax]}
+                                                ticks={percentageYTicks}
+                                                tickFormatter={(value: any) => `${Math.round(value)}%`}
+                                                width={40}
+                                            />
+                                            <Tooltip content={<PercentageTooltip />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                                            {percentageOverallAvg > 0 && (
+                                                <ReferenceLine
+                                                    y={percentageOverallAvg}
+                                                    stroke={config.accent}
+                                                    strokeOpacity={0.5}
+                                                    strokeWidth={1.25}
+                                                    strokeDasharray="5 4"
+                                                    ifOverflow="extendDomain"
+                                                    label={{ value: `Avg ${Math.round(percentageOverallAvg)}%`, position: 'right', fill: config.accent, fontSize: 10, fontWeight: 500, offset: 6 }}
+                                                />
+                                            )}
+                                            <Line
+                                                type="monotone"
+                                                dataKey="average"
+                                                stroke="transparent"
+                                                dot={false}
+                                                activeDot={false}
+                                                isAnimationActive={false}
+                                                legendType="none"
+                                            />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="value"
+                                                stroke={config.accent}
+                                                strokeWidth={2.25}
+                                                dot={{ r: 2.5, fill: config.accent, strokeWidth: 0 }}
+                                                activeDot={{ r: 4, fill: config.accent, stroke: 'white', strokeWidth: 1.5 }}
+                                                strokeLinecap="round"
+                                                connectNulls={true}
+                                            />
+                                        </LineChart>
+                                    ) : (
+                                        <AreaChart data={cumulativeData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="colorCumulative" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor={config.accent} stopOpacity={0.3} />
+                                                    <stop offset="95%" stopColor={config.accent} stopOpacity={0.02} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                                            <XAxis
+                                                dataKey="date"
+                                                tick={{ fontSize: 9, fill: '#94a3b8' }}
+                                                axisLine={{ stroke: '#e2e8f0' }}
+                                                tickLine={false}
+                                                interval="preserveStartEnd"
+                                            />
+                                            <YAxis
+                                                tick={{ fontSize: 9, fill: '#94a3b8' }}
+                                                axisLine={false}
+                                                tickLine={false}
+                                                tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value.toString()}
+                                                width={35}
+                                            />
+                                            <Tooltip
+                                                contentStyle={{
+                                                    backgroundColor: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '12px',
+                                                    boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
+                                                    padding: '8px 12px',
+                                                    fontSize: '12px'
+                                                }}
+                                                formatter={(value: number) => [
+                                                    `${value.toLocaleString()} ${metric.unit_of_measurement}`,
+                                                    'Total'
+                                                ]}
+                                                labelFormatter={(label) => label}
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="cumulative"
+                                                stroke={config.accent}
+                                                strokeWidth={2}
+                                                fillOpacity={1}
+                                                fill="url(#colorCumulative)"
+                                            />
+                                        </AreaChart>
+                                    )}
                                 </ResponsiveContainer>
                             </div>
                         )}
@@ -480,6 +645,7 @@ export default function PublicMetricPage() {
                                             key={update.id || idx}
                                             update={update}
                                             unit={metric.unit_of_measurement}
+                                            isPercentage={metric.metric_type === 'percentage'}
                                             config={config}
                                             orgSlug={orgSlug!}
                                             initiativeSlug={initiativeSlug!}
@@ -616,9 +782,10 @@ export default function PublicMetricPage() {
 }
 
 // Impact Claim Card Component
-function ImpactClaimCard({ update, unit, config, orgSlug, initiativeSlug, tag, selectedTagIds, onToggleTag }: {
+function ImpactClaimCard({ update, unit, isPercentage, config, orgSlug, initiativeSlug, tag, selectedTagIds, onToggleTag }: {
     update: any;
     unit: string;
+    isPercentage?: boolean;
     config: { bg: string; text: string; gradient: string; accent: string };
     orgSlug: string;
     initiativeSlug: string;
@@ -641,9 +808,9 @@ function ImpactClaimCard({ update, unit, config, orgSlug, initiativeSlug, tag, s
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
                         <span className={`text-lg sm:text-xl font-bold ${config.text}`}>
-                            +{parseFloat(update.value).toLocaleString()}
+                            {isPercentage ? '' : '+'}{parseFloat(update.value).toLocaleString()}{isPercentage ? '%' : ''}
                         </span>
-                        <span className="text-[10px] sm:text-xs text-gray-500">{unit}</span>
+                        {!isPercentage && <span className="text-[10px] sm:text-xs text-gray-500">{unit}</span>}
                     </div>
                     <div className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs text-gray-500">
                         <Calendar className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
@@ -1042,7 +1209,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                                 return (
                                                     <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
                                                         <p className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors">
-                                                            {claim.value} {claim.kpis?.unit_of_measurement || ''}
+                                                            {claim.value}{claim.kpis?.metric_type === 'percentage' ? '%' : ` ${claim.kpis?.unit_of_measurement || ''}`}
                                                         </p>
                                                         <p className="text-xs text-muted-foreground mt-0.5">{metricTitle}</p>
                                                         {dateLabel && <p className="text-[10px] text-muted-foreground mt-0.5">{dateLabel}</p>}

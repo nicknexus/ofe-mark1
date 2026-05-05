@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
 import {
@@ -13,6 +13,8 @@ import 'leaflet/dist/leaflet.css'
 import {
     AreaChart,
     Area,
+    LineChart,
+    Line,
     XAxis,
     YAxis,
     CartesianGrid,
@@ -22,7 +24,8 @@ import {
     Pie,
     Cell,
     BarChart,
-    Bar
+    Bar,
+    ReferenceLine
 } from 'recharts'
 import { createPortal } from 'react-dom'
 import {
@@ -42,7 +45,7 @@ import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicTagFilter from '../components/public/PublicTagFilter'
 import PublicTagChip from '../components/public/PublicTagChip'
 import DateRangePicker from '../components/DateRangePicker'
-import { getLocalDateString, formatDate } from '../utils'
+import { getLocalDateString, formatDate, parseLocalDate } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 
 // Map tile configuration - matches internal app
@@ -626,7 +629,7 @@ export default function PublicInitiativePage() {
                                 key={init.id}
                                 onClick={() => handleInitiativeSwitch(init.slug)}
                                 className={`w-full px-3 py-2 text-left text-sm hover:bg-accent/10 truncate ${init.slug === initiativeSlug ? 'bg-accent/10 text-accent font-medium' : 'text-foreground'
-                                    }`}
+                                }`}
                             >
                                 {init.title}
                             </button>
@@ -669,10 +672,10 @@ export default function PublicInitiativePage() {
                                         )
                                     }}
                                     className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${isSelected ? 'bg-blue-50 font-medium' : 'hover:bg-gray-50'
-                                        }`}
+                                    }`}
                                 >
                                     <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-blue-600 border-2 border-blue-600' : 'border-2 border-gray-300 bg-white'
-                                        }`}>
+                                    }`}>
                                         {isSelected && (
                                             <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -876,8 +879,26 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
     const brandColor = initiative.organization_brand_color || '#c0dfa1'
     const [timeFrame, setTimeFrame] = useState<'all' | '1month' | '6months' | '1year'>('all')
     const [isCumulative, setIsCumulative] = useState(false)
+    const [isPercentageMode, setIsPercentageMode] = useState(false)
+    const userPickedGraphModeRef = useRef(false)
     const [visibleKPIs, setVisibleKPIs] = useState<Set<string>>(new Set(dashboard.kpis.map(k => k.id)))
     const [isMetricDropdownOpen, setIsMetricDropdownOpen] = useState(false)
+
+    const hasPercentageKpi = useMemo(() => dashboard.kpis.some(k => k.metric_type === 'percentage'), [dashboard.kpis])
+    const hasNonPercentageKpi = useMemo(() => dashboard.kpis.some(k => k.metric_type !== 'percentage'), [dashboard.kpis])
+
+    useEffect(() => {
+        if (userPickedGraphModeRef.current) return
+        if (!dashboard.kpis || dashboard.kpis.length === 0) return
+        const allPercentage = dashboard.kpis.every(k => k.metric_type === 'percentage')
+        setIsPercentageMode(allPercentage)
+        if (allPercentage) setIsCumulative(false)
+    }, [dashboard.kpis])
+
+    const visiblePercentageKpis = useMemo(
+        () => dashboard.kpis.filter(k => k.metric_type === 'percentage' && visibleKPIs.has(k.id)),
+        [dashboard.kpis, visibleKPIs]
+    )
     const [descExpanded, setDescExpanded] = useState(false)
     const descRef = React.useRef<HTMLParagraphElement>(null)
     const [descClamped, setDescClamped] = useState(false)
@@ -891,20 +912,34 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
 
     // Flatten all updates from all KPIs
     const allUpdates = useMemo(() => {
-        const updates: Array<{ kpi_id: string; value: number; date_represented: string }> = []
+        const updates: Array<{ kpi_id: string; value: number; date_represented: string; date_range_start?: string; date_range_end?: string }> = []
         dashboard.kpis.forEach(kpi => {
             if (kpi.updates && kpi.updates.length > 0) {
                 kpi.updates.forEach(update => {
                     updates.push({
                         kpi_id: kpi.id,
                         value: update.value,
-                        date_represented: update.date_represented
+                        date_represented: update.date_represented,
+                        date_range_start: update.date_range_start,
+                        date_range_end: update.date_range_end
                     })
                 })
             }
         })
         return updates
     }, [dashboard.kpis])
+
+    // Per-metric overall average for percentage metrics (used by ref lines + ghost data)
+    const percentageAveragesById = useMemo(() => {
+        const out: Record<string, number> = {}
+        visiblePercentageKpis.forEach(k => {
+            const updates = (k.updates || []).map(u => ({ value: u.value }))
+            if (updates.length === 0) { out[k.id] = 0; return }
+            const sum = updates.reduce((acc, u) => acc + (Number(u.value) || 0), 0)
+            out[k.id] = sum / updates.length
+        })
+        return out
+    }, [visiblePercentageKpis])
 
     // Generate chart data similar to MetricsDashboard
     const chartData = useMemo(() => {
@@ -931,9 +966,81 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
             }
         }
 
-        // Group updates by KPI
+        // Filter KPIs by mode: % mode = only percentage; otherwise = only non-percentage
+        const kpiTypeById = new Map(dashboard.kpis.map(k => [k.id, k.metric_type]))
+        const isModeKpi = (kpiId: string) => {
+            const t = kpiTypeById.get(kpiId)
+            return isPercentageMode ? t === 'percentage' : t !== 'percentage'
+        }
+
+        // Percentage mode: per-month per-kpi value with range/single override semantics
+        if (isPercentageMode) {
+            const pctKpiIds = dashboard.kpis
+                .filter(k => k.metric_type === 'percentage' && visibleKPIs.has(k.id))
+                .map(k => k.id)
+
+            const monthly: Record<string, Record<string, { singleSum: number; singleCount: number; rangeSum: number; rangeCount: number }>> = {}
+            const ensure = (key: string, kpiId: string) => {
+                if (!monthly[key]) monthly[key] = {}
+                if (!monthly[key][kpiId]) monthly[key][kpiId] = { singleSum: 0, singleCount: 0, rangeSum: 0, rangeCount: 0 }
+                return monthly[key][kpiId]
+            }
+
+            allUpdates.forEach(update => {
+                if (!pctKpiIds.includes(update.kpi_id)) return
+                const value = Number(update.value || 0)
+                if (!Number.isFinite(value)) return
+                const isRange = !!(update.date_range_start && update.date_range_end)
+                if (isRange) {
+                    const cs = parseLocalDate(update.date_range_start as string); cs.setHours(0, 0, 0, 0)
+                    const ce = parseLocalDate(update.date_range_end as string); ce.setHours(0, 0, 0, 0)
+                    const cursor = new Date(cs.getFullYear(), cs.getMonth(), 1)
+                    const stop = new Date(ce.getFullYear(), ce.getMonth(), 1)
+                    while (cursor.getTime() <= stop.getTime()) {
+                        const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`
+                        const b = ensure(key, update.kpi_id)
+                        b.rangeSum += value
+                        b.rangeCount += 1
+                        cursor.setMonth(cursor.getMonth() + 1)
+                    }
+                } else {
+                    const d = parseLocalDate(update.date_represented); d.setHours(0, 0, 0, 0)
+                    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+                    const b = ensure(key, update.kpi_id)
+                    b.singleSum += value
+                    b.singleCount += 1
+                }
+            })
+
+            const firstMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
+            firstMonth.setMonth(firstMonth.getMonth() - 1)
+            const lastMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+            const result: any[] = []
+            const cursor = new Date(firstMonth)
+            while (cursor.getTime() <= lastMonth.getTime()) {
+                const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`
+                const monthLabel = cursor.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+                const dataPoint: any = { date: monthLabel, fullDate: new Date(cursor) }
+                pctKpiIds.forEach(kpiId => {
+                    const b = monthly[key]?.[kpiId]
+                    let v: number | null = null
+                    if (b) {
+                        if (b.singleCount > 0) v = b.singleSum / b.singleCount
+                        else if (b.rangeCount > 0) v = b.rangeSum / b.rangeCount
+                    }
+                    dataPoint[kpiId] = v
+                    dataPoint[`${kpiId}__avg`] = percentageAveragesById[kpiId] || 0
+                })
+                result.push(dataPoint)
+                cursor.setMonth(cursor.getMonth() + 1)
+            }
+            return result
+        }
+
+        // Group updates by KPI (non-percentage modes)
         const updatesByKPI: Record<string, Array<{ value: number; date: Date }>> = {}
         allUpdates.forEach(update => {
+            if (!isModeKpi(update.kpi_id)) return
             if (!updatesByKPI[update.kpi_id]) {
                 updatesByKPI[update.kpi_id] = []
             }
@@ -974,6 +1081,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
 
                 const dataPoint: any = { date: monthLabel, fullDate: new Date(currentDate) }
                 Array.from(visibleKPIs).forEach(kpiId => {
+                    if (!isModeKpi(kpiId)) return
                     dataPoint[kpiId] = monthlyTotals[monthKey]?.[kpiId] || 0
                 })
                 result.push(dataPoint)
@@ -997,6 +1105,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
 
                 // Calculate cumulative for each visible KPI
                 Array.from(visibleKPIs).forEach(kpiId => {
+                    if (!isModeKpi(kpiId)) return
                     const cumulative = (updatesByKPI[kpiId] || [])
                         .filter(u => u.date <= currentDate)
                         .reduce((sum, u) => sum + u.value, 0)
@@ -1012,7 +1121,65 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
             }
             return result
         }
-    }, [allUpdates, timeFrame, isCumulative, visibleKPIs])
+    }, [allUpdates, dashboard.kpis, timeFrame, isCumulative, isPercentageMode, visibleKPIs, percentageAveragesById])
+
+    // Y-axis bounds for percentage mode (0-100 default; extends to next 100 if a value exceeds)
+    const percentageYMax = useMemo(() => {
+        if (!isPercentageMode || chartData.length === 0) return 100
+        let max = 100
+        chartData.forEach((d: any) => {
+            visiblePercentageKpis.forEach(k => {
+                const v = d[k.id]
+                if (typeof v === 'number' && v > max) max = v
+            })
+        })
+        return Math.ceil(max / 100) * 100
+    }, [isPercentageMode, chartData, visiblePercentageKpis])
+    const percentageYTicks = useMemo(() => {
+        if (!isPercentageMode) return [] as number[]
+        const step = percentageYMax / 4
+        return [0, step, step * 2, step * 3, percentageYMax]
+    }, [isPercentageMode, percentageYMax])
+
+    // Tooltip for percentage mode: rows per visible % metric showing month value + overall avg
+    const PercentageTooltip = ({ active, label }: any) => {
+        if (!active) return null
+        const dp = (chartData as any[]).find(d => d.date === label)
+        if (!dp) return null
+        const dateLabel = dp.fullDate ? formatDate(dp.fullDate) : (label || '')
+        return (
+            <div style={{ backgroundColor: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(8px)', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '10px 12px', fontSize: '12px', boxShadow: '0 8px 24px rgba(15,23,42,0.08)', minWidth: 220 }}>
+                <div style={{ fontWeight: 500, color: '#475569', marginBottom: 6 }}>{dateLabel}</div>
+                {visiblePercentageKpis.length === 0 && (
+                    <div style={{ color: '#94a3b8' }}>No percentage metrics selected</div>
+                )}
+                {visiblePercentageKpis.map(k => {
+                    const originalIndex = dashboard.kpis.findIndex(x => x.id === k.id)
+                    const color = getMetricColor(originalIndex)
+                    const v = dp[k.id]
+                    const avg = percentageAveragesById[k.id] || 0
+                    return (
+                        <div key={k.id} style={{ marginBottom: 6 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                <span style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: color, display: 'inline-block' }} />
+                                <span style={{ fontWeight: 500, color: '#0f172a', fontSize: 11 }}>{k.title}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, paddingLeft: 14 }}>
+                                <span style={{ color: '#94a3b8' }}>This month</span>
+                                <span style={{ fontWeight: 500, color: '#0f172a' }}>
+                                    {typeof v === 'number' ? `${Math.round(v)}%` : 'No data'}
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, paddingLeft: 14 }}>
+                                <span style={{ color, opacity: 0.85 }}>Overall avg</span>
+                                <span style={{ fontWeight: 600, color }}>{Math.round(avg)}%</span>
+                            </div>
+                        </div>
+                    )
+                })}
+            </div>
+        )
+    }
 
     // Category breakdown data
     const categoryData = useMemo(() => {
@@ -1102,11 +1269,11 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                             >
                                 <div className="flex items-center justify-between mb-1">
                                     <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: metricColor }} />
-                                    <span className="text-[10px] text-gray-400 truncate ml-1">{kpi.unit_of_measurement}</span>
+                                    <span className="text-[10px] text-gray-400 truncate ml-1">{kpi.metric_type === 'percentage' ? 'avg' : kpi.unit_of_measurement}</span>
                                 </div>
                                 <div className="text-xs font-medium text-gray-700 truncate mb-1 group-hover:text-accent transition-colors">{kpi.title}</div>
                                 <div className="text-lg font-bold" style={{ color: metricColor }}>
-                                    {(kpi.total_value || 0).toLocaleString()}
+                                    {(kpi.total_value || 0).toLocaleString()}{kpi.metric_type === 'percentage' ? '%' : ''}
                                 </div>
                             </Link>
                         )
@@ -1200,22 +1367,32 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                             )}
                         </div>
 
-                        {/* Monthly/Cumulative Toggle */}
+                        {/* Monthly / Cumulative / Percentages Toggle */}
                         <div className="flex items-center bg-white/60 rounded-xl p-0.5 border border-white/80">
+                            {hasNonPercentageKpi && (
+                                <>
                             <button
-                                onClick={() => setIsCumulative(false)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${!isCumulative ? 'bg-gray-800 text-white' : 'text-gray-600 hover:text-gray-800'
-                                    }`}
+                                        onClick={() => { userPickedGraphModeRef.current = true; setIsPercentageMode(false); setIsCumulative(false) }}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${(!isCumulative && !isPercentageMode) ? 'bg-gray-800 text-white' : 'text-gray-600 hover:text-gray-800'}`}
                             >
                                 Monthly
                             </button>
                             <button
-                                onClick={() => setIsCumulative(true)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${isCumulative ? 'bg-gray-800 text-white' : 'text-gray-600 hover:text-gray-800'
-                                    }`}
+                                        onClick={() => { userPickedGraphModeRef.current = true; setIsPercentageMode(false); setIsCumulative(true) }}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${(isCumulative && !isPercentageMode) ? 'bg-gray-800 text-white' : 'text-gray-600 hover:text-gray-800'}`}
                             >
                                 Cumulative
                             </button>
+                                </>
+                            )}
+                            {hasPercentageKpi && (
+                                <button
+                                    onClick={() => { userPickedGraphModeRef.current = true; setIsPercentageMode(true) }}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${isPercentageMode ? 'bg-gray-800 text-white' : 'text-gray-600 hover:text-gray-800'}`}
+                                >
+                                    Percentages
+                                </button>
+                            )}
                         </div>
                         {/* Time Frame */}
                         <div className="flex items-center bg-white/60 rounded-xl p-0.5 border border-white/80">
@@ -1234,7 +1411,106 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                 </div>
 
                 <div className="h-[320px]">
-                    {chartData.length > 0 && visibleKPIs.size > 0 ? (
+                    {(() => {
+                        const visibleNonPctKpis = dashboard.kpis.filter(k => visibleKPIs.has(k.id) && k.metric_type !== 'percentage')
+                        const hasModeData = chartData.length > 0 && (isPercentageMode ? visiblePercentageKpis.length > 0 : visibleNonPctKpis.length > 0)
+                        if (!hasModeData) {
+                            return (
+                                <div className="h-full flex items-center justify-center text-muted-foreground">
+                                    <div className="text-center">
+                                        <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                                        <p>
+                                            {visibleKPIs.size === 0
+                                                ? 'Toggle metrics below to show on chart'
+                                                : isPercentageMode && visiblePercentageKpis.length === 0
+                                                    ? 'No percentage metrics selected'
+                                                    : !isPercentageMode && visibleNonPctKpis.length === 0
+                                                        ? 'Only percentage metrics selected — switch to Percentages'
+                                                        : 'No data available yet'}
+                                        </p>
+                                    </div>
+                                </div>
+                            )
+                        }
+                        if (isPercentageMode) {
+                            return (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={chartData} margin={{ top: 12, right: 20, left: 0, bottom: 30 }}>
+                                        <CartesianGrid vertical={false} stroke="#f1f5f9" strokeDasharray="3 3" />
+                                        <XAxis
+                                            dataKey="date"
+                                            stroke="#cbd5e1"
+                                            fontSize={10}
+                                            tickLine={false}
+                                            axisLine={false}
+                                            tick={{ fill: '#94a3b8' }}
+                                            angle={-45}
+                                            textAnchor="end"
+                                            height={50}
+                                            interval={chartData.length > 12 ? Math.floor(chartData.length / 12) : 0}
+                                        />
+                                        <YAxis
+                                            stroke="#cbd5e1"
+                                            fontSize={10}
+                                            tickLine={false}
+                                            axisLine={false}
+                                            tick={{ fill: '#94a3b8' }}
+                                            domain={[0, percentageYMax]}
+                                            ticks={percentageYTicks}
+                                            tickFormatter={(value: any) => `${Math.round(value)}%`}
+                                        />
+                                        <RechartsTooltip content={<PercentageTooltip />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                                        {visiblePercentageKpis.map(kpi => {
+                                            const originalIndex = dashboard.kpis.findIndex(k => k.id === kpi.id)
+                                            const color = getMetricColor(originalIndex)
+                                            const avg = percentageAveragesById[kpi.id] || 0
+                                            if (avg <= 0) return null
+                                            return (
+                                                <ReferenceLine
+                                                    key={`ref-${kpi.id}`}
+                                                    y={avg}
+                                                    stroke={color}
+                                                    strokeOpacity={0.4}
+                                                    strokeWidth={1.25}
+                                                    strokeDasharray="5 4"
+                                                    ifOverflow="extendDomain"
+                                                />
+                                            )
+                                        })}
+                                        {visiblePercentageKpis.map(kpi => (
+                                            <Line
+                                                key={`ghost-${kpi.id}`}
+                                                type="monotone"
+                                                dataKey={`${kpi.id}__avg`}
+                                                stroke="transparent"
+                                                dot={false}
+                                                activeDot={false}
+                                                isAnimationActive={false}
+                                                legendType="none"
+                                            />
+                                        ))}
+                                        {visiblePercentageKpis.map(kpi => {
+                                            const originalIndex = dashboard.kpis.findIndex(k => k.id === kpi.id)
+                                            const color = getMetricColor(originalIndex)
+                                            return (
+                                                <Line
+                                                    key={kpi.id}
+                                                    type="monotone"
+                                                    dataKey={kpi.id}
+                                                    stroke={color}
+                                                    strokeWidth={2.25}
+                                                    dot={{ r: 2.5, fill: color, strokeWidth: 0 }}
+                                                    activeDot={{ r: 4, fill: color, stroke: 'white', strokeWidth: 1.5 }}
+                                                    strokeLinecap="round"
+                                                    connectNulls={true}
+                                                />
+                                            )
+                                        })}
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            )
+                        }
+                        return (
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 30 }}>
                                 <defs>
@@ -1281,7 +1557,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                                         return [value.toLocaleString() + (kpi?.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : ''), kpi?.title || name]
                                     }}
                                 />
-                                {dashboard.kpis.filter(kpi => visibleKPIs.has(kpi.id)).map((kpi, i) => {
+                                    {visibleNonPctKpis.map((kpi) => {
                                     const originalIndex = dashboard.kpis.findIndex(k => k.id === kpi.id)
                                     return (
                                         <Area
@@ -1297,25 +1573,19 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                                 })}
                             </AreaChart>
                         </ResponsiveContainer>
-                    ) : (
-                        <div className="h-full flex items-center justify-center text-muted-foreground">
-                            <div className="text-center">
-                                <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                                <p>{visibleKPIs.size === 0 ? 'Toggle metrics below to show on chart' : 'No data available yet'}</p>
-                            </div>
-                        </div>
-                    )}
+                        )
+                    })()}
                 </div>
 
                 {/* Legend */}
                 {visibleKPIs.size > 0 && (
                     <div className="flex flex-wrap justify-center gap-4 mt-4 pt-4 border-t border-white/50">
-                        {dashboard.kpis.filter(kpi => visibleKPIs.has(kpi.id)).map((kpi) => {
+                        {dashboard.kpis.filter(kpi => visibleKPIs.has(kpi.id) && (isPercentageMode ? kpi.metric_type === 'percentage' : kpi.metric_type !== 'percentage')).map((kpi) => {
                             const originalIndex = dashboard.kpis.findIndex(k => k.id === kpi.id)
                             return (
                                 <div key={kpi.id} className="flex items-center gap-2">
                                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: getMetricColor(originalIndex) }} />
-                                    <span className="text-xs text-muted-foreground">{kpi.title}</span>
+                                    <span className="text-xs text-muted-foreground">{kpi.title}{kpi.metric_type === 'percentage' ? ' (avg)' : ''}</span>
                                 </div>
                             )
                         })}
@@ -1556,9 +1826,9 @@ function MetricsTab({ dashboard, orgSlug, initiativeSlug, dateQS = '', tagsById,
                             <div className="mb-4">
                                 <div className="flex items-baseline gap-2">
                                     <span className={`text-3xl font-bold ${config.accent}`}>
-                                        {kpi.total_value !== undefined ? kpi.total_value.toLocaleString() : '—'}
+                                        {kpi.total_value !== undefined ? `${kpi.total_value.toLocaleString()}${kpi.metric_type === 'percentage' ? '%' : ''}` : '—'}
                                     </span>
-                                    <span className="text-sm text-muted-foreground">{kpi.unit_of_measurement}</span>
+                                    <span className="text-sm text-muted-foreground">{kpi.metric_type === 'percentage' ? 'average' : kpi.unit_of_measurement}</span>
                                 </div>
                             </div>
 
@@ -1836,7 +2106,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { loc
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div className="min-w-0">
                                                         <p className="text-sm font-medium text-foreground">{m.title}</p>
-                                                        <p className="text-lg font-bold text-foreground mt-0.5">{m.total_value.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{m.unit_of_measurement}</span></p>
+                                                        <p className="text-lg font-bold text-foreground mt-0.5">{m.total_value.toLocaleString()}{m.metric_type === 'percentage' ? '%' : ''} <span className="text-xs font-normal text-muted-foreground">{m.metric_type === 'percentage' ? 'avg' : m.unit_of_measurement}</span></p>
                                                         <p className="text-[10px] text-muted-foreground">{m.claim_count} claim{m.claim_count !== 1 ? 's' : ''} at this location</p>
                                                     </div>
                                                     <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${cat.bg} ${cat.text} capitalize`}>{m.category}</span>
@@ -2549,7 +2819,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                                                 return (
                                                     <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/claim/${claim.id}${dateQS}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
                                                         <p className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors">
-                                                            {claim.value} {claim.kpis?.unit_of_measurement || ''}
+                                                            {claim.value}{claim.kpis?.metric_type === 'percentage' ? '%' : ` ${claim.kpis?.unit_of_measurement || ''}`}
                                                         </p>
                                                         <p className="text-xs text-muted-foreground mt-0.5">{metricTitle}</p>
                                                         {dateLabel && <p className="text-[10px] text-muted-foreground mt-0.5">{dateLabel}</p>}

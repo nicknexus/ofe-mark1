@@ -209,11 +209,11 @@ export default function PublicImpactClaimPage() {
                         orgSlug={orgSlug!}
                         orgName={claim.initiative.org_name || ''}
                         items={from === 'org' ? [
-                            { label: `+${parseFloat(String(claim.value)).toLocaleString()} ${claim.metric.unit_of_measurement}` }
+                            { label: claim.metric.metric_type === 'percentage' ? `${parseFloat(String(claim.value)).toLocaleString()}%` : `+${parseFloat(String(claim.value)).toLocaleString()} ${claim.metric.unit_of_measurement}` }
                         ] : [
                             { label: claim.initiative.title, href: `${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=metrics` },
                             { label: claim.metric.title, href: `${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${claim.metric.slug}` },
-                            { label: `+${parseFloat(String(claim.value)).toLocaleString()} ${claim.metric.unit_of_measurement}` }
+                            { label: claim.metric.metric_type === 'percentage' ? `${parseFloat(String(claim.value)).toLocaleString()}%` : `+${parseFloat(String(claim.value)).toLocaleString()} ${claim.metric.unit_of_measurement}` }
                         ]}
                     />
                 </div>
@@ -248,11 +248,11 @@ export default function PublicImpactClaimPage() {
 
                         {/* Value Card */}
                         <div className="bg-white/70 backdrop-blur-2xl p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-xl shadow-black/10 border border-white/60 lg:min-w-[200px] lg:max-w-[240px]">
-                            <p className="text-gray-500 text-xs sm:text-sm font-medium mb-0.5 sm:mb-1">Claimed Impact</p>
+                            <p className="text-gray-500 text-xs sm:text-sm font-medium mb-0.5 sm:mb-1">{claim.metric.metric_type === 'percentage' ? 'Claimed Percentage' : 'Claimed Impact'}</p>
                             <p className={`text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight ${config.text}`}>
-                                +{parseFloat(String(claim.value)).toLocaleString()}
+                                {claim.metric.metric_type === 'percentage' ? '' : '+'}{parseFloat(String(claim.value)).toLocaleString()}{claim.metric.metric_type === 'percentage' ? '%' : ''}
                             </p>
-                            <p className="text-gray-500 text-xs sm:text-sm mt-0.5 sm:mt-1">{claim.metric.unit_of_measurement}</p>
+                            {claim.metric.metric_type !== 'percentage' && <p className="text-gray-500 text-xs sm:text-sm mt-0.5 sm:mt-1">{claim.metric.unit_of_measurement}</p>}
                         </div>
                     </div>
                 </div>
@@ -844,7 +844,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                                 return (
                                                     <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
                                                         <p className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors">
-                                                            {claim.value} {claim.kpis?.unit_of_measurement || ''}
+                                                            {claim.value}{claim.kpis?.metric_type === 'percentage' ? '%' : ` ${claim.kpis?.unit_of_measurement || ''}`}
                                                         </p>
                                                         <p className="text-xs text-muted-foreground mt-0.5">{metricTitle}</p>
                                                         {dateLabel && <p className="text-[10px] text-muted-foreground mt-0.5">{dateLabel}</p>}

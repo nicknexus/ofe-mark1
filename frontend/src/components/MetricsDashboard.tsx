@@ -27,7 +27,8 @@ import {
     ResponsiveContainer,
     Tooltip,
     CartesianGrid,
-    Legend
+    Legend,
+    ReferenceLine
 } from 'recharts'
 import LocationMap from './LocationMap'
 import AllLocationsModal from './AllLocationsModal'
@@ -81,13 +82,13 @@ function SortableMetricCard({ kpi, metricColor, filteredTotal, onMetricCardClick
             >
                 <div className="flex items-center justify-between mb-1">
                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: metricColor }} />
-                    <span className="text-xs text-gray-400 truncate ml-1 flex-1">{kpi.unit_of_measurement || ''}</span>
+                    <span className="text-xs text-gray-400 truncate ml-1 flex-1">{kpi.metric_type === 'percentage' ? 'avg' : (kpi.unit_of_measurement || '')}</span>
                 </div>
                 <div className="text-xs font-medium text-gray-700 truncate mb-1" title={kpi.title}>
                     {kpi.title}
                 </div>
                 <div className="text-base font-semibold" style={{ color: metricColor }}>
-                    {filteredTotal.toLocaleString()}
+                    {filteredTotal.toLocaleString()}{kpi.metric_type === 'percentage' ? '%' : ''}
                 </div>
             </div>
         </div>
@@ -120,6 +121,10 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     const { canAddImpactClaims, ownedOrganization, hasOwnOrganization } = useTeam()
     const [timeFrame, setTimeFrame] = useState<'all' | '1month' | '6months' | '1year' | '5years'>('all')
     const [isCumulative, setIsCumulative] = useState(false)
+    const [isPercentageMode, setIsPercentageMode] = useState(false)
+    // Tracks whether the user has manually picked a graph mode. If they have,
+    // the auto-toggle (based on kpi mix) stops fighting them.
+    const userPickedGraphModeRef = useRef(false)
     const [visibleKPIs, setVisibleKPIs] = useState<Set<string>>(new Set())
     const [orderedKPIs, setOrderedKPIs] = useState<any[]>([])
 
@@ -136,6 +141,17 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
             onOrderChange(sorted.map(k => k.id))
         }
     }, [kpis, onOrderChange])
+
+    // Auto-pick the graph mode based on the kpi mix until the user picks one
+    // manually. If every metric is a percentage metric, default to Percentages;
+    // otherwise default to Monthly.
+    useEffect(() => {
+        if (userPickedGraphModeRef.current) return
+        if (!kpis || kpis.length === 0) return
+        const allPercentage = kpis.every(k => k.metric_type === 'percentage')
+        setIsPercentageMode(allPercentage)
+        if (allPercentage) setIsCumulative(false)
+    }, [kpis])
 
     // Drag and drop sensors
     const sensors = useSensors(
@@ -564,6 +580,72 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
             [kpiId: string]: any; // Dynamic keys for each KPI
         }> = []
 
+        // Percentage mode: per-month value for each visible percentage metric.
+        // Range claims contribute their value to every month they overlap; single-date
+        // claims override the range value for their month. Multiple in the same month
+        // are averaged. Empty months are null and the line bridges across them.
+        if (isPercentageMode) {
+            const pctKpiIds = kpis
+                .filter(k => k.metric_type === 'percentage' && visibleKPIs.has(k.id))
+                .map(k => k.id)
+
+            const monthly: Record<string, Record<string, { singleSum: number; singleCount: number; rangeSum: number; rangeCount: number }>> = {}
+            const ensure = (key: string, kpiId: string) => {
+                if (!monthly[key]) monthly[key] = {}
+                if (!monthly[key][kpiId]) monthly[key][kpiId] = { singleSum: 0, singleCount: 0, rangeSum: 0, rangeCount: 0 }
+                return monthly[key][kpiId]
+            }
+
+            pctKpiIds.forEach(kpiId => {
+                ;(filteredUpdatesByKPI[kpiId] || []).forEach((update: any) => {
+                    const value = Number(update.value || 0)
+                    if (!Number.isFinite(value)) return
+                    const isRange = !!(update.date_range_start && update.date_range_end)
+                    if (isRange) {
+                        const claimStart = parseLocalDate(update.date_range_start); claimStart.setHours(0, 0, 0, 0)
+                        const claimEnd = parseLocalDate(update.date_range_end); claimEnd.setHours(0, 0, 0, 0)
+                        const cursor = new Date(claimStart.getFullYear(), claimStart.getMonth(), 1)
+                        const stop = new Date(claimEnd.getFullYear(), claimEnd.getMonth(), 1)
+                        while (cursor.getTime() <= stop.getTime()) {
+                            const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`
+                            const b = ensure(key, kpiId)
+                            b.rangeSum += value
+                            b.rangeCount += 1
+                            cursor.setMonth(cursor.getMonth() + 1)
+                        }
+                    } else {
+                        const claimDate = parseLocalDate(update.date_represented); claimDate.setHours(0, 0, 0, 0)
+                        const key = `${claimDate.getFullYear()}-${String(claimDate.getMonth() + 1).padStart(2, '0')}`
+                        const b = ensure(key, kpiId)
+                        b.singleSum += value
+                        b.singleCount += 1
+                    }
+                })
+            })
+
+            const firstMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
+            firstMonth.setMonth(firstMonth.getMonth() - 1)
+            const lastMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1)
+            const cursor = new Date(firstMonth)
+            while (cursor.getTime() <= lastMonth.getTime()) {
+                const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`
+                const monthName = cursor.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                const dataPoint: any = { date: monthName, fullDate: new Date(cursor) }
+                pctKpiIds.forEach(kpiId => {
+                    const b = monthly[key]?.[kpiId]
+                    let v: number | null = null
+                    if (b) {
+                        if (b.singleCount > 0) v = b.singleSum / b.singleCount
+                        else if (b.rangeCount > 0) v = b.rangeSum / b.rangeCount
+                    }
+                    dataPoint[kpiId] = v
+                })
+                data.push(dataPoint)
+                cursor.setMonth(cursor.getMonth() + 1)
+            }
+            return data
+        }
+
         // Non-cumulative mode: group by month (persist even when date filters are applied)
         if (!isCumulative) {
             // Start from the month before the first impact claim (or filtered start date)
@@ -688,7 +770,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
         const dataPointCount = chartData.length
         if (dataPointCount <= 12) return 0
 
-        if (!isCumulative) {
+        if (!isCumulative || isPercentageMode) {
             if (dataPointCount <= 24) return 1
             if (dataPointCount <= 48) return 2
             if (dataPointCount <= 72) return 5
@@ -722,15 +804,21 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     // Get top 12 KPIs for metric cards (from ordered KPIs, then filtered)
     const displayKPIs = orderedKPIs.filter(kpi => filteredKPIs.some(fk => fk.id === kpi.id)).slice(0, 12)
 
+    // KPIs that contribute to the non-percentage chart (monthly/cumulative views).
+    // Percentage metrics use their own Y-axis and shouldn't squash the scale here.
+    const chartKpiIds = new Set(
+        kpis
+            .filter(kpi => visibleKPIs.has(kpi.id) && kpi.metric_type !== 'percentage')
+            .map(kpi => kpi.id)
+    )
+
     // Calculate dynamic max value with headroom for the graph
     const calculateMaxWithHeadroom = () => {
-        if (!chartData || chartData.length === 0 || visibleKPIs.size === 0) return 0
+        if (!chartData || chartData.length === 0 || chartKpiIds.size === 0) return 0
 
-        // Find the maximum value across visible KPIs only
         let maxValue = 0
         chartData.forEach((dataPoint) => {
-            // Only check values for visible KPIs
-            Array.from(visibleKPIs).forEach(kpiId => {
+            chartKpiIds.forEach(kpiId => {
                 const value = dataPoint[kpiId]
                 if (typeof value === 'number' && isFinite(value) && value > 0) {
                     maxValue = Math.max(maxValue, value)
@@ -740,16 +828,15 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
 
         if (maxValue === 0) return 0
 
-        // Add dynamic headroom: more percentage for smaller values, less for larger values
-        let headroomPercentage = 0.15 // Default 15%
+        let headroomPercentage = 0.15
         if (maxValue < 100) {
-            headroomPercentage = 0.20 // 20% for small values
+            headroomPercentage = 0.20
         } else if (maxValue < 1000) {
-            headroomPercentage = 0.15 // 15% for medium values
+            headroomPercentage = 0.15
         } else if (maxValue < 10000) {
-            headroomPercentage = 0.12 // 12% for larger values
+            headroomPercentage = 0.12
         } else {
-            headroomPercentage = 0.10 // 10% for very large values
+            headroomPercentage = 0.10
         }
 
         return maxValue * (1 + headroomPercentage)
@@ -757,7 +844,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
 
     const maxDomainValue = calculateMaxWithHeadroom()
     const actualMaxValue = Math.max(...chartData.flatMap(d =>
-        Array.from(visibleKPIs).map(kpiId => {
+        Array.from(chartKpiIds).map(kpiId => {
             const val = d[kpiId]
             return typeof val === 'number' && isFinite(val) ? val : 0
         })
@@ -792,6 +879,86 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
     }
 
     const yTicks = generateYTicks()
+
+    // Percentage mode: visible percentage metrics + per-metric overall averages
+    const visiblePercentageKpis = isPercentageMode
+        ? kpis.filter(k => k.metric_type === 'percentage' && visibleKPIs.has(k.id))
+        : []
+    const percentageAveragesById: Record<string, number> = {}
+    if (isPercentageMode) {
+        visiblePercentageKpis.forEach(k => {
+            const updates = (kpiUpdates || []).filter((u: any) => u.kpi_id === k.id)
+            percentageAveragesById[k.id] = aggregateKpiUpdates(updates as any, k.metric_type)
+        })
+    }
+    const percentageYMax = (() => {
+        if (!isPercentageMode || chartData.length === 0) return 100
+        let max = 100
+        chartData.forEach(d => {
+            visiblePercentageKpis.forEach(k => {
+                const v = d[k.id]
+                if (typeof v === 'number' && isFinite(v) && v > max) max = v
+            })
+        })
+        if (max <= 100) return 100
+        return Math.ceil(max / 100) * 100
+    })()
+    const percentageYTicks = (() => {
+        if (!isPercentageMode) return [] as number[]
+        const step = percentageYMax / 4
+        return [0, step, step * 2, step * 3, percentageYMax]
+    })()
+
+    // Patch each percentage data point with each metric's overall average so a
+    // hidden ghost line keeps the tooltip alive at every X.
+    if (isPercentageMode) {
+        for (const d of chartData) {
+            visiblePercentageKpis.forEach(k => {
+                ;(d as any)[`${k.id}__avg`] = percentageAveragesById[k.id] || 0
+            })
+        }
+    }
+
+    // Custom tooltip for percentage mode: every visible percentage metric
+    // contributes a row showing this-month value and overall avg.
+    const PercentageTooltip = ({ active, label }: any) => {
+        if (!active) return null
+        const dp = chartData.find(d => d.date === label)
+        if (!dp) return null
+        const dateLabel = dp.fullDate ? formatDate(dp.fullDate) : (label || '')
+        return (
+            <div style={{ backgroundColor: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(8px)', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '10px 12px', fontSize: '12px', boxShadow: '0 8px 24px rgba(15,23,42,0.08)', minWidth: 220 }}>
+                <div style={{ fontWeight: 500, color: '#475569', marginBottom: 6 }}>{dateLabel}</div>
+                {visiblePercentageKpis.length === 0 && (
+                    <div style={{ color: '#94a3b8' }}>No percentage metrics selected</div>
+                )}
+                {visiblePercentageKpis.map(k => {
+                    const originalIndex = kpis.findIndex(x => x.id === k.id)
+                    const color = getKPIColor(k.category, originalIndex)
+                    const v = dp[k.id]
+                    const avg = percentageAveragesById[k.id] || 0
+                    return (
+                        <div key={k.id} style={{ marginBottom: 6 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                <span style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: color, display: 'inline-block' }} />
+                                <span style={{ fontWeight: 500, color: '#0f172a', fontSize: 11 }}>{k.title}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, paddingLeft: 14 }}>
+                                <span style={{ color: '#94a3b8' }}>This month</span>
+                                <span style={{ fontWeight: 500, color: '#0f172a' }}>
+                                    {typeof v === 'number' ? `${Math.round(v)}%` : 'No data'}
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, paddingLeft: 14 }}>
+                                <span style={{ color: color, opacity: 0.85 }}>Overall avg</span>
+                                <span style={{ fontWeight: 600, color }}>{Math.round(avg)}%</span>
+                            </div>
+                        </div>
+                    )
+                })}
+            </div>
+        )
+    }
 
     return (
         <div className="h-full flex flex-col overflow-hidden px-4 pt-4 pb-4 space-y-4">
@@ -1299,27 +1466,48 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             <h3 className="text-sm font-semibold text-gray-800">Metrics Over Time</h3>
                         </div>
                         <div className="flex items-center space-x-2">
-                            {/* Monthly/Cumulative Toggle */}
-                            <div className="flex items-center bg-gray-50 rounded-xl p-0.5">
-                                <button
-                                    onClick={() => setIsCumulative(false)}
-                                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${!isCumulative
-                                        ? 'bg-primary-500 text-white shadow-[0_2px_10px_rgba(192,223,161,0.3)]'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                        }`}
-                                >
-                                    Monthly
-                                </button>
-                                <button
-                                    onClick={() => setIsCumulative(true)}
-                                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${isCumulative
-                                        ? 'bg-primary-500 text-white shadow-[0_2px_10px_rgba(192,223,161,0.3)]'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                        }`}
-                                >
-                                    Cumulative
-                                </button>
-                            </div>
+                            {/* Monthly / Cumulative / Percentages Toggle */}
+                            {(() => {
+                                const hasPercentageKpi = kpis.some(k => k.metric_type === 'percentage')
+                                const hasNonPercentageKpi = kpis.some(k => k.metric_type !== 'percentage')
+                                return (
+                                    <div className="flex items-center bg-gray-50 rounded-xl p-0.5">
+                                        {hasNonPercentageKpi && (
+                                            <>
+                                                <button
+                                                    onClick={() => { userPickedGraphModeRef.current = true; setIsPercentageMode(false); setIsCumulative(false) }}
+                                                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${!isCumulative && !isPercentageMode
+                                                        ? 'bg-primary-500 text-white shadow-[0_2px_10px_rgba(192,223,161,0.3)]'
+                                                        : 'text-gray-500 hover:text-gray-700'
+                                                        }`}
+                                                >
+                                                    Monthly
+                                                </button>
+                                                <button
+                                                    onClick={() => { userPickedGraphModeRef.current = true; setIsPercentageMode(false); setIsCumulative(true) }}
+                                                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${isCumulative && !isPercentageMode
+                                                        ? 'bg-primary-500 text-white shadow-[0_2px_10px_rgba(192,223,161,0.3)]'
+                                                        : 'text-gray-500 hover:text-gray-700'
+                                                        }`}
+                                                >
+                                                    Cumulative
+                                                </button>
+                                            </>
+                                        )}
+                                        {hasPercentageKpi && (
+                                            <button
+                                                onClick={() => { userPickedGraphModeRef.current = true; setIsPercentageMode(true) }}
+                                                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${isPercentageMode
+                                                    ? 'bg-primary-500 text-white shadow-[0_2px_10px_rgba(192,223,161,0.3)]'
+                                                    : 'text-gray-500 hover:text-gray-700'
+                                                    }`}
+                                            >
+                                                Percentages
+                                            </button>
+                                        )}
+                                    </div>
+                                )
+                            })()}
                             {/* Time Frame Filters */}
                             <div className="flex items-center bg-gray-50 rounded-xl p-0.5">
                                 {(['all', '1month', '6months', '1year', '5years'] as const).map((tf) => (
@@ -1342,62 +1530,70 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     </div>
 
                     <div className="flex-1 min-h-0">
-                        {chartData && chartData.length > 0 && kpis && kpis.length > 0 && visibleKPIs.size > 0 ? (
+                        {chartData && chartData.length > 0 && kpis && kpis.length > 0 && (isPercentageMode ? visiblePercentageKpis.length > 0 : chartKpiIds.size > 0) ? (
                             <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={chartData}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                                <LineChart data={chartData} margin={{ top: 12, right: 20, left: 0, bottom: 0 }}>
+                                    <CartesianGrid vertical={false} stroke="#f1f5f9" strokeDasharray="3 3" />
                                     <XAxis
                                         dataKey="date"
-                                        stroke="#6b7280"
+                                        stroke="#cbd5e1"
                                         fontSize={10}
-                                        tick={{ fill: '#6b7280' }}
+                                        tickLine={false}
+                                        axisLine={false}
+                                        tick={{ fill: '#94a3b8' }}
                                         angle={-45}
                                         textAnchor="end"
                                         height={60}
                                         interval={getXAxisInterval()}
                                         tickMargin={8}
-                                        tickFormatter={isCumulative ? formatXAxisTick : undefined}
+                                        tickFormatter={(isCumulative && !isPercentageMode) ? formatXAxisTick : undefined}
                                     />
                                     <YAxis
-                                        stroke="#6b7280"
+                                        stroke="#cbd5e1"
                                         fontSize={10}
-                                        tick={{ fill: '#6b7280' }}
-                                        domain={maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax']}
-                                        ticks={yTicks.length > 0 ? yTicks : undefined}
-                                        tickFormatter={(value) => {
+                                        tickLine={false}
+                                        axisLine={false}
+                                        tick={{ fill: '#94a3b8' }}
+                                        domain={isPercentageMode ? [0, percentageYMax] : (maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax'])}
+                                        ticks={isPercentageMode ? percentageYTicks : (yTicks.length > 0 ? yTicks : undefined)}
+                                        tickFormatter={isPercentageMode ? ((value: any) => `${Math.round(value)}%`) : ((value) => {
                                             if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
                                             if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
                                             return value.toString()
-                                        }}
+                                        })}
                                     />
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: 'white',
-                                            border: '1px solid #e5e7eb',
-                                            borderRadius: '8px',
-                                            padding: '10px 12px',
-                                            fontSize: '12px',
-                                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-                                        }}
-                                        formatter={(value: any, name: string) => {
-                                            const kpi = kpis.find(k => k.id === name)
-                                            const kpiName = kpi ? kpi.title : name
-                                            const unit = kpi?.unit_of_measurement || ''
-                                            const formattedValue = typeof value === 'number'
-                                                ? value.toLocaleString() + (unit ? ` ${unit}` : '')
-                                                : value
-                                            return [formattedValue, kpiName]
-                                        }}
-                                        labelFormatter={(label) => {
-                                            // Find the actual date from chartData
-                                            const dataPoint = chartData.find(d => d.date === label)
-                                            if (dataPoint?.fullDate) {
-                                                return formatDate(dataPoint.fullDate)
-                                            }
-                                            return `Date: ${label}`
-                                        }}
-                                        cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '5 5' }}
-                                    />
+                                    {isPercentageMode ? (
+                                        <Tooltip content={<PercentageTooltip />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                                    ) : (
+                                        <Tooltip
+                                            contentStyle={{
+                                                backgroundColor: 'rgba(255,255,255,0.98)',
+                                                backdropFilter: 'blur(8px)',
+                                                border: '1px solid #f1f5f9',
+                                                borderRadius: '12px',
+                                                padding: '10px 12px',
+                                                fontSize: '12px',
+                                                boxShadow: '0 8px 24px rgba(15,23,42,0.08)'
+                                            }}
+                                            formatter={(value: any, name: string) => {
+                                                const kpi = kpis.find(k => k.id === name)
+                                                const kpiName = kpi ? kpi.title : name
+                                                const unit = kpi?.unit_of_measurement || ''
+                                                const formattedValue = typeof value === 'number'
+                                                    ? value.toLocaleString() + (unit ? ` ${unit}` : '')
+                                                    : value
+                                                return [formattedValue, kpiName]
+                                            }}
+                                            labelFormatter={(label) => {
+                                                const dataPoint = chartData.find(d => d.date === label)
+                                                if (dataPoint?.fullDate) {
+                                                    return formatDate(dataPoint.fullDate)
+                                                }
+                                                return `Date: ${label}`
+                                            }}
+                                            cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }}
+                                        />
+                                    )}
                                     <Legend
                                         wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
                                         formatter={(value) => {
@@ -1406,30 +1602,62 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                         }}
                                         iconType="line"
                                     />
-                                    {kpis
-                                        .filter(kpi => visibleKPIs.has(kpi.id))
-                                        .map((kpi) => {
-                                            const originalIndex = kpis.findIndex(k => k.id === kpi.id)
-                                            return (
-                                                <Line
-                                                    key={kpi.id}
-                                                    type="monotone"
-                                                    dataKey={kpi.id}
-                                                    stroke={getKPIColor(kpi.category, originalIndex)}
-                                                    strokeWidth={3.5}
-                                                    dot={false}
-                                                    activeDot={{ r: 6, fill: getKPIColor(kpi.category, originalIndex), stroke: 'white', strokeWidth: 2 }}
-                                                    strokeLinecap="round"
-                                                />
-                                            )
-                                        })}
+                                    {isPercentageMode && visiblePercentageKpis.map(kpi => {
+                                        const originalIndex = kpis.findIndex(k => k.id === kpi.id)
+                                        const color = getKPIColor(kpi.category, originalIndex)
+                                        const avg = percentageAveragesById[kpi.id] || 0
+                                        if (avg <= 0) return null
+                                        return (
+                                            <ReferenceLine
+                                                key={`ref-${kpi.id}`}
+                                                y={avg}
+                                                stroke={color}
+                                                strokeOpacity={0.4}
+                                                strokeWidth={1.25}
+                                                strokeDasharray="5 4"
+                                                ifOverflow="extendDomain"
+                                            />
+                                        )
+                                    })}
+                                    {isPercentageMode && visiblePercentageKpis.map(kpi => (
+                                        <Line
+                                            key={`ghost-${kpi.id}`}
+                                            type="monotone"
+                                            dataKey={`${kpi.id}__avg`}
+                                            stroke="transparent"
+                                            dot={false}
+                                            activeDot={false}
+                                            isAnimationActive={false}
+                                            legendType="none"
+                                        />
+                                    ))}
+                                    {(isPercentageMode ? visiblePercentageKpis : kpis.filter(kpi => visibleKPIs.has(kpi.id) && kpi.metric_type !== 'percentage')).map((kpi) => {
+                                        const originalIndex = kpis.findIndex(k => k.id === kpi.id)
+                                        return (
+                                            <Line
+                                                key={kpi.id}
+                                                type="monotone"
+                                                dataKey={kpi.id}
+                                                stroke={getKPIColor(kpi.category, originalIndex)}
+                                                strokeWidth={2.25}
+                                                dot={isPercentageMode ? { r: 2.5, fill: getKPIColor(kpi.category, originalIndex), strokeWidth: 0 } : false}
+                                                activeDot={{ r: 4, fill: getKPIColor(kpi.category, originalIndex), stroke: 'white', strokeWidth: 1.5 }}
+                                                strokeLinecap="round"
+                                                connectNulls={isPercentageMode}
+                                            />
+                                        )
+                                    })}
                                 </LineChart>
                             </ResponsiveContainer>
                         ) : (
                             <div className="h-full flex flex-col items-center justify-center text-gray-500">
                                 <BarChart3 className="w-8 h-8 mb-2 opacity-50" />
                                 <p className="text-xs text-center">
-                                    {visibleKPIs.size === 0 ? 'Select metrics to view' : 'No data yet'}
+                                    {isPercentageMode && visiblePercentageKpis.length === 0
+                                        ? 'No percentage metrics selected'
+                                        : !isPercentageMode && chartKpiIds.size === 0
+                                            ? (visibleKPIs.size === 0 ? 'Select metrics to view' : 'Only percentage metrics selected — switch to Percentages')
+                                            : 'No data yet'}
                                 </p>
                             </div>
                         )}

@@ -236,9 +236,9 @@ export default function TagDetailPage() {
                                                 {kpi.metric_type === 'percentage' ? ' · averaged' : ' · summed'}
                                             </p>
                                         </div>
-                                        <div className="flex items-baseline gap-1.5 px-3 py-1.5 bg-primary-50 rounded-lg border border-primary-100 flex-shrink-0">
-                                            <span className="text-lg font-bold text-primary-600">{tagged.toLocaleString()}</span>
-                                            {kpi.unit_of_measurement && <span className="text-xs text-primary-500">{kpi.unit_of_measurement}</span>}
+                                        <div className="flex items-baseline gap-0.5 px-3 py-1.5 bg-primary-50 rounded-lg border border-primary-100 flex-shrink-0">
+                                            <span className="text-lg font-bold text-primary-600">{tagged.toLocaleString()}{kpi.metric_type === 'percentage' ? '%' : ''}</span>
+                                            {kpi.metric_type !== 'percentage' && kpi.unit_of_measurement && <span className="text-xs text-primary-500 ml-1">{kpi.unit_of_measurement}</span>}
                                         </div>
                                     </Link>
                                 )
