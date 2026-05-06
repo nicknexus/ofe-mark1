@@ -7,6 +7,7 @@ import {
     BookOpen, FileText, Calendar, ChevronRight, ChevronLeft,
     TrendingUp, ChevronDown, X, Target, Image, LineChart, Compass, ArrowRight
 } from 'lucide-react'
+import PublicDonateButton from '../components/public/PublicDonateButton'
 import {
     publicApi,
     PublicOrganization,
@@ -23,7 +24,7 @@ import PublicLoader from '../components/public/PublicLoader'
 import PublicTagFilter from '../components/public/PublicTagFilter'
 import PublicTagChip from '../components/public/PublicTagChip'
 import DateRangePicker from '../components/DateRangePicker'
-import { formatDate } from '../utils'
+import { formatDate, compareClaimsByEffectiveDateDesc } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import {
     AreaChart,
@@ -470,7 +471,7 @@ export default function PublicOrganizationPage() {
                 initiativeSlug: m.initiative_slug,
                 category: m.category,
             }))
-        ).sort((a, b) => new Date(b.date_represented).getTime() - new Date(a.date_represented).getTime())
+        ).sort(compareClaimsByEffectiveDateDesc)
 
         if (selectedTagIds.length > 0) {
             claims = claims.filter(c => tagMatchesSingle(c.tag_id))
@@ -690,34 +691,41 @@ export default function PublicOrganizationPage() {
 
             {/* Header with Filters */}
             <header className="flex-shrink-0 bg-white/60 backdrop-blur-2xl border-b border-white/40 shadow-sm z-50 relative">
-                <div className="px-2 sm:px-3 md:px-4 py-1.5">
-                    <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="px-2 sm:px-3 md:px-4 py-2">
+                    <div className="flex items-center gap-2 sm:gap-3">
                         {/* Left: Nav + Org */}
-                        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0">
                             <Link to="/explore" className="flex items-center gap-1 text-muted-foreground hover:text-accent transition-colors flex-shrink-0">
                                 <ArrowLeft className="w-4 h-4" />
                             </Link>
-                            <div className="w-7 h-7 rounded-lg flex items-center justify-center overflow-hidden bg-white shadow-md border border-gray-200/50 flex-shrink-0">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden bg-white shadow-md border border-gray-200/50 flex-shrink-0">
                                 {organization.logo_url ? (
                                     <img src={organization.logo_url} alt={organization.name} className="w-full h-full object-cover" />
                                 ) : (
                                     <Building2 className="w-4 h-4 text-gray-400" />
                                 )}
                             </div>
-                            <h1 className="text-xs font-semibold text-foreground truncate max-w-[100px] md:max-w-[160px] hidden sm:block">{organization.name}</h1>
+                            <h1 className="text-sm font-semibold text-foreground truncate max-w-[120px] md:max-w-[180px] hidden sm:block">{organization.name}</h1>
+
+                            {/* Branded Donate button — only when org has set a donation_url */}
+                            <PublicDonateButton
+                                donationUrl={organization.donation_url || null}
+                                brandColor={brandColor}
+                                orgName={organization.name}
+                            />
                         </div>
 
                         {/* Center: Filters */}
-                        <div className="flex items-center gap-1 sm:gap-1.5 flex-1 min-w-0 overflow-x-auto scrollbar-none">
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto scrollbar-none">
                             <button
                                 ref={initiativeBtnRef}
                                 onClick={() => { setShowInitiativeDropdown(!showInitiativeDropdown); setShowLocationDropdown(false) }}
-                                className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
+                                className="flex items-center pl-0 pr-2.5 sm:pr-3 h-8 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-xs font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
                             >
-                                <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
-                                    <Target className="w-3.5 h-3.5 text-gray-600" />
+                                <div className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
+                                    <Target className="w-4 h-4 text-gray-600" />
                                 </div>
-                                <span className={`ml-1 sm:ml-1.5 max-w-[60px] sm:max-w-[90px] md:max-w-[120px] truncate ${selectedInitiative !== 'all' ? 'text-gray-900' : 'text-gray-500'}`}>
+                                <span className={`ml-1.5 sm:ml-2 max-w-[60px] sm:max-w-[90px] md:max-w-[120px] truncate ${selectedInitiative !== 'all' ? 'text-gray-900' : 'text-gray-500'}`}>
                                     {selectedInitiative === 'all' ? 'Initiative' : initiatives.find(i => i.id === selectedInitiative)?.title || 'Select'}
                                 </span>
                                 {selectedInitiative !== 'all' ? (
@@ -732,7 +740,7 @@ export default function PublicOrganizationPage() {
                                     value={datePickerValue.singleDate || datePickerValue.startDate ? datePickerValue : undefined}
                                     onChange={handleDateChange}
                                     placeholder="Date"
-                                    className="[&>button]:h-7 [&>button]:text-[11px] [&>button]:pr-1.5 sm:[&>button]:pr-2.5 [&>button>div]:w-7 [&>button>div]:h-7 [&>button>div>svg]:w-3.5 [&>button>div>svg]:h-3.5 [&>button>span]:ml-1 sm:[&>button>span]:ml-1.5"
+                                    className="[&>button]:!h-8 [&>button]:!text-xs [&>button]:!pr-2.5 sm:[&>button]:!pr-3 [&>button]:!font-medium [&>button>div]:!w-8 [&>button>div]:!h-8 [&>button>div>svg]:!w-4 [&>button>div>svg]:!h-4 [&>button>span]:!ml-1.5 sm:[&>button>span]:!ml-2"
                                 />
                             </div>
 
@@ -740,12 +748,12 @@ export default function PublicOrganizationPage() {
                                 <button
                                     ref={locationBtnRef}
                                     onClick={() => { setShowLocationDropdown(!showLocationDropdown); setShowInitiativeDropdown(false) }}
-                                    className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
+                                    className="flex items-center pl-0 pr-2.5 sm:pr-3 h-8 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-xs font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
                                 >
-                                    <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
-                                        <MapPin className="w-3.5 h-3.5 text-gray-600" />
+                                    <div className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
+                                        <MapPin className="w-4 h-4 text-gray-600" />
                                     </div>
-                                    <span className={`ml-1 sm:ml-1.5 max-w-[60px] sm:max-w-[90px] md:max-w-[120px] truncate ${selectedLocationIds.length > 0 ? 'text-gray-900' : 'text-gray-500'}`}>
+                                    <span className={`ml-1.5 sm:ml-2 max-w-[60px] sm:max-w-[90px] md:max-w-[120px] truncate ${selectedLocationIds.length > 0 ? 'text-gray-900' : 'text-gray-500'}`}>
                                         {selectedLocationIds.length > 0
                                             ? `${selectedLocationIds.length} loc.`
                                             : 'Location'
@@ -764,21 +772,22 @@ export default function PublicOrganizationPage() {
                                 selectedTagIds={selectedTagIds}
                                 onChange={setSelectedTagIds}
                                 onOpenChange={(open) => { if (open) { setShowInitiativeDropdown(false); setShowLocationDropdown(false) } }}
+                                className="!h-8 !text-xs !pr-2.5 sm:!pr-3 [&>div]:!w-8 [&>div]:!h-8 [&>div>svg]:!w-4 [&>div>svg]:!h-4 [&>span]:!ml-1.5 sm:[&>span]:!ml-2"
                             />
 
                             {hasActiveFilters && (
                                 <button
                                     onClick={clearFilters}
-                                    className="flex items-center gap-0.5 px-1.5 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                                    className="flex items-center gap-0.5 px-1.5 py-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
                                 >
-                                    <X className="w-2.5 h-2.5" /> Clear
+                                    <X className="w-3 h-3" /> Clear
                                 </button>
                             )}
                         </div>
 
                         {/* Right: Nexus Logo */}
                         <Link to="/" className="hidden sm:flex items-center gap-2 flex-shrink-0">
-                            <div className="w-6 h-6 rounded-lg overflow-hidden">
+                            <div className="w-7 h-7 rounded-lg overflow-hidden">
                                 <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
                             </div>
                             <span className="text-sm font-newsreader font-extralight text-foreground hidden lg:block">Nexus Impacts</span>
@@ -1156,7 +1165,7 @@ export default function PublicOrganizationPage() {
                                         }>
                                             <ImpactGlobe
                                                 locations={globeLocations}
-                                                showLabels={true}
+                                                showLabels={false}
                                                 brandColor={brandColor}
                                                 enableZoom={true}
                                             />

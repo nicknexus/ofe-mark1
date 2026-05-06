@@ -17,6 +17,8 @@ export interface PublicOrganization {
     statement?: string
     logo_url?: string
     brand_color?: string
+    donation_url?: string
+    website_url?: string
     created_at?: string
     is_demo?: boolean
 }

@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { apiService } from '../../services/api'
 import { KPI, KPIUpdate, Location, CreateKPIUpdateForm } from '../../types'
-import { formatDate, getLocalDateString } from '../../utils'
+import { formatDate, getLocalDateString, compareClaimsByEffectiveDateDesc } from '../../utils'
 import { aggregateKpiUpdates } from '../../utils/kpiAggregation'
 import DateRangePicker from '../DateRangePicker'
 import TagPicker from '../MetricTags/TagPicker'
@@ -261,8 +261,8 @@ function MobileMetricDetail({ kpi, initiativeId, onBack, autoAdd }: MetricDetail
                 </div>
             ) : (
                 <div className="space-y-2">
-                    {updates
-                        .sort((a, b) => (b.date_represented || b.date_range_start || '').localeCompare(a.date_represented || a.date_range_start || ''))
+                    {[...updates]
+                        .sort(compareClaimsByEffectiveDateDesc)
                         .map((update) => (
                         <div key={update.id} className="bg-white rounded-xl border border-gray-100 p-3.5">
                             <div className="flex items-start justify-between gap-3">

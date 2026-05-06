@@ -368,7 +368,7 @@ export class TeamService {
                 organization_id,
                 can_add_impact_claims,
                 can_edit_evidence,
-                organizations(id, name, slug, logo_url, brand_color, statement, website_url, donation_url)
+                organizations(id, name, slug, logo_url, brand_color, is_public, is_demo, demo_public_share, statement, website_url, donation_url)
             `)
             .eq('user_id', userId);
 
@@ -385,6 +385,9 @@ export class TeamService {
                         canEditEvidence: (membership as any).can_edit_evidence ?? true,
                         logo_url: org.logo_url,
                         brand_color: org.brand_color,
+                        is_public: org.is_public,
+                        is_demo: org.is_demo,
+                        demo_public_share: org.demo_public_share,
                         statement: org.statement,
                         website_url: org.website_url,
                         donation_url: org.donation_url

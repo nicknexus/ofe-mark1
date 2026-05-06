@@ -25,7 +25,7 @@ import {
 import { apiService } from '../services/api'
 import { useTeam } from '../context/TeamContext'
 import { KPI, KPIUpdate, LoadingState, CreateKPIUpdateForm } from '../types'
-import { formatDate, getCategoryColor, getEvidenceTypeInfo } from '../utils'
+import { formatDate, getCategoryColor, getEvidenceTypeInfo, getClaimEffectiveDate, compareClaimsByEffectiveDateDesc } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import AddKPIUpdateModal from '../components/AddKPIUpdateModal'
 import KPIEvidenceSection from '../components/KPIEvidenceSection'
@@ -179,11 +179,7 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
     return (
         <div className="space-y-3 max-h-[calc(100vh-480px)] min-h-[200px] overflow-y-auto pr-2 scrollbar-thin">
             {dataPointsWithEvidence
-                .sort((a, b) => {
-                    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
-                    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
-                    return dateB - dateA
-                })
+                .sort(compareClaimsByEffectiveDateDesc)
                 .map((dataPoint) => {
                     const isExpanded = expandedPoints.includes(dataPoint.id!)
                     return (
@@ -867,9 +863,10 @@ export default function KPIDetailPage() {
                             </h3>
                             <ResponsiveContainer width="100%" height={220}>
                                 <LineChart data={updates
-                                    .sort((a, b) => new Date(a.date_represented).getTime() - new Date(b.date_represented).getTime())
+                                    .slice()
+                                    .sort((a, b) => getClaimEffectiveDate(a).getTime() - getClaimEffectiveDate(b).getTime())
                                     .map(update => ({
-                                        date: formatDate(update.date_represented, { month: 'short', day: 'numeric' }),
+                                        date: formatDate(getClaimEffectiveDate(update), { month: 'short', day: 'numeric' }),
                                         value: update.value,
                                         label: update.label || update.note
                                     }))}>

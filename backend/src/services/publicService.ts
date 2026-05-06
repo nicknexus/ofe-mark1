@@ -249,7 +249,7 @@ export class PublicService {
     } | null> {
         const { data: org, error } = await supabase
             .from('organizations')
-            .select('id, name, slug, description, statement, logo_url, brand_color, created_at, is_demo')
+            .select('id, name, slug, description, statement, logo_url, brand_color, donation_url, website_url, created_at, is_demo')
             .eq('slug', slug)
             .eq('is_public', true)
             .single();

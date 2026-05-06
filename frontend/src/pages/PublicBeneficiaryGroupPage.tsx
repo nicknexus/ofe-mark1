@@ -12,6 +12,7 @@ import { publicApi, PublicBeneficiaryGroupDetail, PublicMetricTag } from '../ser
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
 import PublicTagFilter from '../components/public/PublicTagFilter'
+import PublicDonateButton from '../components/public/PublicDonateButton'
 import PublicTagChip from '../components/public/PublicTagChip'
 import { formatDate } from '../utils'
 
@@ -254,10 +255,13 @@ export default function PublicBeneficiaryGroupPage() {
             <div className="sticky top-0 z-50 bg-white/60 backdrop-blur-2xl border-b border-white/40 flex-shrink-0">
                 <div className="max-w-full mx-auto px-4 sm:px-6 py-2 sm:py-3">
                     <div className="flex items-center justify-between">
-                        <Link to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=beneficiaries`} className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-800 transition-colors">
-                            <ArrowLeft className="w-4 h-4" />
-                            <span className="text-xs sm:text-sm font-medium">Back</span>
-                        </Link>
+                        <div className="flex items-center gap-2 sm:gap-3">
+                            <Link to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=beneficiaries`} className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-800 transition-colors">
+                                <ArrowLeft className="w-4 h-4" />
+                                <span className="text-xs sm:text-sm font-medium">Back</span>
+                            </Link>
+                            <PublicDonateButton orgSlug={orgSlug} />
+                        </div>
                         <PublicTagFilter
                             tags={groupTags}
                             selectedTagIds={selectedTagIds}

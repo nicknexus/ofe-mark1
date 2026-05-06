@@ -17,6 +17,34 @@ export function parseLocalDate(date: string | Date): Date {
     return new Date(date)
 }
 
+// Effective representative date for an impact claim:
+// - Range claim → date_range_end (last day of range)
+// - Single-date claim → date_represented
+// Used so claim lists/charts are ordered by when impact actually happened, not when the row was created.
+export function getClaimEffectiveDate(c: {
+    date_represented?: string | null
+    date_range_start?: string | null
+    date_range_end?: string | null
+}): Date {
+    const raw = c.date_range_end || c.date_represented || c.date_range_start
+    return raw ? parseLocalDate(raw) : new Date(0)
+}
+
+// Comparator for sorting impact claims newest-first by effective date,
+// with created_at as a tiebreaker (most recently created first when same effective date).
+export function compareClaimsByEffectiveDateDesc<T extends {
+    date_represented?: string | null
+    date_range_start?: string | null
+    date_range_end?: string | null
+    created_at?: string | null
+}>(a: T, b: T): number {
+    const diff = getClaimEffectiveDate(b).getTime() - getClaimEffectiveDate(a).getTime()
+    if (diff !== 0) return diff
+    const ca = a.created_at ? new Date(a.created_at).getTime() : 0
+    const cb = b.created_at ? new Date(b.created_at).getTime() : 0
+    return cb - ca
+}
+
 // Format date for display — default "Feb 24, 2025", pass options to customize
 export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions): string {
     return new Intl.DateTimeFormat('en-US', options ?? {

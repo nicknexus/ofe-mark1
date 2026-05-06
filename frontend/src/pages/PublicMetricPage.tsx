@@ -12,9 +12,10 @@ import { publicApi, PublicMetricDetail, PublicEvidence, PublicMetricTag } from '
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
 import PublicTagFilter from '../components/public/PublicTagFilter'
+import PublicDonateButton from '../components/public/PublicDonateButton'
 import PublicTagChip from '../components/public/PublicTagChip'
 import DateRangePicker from '../components/DateRangePicker'
-import { getLocalDateString, formatDate, parseLocalDate } from '../utils'
+import { getLocalDateString, formatDate, parseLocalDate, getClaimEffectiveDate, compareClaimsByEffectiveDateDesc } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 
 // Category colors
@@ -196,16 +197,19 @@ export default function PublicMetricPage() {
         setSelectedBenGroupIds([])
     }
 
-    // Prepare chart data (sorted by date)
+    // Prepare chart data (sorted by effective date — end-of-range for ranges)
     const chartData = [...filteredUpdates]
-        .sort((a, b) => new Date(a.date_represented).getTime() - new Date(b.date_represented).getTime())
-        .map(update => ({
-            date: formatDate(update.date_represented, { month: 'short', day: 'numeric' }),
-            fullDate: update.date_represented,
-            value: parseFloat(String(update.value)) || 0,
-            note: update.note,
-            location: update.location?.name
-        }))
+        .sort((a, b) => getClaimEffectiveDate(a).getTime() - getClaimEffectiveDate(b).getTime())
+        .map(update => {
+            const eff = getClaimEffectiveDate(update)
+            return {
+                date: formatDate(eff, { month: 'short', day: 'numeric' }),
+                fullDate: getLocalDateString(eff),
+                value: parseFloat(String(update.value)) || 0,
+                note: update.note,
+                location: update.location?.name
+            }
+        })
 
     // Calculate cumulative values
     let cumulative = 0
@@ -345,10 +349,13 @@ export default function PublicMetricPage() {
             <div className="sticky top-0 z-50 bg-white/60 backdrop-blur-2xl border-b border-white/40">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 sm:py-3">
                     <div className="flex items-center justify-between">
-                        <Link to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=metrics`} className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-800 transition-colors">
-                            <ArrowLeft className="w-4 h-4" />
-                            <span className="text-xs sm:text-sm font-medium">Back</span>
-                        </Link>
+                        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                            <Link to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=metrics`} className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-800 transition-colors">
+                                <ArrowLeft className="w-4 h-4" />
+                                <span className="text-xs sm:text-sm font-medium">Back</span>
+                            </Link>
+                            <PublicDonateButton orgSlug={orgSlug} />
+                        </div>
                         <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0 justify-center overflow-x-auto scrollbar-none px-2">
                             <div className="flex-shrink-0">
                                 <DateRangePicker
@@ -639,7 +646,7 @@ export default function PublicMetricPage() {
                         ) : (
                             <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2 sm:space-y-3">
                                 {[...filteredUpdates]
-                                    .sort((a, b) => new Date(b.date_represented).getTime() - new Date(a.date_represented).getTime())
+                                    .sort(compareClaimsByEffectiveDateDesc)
                                     .map((update, idx) => (
                                         <ImpactClaimCard
                                             key={update.id || idx}

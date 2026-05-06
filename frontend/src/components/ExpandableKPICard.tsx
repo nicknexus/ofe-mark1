@@ -24,7 +24,7 @@ import {
     Info
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, ReferenceLine } from 'recharts'
-import { getCategoryColor, parseLocalDate, isSameDay, compareDates, formatDate, getEvidenceTypeInfo, getLocalDateString } from '../utils'
+import { getCategoryColor, parseLocalDate, isSameDay, compareDates, formatDate, getEvidenceTypeInfo, getLocalDateString, compareClaimsByEffectiveDateDesc } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import DateRangePicker from './DateRangePicker'
 import EvidencePreviewModal from './EvidencePreviewModal'
@@ -1247,11 +1247,7 @@ export default function ExpandableKPICard({
                                                     {canAddImpactClaims && <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25"><Plus className="w-4 h-4" /><span>Add Impact Claim</span></button>}
                                                 </div>
                                                 <div className="flex-1 overflow-y-auto space-y-1 pr-1 min-h-0">
-                                                    {[...filteredKpiUpdates].sort((a, b) => {
-                                                        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
-                                                        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
-                                                        return dateB - dateA
-                                                    }).map((update, index) => (
+                                                    {[...filteredKpiUpdates].sort(compareClaimsByEffectiveDateDesc).map((update, index) => (
                                                         <div key={update.id || index} className="border border-gray-100/80 rounded-lg bg-white/60 hover:bg-primary-50/50 hover:border-primary-200 cursor-pointer transition-all duration-200 p-2" onClick={() => handleDataPointClick(update)}>
                                                             <div className="flex items-center justify-between">
                                                                 <div className="min-w-0 flex-1">
@@ -1833,11 +1829,7 @@ export default function ExpandableKPICard({
                                                     </button>
                                                 </div>
                                                 <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
-                                                    {[...filteredKpiUpdates].sort((a, b) => {
-                                                        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
-                                                        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
-                                                        return dateB - dateA
-                                                    }).map((update, index) => (
+                                                    {[...filteredKpiUpdates].sort(compareClaimsByEffectiveDateDesc).map((update, index) => (
                                                         <div key={update.id || index} className="border border-gray-100/80 rounded-xl bg-white/60 hover:bg-primary-50/50 hover:border-primary-200 cursor-pointer transition-all duration-200 p-2.5" onClick={() => handleDataPointClick(update)}>
                                                             <div className="flex items-center justify-between">
                                                                 <div className="min-w-0 flex-1">
@@ -2255,11 +2247,7 @@ export default function ExpandableKPICard({
                                                     </div>
                                                 </div>
                                                 <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
-                                                    {[...filteredKpiUpdates].sort((a, b) => {
-                                                        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
-                                                        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
-                                                        return dateB - dateA
-                                                    }).map((update, index) => {
+                                                    {[...filteredKpiUpdates].sort(compareClaimsByEffectiveDateDesc).map((update, index) => {
                                                         const hasDateRange = update.date_range_start && update.date_range_end
                                                         const displayDate = hasDateRange
                                                             ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}`

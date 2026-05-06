@@ -44,6 +44,7 @@ import PublicLoader from '../components/public/PublicLoader'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicTagFilter from '../components/public/PublicTagFilter'
 import PublicTagChip from '../components/public/PublicTagChip'
+import PublicDonateButton from '../components/public/PublicDonateButton'
 import DateRangePicker from '../components/DateRangePicker'
 import { getLocalDateString, formatDate, parseLocalDate } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
@@ -530,6 +531,7 @@ export default function PublicInitiativePage() {
                                 )}
                             </div>
                             <h1 className="text-sm font-semibold text-foreground truncate max-w-[100px] md:max-w-[180px] hidden sm:block">{initiative.title}</h1>
+                            <PublicDonateButton orgSlug={orgSlug} />
                         </div>
 
                         {/* Center: Filters */}

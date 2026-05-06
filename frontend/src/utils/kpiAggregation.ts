@@ -15,6 +15,13 @@ export function getAggregationStrategy(metricType: MetricType): AggregationStrat
 export interface AggregatableUpdate {
     value: number | string | null | undefined
     date_represented?: string | null
+    date_range_start?: string | null
+    date_range_end?: string | null
+}
+
+// Effective representative date — end-of-range for ranges, otherwise date_represented.
+function effectiveDateString(u: AggregatableUpdate): string {
+    return (u.date_range_end || u.date_represented || u.date_range_start || '') as string
 }
 
 export function aggregateKpiUpdates(
@@ -38,7 +45,7 @@ export function aggregateKpiUpdates(
         case 'latest': {
             const sorted = [...updates]
                 .filter(u => Number.isFinite(Number(u?.value ?? 0)))
-                .sort((a, b) => (b?.date_represented || '').localeCompare(a?.date_represented || ''))
+                .sort((a, b) => effectiveDateString(b).localeCompare(effectiveDateString(a)))
             const v = Number(sorted[0]?.value ?? 0)
             return metricType === 'percentage' ? Math.round(v) : v
         }

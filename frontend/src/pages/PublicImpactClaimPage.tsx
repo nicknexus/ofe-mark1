@@ -13,6 +13,7 @@ import { publicApi, PublicImpactClaimDetail, PublicEvidence, PublicMetricTag } f
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
 import PublicTagChip from '../components/public/PublicTagChip'
+import PublicDonateButton from '../components/public/PublicDonateButton'
 import DateRangePicker from '../components/DateRangePicker'
 import { getLocalDateString, formatDate } from '../utils'
 
@@ -175,15 +176,18 @@ export default function PublicImpactClaimPage() {
             <div className="sticky top-0 z-50 bg-white/60 backdrop-blur-2xl border-b border-white/40">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 sm:py-3">
                     <div className="flex items-center justify-between">
-                        <Link
-                            to={from === 'org' ? `${orgLinkBase}/${orgSlug}` : `${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${claim.metric.slug}`}
-                            className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-800 transition-colors"
-                        >
-                            <ArrowLeft className="w-4 h-4" />
-                            <span className="text-xs sm:text-sm font-medium">
-                                {from === 'org' ? `Back to ${claim.initiative.org_name || 'Organization'}` : `Back to ${claim.metric.title}`}
-                            </span>
-                        </Link>
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                            <Link
+                                to={from === 'org' ? `${orgLinkBase}/${orgSlug}` : `${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${claim.metric.slug}`}
+                                className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-800 transition-colors min-w-0"
+                            >
+                                <ArrowLeft className="w-4 h-4 flex-shrink-0" />
+                                <span className="text-xs sm:text-sm font-medium truncate">
+                                    {from === 'org' ? `Back to ${claim.initiative.org_name || 'Organization'}` : `Back to ${claim.metric.title}`}
+                                </span>
+                            </Link>
+                            <PublicDonateButton orgSlug={orgSlug} />
+                        </div>
                         <DateRangePicker
                             value={dateFilter}
                             onChange={setDateFilter}

@@ -9,6 +9,7 @@ import { publicApi, PublicEvidenceDetail, PublicMetricTag } from '../services/pu
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
 import PublicTagChip from '../components/public/PublicTagChip'
+import PublicDonateButton from '../components/public/PublicDonateButton'
 import DateRangePicker from '../components/DateRangePicker'
 import { getLocalDateString, formatDate } from '../utils'
 
@@ -177,11 +178,14 @@ export default function PublicEvidencePage() {
             <div className="sticky top-0 z-50 bg-white/60 backdrop-blur-2xl border-b border-white/40">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
                     <div className="flex items-center justify-between">
-                        <Link to={backUrl}
-                            className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-800 transition-colors">
-                            <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-                            <span className="text-sm sm:text-base font-medium">{backLabel}</span>
-                        </Link>
+                        <div className="flex items-center gap-2 sm:gap-3">
+                            <Link to={backUrl}
+                                className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-800 transition-colors">
+                                <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+                                <span className="text-sm sm:text-base font-medium">{backLabel}</span>
+                            </Link>
+                            <PublicDonateButton orgSlug={orgSlug} />
+                        </div>
                         <DateRangePicker
                             value={dateFilter}
                             onChange={setDateFilter}
