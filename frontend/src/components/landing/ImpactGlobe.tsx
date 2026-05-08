@@ -126,9 +126,21 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
   const polygonCapColorFn = useCallback(() => `${globeColor}99`, [globeColor]);
   const polygonSideColorFn = useCallback(() => `${globeColor}26`, [globeColor]);
   const polygonStrokeColorFn = useCallback(() => "rgba(255, 255, 255, 0.3)", []);
-  const pointColorFn = useCallback(() => globeColor, [globeColor]);
+  // Pins are pure white — pop against the brand-tinted globe.
+  const pointColorFn = useCallback(() => '#ffffff', []);
   const arcColorFn = useCallback(() => ["rgba(255, 255, 255, 0.55)", "rgba(255, 255, 255, 0.05)"], []);
-  const ringColorFn = useCallback(() => (t: number) => `rgba(${brandRgb.r}, ${brandRgb.g}, ${brandRgb.b}, ${0.9 - t * 0.9})`, [brandRgb]);
+  // Glow effect: ring starts bright white at the pin (high alpha, tight),
+  // blends to brand color as it propagates, then fades out. Combined with
+  // a faster repeat below, this reads as a luminous halo around each pin
+  // rather than a slow ripple.
+  const ringColorFn = useCallback(() => (t: number) => {
+    const whiteWeight = Math.max(0, 1 - t * 2.2);
+    const r = Math.round(255 * whiteWeight + brandRgb.r * (1 - whiteWeight));
+    const g = Math.round(255 * whiteWeight + brandRgb.g * (1 - whiteWeight));
+    const b = Math.round(255 * whiteWeight + brandRgb.b * (1 - whiteWeight));
+    const alpha = Math.max(0, 0.95 - t * 0.95);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }, [brandRgb]);
   const labelLatFn = useCallback((d: any) => d.lat, []);
   const labelLngFn = useCallback((d: any) => d.lng, []);
   const labelTextFn = useCallback((d: any) => d.name, []);
@@ -229,8 +241,8 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
           polygonStrokeColor={polygonStrokeColorFn}
           polygonAltitude={0.006}
           pointsData={pointsData}
-          pointAltitude={locations ? 0.015 : 0.01}
-          pointRadius={locations ? 0.6 : 0.5}
+          pointAltitude={locations ? 0.02 : 0.012}
+          pointRadius={locations ? 0.85 : 0.6}
           pointColor={pointColorFn}
           pointsMerge={false}
           arcsData={arcsData}
@@ -242,9 +254,9 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
           arcDashAnimateTime={(d: any) => d.animateTime ?? 2500}
           ringsData={pointsData}
           ringColor={ringColorFn}
-          ringMaxRadius={locations ? 3 : 2}
-          ringPropagationSpeed={1.5}
-          ringRepeatPeriod={2000}
+          ringMaxRadius={locations ? 2.2 : 2}
+          ringPropagationSpeed={2.4}
+          ringRepeatPeriod={1400}
           labelsData={labelsData}
           labelLat={labelLatFn}
           labelLng={labelLngFn}

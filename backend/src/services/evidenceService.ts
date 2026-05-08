@@ -402,17 +402,20 @@ export class EvidenceService {
             ])
             const currentBgIds = (currentBgLinks || []).map((l: any) => l.beneficiary_group_id)
 
+            // Prune only when a constraint EXISTS and isn't met. If the claim
+            // has no location_id (legacy or partial data), treat it as "no
+            // location constraint" and leave the link alone — same lenience as
+            // ben groups and tags. Otherwise a single null field would nuke
+            // every historical link the moment any evidence is edited.
             const staleIds = (linkedUpdates || [])
                 .filter((u: any) => {
-                    const locMatch = u.location_id && currentLocIds.includes(u.location_id)
                     const updateStart = u.date_range_start || u.date_represented
                     const updateEnd = u.date_range_end || null
-                    const dateMatch = this.datesOverlap(evidenceDateStart, evidenceDateEnd, updateStart, updateEnd)
-                    const bgMatch = BeneficiaryService.beneficiaryGroupsMatch(
-                        updateBenGroups[u.id] || [], currentBgIds
-                    )
-                    const tagMatch = MetricTagService.evidenceMatchesClaimTag(updateTagMap[u.id] ?? null, currentEvidenceTagIds)
-                    return !locMatch || !dateMatch || !bgMatch || !tagMatch
+                    if (!this.datesOverlap(evidenceDateStart, evidenceDateEnd, updateStart, updateEnd)) return true
+                    if (u.location_id && currentLocIds.length > 0 && !currentLocIds.includes(u.location_id)) return true
+                    if (!BeneficiaryService.beneficiaryGroupsMatch(updateBenGroups[u.id] || [], currentBgIds)) return true
+                    if (!MetricTagService.evidenceMatchesClaimTag(updateTagMap[u.id] ?? null, currentEvidenceTagIds)) return true
+                    return false
                 })
                 .map((u: any) => u.id)
 
@@ -912,19 +915,40 @@ export class EvidenceService {
             }
 
             // Prune any existing link that fails the current gates.
+            // IMPORTANT: prune only when a constraint EXISTS and isn't met.
+            // If the claim or evidence has a null gate value (legacy data —
+            // null location_id, no ben groups, no tag), treat that gate as
+            // "no constraint" and leave the existing link alone. Otherwise
+            // we'd nuke every historical link the moment a claim slips into
+            // a partial state (e.g. its location was deleted and FK set null).
             for (const linkedClaimId of alreadyLinked) {
                 const claim = claims.find(c => c.id === linkedClaimId)
                 if (!claim) continue // claim deleted — let FK handle it
                 const claimStart = (claim.date_range_start || claim.date_represented || '') as string
                 const claimEnd = (claim.date_range_end || null) as string | null
-                const stillValid =
-                    !!evStart && !!claimStart &&
-                    datesOverlap(evStart, evEnd, claimStart, claimEnd) &&
-                    !!claim.location_id && evLocIds.includes(claim.location_id) &&
-                    BeneficiaryService.beneficiaryGroupsMatch(updateBgMap[claim.id] || [], evBgIds) &&
-                    MetricTagService.evidenceMatchesClaimTag(updateTagMap[claim.id] ?? null, evTagIds)
-                if (!stillValid) {
+
+                // Date check: only prune if BOTH have dates AND they don't overlap.
+                if (evStart && claimStart && !datesOverlap(evStart, evEnd, claimStart, claimEnd)) {
                     linksToPrune.push({ evidence_id: ev.id, kpi_update_id: claim.id })
+                    continue
+                }
+
+                // Location check: only prune if claim HAS a location and evidence
+                // doesn't include it. Null claim location = no location constraint.
+                if (claim.location_id && evLocIds.length > 0 && !evLocIds.includes(claim.location_id)) {
+                    linksToPrune.push({ evidence_id: ev.id, kpi_update_id: claim.id })
+                    continue
+                }
+
+                // Ben groups + tag use service helpers that already treat
+                // missing values as "no constraint" gracefully.
+                if (!BeneficiaryService.beneficiaryGroupsMatch(updateBgMap[claim.id] || [], evBgIds)) {
+                    linksToPrune.push({ evidence_id: ev.id, kpi_update_id: claim.id })
+                    continue
+                }
+                if (!MetricTagService.evidenceMatchesClaimTag(updateTagMap[claim.id] ?? null, evTagIds)) {
+                    linksToPrune.push({ evidence_id: ev.id, kpi_update_id: claim.id })
+                    continue
                 }
             }
         }
