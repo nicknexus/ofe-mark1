@@ -488,7 +488,7 @@ export default function PublicMetricPage() {
                         <div className="bg-white/70 backdrop-blur-2xl p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-xl shadow-black/10 border border-white/60 lg:min-w-[200px] lg:max-w-[240px]">
                             <p className="text-gray-500 text-xs sm:text-sm font-medium mb-0.5 sm:mb-1">{metric.metric_type === 'percentage' ? 'Average' : 'Total Impact'}</p>
                             <p className={`text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight ${config.text}`}>
-                                {(filterStart ? filteredTotal : metric.total_value).toLocaleString()}{metric.metric_type === 'percentage' ? '%' : ''}
+                                {(hasActiveFilters ? filteredTotal : metric.total_value).toLocaleString()}{metric.metric_type === 'percentage' ? '%' : ''}
                             </p>
                             <p className="text-gray-500 text-xs sm:text-sm mt-0.5 sm:mt-1">{metric.metric_type === 'percentage' ? 'across all claims' : metric.unit_of_measurement}</p>
                         </div>
@@ -505,7 +505,7 @@ export default function PublicMetricPage() {
                                 {isPercentage ? 'Percentage Over Time' : 'Cumulative Progress'}
                             </h2>
                             <span className="text-[10px] sm:text-xs text-gray-500 bg-white/60 px-2 sm:px-3 py-1 rounded-full">
-                                All time
+                                {hasActiveFilters ? 'Filtered' : 'All time'}
                             </span>
                         </div>
 

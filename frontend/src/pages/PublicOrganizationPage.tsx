@@ -257,7 +257,13 @@ export default function PublicOrganizationPage() {
                 return { ...m, total_value: newTotal, update_count: filteredUpdates.length }
             })
         }
-        return filtered
+        // Highest total first — top-left has the biggest number, fills the
+        // grid row-by-row in descending order. Percentage metrics use their
+        // average value (already in total_value), so the comparison is
+        // apples-to-apples per metric type, but mixing types in one grid will
+        // surface the biggest absolute number regardless. That matches what
+        // donors visually expect ("the impact you're proudest of, first").
+        return [...filtered].sort((a, b) => (b.total_value ?? 0) - (a.total_value ?? 0))
     }, [metrics, selectedInitiative, locationMatchedInitiativeIds, startDate, endDate, selectedTagIds])
 
     const filteredStories = useMemo(() => {
@@ -516,10 +522,30 @@ export default function PublicOrganizationPage() {
         return filtered
     }, [evidence, selectedInitiative, selectedLocationIds, locationMatchedInitiativeIds, startDate, endDate, selectedTagIds])
 
-    // Evidence pagination (must be after filteredEvidence)
+    // Evidence pagination (must be after filteredEvidence).
+    // Bias the order so the first page lands on viewable photos: images first,
+    // then videos/YouTube (still inline-viewable), then everything else (PDFs,
+    // unknown docs). Within each tier we preserve the original order, so the
+    // overall feel stays "newest-ish first" while making the bottom-right tile
+    // grid look intentional rather than dominated by document placeholders.
     const evidencePerPage = 4
-    const totalEvidencePages = Math.ceil(filteredEvidence.length / evidencePerPage)
-    const displayedEvidence = filteredEvidence.slice(evidencePage * evidencePerPage, (evidencePage + 1) * evidencePerPage)
+    const evidenceVisualTier = useMemo(() => {
+        const isImageUrl = (url?: string | null) => !!url && /\.(jpg|jpeg|png|gif|webp)$/i.test(url)
+        const isVideoUrl = (url?: string | null) => !!url && (
+            /\.(mp4|webm|mov|avi|mkv)$/i.test(url) ||
+            /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(url)
+        )
+        return (e: PublicEvidence) => {
+            if (isImageUrl(e.file_url)) return 0
+            if (isVideoUrl(e.file_url)) return 1
+            return 2
+        }
+    }, [])
+    const sortedEvidence = useMemo(() => {
+        return [...filteredEvidence].sort((a, b) => evidenceVisualTier(a) - evidenceVisualTier(b))
+    }, [filteredEvidence, evidenceVisualTier])
+    const totalEvidencePages = Math.ceil(sortedEvidence.length / evidencePerPage)
+    const displayedEvidence = sortedEvidence.slice(evidencePage * evidencePerPage, (evidencePage + 1) * evidencePerPage)
 
     // Memoize globe locations - group by country to avoid clutter
     const globeLocations = useMemo(() => {

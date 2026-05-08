@@ -129,16 +129,18 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
   // Pins are pure white — pop against the brand-tinted globe.
   const pointColorFn = useCallback(() => '#ffffff', []);
   const arcColorFn = useCallback(() => ["rgba(255, 255, 255, 0.55)", "rgba(255, 255, 255, 0.05)"], []);
-  // Glow effect: ring starts bright white at the pin (high alpha, tight),
-  // blends to brand color as it propagates, then fades out. Combined with
-  // a faster repeat below, this reads as a luminous halo around each pin
-  // rather than a slow ripple.
+  // Glow effect: ring starts bright white at the pin, blends with a touch of
+  // brand color as it propagates, fades out. ringRepeatPeriod below is set
+  // short enough that two rings are alive at once, giving every pin a
+  // continuous outward shimmer (no dead beats between pulses).
   const ringColorFn = useCallback(() => (t: number) => {
-    const whiteWeight = Math.max(0, 1 - t * 2.2);
+    // Heavier white bias — pin reads as luminous, brand color only tints the
+    // outer edge. Keeps the brand identity without making rings feel green.
+    const whiteWeight = Math.max(0, 1 - t * 1.4);
     const r = Math.round(255 * whiteWeight + brandRgb.r * (1 - whiteWeight));
     const g = Math.round(255 * whiteWeight + brandRgb.g * (1 - whiteWeight));
     const b = Math.round(255 * whiteWeight + brandRgb.b * (1 - whiteWeight));
-    const alpha = Math.max(0, 0.95 - t * 0.95);
+    const alpha = Math.max(0, 1 - t * 0.95);
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }, [brandRgb]);
   const labelLatFn = useCallback((d: any) => d.lat, []);
@@ -254,9 +256,11 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
           arcDashAnimateTime={(d: any) => d.animateTime ?? 2500}
           ringsData={pointsData}
           ringColor={ringColorFn}
-          ringMaxRadius={locations ? 2.2 : 2}
-          ringPropagationSpeed={2.4}
-          ringRepeatPeriod={1400}
+          ringMaxRadius={locations ? 2.4 : 2}
+          ringPropagationSpeed={2.2}
+          // 700ms repeat with ~1100ms ring lifetime means each pin always has
+          // 1–2 rings expanding — never goes "quiet". Continuous outward shimmer.
+          ringRepeatPeriod={700}
           labelsData={labelsData}
           labelLat={labelLatFn}
           labelLng={labelLngFn}
