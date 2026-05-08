@@ -19,6 +19,23 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     }
 });
 
+// Update display order for multiple initiatives (drag-and-drop on dashboard).
+// Org-scoped: any team member can reorder.
+router.post('/update-order', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const { order } = req.body; // Array of { id: string, display_order: number }
+        if (!Array.isArray(order)) {
+            res.status(400).json({ error: 'Order must be an array' });
+            return;
+        }
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        await InitiativeService.updateOrder(order, req.user!.id, requestedOrgId);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
 // Create initiative
 router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {

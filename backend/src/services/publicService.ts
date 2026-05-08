@@ -57,8 +57,15 @@ export interface SearchResult {
 export class PublicService {
 
     /**
-     * Filter impact_claims on evidence by beneficiary group compatibility.
-     * Mirrors the private-side logic in EvidenceService.getDataPointsForEvidence.
+     * Filter impact_claims on evidence by:
+     *  - beneficiary group compatibility (existing rule)
+     *  - tag compatibility: if a claim has a tag, evidence must include it
+     *
+     * Both rules are AND-combined. A claim is hidden from evidence's
+     * impact_claims list if it fails either gate.
+     *
+     * Mirrors the private-side logic in EvidenceService.getDataPointsForEvidence
+     * + the new tag rule.
      */
     private static async filterClaimsByBenGroups(
         evidenceItems: any[]
@@ -79,17 +86,18 @@ export class PublicService {
 
         return evidenceItems.map(e => {
             const evGroupIds = evidenceBenGroups[e.id] || [];
+            const evTagIds: string[] = e.tag_ids || [];
             const claims: any[] = e.impact_claims || [];
-
-            const anyScoped = evGroupIds.length > 0 ||
-                claims.some((c: any) => (updateBenGroups[c.id] || []).length > 0);
-            if (!anyScoped) return e;
 
             return {
                 ...e,
                 impact_claims: claims.filter((c: any) => {
                     const claimGroupIds = updateBenGroups[c.id] || [];
-                    return BeneficiaryService.beneficiaryGroupsMatch(claimGroupIds, evGroupIds);
+                    const benOk = !(evGroupIds.length > 0 || claimGroupIds.length > 0)
+                        ? true
+                        : BeneficiaryService.beneficiaryGroupsMatch(claimGroupIds, evGroupIds);
+                    const tagOk = MetricTagService.evidenceMatchesClaimTag(c.tag_id, evTagIds);
+                    return benOk && tagOk;
                 })
             };
         });
@@ -304,12 +312,13 @@ export class PublicService {
         const { data, error } = await supabase
             .from('initiatives')
             .select(`
-                id, title, description, region, location, slug, coordinates, created_at, organization_id,
+                id, title, description, region, location, slug, coordinates, created_at, organization_id, display_order,
                 organizations!inner(slug, name, logo_url, is_public)
             `)
             .eq('organizations.slug', orgSlug)
             .eq('organizations.is_public', true)
-            .order('created_at', { ascending: false });
+            .order('display_order', { ascending: true })
+            .order('created_at', { ascending: true });
 
         if (error) throw new Error(`Failed to fetch initiatives: ${error.message}`);
 
@@ -323,6 +332,7 @@ export class PublicService {
             coordinates: i.coordinates,
             created_at: i.created_at,
             organization_id: i.organization_id,
+            display_order: i.display_order,
             org_slug: i.organizations?.slug,
             organization_name: i.organizations?.name,
             organization_logo_url: i.organizations?.logo_url
@@ -1190,7 +1200,9 @@ export class PublicService {
         const initiative = await this.getInitiativeBySlug(orgSlug, initiativeSlug);
         if (!initiative) return null;
 
-        // Fetch the kpi_update with its parent KPI and location
+        // Fetch the kpi_update with its parent KPI and location.
+        // Tag is on a junction table (kpi_update_metric_tags), not on
+        // kpi_updates — fetched separately below.
         const { data: update, error } = await supabase
             .from('kpi_updates')
             .select(`
@@ -1209,6 +1221,10 @@ export class PublicService {
         // Verify this update belongs to the correct initiative
         const kpi = (update as any).kpis;
         if (!kpi || kpi.initiative_id !== initiative.id) return null;
+
+        // Tag for this claim — fetched up front so the evidence filter below
+        // can use it. (Tag is in kpi_update_metric_tags, not on the row.)
+        const claimTagId = await MetricTagService.getTagIdForUpdate(claimId);
 
         // Get evidence linked to this specific update via evidence_kpi_updates
         const { data: evidenceLinks } = await supabase
@@ -1269,24 +1285,23 @@ export class PublicService {
             const anyScoped = claimGroupIds.length > 0 ||
                 Object.values(evidenceBenGroups).some(ids => ids.length > 0);
 
-            if (anyScoped) {
-                evidence = rawEvidence.filter(e => {
-                    const evGroupIds = evidenceBenGroups[e.id] || [];
-                    return BeneficiaryService.beneficiaryGroupsMatch(claimGroupIds, evGroupIds);
-                });
-            } else {
-                evidence = rawEvidence;
-            }
+            // Tag gate: if the claim is tagged, evidence must include that tag
+            // in its tag set. Untagged claim → no tag filter (graceful default
+            // for orgs that haven't fully adopted tags).
+            const benFiltered = anyScoped
+                ? rawEvidence.filter(e => BeneficiaryService.beneficiaryGroupsMatch(claimGroupIds, evidenceBenGroups[e.id] || []))
+                : rawEvidence;
 
-            // Also filter impact_claims within each evidence item
+            evidence = benFiltered.filter(e =>
+                MetricTagService.evidenceMatchesClaimTag(claimTagId, e.tag_ids)
+            );
+
+            // Also filter impact_claims within each evidence item by ben groups + tags
             evidence = await this.filterClaimsByBenGroups(evidence);
         }
 
-        // Tags for this claim + parent metric.
-        const [claimTagId, kpiTagIds] = await Promise.all([
-            MetricTagService.getTagIdForUpdate(claimId),
-            MetricTagService.getTagIdsForKpi(kpi.id),
-        ]);
+        // Parent metric tags for the response payload.
+        const kpiTagIds = await MetricTagService.getTagIdsForKpi(kpi.id);
 
         return {
             id: update.id,

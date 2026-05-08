@@ -601,4 +601,23 @@ export class MetricTagService {
             )
         await Promise.all(updates)
     }
+
+    /**
+     * Tag-based gate for evidence supporting a claim.
+     * - Claim has no tag → match (no tag filter applied).
+     * - Claim has a tag → evidence must include that tag in its tag set.
+     *
+     * Mirrors BeneficiaryService.beneficiaryGroupsMatch in spirit, but a
+     * claim has at most one tag and evidence can have many, so this is a
+     * set-membership check rather than an intersection.
+     */
+    static evidenceMatchesClaimTag(
+        claimTagId: string | null | undefined,
+        evidenceTagIds: string[] | null | undefined
+    ): boolean {
+        if (!claimTagId) return true
+        if (!evidenceTagIds || evidenceTagIds.length === 0) return false
+        return evidenceTagIds.includes(claimTagId)
+    }
 }
+

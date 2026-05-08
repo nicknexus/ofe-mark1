@@ -37,6 +37,7 @@ export interface PublicInitiative {
     organization_name?: string
     organization_logo_url?: string
     organization_brand_color?: string
+    display_order?: number
 }
 
 export interface PublicMetricTag {

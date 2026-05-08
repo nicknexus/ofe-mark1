@@ -373,6 +373,13 @@ class ApiService {
         })
     }
 
+    async updateInitiativeOrder(order: Array<{ id: string; display_order: number }>): Promise<void> {
+        return this.request<void>('/initiatives/update-order', {
+            method: 'POST',
+            body: JSON.stringify({ order })
+        })
+    }
+
     async getInitiativeDashboard(id: string): Promise<InitiativeDashboard> {
         return this.request<InitiativeDashboard>(`/initiatives/${id}/dashboard`)
     }
@@ -676,6 +683,21 @@ class ApiService {
             method: 'PUT',
             body: JSON.stringify(data)
         })
+    }
+
+    /**
+     * Recomputes evidence ↔ claim links under the current matching rules
+     * (date + location + ben groups + tag). Idempotent. Used to backfill
+     * historical data created before the tag-gate rule existed.
+     * Returns counts so the caller can decide whether to show a toast.
+     */
+    async backfillEvidenceLinks(): Promise<{
+        linksCreated: number
+        linksPruned: number
+        evidenceProcessed: number
+        claimsScanned: number
+    }> {
+        return this.request(`/evidence/backfill-links`, { method: 'POST' })
     }
 
     async deleteEvidence(id: string): Promise<void> {

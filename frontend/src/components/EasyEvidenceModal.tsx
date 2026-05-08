@@ -238,6 +238,9 @@ export default function EasyEvidenceModal({
                             beneficiary_group_ids: capturedImpactClaim.beneficiary_group_ids?.length > 0
                                 ? capturedImpactClaim.beneficiary_group_ids
                                 : undefined,
+                            // Inherit the claim's tag (if any) so evidence uploaded via the
+                            // easy flow always passes the tag-match gate against this claim.
+                            tag_ids: capturedImpactClaim.tag_id ? [capturedImpactClaim.tag_id] : undefined,
                             initiative_id: capturedInitiativeId,
                             file_url: result.file_url,
                             file_urls: [result.file_url],

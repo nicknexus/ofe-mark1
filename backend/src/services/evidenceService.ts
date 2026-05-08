@@ -4,6 +4,7 @@ import { deleteFromSupabase } from '../utils/fileUpload'
 import { StorageService } from './storageService'
 import { BeneficiaryService } from './beneficiaryService'
 import { MetricTagService } from './metricTagService'
+import { InitiativeService } from './initiativeService'
 
 export class EvidenceService {
     static async create(evidence: Evidence, userId: string, requestedOrgId?: string): Promise<Evidence> {
@@ -96,12 +97,13 @@ export class EvidenceService {
             if (linkError2) throw new Error(`Failed to link evidence to data points: ${linkError2.message}`);
         }
 
-        // Auto-link to any existing matching impact claims not already linked
+        // Auto-link to any existing matching impact claims not already linked.
+        // Pass tag_ids alongside ben groups so the auto-link respects the tag gate.
         await this.autoLinkToMatchingUpdates(data.id, kpi_ids || [], location_ids || [], {
             date_represented: data.date_represented,
             date_range_start: data.date_range_start,
             date_range_end: data.date_range_end
-        }, kpi_update_ids || [], userId, beneficiary_group_ids || []);
+        }, kpi_update_ids || [], userId, beneficiary_group_ids || [], tag_ids || []);
 
         // Link to beneficiary groups if provided
         if (beneficiary_group_ids && beneficiary_group_ids.length > 0) {
@@ -377,7 +379,7 @@ export class EvidenceService {
             .eq('evidence_id', id);
         const alreadyLinkedIds = (currentUpdateLinks || []).map((l: any) => l.kpi_update_id);
 
-        // Prune stale links where location, date, or ben groups no longer match
+        // Prune stale links where location, date, ben groups, OR tag no longer match
         if (alreadyLinkedIds.length > 0) {
             const { data: linkedUpdates } = await supabase
                 .from('kpi_updates')
@@ -387,13 +389,18 @@ export class EvidenceService {
             const evidenceDateStart = data.date_range_start || data.date_represented || ''
             const evidenceDateEnd = data.date_range_end || null
 
-            // Get current ben group IDs for scoping
-            const { data: currentBgLinks } = await supabase
-                .from('evidence_beneficiary_groups')
-                .select('beneficiary_group_id')
-                .eq('evidence_id', id)
+            // Get current ben group IDs + current tag set for scoping.
+            // Tags live in junction tables, so fetch them via the service.
+            const [{ data: currentBgLinks }, currentEvidenceTagIds, updateBenGroups, updateTagMap] = await Promise.all([
+                supabase
+                    .from('evidence_beneficiary_groups')
+                    .select('beneficiary_group_id')
+                    .eq('evidence_id', id),
+                MetricTagService.getTagIdsForEvidence(id),
+                BeneficiaryService.getBenGroupsForUpdates(alreadyLinkedIds),
+                MetricTagService.getTagIdsForUpdates(alreadyLinkedIds),
+            ])
             const currentBgIds = (currentBgLinks || []).map((l: any) => l.beneficiary_group_id)
-            const updateBenGroups = await BeneficiaryService.getBenGroupsForUpdates(alreadyLinkedIds)
 
             const staleIds = (linkedUpdates || [])
                 .filter((u: any) => {
@@ -404,7 +411,8 @@ export class EvidenceService {
                     const bgMatch = BeneficiaryService.beneficiaryGroupsMatch(
                         updateBenGroups[u.id] || [], currentBgIds
                     )
-                    return !locMatch || !dateMatch || !bgMatch
+                    const tagMatch = MetricTagService.evidenceMatchesClaimTag(updateTagMap[u.id] ?? null, currentEvidenceTagIds)
+                    return !locMatch || !dateMatch || !bgMatch || !tagMatch
                 })
                 .map((u: any) => u.id)
 
@@ -425,18 +433,21 @@ export class EvidenceService {
             .eq('evidence_id', id)
         const freshLinkedIds = (freshUpdateLinks || []).map((l: any) => l.kpi_update_id)
 
-        // Get current ben group IDs for auto-link scoping
-        const { data: bgLinksForAutoLink } = await supabase
-            .from('evidence_beneficiary_groups')
-            .select('beneficiary_group_id')
-            .eq('evidence_id', id)
+        // Get current ben group IDs + tag IDs for auto-link scoping
+        const [{ data: bgLinksForAutoLink }, tagIdsForAutoLink] = await Promise.all([
+            supabase
+                .from('evidence_beneficiary_groups')
+                .select('beneficiary_group_id')
+                .eq('evidence_id', id),
+            MetricTagService.getTagIdsForEvidence(id),
+        ])
         const bgIdsForAutoLink = (bgLinksForAutoLink || []).map((l: any) => l.beneficiary_group_id)
 
         await this.autoLinkToMatchingUpdates(id, currentKpiIds, currentLocIds, {
             date_represented: data.date_represented,
             date_range_start: data.date_range_start,
             date_range_end: data.date_range_end
-        }, freshLinkedIds, userId, bgIdsForAutoLink);
+        }, freshLinkedIds, userId, bgIdsForAutoLink, tagIdsForAutoLink);
 
         return data;
     }
@@ -562,21 +573,23 @@ export class EvidenceService {
             .map((item: any) => item.evidence)
             .filter(Boolean);
 
-        // Read-time ben group scoping filter
+        // Read-time scoping filter: ben groups + tags. Both must pass.
         const evidenceIds = evidence.map((e: any) => e.id).filter(Boolean)
         if (evidenceIds.length === 0) return evidence
 
-        const updateBenGroups = await BeneficiaryService.getBenGroupsForUpdates([updateId])
+        const [updateBenGroups, evidenceBenGroups, updateTagId, evidenceTagsByEv] = await Promise.all([
+            BeneficiaryService.getBenGroupsForUpdates([updateId]),
+            BeneficiaryService.getBenGroupsForEvidence(evidenceIds),
+            MetricTagService.getTagIdForUpdate(updateId),
+            MetricTagService.getTagIdsForEvidences(evidenceIds),
+        ])
         const updateGroupIds = updateBenGroups[updateId] || []
-        const evidenceBenGroups = await BeneficiaryService.getBenGroupsForEvidence(evidenceIds)
-        const anyEvidenceScoped = Object.values(evidenceBenGroups).some(ids => ids.length > 0)
-
-        // Skip filtering if neither side uses ben groups
-        if (updateGroupIds.length === 0 && !anyEvidenceScoped) return evidence
 
         return evidence.filter((e: any) => {
             const evGroupIds = evidenceBenGroups[e.id] || []
-            return BeneficiaryService.beneficiaryGroupsMatch(updateGroupIds, evGroupIds)
+            if (!BeneficiaryService.beneficiaryGroupsMatch(updateGroupIds, evGroupIds)) return false
+            const evTagIds = evidenceTagsByEv[e.id] || []
+            return MetricTagService.evidenceMatchesClaimTag(updateTagId, evTagIds)
         });
     }
 
@@ -653,20 +666,23 @@ export class EvidenceService {
                 kpi: dp.kpis
             }));
 
-        // Read-time ben group scoping: filter out claims that don't match this evidence's groups
+        // Read-time scoping: filter out claims that don't match this evidence's
+        // ben groups OR tags. Both gates apply.
         if (dataPoints.length === 0) return dataPoints
         const updateIds = dataPoints.map((dp: any) => dp.id).filter(Boolean)
-        const [evidenceBenGroups, updateBenGroups] = await Promise.all([
+        const [evidenceBenGroups, updateBenGroups, evidenceTagIds, updateTagMap] = await Promise.all([
             BeneficiaryService.getBenGroupsForEvidence([evidenceId]),
-            BeneficiaryService.getBenGroupsForUpdates(updateIds)
+            BeneficiaryService.getBenGroupsForUpdates(updateIds),
+            MetricTagService.getTagIdsForEvidence(evidenceId),
+            MetricTagService.getTagIdsForUpdates(updateIds),
         ])
         const evGroupIds = evidenceBenGroups[evidenceId] || []
-        const anyScoped = evGroupIds.length > 0 || Object.values(updateBenGroups).some(ids => ids.length > 0)
-        if (!anyScoped) return dataPoints
 
         return dataPoints.filter((dp: any) => {
             const claimGroupIds = updateBenGroups[dp.id] || []
-            return BeneficiaryService.beneficiaryGroupsMatch(claimGroupIds, evGroupIds)
+            if (!BeneficiaryService.beneficiaryGroupsMatch(claimGroupIds, evGroupIds)) return false
+            const claimTagId = updateTagMap[dp.id] || null
+            return MetricTagService.evidenceMatchesClaimTag(claimTagId, evidenceTagIds)
         });
     }
 
@@ -686,7 +702,8 @@ export class EvidenceService {
         dates: { date_represented?: string; date_range_start?: string; date_range_end?: string },
         alreadyLinkedUpdateIds: string[],
         userId: string,
-        evidenceBenGroupIds: string[] = []
+        evidenceBenGroupIds: string[] = [],
+        evidenceTagIds: string[] = []
     ): Promise<void> {
         try {
             if (kpiIds.length === 0 || locationIds.length === 0) return
@@ -719,11 +736,17 @@ export class EvidenceService {
 
             if (candidateUpdateIds.length === 0) return
 
-            // Ben group scoping: filter by beneficiary group compatibility
-            const updateBenGroups = await BeneficiaryService.getBenGroupsForUpdates(candidateUpdateIds)
+            // Scoping gates: ben groups + tags. Both must pass.
+            // Tags live in kpi_update_metric_tags, fetched via the service.
+            const [updateBenGroups, updateTagMap] = await Promise.all([
+                BeneficiaryService.getBenGroupsForUpdates(candidateUpdateIds),
+                MetricTagService.getTagIdsForUpdates(candidateUpdateIds),
+            ])
+
             const filteredUpdateIds = candidateUpdateIds.filter(updateId => {
                 const updateGroupIds = updateBenGroups[updateId] || []
-                return BeneficiaryService.beneficiaryGroupsMatch(updateGroupIds, evidenceBenGroupIds)
+                if (!BeneficiaryService.beneficiaryGroupsMatch(updateGroupIds, evidenceBenGroupIds)) return false
+                return MetricTagService.evidenceMatchesClaimTag(updateTagMap[updateId] ?? null, evidenceTagIds)
             })
 
             if (filteredUpdateIds.length === 0) return
@@ -745,6 +768,190 @@ export class EvidenceService {
             }
         } catch (error) {
             console.error('Error in autoLinkToMatchingUpdates:', error)
+        }
+    }
+
+    /**
+     * Idempotent backfill: re-evaluates every evidence-claim pair in the org under
+     * the current rules (date overlap + location + ben groups + tag) and creates
+     * any missing links AND prunes any links that no longer satisfy the gates.
+     *
+     * Used to backfill historical data after the tag-gate rule was introduced —
+     * existing evidence + claims that should match but were never linked
+     * (because they were created before the rule, or before the user added a
+     * tag) get connected without needing a manual re-save.
+     *
+     * Safe to call repeatedly. Returns counts of mutations so callers can decide
+     * whether to surface a toast.
+     */
+    static async backfillLinksForOrg(userId: string, requestedOrgId?: string): Promise<{
+        linksCreated: number
+        linksPruned: number
+        evidenceProcessed: number
+        claimsScanned: number
+    }> {
+        const orgId = await InitiativeService.getEffectiveOrganizationId(userId, requestedOrgId)
+        if (!orgId) return { linksCreated: 0, linksPruned: 0, evidenceProcessed: 0, claimsScanned: 0 }
+
+        // Pull all initiatives in the org so we can scope to their KPIs.
+        const { data: initiatives } = await supabase
+            .from('initiatives')
+            .select('id')
+            .eq('organization_id', orgId)
+        const initiativeIds = (initiatives || []).map((i: any) => i.id)
+        if (initiativeIds.length === 0) {
+            return { linksCreated: 0, linksPruned: 0, evidenceProcessed: 0, claimsScanned: 0 }
+        }
+
+        // Pull all evidence in the org via initiative_id.
+        const { data: evidenceRows } = await supabase
+            .from('evidence')
+            .select('id, initiative_id, date_represented, date_range_start, date_range_end')
+            .in('initiative_id', initiativeIds)
+        const evidenceList = (evidenceRows || []) as any[]
+        if (evidenceList.length === 0) {
+            return { linksCreated: 0, linksPruned: 0, evidenceProcessed: 0, claimsScanned: 0 }
+        }
+        const evidenceIds = evidenceList.map(e => e.id)
+
+        // Pre-fetch supporting data in bulk so we don't N+1.
+        const [
+            { data: kpiLinks },
+            { data: locLinks },
+            { data: existingUpdateLinks },
+            evidenceTagMap,
+            evidenceBgMap,
+        ] = await Promise.all([
+            supabase.from('evidence_kpis').select('evidence_id, kpi_id').in('evidence_id', evidenceIds),
+            supabase.from('evidence_locations').select('evidence_id, location_id').in('evidence_id', evidenceIds),
+            supabase.from('evidence_kpi_updates').select('evidence_id, kpi_update_id').in('evidence_id', evidenceIds),
+            MetricTagService.getTagIdsForEvidences(evidenceIds),
+            BeneficiaryService.getBenGroupsForEvidence(evidenceIds),
+        ])
+
+        const kpiIdsByEv: Record<string, string[]> = {}
+        ;(kpiLinks || []).forEach((l: any) => {
+            if (!kpiIdsByEv[l.evidence_id]) kpiIdsByEv[l.evidence_id] = []
+            kpiIdsByEv[l.evidence_id].push(l.kpi_id)
+        })
+        const locIdsByEv: Record<string, string[]> = {}
+        ;(locLinks || []).forEach((l: any) => {
+            if (!locIdsByEv[l.evidence_id]) locIdsByEv[l.evidence_id] = []
+            locIdsByEv[l.evidence_id].push(l.location_id)
+        })
+        const existingByEv: Record<string, Set<string>> = {}
+        ;(existingUpdateLinks || []).forEach((l: any) => {
+            if (!existingByEv[l.evidence_id]) existingByEv[l.evidence_id] = new Set()
+            existingByEv[l.evidence_id].add(l.kpi_update_id)
+        })
+
+        // Pull every claim for these initiatives once (org-scoped).
+        const { data: kpisRows } = await supabase
+            .from('kpis')
+            .select('id')
+            .in('initiative_id', initiativeIds)
+        const kpiIds = (kpisRows || []).map((k: any) => k.id)
+        const { data: claimRows } = await supabase
+            .from('kpi_updates')
+            .select('id, kpi_id, location_id, date_represented, date_range_start, date_range_end')
+            .in('kpi_id', kpiIds.length > 0 ? kpiIds : ['00000000-0000-0000-0000-000000000000'])
+        const claims = (claimRows || []) as any[]
+        const claimIds = claims.map(c => c.id)
+
+        const [updateBgMap, updateTagMap] = claimIds.length > 0
+            ? await Promise.all([
+                BeneficiaryService.getBenGroupsForUpdates(claimIds),
+                MetricTagService.getTagIdsForUpdates(claimIds),
+            ])
+            : [{} as Record<string, string[]>, {} as Record<string, string | null>]
+
+        const claimsByKpi: Record<string, any[]> = {}
+        claims.forEach(c => {
+            if (!claimsByKpi[c.kpi_id]) claimsByKpi[c.kpi_id] = []
+            claimsByKpi[c.kpi_id].push(c)
+        })
+
+        const datesOverlap = (s1: string, e1: string | null, s2: string, e2: string | null): boolean => {
+            const end1 = e1 || s1
+            const end2 = e2 || s2
+            return s1 <= end2 && s2 <= end1
+        }
+
+        const linksToCreate: { evidence_id: string; kpi_update_id: string; user_id: string }[] = []
+        const linksToPrune: { evidence_id: string; kpi_update_id: string }[] = []
+
+        for (const ev of evidenceList) {
+            const kpiIdList = kpiIdsByEv[ev.id] || []
+            const evLocIds = locIdsByEv[ev.id] || []
+            const evTagIds = evidenceTagMap[ev.id] || []
+            const evBgIds = evidenceBgMap[ev.id] || []
+            const evStart = (ev.date_range_start || ev.date_represented || '') as string
+            const evEnd = (ev.date_range_end || null) as string | null
+            const alreadyLinked = existingByEv[ev.id] || new Set<string>()
+
+            // Candidate claims = union of every KPI this evidence is linked to.
+            const candidateClaims: any[] = []
+            for (const kid of kpiIdList) {
+                const list = claimsByKpi[kid]
+                if (list) candidateClaims.push(...list)
+            }
+
+            for (const claim of candidateClaims) {
+                const claimStart = (claim.date_range_start || claim.date_represented || '') as string
+                const claimEnd = (claim.date_range_end || null) as string | null
+                const passes =
+                    !!evStart && !!claimStart &&
+                    datesOverlap(evStart, evEnd, claimStart, claimEnd) &&
+                    !!claim.location_id && evLocIds.includes(claim.location_id) &&
+                    BeneficiaryService.beneficiaryGroupsMatch(updateBgMap[claim.id] || [], evBgIds) &&
+                    MetricTagService.evidenceMatchesClaimTag(updateTagMap[claim.id] ?? null, evTagIds)
+
+                if (passes && !alreadyLinked.has(claim.id)) {
+                    linksToCreate.push({ evidence_id: ev.id, kpi_update_id: claim.id, user_id: userId })
+                }
+            }
+
+            // Prune any existing link that fails the current gates.
+            for (const linkedClaimId of alreadyLinked) {
+                const claim = claims.find(c => c.id === linkedClaimId)
+                if (!claim) continue // claim deleted — let FK handle it
+                const claimStart = (claim.date_range_start || claim.date_represented || '') as string
+                const claimEnd = (claim.date_range_end || null) as string | null
+                const stillValid =
+                    !!evStart && !!claimStart &&
+                    datesOverlap(evStart, evEnd, claimStart, claimEnd) &&
+                    !!claim.location_id && evLocIds.includes(claim.location_id) &&
+                    BeneficiaryService.beneficiaryGroupsMatch(updateBgMap[claim.id] || [], evBgIds) &&
+                    MetricTagService.evidenceMatchesClaimTag(updateTagMap[claim.id] ?? null, evTagIds)
+                if (!stillValid) {
+                    linksToPrune.push({ evidence_id: ev.id, kpi_update_id: claim.id })
+                }
+            }
+        }
+
+        // Bulk apply mutations.
+        if (linksToCreate.length > 0) {
+            // Insert in chunks to stay under PostgREST's row limit.
+            for (let i = 0; i < linksToCreate.length; i += 500) {
+                const chunk = linksToCreate.slice(i, i + 500)
+                const { error } = await supabase.from('evidence_kpi_updates').insert(chunk)
+                if (error) console.error('backfill insert error:', error.message)
+            }
+        }
+
+        for (const stale of linksToPrune) {
+            await supabase
+                .from('evidence_kpi_updates')
+                .delete()
+                .eq('evidence_id', stale.evidence_id)
+                .eq('kpi_update_id', stale.kpi_update_id)
+        }
+
+        return {
+            linksCreated: linksToCreate.length,
+            linksPruned: linksToPrune.length,
+            evidenceProcessed: evidenceList.length,
+            claimsScanned: claims.length,
         }
     }
 } 

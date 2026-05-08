@@ -450,14 +450,20 @@ export class KPIService {
 
             if (matchingEvidenceIds.length === 0) return
 
-            // Ben group scoping: filter by beneficiary group compatibility
+            // Scoping gates: ben groups + tags. Both must pass.
             const updateId = update.id!
-            const claimBenGroups = await BeneficiaryService.getBenGroupsForUpdates([updateId])
+            const [claimBenGroups, evidenceBenGroups, claimTagId, evidenceTagsByEv] = await Promise.all([
+                BeneficiaryService.getBenGroupsForUpdates([updateId]),
+                BeneficiaryService.getBenGroupsForEvidence(matchingEvidenceIds),
+                MetricTagService.getTagIdForUpdate(updateId),
+                MetricTagService.getTagIdsForEvidences(matchingEvidenceIds),
+            ])
             const claimGroupIds = claimBenGroups[updateId] || []
-            const evidenceBenGroups = await BeneficiaryService.getBenGroupsForEvidence(matchingEvidenceIds)
             const benGroupFilteredIds = matchingEvidenceIds.filter(evId => {
                 const evGroupIds = evidenceBenGroups[evId] || []
-                return BeneficiaryService.beneficiaryGroupsMatch(claimGroupIds, evGroupIds)
+                if (!BeneficiaryService.beneficiaryGroupsMatch(claimGroupIds, evGroupIds)) return false
+                const evTagIds = evidenceTagsByEv[evId] || []
+                return MetricTagService.evidenceMatchesClaimTag(claimTagId, evTagIds)
             })
 
             if (benGroupFilteredIds.length === 0) return
@@ -624,14 +630,97 @@ export class KPIService {
             await MetricTagService.setTagForUpdate(id, tag_id || null, data.kpi_id)
         }
 
-        // Re-run auto-link if date or location changed (might match new evidence)
-        const dateOrLocationChanged =
+        // Whether any field that affects evidence-claim matching changed.
+        // Each of these can break an existing link; we prune all 4 gates here
+        // so the coverage % is correct without needing the user to re-save.
+        const matchingFieldChanged =
             'date_represented' in updateData ||
             'date_range_start' in updateData ||
             'date_range_end' in updateData ||
-            'location_id' in updateData
+            'location_id' in updateData ||
+            beneficiary_group_ids !== undefined ||
+            tag_id !== undefined
 
-        if (dateOrLocationChanged) {
+        if (matchingFieldChanged) {
+            // Pull the freshest version of the claim (post-update) so prune uses
+            // the new tag/ben group/date/location values.
+            const { data: linksRows } = await supabase
+                .from('evidence_kpi_updates')
+                .select('evidence_id')
+                .eq('kpi_update_id', id)
+            const linkedEvidenceIds = (linksRows || []).map((l: any) => l.evidence_id)
+
+            if (linkedEvidenceIds.length > 0) {
+                const newClaimTagId = tag_id !== undefined
+                    ? (tag_id || null)
+                    : await MetricTagService.getTagIdForUpdate(id)
+                const newClaimBenGroups = beneficiary_group_ids !== undefined
+                    ? (Array.isArray(beneficiary_group_ids) ? beneficiary_group_ids : [])
+                    : (await BeneficiaryService.getBenGroupsForUpdates([id]))[id] || []
+                const claimStart = (data.date_range_start || data.date_represented || '') as string
+                const claimEnd = (data.date_range_end || null) as string | null
+                const claimLocId = data.location_id as string | null
+
+                const [
+                    evidenceTagsByEv,
+                    evidenceBgByEv,
+                    { data: evidenceRows },
+                    { data: evidenceLocLinks },
+                ] = await Promise.all([
+                    MetricTagService.getTagIdsForEvidences(linkedEvidenceIds),
+                    BeneficiaryService.getBenGroupsForEvidence(linkedEvidenceIds),
+                    supabase
+                        .from('evidence')
+                        .select('id, date_represented, date_range_start, date_range_end')
+                        .in('id', linkedEvidenceIds),
+                    supabase
+                        .from('evidence_locations')
+                        .select('evidence_id, location_id')
+                        .in('evidence_id', linkedEvidenceIds),
+                ])
+
+                const evById = new Map<string, any>()
+                ;(evidenceRows || []).forEach((e: any) => evById.set(e.id, e))
+                const locsByEv: Record<string, string[]> = {}
+                ;(evidenceLocLinks || []).forEach((l: any) => {
+                    if (!locsByEv[l.evidence_id]) locsByEv[l.evidence_id] = []
+                    locsByEv[l.evidence_id].push(l.location_id)
+                })
+
+                const datesOverlap = (
+                    s1: string, e1: string | null,
+                    s2: string, e2: string | null
+                ): boolean => {
+                    const end1 = e1 || s1
+                    const end2 = e2 || s2
+                    return s1 <= end2 && s2 <= end1
+                }
+
+                const staleEvidenceIds = linkedEvidenceIds.filter(evId => {
+                    const ev = evById.get(evId)
+                    if (!ev) return true // evidence row gone -> link is stale
+                    const evStart = (ev.date_range_start || ev.date_represented || '') as string
+                    const evEnd = (ev.date_range_end || null) as string | null
+                    if (!evStart || !claimStart) return true
+                    if (!datesOverlap(evStart, evEnd, claimStart, claimEnd)) return true
+                    const evLocs = locsByEv[evId] || []
+                    if (claimLocId && !evLocs.includes(claimLocId)) return true
+                    if (!BeneficiaryService.beneficiaryGroupsMatch(newClaimBenGroups, evidenceBgByEv[evId] || [])) return true
+                    if (!MetricTagService.evidenceMatchesClaimTag(newClaimTagId, evidenceTagsByEv[evId] || [])) return true
+                    return false
+                })
+
+                if (staleEvidenceIds.length > 0) {
+                    await supabase
+                        .from('evidence_kpi_updates')
+                        .delete()
+                        .eq('kpi_update_id', id)
+                        .in('evidence_id', staleEvidenceIds)
+                    console.log(`Pruned ${staleEvidenceIds.length} stale evidence link(s) on claim ${id}`)
+                }
+            }
+
+            // Re-run auto-link to discover newly-matching evidence after the change.
             await this.autoLinkEvidenceToUpdate(data, userId)
         }
 
@@ -705,14 +794,18 @@ export class KPIService {
             evidenceUpdateLinks = data
         }
 
-        // Batch-fetch ben groups for read-time scoping filter
+        // Batch-fetch ben groups + tags for read-time scoping filters
         const evidenceIds = evidence.map((e: any) => e.id).filter(Boolean)
         let updateBenGroupMap: Record<string, string[]> = {}
         let evidenceBenGroupMap: Record<string, string[]> = {}
+        let updateTagMap: Record<string, string | null> = {}
+        let evidenceTagMap: Record<string, string[]> = {}
         if (updateIds.length > 0 && evidenceIds.length > 0) {
-            ;[updateBenGroupMap, evidenceBenGroupMap] = await Promise.all([
+            ;[updateBenGroupMap, evidenceBenGroupMap, updateTagMap, evidenceTagMap] = await Promise.all([
                 BeneficiaryService.getBenGroupsForUpdates(updateIds),
-                BeneficiaryService.getBenGroupsForEvidence(evidenceIds)
+                BeneficiaryService.getBenGroupsForEvidence(evidenceIds),
+                MetricTagService.getTagIdsForUpdates(updateIds),
+                MetricTagService.getTagIdsForEvidences(evidenceIds),
             ])
         }
 
@@ -733,11 +826,14 @@ export class KPIService {
 
             const explicitEvidence = evidence.filter((e: any) => explicitEvidenceIds.has(e.id))
 
-            // Read-time ben group scoping: only keep evidence that's compatible with this update's groups
+            // Read-time scoping: keep evidence that passes both ben-group AND tag gates.
             const updateGroupIds = updateBenGroupMap[update.id] || []
+            const updateTagId = updateTagMap[update.id] || null
             const relevantEvidence = explicitEvidence.filter((e: any) => {
                 const evGroupIds = evidenceBenGroupMap[e.id] || []
-                return BeneficiaryService.beneficiaryGroupsMatch(updateGroupIds, evGroupIds)
+                if (!BeneficiaryService.beneficiaryGroupsMatch(updateGroupIds, evGroupIds)) return false
+                const evTagIds = evidenceTagMap[e.id] || []
+                return MetricTagService.evidenceMatchesClaimTag(updateTagId, evTagIds)
             })
 
             // Calculate completion percentage for this data point

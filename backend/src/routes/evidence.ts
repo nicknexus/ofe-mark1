@@ -32,6 +32,21 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     }
 });
 
+// Recompute evidence-claim links for the active org under the current
+// matching rules (date overlap + location + ben groups + tag). Idempotent —
+// safe to call repeatedly. Used to backfill historical data when the rules
+// change (e.g. tag-gate rollout) or as a manual "rebuild links" action.
+router.post('/backfill-links', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const result = await EvidenceService.backfillLinksForOrg(req.user!.id, requestedOrgId);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+        return;
+    }
+});
+
 // Get evidence statistics - MUST come before /:id route
 router.get('/stats/by-type', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {

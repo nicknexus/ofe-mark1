@@ -18,8 +18,24 @@ import {
     BarChart3,
     Palette,
     Image as ImageIcon,
-    FileText
+    FileText,
+    GripVertical
 } from 'lucide-react'
+import {
+    DndContext,
+    closestCenter,
+    MouseSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent,
+} from '@dnd-kit/core'
+import {
+    arrayMove,
+    SortableContext,
+    useSortable,
+    verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { apiService } from '../services/api'
 import { Initiative, LoadingState, CreateInitiativeForm, KPI, Location, OrganizationContext } from '../types'
 import { formatDate, truncateText } from '../utils'
@@ -31,6 +47,110 @@ import TagsWidget from '../components/MetricTags/TagsWidget'
 import { ExternalLink } from 'lucide-react'
 import { useTutorial } from '../context/TutorialContext'
 import { useTeam } from '../context/TeamContext'
+
+// ============ Sortable initiative card ============
+// Owner/team can drag-reorder initiatives on the dashboard. Order is persisted
+// to the backend (display_order) and reflected on the public org page.
+function SortableInitiativeCard({
+    initiative,
+    canManageInitiatives,
+    openEditModal,
+    openDeleteConfirm,
+}: {
+    initiative: Initiative
+    canManageInitiatives: boolean
+    openEditModal: (i: Initiative) => void
+    openDeleteConfirm: (i: Initiative) => void
+}) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: initiative.id! })
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        zIndex: isDragging ? 10 : 'auto' as const,
+    }
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className="group bg-gradient-to-br from-white to-gray-50/40 hover:from-primary-50/40 hover:to-primary-50/10 border border-gray-100 hover:border-primary-200/70 rounded-2xl p-3.5 transition-all duration-200 relative"
+        >
+            <Link to={`/initiatives/${initiative.id}`} className="block">
+                <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-white ring-1 ring-gray-200/70 shadow-sm flex items-center justify-center flex-shrink-0 group-hover:ring-primary-200/70 transition-colors">
+                            <img src="/Nexuslogo.png" alt="Nexus Logo" className="w-5 h-5 object-contain" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-semibold text-gray-800 group-hover:text-primary-600 transition-colors truncate">
+                                {initiative.title}
+                            </h3>
+                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+                                {truncateText(initiative.description, 60)}
+                            </p>
+                        </div>
+                    </div>
+                    <span className="text-primary-500 text-sm font-medium group-hover:translate-x-0.5 transition-transform flex-shrink-0 ml-2">
+                        →
+                    </span>
+                </div>
+            </Link>
+
+            {/* Edit/Delete buttons - top right (any team member). */}
+            {canManageInitiatives && (
+                <div className="absolute top-2 right-8 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
+                    <button
+                        onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            openEditModal(initiative)
+                        }}
+                        className="p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
+                        title="Edit Initiative"
+                    >
+                        <Edit className="w-3 h-3 text-gray-500" />
+                    </button>
+                    <button
+                        onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            openDeleteConfirm(initiative)
+                        }}
+                        className="p-1.5 bg-white border border-red-200 rounded-lg shadow-sm hover:bg-red-50 hover:border-red-300 transition-all duration-200"
+                        title="Delete Initiative"
+                    >
+                        <Trash2 className="w-3 h-3 text-red-500" />
+                    </button>
+                </div>
+            )}
+
+            {/* Drag handle - bottom right, desktop only (MouseSensor excludes touch).
+                Hidden until hover so it doesn't fight the rest of the layout. */}
+            {canManageInitiatives && (
+                <button
+                    type="button"
+                    {...attributes}
+                    {...listeners}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
+                    className="hidden md:flex absolute bottom-2 right-2 p-1 rounded-md text-gray-300 hover:text-gray-500 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+                    title="Drag to reorder"
+                    aria-label="Drag to reorder initiative"
+                >
+                    <GripVertical className="w-3.5 h-3.5" />
+                </button>
+            )}
+        </div>
+    )
+}
 
 // ============ Small widgets ============
 function scoreColor(pct: number): string {
@@ -287,6 +407,38 @@ export default function Dashboard() {
         loadingPromise.current = loadAllData()
     }, [dashboardOrg?.id])
 
+    // One-time backfill of evidence ↔ claim links per browser per org.
+    // Catches up historical data created before the tag-gate rule (or other
+    // matching changes) that wouldn't link until the user manually re-saved
+    // either side. Idempotent on the backend; we use localStorage so it
+    // really only runs once per browser/org rather than once per tab session.
+    // To force a re-run (rare), delete the key in devtools.
+    useEffect(() => {
+        if (!dashboardOrg?.id) return
+        const orgId = dashboardOrg.id
+        const storageKey = `evidence-backfill-done:${orgId}`
+        if (localStorage.getItem(storageKey)) return
+
+        apiService.backfillEvidenceLinks()
+            .then(result => {
+                localStorage.setItem(storageKey, new Date().toISOString())
+                if ((result.linksCreated > 0 || result.linksPruned > 0) && canManageInitiatives) {
+                    const created = result.linksCreated
+                    const pruned = result.linksPruned
+                    const parts: string[] = []
+                    if (created > 0) parts.push(`linked ${created} new evidence-claim pair${created === 1 ? '' : 's'}`)
+                    if (pruned > 0) parts.push(`removed ${pruned} stale link${pruned === 1 ? '' : 's'}`)
+                    toast.success(`Coverage refreshed: ${parts.join(', ')}.`, { duration: 4000 })
+                    apiService.clearCache('/kpis')
+                    apiService.clearCache('/initiatives')
+                    apiService.clearCache('/evidence')
+                }
+            })
+            .catch(err => {
+                console.warn('Evidence backfill failed (non-fatal):', err)
+            })
+    }, [dashboardOrg?.id, canManageInitiatives])
+
     useEffect(() => {
         const handleShowTutorial = () => {
             startTutorial()
@@ -437,6 +589,37 @@ export default function Dashboard() {
     const openEditModal = (initiative: Initiative) => {
         setSelectedInitiative(initiative)
         setShowEditModal(true)
+    }
+
+    // dnd-kit sensors. MouseSensor only (no TouchSensor) → drag is desktop-only.
+    // Activation distance prevents accidental drags when clicking the handle.
+    const initiativeDragSensors = useSensors(
+        useSensor(MouseSensor, { activationConstraint: { distance: 6 } })
+    )
+
+    const handleInitiativeDragEnd = async (event: DragEndEvent) => {
+        const { active, over } = event
+        if (!over || active.id === over.id) return
+        const oldIndex = initiatives.findIndex(i => i.id === active.id)
+        const newIndex = initiatives.findIndex(i => i.id === over.id)
+        if (oldIndex < 0 || newIndex < 0) return
+
+        const previous = initiatives
+        const reordered = arrayMove(initiatives, oldIndex, newIndex)
+        // Optimistic update — write the new order with fresh display_order indices.
+        const withOrder = reordered.map((init, idx) => ({ ...init, display_order: idx }))
+        setInitiatives(withOrder)
+        try {
+            await apiService.updateInitiativeOrder(
+                withOrder
+                    .filter(i => !!i.id)
+                    .map((i, idx) => ({ id: i.id!, display_order: idx }))
+            )
+        } catch (err) {
+            console.error('Failed to save initiative order:', err)
+            setInitiatives(previous)
+            toast.error('Failed to save initiative order')
+        }
     }
 
     const openDeleteConfirm = (initiative: Initiative) => {
@@ -623,66 +806,28 @@ export default function Dashboard() {
                                         )}
                                     </div>
                                 ) : (
-                                    <div className="space-y-2.5">
-                                        {initiatives.map((initiative) => (
-                                            <div
-                                                key={initiative.id}
-                                                className="group bg-gradient-to-br from-white to-gray-50/40 hover:from-primary-50/40 hover:to-primary-50/10 border border-gray-100 hover:border-primary-200/70 rounded-2xl p-3.5 transition-all duration-200 relative"
-                                            >
-                                                <Link
-                                                    to={`/initiatives/${initiative.id}`}
-                                                    className="block"
-                                                >
-                                                    <div className="flex items-start justify-between">
-                                                        <div className="flex items-center space-x-3 flex-1 min-w-0">
-                                                            <div className="w-10 h-10 rounded-xl bg-white ring-1 ring-gray-200/70 shadow-sm flex items-center justify-center flex-shrink-0 group-hover:ring-primary-200/70 transition-colors">
-                                                                <img src="/Nexuslogo.png" alt="Nexus Logo" className="w-5 h-5 object-contain" />
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <h3 className="text-sm font-semibold text-gray-800 group-hover:text-primary-600 transition-colors truncate">
-                                                                    {initiative.title}
-                                                                </h3>
-                                                                <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
-                                                                    {truncateText(initiative.description, 60)}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                        <span className="text-primary-500 text-sm font-medium group-hover:translate-x-0.5 transition-transform flex-shrink-0 ml-2">
-                                                            →
-                                                        </span>
-                                                    </div>
-                                                </Link>
-
-                                                {/* Action Buttons - any org member */}
-                                                {canManageInitiatives && (
-                                                    <div className="absolute top-2 right-8 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.preventDefault()
-                                                                e.stopPropagation()
-                                                                openEditModal(initiative)
-                                                            }}
-                                                            className="p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
-                                                            title="Edit Initiative"
-                                                        >
-                                                            <Edit className="w-3 h-3 text-gray-500" />
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.preventDefault()
-                                                                e.stopPropagation()
-                                                                openDeleteConfirm(initiative)
-                                                            }}
-                                                            className="p-1.5 bg-white border border-red-200 rounded-lg shadow-sm hover:bg-red-50 hover:border-red-300 transition-all duration-200"
-                                                            title="Delete Initiative"
-                                                        >
-                                                            <Trash2 className="w-3 h-3 text-red-500" />
-                                                        </button>
-                                                    </div>
-                                                )}
+                                    <DndContext
+                                        sensors={initiativeDragSensors}
+                                        collisionDetection={closestCenter}
+                                        onDragEnd={handleInitiativeDragEnd}
+                                    >
+                                        <SortableContext
+                                            items={initiatives.map(i => i.id!).filter(Boolean)}
+                                            strategy={verticalListSortingStrategy}
+                                        >
+                                            <div className="space-y-2.5">
+                                                {initiatives.map((initiative) => (
+                                                    <SortableInitiativeCard
+                                                        key={initiative.id}
+                                                        initiative={initiative}
+                                                        canManageInitiatives={canManageInitiatives}
+                                                        openEditModal={openEditModal}
+                                                        openDeleteConfirm={openDeleteConfirm}
+                                                    />
+                                                ))}
                                             </div>
-                                        ))}
-                                    </div>
+                                        </SortableContext>
+                                    </DndContext>
                                 )}
                             </div>
                         </div>

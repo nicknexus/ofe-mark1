@@ -430,16 +430,29 @@ export default function ExpandableKPICard({
         return claimGroupIds.some(id => evidenceGroupIds.includes(id))
     }
 
+    // Tag scoping (mirrors MetricTagService.evidenceMatchesClaimTag on the backend):
+    // untagged claim = no tag gate; tagged claim = evidence must carry that tag.
+    // This keeps the frontend in sync with the backend prune so we never display
+    // a stale "100% supported" if a link briefly survives a tag change.
+    const evidenceMatchesClaimTag = (claimTagId: string | null | undefined, evTagIds: string[]): boolean => {
+        if (!claimTagId) return true
+        if (!evTagIds || evTagIds.length === 0) return false
+        return evTagIds.includes(claimTagId)
+    }
+
     // Calculate support percentage for an impact claim based on date overlap with evidence
     const getClaimSupportPercentage = (claim: any): number => {
         if (!claim || !claim.id || !evidence || evidence.length === 0) return 0
 
         const claimGroupIds: string[] = claim.beneficiary_group_ids || []
+        const claimTagId: string | null = claim.tag_id || null
 
-        // Find all evidence linked to this claim AND matching ben group scope
+        // Find all evidence linked to this claim AND matching ben group + tag scope
         const linkedEvidence = evidence.filter((ev: any) => {
             const evGroupIds: string[] = ev.beneficiary_group_ids || []
             if (!beneficiaryGroupsMatch(claimGroupIds, evGroupIds)) return false
+            const evTagIds: string[] = ev.tag_ids || []
+            if (!evidenceMatchesClaimTag(claimTagId, evTagIds)) return false
 
             // Check new precise linking
             if (ev.kpi_update_ids && Array.isArray(ev.kpi_update_ids)) {
@@ -507,10 +520,13 @@ export default function ExpandableKPICard({
         if (!claim || !claim.id || !evidence || evidence.length === 0) return 0
 
         const claimGroupIds: string[] = claim.beneficiary_group_ids || []
+        const claimTagId: string | null = claim.tag_id || null
 
         const linkedEvidence = evidence.filter((ev: any) => {
             const evGroupIds: string[] = ev.beneficiary_group_ids || []
             if (!beneficiaryGroupsMatch(claimGroupIds, evGroupIds)) return false
+            const evTagIds: string[] = ev.tag_ids || []
+            if (!evidenceMatchesClaimTag(claimTagId, evTagIds)) return false
 
             if (ev.kpi_update_ids && Array.isArray(ev.kpi_update_ids)) {
                 return ev.kpi_update_ids.includes(claim.id)
@@ -990,6 +1006,24 @@ export default function ExpandableKPICard({
         // Create a Set of valid update IDs for this KPI only
         const validUpdateIds = new Set(kpiUpdates.map((update: any) => update.id).filter(Boolean))
 
+        // Lookup: claim id -> claim (so we can apply tag/ben group gates per claim)
+        const updateById = new Map<string, any>()
+        kpiUpdates.forEach((u: any) => { if (u.id) updateById.set(u.id, u) })
+
+        // Counts a data-point as covered only if the gates (ben group + tag) hold.
+        const tryCover = (ev: any, updateId: string) => {
+            if (!validUpdateIds.has(updateId)) return
+            const claim = updateById.get(updateId)
+            if (!claim) return
+            const claimGroupIds: string[] = claim.beneficiary_group_ids || []
+            const evGroupIds: string[] = ev.beneficiary_group_ids || []
+            if (!beneficiaryGroupsMatch(claimGroupIds, evGroupIds)) return
+            const claimTagId: string | null = claim.tag_id || null
+            const evTagIds: string[] = ev.tag_ids || []
+            if (!evidenceMatchesClaimTag(claimTagId, evTagIds)) return
+            dataPointsCoveredByType[ev.type as keyof typeof dataPointsCoveredByType].add(updateId)
+        }
+
         // Go through each evidence item and track which data points it covers
         evidence.forEach((ev: any) => {
             if (!ev.type || !dataPointsCoveredByType.hasOwnProperty(ev.type)) return
@@ -997,27 +1031,15 @@ export default function ExpandableKPICard({
             // Get data points covered by this evidence
             // Check if evidence has kpi_update_ids (new precise linking)
             if (ev.kpi_update_ids && Array.isArray(ev.kpi_update_ids)) {
-                ev.kpi_update_ids.forEach((updateId: string) => {
-                    // Only count updates that belong to THIS KPI
-                    if (validUpdateIds.has(updateId)) {
-                        dataPointsCoveredByType[ev.type as keyof typeof dataPointsCoveredByType].add(updateId)
-                    }
-                })
+                ev.kpi_update_ids.forEach((updateId: string) => tryCover(ev, updateId))
             } else if (ev.evidence_kpi_updates && Array.isArray(ev.evidence_kpi_updates)) {
-                // Alternative: check if evidence has nested evidence_kpi_updates
                 ev.evidence_kpi_updates.forEach((link: any) => {
-                    if (link.kpi_update_id && validUpdateIds.has(link.kpi_update_id)) {
-                        // Only count updates that belong to THIS KPI
-                        dataPointsCoveredByType[ev.type as keyof typeof dataPointsCoveredByType].add(link.kpi_update_id)
-                    }
+                    if (link.kpi_update_id) tryCover(ev, link.kpi_update_id)
                 })
             } else if (kpi.id && ev.kpi_ids?.includes(kpi.id)) {
-                // Legacy: if evidence is linked to the KPI (not specific updates), 
-                // it covers all data points for this KPI
+                // Legacy KPI-only link: cover every data-point that passes the gates.
                 kpiUpdates.forEach((update: any) => {
-                    if (update.id) {
-                        dataPointsCoveredByType[ev.type as keyof typeof dataPointsCoveredByType].add(update.id)
-                    }
+                    if (update.id) tryCover(ev, update.id)
                 })
             }
         })

@@ -155,12 +155,14 @@ export class InitiativeService {
             return [];
         }
 
-        // Fetch all initiatives for the organization
+        // Fetch all initiatives for the organization, honoring custom drag-and-drop ordering.
+        // Falls back to creation order for ties (e.g. backfill defaults).
         const { data, error } = await supabase
             .from('initiatives')
             .select('*')
             .eq('organization_id', organizationId)
-            .order('created_at', { ascending: false });
+            .order('display_order', { ascending: true })
+            .order('created_at', { ascending: true });
 
         if (error) throw new Error(`Failed to fetch initiatives: ${error.message}`);
         return data || [];
@@ -249,4 +251,44 @@ export class InitiativeService {
 
         if (error) throw new Error(`Failed to delete initiative: ${error.message}`);
     }
-} 
+
+    /**
+     * Bulk-update display_order for a list of initiatives.
+     * Org-scoped: any team member of the resolved org can reorder.
+     * Silently drops ids that don't belong to the user's effective org.
+     */
+    static async updateOrder(
+        order: Array<{ id: string; display_order: number }>,
+        userId: string,
+        requestedOrgId?: string
+    ): Promise<void> {
+        const organizationId = await this.getEffectiveOrganizationId(userId, requestedOrgId);
+        if (!organizationId) {
+            throw new Error('No organization context');
+        }
+
+        // Validate every id belongs to this org before issuing updates.
+        const ids = order.map(o => o.id);
+        if (ids.length === 0) return;
+
+        const { data: owned, error: fetchError } = await supabase
+            .from('initiatives')
+            .select('id')
+            .eq('organization_id', organizationId)
+            .in('id', ids);
+        if (fetchError) throw new Error(`Failed to validate initiatives: ${fetchError.message}`);
+
+        const allowedIds = new Set((owned || []).map((i: { id: string }) => i.id));
+        const updates = order
+            .filter(item => allowedIds.has(item.id))
+            .map(item =>
+                supabase
+                    .from('initiatives')
+                    .update({ display_order: item.display_order })
+                    .eq('id', item.id)
+                    .eq('organization_id', organizationId)
+            );
+
+        await Promise.all(updates);
+    }
+}

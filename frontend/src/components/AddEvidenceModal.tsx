@@ -914,13 +914,29 @@ export default function AddEvidenceModal({
                     </div>
                         )}
 
-                        {/* Step 3: Tags (optional) */}
+                        {/* Step 3: Tags (optional, but load-bearing) */}
                         {currentStep === 3 && (
                             <div className="space-y-3 animate-fade-in max-w-3xl mx-auto">
                                 <div className="text-center mb-1">
                                     <h3 className="text-lg font-semibold text-gray-900">Tags</h3>
-                                    <p className="text-gray-500 text-xs">Pick any tags to associate with this evidence. Optional.</p>
+                                    <p className="text-gray-500 text-xs">Pick the tags this evidence supports. Required if your impact claims are tagged.</p>
                                 </div>
+
+                                {/* Soft warning when no tags selected — evidence won't support
+                                    tagged claims without matching tags. */}
+                                {selectedTagIds.length === 0 && (() => {
+                                    const selectedKpis = availableKPIs.filter(k => (formData.kpi_ids || []).includes(k.id!))
+                                    const anyMetricTagged = selectedKpis.some(k => Array.isArray((k as any).tag_ids) && ((k as any).tag_ids as string[]).length > 0)
+                                    if (!anyMetricTagged) return null
+                                    return (
+                                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900">
+                                            <p className="font-medium mb-0.5">Untagged evidence won't support tagged impact claims.</p>
+                                            <p className="text-amber-800/90">
+                                                Add the tags this evidence proves (e.g. <em>Grade 1, Grade 2</em>) so it auto-links to matching claims. Skip only if your claims are untagged.
+                                            </p>
+                                        </div>
+                                    )
+                                })()}
 
                                 <TagPicker
                                     mode="multi-grouped"
@@ -938,7 +954,7 @@ export default function AddEvidenceModal({
                                         }))
                                     })()}
                                     canCreate={false}
-                                    helperText="Tags shown are pulled from the metrics you selected. You can skip this step."
+                                    helperText="Tags shown are pulled from the metrics you selected. Pick the ones this evidence covers."
                                 />
 
                                 {selectedTagIds.length > 0 && (() => {

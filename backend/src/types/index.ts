@@ -71,6 +71,7 @@ export interface Initiative {
     created_at?: string;
     updated_at?: string;
     user_id?: string;
+    display_order?: number;
 }
 
 export interface UmbrellaKPI {
