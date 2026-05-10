@@ -99,6 +99,7 @@ initiative slugs in new seed code.
 
 - `GET    /api/admin/demos`              list all demos (every admin sees all)
 - `POST   /api/admin/demos`              create + seed. Body: `{ name, brand_color?, description? }`
+- `POST   /api/admin/demos/generate-from-url` create a demo from a public website via Firecrawl + OpenAI. Body: `{ website_url, name? }`
 - `PATCH  /api/admin/demos/:id`          update name/description/statement/brand_color/logo_url/website_url/donation_url/demo_public_share. Mirrors `demo_public_share` → `is_public`.
 - `DELETE /api/admin/demos/:id`          hard-delete (FK cascade).
 - `POST   /api/admin/demos/:id/clone`    deep-clone org + initiatives + KPIs + updates + locations + beneficiary groups + stories + story_beneficiaries + organization_context.
@@ -204,12 +205,16 @@ everything scopes to the demo from there.
 ## Creating demos — UX flow
 
 1. Admin clicks **Demos** in top nav → `/admin/demos`.
-2. Clicks **New demo**, enters a name → `POST /api/admin/demos`.
+2. Clicks **New demo**.
+   - **Generate from website**: enters a URL, optionally overrides the name → `POST /api/admin/demos/generate-from-url`.
+   - **Manual seed**: enters a name → `POST /api/admin/demos`.
 3. Backend creates org with `is_public=true, is_demo=true, demo_public_share=true`,
-   adds the admin to `user_organizations` as owner, and seeds baseline
-   content via `DemoSeedService.seed`. Seed failures are logged but not
-   fatal — the empty org is still usable.
-4. Demo appears in the list. Admin can: **Open** (enter editing view),
+   adds the admin to `user_organizations` as owner, and seeds content.
+   Manual demos use `DemoSeedService.seed`. Website demos scrape a small
+   set of high-signal public pages, generate synthetic draft data, and
+   persist only normal app rows (no raw scraped text).
+4. Generated demos open directly in the dashboard for review/editing.
+   Manual demos appear in the list. Admin can: **Open** (enter editing view),
    **Rename**, toggle **Share**, **Copy link**, open **Public page**,
    **Clone**, or **Delete**.
 5. Inside a demo the entire app behaves as if the demo is your org.
