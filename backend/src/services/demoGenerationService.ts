@@ -45,7 +45,7 @@ const DEFAULT_MAX_PAGES = 5;
 const MAX_PAGE_MARKDOWN_CHARS = 6000;
 const MAX_TOTAL_CONTEXT_CHARS = 26000;
 const MIN_TOTAL_CONTEXT_CHARS = 1500;
-const DEFAULT_MODEL = 'gpt-4o-mini';
+const DEFAULT_MODEL = 'gpt-5.4-nano';
 
 const HIGH_SIGNAL_PATTERNS = [
     /about/i,
@@ -644,39 +644,37 @@ function safeDate(value: unknown, index: number): string {
     return raw;
 }
 
-// Distribute update dates so they don't cluster. Newest ~2 months ago, oldest ~24 months ago.
+// Redistribute update dates so charts look natural and always have data in the current month.
+// Newest update lands on day 1 of the current month (no jitter applied to it), oldest ≈ 170 days ago.
 function distributeUpdateDates<T extends { date_represented: string }>(updates: T[]): T[] {
     if (updates.length <= 1) return updates;
+
     const today = new Date();
-    const monthsBack = (offset: number) => {
-        const d = new Date(today);
-        d.setDate(15);
-        d.setMonth(d.getMonth() - offset);
-        return d.toISOString().slice(0, 10);
-    };
-
+    const n = updates.length;
     const sorted = [...updates].sort((a, b) => (a.date_represented < b.date_represented ? -1 : 1));
-    const dateSet = new Set(sorted.map((u) => u.date_represented));
-    const tooClustered = dateSet.size < sorted.length * 0.7;
-    if (!tooClustered && sorted.length === updates.length) {
-        // model produced distinct enough dates already — trust it
-        const minDate = sorted[0].date_represented;
-        const maxDate = sorted[sorted.length - 1].date_represented;
-        const spanMonths = (() => {
-            const a = new Date(minDate); const b = new Date(maxDate);
-            return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
-        })();
-        if (spanMonths >= 6) return updates;
-    }
 
-    // Otherwise, evenly redistribute newest→oldest across 2..24 months ago
-    const newestMonths = 2;
-    const oldestMonths = Math.max(newestMonths + 6, Math.min(30, 6 * updates.length));
-    const step = (oldestMonths - newestMonths) / Math.max(1, updates.length - 1);
-    return updates.map((u, i) => ({
-        ...u,
-        date_represented: monthsBack(Math.round(newestMonths + i * step)),
-    }));
+    const oldestDaysAgo = 170;
+    // Anchor newest update to day 1 of the current month so graphs never show a current-month gap.
+    const newestDaysAgo = today.getDate() - 1; // 0 on the 1st, 9 on the 10th, etc.
+    const span = oldestDaysAgo - newestDaysAgo;
+    const slotSize = span / Math.max(1, n - 1);
+    const maxJitter = Math.min(slotSize * 0.35, 10);
+
+    return sorted.map((u, i) => {
+        const isNewest = i === n - 1;
+        const t = n === 1 ? 0 : i / (n - 1);
+        const baseDaysAgo = oldestDaysAgo - t * span;
+        // No jitter on the newest point — keeps it firmly within the current month.
+        const jitter = isNewest ? 0 : (Math.random() * 2 - 1) * maxJitter;
+        const daysAgo = Math.round(Math.max(newestDaysAgo, Math.min(oldestDaysAgo, baseDaysAgo + jitter)));
+
+        const d = new Date(today);
+        d.setDate(d.getDate() - daysAgo);
+        return {
+            ...u,
+            date_represented: d.toISOString().slice(0, 10),
+        };
+    });
 }
 
 function clampIndex(value: unknown, length: number): number {
@@ -1147,7 +1145,7 @@ export class DemoGenerationService {
         const completion = await openai!.chat.completions.create({
             model,
             temperature: 0.7,
-            max_tokens: 8000,
+            max_completion_tokens: 8000,
             response_format: {
                 type: 'json_schema',
                 json_schema: {
@@ -1164,6 +1162,7 @@ export class DemoGenerationService {
                         'Your top priority is generating rich, plausible IMPACT DATA: metrics with multiple historical updates (the "impact claims"), specific real-coordinate locations, and well-defined beneficiary groups.',
                         'Use the scraped website to infer the organization, mission, program themes, geographic service areas, and target beneficiaries.',
                         'All metric values, beneficiary numbers, dates, and story details are dummy demo data, not factual claims about the real organization.',
+                        'Write detailed, substantive descriptions throughout — organization description (3-5 sentences covering mission, approach, and geography), problem statement (3-4 sentences on the root cause and scale), theory of change (3-4 sentences linking inputs to long-term impact), initiative description (3-4 sentences on what the program does and who it serves), beneficiary group descriptions (2-3 sentences on who they are and why they need support), metric descriptions (2-3 sentences explaining what is measured and why it matters), and stories (3-5 sentences with specific detail — setting, challenge overcome, outcome).',
                         'Do not invent real person names. Use group-level story language.',
                         'Use only dates on or before today.',
                         'Return only the JSON object required by the schema.',
@@ -1185,8 +1184,8 @@ export class DemoGenerationService {
                         '- METRICS: 4-6 metrics, balanced across input/output/impact categories.',
                         '- METRIC UPDATES (impact claims): EACH METRIC MUST HAVE 4 to 6 updates. These are the historical impact claims and the most important data.',
                         `  Date rules — VERY IMPORTANT: spread updates across time. The most recent update should be roughly 1-3 months before today (${todayString()}). The earliest update should be at least 18-30 months ago. Use a roughly quarterly cadence between them. NEVER put two updates on the same exact date and NEVER cluster them within the same week. Example pattern for 5 updates if today is 2026-05-10: 2026-03-15, 2025-11-10, 2025-07-20, 2025-03-05, 2024-09-12.`,
-                        '  Vary the values too — show realistic growth or seasonality, not flat or random numbers. Each update needs a descriptive label (e.g. "Q1 2026 enrollment", "Spring 2025 cohort"), a short contextual note, and the appropriate location_index + beneficiary_group_indexes.',
-                        '- 1-2 text-only stories',
+                        '  Vary the values too — show realistic growth or seasonality, not flat or random numbers. Each update needs a descriptive label (e.g. "Q1 2026 enrollment", "Spring 2025 cohort"), a note of 1-2 full sentences providing context for that data point (e.g. what drove the change, seasonal factors, a specific milestone), and the appropriate location_index + beneficiary_group_indexes.',
+                        '- 1-2 text-only stories (each 3-5 sentences: set the scene, describe a real challenge faced, explain how the program helped, and state the concrete outcome)',
                         '- no evidence records or uploaded files',
                         '',
                         'For percentage metrics, values must be 0-100. For number metrics, use realistic absolute counts.',
