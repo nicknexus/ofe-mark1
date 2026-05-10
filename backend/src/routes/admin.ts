@@ -118,14 +118,32 @@ router.post('/demos', async (req: AuthenticatedRequest, res) => {
  * Body: { website_url: string; name?: string }
  */
 router.post('/demos/generate-from-url', async (req: AuthenticatedRequest, res) => {
+    const startedAt = Date.now();
+    const rawUrl = typeof req.body?.website_url === 'string' ? req.body.website_url : '<missing>';
+    const rawName = typeof req.body?.name === 'string' ? req.body.name : '';
+    console.log(`[admin] [${new Date().toISOString()}] generate-from-url received`, {
+        userId: req.user!.id,
+        websiteUrl: rawUrl,
+        name: rawName || null,
+    });
     try {
         const demo = await DemoGenerationService.generateFromWebsite(req.user!.id, {
             website_url: req.body?.website_url,
             name: req.body?.name,
         });
+        console.log(`[admin] [${new Date().toISOString()}] generate-from-url ok`, {
+            ms: Date.now() - startedAt,
+            organizationId: (demo as any)?.id ?? (demo as any)?.organization?.id ?? null,
+        });
         res.status(201).json(demo);
     } catch (error) {
-        console.error('[admin] generate demo error:', error);
+        console.error(`[admin] [${new Date().toISOString()}] generate-from-url FAILED`, {
+            ms: Date.now() - startedAt,
+            websiteUrl: rawUrl,
+            code: error instanceof DemoGenerationError ? error.code : 'unknown',
+            status: error instanceof DemoGenerationError ? error.status : 500,
+            message: error instanceof Error ? error.message : String(error),
+        });
         if (error instanceof DemoGenerationError) {
             res.status(error.status).json({
                 error: error.publicMessage,
