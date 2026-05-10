@@ -192,7 +192,7 @@ export default function PublicImpactClaimPage() {
                             value={dateFilter}
                             onChange={setDateFilter}
                             maxDate={getLocalDateString(new Date())}
-                            placeholder="Filter by date"
+                            placeholder="Date"
                             className="w-auto"
                         />
                         <Link to="/" className="flex items-center gap-2">

@@ -92,7 +92,9 @@ export default function PublicOrganizationPage() {
     const initiativeBtnRef = useRef<HTMLButtonElement>(null)
     const locationBtnRef = useRef<HTMLButtonElement>(null)
 
-    // Location popups state
+    // Location popups state. `rightAnchored` flips CSS to use `right` instead of
+    // `left`, so popups in the right band hug the right edge cleanly without
+    // bleeding off-screen when the label is long.
     const [activePopups, setActivePopups] = useState<Array<{
         id: string
         name: string
@@ -100,6 +102,7 @@ export default function PublicOrganizationPage() {
         initiative_slug?: string
         top: number
         left: number
+        rightAnchored: boolean
     }>>([])
 
     useEffect(() => {
@@ -305,58 +308,73 @@ export default function PublicOrganizationPage() {
         return filtered
     }, [locations, selectedInitiative, selectedLocationIds])
 
-    // Random location popups effect
+    // Random location popups effect.
+    // Mobile gets fewer concurrent popups, slower cadence, and collision-aware
+    // placement so long location names don't stack on top of each other.
     useEffect(() => {
         if (activeView !== 'globe' || filteredLocations.length === 0) return
 
-        const spawnPopup = () => {
-            const randomLocation = filteredLocations[Math.floor(Math.random() * filteredLocations.length)]
-            const popupId = `${randomLocation.id}-${Date.now()}`
+        const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+        const maxConcurrent = isMobile ? 2 : 5
+        const spawnIntervalMs = isMobile ? 4500 : 3000
+        const popupTtlMs = isMobile ? 5500 : 7000
+        // Approximate footprint in % of container — wider on mobile because the
+        // container is narrower so each popup occupies a bigger fraction.
+        const minHorizontalGap = isMobile ? 32 : 22
+        const minVerticalGap = isMobile ? 14 : 10
 
-            // Position around the edges, avoiding center where globe is
-            const edge = Math.floor(Math.random() * 4) // 0=top, 1=right, 2=bottom, 3=left
-            let top, left
+        const tryPickPosition = (existing: { top: number; left: number; rightAnchored: boolean }[]) => {
+            for (let attempt = 0; attempt < 8; attempt++) {
+                const edge = Math.floor(Math.random() * 4)
+                let top: number, left: number, rightAnchored = false
+                // top/bottom bands keep popups centered in the safe horizontal range
+                if (edge === 0) { top = 6 + Math.random() * 10; left = 8 + Math.random() * 40 }
+                else if (edge === 2) { top = 78 + Math.random() * 10; left = 8 + Math.random() * 40 }
+                // right band: anchor from right edge so long labels never bleed off-screen
+                else if (edge === 1) { top = 18 + Math.random() * 55; left = 4 + Math.random() * 14; rightAnchored = true }
+                // left band
+                else { top = 18 + Math.random() * 55; left = 4 + Math.random() * 14 }
 
-            if (edge === 0) { // top edge
-                top = 8 + Math.random() * 12
-                left = 15 + Math.random() * 55
-            } else if (edge === 1) { // right edge
-                top = 20 + Math.random() * 55
-                left = 60 + Math.random() * 25
-            } else if (edge === 2) { // bottom edge
-                top = 75 + Math.random() * 12
-                left = 15 + Math.random() * 55
-            } else { // left edge
-                top = 20 + Math.random() * 55
-                left = 8 + Math.random() * 18
+                // Compare horizontal position in a normalized space so left- and
+                // right-anchored popups are still detected as colliding when they
+                // overlap visually.
+                const normalizedLeft = rightAnchored ? 100 - left : left
+                const collides = existing.some(p => {
+                    const otherNormalized = p.rightAnchored ? 100 - p.left : p.left
+                    return Math.abs(p.top - top) < minVerticalGap && Math.abs(otherNormalized - normalizedLeft) < minHorizontalGap
+                })
+                if (!collides) return { top, left, rightAnchored }
             }
-
-            const newPopup = {
-                id: popupId,
-                name: randomLocation.name,
-                country: randomLocation.country,
-                initiative_slug: randomLocation.initiative_slug,
-                top,
-                left,
-            }
-
-            setActivePopups(prev => [...prev, newPopup])
-
-            // Remove after 7 seconds
-            setTimeout(() => {
-                setActivePopups(prev => prev.filter(p => p.id !== popupId))
-            }, 7000)
+            return null
         }
 
-        // Spawn initial popups
+        const spawnPopup = () => {
+            setActivePopups(prev => {
+                if (prev.length >= maxConcurrent) return prev
+                const pos = tryPickPosition(prev)
+                if (!pos) return prev
+                const randomLocation = filteredLocations[Math.floor(Math.random() * filteredLocations.length)]
+                const popupId = `${randomLocation.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+                const next = [...prev, {
+                    id: popupId,
+                    name: randomLocation.name,
+                    country: randomLocation.country,
+                    initiative_slug: randomLocation.initiative_slug,
+                    top: pos.top,
+                    left: pos.left,
+                    rightAnchored: pos.rightAnchored,
+                }]
+                setTimeout(() => {
+                    setActivePopups(curr => curr.filter(p => p.id !== popupId))
+                }, popupTtlMs)
+                return next
+            })
+        }
+
         spawnPopup()
-        setTimeout(spawnPopup, 500)
+        if (!isMobile) setTimeout(spawnPopup, 500)
 
-        // Spawn new popups every 3 seconds
-        const interval = setInterval(() => {
-            spawnPopup()
-        }, 3000)
-
+        const interval = setInterval(spawnPopup, spawnIntervalMs)
         return () => clearInterval(interval)
     }, [activeView, filteredLocations])
 
@@ -969,8 +987,10 @@ export default function PublicOrganizationPage() {
                     })()}
                 </div>
 
-                {/* Right Side - Initiatives Container (aligned with right panel) */}
-                <div className="flex-1 p-3 md:p-4 md:pl-2">
+                {/* Right Side - Initiatives Container (aligned with right panel)
+                    Mobile: hidden here; rendered below the feature area instead so the
+                    primary content (globe / highlights) sits closer to the toggle tabs. */}
+                <div className="hidden md:block flex-1 p-3 md:p-4 md:pl-2">
                     <div className="h-full overflow-hidden flex flex-col">
                         <div className="px-2 md:px-4 py-2 flex items-center justify-between flex-shrink-0">
                             <div className="flex items-center gap-2">
@@ -1158,8 +1178,11 @@ export default function PublicOrganizationPage() {
                     </div>
                 </div>
 
-                {/* Feature Area (Left-Center) */}
-                <div className="w-full md:w-[45%] flex-shrink-0 pt-0 pb-2 md:pb-4 px-2 md:px-0 md:pr-2 h-[50vh] md:h-auto">
+                {/* Feature Area (Left-Center).
+                    On mobile the graph view needs more vertical room, so we bump the
+                    feature area height when graph is active. Right panel (metrics) just
+                    shifts down — it's already scrollable on mobile. Desktop unchanged. */}
+                <div className={`w-full md:w-[45%] flex-shrink-0 pt-0 pb-2 md:pb-4 px-2 md:px-0 md:pr-2 ${activeView === 'graph' ? 'h-[72vh]' : 'h-[50vh]'} md:h-auto`}>
                     <div className="h-full overflow-hidden relative">
                         {/* Globe View */}
                         <div className={`absolute inset-0 transition-all duration-500 ease-out ${activeView === 'globe'
@@ -1200,21 +1223,33 @@ export default function PublicOrganizationPage() {
                                         <div className="w-full h-full" />
                                     )}
 
-                                    {/* Location Popups */}
+                                    {/* Location Popups.
+                                        whitespace-nowrap + truncate + max-w cap keeps each
+                                        popup as a single-line pill regardless of name length.
+                                        Right-band popups anchor with `right` instead of `left`
+                                        so long labels never bleed off the screen edge. */}
                                     {activePopups.map(popup => {
+                                        const label = `${popup.name}${popup.country ? `, ${popup.country}` : ''}`
                                         const inner = (
                                             <>
-                                                <MapPin className="w-3 h-3 mr-1 inline-block" />
-                                                {popup.name}{popup.country ? `, ${popup.country}` : ''}
+                                                <MapPin className="w-3 h-3 mr-1 inline-block flex-shrink-0" />
+                                                <span className="truncate">{label}</span>
                                             </>
                                         )
-                                        const style = {
-                                            top: `${popup.top}%`,
-                                            left: `${popup.left}%`,
-                                            backgroundColor: brandColor,
-                                            animation: 'fadeInOut 7s ease-in-out forwards',
-                                        }
-                                        const className = "absolute px-3 py-1.5 rounded-full text-white text-xs font-medium shadow-lg transition-all duration-200 hover:scale-105 hover:brightness-110 hover:shadow-xl"
+                                        const style: React.CSSProperties = popup.rightAnchored
+                                            ? {
+                                                top: `${popup.top}%`,
+                                                right: `${popup.left}%`,
+                                                backgroundColor: brandColor,
+                                                animation: 'fadeInOut 7s ease-in-out forwards',
+                                            }
+                                            : {
+                                                top: `${popup.top}%`,
+                                                left: `${popup.left}%`,
+                                                backgroundColor: brandColor,
+                                                animation: 'fadeInOut 7s ease-in-out forwards',
+                                            }
+                                        const className = "absolute px-2 py-0.5 md:px-3 md:py-1.5 rounded-full text-white text-[10px] md:text-xs font-medium shadow-lg transition-all duration-200 hover:scale-105 hover:brightness-110 hover:shadow-xl whitespace-nowrap max-w-[45%] md:max-w-[40%] flex items-center"
 
                                         return popup.initiative_slug ? (
                                             <Link
@@ -1387,7 +1422,9 @@ export default function PublicOrganizationPage() {
                                         View all <ChevronRight className="w-3 h-3" />
                                     </Link>
                                 </div>
-                                <div className="flex-1 px-4 pb-4 pt-0 overflow-hidden">
+                                {/* Mobile: vertical stack with auto height + scroll if needed.
+                                    Desktop: original 2-row grid kept unchanged. */}
+                                <div className="flex-1 px-4 pb-4 pt-0 overflow-y-auto md:overflow-hidden">
                                     {highlightCards.length === 0 ? (
                                         <div className="h-full flex items-center justify-center text-muted-foreground">
                                             <div className="text-center">
@@ -1396,7 +1433,7 @@ export default function PublicOrganizationPage() {
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className={`h-full grid gap-3 ${highlightCards.length === 1 ? 'grid-rows-1' : 'grid-rows-2'}`}>
+                                        <div className={`flex flex-col gap-3 md:h-full md:grid ${highlightCards.length === 1 ? 'md:grid-rows-1' : 'md:grid-rows-2'}`}>
                                             {highlightCards.map((card, idx) => {
                                                 const isStat = card.type === 'stat'
                                                 const title = (card.title || '').trim()
@@ -1406,7 +1443,7 @@ export default function PublicOrganizationPage() {
                                                     <Link
                                                         key={card.id || idx}
                                                         to={`${orgLinkBase}/${slug}/context`}
-                                                        className="group relative rounded-2xl bg-white/60 backdrop-blur-lg border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all p-4 flex flex-col overflow-hidden min-h-0"
+                                                        className="group relative rounded-2xl bg-white/60 backdrop-blur-lg border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all p-4 flex flex-col overflow-hidden md:min-h-0"
                                                     >
                                                         <div
                                                             className="absolute left-0 top-0 bottom-0 w-1"
@@ -1424,18 +1461,18 @@ export default function PublicOrganizationPage() {
                                                             {isStat ? (
                                                                 <div className="flex flex-col h-full">
                                                                     <div
-                                                                        className="text-3xl md:text-4xl font-bold leading-none mb-1 truncate"
+                                                                        className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight mb-1 break-words"
                                                                         style={{ color: brandColor, filter: 'saturate(1.2) brightness(0.8)' }}
                                                                     >
                                                                         {value}
                                                                     </div>
                                                                     {title && (
-                                                                        <h3 className="text-sm font-semibold text-foreground line-clamp-1">
+                                                                        <h3 className="text-sm font-semibold text-foreground line-clamp-2 md:line-clamp-1">
                                                                             {title}
                                                                         </h3>
                                                                     )}
                                                                     {description && (
-                                                                        <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                                                                        <p className="text-xs text-muted-foreground line-clamp-3 md:line-clamp-2 mt-1">
                                                                             {description}
                                                                         </p>
                                                                     )}
@@ -1443,12 +1480,12 @@ export default function PublicOrganizationPage() {
                                                             ) : (
                                                                 <div className="flex flex-col h-full">
                                                                     {title && (
-                                                                        <h3 className="text-base md:text-lg font-bold text-foreground leading-snug line-clamp-2">
+                                                                        <h3 className="text-base md:text-lg font-bold text-foreground leading-snug line-clamp-3 md:line-clamp-2">
                                                                             {title}
                                                                         </h3>
                                                                     )}
                                                                     {description && (
-                                                                        <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                                                                        <p className="text-xs text-muted-foreground line-clamp-3 md:line-clamp-2 mt-1">
                                                                             {description}
                                                                         </p>
                                                                     )}
@@ -1633,6 +1670,61 @@ export default function PublicOrganizationPage() {
 
                 {/* Right Panel */}
                 <div className="flex-1 pt-0 pb-2 md:pb-4 px-2 md:pr-4 md:pl-2 flex flex-col gap-2 md:gap-3 overflow-y-auto md:overflow-hidden">
+                    {/* Mobile-only Initiatives section (placed below feature area).
+                        Mirrors the desktop hero initiatives container but lives here so on
+                        mobile it appears AFTER the toggle tabs + active feature view, per
+                        product requirement. Hidden on md+. */}
+                    <div className="md:hidden flex flex-col flex-shrink-0">
+                        <div className="px-2 py-2 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/60">
+                                    <Target className="w-3.5 h-3.5 text-gray-600" />
+                                </div>
+                                <h2 className="font-semibold text-foreground text-sm">Initiatives</h2>
+                                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-white/60 text-gray-600">{filteredInitiatives.length}</span>
+                            </div>
+                            {filteredInitiatives.length > 4 && (
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        onClick={() => setHeroInitiativePage(p => Math.max(0, p - 1))}
+                                        disabled={heroInitiativePage === 0}
+                                        className="w-6 h-6 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors"
+                                    >
+                                        <ChevronLeft className="w-4 h-4 text-gray-600" />
+                                    </button>
+                                    <span className="text-xs text-muted-foreground w-10 text-center">
+                                        {heroInitiativePage + 1}/{Math.ceil(filteredInitiatives.length / 4)}
+                                    </span>
+                                    <button
+                                        onClick={() => setHeroInitiativePage(p => Math.min(Math.ceil(filteredInitiatives.length / 4) - 1, p + 1))}
+                                        disabled={heroInitiativePage >= Math.ceil(filteredInitiatives.length / 4) - 1}
+                                        className="w-6 h-6 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors"
+                                    >
+                                        <ChevronRight className="w-4 h-4 text-gray-600" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                        <div className="px-2 pb-2">
+                            <div className="grid grid-cols-2 gap-2">
+                                {filteredInitiatives.slice(heroInitiativePage * 4, heroInitiativePage * 4 + 4).map((init) => (
+                                    <Link
+                                        key={init.id}
+                                        to={`${orgLinkBase}/${slug}/${init.slug}`}
+                                        className="p-3 bg-white/60 backdrop-blur-lg rounded-xl border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all group flex flex-col justify-center min-h-[64px]"
+                                    >
+                                        <h4 className="font-medium text-foreground text-xs line-clamp-2 group-hover:text-accent transition-colors">{init.title}</h4>
+                                        {init.region && (
+                                            <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
+                                                <MapPin className="w-2.5 h-2.5" />{init.region}
+                                            </p>
+                                        )}
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Top Row - Metrics + Impact Claims (larger) */}
                     <div className="flex flex-col md:flex-row gap-2 md:gap-3 md:h-[65%]">
                         {/* Key Metrics (Scrollable 2x2 Grid) */}

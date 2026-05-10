@@ -268,12 +268,12 @@ export default function DateRangePicker({
                 ref={buttonRef}
                 type="button"
                 onClick={handleToggle}
-                className={`flex items-center pl-0 pr-4 h-10 bg-white hover:bg-gray-50 text-gray-700 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border border-gray-200 border-l-0 shadow-bubble-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${className}`}
+                className={`flex items-center pl-0 pr-2.5 md:pr-4 h-8 md:h-10 bg-white hover:bg-gray-50 text-gray-700 rounded-r-full rounded-l-full text-xs md:text-sm font-medium transition-all duration-200 border border-gray-200 border-l-0 shadow-bubble-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${className}`}
             >
-                <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
-                    <Calendar className="w-5 h-5 text-gray-600" />
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
+                    <Calendar className="w-4 h-4 md:w-5 md:h-5 text-gray-600" />
                 </div>
-                <span className={`ml-3 ${value ? 'text-gray-900' : 'text-gray-500'}`}>{getDisplayText()}</span>
+                <span className={`ml-2 md:ml-3 ${value ? 'text-gray-900' : 'text-gray-500'}`}>{getDisplayText()}</span>
                 {value && (value.singleDate || value.startDate || value.endDate) && (
                     <X
                         className="w-3 h-3 text-gray-400 hover:text-gray-600 ml-auto"
