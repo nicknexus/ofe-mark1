@@ -4,6 +4,7 @@ import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { requireAdmin } from '../middleware/requireAdmin';
 import { OrganizationService } from '../services/organizationService';
 import { DemoSeedService } from '../services/demoSeedService';
+import { DemoGenerationError, DemoGenerationService } from '../services/demoGenerationService';
 
 const router = Router();
 
@@ -107,6 +108,31 @@ router.post('/demos', async (req: AuthenticatedRequest, res) => {
         res.status(201).json(org);
     } catch (error) {
         console.error('[admin] create demo error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * POST /api/admin/demos/generate-from-url
+ * Creates a demo org from a public website using Firecrawl + OpenAI.
+ * Body: { website_url: string; name?: string }
+ */
+router.post('/demos/generate-from-url', async (req: AuthenticatedRequest, res) => {
+    try {
+        const demo = await DemoGenerationService.generateFromWebsite(req.user!.id, {
+            website_url: req.body?.website_url,
+            name: req.body?.name,
+        });
+        res.status(201).json(demo);
+    } catch (error) {
+        console.error('[admin] generate demo error:', error);
+        if (error instanceof DemoGenerationError) {
+            res.status(error.status).json({
+                error: error.publicMessage,
+                code: error.code,
+            });
+            return;
+        }
         res.status(500).json({ error: (error as Error).message });
     }
 });
@@ -300,7 +326,68 @@ router.post('/demos/:id/clone', async (req: AuthenticatedRequest, res) => {
         const initiativeIdMap = new Map<string, string>();
         const locationIdMap = new Map<string, string>();
         const kpiIdMap = new Map<string, string>();
+        const kpiUpdateIdMap = new Map<string, string>();
         const benIdMap = new Map<string, string>();
+
+        const linkLocationToInitiative = async (locationId: string, initiativeId: string) => {
+            const { error } = await supabase
+                .from('initiative_locations')
+                .upsert(
+                    [{ initiative_id: initiativeId, location_id: locationId }],
+                    { onConflict: 'initiative_id,location_id', ignoreDuplicates: true }
+                );
+            if (error) {
+                console.warn('[clone] initiative_locations link skipped:', error.message);
+            }
+        };
+
+        const cloneLocationForInitiative = async (sourceLocationId: string, newInitiativeId: string): Promise<string | null> => {
+            const existing = locationIdMap.get(sourceLocationId);
+            if (existing) {
+                await linkLocationToInitiative(existing, newInitiativeId);
+                return existing;
+            }
+
+            const { data: loc, error: locFetchErr } = await supabase
+                .from('locations')
+                .select('*')
+                .eq('id', sourceLocationId)
+                .maybeSingle();
+            if (locFetchErr || !loc) {
+                console.warn('[clone] source location missing:', locFetchErr?.message || sourceLocationId);
+                return null;
+            }
+
+            const {
+                id: _lid,
+                organization_id: _lo,
+                initiative_id: _li,
+                created_at: _lc,
+                updated_at: _lu,
+                ...locFields
+            } = loc;
+
+            const { data: newLoc, error: locErr } = await supabase
+                .from('locations')
+                .insert([
+                    {
+                        ...locFields,
+                        organization_id: newOrg.id,
+                        initiative_id: newInitiativeId,
+                        user_id: userId,
+                    },
+                ])
+                .select()
+                .single();
+            if (locErr || !newLoc) {
+                console.warn('[clone] location failed:', locErr?.message);
+                return null;
+            }
+
+            locationIdMap.set(sourceLocationId, newLoc.id);
+            await linkLocationToInitiative(newLoc.id, newInitiativeId);
+            return newLoc.id;
+        };
 
         for (const srcInit of sourceInitiatives || []) {
             const { id: _oldId, organization_id: _o, slug: srcSlug, created_at: _c, updated_at: _u, ...initFields } = srcInit;
@@ -321,20 +408,28 @@ router.post('/demos/:id/clone', async (req: AuthenticatedRequest, res) => {
             }
             initiativeIdMap.set(srcInit.id, newInit.id);
 
-            // Locations
-            const { data: srcLocs } = await supabase
-                .from('locations')
-                .select('*')
+            // Locations linked through the current org-global junction table,
+            // with the legacy initiative_id path as a fallback for older rows.
+            const linkedLocationIds = new Set<string>();
+            const { data: srcLocLinks } = await supabase
+                .from('initiative_locations')
+                .select('location_id')
                 .eq('initiative_id', srcInit.id);
-            for (const loc of srcLocs || []) {
-                const { id: _lid, initiative_id: _li, created_at: _lc, updated_at: _lu, ...locFields } = loc;
-                const { data: newLoc, error: locErr } = await supabase
-                    .from('locations')
-                    .insert([{ ...locFields, initiative_id: newInit.id, user_id: userId }])
-                    .select()
-                    .single();
-                if (!locErr && newLoc) locationIdMap.set(loc.id, newLoc.id);
+            for (const link of srcLocLinks || []) {
+                if (link.location_id) linkedLocationIds.add(link.location_id);
             }
+            const { data: legacyLocs } = await supabase
+                .from('locations')
+                .select('id')
+                .eq('initiative_id', srcInit.id);
+            for (const loc of legacyLocs || []) {
+                if (loc.id) linkedLocationIds.add(loc.id);
+            }
+            for (const locationId of linkedLocationIds) {
+                await cloneLocationForInitiative(locationId, newInit.id);
+            }
+
+            const sourceUpdateIdsForInit: string[] = [];
 
             // KPIs
             const { data: srcKpis } = await supabase
@@ -355,17 +450,29 @@ router.post('/demos/:id/clone', async (req: AuthenticatedRequest, res) => {
                     .from('kpi_updates')
                     .select('*')
                     .eq('kpi_id', kpi.id);
-                if (srcUpdates && srcUpdates.length > 0) {
-                    const inserts = srcUpdates.map((u) => {
-                        const { id: _uid, kpi_id: _k, created_at: _uc, updated_at: _uu, location_id, ...rest } = u;
-                        return {
-                            ...rest,
-                            kpi_id: newKpi.id,
-                            user_id: userId,
-                            location_id: location_id ? locationIdMap.get(location_id) ?? null : null,
-                        };
-                    });
-                    await supabase.from('kpi_updates').insert(inserts);
+                for (const u of srcUpdates || []) {
+                    const { id: oldUpdateId, kpi_id: _k, created_at: _uc, updated_at: _uu, location_id, ...rest } = u;
+                    const mappedLocationId = location_id
+                        ? await cloneLocationForInitiative(location_id, newInit.id)
+                        : null;
+                    const { data: newUpdate, error: updateErr } = await supabase
+                        .from('kpi_updates')
+                        .insert([
+                            {
+                                ...rest,
+                                kpi_id: newKpi.id,
+                                user_id: userId,
+                                location_id: mappedLocationId,
+                            },
+                        ])
+                        .select()
+                        .single();
+                    if (updateErr || !newUpdate) {
+                        console.warn('[clone] kpi_update failed:', updateErr?.message);
+                        continue;
+                    }
+                    kpiUpdateIdMap.set(oldUpdateId, newUpdate.id);
+                    sourceUpdateIdsForInit.push(oldUpdateId);
                 }
             }
 
@@ -376,6 +483,9 @@ router.post('/demos/:id/clone', async (req: AuthenticatedRequest, res) => {
                 .eq('initiative_id', srcInit.id);
             for (const ben of srcBens || []) {
                 const { id: _bid, initiative_id: _bi, created_at: _bc, updated_at: _bu, location_id, ...benFields } = ben;
+                const mappedBenLocationId = location_id
+                    ? await cloneLocationForInitiative(location_id, newInit.id)
+                    : null;
                 const { data: newBen, error: benErr } = await supabase
                     .from('beneficiary_groups')
                     .insert([
@@ -383,12 +493,34 @@ router.post('/demos/:id/clone', async (req: AuthenticatedRequest, res) => {
                             ...benFields,
                             initiative_id: newInit.id,
                             user_id: userId,
-                            location_id: location_id ? locationIdMap.get(location_id) ?? null : null,
+                            location_id: mappedBenLocationId,
                         },
                     ])
                     .select()
                     .single();
                 if (!benErr && newBen) benIdMap.set(ben.id, newBen.id);
+            }
+
+            if (sourceUpdateIdsForInit.length > 0) {
+                const { data: srcUpdateLinks } = await supabase
+                    .from('kpi_update_beneficiary_groups')
+                    .select('*')
+                    .in('kpi_update_id', sourceUpdateIdsForInit);
+                const updateLinks = (srcUpdateLinks || [])
+                    .map((link: any) => {
+                        const mappedUpdate = kpiUpdateIdMap.get(link.kpi_update_id);
+                        const mappedBen = benIdMap.get(link.beneficiary_group_id);
+                        if (!mappedUpdate || !mappedBen) return null;
+                        return {
+                            kpi_update_id: mappedUpdate,
+                            beneficiary_group_id: mappedBen,
+                            user_id: userId,
+                        };
+                    })
+                    .filter(Boolean);
+                if (updateLinks.length > 0) {
+                    await supabase.from('kpi_update_beneficiary_groups').insert(updateLinks as any[]);
+                }
             }
 
             // Stories
@@ -398,6 +530,9 @@ router.post('/demos/:id/clone', async (req: AuthenticatedRequest, res) => {
                 .eq('initiative_id', srcInit.id);
             for (const story of srcStories || []) {
                 const { id: _sid, initiative_id: _si, created_at: _sc, updated_at: _su, location_id, ...storyFields } = story;
+                const mappedLegacyLocationId = location_id
+                    ? await cloneLocationForInitiative(location_id, newInit.id)
+                    : null;
                 const { data: newStory, error: storyErr } = await supabase
                     .from('stories')
                     .insert([
@@ -405,12 +540,40 @@ router.post('/demos/:id/clone', async (req: AuthenticatedRequest, res) => {
                             ...storyFields,
                             initiative_id: newInit.id,
                             user_id: userId,
-                            location_id: location_id ? locationIdMap.get(location_id) ?? null : null,
+                            location_id: mappedLegacyLocationId,
                         },
                     ])
                     .select()
                     .single();
                 if (storyErr || !newStory) continue;
+
+                const { data: srcStoryLocs } = await supabase
+                    .from('story_locations')
+                    .select('*')
+                    .eq('story_id', story.id);
+                const storyLocationLinks: any[] = [];
+                for (const link of srcStoryLocs || []) {
+                    const mappedLocation = link.location_id
+                        ? await cloneLocationForInitiative(link.location_id, newInit.id)
+                        : null;
+                    if (mappedLocation) {
+                        storyLocationLinks.push({
+                            story_id: newStory.id,
+                            location_id: mappedLocation,
+                            user_id: userId,
+                        });
+                    }
+                }
+                if (storyLocationLinks.length === 0 && mappedLegacyLocationId) {
+                    storyLocationLinks.push({
+                        story_id: newStory.id,
+                        location_id: mappedLegacyLocationId,
+                        user_id: userId,
+                    });
+                }
+                if (storyLocationLinks.length > 0) {
+                    await supabase.from('story_locations').insert(storyLocationLinks);
+                }
 
                 // Clone story_beneficiaries links
                 const { data: srcLinks } = await supabase

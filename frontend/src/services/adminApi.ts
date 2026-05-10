@@ -25,6 +25,11 @@ export interface CreateDemoInput {
     description?: string
 }
 
+export interface GenerateDemoFromWebsiteInput {
+    website_url: string
+    name?: string
+}
+
 export interface PatchDemoInput {
     name?: string
     description?: string
@@ -52,6 +57,17 @@ export class AdminApi {
             body: JSON.stringify(input),
         })
         if (!resp.ok) throw new Error((await resp.json()).error || 'Failed to create demo')
+        return resp.json()
+    }
+
+    static async createDemoFromWebsite(input: GenerateDemoFromWebsiteInput): Promise<DemoOrg> {
+        const headers = await getAuthHeaders()
+        const resp = await fetch(`${API_BASE_URL}/api/admin/demos/generate-from-url`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(input),
+        })
+        if (!resp.ok) throw new Error((await resp.json()).error || 'Failed to generate demo')
         return resp.json()
     }
 

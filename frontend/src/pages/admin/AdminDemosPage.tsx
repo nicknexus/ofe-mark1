@@ -13,6 +13,8 @@ import {
     Building2,
     Search,
     X,
+    Sparkles,
+    Globe2,
 } from 'lucide-react'
 import { AdminApi, DemoOrg } from '../../services/adminApi'
 
@@ -22,7 +24,12 @@ export default function AdminDemosPage() {
     const [demos, setDemos] = useState<DemoOrg[]>([])
     const [loading, setLoading] = useState(true)
     const [creating, setCreating] = useState(false)
+    const [generating, setGenerating] = useState(false)
+    const [createMode, setCreateMode] = useState<'website' | 'manual'>('website')
     const [newName, setNewName] = useState('')
+    const [websiteUrl, setWebsiteUrl] = useState('')
+    const [websiteName, setWebsiteName] = useState('')
+    const [generationStage, setGenerationStage] = useState('')
     const [showCreate, setShowCreate] = useState(false)
     const [search, setSearch] = useState('')
 
@@ -68,6 +75,39 @@ export default function AdminDemosPage() {
             toast.error((err as Error).message)
         } finally {
             setCreating(false)
+        }
+    }
+
+    const handleGenerateFromWebsite = async () => {
+        const url = websiteUrl.trim()
+        if (!url) {
+            toast.error('Website URL is required')
+            return
+        }
+
+        const stages = ['Reading website...', 'Drafting demo content...', 'Creating profile...']
+        let stageIndex = 0
+        setGenerationStage(stages[stageIndex])
+        const stageTimer = window.setInterval(() => {
+            stageIndex = Math.min(stageIndex + 1, stages.length - 1)
+            setGenerationStage(stages[stageIndex])
+        }, 4500)
+
+        setGenerating(true)
+        try {
+            const demo = await AdminApi.createDemoFromWebsite({
+                website_url: url,
+                name: websiteName.trim() || undefined,
+            })
+            toast.success(`Generated "${demo.name}"`)
+            localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, demo.id)
+            window.location.href = '/dashboard'
+        } catch (err) {
+            toast.error((err as Error).message)
+        } finally {
+            window.clearInterval(stageTimer)
+            setGenerating(false)
+            setGenerationStage('')
         }
     }
 
@@ -161,40 +201,120 @@ export default function AdminDemosPage() {
 
                 {showCreate && (
                     <div className="mb-6 p-4 bg-white border border-gray-200 rounded-2xl shadow-bubble-sm">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                value={newName}
-                                onChange={(e) => setNewName(e.target.value)}
-                                placeholder="Acme Foundation (demo)"
-                                className="flex-1 px-4 py-2 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') handleCreate()
-                                }}
-                                autoFocus
-                            />
+                        <div className="flex items-center justify-between gap-3 mb-4">
+                            <div className="inline-flex p-1 bg-gray-100 rounded-full">
+                                <button
+                                    type="button"
+                                    onClick={() => setCreateMode('website')}
+                                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${createMode === 'website'
+                                            ? 'bg-white text-gray-900 shadow-sm'
+                                            : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                >
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    Generate from website
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setCreateMode('manual')}
+                                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${createMode === 'manual'
+                                            ? 'bg-white text-gray-900 shadow-sm'
+                                            : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    Manual seed
+                                </button>
+                            </div>
                             <button
-                                onClick={handleCreate}
-                                disabled={creating}
-                                className="px-5 py-2 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50 inline-flex items-center gap-2"
-                            >
-                                {creating && <Loader2 className="w-4 h-4 animate-spin" />}
-                                Create + seed
-                            </button>
-                            <button
+                                type="button"
                                 onClick={() => {
                                     setShowCreate(false)
                                     setNewName('')
+                                    setWebsiteUrl('')
+                                    setWebsiteName('')
                                 }}
-                                className="px-4 py-2 border border-gray-200 text-gray-700 rounded-full hover:bg-gray-50 text-sm font-medium"
+                                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full"
+                                aria-label="Close create panel"
                             >
-                                Cancel
+                                <X className="w-4 h-4" />
                             </button>
                         </div>
-                        <p className="mt-2 text-xs text-gray-500">
-                            Auto-seeds with 1 initiative, 4 KPIs (with updates), 1 beneficiary group, 1 location, and 1 story.
-                        </p>
+
+                        {createMode === 'website' ? (
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Website URL</label>
+                                    <div className="relative">
+                                        <Globe2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                        <input
+                                            type="url"
+                                            value={websiteUrl}
+                                            onChange={(e) => setWebsiteUrl(e.target.value)}
+                                            placeholder="https://example.org"
+                                            className="w-full pl-11 pr-4 py-2.5 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && !generating) handleGenerateFromWebsite()
+                                            }}
+                                            autoFocus
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Demo name override</label>
+                                    <input
+                                        type="text"
+                                        value={websiteName}
+                                        onChange={(e) => setWebsiteName(e.target.value)}
+                                        placeholder="Optional"
+                                        className="w-full px-4 py-2.5 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !generating) handleGenerateFromWebsite()
+                                        }}
+                                    />
+                                </div>
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-1">
+                                    <button
+                                        onClick={handleGenerateFromWebsite}
+                                        disabled={generating}
+                                        className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50"
+                                    >
+                                        {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                        {generating ? generationStage || 'Generating...' : 'Generate demo'}
+                                    </button>
+                                    <p className="text-xs text-gray-500">
+                                        Creates a normal editable demo with profile, context, initiative, metrics, locations, beneficiaries, and stories.
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <input
+                                        type="text"
+                                        value={newName}
+                                        onChange={(e) => setNewName(e.target.value)}
+                                        placeholder="Acme Foundation (demo)"
+                                        className="flex-1 px-4 py-2 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') handleCreate()
+                                        }}
+                                    />
+                                    <button
+                                        onClick={handleCreate}
+                                        disabled={creating}
+                                        className="px-5 py-2 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50 inline-flex items-center justify-center gap-2"
+                                    >
+                                        {creating && <Loader2 className="w-4 h-4 animate-spin" />}
+                                        Create + seed
+                                    </button>
+                                </div>
+                                <p className="mt-2 text-xs text-gray-500">
+                                    Auto-seeds with 1 initiative, 4 KPIs, 1 beneficiary group, 1 location, and 1 story.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 )}
 

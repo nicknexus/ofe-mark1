@@ -159,6 +159,7 @@ export class DemoSeedService {
             .insert([
                 {
                     ...SEED_LOCATION,
+                    organization_id: organizationId,
                     initiative_id: initiativeId,
                     user_id: userId,
                     display_order: 0,
@@ -171,6 +172,13 @@ export class DemoSeedService {
             throw new Error(`Seed failed (location): ${locErr?.message}`);
         }
         const locationId = location.id as string;
+
+        const { error: locLinkErr } = await supabase
+            .from('initiative_locations')
+            .insert([{ initiative_id: initiativeId, location_id: locationId }]);
+        if (locLinkErr) {
+            throw new Error(`Seed failed (initiative_location): ${locLinkErr.message}`);
+        }
 
         // --- 3. KPIs + updates ---
         let createdKpis = 0;
@@ -251,6 +259,13 @@ export class DemoSeedService {
             throw new Error(`Seed failed (story): ${storyErr?.message}`);
         }
         const storyId = story.id as string;
+
+        const { error: storyLocErr } = await supabase
+            .from('story_locations')
+            .insert([{ story_id: storyId, location_id: locationId, user_id: userId }]);
+        if (storyLocErr) {
+            console.warn('[DemoSeed] story_locations link skipped:', storyLocErr.message);
+        }
 
         // Link story → beneficiary group (best-effort; junction may or may not exist)
         const { error: storyBenErr } = await supabase
