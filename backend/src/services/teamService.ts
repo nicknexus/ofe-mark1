@@ -1,5 +1,6 @@
 import { supabase } from '../utils/supabase';
 import crypto from 'crypto';
+import { PlatformAdminService } from './platformAdminService';
 
 export interface TeamInvitation {
     id: string;
@@ -393,6 +394,42 @@ export class TeamService {
                         donation_url: org.donation_url
                     });
                 }
+            }
+        }
+
+        // Platform admins can open ANY demo org from the admin dash, even if
+        // it was created by another admin. Without this, opening someone
+        // else's demo silently bounces back to the user's real org because
+        // TeamProvider treats unknown active-org ids as invalid.
+        const isAdmin = await PlatformAdminService.isAdmin(userId);
+        if (isAdmin) {
+            const ownIds = new Set(orgs.map(o => o.id));
+            const { data: allDemos, error: demoErr } = await supabase
+                .from('organizations')
+                .select('id, name, slug, logo_url, brand_color, is_public, is_demo, demo_public_share, statement, website_url, donation_url')
+                .eq('is_demo', true);
+            if (!demoErr && allDemos) {
+                for (const demo of allDemos) {
+                    if (ownIds.has(demo.id)) continue;
+                    orgs.push({
+                        id: demo.id,
+                        name: demo.name,
+                        slug: demo.slug,
+                        role: 'owner',
+                        canAddImpactClaims: true,
+                        canEditEvidence: true,
+                        logo_url: demo.logo_url,
+                        brand_color: demo.brand_color,
+                        is_public: demo.is_public,
+                        is_demo: demo.is_demo,
+                        demo_public_share: demo.demo_public_share,
+                        statement: demo.statement,
+                        website_url: demo.website_url,
+                        donation_url: demo.donation_url,
+                    });
+                }
+            } else if (demoErr) {
+                console.warn('[getUserAccessibleOrganizations] failed to fetch shared demos:', demoErr.message);
             }
         }
 

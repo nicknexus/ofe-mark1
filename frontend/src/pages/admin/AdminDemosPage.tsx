@@ -112,9 +112,7 @@ export default function AdminDemosPage() {
     }
 
     const handleOpen = (demo: DemoOrg) => {
-        // Switch the active org (TeamContext reads this on mount) and go to dashboard.
         localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, demo.id)
-        // Full reload so TeamContext picks up the new active org cleanly.
         window.location.href = '/dashboard'
     }
 

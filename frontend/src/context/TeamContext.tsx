@@ -66,7 +66,6 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
     const [permissions, setPermissions] = useState<UserPermissions | null>(null)
     const [accessibleOrganizations, setAccessibleOrganizations] = useState<AccessibleOrganization[]>([])
     const [activeOrgId, setActiveOrgId] = useState<string | null>(() => {
-        // Restore from localStorage on mount
         return localStorage.getItem(ACTIVE_ORG_STORAGE_KEY)
     })
     const [loading, setLoading] = useState(true)

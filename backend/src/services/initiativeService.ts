@@ -2,6 +2,7 @@ import { supabase } from '../utils/supabase';
 import { Initiative } from '../types';
 import { OrganizationService } from './organizationService';
 import { TeamService } from './teamService';
+import { PlatformAdminService } from './platformAdminService';
 
 export class InitiativeService {
     /**
@@ -11,32 +12,30 @@ export class InitiativeService {
      */
     static async getEffectiveOrganizationId(userId: string, requestedOrgId?: string): Promise<string | null> {
         if (requestedOrgId) {
-            // Check if user owns this specific org (covers real + demo orgs for admins)
             const ownsRequested = await TeamService.isUserOwnerOfOrganization(userId, requestedOrgId);
-            if (ownsRequested) {
-                return requestedOrgId;
-            }
+            if (ownsRequested) return requestedOrgId;
 
-            // Check if user is a team member of this specific org
             const membership = await TeamService.getUserTeamMembership(userId, requestedOrgId);
-            if (membership) {
-                return requestedOrgId;
+            if (membership) return requestedOrgId;
+
+            // Platform admins can act inside any demo org (admin sandbox),
+            // even ones created by another admin.
+            const isAdmin = await PlatformAdminService.isAdmin(userId);
+            if (isAdmin) {
+                const { data: org } = await supabase
+                    .from('organizations')
+                    .select('id, is_demo')
+                    .eq('id', requestedOrgId)
+                    .maybeSingle();
+                if (org?.is_demo) return requestedOrgId;
             }
-
-            // User doesn't have access to requested org - fall through to default
         }
 
-        // Default: check if user owns an organization first
         const ownedOrg = await TeamService.getUserOwnedOrganization(userId);
-        if (ownedOrg) {
-            return ownedOrg.id;
-        }
+        if (ownedOrg) return ownedOrg.id;
 
-        // Then check team membership
         const membership = await TeamService.getUserTeamMembership(userId);
-        if (membership) {
-            return membership.organization_id;
-        }
+        if (membership) return membership.organization_id;
 
         return null;
     }
