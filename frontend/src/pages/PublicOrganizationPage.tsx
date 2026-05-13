@@ -271,7 +271,7 @@ export default function PublicOrganizationPage() {
                     const newTotal = aggregateKpiUpdates(matching as any, m.metric_type)
                     return { ...m, total_value: newTotal, update_count: matching.length, updates: matching }
                 })
-                .filter((m): m is typeof metrics[number] => m !== null)
+                .filter((m): m is NonNullable<typeof m> => m !== null)
         }
         if (selectedTagIds.length > 0) {
             // Keep metrics that either carry the tag themselves, or have at
