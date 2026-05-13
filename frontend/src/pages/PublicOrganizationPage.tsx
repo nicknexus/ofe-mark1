@@ -1101,7 +1101,7 @@ export default function PublicOrganizationPage() {
                                     <Link
                                         key={init.id}
                                         to={`${orgLinkBase}/${slug}/${init.slug}`}
-                                        className="px-3 py-2 bg-white rounded-xl border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group flex flex-col justify-center"
+                                        className="px-3 py-2 bg-white rounded-xl border border-gray-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.08),0_1px_3px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_10px_-2px_rgba(15,23,42,0.16),0_10px_20px_-6px_rgba(15,23,42,0.18)] hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group flex flex-col justify-center"
                                     >
                                         <h4 className="font-medium text-foreground text-xs line-clamp-2 group-hover:text-accent transition-colors leading-snug">{init.title}</h4>
                                         {init.region && (
@@ -1523,7 +1523,7 @@ export default function PublicOrganizationPage() {
                                 </div>
                                 {/* Mobile: vertical stack with auto height + scroll if needed.
                                     Desktop: original 2-row grid kept unchanged. */}
-                                <div className="flex-1 px-4 pb-4 pt-0 overflow-y-auto md:overflow-hidden">
+                                <div className="flex-1 px-4 pb-4 pt-0 overflow-y-auto md:overflow-visible">
                                     {highlightCards.length === 0 ? (
                                         <div className="h-full flex items-center justify-center text-muted-foreground">
                                             <div className="text-center">
@@ -1542,7 +1542,7 @@ export default function PublicOrganizationPage() {
                                                     <Link
                                                         key={card.id || idx}
                                                         to={`${orgLinkBase}/${slug}/context`}
-                                                        className="group relative rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all p-4 flex flex-col overflow-hidden md:min-h-0"
+                                                        className="group relative rounded-2xl bg-white border border-gray-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.08),0_1px_3px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_10px_-2px_rgba(15,23,42,0.16),0_10px_20px_-6px_rgba(15,23,42,0.18)] hover:border-gray-300 hover:-translate-y-px transition-all duration-200 p-4 flex flex-col overflow-hidden md:min-h-0"
                                                     >
                                                         <div
                                                             className="absolute left-0 top-0 bottom-0 w-1"
@@ -1644,7 +1644,7 @@ export default function PublicOrganizationPage() {
                                                 <Link
                                                     key={init.id}
                                                     to={`${orgLinkBase}/${slug}/${init.slug}`}
-                                                    className="block p-4 bg-white rounded-xl border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group"
+                                                    className="block p-4 bg-white rounded-xl border border-gray-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.08),0_1px_3px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_10px_-2px_rgba(15,23,42,0.16),0_10px_20px_-6px_rgba(15,23,42,0.18)] hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group"
                                                 >
                                                     <div className="flex items-start gap-3">
                                                         <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-gray-50 border border-gray-100">
@@ -1834,7 +1834,7 @@ export default function PublicOrganizationPage() {
                                     <Link
                                         key={init.id}
                                         to={`${orgLinkBase}/${slug}/${init.slug}`}
-                                        className="p-3 bg-white rounded-xl border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group flex flex-col justify-center min-h-[64px]"
+                                        className="p-3 bg-white rounded-xl border border-gray-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.08),0_1px_3px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_10px_-2px_rgba(15,23,42,0.16),0_10px_20px_-6px_rgba(15,23,42,0.18)] hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group flex flex-col justify-center min-h-[64px]"
                                     >
                                         <h4 className="font-medium text-foreground text-xs line-clamp-2 group-hover:text-accent transition-colors">{init.title}</h4>
                                         {init.region && (
@@ -1851,7 +1851,7 @@ export default function PublicOrganizationPage() {
                     {/* Top Row - Metrics + Impact Claims (larger) */}
                     <div className="flex flex-col md:flex-row gap-2 md:gap-3 md:h-[68%]">
                         {/* Key Metrics (Scrollable 2x2 Grid) */}
-                        <div className="w-full md:w-[52%] overflow-hidden flex flex-col max-h-[320px] md:max-h-none md:min-h-0">
+                        <div className="w-full md:w-[52%] overflow-hidden md:overflow-visible flex flex-col max-h-[320px] md:max-h-none md:min-h-0">
                             <div className="px-3 md:px-4 py-2 md:py-3 flex items-center justify-between flex-shrink-0">
                                 <div className="flex items-center gap-2">
                                     <div
@@ -1884,7 +1884,7 @@ export default function PublicOrganizationPage() {
                                             <Link
                                                 key={metric.id}
                                                 to={`${orgLinkBase}/${slug}/${metric.initiative_slug}/metric/${generateMetricSlug(metric.title)}`}
-                                                className="group relative rounded-xl bg-white border border-gray-200/80 overflow-hidden shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all h-[88px] md:h-[15.5vh] flex flex-col"
+                                                className="group relative rounded-xl bg-white border border-gray-200/80 overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,0.08),0_1px_3px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_10px_-2px_rgba(15,23,42,0.16),0_10px_20px_-6px_rgba(15,23,42,0.18)] hover:border-gray-300 hover:-translate-y-px transition-all duration-200 h-[88px] md:h-[15.5vh] flex flex-col"
                                             >
                                                 {metric.unit_of_measurement && metric.metric_type !== 'percentage' && (
                                                     <span className="absolute top-1 right-1.5 md:top-1.5 md:right-2 text-[9px] md:text-[10px] font-medium text-gray-400 leading-tight truncate max-w-[60%] text-right">
@@ -1919,7 +1919,7 @@ export default function PublicOrganizationPage() {
                         </div>
 
                         {/* Impact Claims Container (Scrollable) */}
-                        <div className="w-full md:w-[48%] overflow-hidden flex flex-col max-h-[280px] md:max-h-none md:min-h-0">
+                        <div className="w-full md:w-[48%] overflow-hidden md:overflow-visible flex flex-col max-h-[280px] md:max-h-none md:min-h-0">
                             <div className="px-3 md:px-4 py-2 md:py-3 flex items-center justify-between flex-shrink-0">
                                 <div className="flex items-center gap-2">
                                     <div
@@ -1952,7 +1952,7 @@ export default function PublicOrganizationPage() {
                                             <Link
                                                 key={`${claim.id}-${idx}`}
                                                 to={`${orgLinkBase}/${slug}/${claim.initiativeSlug}/claim/${claim.id}?from=org`}
-                                                className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group"
+                                                className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.08),0_1px_3px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_10px_-2px_rgba(15,23,42,0.16),0_10px_20px_-6px_rgba(15,23,42,0.18)] hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group"
                                             >
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div className="flex-1 min-w-0">
@@ -2052,7 +2052,7 @@ export default function PublicOrganizationPage() {
                                             <Link
                                                 key={ev.id}
                                                 to={`${orgLinkBase}/${slug}/${ev.initiative_slug}?tab=evidence`}
-                                                className="rounded-xl overflow-hidden bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group h-[120px] md:h-full"
+                                                className="rounded-xl overflow-hidden bg-white border border-gray-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.08),0_1px_3px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_10px_-2px_rgba(15,23,42,0.16),0_10px_20px_-6px_rgba(15,23,42,0.18)] hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group h-[120px] md:h-full"
                                             >
                                                 {isImage ? (
                                                     <img src={ev.file_url} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
