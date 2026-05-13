@@ -219,6 +219,43 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
     }
   }, [dimensions, initialPov, locations, enableZoom]);
 
+  // Dispose the WebGL context on unmount.
+  //
+  // react-globe.gl does NOT release its WebGLRenderer when the React component
+  // unmounts, so during dev with HMR (and in any SPA route change that
+  // remounts the globe) Chrome accumulates contexts until it hits the per-page
+  // limit (~16) and blocks new ones with:
+  //   "WebGLRenderer: Error creating WebGL context."
+  //   "Web page caused context loss and was blocked"
+  // Calling `forceContextLoss()` + `dispose()` here tells the GPU driver to
+  // reclaim the context immediately instead of waiting on GC.
+  useEffect(() => {
+    return () => {
+      try {
+        const inst = globeRef.current as any;
+        if (!inst) return;
+        const renderer = typeof inst.renderer === 'function' ? inst.renderer() : null;
+        if (renderer) {
+          renderer.forceContextLoss?.();
+          renderer.dispose?.();
+        }
+        const scene = typeof inst.scene === 'function' ? inst.scene() : null;
+        if (scene) {
+          scene.traverse?.((obj: any) => {
+            obj.geometry?.dispose?.();
+            if (Array.isArray(obj.material)) {
+              obj.material.forEach((m: any) => m?.dispose?.());
+            } else {
+              obj.material?.dispose?.();
+            }
+          });
+        }
+      } catch {
+        // Best-effort cleanup; never let teardown errors break unmount.
+      }
+    };
+  }, []);
+
   return (
     <div ref={containerRef} className="w-full h-full">
       {/* Loading placeholder */}

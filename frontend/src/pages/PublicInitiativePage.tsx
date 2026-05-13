@@ -46,6 +46,18 @@ import PublicTagFilter from '../components/public/PublicTagFilter'
 import PublicTagChip from '../components/public/PublicTagChip'
 import PublicDonateButton from '../components/public/PublicDonateButton'
 import DateRangePicker from '../components/DateRangePicker'
+import {
+    PublicPageBackground,
+    PUBLIC_CARD_CLASS,
+    PUBLIC_HEADER_CLASS,
+    PUBLIC_PANEL_CLASS,
+    PUBLIC_PANEL_STATIC_CLASS,
+    PUBLIC_TILE_CLASS,
+    PUBLIC_SECTION_CHIP_STYLE,
+    brandIconStyle,
+    publicActiveFilterStyle,
+    publicCountBadgeStyle,
+} from '../components/public/publicStyles'
 import { getLocalDateString, formatDate, parseLocalDate } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 
@@ -367,10 +379,12 @@ export default function PublicInitiativePage() {
         navigate(`${orgLinkBase}/${orgSlug}/${slug}${queryString ? `?${queryString}` : ''}`)
     }
 
-    // Filter dashboard KPIs by date + tag — filter each KPI's updates and recalculate totals
+    // Filter dashboard KPIs by date + tag + location — filter each KPI's
+    // updates and recalculate totals so cards/charts/numbers all reflect the
+    // active filters consistently.
     const filteredDashboard = useMemo(() => {
         if (!dashboard) return null
-        if (!startDate && !endDate && selectedTagIds.length === 0) return dashboard
+        if (!startDate && !endDate && selectedTagIds.length === 0 && selectedLocationIds.length === 0) return dashboard
 
         const sd = startDate ? new Date(startDate) : null
         const ed = endDate ? new Date(endDate + 'T23:59:59') : null
@@ -383,6 +397,14 @@ export default function PublicInitiativePage() {
                 if (sd && d < sd) return false
                 if (ed && d > ed) return false
                 if (selectedTagIds.length > 0 && !tagMatchesSingle(u.tag_id)) return false
+                // Location filter: an update is kept only if its location_id
+                // matches one of the selected locations. Updates without a
+                // location_id are excluded when a location filter is active
+                // (otherwise the filter would be effectively a no-op for any
+                // metric with mostly "global" updates).
+                if (selectedLocationIds.length > 0) {
+                    if (!u.location_id || !selectedLocationIds.includes(u.location_id)) return false
+                }
                 return true
             })
 
@@ -404,8 +426,15 @@ export default function PublicInitiativePage() {
             })
         }
 
+        if (selectedLocationIds.length > 0) {
+            // Drop KPIs that ended up with no matching updates after the
+            // location filter — keeping them would show "0" cards with no
+            // explanation. This mirrors the org page's behavior.
+            filteredKpis = filteredKpis.filter(kpi => (kpi.updates || []).length > 0)
+        }
+
         return { ...dashboard, kpis: filteredKpis }
-    }, [dashboard, startDate, endDate, selectedTagIds])
+    }, [dashboard, startDate, endDate, selectedTagIds, selectedLocationIds])
 
     // Filter stories by date + location + tags
     const filteredStories = useMemo(() => {
@@ -445,6 +474,12 @@ export default function PublicInitiativePage() {
                 if (e.locations && e.locations.length > 0) {
                     return e.locations.some((loc: any) => selectedLocationIds.includes(loc.id))
                 }
+                // Evidence has no direct locations → fall back to checking
+                // whether any of its impact claims reference a selected
+                // location, so location-scoped evidence still shows up.
+                if ((e as any).impact_claims && (e as any).impact_claims.length > 0) {
+                    return (e as any).impact_claims.some((c: any) => c.location_id && selectedLocationIds.includes(c.location_id))
+                }
                 return false
             })
         }
@@ -474,7 +509,7 @@ export default function PublicInitiativePage() {
     if (error || !initiative || !dashboard) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center px-6">
-                <div className="glass-card p-12 rounded-3xl text-center max-w-md">
+                <div className="rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-12 text-center max-w-md">
                     <Globe className="w-16 h-16 text-muted-foreground/50 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-foreground mb-3">Initiative Not Found</h1>
                     <p className="text-muted-foreground mb-8">{error || 'This initiative does not exist.'}</p>
@@ -500,22 +535,10 @@ export default function PublicInitiativePage() {
 
     return (
         <div className="min-h-screen font-figtree relative animate-fadeIn">
-            {/* Flowing gradient background */}
-            <div
-                className="fixed inset-0 pointer-events-none"
-                style={{
-                    background: `
-                        radial-gradient(ellipse 80% 50% at 20% 40%, ${brandColor}90, transparent 60%),
-                        radial-gradient(ellipse 60% 80% at 80% 20%, ${brandColor}70, transparent 55%),
-                        radial-gradient(ellipse 50% 60% at 60% 80%, ${brandColor}60, transparent 55%),
-                        radial-gradient(ellipse 70% 40% at 10% 90%, ${brandColor}50, transparent 50%),
-                        linear-gradient(180deg, white 0%, #fafafa 100%)
-                    `
-                }}
-            />
+            <PublicPageBackground brandColor={brandColor} />
 
-            {/* Header with Filters - matching org page style */}
-            <header className="sticky top-0 z-40 bg-white/60 backdrop-blur-2xl border-b border-white/40 shadow-sm">
+            {/* Header with Filters — matches the public org dashboard. */}
+            <header className={`sticky top-0 z-40 ${PUBLIC_HEADER_CLASS}`}>
                 <div className="px-2 sm:px-3 md:px-5 py-2 sm:py-2.5">
                     <div className="flex items-center gap-1.5 sm:gap-3">
                         {/* Left: Nav + Org */}
@@ -530,17 +553,22 @@ export default function PublicInitiativePage() {
                                     <Building2 className="w-4 h-4 text-gray-400" />
                                 )}
                             </div>
-                            <h1 className="text-sm font-semibold text-foreground truncate max-w-[100px] md:max-w-[180px] hidden sm:block">{initiative.title}</h1>
+                            {/* Top-bar title shows the CHARITY name; the initiative
+                                is identified by the switcher pill below + the main page
+                                content, so duplicating it here is just noise. */}
+                            <h1 className="text-sm font-semibold text-foreground truncate max-w-[100px] md:max-w-[180px] hidden sm:block">{initiative.organization_name}</h1>
                             <PublicDonateButton orgSlug={orgSlug} />
                         </div>
 
                         {/* Center: Filters */}
                         <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0 overflow-x-auto scrollbar-none">
-                            {/* Initiative Switcher */}
+                            {/* Initiative Switcher — always carries the brand
+                                border since this page is initiative-scoped. */}
                             <button
                                 ref={initiativeBtnRef}
                                 onClick={() => { setShowInitiativeDropdown(!showInitiativeDropdown); setShowLocationDropdown(false) }}
-                                className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
+                                className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all flex-shrink-0"
+                                style={publicActiveFilterStyle(brandColor, true)}
                             >
                                 <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
                                     <Target className="w-3.5 h-3.5 text-gray-600" />
@@ -558,6 +586,7 @@ export default function PublicInitiativePage() {
                                     onChange={setDateFilter}
                                     maxDate={getLocalDateString(new Date())}
                                     placeholder="Date"
+                                    activeColor={brandColor}
                                     className="[&>button]:h-7 [&>button]:text-[11px] [&>button]:pr-1.5 sm:[&>button]:pr-2.5 [&>button>div]:w-7 [&>button>div]:h-7 [&>button>div>svg]:w-3.5 [&>button>div>svg]:h-3.5 [&>button>span]:ml-1 sm:[&>button>span]:ml-1.5"
                                 />
                             </div>
@@ -567,7 +596,8 @@ export default function PublicInitiativePage() {
                                 <button
                                     ref={locationBtnRef}
                                     onClick={() => { setShowLocationDropdown(!showLocationDropdown); setShowInitiativeDropdown(false) }}
-                                    className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
+                                    className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all flex-shrink-0"
+                                    style={publicActiveFilterStyle(brandColor, selectedLocationIds.length > 0)}
                                 >
                                     <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
                                         <MapPin className="w-3.5 h-3.5 text-gray-600" />
@@ -590,6 +620,7 @@ export default function PublicInitiativePage() {
                                 tags={initiativeTags}
                                 selectedTagIds={selectedTagIds}
                                 onChange={setSelectedTagIds}
+                                activeColor={brandColor}
                                 onOpenChange={(open) => { if (open) { setShowInitiativeDropdown(false); setShowLocationDropdown(false) } }}
                             />
 
@@ -717,9 +748,9 @@ export default function PublicInitiativePage() {
                     <div className="w-56 flex-shrink-0 hidden lg:block">
                         <div className="sticky top-[140px]">
                             {/* Initiative Info Card */}
-                            <div className="bg-white/40 backdrop-blur-2xl p-4 rounded-2xl border border-white/60 shadow-xl shadow-black/5 mb-4">
+                            <div className={`${PUBLIC_PANEL_STATIC_CLASS} p-4 mb-4`}>
                                 <div className="flex items-center gap-3 mb-3">
-                                    <div className="w-11 h-11 bg-white/60 rounded-xl flex items-center justify-center flex-shrink-0 border border-white/50 overflow-hidden shadow-md">
+                                    <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden" style={PUBLIC_SECTION_CHIP_STYLE}>
                                         {initiative.organization_logo_url ? (
                                             <img src={initiative.organization_logo_url} alt={initiative.organization_name || 'Organization'} className="w-full h-full object-cover" />
                                         ) : (
@@ -736,15 +767,15 @@ export default function PublicInitiativePage() {
 
                                 {/* Quick Stats */}
                                 <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/50">
-                                    <div className="text-center p-2 rounded-lg bg-white/40">
+                                    <div className="text-center p-2 rounded-lg bg-gray-50 border border-gray-100">
                                         <p className="text-lg font-bold text-foreground">{dashboard.stats.kpis}</p>
                                         <p className="text-[10px] text-muted-foreground font-medium">Metrics</p>
                                     </div>
-                                    <div className="text-center p-2 rounded-lg bg-white/40">
+                                    <div className="text-center p-2 rounded-lg bg-gray-50 border border-gray-100">
                                         <p className="text-lg font-bold text-foreground">{dashboard.stats.evidence}</p>
                                         <p className="text-[10px] text-muted-foreground font-medium">Evidence</p>
                                     </div>
-                                    <div className="text-center p-2 rounded-lg bg-white/40">
+                                    <div className="text-center p-2 rounded-lg bg-gray-50 border border-gray-100">
                                         <p className="text-lg font-bold text-foreground">{dashboard.stats.stories}</p>
                                         <p className="text-[10px] text-muted-foreground font-medium">Stories</p>
                                     </div>
@@ -752,22 +783,22 @@ export default function PublicInitiativePage() {
                             </div>
 
                             {/* Navigation Tabs */}
-                            <nav className="space-y-1 bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-2">
+                            <nav className={`${PUBLIC_PANEL_STATIC_CLASS} space-y-1 p-2`}>
                                 {tabs.map((tab) => (
                                     <div key={tab.id} className="flex items-center gap-1">
                                         <button
                                             onClick={() => setActiveTab(tab.id)}
                                             className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === tab.id
                                                 ? 'bg-gray-800 text-white shadow-lg'
-                                                : 'text-gray-700 hover:bg-white/60'
+                                                : 'text-gray-700 hover:bg-gray-50'
                                                 }`}
                                         >
                                             <tab.icon className="w-4 h-4" />
                                             <span className="flex-1 text-left">{tab.label}</span>
                                             {tab.count !== undefined && (
                                                 <span className={`px-2 py-0.5 text-xs rounded-full font-semibold ${activeTab === tab.id
-                                                    ? 'bg-white/30 text-white'
-                                                    : 'bg-white/60 text-gray-600'
+                                                    ? 'bg-white/20 text-white'
+                                                    : 'bg-gray-100 text-gray-600'
                                                     }`}>
                                                     {tab.count}
                                                 </span>
@@ -781,7 +812,7 @@ export default function PublicInitiativePage() {
                     </div>
 
                     {/* Mobile Tab Bar */}
-                    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-2xl border-t border-gray-200 z-30 safe-area-pb">
+                    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-2px_8px_rgba(15,23,42,0.06)] z-30 safe-area-pb">
                         <div className="flex justify-around px-1 py-2">
                             {tabs.slice(0, 5).map((tab) => (
                                 <button
@@ -1219,7 +1250,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
     return (
         <div className="space-y-5">
             {/* Hero Section - Compact */}
-            <div className="bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl p-6">
+            <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-6">
                 <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                     <div className="flex-1">
                         <h1 className="text-2xl font-semibold text-foreground mb-2">{initiative.title}</h1>
@@ -1244,12 +1275,12 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                     </div>
                     <div className="flex flex-wrap gap-3">
                         {initiative.region && (
-                            <span className="inline-flex items-center gap-2 px-4 py-2 bg-white/60 rounded-xl text-sm font-medium text-foreground border border-white/80">
+                            <span className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-xl text-sm font-medium text-foreground border border-gray-200">
                                 <MapPin className="w-4 h-4 text-gray-500" />
                                 {initiative.region}
                             </span>
                         )}
-                        <span className="inline-flex items-center gap-2 px-4 py-2 bg-white/60 rounded-xl text-sm font-medium text-foreground border border-white/80">
+                        <span className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-xl text-sm font-medium text-foreground border border-gray-200">
                             <Activity className="w-4 h-4 text-gray-500" />
                             {totalDataPoints} data points
                         </span>
@@ -1267,7 +1298,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                             <Link
                                 key={kpi.id}
                                 to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}${dateQS}`}
-                                className="bg-white/60 backdrop-blur rounded-xl border border-white/80 p-3 transition-all hover:shadow-lg hover:border-accent group"
+                                className="rounded-xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 p-3 transition-all group"
                             >
                                 <div className="flex items-center justify-between mb-1">
                                     <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: metricColor }} />
@@ -1284,11 +1315,11 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
             )}
 
             {/* Main Chart */}
-            <div className="bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl p-5">
+            <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-5">
                 <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                     <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${brandColor}30` }}>
-                            <TrendingUp className="w-4 h-4" style={{ color: brandColor }} />
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={PUBLIC_SECTION_CHIP_STYLE}>
+                            <TrendingUp className="w-4 h-4" style={brandIconStyle(brandColor)} />
                         </div>
                         <h2 className="font-semibold text-foreground">Metrics Over Time</h2>
                     </div>
@@ -1299,7 +1330,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                                 onClick={() => setIsMetricDropdownOpen(!isMetricDropdownOpen)}
                                 className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-xl border-2 transition-all duration-200 ${visibleKPIs.size < dashboard.kpis.length
                                     ? 'bg-accent/10 text-accent border-accent/30 hover:bg-accent/20'
-                                    : 'bg-white/60 text-gray-700 border-white/80 hover:bg-white/80'
+                                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
                                     }`}
                             >
                                 <Layers className="w-3.5 h-3.5" />
@@ -1370,7 +1401,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                         </div>
 
                         {/* Monthly / Cumulative / Percentages Toggle */}
-                        <div className="flex items-center bg-white/60 rounded-xl p-0.5 border border-white/80">
+                        <div className="flex items-center bg-gray-100 rounded-xl p-0.5 border border-gray-200">
                             {hasNonPercentageKpi && (
                                 <>
                             <button
@@ -1397,7 +1428,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                             )}
                         </div>
                         {/* Time Frame */}
-                        <div className="flex items-center bg-white/60 rounded-xl p-0.5 border border-white/80">
+                        <div className="flex items-center bg-gray-100 rounded-xl p-0.5 border border-gray-200">
                             {(['all', '1month', '6months', '1year'] as const).map((tf) => (
                                 <button
                                     key={tf}
@@ -1598,27 +1629,27 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
             {/* Bottom Row: Stats + Category Breakdown + Locations */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 {/* Stats */}
-                <div className="bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl p-5">
+                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-5">
                     <div className="flex items-center gap-2 mb-4">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${brandColor}30` }}>
-                            <BarChart3 className="w-4 h-4" style={{ color: brandColor }} />
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={PUBLIC_SECTION_CHIP_STYLE}>
+                            <BarChart3 className="w-4 h-4" style={brandIconStyle(brandColor)} />
                         </div>
                         <h2 className="font-semibold text-foreground">Quick Stats</h2>
                     </div>
                     <div className="space-y-3">
-                        <div className="flex items-center justify-between p-3 bg-white/60 rounded-xl">
+                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
                             <span className="text-sm text-muted-foreground">Metrics</span>
                             <span className="font-bold text-foreground">{dashboard.stats.kpis}</span>
                         </div>
-                        <div className="flex items-center justify-between p-3 bg-white/60 rounded-xl">
+                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
                             <span className="text-sm text-muted-foreground">Evidence</span>
                             <span className="font-bold text-foreground">{dashboard.stats.evidence}</span>
                         </div>
-                        <div className="flex items-center justify-between p-3 bg-white/60 rounded-xl">
+                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
                             <span className="text-sm text-muted-foreground">Stories</span>
                             <span className="font-bold text-foreground">{dashboard.stats.stories}</span>
                         </div>
-                        <div className="flex items-center justify-between p-3 bg-white/60 rounded-xl">
+                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
                             <span className="text-sm text-muted-foreground">Locations</span>
                             <span className="font-bold text-foreground">{dashboard.stats.locations}</span>
                         </div>
@@ -1626,7 +1657,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                 </div>
 
                 {/* Category Breakdown */}
-                <div className="bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl p-5">
+                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-5">
                     <div className="flex items-center gap-2 mb-4">
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-purple-100">
                             <Layers className="w-4 h-4 text-purple-600" />
@@ -1672,7 +1703,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                 </div>
 
                 {/* Locations Preview */}
-                <div className="bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl p-5">
+                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-5">
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-amber-100">
@@ -1705,7 +1736,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                             </div>
                             <div className="flex flex-wrap gap-1.5">
                                 {dashboard.locations.slice(0, 5).map((loc) => (
-                                    <span key={loc.id} className="px-2 py-1 bg-white/60 text-foreground rounded text-xs font-medium">
+                                    <span key={loc.id} className="px-2 py-1 bg-gray-100 text-foreground rounded text-xs font-medium border border-gray-200">
                                         {loc.name}
                                     </span>
                                 ))}
@@ -1750,7 +1781,7 @@ function MetricsTab({ dashboard, orgSlug, initiativeSlug, dateQS = '', tagsById,
 
     if (kpis.length === 0) {
         return (
-            <div className="glass-card p-12 rounded-2xl text-center border-accent/20">
+            <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-12 text-center">
                 <BarChart3 className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
                 <p className="text-muted-foreground">No metrics available yet.</p>
             </div>
@@ -1776,12 +1807,12 @@ function MetricsTab({ dashboard, orgSlug, initiativeSlug, dateQS = '', tagsById,
                     <Link
                         key={kpi.id}
                         to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}${dateQS}`}
-                        className="glass-card rounded-2xl border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all overflow-hidden group cursor-pointer"
+                        className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all overflow-hidden group cursor-pointer"
                     >
                         {/* Header */}
                         <div className={`px-5 py-3 ${config.bg} border-b ${config.border}`}>
                             <div className="flex items-center justify-between">
-                                <span className={`px-2.5 py-1 text-xs font-semibold rounded-full bg-white/60 ${config.text} capitalize`}>
+                                <span className={`px-2.5 py-1 text-xs font-semibold rounded-full bg-white border border-gray-200 ${config.text} capitalize`}>
                                     {kpi.category}
                                 </span>
                                 {kpi.update_count !== undefined && kpi.update_count > 0 && (
@@ -1874,7 +1905,7 @@ function StoriesTab({ stories, orgSlug, initiativeSlug, dateQS = '', tagsById, o
                 <Link
                     key={story.id}
                     to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/story/${story.id}${dateQS}`}
-                    className="glass-card rounded-2xl overflow-hidden group border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all"
+                    className="rounded-2xl overflow-hidden group bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all"
                 >
                     <div className="h-44 bg-gradient-to-br from-accent/10 to-accent/5 overflow-hidden">
                         {story.media_url && /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(story.media_url) ? (
@@ -2180,7 +2211,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { loc
     ] as [number, number]
 
     return (
-        <div className="glass-card p-5 rounded-2xl border-accent/20">
+        <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-5">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 <div className="lg:col-span-2 h-[450px] rounded-xl overflow-hidden border border-gray-200">
                     <MapContainer center={mapCenter} zoom={locations.length === 1 ? 8 : 3} className="w-full h-full" zoomControl={true} scrollWheelZoom={true}>
@@ -2522,7 +2553,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                         <button
                             key={item.id}
                             onClick={() => openGallery(filteredIndex)}
-                            className="glass-card rounded-2xl border border-transparent hover:border-accent hover:shadow-[0_0_20px_rgba(192,223,161,0.3)] transition-all overflow-hidden group text-left"
+                            className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all overflow-hidden group text-left"
                         >
                             {previewUrl ? (
                                 <div className="relative aspect-video bg-gray-100 overflow-hidden">
@@ -2671,7 +2702,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                             </div>
                             <button
                                 onClick={closeGallery}
-                                className="w-9 h-9 rounded-full bg-white/60 hover:bg-white/80 border border-gray-200/50 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors shadow-sm"
+                                className="w-9 h-9 rounded-full bg-white hover:bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors shadow-sm"
                             >
                                 <X className="w-4 h-4" />
                             </button>
@@ -2681,7 +2712,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
                             {/* File preview */}
                             <div className="lg:col-span-2 flex flex-col">
-                                <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 overflow-hidden flex-1 flex flex-col">
+                                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden flex-1 flex flex-col">
                                     <div className="relative bg-gray-900 flex-1 min-h-[250px] sm:min-h-[400px] max-h-[50vh] sm:max-h-[60vh] flex items-center justify-center">
                                         {galleryFile ? (
                                             isImageFile(galleryFile.file_url) ? (
@@ -2788,7 +2819,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                             {/* Info sidebar - glass card style */}
                             <div className="lg:col-span-1 flex flex-col gap-3 sm:gap-4 min-h-0 overflow-y-auto">
                                 {/* Evidence Info Card */}
-                                <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 sm:p-5 flex-shrink-0">
+                                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5 flex-shrink-0">
                                     <h2 className="font-semibold text-foreground text-base sm:text-lg mb-1">{galleryItem.title}</h2>
                                     {galleryItem.description && (
                                         <p className="text-muted-foreground text-xs sm:text-sm mb-3 line-clamp-4">{galleryItem.description}</p>
@@ -2808,7 +2839,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
 
                                 {/* Impact Claims Card */}
                                 {galleryItem.impact_claims && galleryItem.impact_claims.length > 0 ? (
-                                    <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 sm:p-5 flex-shrink-0">
+                                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5 flex-shrink-0">
                                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Supporting Impact Claims</h3>
                                         <div className="space-y-2">
                                             {galleryItem.impact_claims.map((claim: any) => {
@@ -2819,7 +2850,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                                                         ? formatDate(claim.date_represented)
                                                         : ''
                                                 return (
-                                                    <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/claim/${claim.id}${dateQS}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
+                                                    <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/claim/${claim.id}${dateQS}`} className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group">
                                                         <p className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors">
                                                             {claim.value}{claim.kpis?.metric_type === 'percentage' ? '%' : ` ${claim.kpis?.unit_of_measurement || ''}`}
                                                         </p>
@@ -2831,11 +2862,11 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                                         </div>
                                     </div>
                                 ) : galleryItem.kpis && galleryItem.kpis.length > 0 ? (
-                                    <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 sm:p-5 flex-shrink-0">
+                                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5 flex-shrink-0">
                                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Linked Metrics</h3>
                                         <div className="space-y-2">
                                             {galleryItem.kpis.map((kpi) => (
-                                                <Link key={kpi.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}${dateQS}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
+                                                <Link key={kpi.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}${dateQS}`} className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group">
                                                     <p className="text-sm font-medium text-foreground group-hover:text-accent transition-colors">{kpi.title}</p>
                                                 </Link>
                                             ))}
@@ -2849,7 +2880,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                         <div className="flex items-center justify-between mt-3 sm:mt-4 flex-shrink-0">
                             <button
                                 onClick={goToPrevEvidence}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/50 text-foreground rounded-xl transition-colors text-sm font-medium shadow-sm"
+                                className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-foreground rounded-xl transition-colors text-sm font-medium shadow-sm"
                             >
                                 <ChevronLeft className="w-4 h-4" />
                                 <span className="hidden sm:inline">Previous</span>
@@ -2889,7 +2920,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
 
                             <button
                                 onClick={goToNextEvidence}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/50 text-foreground rounded-xl transition-colors text-sm font-medium shadow-sm"
+                                className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-foreground rounded-xl transition-colors text-sm font-medium shadow-sm"
                             >
                                 <span className="hidden sm:inline">Next</span>
                                 <ChevronRight className="w-4 h-4" />
@@ -2910,7 +2941,7 @@ function BeneficiariesTab({ beneficiaries, orgSlug, initiativeSlug }: { benefici
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {beneficiaries.map((group) => (
-                <Link key={group.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/beneficiary/${group.id}`} className="group glass-card rounded-2xl border border-white/60 hover:border-accent/40 hover:shadow-[0_8px_30px_rgba(192,223,161,0.25)] transition-all active:scale-[0.98] overflow-hidden">
+                <Link key={group.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/beneficiary/${group.id}`} className="group rounded-2xl overflow-hidden bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all active:scale-[0.98]">
                     <div className="p-5 pb-3">
                         <div className="flex items-start gap-4">
                             <div className="w-11 h-11 bg-accent/15 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-accent/25 transition-colors">
@@ -2957,7 +2988,7 @@ function BeneficiariesTab({ beneficiaries, orgSlug, initiativeSlug }: { benefici
 
 function LoadingState() {
     return (
-        <div className="glass-card p-16 rounded-2xl text-center border-accent/20">
+        <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-16 text-center">
             <div className="flex flex-col items-center">
                 {/* Nexus Logo */}
                 <div className="w-12 h-12 mb-4">
@@ -2976,7 +3007,7 @@ function LoadingState() {
 
 function EmptyState({ icon: Icon, message }: { icon: any; message: string }) {
     return (
-        <div className="glass-card p-12 rounded-2xl text-center border-accent/20">
+        <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-12 text-center">
             <Icon className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
             <p className="text-muted-foreground">{message}</p>
         </div>

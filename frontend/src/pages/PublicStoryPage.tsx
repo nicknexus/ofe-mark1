@@ -10,6 +10,7 @@ import PublicLoader from '../components/public/PublicLoader'
 import PublicTagChip from '../components/public/PublicTagChip'
 import PublicDonateButton from '../components/public/PublicDonateButton'
 import DateRangePicker from '../components/DateRangePicker'
+import { PublicPageBackground } from '../components/public/publicStyles'
 import { getLocalDateString, formatDate } from '../utils'
 
 export default function PublicStoryPage() {
@@ -101,7 +102,7 @@ export default function PublicStoryPage() {
     if (error || !story) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center px-6">
-                <div className="bg-white/40 backdrop-blur-2xl p-12 rounded-3xl text-center max-w-md border border-white/60 shadow-xl">
+                <div className="rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-12 text-center max-w-md">
                     <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-gray-800 mb-3">Story Not Found</h1>
                     <p className="text-gray-500 mb-8">{error || 'This story does not exist.'}</p>
@@ -119,22 +120,10 @@ export default function PublicStoryPage() {
 
     return (
         <div className="min-h-screen font-figtree relative animate-fadeIn">
-            {/* Flowing gradient background */}
-            <div
-                className="fixed inset-0 pointer-events-none"
-                style={{
-                    background: `
-                        radial-gradient(ellipse 80% 50% at 20% 40%, ${brandColor}90, transparent 60%),
-                        radial-gradient(ellipse 60% 80% at 80% 20%, ${brandColor}70, transparent 55%),
-                        radial-gradient(ellipse 50% 60% at 60% 80%, ${brandColor}60, transparent 55%),
-                        radial-gradient(ellipse 70% 40% at 10% 90%, ${brandColor}50, transparent 50%),
-                        linear-gradient(180deg, white 0%, #fafafa 100%)
-                    `
-                }}
-            />
+            <PublicPageBackground brandColor={brandColor} />
 
             {/* Navigation Header */}
-            <div className="sticky top-0 z-50 bg-white/60 backdrop-blur-2xl border-b border-white/40">
+            <div className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
                 <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 sm:gap-3">
@@ -149,7 +138,8 @@ export default function PublicStoryPage() {
                             value={dateFilter}
                             onChange={setDateFilter}
                             maxDate={getLocalDateString(new Date())}
-                            placeholder="Filter by date"
+                            placeholder="Date"
+                            activeColor={brandColor}
                             className="w-auto"
                         />
                         <Link to="/" className="flex items-center gap-2">
@@ -176,7 +166,7 @@ export default function PublicStoryPage() {
                 </div>
 
                 {/* Story Card */}
-                <div className="bg-white/50 backdrop-blur-2xl rounded-2xl sm:rounded-3xl border border-white/60 shadow-2xl shadow-black/10 overflow-hidden">
+                <div className="rounded-2xl sm:rounded-3xl bg-white border border-gray-200/80 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_8px_24px_-6px_rgba(15,23,42,0.14)] overflow-hidden">
                     {/* Media */}
                     {(() => {
                         const url = story.media_url
@@ -357,7 +347,7 @@ export default function PublicStoryPage() {
                                 {prevStory ? (
                                     <button
                                         onClick={goToPrev}
-                                        className="flex items-center gap-2 px-4 py-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/50 text-foreground rounded-xl transition-colors text-sm font-medium shadow-sm group min-w-0 flex-1"
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-foreground rounded-xl transition-colors text-sm font-medium shadow-sm group min-w-0 flex-1"
                                     >
                                         <ChevronLeft className="w-4 h-4 flex-shrink-0 group-hover:-translate-x-0.5 transition-transform" />
                                         <div className="min-w-0 text-left">
@@ -374,7 +364,7 @@ export default function PublicStoryPage() {
                                 {nextStory ? (
                                     <button
                                         onClick={goToNext}
-                                        className="flex items-center gap-2 px-4 py-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/50 text-foreground rounded-xl transition-colors text-sm font-medium shadow-sm group min-w-0 flex-1 justify-end"
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-foreground rounded-xl transition-colors text-sm font-medium shadow-sm group min-w-0 flex-1 justify-end"
                                     >
                                         <div className="min-w-0 text-right">
                                             <p className="text-[10px] text-muted-foreground">Next</p>

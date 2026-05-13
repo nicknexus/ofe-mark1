@@ -352,7 +352,7 @@ export class PublicService {
                 initiatives!inner(id, slug, title, organization_id,
                     organizations!inner(slug, is_public)
                 ),
-                kpi_updates(id, value, date_represented)
+                kpi_updates(id, value, date_represented, location_id)
             `)
             .eq('initiatives.organizations.slug', orgSlug)
             .eq('initiatives.organizations.is_public', true)
@@ -396,6 +396,7 @@ export class PublicService {
                     id: u.id,
                     value: u.value,
                     date_represented: u.date_represented,
+                    location_id: u.location_id || undefined,
                     tag_id: tagByUpdate[u.id] || null,
                 }))
             };

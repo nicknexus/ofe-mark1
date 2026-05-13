@@ -15,6 +15,13 @@ import PublicTagFilter from '../components/public/PublicTagFilter'
 import PublicDonateButton from '../components/public/PublicDonateButton'
 import PublicTagChip from '../components/public/PublicTagChip'
 import DateRangePicker from '../components/DateRangePicker'
+import {
+    PublicPageBackground,
+    PUBLIC_PANEL_STATIC_CLASS,
+    PUBLIC_SECTION_CHIP_STYLE,
+    brandIconStyle,
+    publicActiveFilterStyle,
+} from '../components/public/publicStyles'
 import { getLocalDateString, formatDate, parseLocalDate, getClaimEffectiveDate, compareClaimsByEffectiveDateDesc } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 
@@ -93,7 +100,7 @@ export default function PublicMetricPage() {
     if (error || !metric) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center px-6">
-                <div className="bg-white/50 backdrop-blur-2xl border border-white/60 shadow-xl p-12 rounded-3xl text-center max-w-md">
+                <div className="rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-12 text-center max-w-md">
                     <BarChart3 className="w-16 h-16 text-gray-300 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-gray-800 mb-3">Metric Not Found</h1>
                     <p className="text-gray-500 mb-8">{error || 'This metric does not exist.'}</p>
@@ -331,22 +338,10 @@ export default function PublicMetricPage() {
 
     return (
         <div className="min-h-screen font-figtree relative animate-fadeIn">
-            {/* Flowing gradient background */}
-            <div
-                className="fixed inset-0 pointer-events-none"
-                style={{
-                    background: `
-                        radial-gradient(ellipse 80% 50% at 20% 40%, ${brandColor}90, transparent 60%),
-                        radial-gradient(ellipse 60% 80% at 80% 20%, ${brandColor}70, transparent 55%),
-                        radial-gradient(ellipse 50% 60% at 60% 80%, ${brandColor}60, transparent 55%),
-                        radial-gradient(ellipse 70% 40% at 10% 90%, ${brandColor}50, transparent 50%),
-                        linear-gradient(180deg, white 0%, #fafafa 100%)
-                    `
-                }}
-            />
+            <PublicPageBackground brandColor={brandColor} />
 
             {/* Navigation Header */}
-            <div className="sticky top-0 z-50 bg-white/60 backdrop-blur-2xl border-b border-white/40">
+            <div className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 sm:py-3">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
@@ -363,6 +358,7 @@ export default function PublicMetricPage() {
                                     onChange={setDateFilter}
                                     maxDate={getLocalDateString(new Date())}
                                     placeholder="Date"
+                                    activeColor={brandColor}
                                     className="[&>button]:h-7 [&>button]:text-[11px] [&>button]:pr-1.5 sm:[&>button]:pr-2.5 [&>button>div]:w-7 [&>button>div]:h-7 [&>button>div>svg]:w-3.5 [&>button>div>svg]:h-3.5 [&>button>span]:ml-1 sm:[&>button>span]:ml-1.5"
                                 />
                             </div>
@@ -371,7 +367,8 @@ export default function PublicMetricPage() {
                                 <button
                                     ref={locationBtnRef}
                                     onClick={() => { setShowLocationDropdown(!showLocationDropdown); setShowBenDropdown(false) }}
-                                    className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
+                                    className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all flex-shrink-0"
+                                    style={publicActiveFilterStyle(brandColor, selectedLocationIds.length > 0)}
                                 >
                                     <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
                                         <MapPin className="w-3.5 h-3.5 text-gray-600" />
@@ -391,6 +388,7 @@ export default function PublicMetricPage() {
                                 tags={metricTags}
                                 selectedTagIds={selectedTagIds}
                                 onChange={setSelectedTagIds}
+                                activeColor={brandColor}
                                 onOpenChange={(open) => { if (open) { setShowLocationDropdown(false); setShowBenDropdown(false) } }}
                             />
 
@@ -398,7 +396,8 @@ export default function PublicMetricPage() {
                                 <button
                                     ref={benBtnRef}
                                     onClick={() => { setShowBenDropdown(!showBenDropdown); setShowLocationDropdown(false) }}
-                                    className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
+                                    className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all flex-shrink-0"
+                                    style={publicActiveFilterStyle(brandColor, selectedBenGroupIds.length > 0)}
                                 >
                                     <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
                                         <Users className="w-3.5 h-3.5 text-gray-600" />
@@ -485,7 +484,7 @@ export default function PublicMetricPage() {
                         </div>
 
                         {/* Big Total Card - Full width on mobile */}
-                        <div className="bg-white/70 backdrop-blur-2xl p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-xl shadow-black/10 border border-white/60 lg:min-w-[200px] lg:max-w-[240px]">
+                        <div className="rounded-2xl sm:rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-6 lg:min-w-[200px] lg:max-w-[240px]">
                             <p className="text-gray-500 text-xs sm:text-sm font-medium mb-0.5 sm:mb-1">{metric.metric_type === 'percentage' ? 'Average' : 'Total Impact'}</p>
                             <p className={`text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight ${config.text}`}>
                                 {(hasActiveFilters ? filteredTotal : metric.total_value).toLocaleString()}{metric.metric_type === 'percentage' ? '%' : ''}
@@ -498,13 +497,13 @@ export default function PublicMetricPage() {
                 {/* Dashboard Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-5 sm:mb-8">
                     {/* Chart - Takes 2 columns */}
-                    <div className="lg:col-span-2 bg-white/50 backdrop-blur-2xl rounded-2xl sm:rounded-3xl border border-white/60 shadow-xl shadow-black/5 overflow-hidden">
+                    <div className="lg:col-span-2 rounded-2xl sm:rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
                         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/40 flex items-center justify-between">
                             <h2 className="font-semibold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
                                 <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
                                 {isPercentage ? 'Percentage Over Time' : 'Cumulative Progress'}
                             </h2>
-                            <span className="text-[10px] sm:text-xs text-gray-500 bg-white/60 px-2 sm:px-3 py-1 rounded-full">
+                            <span className="text-[10px] sm:text-xs text-gray-500 bg-gray-100 px-2 sm:px-3 py-1 rounded-full">
                                 {hasActiveFilters ? 'Filtered' : 'All time'}
                             </span>
                         </div>
@@ -628,7 +627,7 @@ export default function PublicMetricPage() {
                     </div>
 
                     {/* Impact Claims - Right side scrollable */}
-                    <div className="bg-white/50 backdrop-blur-2xl rounded-2xl sm:rounded-3xl border border-white/60 shadow-xl shadow-black/5 overflow-hidden flex flex-col max-h-[300px] sm:max-h-[400px]">
+                    <div className="rounded-2xl sm:rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden flex flex-col max-h-[300px] sm:max-h-[400px]">
                         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/40 flex-shrink-0">
                             <h2 className="font-semibold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
                                 <Target className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
@@ -772,7 +771,7 @@ export default function PublicMetricPage() {
             )}
 
             {/* Footer */}
-            <div className="relative z-10 border-t border-white/40 bg-white/40 backdrop-blur-xl mt-8 sm:mt-12">
+            <div className="relative z-10 border-t border-gray-100 bg-white mt-8 sm:mt-12">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
                         <p className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
@@ -809,7 +808,7 @@ function ImpactClaimCard({ update, unit, isPercentage, config, orgSlug, initiati
     return (
         <Link
             to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/claim/${update.id}`}
-            className="block p-3 sm:p-4 bg-white/60 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-white/50 hover:bg-white/80 hover:shadow-md hover:border-accent/30 transition-all group active:scale-[0.98]"
+            className="block p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group active:scale-[0.98]"
         >
             <div className="flex items-start justify-between gap-2 sm:gap-3">
                 <div className="flex-1 min-w-0">
@@ -991,7 +990,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
 
     return (
         <>
-            <div className="bg-white/50 backdrop-blur-2xl rounded-2xl sm:rounded-3xl border border-white/60 shadow-xl shadow-black/5 overflow-hidden">
+            <div className="rounded-2xl sm:rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
                 <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/40 flex items-center justify-between">
                     <h2 className="font-semibold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
                         <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
@@ -1020,7 +1019,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                 <button
                                     key={ev.id}
                                     onClick={() => openGallery(idx)}
-                                    className="bg-white/60 backdrop-blur-sm rounded-2xl border border-white/50 hover:bg-white/80 hover:shadow-lg hover:border-accent transition-all overflow-hidden group text-left"
+                                    className="rounded-2xl overflow-hidden group text-left bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all"
                                 >
                                     {previewUrl ? (
                                         <div className="relative aspect-video bg-gray-100 overflow-hidden">
@@ -1103,7 +1102,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                 </span>
                                 <span className="text-muted-foreground text-sm">{galleryIndex + 1} of {evidence.length}</span>
                             </div>
-                            <button onClick={closeGallery} className="w-9 h-9 rounded-full bg-white/60 hover:bg-white/80 border border-gray-200/50 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors shadow-sm">
+                            <button onClick={closeGallery} className="w-9 h-9 rounded-full bg-white hover:bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors shadow-sm">
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
@@ -1112,7 +1111,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
                             {/* File preview */}
                             <div className="lg:col-span-2 flex flex-col">
-                                <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 overflow-hidden flex-1 flex flex-col">
+                                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden flex-1 flex flex-col">
                                     <div className="relative bg-gray-900 flex-1 min-h-[250px] sm:min-h-[400px] max-h-[50vh] sm:max-h-[60vh] flex items-center justify-center">
                                         {galleryFile ? (
                                             isImageFile(galleryFile.file_url) ? (
@@ -1184,7 +1183,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
 
                             {/* Sidebar */}
                             <div className="lg:col-span-1 flex flex-col gap-3 sm:gap-4 min-h-0 overflow-y-auto">
-                                <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 sm:p-5 flex-shrink-0">
+                                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5 flex-shrink-0">
                                     <h2 className="font-semibold text-foreground text-base sm:text-lg mb-1">{galleryItem.title}</h2>
                                     {galleryItem.description && <p className="text-muted-foreground text-xs sm:text-sm mb-3 line-clamp-4">{galleryItem.description}</p>}
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -1202,7 +1201,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
 
                                 {/* Impact Claims */}
                                 {galleryItem.impact_claims && galleryItem.impact_claims.length > 0 ? (
-                                    <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 sm:p-5 flex-shrink-0">
+                                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5 flex-shrink-0">
                                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Supporting Impact Claims</h3>
                                         <div className="space-y-2">
                                             {galleryItem.impact_claims.map((claim: any) => {
@@ -1214,7 +1213,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                                         ? formatDate(claim.date_represented)
                                                         : ''
                                                 return (
-                                                    <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
+                                                    <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`} className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group">
                                                         <p className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors">
                                                             {claim.value}{claim.kpis?.metric_type === 'percentage' ? '%' : ` ${claim.kpis?.unit_of_measurement || ''}`}
                                                         </p>
@@ -1226,11 +1225,11 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                         </div>
                                     </div>
                                 ) : galleryItem.kpis && galleryItem.kpis.length > 0 ? (
-                                    <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 sm:p-5 flex-shrink-0">
+                                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5 flex-shrink-0">
                                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Linked Metrics</h3>
                                         <div className="space-y-2">
                                             {galleryItem.kpis.map((kpi) => (
-                                                <Link key={kpi.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}`} className="block p-3 rounded-xl bg-white/60 border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group">
+                                                <Link key={kpi.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}`} className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group">
                                                     <p className="text-sm font-medium text-foreground group-hover:text-accent transition-colors">{kpi.title}</p>
                                                 </Link>
                                             ))}
@@ -1242,7 +1241,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
 
                         {/* Bottom nav */}
                         <div className="flex items-center justify-between mt-3 sm:mt-4 flex-shrink-0">
-                            <button onClick={goToPrev} className="flex items-center gap-2 px-4 py-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/50 text-foreground rounded-xl transition-colors text-sm font-medium shadow-sm">
+                            <button onClick={goToPrev} className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-foreground rounded-xl transition-colors text-sm font-medium shadow-sm">
                                 <ChevronLeft className="w-4 h-4" />
                                 <span className="hidden sm:inline">Previous</span>
                             </button>
@@ -1266,7 +1265,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                 })}
                             </div>
 
-                            <button onClick={goToNext} className="flex items-center gap-2 px-4 py-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/50 text-foreground rounded-xl transition-colors text-sm font-medium shadow-sm">
+                            <button onClick={goToNext} className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-foreground rounded-xl transition-colors text-sm font-medium shadow-sm">
                                 <span className="hidden sm:inline">Next</span>
                                 <ChevronRight className="w-4 h-4" />
                             </button>

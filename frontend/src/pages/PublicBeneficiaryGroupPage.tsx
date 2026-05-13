@@ -13,6 +13,12 @@ import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
 import PublicTagFilter from '../components/public/PublicTagFilter'
 import PublicDonateButton from '../components/public/PublicDonateButton'
+import {
+    PublicPageBackground,
+    PUBLIC_SECTION_CHIP_STYLE,
+    brandIconStyle,
+    publicCountBadgeStyle,
+} from '../components/public/publicStyles'
 import PublicTagChip from '../components/public/PublicTagChip'
 import { formatDate } from '../utils'
 
@@ -217,7 +223,7 @@ export default function PublicBeneficiaryGroupPage() {
     if (error || !data) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center px-6">
-                <div className="bg-white/50 backdrop-blur-2xl border border-white/60 shadow-xl p-12 rounded-3xl text-center max-w-md">
+                <div className="rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-12 text-center max-w-md">
                     <Users className="w-16 h-16 text-gray-300 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-gray-800 mb-3">Beneficiary Group Not Found</h1>
                     <p className="text-gray-500 mb-8">{error || 'This beneficiary group does not exist.'}</p>
@@ -237,22 +243,10 @@ export default function PublicBeneficiaryGroupPage() {
 
     return (
         <div className="min-h-screen md:h-screen font-figtree relative animate-fadeIn flex flex-col overflow-hidden">
-            {/* Gradient background */}
-            <div
-                className="fixed inset-0 pointer-events-none"
-                style={{
-                    background: `
-                        radial-gradient(ellipse 80% 50% at 20% 40%, ${brandColor}90, transparent 60%),
-                        radial-gradient(ellipse 60% 80% at 80% 20%, ${brandColor}70, transparent 55%),
-                        radial-gradient(ellipse 50% 60% at 60% 80%, ${brandColor}60, transparent 55%),
-                        radial-gradient(ellipse 70% 40% at 10% 90%, ${brandColor}50, transparent 50%),
-                        linear-gradient(180deg, white 0%, #fafafa 100%)
-                    `
-                }}
-            />
+            <PublicPageBackground brandColor={brandColor} />
 
             {/* Header */}
-            <div className="sticky top-0 z-50 bg-white/60 backdrop-blur-2xl border-b border-white/40 flex-shrink-0">
+            <div className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm flex-shrink-0">
                 <div className="max-w-full mx-auto px-4 sm:px-6 py-2 sm:py-3">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 sm:gap-3">
@@ -266,6 +260,7 @@ export default function PublicBeneficiaryGroupPage() {
                             tags={groupTags}
                             selectedTagIds={selectedTagIds}
                             onChange={setSelectedTagIds}
+                            activeColor={brandColor}
                         />
                         <Link to="/" className="flex items-center gap-2">
                             <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center overflow-hidden">
@@ -293,10 +288,10 @@ export default function PublicBeneficiaryGroupPage() {
 
                 {/* Group header */}
                 <div className="flex-shrink-0 mb-4 sm:mb-5">
-                    <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 sm:p-5">
+                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5">
                         <div className="flex items-start gap-4">
-                            <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${brandColor}33` }}>
-                                <Users className="w-6 h-6" style={{ color: brandColor }} />
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={PUBLIC_SECTION_CHIP_STYLE}>
+                                <Users className="w-6 h-6" style={brandIconStyle(brandColor)} />
                             </div>
                             <div className="flex-1 min-w-0">
                                 <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">{data.name}</h1>
@@ -317,8 +312,8 @@ export default function PublicBeneficiaryGroupPage() {
                 {/* 4-column grid */}
                 <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 min-h-0 overflow-auto lg:overflow-hidden">
                     {/* Column 1 - Stories */}
-                    <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 flex flex-col min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden">
-                        <div className="px-4 py-3 border-b border-white/40 flex-shrink-0">
+                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] flex flex-col min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden">
+                        <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
                             <div className="flex items-center gap-2">
                                 <BookOpen className="w-4 h-4 text-gray-600" />
                                 <h3 className="text-sm font-semibold text-gray-900">Stories</h3>
@@ -337,7 +332,7 @@ export default function PublicBeneficiaryGroupPage() {
                                         <Link
                                             key={story.id}
                                             to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/story/${story.id}`}
-                                            className="block bg-white/60 rounded-xl border border-white/50 overflow-hidden hover:bg-white/80 hover:shadow-md transition-all group"
+                                            className="block rounded-xl overflow-hidden bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group"
                                         >
                                             {story.media_url && story.media_type === 'photo' && (
                                                 <div className="w-full h-32 bg-gray-100 overflow-hidden">
@@ -377,8 +372,8 @@ export default function PublicBeneficiaryGroupPage() {
                     </div>
 
                     {/* Column 2 - Metrics (impact claims grouped by KPI) */}
-                    <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 flex flex-col min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden">
-                        <div className="px-4 py-3 border-b border-white/40 flex-shrink-0">
+                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] flex flex-col min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden">
+                        <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
                             <div className="flex items-center gap-2">
                                 <BarChart3 className="w-4 h-4 text-gray-600" />
                                 <h3 className="text-sm font-semibold text-gray-900">Metrics</h3>
@@ -401,7 +396,7 @@ export default function PublicBeneficiaryGroupPage() {
                                             <Link
                                                 key={group.kpi?.id || idx}
                                                 to={slug ? `${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${slug}` : '#'}
-                                                className="block p-3 bg-white/60 rounded-xl border border-white/50 hover:bg-white/80 hover:shadow-md transition-all group"
+                                                className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group"
                                             >
                                                 <div className="flex items-start gap-3">
                                                     <div className={`p-2 rounded-lg flex-shrink-0 ${colors.bg}`}>
@@ -446,8 +441,8 @@ export default function PublicBeneficiaryGroupPage() {
                     </div>
 
                     {/* Column 3 - Evidence grouped by type */}
-                    <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 flex flex-col min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden">
-                        <div className="px-4 py-3 border-b border-white/40 flex-shrink-0">
+                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] flex flex-col min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden">
+                        <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
                             <div className="flex items-center gap-2">
                                 <FileText className="w-4 h-4 text-gray-600" />
                                 <h3 className="text-sm font-semibold text-gray-900">Evidence</h3>
@@ -482,7 +477,7 @@ export default function PublicBeneficiaryGroupPage() {
                                                         <Link
                                                             key={ev.id}
                                                             to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/evidence/${ev.id}`}
-                                                            className={`flex items-center py-1.5 px-2 rounded-md transition-all hover:bg-white/80 hover:shadow-sm ${idx < evidenceList.length - 1 ? `border-b ${colors.itemBorder}` : ''
+                                                            className={`flex items-center py-1.5 px-2 rounded-md transition-all hover:bg-gray-50 ${idx < evidenceList.length - 1 ? `border-b ${colors.itemBorder}` : ''
                                                                 }`}
                                                         >
                                                             <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -521,8 +516,8 @@ export default function PublicBeneficiaryGroupPage() {
                     </div>
 
                     {/* Column 4 - Location map */}
-                    <div className="bg-white/50 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-xl shadow-black/5 flex flex-col min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden">
-                        <div className="px-4 py-3 border-b border-white/40 flex-shrink-0">
+                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] flex flex-col min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden">
+                        <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
                             <div className="flex items-center gap-2">
                                 <MapPin className="w-4 h-4 text-gray-600" />
                                 <h3 className="text-sm font-semibold text-gray-900">Locations</h3>

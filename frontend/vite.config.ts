@@ -25,4 +25,13 @@ export default defineConfig({
     define: {
         global: 'globalThis',
     },
-}) 
+    // Without this, our direct `three` dep and the copy bundled by
+    // `react-globe.gl` end up as two separate modules → "Multiple instances
+    // of Three.js" warning + double the WebGL context churn during HMR.
+    resolve: {
+        dedupe: ['three'],
+    },
+    optimizeDeps: {
+        include: ['three'],
+    },
+})

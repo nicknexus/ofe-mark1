@@ -24,6 +24,7 @@ import PublicLoader from '../components/public/PublicLoader'
 import PublicTagFilter from '../components/public/PublicTagFilter'
 import PublicTagChip from '../components/public/PublicTagChip'
 import DateRangePicker from '../components/DateRangePicker'
+import { PublicPageBackground } from '../components/public/publicStyles'
 import { formatDate, compareClaimsByEffectiveDateDesc } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import {
@@ -37,6 +38,33 @@ import {
 
 // Lazy load the globe component
 const ImpactGlobe = lazy(() => import('../components/landing/ImpactGlobe'))
+
+/**
+ * WebGL is fragile: Chrome refuses to create more than ~16 contexts per page,
+ * older GPUs can fail outright, and `react-globe.gl` will throw a hard error
+ * inside React's render if the context can't be acquired. Without an error
+ * boundary the whole org page blanks out. This boundary renders a neutral
+ * placeholder instead, so location data still loads — just without the globe.
+ */
+class GlobeErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+    state = { hasError: false }
+    static getDerivedStateFromError() { return { hasError: true } }
+    componentDidCatch(error: Error) {
+        console.warn('[ImpactGlobe] WebGL unavailable, falling back to placeholder:', error.message)
+    }
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                    <div className="w-48 h-48 rounded-full bg-gradient-to-br from-gray-100 to-gray-50 border border-gray-200/80 flex items-center justify-center">
+                        <span>Globe unavailable</span>
+                    </div>
+                </div>
+            )
+        }
+        return this.props.children
+    }
+}
 
 // Toggle view types for the feature area
 type FeatureView = 'globe' | 'stories' | 'highlights' | 'initiatives' | 'graph'
@@ -178,17 +206,28 @@ export default function PublicOrganizationPage() {
         return loc.initiative_id === initiativeId
     }
 
-    // Initiatives that operate at any of the selected locations
+    // Initiatives that operate at any of the selected locations.
+    //
+    // Returns `null` when no location filter is active OR when the only
+    // selected locations are "global" (org-level, no initiative links). The
+    // null sentinel is treated as "don't scope metrics/claims/stories by
+    // initiative" downstream — global locations apply org-wide and shouldn't
+    // zero out the dashboards just because they aren't tied to a single
+    // initiative.
     const locationMatchedInitiativeIds = useMemo(() => {
         if (selectedLocationIds.length === 0) return null
         const ids = new Set<string>()
+        let anyHasInitiativeLink = false
         locations.forEach(loc => {
             if (!loc.id || !selectedLocationIds.includes(loc.id)) return
             const linked = (loc.initiative_ids && loc.initiative_ids.length > 0)
                 ? loc.initiative_ids
                 : (loc.initiative_id ? [loc.initiative_id] : [])
+            if (linked.length > 0) anyHasInitiativeLink = true
             linked.forEach(id => ids.add(id))
         })
+        // All selected locations are global → skip initiative-based scoping.
+        if (!anyHasInitiativeLink) return null
         return ids
     }, [selectedLocationIds, locations])
 
@@ -220,8 +259,19 @@ export default function PublicOrganizationPage() {
         if (selectedInitiative !== 'all') {
             filtered = filtered.filter(m => m.initiative_id === selectedInitiative)
         }
-        if (locationMatchedInitiativeIds) {
-            filtered = filtered.filter(m => locationMatchedInitiativeIds.has(m.initiative_id))
+        if (selectedLocationIds.length > 0) {
+            // Filter updates by their location_id. A metric is kept if any
+            // of its updates references a selected location; totals are
+            // recomputed from just the matching updates so the dashboard
+            // numbers reflect the location filter.
+            filtered = filtered
+                .map(m => {
+                    const matching = (m.updates || []).filter(u => u.location_id && selectedLocationIds.includes(u.location_id))
+                    if (matching.length === 0) return null
+                    const newTotal = aggregateKpiUpdates(matching as any, m.metric_type)
+                    return { ...m, total_value: newTotal, update_count: matching.length, updates: matching }
+                })
+                .filter((m): m is typeof metrics[number] => m !== null)
         }
         if (selectedTagIds.length > 0) {
             // Keep metrics that either carry the tag themselves, or have at
@@ -267,7 +317,7 @@ export default function PublicOrganizationPage() {
         // surface the biggest absolute number regardless. That matches what
         // donors visually expect ("the impact you're proudest of, first").
         return [...filtered].sort((a, b) => (b.total_value ?? 0) - (a.total_value ?? 0))
-    }, [metrics, selectedInitiative, locationMatchedInitiativeIds, startDate, endDate, selectedTagIds])
+    }, [metrics, selectedInitiative, selectedLocationIds, startDate, endDate, selectedTagIds])
 
     const filteredStories = useMemo(() => {
         let filtered = stories
@@ -277,10 +327,8 @@ export default function PublicOrganizationPage() {
         if (selectedLocationIds.length > 0) {
             filtered = filtered.filter(s => {
                 const storyLocIds = s.location_ids || s.locations?.map(l => l.id) || []
-                if (storyLocIds.length > 0) {
-                    return storyLocIds.some(id => id && selectedLocationIds.includes(id))
-                }
-                return locationMatchedInitiativeIds ? locationMatchedInitiativeIds.has(s.initiative_id) : false
+                if (storyLocIds.length === 0) return false
+                return storyLocIds.some(id => id && selectedLocationIds.includes(id))
             })
         }
         if (selectedTagIds.length > 0) {
@@ -295,7 +343,7 @@ export default function PublicOrganizationPage() {
             })
         }
         return filtered
-    }, [stories, selectedInitiative, selectedLocationIds, locationMatchedInitiativeIds, startDate, endDate, selectedTagIds])
+    }, [stories, selectedInitiative, selectedLocationIds, startDate, endDate, selectedTagIds])
 
     const filteredLocations = useMemo(() => {
         let filtered = locations
@@ -356,15 +404,15 @@ export default function PublicOrganizationPage() {
                 const randomLocation = filteredLocations[Math.floor(Math.random() * filteredLocations.length)]
                 const popupId = `${randomLocation.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
                 const next = [...prev, {
-                    id: popupId,
-                    name: randomLocation.name,
-                    country: randomLocation.country,
-                    initiative_slug: randomLocation.initiative_slug,
+                id: popupId,
+                name: randomLocation.name,
+                country: randomLocation.country,
+                initiative_slug: randomLocation.initiative_slug,
                     top: pos.top,
                     left: pos.left,
                     rightAnchored: pos.rightAnchored,
                 }]
-                setTimeout(() => {
+            setTimeout(() => {
                     setActivePopups(curr => curr.filter(p => p.id !== popupId))
                 }, popupTtlMs)
                 return next
@@ -478,12 +526,9 @@ export default function PublicOrganizationPage() {
     const brandColor = organization?.brand_color || '#c0dfa1'
 
     const allImpactClaims = useMemo(() => {
-        let sourceMetrics = selectedInitiative === 'all'
+        const sourceMetrics = selectedInitiative === 'all'
             ? metrics
             : metrics.filter(m => m.initiative_id === selectedInitiative)
-        if (locationMatchedInitiativeIds) {
-            sourceMetrics = sourceMetrics.filter(m => locationMatchedInitiativeIds.has(m.initiative_id))
-        }
 
         let claims = sourceMetrics.flatMap(m =>
             (m.updates || []).map(u => ({
@@ -496,6 +541,13 @@ export default function PublicOrganizationPage() {
                 category: m.category,
             }))
         ).sort(compareClaimsByEffectiveDateDesc)
+
+        // Filter individual claims/updates by their own location_id (each
+        // update belongs to one location). Falls through cleanly when no
+        // location filter is active.
+        if (selectedLocationIds.length > 0) {
+            claims = claims.filter(c => c.location_id && selectedLocationIds.includes(c.location_id))
+        }
 
         if (selectedTagIds.length > 0) {
             claims = claims.filter(c => tagMatchesSingle(c.tag_id))
@@ -510,7 +562,7 @@ export default function PublicOrganizationPage() {
             })
         }
         return claims
-    }, [metrics, selectedInitiative, locationMatchedInitiativeIds, startDate, endDate, selectedTagIds])
+    }, [metrics, selectedInitiative, selectedLocationIds, startDate, endDate, selectedTagIds])
 
     const filteredEvidence = useMemo(() => {
         let filtered = evidence
@@ -522,7 +574,13 @@ export default function PublicOrganizationPage() {
                 if (e.locations && e.locations.length > 0) {
                     return e.locations.some(loc => selectedLocationIds.includes(loc.id))
                 }
-                return locationMatchedInitiativeIds ? locationMatchedInitiativeIds.has(e.initiative_id!) : true
+                // Evidence has no direct locations → fall back to checking
+                // whether any of its impact claims reference a selected
+                // location, so location-scoped evidence still shows up.
+                if (e.impact_claims && e.impact_claims.length > 0) {
+                    return e.impact_claims.some((c: any) => c.location_id && selectedLocationIds.includes(c.location_id))
+                }
+                return false
             })
         }
         if (selectedTagIds.length > 0) {
@@ -538,7 +596,7 @@ export default function PublicOrganizationPage() {
             })
         }
         return filtered
-    }, [evidence, selectedInitiative, selectedLocationIds, locationMatchedInitiativeIds, startDate, endDate, selectedTagIds])
+    }, [evidence, selectedInitiative, selectedLocationIds, startDate, endDate, selectedTagIds])
 
     // Evidence pagination (must be after filteredEvidence).
     // Bias the order so the first page lands on viewable photos: images first,
@@ -705,7 +763,7 @@ export default function PublicOrganizationPage() {
     if (error || !organization) {
         return (
             <div className="h-screen bg-background flex items-center justify-center px-6">
-                <div className="glass-card p-12 rounded-3xl text-center max-w-md">
+                <div className="bg-white border border-gray-100 shadow-sm p-12 rounded-3xl text-center max-w-md">
                     <Building2 className="w-16 h-16 text-muted-foreground/50 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-foreground mb-3">Organization Not Found</h1>
                     <p className="text-muted-foreground mb-8">{error}</p>
@@ -719,22 +777,10 @@ export default function PublicOrganizationPage() {
 
     return (
         <div className="min-h-screen md:h-screen flex flex-col font-figtree overflow-auto md:overflow-hidden relative animate-fadeIn">
-            {/* Flowing gradient background */}
-            <div
-                className="fixed inset-0 pointer-events-none"
-                style={{
-                    background: `
-                        radial-gradient(ellipse 80% 50% at 20% 40%, ${brandColor}90, transparent 60%),
-                        radial-gradient(ellipse 60% 80% at 80% 20%, ${brandColor}70, transparent 55%),
-                        radial-gradient(ellipse 50% 60% at 60% 80%, ${brandColor}60, transparent 55%),
-                        radial-gradient(ellipse 70% 40% at 10% 90%, ${brandColor}50, transparent 50%),
-                        linear-gradient(180deg, white 0%, #fafafa 100%)
-                    `
-                }}
-            />
+            <PublicPageBackground brandColor={brandColor} />
 
             {/* Header with Filters */}
-            <header className="flex-shrink-0 bg-white/60 backdrop-blur-2xl border-b border-white/40 shadow-sm z-50 relative">
+            <header className="flex-shrink-0 bg-white border-b border-gray-100 shadow-sm z-50 relative">
                 <div className="px-2 sm:px-3 md:px-4 py-2">
                     <div className="flex items-center gap-2 sm:gap-3">
                         {/* Left: Nav + Org */}
@@ -749,8 +795,6 @@ export default function PublicOrganizationPage() {
                                     <Building2 className="w-4 h-4 text-gray-400" />
                                 )}
                             </div>
-                            <h1 className="text-sm font-semibold text-foreground truncate max-w-[120px] md:max-w-[180px] hidden sm:block">{organization.name}</h1>
-
                             {/* Branded Donate button — only when org has set a donation_url */}
                             <PublicDonateButton
                                 donationUrl={organization.donation_url || null}
@@ -764,7 +808,13 @@ export default function PublicOrganizationPage() {
                             <button
                                 ref={initiativeBtnRef}
                                 onClick={() => { setShowInitiativeDropdown(!showInitiativeDropdown); setShowLocationDropdown(false) }}
-                                className="flex items-center pl-0 pr-2.5 sm:pr-3 h-8 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-xs font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
+                                className="flex items-center pl-0 pr-2.5 sm:pr-3 h-8 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-xs font-medium transition-all shadow-sm flex-shrink-0"
+                                style={{
+                                    border: selectedInitiative !== 'all' ? `1.5px solid ${brandColor}` : '1px solid #e5e7eb',
+                                    boxShadow: selectedInitiative !== 'all'
+                                        ? `0 1px 2px rgba(15,23,42,0.06), 0 0 0 3px ${brandColor}20`
+                                        : '0 1px 2px rgba(15,23,42,0.06)',
+                                }}
                             >
                                 <div className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
                                     <Target className="w-4 h-4 text-gray-600" />
@@ -784,6 +834,7 @@ export default function PublicOrganizationPage() {
                                     value={datePickerValue.singleDate || datePickerValue.startDate ? datePickerValue : undefined}
                                     onChange={handleDateChange}
                                     placeholder="Date"
+                                    activeColor={brandColor}
                                     className="[&>button]:!h-8 [&>button]:!text-xs [&>button]:!pr-2.5 sm:[&>button]:!pr-3 [&>button]:!font-medium [&>button>div]:!w-8 [&>button>div]:!h-8 [&>button>div>svg]:!w-4 [&>button>div>svg]:!h-4 [&>button>span]:!ml-1.5 sm:[&>button>span]:!ml-2"
                                 />
                             </div>
@@ -792,7 +843,13 @@ export default function PublicOrganizationPage() {
                                 <button
                                     ref={locationBtnRef}
                                     onClick={() => { setShowLocationDropdown(!showLocationDropdown); setShowInitiativeDropdown(false) }}
-                                    className="flex items-center pl-0 pr-2.5 sm:pr-3 h-8 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-xs font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0"
+                                    className="flex items-center pl-0 pr-2.5 sm:pr-3 h-8 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-xs font-medium transition-all shadow-sm flex-shrink-0"
+                                    style={{
+                                        border: selectedLocationIds.length > 0 ? `1.5px solid ${brandColor}` : '1px solid #e5e7eb',
+                                        boxShadow: selectedLocationIds.length > 0
+                                            ? `0 1px 2px rgba(15,23,42,0.06), 0 0 0 3px ${brandColor}20`
+                                            : '0 1px 2px rgba(15,23,42,0.06)',
+                                    }}
                                 >
                                     <div className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
                                         <MapPin className="w-4 h-4 text-gray-600" />
@@ -815,6 +872,7 @@ export default function PublicOrganizationPage() {
                                 tags={tags}
                                 selectedTagIds={selectedTagIds}
                                 onChange={setSelectedTagIds}
+                                activeColor={brandColor}
                                 onOpenChange={(open) => { if (open) { setShowInitiativeDropdown(false); setShowLocationDropdown(false) } }}
                                 className="!h-8 !text-xs !pr-2.5 sm:!pr-3 [&>div]:!w-8 [&>div]:!h-8 [&>div>svg]:!w-4 [&>div>svg]:!h-4 [&>span]:!ml-1.5 sm:[&>span]:!ml-2"
                             />
@@ -933,79 +991,94 @@ export default function PublicOrganizationPage() {
             )}
 
             {/* Organization Hero Section */}
-            <div className="flex flex-col md:flex-row relative z-20">
+            <div className="flex flex-col md:flex-row md:items-start relative z-20">
                 {/* Left Side - Logo, Name, Statement (aligned with feature area) */}
                 <div className="hidden md:block w-16 flex-shrink-0"></div>
-                <div className="w-full md:w-[45%] flex-shrink-0 p-3 md:p-4 md:pr-2">
-                    <div className="flex items-start gap-3 md:gap-5">
+                <div className="w-full md:w-[45%] flex-shrink-0 p-3 md:px-4 md:pt-3 md:pb-2">
+                    {/* Logo is now vertically centered with the title + statement
+                        + Context pill column, and grown into the extra space the
+                        button used to occupy below the row. */}
+                    <div className="flex items-center gap-3 md:gap-4">
                         {/* Logo */}
-                        <div className="w-14 h-14 md:w-20 md:h-20 rounded-xl md:rounded-2xl overflow-hidden flex-shrink-0 flex items-center justify-center bg-white/50 backdrop-blur-sm border border-white/60 shadow-sm">
+                        <div className="w-20 h-20 md:w-[88px] md:h-[88px] rounded-xl md:rounded-2xl overflow-hidden flex-shrink-0 flex items-center justify-center bg-white border border-gray-100 shadow-sm">
                             {organization.logo_url ? (
                                 <img src={organization.logo_url} alt={organization.name} className="w-full h-full object-cover" />
                             ) : (
-                                <span className="text-xl md:text-3xl font-bold text-gray-400">{organization.name.charAt(0)}</span>
+                                <span className="text-2xl md:text-3xl font-bold text-gray-400">{organization.name.charAt(0)}</span>
                             )}
                         </div>
 
-                        {/* Name and Statement */}
-                        <div className="flex-1 min-w-0 pt-1 md:pt-2">
-                            <h1 className="text-xl md:text-3xl font-bold mb-1" style={{ color: '#465360' }}>{organization.name}</h1>
+                        {/* Name, Statement, Context pill (all aligned to the
+                            same left edge so the pill starts in line with the
+                            title and description). */}
+                        <div className="flex-1 min-w-0">
+                            <h1 className="text-xl md:text-2xl font-bold mb-0.5 leading-tight" style={{ color: '#465360' }}>{organization.name}</h1>
                             {organization.statement && (
-                                <p className="text-sm md:text-base leading-relaxed line-clamp-3 md:line-clamp-none" style={{ color: '#6b7280' }}>{organization.statement}</p>
+                                <p className="text-sm md:text-[13.5px] leading-snug line-clamp-3 md:line-clamp-2" style={{ color: '#6b7280' }}>{organization.statement}</p>
                             )}
+
+                            {/* Context & Challenges button. Modern white pill
+                                with brand accent + soft shadow; arrow slides in
+                                on hover. Lives inside the text column so it
+                                aligns with the title/statement left edge. */}
+                            {(() => {
+                                const brand = organization.brand_color || '#c0dfa1'
+                                return (
+                                    <Link
+                                        to={`${orgLinkBase}/${slug}/context`}
+                                        className="group inline-flex items-center gap-2 mt-2 pl-1 pr-3.5 py-1 rounded-full text-xs font-semibold text-gray-900 bg-white shadow-sm transition-all hover:shadow-md hover:-translate-y-px"
+                                        style={{
+                                            border: `1.5px solid ${brand}`,
+                                            boxShadow: `0 1px 2px rgba(15,23,42,0.06), 0 4px 14px -8px ${brand}80`,
+                                        }}
+                                        title="Context & Challenges"
+                                    >
+                                        <span
+                                            className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ring-1 ring-black/[0.04]"
+                                            style={{ backgroundColor: brand }}
+                                        >
+                                            <Compass className="w-3 h-3 text-white" strokeWidth={2.5} />
+                                        </span>
+                                        <span>Context &amp; Challenges</span>
+                                        <ArrowRight className="w-3 h-3 text-gray-400 -ml-1 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                                    </Link>
+                                )
+                            })()}
                         </div>
                     </div>
-
-                    {/* Context & Challenges button.
-                        Modern pill: white surface for guaranteed text contrast,
-                        brand color is used only as an accent (icon bubble + soft
-                        shadow) so it never blends into a pastel brand. Subtle
-                        ring + shadow give it definition; an arrow slides in on
-                        hover for affordance. */}
-                    {(() => {
-                        const brand = organization.brand_color || '#c0dfa1'
-                        return (
-                            <Link
-                                to={`${orgLinkBase}/${slug}/context`}
-                                className="group inline-flex items-center gap-2 mt-3 pl-1 pr-3.5 py-1 rounded-full text-xs font-semibold text-gray-900 bg-white shadow-sm transition-all hover:shadow-md hover:-translate-y-px"
-                                style={{
-                                    border: `1.5px solid ${brand}`,
-                                    boxShadow: `0 1px 2px rgba(15,23,42,0.06), 0 4px 14px -8px ${brand}80`,
-                                }}
-                                title="Context & Challenges"
-                            >
-                                <span
-                                    className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ring-1 ring-black/[0.04]"
-                                    style={{ backgroundColor: brand }}
-                                >
-                                    <Compass className="w-3 h-3 text-white" strokeWidth={2.5} />
-                                </span>
-                                <span>Context &amp; Challenges</span>
-                                <ArrowRight className="w-3 h-3 text-gray-400 -ml-1 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
-                            </Link>
-                        )
-                    })()}
                 </div>
 
                 {/* Right Side - Initiatives Container (aligned with right panel)
+                    `md:self-end` pins this column to the bottom of the hero row so the
+                    single row of initiative tiles sits flush above the metrics section,
+                    instead of floating at the top of the hero with whitespace below it.
                     Mobile: hidden here; rendered below the feature area instead so the
                     primary content (globe / highlights) sits closer to the toggle tabs. */}
-                <div className="hidden md:block flex-1 p-3 md:p-4 md:pl-2">
-                    <div className="h-full overflow-hidden flex flex-col">
+                <div className="hidden md:block md:self-end flex-1 p-3 md:px-4 md:pt-2 md:pb-3 md:pl-2">
+                    <div className="h-full flex flex-col">
                         <div className="px-2 md:px-4 py-2 flex items-center justify-between flex-shrink-0">
                             <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg flex items-center justify-center bg-white/60">
-                                    <Target className="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-600" />
+                                <div
+                                    className="w-7 h-7 md:w-8 md:h-8 rounded-lg flex items-center justify-center"
+                                    style={{ backgroundColor: '#ffffff', boxShadow: '0 1px 2px rgba(15,23,42,0.06), inset 0 0 0 1px rgba(15,23,42,0.06)' }}
+                                >
+                                    <Target
+                                        className="w-3.5 h-3.5 md:w-4 md:h-4"
+                                        style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
+                                    />
                                 </div>
                                 <h2 className="font-semibold text-foreground text-sm md:text-base">Initiatives</h2>
-                                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-white/60 text-gray-600">{filteredInitiatives.length}</span>
+                                <span
+                                    className="px-2 py-0.5 text-[11px] font-semibold rounded-full text-gray-700"
+                                    style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
+                                >{filteredInitiatives.length}</span>
                             </div>
                             {filteredInitiatives.length > 4 && (
                                 <div className="flex items-center gap-1">
                                     <button
                                         onClick={() => setHeroInitiativePage(p => Math.max(0, p - 1))}
                                         disabled={heroInitiativePage === 0}
-                                        className="w-6 h-6 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors"
+                                        className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-30 flex items-center justify-center transition-colors"
                                     >
                                         <ChevronLeft className="w-4 h-4 text-gray-600" />
                                     </button>
@@ -1015,24 +1088,24 @@ export default function PublicOrganizationPage() {
                                     <button
                                         onClick={() => setHeroInitiativePage(p => Math.min(Math.ceil(filteredInitiatives.length / 4) - 1, p + 1))}
                                         disabled={heroInitiativePage >= Math.ceil(filteredInitiatives.length / 4) - 1}
-                                        className="w-6 h-6 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors"
+                                        className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-30 flex items-center justify-center transition-colors"
                                     >
                                         <ChevronRight className="w-4 h-4 text-gray-600" />
                                     </button>
                                 </div>
                             )}
                         </div>
-                        <div className="flex-1 px-2 md:px-3 pb-2">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 h-full">
+                        <div className="px-2 md:px-3 pb-2">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                                 {filteredInitiatives.slice(heroInitiativePage * 4, heroInitiativePage * 4 + 4).map((init) => (
                                     <Link
                                         key={init.id}
                                         to={`${orgLinkBase}/${slug}/${init.slug}`}
-                                        className="p-3 bg-white/60 backdrop-blur-lg rounded-xl border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all group flex flex-col justify-center"
+                                        className="px-3 py-2 bg-white rounded-xl border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group flex flex-col justify-center"
                                     >
-                                        <h4 className="font-medium text-foreground text-xs line-clamp-2 group-hover:text-accent transition-colors">{init.title}</h4>
+                                        <h4 className="font-medium text-foreground text-xs line-clamp-2 group-hover:text-accent transition-colors leading-snug">{init.title}</h4>
                                         {init.region && (
-                                            <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
+                                            <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
                                                 <MapPin className="w-2.5 h-2.5" />{init.region}
                                             </p>
                                         )}
@@ -1047,12 +1120,12 @@ export default function PublicOrganizationPage() {
             {/* Main Content Area - Fixed Height */}
             <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
                 {/* Mobile Toggle Tabs */}
-                <div className="md:hidden flex items-center gap-2 py-2 px-3 bg-white/40 backdrop-blur-lg border-b border-white/40 flex-shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&>button]:flex-shrink-0">
+                <div className="md:hidden flex items-center gap-2 py-2 px-3 bg-white border-b border-gray-100 flex-shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&>button]:flex-shrink-0">
                     <button
                         onClick={() => chooseView('globe')}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${activeView === 'globe'
                                 ? 'bg-gray-800 text-white'
-                                : 'bg-white/60 text-gray-600'
+                                : 'bg-gray-100 text-gray-600'
                             }`}
                     >
                         <Globe className="w-3.5 h-3.5" />
@@ -1062,7 +1135,7 @@ export default function PublicOrganizationPage() {
                         onClick={() => chooseView('stories')}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${activeView === 'stories'
                                 ? 'bg-gray-800 text-white'
-                                : 'bg-white/60 text-gray-600'
+                                : 'bg-gray-100 text-gray-600'
                             }`}
                     >
                         <BookOpen className="w-3.5 h-3.5" />
@@ -1073,7 +1146,7 @@ export default function PublicOrganizationPage() {
                             onClick={() => chooseView('highlights')}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${activeView === 'highlights'
                                     ? 'bg-gray-800 text-white'
-                                    : 'bg-white/60 text-gray-600'
+                                    : 'bg-gray-100 text-gray-600'
                                 }`}
                         >
                             <Compass className="w-3.5 h-3.5" />
@@ -1084,7 +1157,7 @@ export default function PublicOrganizationPage() {
                         onClick={() => chooseView('graph')}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${activeView === 'graph'
                                 ? 'bg-gray-800 text-white'
-                                : 'bg-white/60 text-gray-600'
+                                : 'bg-gray-100 text-gray-600'
                             }`}
                     >
                         <LineChart className="w-3.5 h-3.5" />
@@ -1094,7 +1167,7 @@ export default function PublicOrganizationPage() {
                         onClick={() => chooseView('initiatives')}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${activeView === 'initiatives'
                                 ? 'bg-gray-800 text-white'
-                                : 'bg-white/60 text-gray-600'
+                                : 'bg-gray-100 text-gray-600'
                             }`}
                     >
                         <Target className="w-3.5 h-3.5" />
@@ -1109,7 +1182,7 @@ export default function PublicOrganizationPage() {
                             onClick={() => chooseView('globe')}
                             className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${activeView === 'globe'
                                     ? 'bg-gray-800 text-white shadow-lg scale-110'
-                                    : 'bg-white/60 backdrop-blur-lg text-gray-600 hover:bg-white/80 hover:scale-105 border border-white/60'
+                                    : 'bg-white text-gray-600 hover:bg-gray-50 hover:scale-105 border border-gray-100 shadow-sm'
                                 }`}
                         >
                             <Globe className="w-5 h-5" />
@@ -1123,7 +1196,7 @@ export default function PublicOrganizationPage() {
                             onClick={() => chooseView('stories')}
                             className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${activeView === 'stories'
                                     ? 'bg-gray-800 text-white shadow-lg scale-110'
-                                    : 'bg-white/60 backdrop-blur-lg text-gray-600 hover:bg-white/80 hover:scale-105 border border-white/60'
+                                    : 'bg-white text-gray-600 hover:bg-gray-50 hover:scale-105 border border-gray-100 shadow-sm'
                                 }`}
                         >
                             <BookOpen className="w-5 h-5" />
@@ -1138,7 +1211,7 @@ export default function PublicOrganizationPage() {
                                 onClick={() => chooseView('highlights')}
                                 className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${activeView === 'highlights'
                                         ? 'bg-gray-800 text-white shadow-lg scale-110'
-                                        : 'bg-white/60 backdrop-blur-lg text-gray-600 hover:bg-white/80 hover:scale-105 border border-white/60'
+                                        : 'bg-white text-gray-600 hover:bg-gray-50 hover:scale-105 border border-gray-100 shadow-sm'
                                     }`}
                             >
                                 <Compass className="w-5 h-5" />
@@ -1153,7 +1226,7 @@ export default function PublicOrganizationPage() {
                             onClick={() => chooseView('graph')}
                             className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${activeView === 'graph'
                                     ? 'bg-gray-800 text-white shadow-lg scale-110'
-                                    : 'bg-white/60 backdrop-blur-lg text-gray-600 hover:bg-white/80 hover:scale-105 border border-white/60'
+                                    : 'bg-white text-gray-600 hover:bg-gray-50 hover:scale-105 border border-gray-100 shadow-sm'
                                 }`}
                         >
                             <LineChart className="w-5 h-5" />
@@ -1167,7 +1240,7 @@ export default function PublicOrganizationPage() {
                             onClick={() => chooseView('initiatives')}
                             className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${activeView === 'initiatives'
                                     ? 'bg-gray-800 text-white shadow-lg scale-110'
-                                    : 'bg-white/60 backdrop-blur-lg text-gray-600 hover:bg-white/80 hover:scale-105 border border-white/60'
+                                    : 'bg-white text-gray-600 hover:bg-gray-50 hover:scale-105 border border-gray-100 shadow-sm'
                                 }`}
                         >
                             <Target className="w-5 h-5" />
@@ -1192,12 +1265,21 @@ export default function PublicOrganizationPage() {
                             <div className="h-full flex flex-col">
                                 <div className="px-4 py-3 flex items-center justify-between ">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/60">
-                                            <Globe className="w-4 h-4 text-gray-600" />
+                                        <div
+                                            className="w-8 h-8 rounded-lg flex items-center justify-center"
+                                            style={{ backgroundColor: '#ffffff', boxShadow: '0 1px 2px rgba(15,23,42,0.06), inset 0 0 0 1px rgba(15,23,42,0.06)' }}
+                                        >
+                                            <Globe
+                                                className="w-4 h-4"
+                                                style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
+                                            />
                                         </div>
                                         <h2 className="font-semibold text-foreground">Global Impact</h2>
                                     </div>
-                                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-white/60 text-gray-600">
+                                    <span
+                                        className="px-2 py-0.5 text-[11px] font-semibold rounded-full text-gray-700"
+                                        style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
+                                    >
                                         {filteredLocations.length} locations
                                     </span>
                                 </div>
@@ -1207,18 +1289,20 @@ export default function PublicOrganizationPage() {
                                         loop) so leaving it mounted in the background
                                         burns CPU/GPU even when invisible. */}
                                     {activeView === 'globe' ? (
-                                        <Suspense fallback={
-                                            <div className="w-full h-full flex items-center justify-center">
-                                                <div className="w-48 h-48 rounded-full bg-gradient-to-br from-accent/60 to-accent/30 animate-pulse" />
-                                            </div>
-                                        }>
-                                            <ImpactGlobe
-                                                locations={globeLocations}
-                                                showLabels={false}
-                                                brandColor={brandColor}
-                                                enableZoom={true}
-                                            />
-                                        </Suspense>
+                                        <GlobeErrorBoundary>
+                                            <Suspense fallback={
+                                                <div className="w-full h-full flex items-center justify-center">
+                                                    <div className="w-48 h-48 rounded-full bg-gradient-to-br from-accent/60 to-accent/30 animate-pulse" />
+                                                </div>
+                                            }>
+                                                <ImpactGlobe
+                                                    locations={globeLocations}
+                                                    showLabels={false}
+                                                    brandColor={brandColor}
+                                                    enableZoom={true}
+                                                />
+                                            </Suspense>
+                                        </GlobeErrorBoundary>
                                     ) : (
                                         <div className="w-full h-full" />
                                     )}
@@ -1244,11 +1328,11 @@ export default function PublicOrganizationPage() {
                                                 animation: 'fadeInOut 7s ease-in-out forwards',
                                             }
                                             : {
-                                                top: `${popup.top}%`,
-                                                left: `${popup.left}%`,
-                                                backgroundColor: brandColor,
-                                                animation: 'fadeInOut 7s ease-in-out forwards',
-                                            }
+                                            top: `${popup.top}%`,
+                                            left: `${popup.left}%`,
+                                            backgroundColor: brandColor,
+                                            animation: 'fadeInOut 7s ease-in-out forwards',
+                                        }
                                         const className = "absolute px-2 py-0.5 md:px-3 md:py-1.5 rounded-full text-white text-[10px] md:text-xs font-medium shadow-lg transition-all duration-200 hover:scale-105 hover:brightness-110 hover:shadow-xl whitespace-nowrap max-w-[45%] md:max-w-[40%] flex items-center"
 
                                         return popup.initiative_slug ? (
@@ -1280,24 +1364,33 @@ export default function PublicOrganizationPage() {
                             <div className="h-full flex flex-col">
                                 <div className="px-4 py-3 flex items-center justify-between ">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/60">
-                                            <BookOpen className="w-4 h-4 text-gray-600" />
+                                        <div
+                                            className="w-8 h-8 rounded-lg flex items-center justify-center"
+                                            style={{ backgroundColor: '#ffffff', boxShadow: '0 1px 2px rgba(15,23,42,0.06), inset 0 0 0 1px rgba(15,23,42,0.06)' }}
+                                        >
+                                            <BookOpen
+                                                className="w-4 h-4"
+                                                style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
+                                            />
                                         </div>
                                         <h2 className="font-semibold text-foreground">Stories</h2>
-                                        <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-white/60 text-gray-600">{filteredStories.length}</span>
+                                        <span
+                                            className="px-2 py-0.5 text-[11px] font-semibold rounded-full text-gray-700"
+                                            style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
+                                        >{filteredStories.length}</span>
                                     </div>
                                     {filteredStories.length > 1 && (
                                         <div className="flex items-center gap-2">
                                             <button
                                                 onClick={() => setStoryIndex(p => p === 0 ? filteredStories.length - 1 : p - 1)}
-                                                className="w-8 h-8 rounded-lg bg-white/60 hover:bg-white/80 flex items-center justify-center transition-colors"
+                                                className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
                                             >
                                                 <ChevronLeft className="w-4 h-4 text-gray-600" />
                                             </button>
                                             <span className="text-xs text-muted-foreground w-12 text-center">{storyIndex + 1}/{filteredStories.length}</span>
                                             <button
                                                 onClick={() => setStoryIndex(p => (p + 1) % filteredStories.length)}
-                                                className="w-8 h-8 rounded-lg bg-white/60 hover:bg-white/80 flex items-center justify-center transition-colors"
+                                                className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
                                             >
                                                 <ChevronRight className="w-4 h-4 text-gray-600" />
                                             </button>
@@ -1410,8 +1503,14 @@ export default function PublicOrganizationPage() {
                             <div className="h-full flex flex-col">
                                 <div className="px-4 py-3 flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/60">
-                                            <Compass className="w-4 h-4 text-gray-600" />
+                                        <div
+                                            className="w-8 h-8 rounded-lg flex items-center justify-center"
+                                            style={{ backgroundColor: '#ffffff', boxShadow: '0 1px 2px rgba(15,23,42,0.06), inset 0 0 0 1px rgba(15,23,42,0.06)' }}
+                                        >
+                                            <Compass
+                                                className="w-4 h-4"
+                                                style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
+                                            />
                                         </div>
                                         <h2 className="font-semibold text-foreground">Context & Challenges</h2>
                                     </div>
@@ -1443,7 +1542,7 @@ export default function PublicOrganizationPage() {
                                                     <Link
                                                         key={card.id || idx}
                                                         to={`${orgLinkBase}/${slug}/context`}
-                                                        className="group relative rounded-2xl bg-white/60 backdrop-blur-lg border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all p-4 flex flex-col overflow-hidden md:min-h-0"
+                                                        className="group relative rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all p-4 flex flex-col overflow-hidden md:min-h-0"
                                                     >
                                                         <div
                                                             className="absolute left-0 top-0 bottom-0 w-1"
@@ -1515,11 +1614,20 @@ export default function PublicOrganizationPage() {
                             <div className="h-full flex flex-col">
                                 <div className="px-4 py-3 flex items-center justify-between ">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/60">
-                                            <Target className="w-4 h-4 text-gray-600" />
+                                        <div
+                                            className="w-8 h-8 rounded-lg flex items-center justify-center"
+                                            style={{ backgroundColor: '#ffffff', boxShadow: '0 1px 2px rgba(15,23,42,0.06), inset 0 0 0 1px rgba(15,23,42,0.06)' }}
+                                        >
+                                            <Target
+                                                className="w-4 h-4"
+                                                style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
+                                            />
                                         </div>
                                         <h2 className="font-semibold text-foreground">Initiatives</h2>
-                                        <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-white/60 text-gray-600">{filteredInitiatives.length}</span>
+                                        <span
+                                            className="px-2 py-0.5 text-[11px] font-semibold rounded-full text-gray-700"
+                                            style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
+                                        >{filteredInitiatives.length}</span>
                                     </div>
                                 </div>
                                 <div className="flex-1 p-4 overflow-y-auto">
@@ -1536,10 +1644,10 @@ export default function PublicOrganizationPage() {
                                                 <Link
                                                     key={init.id}
                                                     to={`${orgLinkBase}/${slug}/${init.slug}`}
-                                                    className="block p-4 bg-white/60 backdrop-blur-lg rounded-xl border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all group"
+                                                    className="block p-4 bg-white rounded-xl border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group"
                                                 >
                                                     <div className="flex items-start gap-3">
-                                                        <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-white/80 border border-white/50">
+                                                        <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-gray-50 border border-gray-100">
                                                             {organization.logo_url ? (
                                                                 <img src={organization.logo_url} alt="" className="w-full h-full object-cover" />
                                                             ) : (
@@ -1573,11 +1681,17 @@ export default function PublicOrganizationPage() {
                                 : 'opacity-0 translate-x-8 z-0 pointer-events-none'
                             }`}>
                             <div className="h-full p-4">
-                                <div className="h-full bg-white/40 backdrop-blur-2xl rounded-2xl border border-white/60 shadow-2xl shadow-black/10 flex flex-col">
-                                    <div className="px-4 py-3 flex items-center justify-between border-b border-white/50">
+                                <div className="h-full bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col">
+                                    <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100">
                                         <div className="flex items-center gap-2">
-                                            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/60">
-                                                <LineChart className="w-4 h-4 text-gray-600" />
+                                            <div
+                                                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                                                style={{ backgroundColor: '#ffffff', boxShadow: '0 1px 2px rgba(15,23,42,0.06), inset 0 0 0 1px rgba(15,23,42,0.06)' }}
+                                            >
+                                                <LineChart
+                                                    className="w-4 h-4"
+                                                    style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
+                                                />
                                             </div>
                                             <h2 className="font-semibold text-foreground">Cumulative Impact</h2>
                                         </div>
@@ -1648,7 +1762,7 @@ export default function PublicOrganizationPage() {
                                                     </ResponsiveContainer>
                                                 </div>
                                                 {/* Legend */}
-                                                <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-white/30">
+                                                <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-gray-100">
                                                     {chartInitiatives.map(({ initiative, metric }, index) => (
                                                         <div key={metric.id} className="flex items-center gap-2">
                                                             <div
@@ -1677,18 +1791,27 @@ export default function PublicOrganizationPage() {
                     <div className="md:hidden flex flex-col flex-shrink-0">
                         <div className="px-2 py-2 flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/60">
-                                    <Target className="w-3.5 h-3.5 text-gray-600" />
+                                <div
+                                    className="w-7 h-7 rounded-lg flex items-center justify-center"
+                                    style={{ backgroundColor: '#ffffff', boxShadow: '0 1px 2px rgba(15,23,42,0.06), inset 0 0 0 1px rgba(15,23,42,0.06)' }}
+                                >
+                                    <Target
+                                        className="w-3.5 h-3.5"
+                                        style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
+                                    />
                                 </div>
                                 <h2 className="font-semibold text-foreground text-sm">Initiatives</h2>
-                                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-white/60 text-gray-600">{filteredInitiatives.length}</span>
+                                <span
+                                    className="px-2 py-0.5 text-[11px] font-semibold rounded-full text-gray-700"
+                                    style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
+                                >{filteredInitiatives.length}</span>
                             </div>
                             {filteredInitiatives.length > 4 && (
                                 <div className="flex items-center gap-1">
                                     <button
                                         onClick={() => setHeroInitiativePage(p => Math.max(0, p - 1))}
                                         disabled={heroInitiativePage === 0}
-                                        className="w-6 h-6 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors"
+                                        className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-30 flex items-center justify-center transition-colors"
                                     >
                                         <ChevronLeft className="w-4 h-4 text-gray-600" />
                                     </button>
@@ -1698,7 +1821,7 @@ export default function PublicOrganizationPage() {
                                     <button
                                         onClick={() => setHeroInitiativePage(p => Math.min(Math.ceil(filteredInitiatives.length / 4) - 1, p + 1))}
                                         disabled={heroInitiativePage >= Math.ceil(filteredInitiatives.length / 4) - 1}
-                                        className="w-6 h-6 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors"
+                                        className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-30 flex items-center justify-center transition-colors"
                                     >
                                         <ChevronRight className="w-4 h-4 text-gray-600" />
                                     </button>
@@ -1711,7 +1834,7 @@ export default function PublicOrganizationPage() {
                                     <Link
                                         key={init.id}
                                         to={`${orgLinkBase}/${slug}/${init.slug}`}
-                                        className="p-3 bg-white/60 backdrop-blur-lg rounded-xl border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all group flex flex-col justify-center min-h-[64px]"
+                                        className="p-3 bg-white rounded-xl border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group flex flex-col justify-center min-h-[64px]"
                                     >
                                         <h4 className="font-medium text-foreground text-xs line-clamp-2 group-hover:text-accent transition-colors">{init.title}</h4>
                                         {init.region && (
@@ -1726,16 +1849,25 @@ export default function PublicOrganizationPage() {
                     </div>
 
                     {/* Top Row - Metrics + Impact Claims (larger) */}
-                    <div className="flex flex-col md:flex-row gap-2 md:gap-3 md:h-[65%]">
+                    <div className="flex flex-col md:flex-row gap-2 md:gap-3 md:h-[68%]">
                         {/* Key Metrics (Scrollable 2x2 Grid) */}
-                        <div className="w-full md:w-[60%] overflow-hidden flex flex-col max-h-[350px] md:max-h-none md:min-h-0">
+                        <div className="w-full md:w-[52%] overflow-hidden flex flex-col max-h-[320px] md:max-h-none md:min-h-0">
                             <div className="px-3 md:px-4 py-2 md:py-3 flex items-center justify-between flex-shrink-0">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg flex items-center justify-center bg-white/60">
-                                        <BarChart3 className="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-600" />
+                                    <div
+                                        className="w-7 h-7 md:w-8 md:h-8 rounded-lg flex items-center justify-center"
+                                        style={{ backgroundColor: '#ffffff', boxShadow: '0 1px 2px rgba(15,23,42,0.06), inset 0 0 0 1px rgba(15,23,42,0.06)' }}
+                                    >
+                                        <BarChart3
+                                            className="w-3.5 h-3.5 md:w-4 md:h-4"
+                                            style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
+                                        />
                                     </div>
                                     <h2 className="font-semibold text-foreground text-sm md:text-base">Key Metrics</h2>
-                                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-white/60 text-gray-600">{filteredMetrics.length}</span>
+                                    <span
+                                        className="px-2 py-0.5 text-[11px] font-semibold rounded-full text-gray-700"
+                                        style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
+                                    >{filteredMetrics.length}</span>
                                 </div>
                             </div>
                             <div className="flex-1 p-2 md:p-3 overflow-y-auto min-h-0 scrollbar-thin">
@@ -1752,13 +1884,33 @@ export default function PublicOrganizationPage() {
                                             <Link
                                                 key={metric.id}
                                                 to={`${orgLinkBase}/${slug}/${metric.initiative_slug}/metric/${generateMetricSlug(metric.title)}`}
-                                                className="p-3 md:p-4 h-[100px] md:h-[19vh] rounded-xl bg-white/60 backdrop-blur-lg border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all flex flex-col justify-between"
+                                                className="group relative rounded-xl bg-white border border-gray-200/80 overflow-hidden shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all h-[88px] md:h-[15.5vh] flex flex-col"
                                             >
-                                                <div>
-                                                    <span className="text-2xl md:text-4xl font-bold text-foreground">{metric.total_value?.toLocaleString() || '—'}{metric.metric_type === 'percentage' ? '%' : ''}</span>
-                                                    {metric.metric_type !== 'percentage' && <span className="text-xs md:text-sm text-muted-foreground ml-1">{metric.unit_of_measurement}</span>}
+                                                {metric.unit_of_measurement && metric.metric_type !== 'percentage' && (
+                                                    <span className="absolute top-1 right-1.5 md:top-1.5 md:right-2 text-[9px] md:text-[10px] font-medium text-gray-400 leading-tight truncate max-w-[60%] text-right">
+                                                        {metric.unit_of_measurement}
+                                                    </span>
+                                                )}
+                                                <div className="flex-1 px-3 py-1.5 md:py-2 flex items-center justify-center">
+                                                    <span
+                                                        className="text-xl md:text-3xl font-bold leading-none tabular-nums tracking-tight"
+                                                        style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
+                                                    >
+                                                        {metric.total_value?.toLocaleString() || '—'}{metric.metric_type === 'percentage' ? '%' : ''}
+                                                    </span>
                                                 </div>
-                                                <h4 className="font-normal text-muted-foreground text-xs md:text-sm line-clamp-2 leading-snug">{metric.title}{metric.metric_type === 'percentage' ? ' (avg)' : ''}</h4>
+                                                <div
+                                                    className="px-2 py-1 text-center border-t flex items-center justify-center"
+                                                    style={{
+                                                        backgroundColor: `${brandColor}15`,
+                                                        borderColor: `${brandColor}25`,
+                                                        minHeight: 32,
+                                                    }}
+                                                >
+                                                    <span className="text-[10.5px] md:text-[11.5px] font-semibold text-gray-800 line-clamp-2 leading-tight">
+                                                        {metric.title}{metric.metric_type === 'percentage' ? ' (avg)' : ''}
+                                                    </span>
+                                                </div>
                                             </Link>
                                         ))}
                                     </div>
@@ -1767,14 +1919,23 @@ export default function PublicOrganizationPage() {
                         </div>
 
                         {/* Impact Claims Container (Scrollable) */}
-                        <div className="w-full md:w-[40%] overflow-hidden flex flex-col max-h-[280px] md:max-h-none md:min-h-0">
+                        <div className="w-full md:w-[48%] overflow-hidden flex flex-col max-h-[280px] md:max-h-none md:min-h-0">
                             <div className="px-3 md:px-4 py-2 md:py-3 flex items-center justify-between flex-shrink-0">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg flex items-center justify-center bg-white/60">
-                                        <TrendingUp className="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-600" />
+                                    <div
+                                        className="w-7 h-7 md:w-8 md:h-8 rounded-lg flex items-center justify-center"
+                                        style={{ backgroundColor: '#ffffff', boxShadow: '0 1px 2px rgba(15,23,42,0.06), inset 0 0 0 1px rgba(15,23,42,0.06)' }}
+                                    >
+                                        <TrendingUp
+                                            className="w-3.5 h-3.5 md:w-4 md:h-4"
+                                            style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
+                                        />
                                     </div>
                                     <h2 className="font-semibold text-foreground text-sm md:text-base">Impact Claims</h2>
-                                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-white/60 text-gray-600">{allImpactClaims.length}</span>
+                                    <span
+                                        className="px-2 py-0.5 text-[11px] font-semibold rounded-full text-gray-700"
+                                        style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
+                                    >{allImpactClaims.length}</span>
                                 </div>
                             </div>
                             <div className="flex-1 p-3 overflow-y-auto scrollbar-thin">
@@ -1791,12 +1952,15 @@ export default function PublicOrganizationPage() {
                                             <Link
                                                 key={`${claim.id}-${idx}`}
                                                 to={`${orgLinkBase}/${slug}/${claim.initiativeSlug}/claim/${claim.id}?from=org`}
-                                                className="block p-3 rounded-xl bg-white/60 backdrop-blur-lg border border-white/80 hover:bg-white/80 hover:border-accent/30 hover:shadow-md transition-all group"
+                                                className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group"
                                             >
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-lg font-bold text-foreground group-hover:text-accent transition-colors">{claim.value?.toLocaleString()}{claim.metricType === 'percentage' ? '%' : ''}</span>
+                                                            <span
+                                                                className="text-lg font-bold tabular-nums tracking-tight"
+                                                                style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
+                                                            >{claim.value?.toLocaleString()}{claim.metricType === 'percentage' ? '%' : ''}</span>
                                                             {claim.metricType !== 'percentage' && <span className="text-xs text-muted-foreground">{claim.metricUnit}</span>}
                                                         </div>
                                                         <p className="text-xs text-muted-foreground truncate mt-0.5">{claim.metricTitle}</p>
@@ -1830,21 +1994,30 @@ export default function PublicOrganizationPage() {
                     </div>
 
                     {/* Bottom Row - Evidence (with pagination) */}
-                    <div className="min-h-[120px] md:h-[35%] overflow-hidden flex flex-col">
+                    <div className="min-h-[160px] md:h-[30%] flex flex-col">
                         <div className="px-3 md:px-4 py-2 flex items-center justify-between flex-shrink-0">
                             <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/60">
-                                    <Image className="w-3.5 h-3.5 text-gray-600" />
+                                <div
+                                    className="w-7 h-7 rounded-lg flex items-center justify-center"
+                                    style={{ backgroundColor: '#ffffff', boxShadow: '0 1px 2px rgba(15,23,42,0.06), inset 0 0 0 1px rgba(15,23,42,0.06)' }}
+                                >
+                                    <Image
+                                        className="w-3.5 h-3.5"
+                                        style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
+                                    />
                                 </div>
                                 <h2 className="font-semibold text-foreground text-sm">Evidence</h2>
-                                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-white/60 text-gray-600">{filteredEvidence.length}</span>
+                                <span
+                                    className="px-2 py-0.5 text-[11px] font-semibold rounded-full text-gray-700"
+                                    style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
+                                >{filteredEvidence.length}</span>
                             </div>
                             {totalEvidencePages > 1 && (
                                 <div className="flex items-center gap-1">
                                     <button
                                         onClick={() => setEvidencePage(p => Math.max(0, p - 1))}
                                         disabled={evidencePage === 0}
-                                        className="w-6 h-6 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors"
+                                        className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-30 flex items-center justify-center transition-colors"
                                     >
                                         <ChevronLeft className="w-4 h-4 text-gray-600" />
                                     </button>
@@ -1852,14 +2025,14 @@ export default function PublicOrganizationPage() {
                                     <button
                                         onClick={() => setEvidencePage(p => Math.min(totalEvidencePages - 1, p + 1))}
                                         disabled={evidencePage >= totalEvidencePages - 1}
-                                        className="w-6 h-6 rounded-lg bg-white/60 hover:bg-white/80 disabled:opacity-30 flex items-center justify-center transition-colors"
+                                        className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-30 flex items-center justify-center transition-colors"
                                     >
                                         <ChevronRight className="w-4 h-4 text-gray-600" />
                                     </button>
                                 </div>
                             )}
                         </div>
-                        <div className="flex-1 p-2 overflow-hidden">
+                        <div className="flex-1 p-2 pb-3 min-h-0">
                             {filteredEvidence.length === 0 ? (
                                 <div className="h-full flex items-center justify-center text-muted-foreground">
                                     <div className="text-center">
@@ -1879,7 +2052,7 @@ export default function PublicOrganizationPage() {
                                             <Link
                                                 key={ev.id}
                                                 to={`${orgLinkBase}/${slug}/${ev.initiative_slug}?tab=evidence`}
-                                                className="rounded-xl overflow-hidden hover:shadow-lg transition-all group h-[80px] md:h-full"
+                                                className="rounded-xl overflow-hidden bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group h-[120px] md:h-full"
                                             >
                                                 {isImage ? (
                                                     <img src={ev.file_url} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />

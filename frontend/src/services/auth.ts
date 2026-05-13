@@ -139,27 +139,48 @@ export class AuthService {
     }
 
     static onAuthStateChange(callback: (user: User | null) => void) {
+        // Cache the admin flag per-user so we don't refetch /me on every
+        // TOKEN_REFRESHED / USER_UPDATED tick. Without this, a transient
+        // /me failure can feedback-loop with Supabase's auto refresh and
+        // exhaust the browser's connection pool, surfacing as bogus
+        // ERR_INTERNET_DISCONNECTED errors on every fetch in the page.
+        let cachedAdminFor: string | null = null
+        let cachedIsAdmin = false
+
         return supabase.auth.onAuthStateChange(async (event, session) => {
-            // Identity change → wipe data cache. Token refresh keeps the
-            // same user, so we leave data cache intact (avoids a full refetch
-            // every hour when the token quietly rotates).
             if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
                 apiService.clearCache()
             }
+            if (event === 'SIGNED_OUT') {
+                cachedAdminFor = null
+                cachedIsAdmin = false
+            }
 
             if (session?.user) {
-                // Fetch platform-admin flag best-effort.
-                let isAdmin = false
-                try {
-                    const resp = await fetch(`${API_URL}/api/auth/me`, {
-                        headers: { Authorization: `Bearer ${session.access_token}` },
-                    })
-                    if (resp.ok) {
-                        const me = await resp.json()
-                        isAdmin = !!me?.is_admin
+                let isAdmin = cachedIsAdmin
+                // Only hit /me when the user identity actually changed (sign-in
+                // or first session of the page). Token refresh keeps the same
+                // user, so reuse the cached flag.
+                const userChanged = cachedAdminFor !== session.user.id
+                const shouldFetchMe =
+                    userChanged ||
+                    event === 'SIGNED_IN' ||
+                    event === 'INITIAL_SESSION'
+
+                if (shouldFetchMe) {
+                    try {
+                        const resp = await fetch(`${API_URL}/api/auth/me`, {
+                            headers: { Authorization: `Bearer ${session.access_token}` },
+                        })
+                        if (resp.ok) {
+                            const me = await resp.json()
+                            isAdmin = !!me?.is_admin
+                            cachedAdminFor = session.user.id
+                            cachedIsAdmin = isAdmin
+                        }
+                    } catch (err) {
+                        console.warn('[AuthService] /me lookup failed in authStateChange:', err)
                     }
-                } catch (err) {
-                    console.warn('[AuthService] /me lookup failed in authStateChange:', err)
                 }
 
                 const user: User = {

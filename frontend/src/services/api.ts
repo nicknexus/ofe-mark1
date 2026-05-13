@@ -93,33 +93,35 @@ class ApiService {
 
     private async retryWithBackoff<T>(
         requestFn: () => Promise<T>,
-        maxRetries: number = 3,
-        baseDelay: number = 1000
+        maxRetries: number = 2,
+        baseDelay: number = 500
     ): Promise<T> {
         for (let attempt = 0; attempt <= maxRetries; attempt++) {
             try {
                 return await requestFn()
             } catch (error: any) {
-                // Connection refused (server not running) - don't retry
-                const isConnectionRefused = error.message?.includes('Failed to fetch') &&
+                // `TypeError: Failed to fetch` covers everything from a literal
+                // connection refused (dev backend offline) to a transient DNS/
+                // ISP/SW blip in production. We retry a couple of times with
+                // short backoff — most blips clear within ~1s.
+                const isFetchFailure = error.message?.includes('Failed to fetch') &&
                     (error.name === 'TypeError' || error.constructor?.name === 'TypeError')
 
-                // If connection refused, throw immediately with helpful message
-                if (isConnectionRefused && attempt === 0) {
-                    throw new Error('Backend server is not running. Please start the server at http://localhost:3001')
-                }
+                const isNetworkError = isFetchFailure ||
+                    error.message?.includes('Network error')
 
-                const isNetworkError = !isConnectionRefused && (
-                    error.message?.includes('Network error') ||
-                    error.message?.includes('Failed to fetch')
-                )
-
-                // Retry only on transient network errors. Do NOT retry on 429:
-                // the rate-limit window is measured in seconds-to-minutes, so a
-                // sub-second exponential backoff is guaranteed to fail and just
-                // burns more quota, deepening the hole. Surface the 429 to the
-                // caller so it can show a friendly "try again in a moment" toast.
+                // Out of retries: surface a useful error string. Only mention
+                // localhost when running on localhost — in prod that message
+                // is misleading.
                 if (attempt === maxRetries || !isNetworkError) {
+                    if (isFetchFailure) {
+                        const isLocal = typeof window !== 'undefined' &&
+                            (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+                        const msg = isLocal
+                            ? 'Backend server is not running. Please start the server at http://localhost:3001'
+                            : 'Network error reaching the server. Please check your connection and try again.'
+                        throw new Error(msg)
+                    }
                     throw error
                 }
 

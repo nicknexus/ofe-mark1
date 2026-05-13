@@ -13,6 +13,9 @@ interface PublicTagFilterProps {
     onOpenChange?: (open: boolean) => void
     /** Customise the placeholder when nothing is selected. Defaults to "Tag". */
     placeholder?: string
+    /** When set, the trigger pill gets a colored border + ring while at least
+     * one tag is selected. Used by public org pages to brand the active filter. */
+    activeColor?: string
 }
 
 /**
@@ -31,6 +34,7 @@ export default function PublicTagFilter({
     className = '',
     onOpenChange,
     placeholder = 'Tag',
+    activeColor,
 }: PublicTagFilterProps) {
     const [open, setOpen] = useState(false)
     const btnRef = useRef<HTMLButtonElement>(null)
@@ -57,7 +61,15 @@ export default function PublicTagFilter({
             <button
                 ref={btnRef}
                 onClick={() => setOpenAnnounced(!open)}
-                className={`flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all border border-gray-200 shadow-sm flex-shrink-0 ${className}`}
+                className={`flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all border shadow-sm flex-shrink-0 ${className}`}
+                style={selectedTagIds.length > 0 && activeColor
+                    ? {
+                        borderColor: activeColor,
+                        borderWidth: '1.5px',
+                        boxShadow: `0 0 0 3px ${activeColor}20`,
+                    }
+                    : { borderColor: '#e5e7eb' }
+                }
             >
                 <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
                     <TagIcon className="w-3.5 h-3.5 text-gray-600" />

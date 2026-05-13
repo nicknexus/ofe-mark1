@@ -11,6 +11,7 @@ import PublicLoader from '../components/public/PublicLoader'
 import PublicTagChip from '../components/public/PublicTagChip'
 import PublicDonateButton from '../components/public/PublicDonateButton'
 import DateRangePicker from '../components/DateRangePicker'
+import { PublicPageBackground } from '../components/public/publicStyles'
 import { getLocalDateString, formatDate } from '../utils'
 
 // Evidence type config
@@ -102,7 +103,7 @@ export default function PublicEvidencePage() {
     if (error || !evidence) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center px-6">
-                <div className="bg-white/40 backdrop-blur-2xl p-12 rounded-3xl text-center max-w-md border border-white/60 shadow-xl">
+                <div className="rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-12 text-center max-w-md">
                     <FileText className="w-16 h-16 text-gray-300 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-gray-800 mb-3">Evidence Not Found</h1>
                     <p className="text-gray-500 mb-8">{error || 'This evidence does not exist.'}</p>
@@ -160,22 +161,10 @@ export default function PublicEvidencePage() {
 
     return (
         <div className="min-h-screen font-figtree relative animate-fadeIn">
-            {/* Flowing gradient background */}
-            <div
-                className="fixed inset-0 pointer-events-none"
-                style={{
-                    background: `
-                        radial-gradient(ellipse 80% 50% at 20% 40%, ${brandColor}90, transparent 60%),
-                        radial-gradient(ellipse 60% 80% at 80% 20%, ${brandColor}70, transparent 55%),
-                        radial-gradient(ellipse 50% 60% at 60% 80%, ${brandColor}60, transparent 55%),
-                        radial-gradient(ellipse 70% 40% at 10% 90%, ${brandColor}50, transparent 50%),
-                        linear-gradient(180deg, white 0%, #fafafa 100%)
-                    `
-                }}
-            />
+            <PublicPageBackground brandColor={brandColor} />
 
             {/* Navigation Header */}
-            <div className="sticky top-0 z-50 bg-white/60 backdrop-blur-2xl border-b border-white/40">
+            <div className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 sm:gap-3">
@@ -190,7 +179,8 @@ export default function PublicEvidencePage() {
                             value={dateFilter}
                             onChange={setDateFilter}
                             maxDate={getLocalDateString(new Date())}
-                            placeholder="Filter by date"
+                            placeholder="Date"
+                            activeColor={brandColor}
                             className="w-auto"
                         />
                         <Link to="/" className="flex items-center gap-2">
@@ -228,7 +218,7 @@ export default function PublicEvidencePage() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 flex-1 min-h-0">
                     {/* File Preview - Takes 2 columns */}
                     <div className="lg:col-span-2 flex flex-col">
-                        <div className="bg-white/50 backdrop-blur-2xl rounded-xl sm:rounded-2xl border border-white/60 shadow-2xl shadow-black/10 overflow-hidden flex-1 flex flex-col">
+                        <div className="rounded-xl sm:rounded-2xl bg-white border border-gray-200/80 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_8px_24px_-6px_rgba(15,23,42,0.14)] overflow-hidden flex-1 flex flex-col">
                             {/* Preview Area */}
                             <div className="relative bg-gray-900 flex-1 min-h-[250px] sm:min-h-[400px] max-h-[50vh] sm:max-h-[60vh] flex items-center justify-center">
                                 {currentFile ? (
@@ -345,7 +335,7 @@ export default function PublicEvidencePage() {
                     {/* Details Sidebar */}
                     <div className="flex flex-col gap-3 sm:gap-4 min-h-0">
                         {/* Evidence Info */}
-                        <div className="bg-white/50 backdrop-blur-2xl rounded-xl sm:rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 sm:p-5 flex-shrink-0">
+                        <div className="rounded-xl sm:rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5 flex-shrink-0">
                             {/* Type Badge */}
                             <div className={`inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full ${typeConfig.bg} ${typeConfig.color} text-xs sm:text-sm font-medium mb-2 sm:mb-3`}>
                                 <TypeIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -384,7 +374,7 @@ export default function PublicEvidencePage() {
 
                         {/* Impact Claims - Scrollable */}
                         {evidence.impact_claims && evidence.impact_claims.length > 0 ? (
-                            <div className="bg-white/50 backdrop-blur-2xl rounded-xl sm:rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 sm:p-5 flex-1 min-h-0 flex flex-col max-h-[200px] sm:max-h-none">
+                            <div className="rounded-xl sm:rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5 flex-1 min-h-0 flex flex-col max-h-[200px] sm:max-h-none">
                                 <h3 className="text-xs sm:text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2 sm:mb-3 flex-shrink-0">
                                     Supporting Impact Claims
                                 </h3>
@@ -401,7 +391,7 @@ export default function PublicEvidencePage() {
                                             <Link
                                                 key={claim.id}
                                                 to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`}
-                                                className="block p-2.5 sm:p-3 bg-white/60 rounded-lg sm:rounded-xl border border-white/50 hover:bg-white/80 hover:shadow-md transition-all group active:scale-[0.98]"
+                                                className="block p-2.5 sm:p-3 rounded-lg sm:rounded-xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group active:scale-[0.98]"
                                             >
                                                 <p className="font-semibold text-gray-800 text-xs sm:text-sm group-hover:text-primary-600 transition-colors">
                                                     {claim.value}{claim.kpis?.metric_type === 'percentage' ? '%' : ` ${claim.kpis?.unit_of_measurement || ''}`}
@@ -419,7 +409,7 @@ export default function PublicEvidencePage() {
                                 </div>
                             </div>
                         ) : evidence.linked_kpis && evidence.linked_kpis.length > 0 ? (
-                            <div className="bg-white/50 backdrop-blur-2xl rounded-xl sm:rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-4 sm:p-5 flex-1 min-h-0 flex flex-col max-h-[200px] sm:max-h-none">
+                            <div className="rounded-xl sm:rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5 flex-1 min-h-0 flex flex-col max-h-[200px] sm:max-h-none">
                                 <h3 className="text-xs sm:text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2 sm:mb-3 flex-shrink-0">
                                     Linked Metrics
                                 </h3>
@@ -428,7 +418,7 @@ export default function PublicEvidencePage() {
                                         <Link
                                             key={kpi.id}
                                             to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${kpi.title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}`}
-                                            className="block p-2.5 sm:p-3 bg-white/60 rounded-lg sm:rounded-xl border border-white/50 hover:bg-white/80 hover:shadow-md transition-all group active:scale-[0.98]"
+                                            className="block p-2.5 sm:p-3 rounded-lg sm:rounded-xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group active:scale-[0.98]"
                                         >
                                             <p className="font-medium text-gray-800 text-xs sm:text-sm group-hover:text-primary-600 transition-colors truncate">
                                                 {kpi.title}
@@ -440,7 +430,7 @@ export default function PublicEvidencePage() {
                         ) : null}
 
                         {/* Initiative Link */}
-                        <div className="bg-white/50 backdrop-blur-2xl rounded-xl sm:rounded-2xl border border-white/60 shadow-xl shadow-black/5 p-3 sm:p-4 flex-shrink-0">
+                        <div className="rounded-xl sm:rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-3 sm:p-4 flex-shrink-0">
                             <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide mb-1">From Initiative</p>
                             <Link
                                 to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=evidence`}
