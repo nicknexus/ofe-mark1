@@ -27,7 +27,7 @@ import { AuthService } from '../services/auth'
 import CreateKPIModal from '../components/CreateKPIModal'
 import AddKPIUpdateModal from '../components/AddKPIUpdateModal'
 import AddKPIUpdateModalWithMetricSelection from '../components/AddKPIUpdateModalWithMetricSelection'
-import AddEvidenceModal from '../components/AddEvidenceModal'
+import EvidenceUploadModal from '../components/evidence/EvidenceUploadModal'
 import InitiativeCharts from '../components/InitiativeCharts'
 import BeneficiaryManager from '../components/BeneficiaryManager'
 import MetricsDashboard from '../components/MetricsDashboard'
@@ -639,14 +639,16 @@ export default function InitiativePage() {
                 />
             )}
 
-            <AddEvidenceModal
+            <EvidenceUploadModal
                 isOpen={isEvidenceModalOpen}
                 onClose={() => {
                     setIsEvidenceModalOpen(false)
                     setSelectedKPI(null)
                 }}
-                onSubmit={handleAddEvidence}
-                availableKPIs={dashboard.kpis}
+                onCreated={async () => {
+                    apiService.clearCache(`/initiatives/${id}/dashboard`)
+                    if (!isLoadingDashboard) loadDashboard()
+                }}
                 initiativeId={id!}
                 preSelectedKPIId={selectedKPI?.id}
             />

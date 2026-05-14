@@ -75,7 +75,7 @@ function UploadRow({ item, onDismiss, onCancel }: { item: UploadItem; onDismiss:
 }
 
 export default function FloatingUploadPanel() {
-    const { uploads, dismissUpload, dismissAll, cancelUpload, isMinimized, setIsMinimized } = useUploadManager()
+    const { uploads, dismissUpload, dismissAll, cancelUpload, isMinimized, setIsMinimized, panelSuppressed } = useUploadManager()
 
     // Warn user before leaving page if uploads are active
     useEffect(() => {
@@ -91,6 +91,7 @@ export default function FloatingUploadPanel() {
     }, [uploads])
 
     if (uploads.length === 0) return null
+    if (panelSuppressed) return null
 
     const activeCount = uploads.filter(u => u.status === 'uploading').length
     const completedCount = uploads.filter(u => u.status === 'complete').length

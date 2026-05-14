@@ -22,19 +22,29 @@ import React from 'react'
 // Resolve a usable brand color even when org metadata hasn't loaded yet.
 export const DEFAULT_PUBLIC_BRAND = '#c0dfa1'
 
-/** Solid white base + a single brand radial wash, identical to the org page. */
+/**
+ * Atmospheric blurred multi-radial gradient used on every public page.
+ *
+ * Four offset brand-tinted radials layered over a near-white linear base
+ * give the page a soft, painterly background — much more "lived-in" than a
+ * single wash, and the chosen ellipse positions create a natural focal point
+ * that pairs well with content like the org page's globe.
+ */
 export function PublicPageBackground({ brandColor }: { brandColor?: string | null }) {
     const brand = brandColor || DEFAULT_PUBLIC_BRAND
     return (
-        <>
-            <div className="fixed inset-0 pointer-events-none bg-white" />
-            <div
-                className="fixed inset-0 pointer-events-none"
-                style={{
-                    background: `radial-gradient(ellipse 55% 60% at 28% 55%, ${brand}1A 0%, ${brand}30 40%, ${brand}55 80%)`,
-                }}
-            />
-        </>
+        <div
+            className="fixed inset-0 pointer-events-none"
+            style={{
+                background: `
+                    radial-gradient(ellipse 80% 50% at 20% 40%, ${brand}90, transparent 60%),
+                    radial-gradient(ellipse 60% 80% at 80% 20%, ${brand}70, transparent 55%),
+                    radial-gradient(ellipse 50% 60% at 60% 80%, ${brand}60, transparent 55%),
+                    radial-gradient(ellipse 70% 40% at 10% 90%, ${brand}50, transparent 50%),
+                    linear-gradient(180deg, white 0%, #fafafa 100%)
+                `,
+            }}
+        />
     )
 }
 

@@ -9,6 +9,7 @@ import DateRangePicker from '../DateRangePicker'
 import EvidencePreviewModal from '../EvidencePreviewModal'
 import DataPointPreviewModal from '../DataPointPreviewModal'
 import AddEvidenceModal from '../AddEvidenceModal'
+import EvidenceUploadModal from '../evidence/EvidenceUploadModal'
 import toast from 'react-hot-toast'
 
 interface EvidenceTabProps {
@@ -1092,8 +1093,8 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                 />
             )}
 
-            {/* Add/Edit Evidence Modal */}
-            {isAddModalOpen && (
+            {/* Edit Evidence Modal (legacy single-record form) */}
+            {isAddModalOpen && editingEvidence && (
                 <AddEvidenceModal
                     isOpen={isAddModalOpen}
                     onClose={() => {
@@ -1104,6 +1105,19 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                     availableKPIs={availableKPIs}
                     initiativeId={initiativeId}
                     editData={editingEvidence}
+                />
+            )}
+
+            {/* Add Evidence Modal (kanban batch upload) */}
+            {isAddModalOpen && !editingEvidence && (
+                <EvidenceUploadModal
+                    isOpen={isAddModalOpen}
+                    onClose={() => setIsAddModalOpen(false)}
+                    onCreated={async () => {
+                        await loadEvidence()
+                        onRefresh?.()
+                    }}
+                    initiativeId={initiativeId}
                 />
             )}
         </div>

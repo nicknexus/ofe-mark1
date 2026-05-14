@@ -7,6 +7,27 @@ import { MetricTagService } from './metricTagService'
 import { InitiativeService } from './initiativeService'
 
 export class EvidenceService {
+    /**
+     * Best-effort cleanup of a half-written evidence row + its junction inserts.
+     * Used when a downstream link insert fails inside `create()` so we don't
+     * leave orphan rows that the auto-linker / read paths would silently
+     * surface as "evidence with no files" or "evidence with no locations".
+     */
+    private static async cleanupPartialEvidence(evidenceId: string): Promise<void> {
+        try {
+            await Promise.allSettled([
+                supabase.from('evidence_files').delete().eq('evidence_id', evidenceId),
+                supabase.from('evidence_locations').delete().eq('evidence_id', evidenceId),
+                supabase.from('evidence_kpis').delete().eq('evidence_id', evidenceId),
+                supabase.from('evidence_kpi_updates').delete().eq('evidence_id', evidenceId),
+                supabase.from('evidence_beneficiary_groups').delete().eq('evidence_id', evidenceId),
+            ])
+            await supabase.from('evidence').delete().eq('id', evidenceId)
+        } catch (err) {
+            console.error(`[cleanupPartialEvidence] failed to clean up evidence ${evidenceId}:`, err)
+        }
+    }
+
     static async create(evidence: Evidence, userId: string, requestedOrgId?: string): Promise<Evidence> {
         // Extract linkage fields and file_urls/file_sizes before inserting into evidence table
         const { kpi_ids, kpi_update_ids, file_urls, file_sizes, location_ids, beneficiary_group_ids, tag_ids, ...evidenceData } = evidence as any;
@@ -19,7 +40,10 @@ export class EvidenceService {
 
         if (error) throw new Error(`Failed to create evidence: ${error.message}`);
 
-        // Insert multiple locations into evidence_locations junction table if provided
+        // Insert multiple locations into evidence_locations junction table if provided.
+        // Locations are load-bearing for auto-link (autoLinkToMatchingUpdates short-circuits
+        // on empty location_ids), so a silent drop here would produce an evidence row that
+        // can never auto-link to claims. Treat failures as fatal and roll back.
         if (location_ids && location_ids.length > 0) {
             const locationLinks = (location_ids as string[]).map((locationId: string) => ({
                 evidence_id: data.id,
@@ -33,27 +57,28 @@ export class EvidenceService {
 
             if (locationError) {
                 console.error('Failed to insert evidence locations:', locationError);
-                // Don't throw - evidence is created, location links are optional
+                await this.cleanupPartialEvidence(data.id)
+                throw new Error(`Failed to link evidence to locations: ${locationError.message}`)
             }
         }
 
-        // Insert multiple files into evidence_files table if provided
+        // Insert multiple files into evidence_files table if provided.
+        // For grouped uploads this is the single source of truth for the file set —
+        // silently dropping the inserts would leave a titled evidence row with zero
+        // files visible in the UI. Roll back on failure so the caller can retry.
         if (file_urls && file_urls.length > 0) {
             const evidenceFiles = (file_urls as string[]).map((fileUrl: string, index: number) => {
-                // Extract filename from URL
                 const fileName = fileUrl.split('/').pop() || `file-${index + 1}`
-                // Try to determine file type from extension
                 const extension = fileName.split('.').pop()?.toLowerCase() || ''
                 const fileType = extension || 'unknown'
-                // Get file size if provided (for storage tracking)
                 const fileSize = (file_sizes as number[] | undefined)?.[index] || 0
-                
+
                 return {
                     evidence_id: data.id,
                     file_url: fileUrl,
                     file_name: fileName,
                     file_type: fileType,
-                    file_size: fileSize, // Store file size for storage tracking
+                    file_size: fileSize,
                     display_order: index
                 }
             })
@@ -64,7 +89,8 @@ export class EvidenceService {
 
             if (filesError) {
                 console.error('Failed to insert evidence files:', filesError)
-                // Don't throw - evidence is created, files are optional
+                await this.cleanupPartialEvidence(data.id)
+                throw new Error(`Failed to attach files to evidence: ${filesError.message}`)
             }
         }
 

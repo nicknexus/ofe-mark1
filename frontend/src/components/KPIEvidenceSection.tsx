@@ -13,6 +13,7 @@ import { apiService } from '../services/api'
 import { KPI, Evidence, CreateEvidenceForm } from '../types'
 import { formatDate, getEvidenceTypeInfo } from '../utils'
 import AddEvidenceModal from './AddEvidenceModal'
+import EvidenceUploadModal from './evidence/EvidenceUploadModal'
 import EvidencePreviewModal from './EvidencePreviewModal'
 import toast from 'react-hot-toast'
 
@@ -267,12 +268,11 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateF
                 )}
             </div>
 
-            {/* Add Evidence Modal */}
-            <AddEvidenceModal
+            {/* Add Evidence Modal (kanban batch upload) */}
+            <EvidenceUploadModal
                 isOpen={isEvidenceModalOpen}
                 onClose={() => setIsEvidenceModalOpen(false)}
-                onSubmit={handleAddEvidence}
-                availableKPIs={[kpi]}
+                onCreated={async () => { loadEvidence(); onRefresh() }}
                 initiativeId={initiativeId}
                 preSelectedKPIId={kpi.id}
             />

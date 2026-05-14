@@ -28,6 +28,11 @@ interface UploadContextType {
     dismissAll: () => void
     isMinimized: boolean
     setIsMinimized: (v: boolean) => void
+    /** When true, FloatingUploadPanel hides itself (used by modals that show
+     *  their own internal upload progress so the global panel doesn't cover
+     *  their action buttons). */
+    panelSuppressed: boolean
+    setPanelSuppressed: (v: boolean) => void
 }
 
 const UploadContext = createContext<UploadContextType | null>(null)
@@ -43,6 +48,7 @@ let nextId = 1
 export function UploadProvider({ children }: { children: React.ReactNode }) {
     const [uploads, setUploads] = useState<UploadItem[]>([])
     const [isMinimized, setIsMinimized] = useState(false)
+    const [panelSuppressed, setPanelSuppressed] = useState(false)
     const abortControllers = useRef<Map<string, AbortController>>(new Map())
 
     const updateUpload = useCallback((id: string, patch: Partial<UploadItem>) => {
@@ -122,7 +128,9 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
             dismissUpload,
             dismissAll,
             isMinimized,
-            setIsMinimized
+            setIsMinimized,
+            panelSuppressed,
+            setPanelSuppressed,
         }}>
             {children}
         </UploadContext.Provider>
