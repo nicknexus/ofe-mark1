@@ -24,7 +24,7 @@ import {
     Info
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, ReferenceLine } from 'recharts'
-import { getCategoryColor, parseLocalDate, isSameDay, compareDates, formatDate, getEvidenceTypeInfo, getLocalDateString, compareClaimsByEffectiveDateDesc } from '../utils'
+import { getCategoryColor, formatDate, getEvidenceTypeInfo, compareClaimsByEffectiveDateDesc } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import DateRangePicker from './DateRangePicker'
 import EvidencePreviewModal from './EvidencePreviewModal'
@@ -41,6 +41,22 @@ import { Link } from 'react-router-dom'
 import { MetricTag, Location, BeneficiaryGroup } from '../types'
 import { apiService } from '../services/api'
 import toast from 'react-hot-toast'
+import ConfirmDialog from './ConfirmDialog'
+import {
+    getClaimSupportPercentage as computeClaimSupportPercentage,
+    getClaimEvidenceCount as computeClaimEvidenceCount,
+} from './expandableKpiCard/claimEvidenceSupport'
+import { generateKpiChartData } from './expandableKpiCard/generateKpiChartData'
+import { calculateEvidenceTypePercentages } from './expandableKpiCard/evidenceTypeCoverage'
+import {
+    getXAxisInterval,
+    formatXAxisTick,
+    calculateMaxWithHeadroom,
+    computeActualMaxCumulative,
+    generateYTicks,
+    computePercentageYAxis,
+} from './expandableKpiCard/kpiChartAxisHelpers'
+import { ExpandableKPICardPercentageTooltip } from './expandableKpiCard/ExpandableKPICardPercentageTooltip'
 
 interface ExpandableKPICardProps {
     kpi: any
@@ -58,21 +74,6 @@ interface ExpandableKPICardProps {
     metricColor?: string // Color for the metric's chart line (matches home tab color)
 }
 
-// Color palette matching MetricsDashboard - for metrics past 12, default to site green
-const METRIC_COLOR_PALETTE = [
-    '#3b82f6', // blue
-    '#10b981', // green
-    '#8b5cf6', // purple
-    '#f59e0b', // amber
-    '#ef4444', // red
-    '#06b6d4', // cyan
-    '#ec4899', // pink
-    '#84cc16', // lime
-    '#f97316', // orange
-    '#6366f1', // indigo
-    '#14b8a6', // teal
-    '#a855f7', // violet
-]
 const DEFAULT_METRIC_COLOR = '#c0dfa1' // site green (primary-500)
 
 export default function ExpandableKPICard({
@@ -421,651 +422,45 @@ export default function ExpandableKPICard({
         setIsEasyEvidenceModalOpen(true)
     }
 
-    // Ben group scoping: both unscoped = match, both scoped with overlap = match, otherwise no match
-    const beneficiaryGroupsMatch = (claimGroupIds: string[], evidenceGroupIds: string[]): boolean => {
-        const claimScoped = claimGroupIds.length > 0
-        const evidenceScoped = evidenceGroupIds.length > 0
-        if (!claimScoped && !evidenceScoped) return true
-        if (claimScoped !== evidenceScoped) return false
-        return claimGroupIds.some(id => evidenceGroupIds.includes(id))
-    }
+    const getClaimSupportPercentage = (claim: any) => computeClaimSupportPercentage(claim, evidence)
+    const getClaimEvidenceCount = (claim: any) => computeClaimEvidenceCount(claim, evidence)
 
-    // Tag scoping (mirrors MetricTagService.evidenceMatchesClaimTag on the backend):
-    // untagged claim = no tag gate; tagged claim = evidence must carry that tag.
-    // This keeps the frontend in sync with the backend prune so we never display
-    // a stale "100% supported" if a link briefly survives a tag change.
-    const evidenceMatchesClaimTag = (claimTagId: string | null | undefined, evTagIds: string[]): boolean => {
-        if (!claimTagId) return true
-        if (!evTagIds || evTagIds.length === 0) return false
-        return evTagIds.includes(claimTagId)
-    }
-
-    // Calculate support percentage for an impact claim based on date overlap with evidence
-    const getClaimSupportPercentage = (claim: any): number => {
-        if (!claim || !claim.id || !evidence || evidence.length === 0) return 0
-
-        const claimGroupIds: string[] = claim.beneficiary_group_ids || []
-        const claimTagId: string | null = claim.tag_id || null
-
-        // Find all evidence linked to this claim AND matching ben group + tag scope
-        const linkedEvidence = evidence.filter((ev: any) => {
-            const evGroupIds: string[] = ev.beneficiary_group_ids || []
-            if (!beneficiaryGroupsMatch(claimGroupIds, evGroupIds)) return false
-            const evTagIds: string[] = ev.tag_ids || []
-            if (!evidenceMatchesClaimTag(claimTagId, evTagIds)) return false
-
-            // Check new precise linking
-            if (ev.kpi_update_ids && Array.isArray(ev.kpi_update_ids)) {
-                return ev.kpi_update_ids.includes(claim.id)
-            }
-            // Check nested evidence_kpi_updates
-            if (ev.evidence_kpi_updates && Array.isArray(ev.evidence_kpi_updates)) {
-                return ev.evidence_kpi_updates.some((link: any) => link.kpi_update_id === claim.id)
-            }
-            return false
-        })
-
-        if (linkedEvidence.length === 0) return 0
-
-        // Calculate claim date range
-        const claimStart = claim.date_range_start
-            ? parseLocalDate(claim.date_range_start)
-            : parseLocalDate(claim.date_represented)
-        const claimEnd = claim.date_range_end
-            ? parseLocalDate(claim.date_range_end)
-            : parseLocalDate(claim.date_represented)
-
-        // Count days using UTC noon to avoid DST issues
-        const startUTC = Date.UTC(claimStart.getFullYear(), claimStart.getMonth(), claimStart.getDate(), 12, 0, 0)
-        const endUTC = Date.UTC(claimEnd.getFullYear(), claimEnd.getMonth(), claimEnd.getDate(), 12, 0, 0)
-        const claimDays = Math.round((endUTC - startUTC) / (1000 * 60 * 60 * 24)) + 1
-
-        // Collect all covered days from evidence
-        const coveredDays = new Set<string>()
-
-        linkedEvidence.forEach((ev: any) => {
-            if (ev.date_range_start && ev.date_range_end) {
-                // Evidence has date range
-                const evidenceStart = parseLocalDate(ev.date_range_start)
-                const evidenceEnd = parseLocalDate(ev.date_range_end)
-
-                // Find overlap
-                const overlapStart = new Date(Math.max(claimStart.getTime(), evidenceStart.getTime()))
-                const overlapEnd = new Date(Math.min(claimEnd.getTime(), evidenceEnd.getTime()))
-
-                if (overlapEnd >= overlapStart) {
-                    // Add all days in the overlap using local date strings
-                    for (let d = new Date(overlapStart); d <= overlapEnd; d.setDate(d.getDate() + 1)) {
-                        if (d >= claimStart && d <= claimEnd) {
-                            coveredDays.add(getLocalDateString(d))
-                        }
-                    }
-                }
-            } else if (ev.date_represented) {
-                // Evidence has single date
-                const evidenceDate = parseLocalDate(ev.date_represented)
-                if (evidenceDate >= claimStart && evidenceDate <= claimEnd) {
-                    coveredDays.add(ev.date_represented.split('T')[0])
-                }
-            }
-        })
-
-        // Calculate percentage
-        const percentage = Math.round((coveredDays.size / claimDays) * 100)
-        return Math.min(percentage, 100) // Cap at 100%
-    }
-
-    // Get count of evidence pieces linked to a claim
-    const getClaimEvidenceCount = (claim: any): number => {
-        if (!claim || !claim.id || !evidence || evidence.length === 0) return 0
-
-        const claimGroupIds: string[] = claim.beneficiary_group_ids || []
-        const claimTagId: string | null = claim.tag_id || null
-
-        const linkedEvidence = evidence.filter((ev: any) => {
-            const evGroupIds: string[] = ev.beneficiary_group_ids || []
-            if (!beneficiaryGroupsMatch(claimGroupIds, evGroupIds)) return false
-            const evTagIds: string[] = ev.tag_ids || []
-            if (!evidenceMatchesClaimTag(claimTagId, evTagIds)) return false
-
-            if (ev.kpi_update_ids && Array.isArray(ev.kpi_update_ids)) {
-                return ev.kpi_update_ids.includes(claim.id)
-            }
-            if (ev.evidence_kpi_updates && Array.isArray(ev.evidence_kpi_updates)) {
-                return ev.evidence_kpi_updates.some((link: any) => link.kpi_update_id === claim.id)
-            }
-            return false
-        })
-
-        return linkedEvidence.length
-    }
-
-    // Check if an impact claim has evidence supporting it (for boolean checks)
-    const isClaimSupported = (claimId: string): boolean => {
-        const claim = kpiUpdates.find((u: any) => u.id === claimId)
-        if (!claim) return false
-        return getClaimSupportPercentage(claim) > 0
-    }
-
-    // Get effective date for an update - use end date for ranges, otherwise use date_represented
-    // Parse as local date to avoid timezone shifts
-    const getEffectiveDate = (update: any): Date => {
-        if (update.date_range_end) {
-            return parseLocalDate(update.date_range_end)
-        }
-        return parseLocalDate(update.date_represented)
-    }
-
-    // Percentage metrics get a different chart treatment: monthly-only,
-    // per-month mean, range claims contribute to every overlapping month.
     const isPercentageMetric = kpi.metric_type === 'percentage'
     const effectiveIsCumulative = isCumulative && !isPercentageMetric
 
-    // Generate cumulative data for this specific KPI
-    const generateChartData = () => {
-        if (!filteredKpiUpdates || filteredKpiUpdates.length === 0) {
-            return []
-        }
+    const chartData = generateKpiChartData({
+        filteredKpiUpdates,
+        datePickerValue,
+        timeFrame,
+        isCumulative,
+        isPercentageMetric,
+    })
 
-        // Sort updates by effective date (end date for ranges, date_represented otherwise)
-        const sortedUpdates = [...filteredKpiUpdates].sort((a, b) =>
-            getEffectiveDate(a).getTime() - getEffectiveDate(b).getTime()
-        )
-
-        // Calculate date range based on date picker, time frame, or all time
-        const now = new Date()
-        let startDate: Date
-        let endDate: Date
-
-        // If a single date is selected, only show that date
-        if (datePickerValue.singleDate) {
-            startDate = parseLocalDate(datePickerValue.singleDate)
-            startDate.setHours(0, 0, 0, 0)
-            endDate = parseLocalDate(datePickerValue.singleDate)
-            endDate.setHours(23, 59, 59, 999)
-        }
-        // If a date range is selected, use that range
-        else if (datePickerValue.startDate && datePickerValue.endDate) {
-            startDate = parseLocalDate(datePickerValue.startDate)
-            startDate.setHours(0, 0, 0, 0)
-            endDate = parseLocalDate(datePickerValue.endDate)
-            endDate.setHours(23, 59, 59, 999)
-        }
-        // Otherwise, use time frame
-        else {
-            if (timeFrame === 'all') {
-                // Find the oldest update date for this KPI
-                if (sortedUpdates.length > 0) {
-                    startDate = getEffectiveDate(sortedUpdates[0])
-                    startDate.setHours(0, 0, 0, 0)
-                    // Subtract 1 day to show the graph starting at 0 before the first impact claim
-                    startDate.setDate(startDate.getDate() - 1)
-                } else {
-                    // Fallback to 1 month if no updates
-                    startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
-                    startDate.setHours(0, 0, 0, 0)
-                }
-            } else {
-                switch (timeFrame) {
-                    case '1month':
-                        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
-                        break
-                    case '6months':
-                        startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate())
-                        break
-                    case '1year':
-                        startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
-                        break
-                    case '5years':
-                        startDate = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate())
-                        break
-                    default:
-                        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
-                }
-                startDate.setHours(0, 0, 0, 0)
-            }
-            endDate = new Date(now)
-            endDate.setHours(23, 59, 59, 999) // End of today
-        }
-
-        // Filter updates within the date range (using effective date)
-        const filteredUpdates = sortedUpdates.filter(update => {
-            const updateDate = getEffectiveDate(update)
-            updateDate.setHours(0, 0, 0, 0)
-            const updateStart = update.date_range_start ? parseLocalDate(update.date_range_start) : null
-            const updateEnd = update.date_range_end ? parseLocalDate(update.date_range_end) : null
-
-            // If update is a date range, check if it overlaps with filter range
-            if (updateStart && updateEnd) {
-                updateStart.setHours(0, 0, 0, 0)
-                updateEnd.setHours(23, 59, 59, 999)
-                return updateStart <= endDate && updateEnd >= startDate
-            }
-            // If update is a single date, check if it's within the range
-            return compareDates(updateDate, startDate) >= 0 && compareDates(updateDate, endDate) <= 0
-        })
-
-        // Generate time series data with proper spacing
-        const data: Array<{
-            date: string;
-            cumulative: number | null;
-            value: number;
-            fullDate: Date;
-            claimCount?: number;
-        }> = []
-
-        // Percentage metrics: month-by-month percentage line.
-        // Range claims contribute their value to every month they overlap.
-        // Single-date claims OVERRIDE the range value for their month
-        // (multiple single-date claims in the same month are averaged).
-        // Multiple overlapping range claims in the same month are also averaged.
-        // Months with no claim data render null and the line connects across them.
-        if (isPercentageMetric) {
-            const monthly: Record<string, { singleSum: number; singleCount: number; rangeSum: number; rangeCount: number; date: Date }> = {}
-            const ensureBucket = (cursor: Date) => {
-                const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`
-                if (!monthly[key]) monthly[key] = { singleSum: 0, singleCount: 0, rangeSum: 0, rangeCount: 0, date: new Date(cursor) }
-                return key
-            }
-
-            filteredUpdates.forEach(update => {
-                const value = Number(update.value || 0)
-                if (!Number.isFinite(value)) return
-
-                const isRange = !!(update.date_range_start && update.date_range_end)
-                if (isRange) {
-                    const claimStart = parseLocalDate(update.date_range_start)
-                    const claimEnd = parseLocalDate(update.date_range_end)
-                    claimStart.setHours(0, 0, 0, 0)
-                    claimEnd.setHours(0, 0, 0, 0)
-                    const cursor = new Date(claimStart.getFullYear(), claimStart.getMonth(), 1)
-                    const stop = new Date(claimEnd.getFullYear(), claimEnd.getMonth(), 1)
-                    while (cursor.getTime() <= stop.getTime()) {
-                        const key = ensureBucket(cursor)
-                        monthly[key].rangeSum += value
-                        monthly[key].rangeCount += 1
-                        cursor.setMonth(cursor.getMonth() + 1)
-                    }
-                } else {
-                    const claimDate = parseLocalDate(update.date_represented)
-                    claimDate.setHours(0, 0, 0, 0)
-                    const cursor = new Date(claimDate.getFullYear(), claimDate.getMonth(), 1)
-                    const key = ensureBucket(cursor)
-                    monthly[key].singleSum += value
-                    monthly[key].singleCount += 1
-                }
-            })
-
-            // Walk every month in the visible window, plus one buffer month before
-            // the first claim so the chart breathes a little on the left.
-            const firstMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
-            firstMonth.setMonth(firstMonth.getMonth() - 1)
-            const lastMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1)
-            const cursor = new Date(firstMonth)
-            while (cursor.getTime() <= lastMonth.getTime()) {
-                const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`
-                const monthName = cursor.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-                const bucket = monthly[key]
-                let monthValue: number | null = null
-                let claimCount = 0
-                if (bucket) {
-                    if (bucket.singleCount > 0) {
-                        monthValue = bucket.singleSum / bucket.singleCount
-                        claimCount = bucket.singleCount
-                    } else if (bucket.rangeCount > 0) {
-                        monthValue = bucket.rangeSum / bucket.rangeCount
-                        claimCount = bucket.rangeCount
-                    }
-                }
-                data.push({
-                    date: monthName,
-                    cumulative: monthValue,
-                    value: monthValue ?? 0,
-                    fullDate: new Date(cursor),
-                    claimCount,
-                })
-                cursor.setMonth(cursor.getMonth() + 1)
-            }
-
-            return data
-        }
-
-        // Non-cumulative mode: group by month (only when timeFrame is 'all' and no date picker)
-        if (!isCumulative && timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate) {
-            // Start from the month before the first impact claim
-            const firstMonthStart = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
-            firstMonthStart.setMonth(firstMonthStart.getMonth() - 1)
-
-            const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-
-            // Group updates by month
-            const monthlyTotals: Record<string, number> = {}
-
-            filteredUpdates.forEach(update => {
-                const updateDate = getEffectiveDate(update)
-                const monthKey = `${updateDate.getFullYear()}-${String(updateDate.getMonth() + 1).padStart(2, '0')}`
-
-                if (!monthlyTotals[monthKey]) {
-                    monthlyTotals[monthKey] = 0
-                }
-                monthlyTotals[monthKey] += (update.value || 0)
-            })
-
-            // Generate monthly data points
-            let currentMonthDate = new Date(firstMonthStart)
-            while (currentMonthDate <= currentMonth) {
-                const monthKey = `${currentMonthDate.getFullYear()}-${String(currentMonthDate.getMonth() + 1).padStart(2, '0')}`
-                const monthName = currentMonthDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-                const monthlyTotal = monthlyTotals[monthKey] || 0
-
-                data.push({
-                    date: monthName,
-                    cumulative: monthlyTotal,
-                    value: monthlyTotal,
-                    fullDate: new Date(currentMonthDate)
-                })
-
-                // Move to next month
-                currentMonthDate.setMonth(currentMonthDate.getMonth() + 1)
-            }
-
-            return data
-        }
-
-        // Cumulative mode: daily data points
-        // Normalize startDate to midnight
-        startDate.setHours(0, 0, 0, 0)
-        const endDateNormalized = new Date(endDate)
-        endDateNormalized.setHours(0, 0, 0, 0)
-
-        const timeDiff = endDateNormalized.getTime() - startDate.getTime()
-        const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24))
-
-        // Create daily data points for the entire period
-        for (let i = 0; i <= daysDiff; i++) {
-            const currentDate = new Date(startDate)
-            currentDate.setDate(startDate.getDate() + i)
-            currentDate.setHours(0, 0, 0, 0) // Normalize to midnight local time
-
-            // Don't create dates beyond endDate
-            if (compareDates(currentDate, endDateNormalized) > 0) {
-                break
-            }
-
-            const dateString = formatDate(currentDate).split(',')[0] // Get just the date part without year
-
-            // Find if there's an update on this date (using effective date)
-            const updateOnThisDate = filteredUpdates.find(update => {
-                const updateDate = getEffectiveDate(update)
-                updateDate.setHours(0, 0, 0, 0)
-                return isSameDay(updateDate, currentDate)
-            })
-
-            // Calculate cumulative value up to this point (using effective date)
-            const cumulative = filteredUpdates
-                .filter(update => {
-                    const updateDate = getEffectiveDate(update)
-                    updateDate.setHours(0, 0, 0, 0)
-                    return compareDates(updateDate, currentDate) <= 0
-                })
-                .reduce((sum, update) => sum + (update.value || 0), 0)
-
-            data.push({
-                date: dateString,
-                cumulative: cumulative,
-                value: updateOnThisDate ? (updateOnThisDate.value || 0) : 0,
-                fullDate: currentDate
-            })
-        }
-
-        return data
-    }
-
-    const chartData = generateChartData()
-
-    // Aggregate value (mean for percentage, sum for number metrics) — used by the
-    // headline pill, the chart's reference line, and the chart tooltip.
     const totalMetricValue = aggregateKpiUpdates(kpiUpdates as any, kpi.metric_type)
 
-    // Patch the overall average onto every percentage data point. We render an
-    // invisible "ghost" line bound to this field so Recharts' tooltip activates
-    // at every X position — even over months with no claim data.
     if (isPercentageMetric) {
         for (const d of chartData) {
             (d as any).average = totalMetricValue
         }
     }
 
-    const getTimeSpanDays = () => {
-        if (chartData.length < 2) return 0
-        const first = chartData[0]?.fullDate
-        const last = chartData[chartData.length - 1]?.fullDate
-        if (!first || !last) return 0
-        return Math.round((last.getTime() - first.getTime()) / (1000 * 60 * 60 * 24))
-    }
+    const xAxisInterval = getXAxisInterval({ timeFrame, chartData, effectiveIsCumulative })
 
-    // Custom tooltip for percentage metrics: always shows the overall average
-    // plus the hovered month's value (or "No data" for empty months).
-    const PercentageTooltip = ({ active, payload, label }: any) => {
-        if (!active || !payload || !payload.length) return null
-        const dp = chartData.find(d => d.date === label)
-        const dateLabel = dp?.fullDate ? formatDate(dp.fullDate) : (label || '')
-        const monthVal = (dp as any)?.cumulative as number | null | undefined
-        const claimCount = (dp as any)?.claimCount ?? 0
-        return (
-            <div style={{ backgroundColor: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(8px)', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '10px 12px', fontSize: '12px', boxShadow: '0 8px 24px rgba(15,23,42,0.08)', minWidth: 160 }}>
-                <div style={{ fontWeight: 500, color: '#475569', marginBottom: 6 }}>{dateLabel}</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                    <span style={{ color: '#94a3b8' }}>This month</span>
-                    <span style={{ fontWeight: 500, color: '#0f172a' }}>
-                        {typeof monthVal === 'number' ? `${Math.round(monthVal)}% · ${claimCount} claim${claimCount === 1 ? '' : 's'}` : 'No data'}
-                    </span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 6, paddingTop: 6, borderTop: '1px dashed #e2e8f0' }}>
-                    <span style={{ color: chartColor, opacity: 0.85, fontWeight: 500 }}>Overall avg</span>
-                    <span style={{ fontWeight: 600, color: chartColor }}>{Math.round(totalMetricValue)}%</span>
-                </div>
-            </div>
-        )
-    }
+    const formatXAxisTickBound = (dateStr: string) => formatXAxisTick(chartData, dateStr)
 
-    const getXAxisInterval = () => {
-        if (timeFrame === '1month') return 0
+    const maxDomainValue = calculateMaxWithHeadroom(chartData)
+    const actualMaxValue = computeActualMaxCumulative(chartData)
 
-        const dataPointCount = chartData.length
-        if (dataPointCount <= 12) return 0
+    const { percentageYMax, percentageYTicks } = computePercentageYAxis(chartData, isPercentageMetric)
 
-        if (!effectiveIsCumulative) {
-            if (dataPointCount <= 24) return 1
-            if (dataPointCount <= 48) return 2
-            if (dataPointCount <= 72) return 5
-            return Math.floor((dataPointCount - 1) / 12)
-        }
+    const yTicks = generateYTicks(maxDomainValue, actualMaxValue)
 
-        const spanDays = getTimeSpanDays()
-        if (spanDays <= 90) return Math.floor((dataPointCount - 1) / 30)
-        if (spanDays <= 365) return Math.floor((dataPointCount - 1) / 12)
-        if (spanDays <= 730) return Math.floor((dataPointCount - 1) / 12)
-        return Math.floor((dataPointCount - 1) / 8)
-    }
+    const evidenceTypePercentages = calculateEvidenceTypePercentages({
+        kpiId: kpi.id,
+        kpiUpdates,
+        evidence,
+    })
 
-    const formatXAxisTick = (dateStr: string) => {
-        const dp = chartData.find(d => d.date === dateStr)
-        if (!dp?.fullDate) return dateStr
-        const spanDays = getTimeSpanDays()
-        const d = dp.fullDate as Date
-        if (spanDays <= 60) {
-            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-        }
-        if (spanDays <= 365) {
-            return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-        }
-        if (spanDays <= 730) {
-            return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-        }
-        return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-    }
-
-    // Calculate dynamic max value with headroom for the graph
-    const calculateMaxWithHeadroom = () => {
-        if (!chartData || chartData.length === 0) return 0
-
-        // Find the maximum cumulative value
-        let maxValue = 0
-        chartData.forEach((dataPoint) => {
-            if (dataPoint.cumulative && typeof dataPoint.cumulative === 'number' && isFinite(dataPoint.cumulative)) {
-                maxValue = Math.max(maxValue, dataPoint.cumulative)
-            }
-        })
-
-        if (maxValue === 0) return 0
-
-        // Add dynamic headroom: more percentage for smaller values, less for larger values
-        let headroomPercentage = 0.15 // Default 15%
-        if (maxValue < 100) {
-            headroomPercentage = 0.20 // 20% for small values
-        } else if (maxValue < 1000) {
-            headroomPercentage = 0.15 // 15% for medium values
-        } else if (maxValue < 10000) {
-            headroomPercentage = 0.12 // 12% for larger values
-        } else {
-            headroomPercentage = 0.10 // 10% for very large values
-        }
-
-        return maxValue * (1 + headroomPercentage)
-    }
-
-    const maxDomainValue = calculateMaxWithHeadroom()
-    const actualMaxValue = Math.max(...chartData.map(d =>
-        typeof d.cumulative === 'number' && isFinite(d.cumulative) ? d.cumulative : 0
-    ).filter(v => v > 0), 0)
-
-    // Percentage metrics get their own Y-axis: floor 0-100, extend upward to the
-    // next multiple of 100 if any visible value exceeds 100 (e.g. 350% → 0-400).
-    const percentageYMax = (() => {
-        if (!isPercentageMetric || chartData.length === 0) return 100
-        let maxValue = 100
-        chartData.forEach(d => {
-            if (typeof d.cumulative === 'number' && isFinite(d.cumulative) && d.cumulative > maxValue) {
-                maxValue = d.cumulative
-            }
-        })
-        if (maxValue <= 100) return 100
-        return Math.ceil(maxValue / 100) * 100
-    })()
-    const percentageYTicks = (() => {
-        if (!isPercentageMetric) return [] as number[]
-        const step = percentageYMax / 4
-        return [0, step, step * 2, step * 3, percentageYMax]
-    })()
-
-    // Generate ticks that include the actual max value
-    const generateYTicks = () => {
-        if (maxDomainValue === 0) return []
-        const ticks: number[] = []
-        const numTicks = 5
-        const step = maxDomainValue / numTicks
-
-        for (let i = 0; i <= numTicks; i++) {
-            ticks.push(Math.round(i * step))
-        }
-
-        // Ensure the actual max value is included if it's not already close to a tick
-        if (actualMaxValue > 0 && !ticks.some(t => Math.abs(t - actualMaxValue) < step * 0.1)) {
-            ticks.push(actualMaxValue)
-            ticks.sort((a, b) => a - b)
-        }
-
-        return ticks
-    }
-
-    const yTicks = generateYTicks()
-
-    // Calculate evidence type percentages based on data point coverage
-    const calculateEvidenceTypePercentages = () => {
-        // Total data points (claims) for this KPI
-        const totalDataPoints = kpiUpdates?.length || 0
-
-        if (!evidence || evidence.length === 0 || totalDataPoints === 0) {
-            return {
-                visual_proof: { count: 0, percentage: 0 },
-                documentation: { count: 0, percentage: 0 },
-                testimony: { count: 0, percentage: 0 },
-                financials: { count: 0, percentage: 0 }
-            }
-        }
-
-        // For each evidence type, track which unique data points it covers
-        const dataPointsCoveredByType: Record<string, Set<string>> = {
-            visual_proof: new Set(),
-            documentation: new Set(),
-            testimony: new Set(),
-            financials: new Set()
-        }
-
-        // Create a Set of valid update IDs for this KPI only
-        const validUpdateIds = new Set(kpiUpdates.map((update: any) => update.id).filter(Boolean))
-
-        // Lookup: claim id -> claim (so we can apply tag/ben group gates per claim)
-        const updateById = new Map<string, any>()
-        kpiUpdates.forEach((u: any) => { if (u.id) updateById.set(u.id, u) })
-
-        // Counts a data-point as covered only if the gates (ben group + tag) hold.
-        const tryCover = (ev: any, updateId: string) => {
-            if (!validUpdateIds.has(updateId)) return
-            const claim = updateById.get(updateId)
-            if (!claim) return
-            const claimGroupIds: string[] = claim.beneficiary_group_ids || []
-            const evGroupIds: string[] = ev.beneficiary_group_ids || []
-            if (!beneficiaryGroupsMatch(claimGroupIds, evGroupIds)) return
-            const claimTagId: string | null = claim.tag_id || null
-            const evTagIds: string[] = ev.tag_ids || []
-            if (!evidenceMatchesClaimTag(claimTagId, evTagIds)) return
-            dataPointsCoveredByType[ev.type as keyof typeof dataPointsCoveredByType].add(updateId)
-        }
-
-        // Go through each evidence item and track which data points it covers
-        evidence.forEach((ev: any) => {
-            if (!ev.type || !dataPointsCoveredByType.hasOwnProperty(ev.type)) return
-
-            // Get data points covered by this evidence
-            // Check if evidence has kpi_update_ids (new precise linking)
-            if (ev.kpi_update_ids && Array.isArray(ev.kpi_update_ids)) {
-                ev.kpi_update_ids.forEach((updateId: string) => tryCover(ev, updateId))
-            } else if (ev.evidence_kpi_updates && Array.isArray(ev.evidence_kpi_updates)) {
-                ev.evidence_kpi_updates.forEach((link: any) => {
-                    if (link.kpi_update_id) tryCover(ev, link.kpi_update_id)
-                })
-            } else if (kpi.id && ev.kpi_ids?.includes(kpi.id)) {
-                // Legacy KPI-only link: cover every data-point that passes the gates.
-                kpiUpdates.forEach((update: any) => {
-                    if (update.id) tryCover(ev, update.id)
-                })
-            }
-        })
-
-        // Calculate percentage for each type: (unique data points covered / total data points) * 100
-        return {
-            visual_proof: {
-                count: dataPointsCoveredByType.visual_proof.size,
-                percentage: totalDataPoints > 0 ? Math.round((dataPointsCoveredByType.visual_proof.size / totalDataPoints) * 100) : 0
-            },
-            documentation: {
-                count: dataPointsCoveredByType.documentation.size,
-                percentage: totalDataPoints > 0 ? Math.round((dataPointsCoveredByType.documentation.size / totalDataPoints) * 100) : 0
-            },
-            testimony: {
-                count: dataPointsCoveredByType.testimony.size,
-                percentage: totalDataPoints > 0 ? Math.round((dataPointsCoveredByType.testimony.size / totalDataPoints) * 100) : 0
-            },
-            financials: {
-                count: dataPointsCoveredByType.financials.size,
-                percentage: totalDataPoints > 0 ? Math.round((dataPointsCoveredByType.financials.size / totalDataPoints) * 100) : 0
-            }
-        }
-    }
-
-    const evidenceTypePercentages = calculateEvidenceTypePercentages()
 
     // Get evidence type icon component
     const getEvidenceIcon = (type: 'visual_proof' | 'documentation' | 'testimony' | 'financials') => {
@@ -1193,10 +588,10 @@ export default function ExpandableKPICard({
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                                                         <CartesianGrid vertical={false} stroke="#f1f5f9" strokeDasharray="3 3" />
-                                                        <XAxis dataKey="date" stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} angle={-45} textAnchor="end" height={50} interval={getXAxisInterval()} tickMargin={6} tickFormatter={effectiveIsCumulative ? formatXAxisTick : undefined} />
+                                                        <XAxis dataKey="date" stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} angle={-45} textAnchor="end" height={50} interval={xAxisInterval} tickMargin={6} tickFormatter={effectiveIsCumulative ? formatXAxisTickBound : undefined} />
                                                         <YAxis stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} domain={isPercentageMetric ? [0, percentageYMax] : (maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax'])} ticks={isPercentageMetric ? percentageYTicks : (yTicks.length > 0 ? yTicks : undefined)} tickFormatter={isPercentageMetric ? ((value: any) => `${Math.round(value)}%`) : ((value) => { if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`; if (value >= 1000) return `${(value / 1000).toFixed(1)}K`; return value.toString() })} />
                                                         {isPercentageMetric ? (
-                                                            <Tooltip content={<PercentageTooltip />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                                                            <Tooltip content={(tooltipProps) => <ExpandableKPICardPercentageTooltip {...tooltipProps} chartData={chartData} chartColor={chartColor} totalMetricValue={totalMetricValue} />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
                                                         ) : (
                                                             <Tooltip contentStyle={{ backgroundColor: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(8px)', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '8px 12px', fontSize: '12px', boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }} formatter={(value: any) => [typeof value === 'number' ? value.toLocaleString() + (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '') : value, 'Cumulative Total']} labelFormatter={(label) => { const dp = chartData.find(d => d.date === label); return dp?.fullDate ? formatDate(dp.fullDate) : `Date: ${label}` }} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
                                                         )}
@@ -1401,36 +796,30 @@ export default function ExpandableKPICard({
                 )}
 
                 {deleteConfirmDataPoint && createPortal(
-                    <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[80]">
-                        <div className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-3xl max-w-md w-full p-6 shadow-dialog">
-                            <div className="flex items-center space-x-3 mb-4">
-                                <div className="p-2.5 bg-red-100/80 rounded-xl"><Trash2 className="w-5 h-5 text-red-500" /></div>
-                                <div><h3 className="text-lg font-semibold text-gray-800">Delete Impact Claim</h3><p className="text-sm text-gray-500">This action cannot be undone</p></div>
-                            </div>
-                            <p className="text-gray-600 mb-6">Are you sure you want to delete this impact claim?</p>
-                            <div className="flex space-x-3">
-                                <button onClick={() => setDeleteConfirmDataPoint(null)} className="flex-1 px-5 py-3 text-gray-600 bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-xl hover:bg-white/80 font-medium transition-all duration-200">Cancel</button>
-                                <button onClick={() => handleDeleteDataPoint(deleteConfirmDataPoint)} className="flex-1 px-5 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all duration-200 font-semibold shadow-lg shadow-red-500/25">Delete</button>
-                            </div>
-                        </div>
-                    </div>,
+                    <ConfirmDialog
+                        tone="danger"
+                        title="Delete Impact Claim"
+                        message={
+                            'This action cannot be undone.\n\nAre you sure you want to delete this impact claim and its associated information?'
+                        }
+                        confirmLabel="Delete"
+                        onCancel={() => setDeleteConfirmDataPoint(null)}
+                        onConfirm={() => handleDeleteDataPoint(deleteConfirmDataPoint)}
+                    />,
                     document.body
                 )}
 
                 {deleteConfirmEvidence && createPortal(
-                    <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[80]">
-                        <div className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-3xl max-w-md w-full p-6 shadow-dialog">
-                            <div className="flex items-center space-x-3 mb-4">
-                                <div className="p-2.5 bg-red-100/80 rounded-xl"><Trash2 className="w-5 h-5 text-red-500" /></div>
-                                <div><h3 className="text-lg font-semibold text-gray-800">Delete Evidence</h3><p className="text-sm text-gray-500">This action cannot be undone</p></div>
-                            </div>
-                            <p className="text-gray-600 mb-6">Are you sure you want to delete this evidence?</p>
-                            <div className="flex space-x-3">
-                                <button onClick={() => setDeleteConfirmEvidence(null)} className="flex-1 px-5 py-3 text-gray-600 bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-xl hover:bg-white/80 font-medium transition-all duration-200">Cancel</button>
-                                <button onClick={() => handleDeleteEvidence(deleteConfirmEvidence)} className="flex-1 px-5 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all duration-200 font-semibold shadow-lg shadow-red-500/25">Delete</button>
-                            </div>
-                        </div>
-                    </div>,
+                    <ConfirmDialog
+                        tone="danger"
+                        title="Delete Evidence"
+                        message={
+                            'This action cannot be undone.\n\nAre you sure you want to delete this evidence and its associated information?'
+                        }
+                        confirmLabel="Delete"
+                        onCancel={() => setDeleteConfirmEvidence(null)}
+                        onConfirm={() => handleDeleteEvidence(deleteConfirmEvidence)}
+                    />,
                     document.body
                 )}
 
@@ -1814,10 +1203,10 @@ export default function ExpandableKPICard({
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <LineChart data={chartData} margin={{ top: 12, right: 20, left: 0, bottom: 0 }}>
                                                         <CartesianGrid vertical={false} stroke="#f1f5f9" strokeDasharray="3 3" />
-                                                        <XAxis dataKey="date" stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} angle={-45} textAnchor="end" height={60} interval={getXAxisInterval()} tickMargin={8} tickFormatter={effectiveIsCumulative ? formatXAxisTick : undefined} />
+                                                        <XAxis dataKey="date" stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} angle={-45} textAnchor="end" height={60} interval={xAxisInterval} tickMargin={8} tickFormatter={effectiveIsCumulative ? formatXAxisTickBound : undefined} />
                                                         <YAxis stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} domain={isPercentageMetric ? [0, percentageYMax] : (maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax'])} ticks={isPercentageMetric ? percentageYTicks : (yTicks.length > 0 ? yTicks : undefined)} tickFormatter={isPercentageMetric ? ((value: any) => `${Math.round(value)}%`) : ((value) => { if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`; if (value >= 1000) return `${(value / 1000).toFixed(1)}K`; return value.toString() })} />
                                                         {isPercentageMetric ? (
-                                                            <Tooltip content={<PercentageTooltip />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                                                            <Tooltip content={(tooltipProps) => <ExpandableKPICardPercentageTooltip {...tooltipProps} chartData={chartData} chartColor={chartColor} totalMetricValue={totalMetricValue} />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
                                                         ) : (
                                                             <Tooltip contentStyle={{ backgroundColor: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(8px)', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '10px 12px', fontSize: '12px', boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }} formatter={(value: any) => { const unit = kpi.unit_of_measurement || ''; const formattedValue = typeof value === 'number' ? value.toLocaleString() + (unit ? ` ${unit}` : '') : value; return [formattedValue, 'Cumulative Total'] }} labelFormatter={(label) => { const dataPoint = chartData.find(d => d.date === label); if (dataPoint?.fullDate) { return formatDate(dataPoint.fullDate) } return `Date: ${label}` }} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
                                                         )}
@@ -2152,9 +1541,9 @@ export default function ExpandableKPICard({
                                                             angle={-45}
                                                             textAnchor="end"
                                                             height={60}
-                                                            interval={getXAxisInterval()}
+                                                            interval={xAxisInterval}
                                                             tickMargin={8}
-                                                            tickFormatter={effectiveIsCumulative ? formatXAxisTick : undefined}
+                                                            tickFormatter={effectiveIsCumulative ? formatXAxisTickBound : undefined}
                                                         />
                                                         <YAxis
                                                             stroke="#cbd5e1"
@@ -2171,7 +1560,7 @@ export default function ExpandableKPICard({
                                                             })}
                                                         />
                                                         {isPercentageMetric ? (
-                                                            <Tooltip content={<PercentageTooltip />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                                                            <Tooltip content={(tooltipProps) => <ExpandableKPICardPercentageTooltip {...tooltipProps} chartData={chartData} chartColor={chartColor} totalMetricValue={totalMetricValue} />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
                                                         ) : (
                                                             <Tooltip
                                                                 contentStyle={{
@@ -2454,6 +1843,7 @@ export default function ExpandableKPICard({
                     metricType={kpi.metric_type || 'number'}
                     unitOfMeasurement={kpi.unit_of_measurement || ''}
                     initiativeId={initiativeId}
+                    kpiTagIds={(kpi as any).tag_ids || []}
                     editData={editingDataPoint}
                 />,
                 document.body
@@ -2476,77 +1866,31 @@ export default function ExpandableKPICard({
                 document.body
             )}
 
-            {/* Delete Data Point Confirmation */}
             {deleteConfirmDataPoint && createPortal(
-                <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[80]">
-                    <div className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-3xl max-w-md w-full p-6 shadow-dialog">
-                        <div className="flex items-center space-x-3 mb-4">
-                            <div className="p-2.5 bg-red-100/80 rounded-xl">
-                                <Trash2 className="w-5 h-5 text-red-500" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-semibold text-gray-800">Delete Impact Claim</h3>
-                                <p className="text-sm text-gray-500">This action cannot be undone</p>
-                            </div>
-                        </div>
-
-                        <p className="text-gray-600 mb-6">
-                            Are you sure you want to delete this impact claim and its associated information?
-                        </p>
-
-                        <div className="flex space-x-3">
-                            <button
-                                onClick={() => setDeleteConfirmDataPoint(null)}
-                                className="flex-1 px-5 py-3 text-gray-600 bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-xl hover:bg-white/80 font-medium transition-all duration-200"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => handleDeleteDataPoint(deleteConfirmDataPoint)}
-                                className="flex-1 px-5 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all duration-200 font-semibold shadow-lg shadow-red-500/25"
-                            >
-                                Delete
-                            </button>
-                        </div>
-                    </div>
-                </div>,
+                <ConfirmDialog
+                    tone="danger"
+                    title="Delete Impact Claim"
+                    message={
+                        'This action cannot be undone.\n\nAre you sure you want to delete this impact claim and its associated information?'
+                    }
+                    confirmLabel="Delete"
+                    onCancel={() => setDeleteConfirmDataPoint(null)}
+                    onConfirm={() => handleDeleteDataPoint(deleteConfirmDataPoint)}
+                />,
                 document.body
             )}
 
-            {/* Delete Evidence Confirmation */}
             {deleteConfirmEvidence && createPortal(
-                <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[80]">
-                    <div className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-3xl max-w-md w-full p-6 shadow-dialog">
-                        <div className="flex items-center space-x-3 mb-4">
-                            <div className="p-2.5 bg-red-100/80 rounded-xl">
-                                <Trash2 className="w-5 h-5 text-red-500" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-semibold text-gray-800">Delete Evidence</h3>
-                                <p className="text-sm text-gray-500">This action cannot be undone</p>
-                            </div>
-                        </div>
-
-                        <p className="text-gray-600 mb-6">
-                            Are you sure you want to delete this evidence and its associated information?
-                        </p>
-
-                        <div className="flex space-x-3">
-                            <button
-                                onClick={() => setDeleteConfirmEvidence(null)}
-                                className="flex-1 px-5 py-3 text-gray-600 bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-xl hover:bg-white/80 font-medium transition-all duration-200"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => handleDeleteEvidence(deleteConfirmEvidence)}
-                                className="flex-1 px-5 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all duration-200 font-semibold shadow-lg shadow-red-500/25"
-                            >
-                                Delete
-                            </button>
-                        </div>
-                    </div>
-                </div>,
+                <ConfirmDialog
+                    tone="danger"
+                    title="Delete Evidence"
+                    message={
+                        'This action cannot be undone.\n\nAre you sure you want to delete this evidence and its associated information?'
+                    }
+                    confirmLabel="Delete"
+                    onCancel={() => setDeleteConfirmEvidence(null)}
+                    onConfirm={() => handleDeleteEvidence(deleteConfirmEvidence)}
+                />,
                 document.body
             )}
 

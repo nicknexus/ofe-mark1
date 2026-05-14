@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { TrendingUp, Target, BarChart3, Calendar, FileText, Filter, ChevronDown, X, MapPin, ExternalLink, Plus, Users, GripVertical, Upload } from 'lucide-react'
+import { TrendingUp, Target, BarChart3, Calendar, FileText, Filter, ChevronDown, X, MapPin, ExternalLink, Plus, Users, Upload } from 'lucide-react'
 import { useTeam } from '../context/TeamContext'
 import { createPortal } from 'react-dom'
 import {
@@ -15,10 +15,8 @@ import {
     arrayMove,
     SortableContext,
     sortableKeyboardCoordinates,
-    useSortable,
     horizontalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
 import {
     LineChart,
     Line,
@@ -36,64 +34,24 @@ import DateRangePicker from './DateRangePicker'
 import { apiService } from '../services/api'
 import { Location, BeneficiaryGroup, User, Organization } from '../types'
 import { AuthService } from '../services/auth'
-import { getCategoryColor, parseLocalDate, isSameDay, compareDates, getLocalDateString, formatDate } from '../utils'
+import { getCategoryColor, getLocalDateString, formatDate } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import toast from 'react-hot-toast'
-
-// Sortable Metric Card Component
-function SortableMetricCard({ kpi, metricColor, filteredTotal, onMetricCardClick }: {
-    kpi: any
-    metricColor: string
-    filteredTotal: number
-    onMetricCardClick?: (kpiId: string) => void
-}) {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: kpi.id })
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-    }
-
-    return (
-        <div
-            ref={setNodeRef}
-            style={style}
-            className="bg-white rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.15)] border border-gray-100 p-3 hover:shadow-[0_4px_20px_rgba(0,0,0,0.18)] hover:border-gray-200 cursor-pointer transition-all duration-200 relative group"
-        >
-            {/* Drag Handle - Top Right Corner */}
-            <div
-                {...attributes}
-                {...listeners}
-                className="absolute top-1 right-1 cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded-lg z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-                style={{ opacity: isDragging ? 1 : undefined }}
-            >
-                <GripVertical className="w-3 h-3 text-gray-400" />
-            </div>
-            <div
-                onClick={() => onMetricCardClick?.(kpi.id)}
-            >
-                <div className="flex items-center justify-between mb-1">
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: metricColor }} />
-                    <span className="text-xs text-gray-400 truncate ml-1 flex-1">{kpi.metric_type === 'percentage' ? 'avg' : (kpi.unit_of_measurement || '')}</span>
-                </div>
-                <div className="text-xs font-medium text-gray-700 truncate mb-1" title={kpi.title}>
-                    {kpi.title}
-                </div>
-                <div className="text-base font-semibold" style={{ color: metricColor }}>
-                    {filteredTotal.toLocaleString()}{kpi.metric_type === 'percentage' ? '%' : ''}
-                </div>
-            </div>
-        </div>
-    )
-}
+import { SortableMetricCard } from './metricsDashboard/SortableMetricCard'
+import { getKPIColor } from './metricsDashboard/metricColorPalette'
+import { filterDashboardKpiUpdates, computeFilteredTotals } from './metricsDashboard/filterDashboardKpiUpdates'
+import { generateMetricsDashboardChartData } from './metricsDashboard/generateMetricsDashboardChartData'
+import {
+    getMetricsDashboardXAxisInterval,
+    formatMetricsDashboardXAxisTick,
+} from './metricsDashboard/metricsDashboardChartAxis'
+import {
+    calculateMultiKpiMaxWithHeadroom,
+    computeMultiKpiActualMax,
+    generateMultiKpiYTicks,
+    computeDashboardPercentageYAxis,
+} from './metricsDashboard/metricsDashboardChartDomain'
+import { MetricsDashboardPercentageTooltip } from './metricsDashboard/MetricsDashboardPercentageTooltip'
 
 interface MetricsDashboardProps {
     kpis: any[]
@@ -316,9 +274,8 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
 
     // Initialize visible KPIs with all KPIs when component mounts or kpis change
     useEffect(() => {
-        const filteredKPIs = getFilteredKPIs()
-        if (filteredKPIs && filteredKPIs.length > 0) {
-            setVisibleKPIs(new Set(filteredKPIs.map(kpi => kpi.id)))
+        if (kpis && kpis.length > 0) {
+            setVisibleKPIs(new Set(kpis.map(kpi => kpi.id)))
         }
     }, [kpis, selectedLocations])
 
@@ -344,543 +301,48 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
         }
     }
 
-    // Get effective date for an update - use end date for ranges, otherwise use date_represented
-    // Parse as local date to avoid timezone shifts
-    const getEffectiveDate = (update: any): Date => {
-        if (update.date_range_end) {
-            return parseLocalDate(update.date_range_end)
-        }
-        return parseLocalDate(update.date_represented)
-    }
+    const filteredUpdates = filterDashboardKpiUpdates({
+        kpiUpdates,
+        datePickerValue,
+        selectedLocations,
+        selectedBeneficiaryGroups,
+        selectedTags,
+        updateBeneficiaryGroupsCache,
+    })
+    const filteredKPIs = kpis
+    const filteredTotals = computeFilteredTotals(filteredUpdates, filteredKPIs)
+    const chartData = generateMetricsDashboardChartData({
+        filteredUpdates,
+        filteredKPIs,
+        kpis,
+        visibleKPIs,
+        datePickerValue,
+        timeFrame,
+        isCumulative,
+        isPercentageMode,
+    })
 
-    // Get color for each KPI - use unique colors based on index to ensure all metrics have different colors
-    const getKPIColor = (category: string, index: number): string => {
-        // Extended color palette for unique colors per metric
-        const colorPalette = [
-            '#3b82f6', // blue
-            '#10b981', // green
-            '#8b5cf6', // purple
-            '#f59e0b', // amber
-            '#ef4444', // red
-            '#06b6d4', // cyan
-            '#ec4899', // pink
-            '#84cc16', // lime
-            '#f97316', // orange
-            '#6366f1', // indigo
-            '#14b8a6', // teal
-            '#a855f7', // violet
-            '#22c55e', // emerald
-            '#eab308', // yellow
-            '#64748b', // slate
-        ]
-        // Always use index-based colors to ensure uniqueness
-        return colorPalette[index % colorPalette.length]
-    }
+    const xAxisInterval = getMetricsDashboardXAxisInterval({
+        timeFrame,
+        datePickerValue,
+        chartData,
+        isCumulative,
+        isPercentageMode,
+    })
+    const formatXAxisTickBound = (dateStr: string) => formatMetricsDashboardXAxisTick(chartData, dateStr)
 
-    // Filter updates based on date filters
-    const getFilteredUpdates = () => {
-        if (!kpiUpdates || kpiUpdates.length === 0) {
-            return []
-        }
-
-        let filtered = [...kpiUpdates]
-
-        // Filter by single date or date range
-        if (datePickerValue.singleDate) {
-            filtered = filtered.filter(update => {
-                const updateDate = update.date_represented ? getLocalDateString(parseLocalDate(update.date_represented)) : ''
-                return updateDate === datePickerValue.singleDate
-            })
-        } else if (datePickerValue.startDate && datePickerValue.endDate) {
-            const filterStartDate = datePickerValue.startDate
-            const filterEndDate = datePickerValue.endDate
-            filtered = filtered.filter(update => {
-                const updateDate = update.date_represented ? getLocalDateString(parseLocalDate(update.date_represented)) : ''
-                const updateStart = update.date_range_start ? getLocalDateString(parseLocalDate(update.date_range_start)) : ''
-                const updateEnd = update.date_range_end ? getLocalDateString(parseLocalDate(update.date_range_end)) : ''
-
-                // If update is a date range, check if it overlaps with filter range
-                if (updateStart && updateEnd) {
-                    return updateStart <= filterEndDate && updateEnd >= filterStartDate
-                }
-                // If update is a single date, check if it's within the range
-                return updateDate >= filterStartDate && updateDate <= filterEndDate
-            })
-        }
-
-        // Filter by location(s) - impact claims must have location_id in selected locations
-        if (selectedLocations.length > 0) {
-            filtered = filtered.filter(update => {
-                return update.location_id && selectedLocations.includes(update.location_id)
-            })
-        }
-
-        // Filter by beneficiary group(s) - impact claims must be linked to selected beneficiary groups
-        if (selectedBeneficiaryGroups.length > 0) {
-            filtered = filtered.filter(update => {
-                if (!update.id) return false
-                const updateGroupIds = updateBeneficiaryGroupsCache[update.id] || []
-                // Check if update is linked to any of the selected beneficiary groups
-                return updateGroupIds.some(groupId => selectedBeneficiaryGroups.includes(groupId))
-            })
-        }
-
-        // Filter by metric tag(s) - claim's tag_id must match one of the selected tags
-        if (selectedTags.length > 0) {
-            filtered = filtered.filter(update => {
-                const tagId = (update as any).tag_id
-                return tagId && selectedTags.includes(tagId)
-            })
-        }
-
-        return filtered
-    }
-
-    // Filter KPIs by selected locations
-    const getFilteredKPIs = () => {
-        // Always return all KPIs - we don't filter KPIs by location
-        // Only impact claims are filtered by location
-        return kpis
-    }
-
-    // Initialize visible KPIs with all KPIs when component mounts or kpis change
-    useEffect(() => {
-        const filtered = getFilteredKPIs()
-        if (filtered && filtered.length > 0) {
-            setVisibleKPIs(new Set(filtered.map(kpi => kpi.id)))
-        }
-    }, [kpis, selectedLocations])
-
-    // Calculate filtered totals
-    const getFilteredTotals = () => {
-        const filteredUpdates = getFilteredUpdates()
-        const filteredKPIs = getFilteredKPIs()
-        const filteredTotals: Record<string, number> = {}
-
-        filteredKPIs.forEach(kpi => {
-            const kpiFilteredUpdates = filteredUpdates.filter(update => update.kpi_id === kpi.id)
-            filteredTotals[kpi.id] = aggregateKpiUpdates(kpiFilteredUpdates as any, kpi.metric_type)
-        })
-
-        return filteredTotals
-    }
-
-    // Generate cumulative data for all KPIs
-    const generateChartData = () => {
-        const filteredUpdates = getFilteredUpdates()
-        const filteredKPIs = getFilteredKPIs()
-
-        if (!filteredKPIs || filteredKPIs.length === 0) {
-            return []
-        }
-
-        // Group updates by KPI (only for filtered KPIs)
-        const filteredKPIIds = new Set(filteredKPIs.map(kpi => kpi.id))
-        const updatesByKPI: Record<string, any[]> = {}
-        filteredUpdates.forEach(update => {
-            const kpiId = update.kpi_id
-            if (filteredKPIIds.has(kpiId)) {
-                if (!updatesByKPI[kpiId]) {
-                    updatesByKPI[kpiId] = []
-                }
-                updatesByKPI[kpiId].push(update)
-            }
-        })
-
-        // Sort updates by effective date for each KPI (end date for ranges, date_represented otherwise)
-        Object.keys(updatesByKPI).forEach(kpiId => {
-            updatesByKPI[kpiId].sort((a, b) =>
-                getEffectiveDate(a).getTime() - getEffectiveDate(b).getTime()
-            )
-        })
-
-        // Calculate date range based on filters or time frame
-        let startDate: Date
-        let endDate: Date
-
-        // If a single date is selected, only show that date
-        if (datePickerValue.singleDate) {
-            startDate = parseLocalDate(datePickerValue.singleDate)
-            startDate.setHours(0, 0, 0, 0)
-            endDate = parseLocalDate(datePickerValue.singleDate)
-            endDate.setHours(23, 59, 59, 999)
-        }
-        // If a date range is selected, use that range
-        else if (datePickerValue.startDate && datePickerValue.endDate) {
-            startDate = parseLocalDate(datePickerValue.startDate)
-            startDate.setHours(0, 0, 0, 0)
-            endDate = parseLocalDate(datePickerValue.endDate)
-            endDate.setHours(23, 59, 59, 999)
-        }
-        // Otherwise, use time frame
-        else {
-            const now = new Date()
-            now.setHours(0, 0, 0, 0) // Normalize to midnight local time
-
-            if (timeFrame === 'all') {
-                // Find the oldest update date across visible KPIs only
-                // Filter updates to only include those from visible KPIs
-                const visibleKPIUpdates = filteredUpdates.filter(update => {
-                    const kpiId = update.kpi_id
-                    return visibleKPIs.has(kpiId) && filteredKPIIds.has(kpiId)
-                })
-
-                if (visibleKPIUpdates.length > 0) {
-                    const oldestUpdate = visibleKPIUpdates.reduce((oldest, update) => {
-                        const updateDate = getEffectiveDate(update)
-                        const oldestDate = getEffectiveDate(oldest)
-                        return updateDate < oldestDate ? update : oldest
-                    })
-                    startDate = getEffectiveDate(oldestUpdate)
-                    startDate.setHours(0, 0, 0, 0)
-                    // Subtract 1 day to show the graph starting at 0 before the first impact claim
-                    startDate.setDate(startDate.getDate() - 1)
-                } else {
-                    // Fallback to 1 month if no updates from visible KPIs
-                    startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
-                    startDate.setHours(0, 0, 0, 0)
-                }
-            } else {
-                switch (timeFrame) {
-                    case '1month':
-                        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
-                        break
-                    case '6months':
-                        startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate())
-                        break
-                    case '1year':
-                        startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
-                        break
-                    case '5years':
-                        startDate = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate())
-                        break
-                    default:
-                        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
-                }
-                startDate.setHours(0, 0, 0, 0) // Normalize to midnight local time
-            }
-            endDate = new Date(now)
-            endDate.setHours(23, 59, 59, 999) // End of today
-        }
-
-        // Filter updates within the time frame for each KPI (using effective date)
-        const filteredUpdatesByKPI: Record<string, any[]> = {}
-        Object.keys(updatesByKPI).forEach(kpiId => {
-            filteredUpdatesByKPI[kpiId] = updatesByKPI[kpiId].filter(update => {
-                const updateDate = getEffectiveDate(update)
-                updateDate.setHours(0, 0, 0, 0)
-                return compareDates(updateDate, startDate) >= 0 && compareDates(updateDate, endDate) <= 0
-            })
-        })
-
-        // Generate time series data
-        const data: Array<{
-            date: string;
-            fullDate: Date;
-            [kpiId: string]: any; // Dynamic keys for each KPI
-        }> = []
-
-        // Percentage mode: per-month value for each visible percentage metric.
-        // Range claims contribute their value to every month they overlap; single-date
-        // claims override the range value for their month. Multiple in the same month
-        // are averaged. Empty months are null and the line bridges across them.
-        if (isPercentageMode) {
-            const pctKpiIds = kpis
-                .filter(k => k.metric_type === 'percentage' && visibleKPIs.has(k.id))
-                .map(k => k.id)
-
-            const monthly: Record<string, Record<string, { singleSum: number; singleCount: number; rangeSum: number; rangeCount: number }>> = {}
-            const ensure = (key: string, kpiId: string) => {
-                if (!monthly[key]) monthly[key] = {}
-                if (!monthly[key][kpiId]) monthly[key][kpiId] = { singleSum: 0, singleCount: 0, rangeSum: 0, rangeCount: 0 }
-                return monthly[key][kpiId]
-            }
-
-            pctKpiIds.forEach(kpiId => {
-                ;(filteredUpdatesByKPI[kpiId] || []).forEach((update: any) => {
-                    const value = Number(update.value || 0)
-                    if (!Number.isFinite(value)) return
-                    const isRange = !!(update.date_range_start && update.date_range_end)
-                    if (isRange) {
-                        const claimStart = parseLocalDate(update.date_range_start); claimStart.setHours(0, 0, 0, 0)
-                        const claimEnd = parseLocalDate(update.date_range_end); claimEnd.setHours(0, 0, 0, 0)
-                        const cursor = new Date(claimStart.getFullYear(), claimStart.getMonth(), 1)
-                        const stop = new Date(claimEnd.getFullYear(), claimEnd.getMonth(), 1)
-                        while (cursor.getTime() <= stop.getTime()) {
-                            const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`
-                            const b = ensure(key, kpiId)
-                            b.rangeSum += value
-                            b.rangeCount += 1
-                            cursor.setMonth(cursor.getMonth() + 1)
-                        }
-                    } else {
-                        const claimDate = parseLocalDate(update.date_represented); claimDate.setHours(0, 0, 0, 0)
-                        const key = `${claimDate.getFullYear()}-${String(claimDate.getMonth() + 1).padStart(2, '0')}`
-                        const b = ensure(key, kpiId)
-                        b.singleSum += value
-                        b.singleCount += 1
-                    }
-                })
-            })
-
-            const firstMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
-            firstMonth.setMonth(firstMonth.getMonth() - 1)
-            const lastMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1)
-            const cursor = new Date(firstMonth)
-            while (cursor.getTime() <= lastMonth.getTime()) {
-                const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`
-                const monthName = cursor.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-                const dataPoint: any = { date: monthName, fullDate: new Date(cursor) }
-                pctKpiIds.forEach(kpiId => {
-                    const b = monthly[key]?.[kpiId]
-                    let v: number | null = null
-                    if (b) {
-                        if (b.singleCount > 0) v = b.singleSum / b.singleCount
-                        else if (b.rangeCount > 0) v = b.rangeSum / b.rangeCount
-                    }
-                    dataPoint[kpiId] = v
-                })
-                data.push(dataPoint)
-                cursor.setMonth(cursor.getMonth() + 1)
-            }
-            return data
-        }
-
-        // Non-cumulative mode: group by month (persist even when date filters are applied)
-        if (!isCumulative) {
-            // Start from the month before the first impact claim (or filtered start date)
-            const firstMonthStart = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
-            firstMonthStart.setMonth(firstMonthStart.getMonth() - 1)
-
-            // Use endDate for the last month to show (respects date filters if applied)
-            const lastMonthDate = new Date(endDate.getFullYear(), endDate.getMonth(), 1)
-
-            // Group updates by month for each visible KPI only
-            const monthlyTotals: Record<string, Record<string, number>> = {} // [monthKey][kpiId] = total
-
-            Object.keys(filteredUpdatesByKPI).forEach(kpiId => {
-                // Only process visible KPIs
-                if (!visibleKPIs.has(kpiId)) return
-
-                filteredUpdatesByKPI[kpiId].forEach(update => {
-                    const updateDate = getEffectiveDate(update)
-                    const monthKey = `${updateDate.getFullYear()}-${String(updateDate.getMonth() + 1).padStart(2, '0')}`
-
-                    if (!monthlyTotals[monthKey]) {
-                        monthlyTotals[monthKey] = {}
-                    }
-                    if (!monthlyTotals[monthKey][kpiId]) {
-                        monthlyTotals[monthKey][kpiId] = 0
-                    }
-                    monthlyTotals[monthKey][kpiId] += (update.value || 0)
-                })
-            })
-
-            // Generate monthly data points
-            let currentMonthDate = new Date(firstMonthStart)
-            while (currentMonthDate <= lastMonthDate) {
-                const monthKey = `${currentMonthDate.getFullYear()}-${String(currentMonthDate.getMonth() + 1).padStart(2, '0')}`
-                const monthName = currentMonthDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-
-                const dataPoint: any = {
-                    date: monthName,
-                    fullDate: new Date(currentMonthDate)
-                }
-
-                // Set value for each visible KPI (0 if no updates for that month)
-                Array.from(visibleKPIs).forEach(kpiId => {
-                    dataPoint[kpiId] = monthlyTotals[monthKey]?.[kpiId] || 0
-                })
-
-                data.push(dataPoint)
-
-                // Move to next month
-                currentMonthDate.setMonth(currentMonthDate.getMonth() + 1)
-            }
-
-            return data
-        }
-
-        // Cumulative mode: daily data points
-        // Calculate time range
-        // Normalize dates to ensure accurate day calculation - use date-only values
-        const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate())
-        startDateOnly.setHours(0, 0, 0, 0)
-        const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate())
-        endDateOnly.setHours(0, 0, 0, 0)
-
-        const timeDiff = endDateOnly.getTime() - startDateOnly.getTime()
-        const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24))
-
-        // Create daily data points for the entire period
-        for (let i = 0; i <= daysDiff; i++) {
-            const currentDate = new Date(startDateOnly)
-            currentDate.setDate(startDateOnly.getDate() + i)
-            currentDate.setHours(0, 0, 0, 0) // Normalize to midnight local time
-
-            // Don't create dates beyond today
-            const today = new Date()
-            today.setHours(0, 0, 0, 0)
-            if (compareDates(currentDate, today) > 0) {
-                break
-            }
-
-            const dateString = formatDate(currentDate).split(',')[0] // Get just the date part without year
-
-            const dataPoint: any = {
-                date: dateString,
-                fullDate: currentDate
-            }
-
-            // Calculate cumulative value for each KPI up to this date (using effective date)
-            Object.keys(filteredUpdatesByKPI).forEach(kpiId => {
-                const cumulative = filteredUpdatesByKPI[kpiId]
-                    .filter(update => {
-                        const updateDate = getEffectiveDate(update)
-                        updateDate.setHours(0, 0, 0, 0)
-                        return compareDates(updateDate, currentDate) <= 0
-                    })
-                    .reduce((sum, update) => sum + (update.value || 0), 0)
-
-                dataPoint[kpiId] = cumulative
-            })
-
-            data.push(dataPoint)
-        }
-
-        return data
-    }
-
-    const chartData = generateChartData()
-    const filteredTotals = getFilteredTotals()
-    const filteredUpdates = getFilteredUpdates()
-    const filteredKPIs = getFilteredKPIs()
-
-    const getTimeSpanDays = () => {
-        if (chartData.length < 2) return 0
-        const first = chartData[0]?.fullDate
-        const last = chartData[chartData.length - 1]?.fullDate
-        if (!first || !last) return 0
-        return Math.round((last.getTime() - first.getTime()) / (1000 * 60 * 60 * 24))
-    }
-
-    const getXAxisInterval = () => {
-        if (timeFrame === '1month' && !datePickerValue.singleDate && !datePickerValue.startDate) return 0
-
-        const dataPointCount = chartData.length
-        if (dataPointCount <= 12) return 0
-
-        if (!isCumulative || isPercentageMode) {
-            if (dataPointCount <= 24) return 1
-            if (dataPointCount <= 48) return 2
-            if (dataPointCount <= 72) return 5
-            return Math.floor((dataPointCount - 1) / 12)
-        }
-
-        const spanDays = getTimeSpanDays()
-        if (spanDays <= 90) return Math.floor((dataPointCount - 1) / 30)
-        if (spanDays <= 365) return Math.floor((dataPointCount - 1) / 12)
-        if (spanDays <= 730) return Math.floor((dataPointCount - 1) / 12)
-        return Math.floor((dataPointCount - 1) / 8)
-    }
-
-    const formatXAxisTick = (dateStr: string) => {
-        const dp = chartData.find(d => d.date === dateStr)
-        if (!dp?.fullDate) return dateStr
-        const spanDays = getTimeSpanDays()
-        const d = dp.fullDate as Date
-        if (spanDays <= 60) {
-            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-        }
-        if (spanDays <= 365) {
-            return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-        }
-        if (spanDays <= 730) {
-            return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-        }
-        return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-    }
-
-    // Get top 12 KPIs for metric cards (from ordered KPIs, then filtered)
     const displayKPIs = orderedKPIs.filter(kpi => filteredKPIs.some(fk => fk.id === kpi.id)).slice(0, 12)
 
-    // KPIs that contribute to the non-percentage chart (monthly/cumulative views).
-    // Percentage metrics use their own Y-axis and shouldn't squash the scale here.
-    const chartKpiIds = new Set(
+    const chartKpiIds = new Set<string>(
         kpis
-            .filter(kpi => visibleKPIs.has(kpi.id) && kpi.metric_type !== 'percentage')
-            .map(kpi => kpi.id)
+            .filter((kpi: any) => visibleKPIs.has(kpi.id) && kpi.metric_type !== 'percentage')
+            .map((kpi: any) => kpi.id as string)
     )
 
-    // Calculate dynamic max value with headroom for the graph
-    const calculateMaxWithHeadroom = () => {
-        if (!chartData || chartData.length === 0 || chartKpiIds.size === 0) return 0
+    const maxDomainValue = calculateMultiKpiMaxWithHeadroom(chartData, chartKpiIds)
+    const actualMaxValue = computeMultiKpiActualMax(chartData, chartKpiIds)
+    const yTicks = generateMultiKpiYTicks(maxDomainValue, actualMaxValue)
 
-        let maxValue = 0
-        chartData.forEach((dataPoint) => {
-            chartKpiIds.forEach(kpiId => {
-                const value = dataPoint[kpiId]
-                if (typeof value === 'number' && isFinite(value) && value > 0) {
-                    maxValue = Math.max(maxValue, value)
-                }
-            })
-        })
-
-        if (maxValue === 0) return 0
-
-        let headroomPercentage = 0.15
-        if (maxValue < 100) {
-            headroomPercentage = 0.20
-        } else if (maxValue < 1000) {
-            headroomPercentage = 0.15
-        } else if (maxValue < 10000) {
-            headroomPercentage = 0.12
-        } else {
-            headroomPercentage = 0.10
-        }
-
-        return maxValue * (1 + headroomPercentage)
-    }
-
-    const maxDomainValue = calculateMaxWithHeadroom()
-    const actualMaxValue = Math.max(...chartData.flatMap(d =>
-        Array.from(chartKpiIds).map(kpiId => {
-            const val = d[kpiId]
-            return typeof val === 'number' && isFinite(val) ? val : 0
-        })
-    ).filter(v => v > 0), 0)
-
-    // Generate ticks that include the actual max value
-    const generateYTicks = () => {
-        if (maxDomainValue === 0) return []
-        const ticks: number[] = []
-        const numTicks = 5
-        const step = maxDomainValue / numTicks
-
-        for (let i = 0; i <= numTicks; i++) {
-            ticks.push(Math.round(i * step))
-        }
-
-        // Ensure the actual max value is included if it's not already close to a tick
-        // But avoid duplicates by checking if the value is already in the array
-        if (actualMaxValue > 0) {
-            const isCloseToExistingTick = ticks.some(t => Math.abs(t - actualMaxValue) < step * 0.1)
-            if (!isCloseToExistingTick) {
-                ticks.push(actualMaxValue)
-                ticks.sort((a, b) => a - b)
-                // Remove duplicates after sorting
-                const uniqueTicks = ticks.filter((val, idx, arr) => idx === 0 || val !== arr[idx - 1])
-                return uniqueTicks
-            }
-        }
-
-        // Remove duplicates
-        return ticks.filter((val, idx, arr) => idx === 0 || val !== arr[idx - 1])
-    }
-
-    const yTicks = generateYTicks()
-
-    // Percentage mode: visible percentage metrics + per-metric overall averages
     const visiblePercentageKpis = isPercentageMode
         ? kpis.filter(k => k.metric_type === 'percentage' && visibleKPIs.has(k.id))
         : []
@@ -891,73 +353,18 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
             percentageAveragesById[k.id] = aggregateKpiUpdates(updates as any, k.metric_type)
         })
     }
-    const percentageYMax = (() => {
-        if (!isPercentageMode || chartData.length === 0) return 100
-        let max = 100
-        chartData.forEach(d => {
-            visiblePercentageKpis.forEach(k => {
-                const v = d[k.id]
-                if (typeof v === 'number' && isFinite(v) && v > max) max = v
-            })
-        })
-        if (max <= 100) return 100
-        return Math.ceil(max / 100) * 100
-    })()
-    const percentageYTicks = (() => {
-        if (!isPercentageMode) return [] as number[]
-        const step = percentageYMax / 4
-        return [0, step, step * 2, step * 3, percentageYMax]
-    })()
+    const { percentageYMax, percentageYTicks } = computeDashboardPercentageYAxis({
+        isPercentageMode,
+        chartData,
+        visiblePercentageKpis,
+    })
 
-    // Patch each percentage data point with each metric's overall average so a
-    // hidden ghost line keeps the tooltip alive at every X.
     if (isPercentageMode) {
         for (const d of chartData) {
             visiblePercentageKpis.forEach(k => {
                 ;(d as any)[`${k.id}__avg`] = percentageAveragesById[k.id] || 0
             })
         }
-    }
-
-    // Custom tooltip for percentage mode: every visible percentage metric
-    // contributes a row showing this-month value and overall avg.
-    const PercentageTooltip = ({ active, label }: any) => {
-        if (!active) return null
-        const dp = chartData.find(d => d.date === label)
-        if (!dp) return null
-        const dateLabel = dp.fullDate ? formatDate(dp.fullDate) : (label || '')
-        return (
-            <div style={{ backgroundColor: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(8px)', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '10px 12px', fontSize: '12px', boxShadow: '0 8px 24px rgba(15,23,42,0.08)', minWidth: 220 }}>
-                <div style={{ fontWeight: 500, color: '#475569', marginBottom: 6 }}>{dateLabel}</div>
-                {visiblePercentageKpis.length === 0 && (
-                    <div style={{ color: '#94a3b8' }}>No percentage metrics selected</div>
-                )}
-                {visiblePercentageKpis.map(k => {
-                    const originalIndex = kpis.findIndex(x => x.id === k.id)
-                    const color = getKPIColor(k.category, originalIndex)
-                    const v = dp[k.id]
-                    const avg = percentageAveragesById[k.id] || 0
-                    return (
-                        <div key={k.id} style={{ marginBottom: 6 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                                <span style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: color, display: 'inline-block' }} />
-                                <span style={{ fontWeight: 500, color: '#0f172a', fontSize: 12 }}>{k.title}</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, paddingLeft: 14 }}>
-                                <span style={{ color: '#94a3b8' }}>This month</span>
-                                <span style={{ fontWeight: 500, color: '#0f172a' }}>
-                                    {typeof v === 'number' ? `${Math.round(v)}%` : 'No data'}
-                                </span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, paddingLeft: 14 }}>
-                                <span style={{ color: color, opacity: 0.85 }}>Overall avg</span>
-                                <span style={{ fontWeight: 600, color }}>{Math.round(avg)}%</span>
-                            </div>
-                        </div>
-                    )
-                })}
-            </div>
-        )
     }
 
     return (
@@ -1544,9 +951,9 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                         angle={-45}
                                         textAnchor="end"
                                         height={60}
-                                        interval={getXAxisInterval()}
+                                        interval={xAxisInterval}
                                         tickMargin={8}
-                                        tickFormatter={(isCumulative && !isPercentageMode) ? formatXAxisTick : undefined}
+                                        tickFormatter={(isCumulative && !isPercentageMode) ? formatXAxisTickBound : undefined}
                                     />
                                     <YAxis
                                         stroke="#cbd5e1"
@@ -1563,7 +970,19 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                         })}
                                     />
                                     {isPercentageMode ? (
-                                        <Tooltip content={<PercentageTooltip />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                                        <Tooltip
+                                            content={(tooltipProps) => (
+                                                <MetricsDashboardPercentageTooltip
+                                                    {...tooltipProps}
+                                                    chartData={chartData}
+                                                    visiblePercentageKpis={visiblePercentageKpis}
+                                                    kpis={kpis}
+                                                    percentageAveragesById={percentageAveragesById}
+                                                    getKPIColorFn={getKPIColor}
+                                                />
+                                            )}
+                                            cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }}
+                                        />
                                     ) : (
                                         <Tooltip
                                             contentStyle={{
