@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
@@ -119,6 +119,7 @@ export default function PublicOrganizationPage() {
     const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
     const initiativeBtnRef = useRef<HTMLButtonElement>(null)
     const locationBtnRef = useRef<HTMLButtonElement>(null)
+    const keyMetricsScrollRef = useRef<HTMLDivElement>(null)
 
     // Location popups state. `rightAnchored` flips CSS to use `right` instead of
     // `left`, so popups in the right band hug the right edge cleanly without
@@ -318,6 +319,25 @@ export default function PublicOrganizationPage() {
         // donors visually expect ("the impact you're proudest of, first").
         return [...filtered].sort((a, b) => (b.total_value ?? 0) - (a.total_value ?? 0))
     }, [metrics, selectedInitiative, selectedLocationIds, startDate, endDate, selectedTagIds])
+
+    const [keyMetricsRowPx, setKeyMetricsRowPx] = useState<number | null>(null)
+    useLayoutEffect(() => {
+        const el = keyMetricsScrollRef.current
+        if (!el || filteredMetrics.length === 0) {
+            setKeyMetricsRowPx(null)
+            return
+        }
+        const gapPx = 8
+        const measure = () => {
+            const h = el.clientHeight
+            if (h <= 0) return
+            setKeyMetricsRowPx(Math.max(72, Math.floor((h - gapPx) / 2)))
+        }
+        measure()
+        const ro = new ResizeObserver(measure)
+        ro.observe(el)
+        return () => ro.disconnect()
+    }, [filteredMetrics.length, loading])
 
     const filteredStories = useMemo(() => {
         let filtered = stories
@@ -964,10 +984,10 @@ export default function PublicOrganizationPage() {
                                                 : [...prev, loc.id]
                                         )
                                     }}
-                                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${isSelected ? 'bg-blue-50 font-medium' : 'hover:bg-gray-50'
+                                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${isSelected ? 'bg-accent/10 font-medium' : 'hover:bg-gray-50'
                                         }`}
                                 >
-                                    <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-blue-600 border-2 border-blue-600' : 'border-2 border-gray-300 bg-white'
+                                    <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-accent border-2 border-accent' : 'border-2 border-gray-300 bg-white'
                                         }`}>
                                         {isSelected && (
                                             <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -976,7 +996,7 @@ export default function PublicOrganizationPage() {
                                         )}
                                     </div>
                                     <div className="min-w-0">
-                                        <span className={`truncate block ${isSelected ? 'text-blue-700' : 'text-gray-900'}`}>{loc.name}</span>
+                                        <span className={`truncate block ${isSelected ? 'text-accent' : 'text-gray-900'}`}>{loc.name}</span>
                                         {loc.country && <span className="text-xs text-gray-500">{loc.country}</span>}
                                     </div>
                                 </button>
@@ -1000,11 +1020,11 @@ export default function PublicOrganizationPage() {
                         button used to occupy below the row. */}
                     <div className="flex items-center gap-3 md:gap-4">
                         {/* Logo */}
-                        <div className="w-20 h-20 md:w-[88px] md:h-[88px] rounded-xl md:rounded-2xl overflow-hidden flex-shrink-0 flex items-center justify-center bg-white border border-gray-100 shadow-sm">
+                        <div className="w-24 h-24 md:w-[108px] md:h-[108px] rounded-xl md:rounded-2xl overflow-hidden flex-shrink-0 flex items-center justify-center bg-white border border-gray-100 shadow-sm">
                             {organization.logo_url ? (
                                 <img src={organization.logo_url} alt={organization.name} className="w-full h-full object-cover" />
                             ) : (
-                                <span className="text-2xl md:text-3xl font-bold text-gray-400">{organization.name.charAt(0)}</span>
+                                <span className="text-4xl md:text-5xl font-bold text-gray-400">{organization.name.charAt(0)}</span>
                             )}
                         </div>
 
@@ -1012,9 +1032,9 @@ export default function PublicOrganizationPage() {
                             same left edge so the pill starts in line with the
                             title and description). */}
                         <div className="flex-1 min-w-0">
-                            <h1 className="text-xl md:text-2xl font-bold mb-0.5 leading-tight" style={{ color: '#465360' }}>{organization.name}</h1>
+                            <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-0.5 leading-tight">{organization.name}</h1>
                             {organization.statement && (
-                                <p className="text-sm md:text-[13.5px] leading-snug line-clamp-3 md:line-clamp-2" style={{ color: '#6b7280' }}>{organization.statement}</p>
+                                <p className="text-base md:text-lg text-muted-foreground leading-snug line-clamp-3 md:line-clamp-2">{organization.statement}</p>
                             )}
 
                             {/* Context & Challenges button. Modern white pill
@@ -1026,7 +1046,7 @@ export default function PublicOrganizationPage() {
                                 return (
                                     <Link
                                         to={`${orgLinkBase}/${slug}/context`}
-                                        className="group inline-flex items-center gap-2 mt-2 pl-1 pr-3.5 py-1 rounded-full text-xs font-semibold text-gray-900 bg-white shadow-sm transition-all hover:shadow-md hover:-translate-y-px"
+                                        className="group inline-flex items-center gap-1.5 mt-2 pl-1 pr-3 py-1 rounded-full text-xs font-semibold text-gray-900 bg-white shadow-sm transition-all hover:shadow-md hover:-translate-y-px"
                                         style={{
                                             border: `1.5px solid ${brand}`,
                                             boxShadow: `0 1px 2px rgba(15,23,42,0.06), 0 4px 14px -8px ${brand}80`,
@@ -1103,7 +1123,7 @@ export default function PublicOrganizationPage() {
                                         to={`${orgLinkBase}/${slug}/${init.slug}`}
                                         className="px-3 py-2 bg-white rounded-xl border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group flex flex-col justify-center"
                                     >
-                                        <h4 className="font-medium text-foreground text-xs line-clamp-2 group-hover:text-accent transition-colors leading-snug">{init.title}</h4>
+                                        <h4 className="font-medium text-foreground text-sm line-clamp-2 group-hover:text-accent transition-colors leading-snug">{init.title}</h4>
                                         {init.region && (
                                             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                                                 <MapPin className="w-2.5 h-2.5" />{init.region}
@@ -1383,16 +1403,16 @@ export default function PublicOrganizationPage() {
                                         <div className="flex items-center gap-2">
                                             <button
                                                 onClick={() => setStoryIndex(p => p === 0 ? filteredStories.length - 1 : p - 1)}
-                                                className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+                                                className="w-8 h-8 md:w-6 md:h-6 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
                                             >
-                                                <ChevronLeft className="w-4 h-4 text-gray-600" />
+                                                <ChevronLeft className="w-4 h-4 md:w-3.5 md:h-3.5 text-gray-600" />
                                             </button>
                                             <span className="text-xs text-muted-foreground w-12 text-center">{storyIndex + 1}/{filteredStories.length}</span>
                                             <button
                                                 onClick={() => setStoryIndex(p => (p + 1) % filteredStories.length)}
-                                                className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+                                                className="w-8 h-8 md:w-6 md:h-6 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
                                             >
-                                                <ChevronRight className="w-4 h-4 text-gray-600" />
+                                                <ChevronRight className="w-4 h-4 md:w-3.5 md:h-3.5 text-gray-600" />
                                             </button>
                                         </div>
                                     )}
@@ -1516,7 +1536,7 @@ export default function PublicOrganizationPage() {
                                     </div>
                                     <Link
                                         to={`${orgLinkBase}/${slug}/context`}
-                                        className="text-xs font-medium text-gray-600 hover:text-gray-900 flex items-center gap-1"
+                                        className="text-xs font-medium text-muted-foreground hover:text-foreground flex items-center gap-1"
                                     >
                                         View all <ChevronRight className="w-3 h-3" />
                                     </Link>
@@ -1550,8 +1570,8 @@ export default function PublicOrganizationPage() {
                                                         />
                                                         <div className="flex items-center gap-2 mb-2 pl-1">
                                                             <span
-                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider"
-                                                                style={{ backgroundColor: `${brandColor}30`, color: '#374151' }}
+                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider text-gray-800"
+                                                                style={{ backgroundColor: `${brandColor}30` }}
                                                             >
                                                                 {isStat ? 'Stat' : 'Statement'}
                                                             </span>
@@ -1680,23 +1700,22 @@ export default function PublicOrganizationPage() {
                                 ? 'opacity-100 translate-x-0 z-10'
                                 : 'opacity-0 translate-x-8 z-0 pointer-events-none'
                             }`}>
-                            <div className="h-full p-4">
-                                <div className="h-full bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col">
-                                    <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100">
-                                        <div className="flex items-center gap-2">
-                                            <div
-                                                className="w-8 h-8 rounded-lg flex items-center justify-center"
-                                                style={{ backgroundColor: '#ffffff', boxShadow: '0 1px 2px rgba(15,23,42,0.06), inset 0 0 0 1px rgba(15,23,42,0.06)' }}
-                                            >
-                                                <LineChart
-                                                    className="w-4 h-4"
-                                                    style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
-                                                />
-                                            </div>
-                                            <h2 className="font-semibold text-foreground">Cumulative Impact</h2>
+                            <div className="h-full flex flex-col">
+                                <div className="px-4 py-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <div
+                                            className="w-8 h-8 rounded-lg flex items-center justify-center"
+                                            style={{ backgroundColor: '#ffffff', boxShadow: '0 1px 2px rgba(15,23,42,0.06), inset 0 0 0 1px rgba(15,23,42,0.06)' }}
+                                        >
+                                            <LineChart
+                                                className="w-4 h-4"
+                                                style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
+                                            />
                                         </div>
+                                        <h2 className="font-semibold text-foreground">Cumulative Impact</h2>
                                     </div>
-                                    <div className="flex-1 p-4 overflow-hidden flex flex-col">
+                                </div>
+                                <div className="flex-1 p-4 pt-0 overflow-hidden flex flex-col">
                                         {initiativeChartData.length === 0 ? (
                                             <div className="h-full flex items-center justify-center text-muted-foreground">
                                                 <div className="text-center">
@@ -1775,7 +1794,6 @@ export default function PublicOrganizationPage() {
                                                 </div>
                                             </>
                                         )}
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1836,7 +1854,7 @@ export default function PublicOrganizationPage() {
                                         to={`${orgLinkBase}/${slug}/${init.slug}`}
                                         className="p-3 bg-white rounded-xl border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group flex flex-col justify-center min-h-[64px]"
                                     >
-                                        <h4 className="font-medium text-foreground text-xs line-clamp-2 group-hover:text-accent transition-colors">{init.title}</h4>
+                                        <h4 className="font-medium text-foreground text-sm line-clamp-2 group-hover:text-accent transition-colors">{init.title}</h4>
                                         {init.region && (
                                             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                                                 <MapPin className="w-2.5 h-2.5" />{init.region}
@@ -1851,8 +1869,8 @@ export default function PublicOrganizationPage() {
                     {/* Top Row - Metrics + Impact Claims (larger) */}
                     <div className="flex flex-col md:flex-row gap-2 md:gap-3 md:h-[68%]">
                         {/* Key Metrics (Scrollable 2x2 Grid) */}
-                        <div className="w-full md:w-[52%] overflow-hidden md:overflow-visible flex flex-col max-h-[320px] md:max-h-none md:min-h-0">
-                            <div className="px-3 md:px-4 py-2 md:py-3 flex items-center justify-between flex-shrink-0">
+                        <div className="w-full md:w-[52%] overflow-hidden flex flex-col max-h-[320px] md:max-h-none md:min-h-0">
+                            <div className="px-2 md:px-4 py-2 flex items-center justify-between flex-shrink-0">
                                 <div className="flex items-center gap-2">
                                     <div
                                         className="w-7 h-7 md:w-8 md:h-8 rounded-lg flex items-center justify-center"
@@ -1870,7 +1888,10 @@ export default function PublicOrganizationPage() {
                                     >{filteredMetrics.length}</span>
                                 </div>
                             </div>
-                            <div className="flex-1 p-2 md:p-3 overflow-y-auto min-h-0 scrollbar-thin">
+                            <div
+                                ref={keyMetricsScrollRef}
+                                className="flex-1 px-2 md:px-3 pb-2 overflow-y-auto min-h-0 scrollbar-thin"
+                            >
                                 {filteredMetrics.length === 0 ? (
                                     <div className="h-full flex items-center justify-center text-muted-foreground">
                                         <div className="text-center">
@@ -1879,21 +1900,28 @@ export default function PublicOrganizationPage() {
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div
+                                        className="grid grid-cols-2 gap-2"
+                                        style={{
+                                            gridAutoRows: keyMetricsRowPx != null
+                                                ? `${keyMetricsRowPx}px`
+                                                : 'minmax(88px, 20vh)',
+                                        }}
+                                    >
                                         {filteredMetrics.map((metric) => (
                                             <Link
                                                 key={metric.id}
                                                 to={`${orgLinkBase}/${slug}/${metric.initiative_slug}/metric/${generateMetricSlug(metric.title)}`}
-                                                className="group relative rounded-xl bg-white border border-gray-200/80 overflow-hidden shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 h-[88px] md:h-[15.5vh] flex flex-col"
+                                                className="group relative min-h-0 h-full rounded-xl bg-white border border-gray-200/80 overflow-hidden shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 flex flex-col"
                                             >
                                                 {metric.unit_of_measurement && metric.metric_type !== 'percentage' && (
                                                     <span className="absolute top-1 right-1.5 md:top-1.5 md:right-2 text-xs font-medium text-gray-400 leading-tight truncate max-w-[60%] text-right">
                                                         {metric.unit_of_measurement}
                                                     </span>
                                                 )}
-                                                <div className="flex-1 px-3 py-1.5 md:py-2 flex items-center justify-center">
+                                                <div className="flex-1 min-h-0 px-2 py-0.5 md:px-2 md:py-1 flex items-center justify-center">
                                                     <span
-                                                        className="text-xl md:text-3xl font-bold leading-none tabular-nums tracking-tight"
+                                                        className="text-3xl md:text-5xl font-bold leading-none tabular-nums tracking-tight text-center"
                                                         style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
                                                     >
                                                         {metric.total_value?.toLocaleString() || '—'}{metric.metric_type === 'percentage' ? '%' : ''}
@@ -1920,7 +1948,7 @@ export default function PublicOrganizationPage() {
 
                         {/* Impact Claims Container (Scrollable) */}
                         <div className="w-full md:w-[48%] overflow-hidden md:overflow-visible flex flex-col max-h-[280px] md:max-h-none md:min-h-0">
-                            <div className="px-3 md:px-4 py-2 md:py-3 flex items-center justify-between flex-shrink-0">
+                            <div className="px-2 md:px-4 py-2 flex items-center justify-between flex-shrink-0">
                                 <div className="flex items-center gap-2">
                                     <div
                                         className="w-7 h-7 md:w-8 md:h-8 rounded-lg flex items-center justify-center"
@@ -1938,7 +1966,7 @@ export default function PublicOrganizationPage() {
                                     >{allImpactClaims.length}</span>
                                 </div>
                             </div>
-                            <div className="flex-1 p-3 overflow-y-auto scrollbar-thin">
+                            <div className="flex-1 px-2 md:px-3 pb-2 overflow-y-auto min-h-0 scrollbar-thin">
                                 {allImpactClaims.length === 0 ? (
                                     <div className="h-full flex items-center justify-center text-muted-foreground">
                                         <div className="text-center">
@@ -1958,18 +1986,18 @@ export default function PublicOrganizationPage() {
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2">
                                                             <span
-                                                                className="text-lg font-bold tabular-nums tracking-tight"
+                                                                className="text-xl md:text-2xl font-bold tabular-nums tracking-tight leading-none"
                                                                 style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
                                                             >{claim.value?.toLocaleString()}{claim.metricType === 'percentage' ? '%' : ''}</span>
-                                                            {claim.metricType !== 'percentage' && <span className="text-xs text-muted-foreground">{claim.metricUnit}</span>}
+                                                            {claim.metricType !== 'percentage' && <span className="text-sm text-muted-foreground">{claim.metricUnit}</span>}
                                                         </div>
-                                                        <p className="text-xs text-muted-foreground truncate mt-0.5">{claim.metricTitle}</p>
-                                                        <p className="text-xs text-muted-foreground/70 truncate">{claim.initiativeTitle}</p>
+                                                        <p className="text-sm text-muted-foreground truncate mt-0.5">{claim.metricTitle}</p>
+                                                        <p className="text-sm text-muted-foreground/70 truncate">{claim.initiativeTitle}</p>
                                                         {claim.tag_id && tagsById.get(claim.tag_id) && (
                                                             <div className="mt-1 flex">
                                                                 <PublicTagChip
                                                                     name={tagsById.get(claim.tag_id)!.name}
-                                                                    size="xs"
+                                                                    size="sm"
                                                                     onClick={() => setSelectedTagIds(prev => prev.includes(claim.tag_id!) ? prev.filter(x => x !== claim.tag_id!) : [...prev, claim.tag_id!])}
                                                                     selected={selectedTagIds.includes(claim.tag_id)}
                                                                 />
@@ -1977,10 +2005,10 @@ export default function PublicOrganizationPage() {
                                                         )}
                                                     </div>
                                                     <div className="text-right flex-shrink-0">
-                                                        <span className={`px-1.5 py-0.5 text-xs font-semibold rounded-full ${claim.category === 'impact' ? 'bg-purple-100/80 text-purple-700' :
+                                                        <span className={`px-2 py-0.5 text-sm font-semibold rounded-full ${claim.category === 'impact' ? 'bg-purple-100/80 text-purple-700' :
                                                                 claim.category === 'output' ? 'bg-green-100/80 text-green-700' : 'bg-blue-100/80 text-blue-700'
                                                             }`}>{claim.category}</span>
-                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                        <p className="text-sm text-muted-foreground mt-1">
                                                             {formatDate(claim.date_represented)}
                                                         </p>
                                                     </div>
@@ -1995,18 +2023,18 @@ export default function PublicOrganizationPage() {
 
                     {/* Bottom Row - Evidence (with pagination) */}
                     <div className="min-h-[160px] md:h-[30%] flex flex-col">
-                        <div className="px-3 md:px-4 py-2 flex items-center justify-between flex-shrink-0">
+                        <div className="px-2 md:px-4 py-2 flex items-center justify-between flex-shrink-0">
                             <div className="flex items-center gap-2">
                                 <div
-                                    className="w-7 h-7 rounded-lg flex items-center justify-center"
+                                    className="w-7 h-7 md:w-8 md:h-8 rounded-lg flex items-center justify-center"
                                     style={{ backgroundColor: '#ffffff', boxShadow: '0 1px 2px rgba(15,23,42,0.06), inset 0 0 0 1px rgba(15,23,42,0.06)' }}
                                 >
                                     <Image
-                                        className="w-3.5 h-3.5"
+                                        className="w-3.5 h-3.5 md:w-4 md:h-4"
                                         style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
                                     />
                                 </div>
-                                <h2 className="font-semibold text-foreground text-sm">Evidence</h2>
+                                <h2 className="font-semibold text-foreground text-sm md:text-base">Evidence</h2>
                                 <span
                                     className="px-2 py-0.5 text-xs font-semibold rounded-full text-gray-700"
                                     style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
@@ -2032,7 +2060,7 @@ export default function PublicOrganizationPage() {
                                 </div>
                             )}
                         </div>
-                        <div className="flex-1 p-2 pb-3 min-h-0">
+                        <div className="flex-1 px-2 md:px-3 pb-2 min-h-0">
                             {filteredEvidence.length === 0 ? (
                                 <div className="h-full flex items-center justify-center text-muted-foreground">
                                     <div className="text-center">
