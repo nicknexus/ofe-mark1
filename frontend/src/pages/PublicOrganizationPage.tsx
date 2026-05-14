@@ -5,7 +5,7 @@ import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
 import {
     Building2, MapPin, BarChart3, ArrowLeft, Globe,
     BookOpen, FileText, Calendar, ChevronRight, ChevronLeft,
-    TrendingUp, ChevronDown, X, Target, Image, LineChart, Compass, ArrowRight
+    TrendingUp, ChevronDown, X, Target, Image, LineChart, Compass, ArrowRight, ArrowUpRight
 } from 'lucide-react'
 import PublicDonateButton from '../components/public/PublicDonateButton'
 import {
@@ -331,7 +331,7 @@ export default function PublicOrganizationPage() {
         const measure = () => {
             const h = el.clientHeight
             if (h <= 0) return
-            setKeyMetricsRowPx(Math.max(72, Math.floor((h - gapPx) / 2)))
+            setKeyMetricsRowPx(Math.max(96, Math.floor((h - gapPx) / 2)))
         }
         measure()
         const ro = new ResizeObserver(measure)
@@ -1905,42 +1905,72 @@ export default function PublicOrganizationPage() {
                                         style={{
                                             gridAutoRows: keyMetricsRowPx != null
                                                 ? `${keyMetricsRowPx}px`
-                                                : 'minmax(88px, 20vh)',
+                                                : 'minmax(104px, 22vh)',
                                         }}
                                     >
-                                        {filteredMetrics.map((metric) => (
-                                            <Link
-                                                key={metric.id}
-                                                to={`${orgLinkBase}/${slug}/${metric.initiative_slug}/metric/${generateMetricSlug(metric.title)}`}
-                                                className="group relative min-h-0 h-full rounded-xl bg-white border border-gray-200/80 overflow-hidden shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 flex flex-col"
-                                            >
-                                                {metric.unit_of_measurement && metric.metric_type !== 'percentage' && (
-                                                    <span className="absolute top-1 right-1.5 md:top-1.5 md:right-2 text-xs font-medium text-gray-400 leading-tight truncate max-w-[60%] text-right">
-                                                        {metric.unit_of_measurement}
-                                                    </span>
-                                                )}
-                                                <div className="flex-1 min-h-0 px-2 py-0.5 md:px-2 md:py-1 flex items-center justify-center">
-                                                    <span
-                                                        className="text-3xl md:text-5xl font-bold leading-none tabular-nums tracking-tight text-center"
-                                                        style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
-                                                    >
-                                                        {metric.total_value?.toLocaleString() || '—'}{metric.metric_type === 'percentage' ? '%' : ''}
-                                                    </span>
-                                                </div>
-                                                <div
-                                                    className="px-2 py-1 text-center border-t flex items-center justify-center"
-                                                    style={{
-                                                        backgroundColor: `${brandColor}15`,
-                                                        borderColor: `${brandColor}25`,
-                                                        minHeight: 32,
-                                                    }}
+                                        {filteredMetrics.map((metric) => {
+                                            const isPct = metric.metric_type === 'percentage'
+                                            const unit = metric.unit_of_measurement?.trim()
+                                            return (
+                                                <Link
+                                                    key={metric.id}
+                                                    to={`${orgLinkBase}/${slug}/${metric.initiative_slug}/metric/${generateMetricSlug(metric.title)}`}
+                                                    className="group relative min-h-0 h-full rounded-xl overflow-hidden border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300/90 hover:-translate-y-px transition-all duration-200 flex flex-col"
+                                                    style={{ background: `linear-gradient(150deg, ${brandColor}0a 0%, white 55%)` }}
                                                 >
-                                                    <span className="text-[10.5px] md:text-[11.5px] font-semibold text-gray-800 line-clamp-2 leading-tight">
-                                                        {metric.title}{metric.metric_type === 'percentage' ? ' (avg)' : ''}
-                                                    </span>
-                                                </div>
-                                            </Link>
-                                        ))}
+                                                    {/* Top accent strip */}
+                                                    <span
+                                                        className="absolute top-0 left-0 right-0 h-[3px] pointer-events-none"
+                                                        style={{ backgroundColor: brandColor, opacity: 0.85 }}
+                                                        aria-hidden
+                                                    />
+                                                    {/* Header: title + arrow */}
+                                                    <div className="shrink-0 flex items-start gap-1 px-3 pt-3 pb-0.5 md:px-3.5 md:pt-3.5">
+                                                        <p className="flex-1 min-w-0 text-[11px] md:text-xs font-medium text-gray-500 leading-snug line-clamp-2">
+                                                            {metric.title}
+                                                            {isPct ? <span className="text-gray-400"> · avg</span> : null}
+                                                        </p>
+                                                        <ArrowUpRight className="w-3 h-3 shrink-0 mt-0.5 text-gray-300 group-hover:text-gray-500 transition-colors" aria-hidden />
+                                                    </div>
+                                                    {/* Value */}
+                                                    <div className="flex-1 min-h-0 overflow-hidden flex flex-col justify-end px-3 pb-2.5 md:px-3.5 md:pb-3">
+                                                        <span
+                                                            className="text-2xl md:text-[2.2rem] font-bold leading-none tabular-nums tracking-tight truncate"
+                                                            style={{ color: brandColor, filter: 'saturate(1.1) brightness(0.78)' }}
+                                                        >
+                                                            {metric.total_value?.toLocaleString() ?? '—'}{isPct ? '%' : ''}
+                                                        </span>
+                                                        {!isPct && unit && (
+                                                            <span className="mt-0.5 text-xs md:text-sm font-semibold text-gray-400 truncate">{unit}</span>
+                                                        )}
+                                                    </div>
+                                                    {/* Progress bar toward target */}
+                                                    {metric.target_value != null && metric.total_value != null && (
+                                                        <div className="px-3 md:px-3.5 pb-1">
+                                                            <div className="h-1 rounded-full bg-black/5 overflow-hidden">
+                                                                <div
+                                                                    className="h-full rounded-full"
+                                                                    style={{
+                                                                        width: `${Math.min(100, (metric.total_value / metric.target_value) * 100).toFixed(1)}%`,
+                                                                        backgroundColor: brandColor,
+                                                                        opacity: 0.55,
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {/* Footer: category */}
+                                                    {metric.category && (
+                                                        <div className="shrink-0 px-3 pb-2 md:px-3.5 md:pb-2.5">
+                                                            <span
+                                                                className="text-[9px] md:text-[10px] font-semibold uppercase tracking-wide px-1.5 py-px rounded-md"
+                                                                style={{ backgroundColor: `${brandColor}18`, color: brandColor, filter: 'brightness(0.75)' }}
+                                                            >{metric.category}</span>
+                                                        </div>
+                                                    )}
+                                                </Link>
+                                            )
+                                        })}
                                     </div>
                                 )}
                             </div>
