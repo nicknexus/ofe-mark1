@@ -25,7 +25,7 @@ import PublicTagFilter from '../components/public/PublicTagFilter'
 import PublicTagChip from '../components/public/PublicTagChip'
 import DateRangePicker from '../components/DateRangePicker'
 import { PublicPageBackground, PUBLIC_HEADER_CLASS, PUBLIC_PANEL_STATIC_CLASS } from '../components/public/publicStyles'
-import { formatDate, compareClaimsByEffectiveDateDesc } from '../utils'
+import { formatDate, formatAbbreviatedMetricTotal, compareClaimsByEffectiveDateDesc } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import {
     AreaChart,
@@ -331,7 +331,7 @@ export default function PublicOrganizationPage() {
         const measure = () => {
             const h = el.clientHeight
             if (h <= 0) return
-            setKeyMetricsRowPx(Math.max(96, Math.floor((h - gapPx) / 2)))
+            setKeyMetricsRowPx(Math.max(124, Math.floor((h - gapPx) / 2)))
         }
         measure()
         const ro = new ResizeObserver(measure)
@@ -1869,7 +1869,7 @@ export default function PublicOrganizationPage() {
                     {/* Top Row - Metrics + Impact Claims (larger) */}
                     <div className="flex flex-col md:flex-row gap-2 md:gap-3 md:h-[68%]">
                         {/* Key Metrics (Scrollable 2x2 Grid) */}
-                        <div className="w-full md:w-[52%] overflow-hidden flex flex-col max-h-[320px] md:max-h-none md:min-h-0">
+                        <div className="w-full md:w-[62%] overflow-hidden flex flex-col max-h-[320px] md:max-h-none md:min-h-0">
                             <div className="px-2 md:px-4 py-2 flex items-center justify-between flex-shrink-0">
                                 <div className="flex items-center gap-2">
                                     <div
@@ -1905,7 +1905,7 @@ export default function PublicOrganizationPage() {
                                         style={{
                                             gridAutoRows: keyMetricsRowPx != null
                                                 ? `${keyMetricsRowPx}px`
-                                                : 'minmax(104px, 22vh)',
+                                                : 'minmax(118px, 22vh)',
                                         }}
                                     >
                                         {filteredMetrics.map((metric) => {
@@ -1915,38 +1915,31 @@ export default function PublicOrganizationPage() {
                                                 <Link
                                                     key={metric.id}
                                                     to={`${orgLinkBase}/${slug}/${metric.initiative_slug}/metric/${generateMetricSlug(metric.title)}`}
-                                                    className="group relative min-h-0 h-full rounded-xl overflow-hidden border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300/90 hover:-translate-y-px transition-all duration-200 flex flex-col"
-                                                    style={{ background: `linear-gradient(150deg, ${brandColor}0a 0%, white 55%)` }}
+                                                    className="group relative min-h-0 h-full rounded-xl overflow-hidden border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300/90 hover:-translate-y-px transition-all duration-200 flex flex-col bg-white"
                                                 >
-                                                    {/* Top accent strip */}
                                                     <span
-                                                        className="absolute top-0 left-0 right-0 h-[3px] pointer-events-none"
+                                                        className="absolute top-0 left-0 right-0 h-[3px] pointer-events-none z-[1]"
                                                         style={{ backgroundColor: brandColor, opacity: 0.85 }}
                                                         aria-hidden
                                                     />
-                                                    {/* Header: title + arrow */}
-                                                    <div className="shrink-0 flex items-start gap-1 px-3 pt-3 pb-0.5 md:px-3.5 md:pt-3.5">
-                                                        <p className="flex-1 min-w-0 text-[11px] md:text-xs font-medium text-gray-500 leading-snug line-clamp-2">
-                                                            {metric.title}
-                                                            {isPct ? <span className="text-gray-400"> · avg</span> : null}
-                                                        </p>
-                                                        <ArrowUpRight className="w-3 h-3 shrink-0 mt-0.5 text-gray-300 group-hover:text-gray-500 transition-colors" aria-hidden />
-                                                    </div>
-                                                    {/* Value */}
-                                                    <div className="flex-1 min-h-0 overflow-hidden flex flex-col justify-end px-3 pb-2.5 md:px-3.5 md:pb-3">
+                                                    <ArrowUpRight className="absolute top-3 right-2.5 w-3.5 h-3.5 shrink-0 z-[1] text-gray-300 group-hover:text-gray-500 transition-colors" aria-hidden />
+
+                                                    <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col items-center justify-center px-3 pt-7 pb-1 md:px-4 md:pt-9 md:pb-2">
                                                         <span
-                                                            className="text-2xl md:text-[2.2rem] font-bold leading-none tabular-nums tracking-tight truncate"
+                                                            className="text-4xl md:text-5xl lg:text-[3.5rem] font-bold leading-none tabular-nums tracking-tight text-center max-w-full min-w-0 shrink truncate"
                                                             style={{ color: brandColor, filter: 'saturate(1.1) brightness(0.78)' }}
                                                         >
-                                                            {metric.total_value?.toLocaleString() ?? '—'}{isPct ? '%' : ''}
+                                                            {formatAbbreviatedMetricTotal(metric.total_value, { isPercentage: isPct })}{isPct ? '%' : ''}
                                                         </span>
-                                                        {!isPct && unit && (
-                                                            <span className="mt-0.5 text-xs md:text-sm font-semibold text-gray-400 truncate">{unit}</span>
-                                                        )}
+                                                        {!isPct && unit ? (
+                                                            <span className="mt-1.5 text-[11px] md:text-xs font-semibold text-gray-400 text-center line-clamp-1 shrink-0">{unit}</span>
+                                                        ) : isPct ? (
+                                                            <span className="mt-1.5 text-[11px] md:text-xs font-semibold text-gray-400 text-center shrink-0">average</span>
+                                                        ) : null}
                                                     </div>
-                                                    {/* Progress bar toward target */}
+
                                                     {metric.target_value != null && metric.total_value != null && (
-                                                        <div className="px-3 md:px-3.5 pb-1">
+                                                        <div className="px-3 md:px-4 pb-2 pt-1 bg-white shrink-0">
                                                             <div className="h-1 rounded-full bg-black/5 overflow-hidden">
                                                                 <div
                                                                     className="h-full rounded-full"
@@ -1959,15 +1952,18 @@ export default function PublicOrganizationPage() {
                                                             </div>
                                                         </div>
                                                     )}
-                                                    {/* Footer: category */}
-                                                    {metric.category && (
-                                                        <div className="shrink-0 px-3 pb-2 md:px-3.5 md:pb-2.5">
-                                                            <span
-                                                                className="text-[9px] md:text-[10px] font-semibold uppercase tracking-wide px-1.5 py-px rounded-md"
-                                                                style={{ backgroundColor: `${brandColor}18`, color: brandColor, filter: 'brightness(0.75)' }}
-                                                            >{metric.category}</span>
-                                                        </div>
-                                                    )}
+
+                                                    <div
+                                                        className="shrink-0 h-[3.875rem] md:h-[4.125rem] border-t px-3 py-0 flex items-center justify-center overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]"
+                                                        style={{
+                                                            background: `linear-gradient(180deg, ${brandColor}14 0%, ${brandColor}26 100%)`,
+                                                            borderColor: `${brandColor}38`,
+                                                        }}
+                                                    >
+                                                        <p className="text-xs md:text-sm font-semibold text-foreground/90 text-center leading-snug line-clamp-3 w-full px-0.5 min-h-0">
+                                                            {metric.title}
+                                                        </p>
+                                                    </div>
                                                 </Link>
                                             )
                                         })}
@@ -1977,7 +1973,7 @@ export default function PublicOrganizationPage() {
                         </div>
 
                         {/* Impact Claims Container (Scrollable) */}
-                        <div className="w-full md:w-[48%] overflow-hidden md:overflow-visible flex flex-col max-h-[280px] md:max-h-none md:min-h-0">
+                        <div className="w-full md:w-[38%] overflow-hidden md:overflow-visible flex flex-col max-h-[280px] md:max-h-none md:min-h-0">
                             <div className="px-2 md:px-4 py-2 flex items-center justify-between flex-shrink-0">
                                 <div className="flex items-center gap-2">
                                     <div
@@ -2010,7 +2006,7 @@ export default function PublicOrganizationPage() {
                                             <Link
                                                 key={`${claim.id}-${idx}`}
                                                 to={`${orgLinkBase}/${slug}/${claim.initiativeSlug}/claim/${claim.id}?from=org`}
-                                                className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group"
+                                                className="block p-2.5 rounded-xl bg-white border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group"
                                             >
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div className="flex-1 min-w-0">

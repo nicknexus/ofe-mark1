@@ -22,7 +22,7 @@ import {
     brandIconStyle,
     publicActiveFilterStyle,
 } from '../components/public/publicStyles'
-import { getLocalDateString, formatDate, parseLocalDate, getClaimEffectiveDate, compareClaimsByEffectiveDateDesc } from '../utils'
+import { getLocalDateString, formatDate, formatAbbreviatedMetricTotal, parseLocalDate, getClaimEffectiveDate, compareClaimsByEffectiveDateDesc } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 
 // Category colors
@@ -487,7 +487,8 @@ export default function PublicMetricPage() {
                         <div className="rounded-2xl sm:rounded-3xl bg-white border border-gray-200/80 shadow-public p-4 sm:p-6 lg:min-w-[200px] lg:max-w-[240px]">
                             <p className="text-gray-500 text-xs sm:text-sm font-medium mb-0.5 sm:mb-1">{metric.metric_type === 'percentage' ? 'Average' : 'Total Impact'}</p>
                             <p className={`text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight ${config.text}`}>
-                                {(hasActiveFilters ? filteredTotal : metric.total_value).toLocaleString()}{metric.metric_type === 'percentage' ? '%' : ''}
+                                {formatAbbreviatedMetricTotal(hasActiveFilters ? filteredTotal : metric.total_value, { isPercentage: metric.metric_type === 'percentage' })}
+                                {metric.metric_type === 'percentage' ? '%' : ''}
                             </p>
                             <p className="text-gray-500 text-xs sm:text-sm mt-0.5 sm:mt-1">{metric.metric_type === 'percentage' ? 'across all claims' : metric.unit_of_measurement}</p>
                         </div>

@@ -54,6 +54,16 @@ export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOpt
     }).format(parseLocalDate(date))
 }
 
+/** Absolute values ≥10_000 (more than four digit places) shorten as 10k, 150k; ≥1e6 uses M. Percents unchanged. */
+export function formatAbbreviatedMetricTotal(value: number | null | undefined, opts?: { isPercentage?: boolean }): string {
+    if (value == null || !Number.isFinite(value)) return '—'
+    if (opts?.isPercentage) return value.toLocaleString()
+    const abs = Math.abs(value)
+    if (abs < 10_000) return value.toLocaleString()
+    if (abs >= 1_000_000) return `${Math.round(value / 1_000_000)}M`
+    return `${Math.round(value / 1_000)}k`
+}
+
 // Format date for inputs
 export function formatDateForInput(date: string | Date): string {
     const dateToFormat = parseLocalDate(date)

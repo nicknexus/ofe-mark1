@@ -58,7 +58,7 @@ import {
     publicActiveFilterStyle,
     publicCountBadgeStyle,
 } from '../components/public/publicStyles'
-import { getLocalDateString, formatDate, parseLocalDate } from '../utils'
+import { getLocalDateString, formatDate, formatAbbreviatedMetricTotal, parseLocalDate } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 
 // Map tile configuration - matches internal app
@@ -1298,15 +1298,30 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                             <Link
                                 key={kpi.id}
                                 to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}${dateQS}`}
-                                className="rounded-xl bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 p-3 transition-all group"
+                                className="rounded-xl bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 overflow-hidden flex flex-col h-full min-h-[7rem] transition-all group"
                             >
-                                <div className="flex items-center justify-between mb-1">
-                                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: metricColor }} />
-                                    <span className="text-xs text-gray-400 truncate ml-1">{kpi.metric_type === 'percentage' ? 'avg' : kpi.unit_of_measurement}</span>
+                                <div className="flex-1 min-h-0 overflow-hidden flex flex-col items-center justify-center px-2 pt-3 pb-2">
+                                    <div
+                                        className="text-2xl sm:text-3xl font-bold tabular-nums tracking-tight text-center max-w-full min-w-0 shrink truncate px-1"
+                                        style={{ color: metricColor }}
+                                    >
+                                        {formatAbbreviatedMetricTotal(kpi.total_value ?? 0, { isPercentage: kpi.metric_type === 'percentage' })}
+                                        {kpi.metric_type === 'percentage' ? '%' : ''}
+                                    </div>
+                                    {(kpi.metric_type === 'percentage' || kpi.unit_of_measurement) && (
+                                        <span className="text-[10px] text-muted-foreground mt-1 text-center line-clamp-1">
+                                            {kpi.metric_type === 'percentage' ? 'average' : kpi.unit_of_measurement}
+                                        </span>
+                                    )}
                                 </div>
-                                <div className="text-xs font-medium text-gray-700 truncate mb-1 group-hover:text-accent transition-colors">{kpi.title}</div>
-                                <div className="text-lg font-bold" style={{ color: metricColor }}>
-                                    {(kpi.total_value || 0).toLocaleString()}{kpi.metric_type === 'percentage' ? '%' : ''}
+                                <div
+                                    className="shrink-0 h-[3.75rem] border-t px-2 py-0 flex items-center justify-center overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]"
+                                    style={{
+                                        background: `linear-gradient(180deg, ${brandColor}14 0%, ${brandColor}26 100%)`,
+                                        borderColor: `${brandColor}38`,
+                                    }}
+                                >
+                                    <p className="text-[11px] sm:text-xs font-semibold text-foreground/90 text-center leading-snug line-clamp-3 w-full px-0.5 min-h-0 group-hover:text-accent transition-colors">{kpi.title}</p>
                                 </div>
                             </Link>
                         )
@@ -1859,7 +1874,9 @@ function MetricsTab({ dashboard, orgSlug, initiativeSlug, dateQS = '', tagsById,
                             <div className="mb-4">
                                 <div className="flex items-baseline gap-2">
                                     <span className={`text-3xl font-bold ${config.accent}`}>
-                                        {kpi.total_value !== undefined ? `${kpi.total_value.toLocaleString()}${kpi.metric_type === 'percentage' ? '%' : ''}` : '—'}
+                                        {kpi.total_value !== undefined
+                                            ? `${formatAbbreviatedMetricTotal(kpi.total_value, { isPercentage: kpi.metric_type === 'percentage' })}${kpi.metric_type === 'percentage' ? '%' : ''}`
+                                            : '—'}
                                     </span>
                                     <span className="text-sm text-muted-foreground">{kpi.metric_type === 'percentage' ? 'average' : kpi.unit_of_measurement}</span>
                                 </div>
@@ -2139,7 +2156,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { loc
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div className="min-w-0">
                                                         <p className="text-sm font-medium text-foreground">{m.title}</p>
-                                                        <p className="text-lg font-bold text-foreground mt-0.5">{m.total_value.toLocaleString()}{m.metric_type === 'percentage' ? '%' : ''} <span className="text-xs font-normal text-muted-foreground">{m.metric_type === 'percentage' ? 'avg' : m.unit_of_measurement}</span></p>
+                                                        <p className="text-lg font-bold text-foreground mt-0.5">{formatAbbreviatedMetricTotal(m.total_value, { isPercentage: m.metric_type === 'percentage' })}{m.metric_type === 'percentage' ? '%' : ''} <span className="text-xs font-normal text-muted-foreground">{m.metric_type === 'percentage' ? 'avg' : m.unit_of_measurement}</span></p>
                                                         <p className="text-xs text-muted-foreground">{m.claim_count} claim{m.claim_count !== 1 ? 's' : ''} at this location</p>
                                                     </div>
                                                     <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${cat.bg} ${cat.text} capitalize`}>{m.category}</span>
