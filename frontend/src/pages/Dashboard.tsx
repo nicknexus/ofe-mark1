@@ -43,10 +43,12 @@ import toast from 'react-hot-toast'
 import CreateInitiativeModal from '../components/CreateInitiativeModal'
 import LocationMap from '../components/LocationMap'
 import AllLocationsModal from '../components/AllLocationsModal'
+import ModalFrame from '../components/ModalFrame'
 import TagsWidget from '../components/MetricTags/TagsWidget'
 import { ExternalLink } from 'lucide-react'
 import { useTutorial } from '../context/TutorialContext'
 import { useTeam } from '../context/TeamContext'
+import { Button } from '../components/ui/button'
 
 // ============ Sortable initiative card ============
 // Owner/team can drag-reorder initiatives on the dashboard. Order is persisted
@@ -252,7 +254,7 @@ function ContextScoreCard({
     return (
         <Link
             to="/context"
-            className="group bg-white rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.12)] ring-1 ring-gray-900/[0.04] p-4 flex flex-col gap-2.5 hover:ring-primary-200/60 hover:-translate-y-0.5 transition-all duration-200 min-h-0"
+            className="group bg-white rounded-2xl shadow-surface ring-1 ring-gray-900/[0.04] p-4 flex flex-col gap-2.5 hover:ring-primary-200/60 hover:-translate-y-0.5 transition-all duration-200 min-h-0"
         >
             <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-primary-50 ring-1 ring-primary-100/50 flex items-center justify-center">
@@ -264,7 +266,7 @@ function ContextScoreCard({
             </div>
             <div className="w-full h-1.5 bg-gray-100/80 rounded-full overflow-hidden">
                 <div
-                    className="h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(0,0,0,0.08)]"
+                    className="h-full rounded-full transition-all duration-500 shadow-bubble-sm"
                     style={{ width: `${score.pct}%`, backgroundColor: color }}
                 />
             </div>
@@ -296,7 +298,7 @@ function NextStepsCard({
 }) {
     const rowClass = "group w-full text-left flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-gradient-to-br from-white to-gray-50/40 hover:from-primary-50/40 hover:to-primary-50/10 border border-gray-100 hover:border-primary-200/70 transition-all"
     return (
-        <div className="bg-white rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.12)] ring-1 ring-gray-900/[0.04] p-4 flex flex-col min-h-0 flex-1">
+        <div className="bg-white rounded-2xl shadow-surface ring-1 ring-gray-900/[0.04] p-4 flex flex-col min-h-0 flex-1">
             <div className="flex items-center gap-2.5 mb-3 flex-shrink-0">
                 <div className="w-8 h-8 rounded-xl bg-primary-50 ring-1 ring-primary-100/50 flex items-center justify-center">
                     <Sparkles className="w-4 h-4 text-primary-600" />
@@ -708,17 +710,16 @@ export default function Dashboard() {
         return (
             <div className="text-center py-12">
                 <div className="text-red-600 mb-4">{loadingState.error}</div>
-                <button
+                <Button
                     onClick={() => {
                         if (!isLoadingData && !loadingPromise.current) {
                             loadingPromise.current = loadAllData()
                         }
                     }}
-                    className="btn-primary"
                     disabled={isLoadingData || !!loadingPromise.current}
                 >
                     {(isLoadingData || loadingPromise.current) ? 'Loading...' : 'Try Again'}
-                </button>
+                </Button>
             </div>
         )
     }
@@ -741,7 +742,7 @@ export default function Dashboard() {
                 <div className="flex-1 min-h-0">
                     <div className={`grid grid-cols-1 ${showOwnerWidgets ? 'lg:grid-cols-5' : 'lg:grid-cols-3'} gap-4 h-full`}>
                         {/* Initiatives Module - narrower on desktop (2/5), full width on mobile */}
-                        <div className={`col-span-1 ${showOwnerWidgets ? 'lg:col-span-2' : 'lg:col-span-2'} bg-white rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.12)] ring-1 ring-gray-900/[0.04] overflow-hidden flex flex-col min-h-0`}>
+                        <div className={`col-span-1 ${showOwnerWidgets ? 'lg:col-span-2' : 'lg:col-span-2'} bg-white rounded-2xl shadow-surface ring-1 ring-gray-900/[0.04] overflow-hidden flex flex-col min-h-0`}>
                             {/* Team Member Banner */}
                             {isSharedMember && organizationName && (
                                 <div className="px-6 py-3 bg-purple-50 border-b border-purple-100 flex items-center gap-2">
@@ -833,7 +834,7 @@ export default function Dashboard() {
                         </div>
 
                         {/* Locations Map Module - hidden on mobile */}
-                        <div className={`col-span-1 ${showOwnerWidgets ? 'lg:col-span-2' : 'lg:col-span-1'} bg-white rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.12)] ring-1 ring-gray-900/[0.04] overflow-hidden hidden md:flex flex-col min-h-0`}>
+                        <div className={`col-span-1 ${showOwnerWidgets ? 'lg:col-span-2' : 'lg:col-span-1'} bg-white rounded-2xl shadow-surface ring-1 ring-gray-900/[0.04] overflow-hidden hidden md:flex flex-col min-h-0`}>
                             <div className="px-6 py-4 border-b border-gray-100/70 bg-gradient-to-b from-gray-50/50 to-transparent flex items-center justify-between flex-shrink-0">
                                 <div className="flex items-center gap-2.5">
                                     <div className="w-8 h-8 rounded-xl bg-primary-50 ring-1 ring-primary-100/50 flex items-center justify-center">
@@ -929,8 +930,7 @@ export default function Dashboard() {
 
             {/* Delete Confirmation Dialog */}
             {deleteConfirmInitiative && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-bubble-lg border border-gray-100">
+                <ModalFrame zIndexClass="z-50" backdropClassName="bg-black/40 backdrop-blur-sm" panelClassName="bg-white rounded-2xl max-w-md w-full p-6 shadow-bubble-lg border border-gray-100">
                         <div className="flex items-start space-x-4 mb-6">
                             <div className="icon-bubble">
                                 <Trash2 className="w-5 h-5 text-red-500" />
@@ -974,14 +974,12 @@ export default function Dashboard() {
                                 Delete Initiative
                             </button>
                         </div>
-                    </div>
-                </div>
+                </ModalFrame>
             )}
 
             {/* Upgrade Modal - Initiative Limit Reached */}
             {showUpgradeModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60] animate-fade-in">
-                    <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] transform transition-all duration-200 ease-out animate-slide-up-fast">
+                <ModalFrame zIndexClass="z-[60]" panelClassName="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-modal transform transition-all duration-200 ease-out">
                         {/* Header */}
                         <div className="relative bg-gradient-to-br from-amber-50 to-orange-50 p-6 text-center border-b border-amber-100">
                             <button
@@ -1042,8 +1040,7 @@ export default function Dashboard() {
                                 </button>
                             </div>
                         </div>
-                    </div>
-                </div>
+                </ModalFrame>
             )}
 
         </>

@@ -33,6 +33,8 @@
     }
 
     var BASE = getBase();
+    var EMBED_RADIUS = '16px';
+    var EMBED_SHADOW = '0 2px 8px -1px rgba(15,23,42,0.10), 0 4px 16px -4px rgba(15,23,42,0.10)';
     var initialised = new WeakSet();
 
     function buildSrc(slug) {
@@ -57,10 +59,10 @@
             'width: 100%',
             'margin: 0 auto',
             'box-sizing: border-box',
-            'border-radius: 20px',
+            'border-radius: ' + EMBED_RADIUS,
             'overflow: hidden',
             'background: #ffffff',
-            'box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 12px 32px rgba(15,23,42,0.08)'
+            'box-shadow: ' + EMBED_SHADOW
         ].join(';');
 
         var iframe = document.createElement('iframe');

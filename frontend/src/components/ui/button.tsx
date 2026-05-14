@@ -16,7 +16,7 @@ const buttonVariants = cva(
         outline:
           "border-2 border-input bg-background hover:bg-accent/10 hover:border-accent",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          "bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 shadow-sm",
         ghost: "hover:bg-accent/10 hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
         sage: "bg-accent text-accent-foreground hover:bg-accent/90 shadow-sage hover:shadow-md hover:-translate-y-0.5 border-2 border-accent/50",
@@ -55,4 +55,3 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 Button.displayName = "Button";
 
 export { Button, buttonVariants };
-

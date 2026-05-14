@@ -4,6 +4,8 @@ import { Location } from '../types'
 import { apiService } from '../services/api'
 import LocationMap from './LocationMap'
 import LocationModal from './LocationModal'
+import ModalFrame from './ModalFrame'
+import ConfirmDialog from './ConfirmDialog'
 import toast from 'react-hot-toast'
 
 interface AllLocationsModalProps {
@@ -74,8 +76,7 @@ export default function AllLocationsModal({ isOpen, onClose }: AllLocationsModal
 
     return (
         <>
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80] animate-fade-in">
-                <div className="bg-white rounded-2xl w-[95vw] max-w-6xl h-[90vh] flex flex-col overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] border border-gray-100">
+            <ModalFrame panelClassName="bg-white rounded-2xl w-[95vw] max-w-6xl h-[90vh] flex flex-col overflow-hidden shadow-modal border border-gray-100">
                     {/* Header */}
                     <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
                         <div className="flex items-center gap-2">
@@ -189,8 +190,7 @@ export default function AllLocationsModal({ isOpen, onClose }: AllLocationsModal
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
+            </ModalFrame>
 
             {/* Create Modal */}
             <LocationModal
@@ -202,43 +202,14 @@ export default function AllLocationsModal({ isOpen, onClose }: AllLocationsModal
 
             {/* Delete Confirmation */}
             {deleteConfirmId && target && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
-                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-bubble-lg border border-gray-100">
-                        <div className="flex items-start space-x-4 mb-6">
-                            <div className="icon-bubble">
-                                <Trash2 className="w-5 h-5 text-red-500" />
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-gray-800 mb-1">Delete Location</h3>
-                                <p className="text-sm text-gray-500">This action cannot be undone</p>
-                            </div>
-                        </div>
-
-                        <p className="text-gray-600 mb-2 text-sm">
-                            Permanently delete{' '}
-                            <strong className="text-gray-800">"{target.name}"</strong>{' '}
-                            from your organization?
-                        </p>
-                        <p className="text-xs text-gray-500 mb-6">
-                            This removes the location from every initiative that uses it. Existing impact claims, evidence, and stories linked here will keep their data but lose the location reference.
-                        </p>
-
-                        <div className="flex space-x-3">
-                            <button
-                                onClick={() => setDeleteConfirmId(null)}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-all duration-200"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => handleDelete(deleteConfirmId)}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-2xl transition-all duration-200 shadow-bubble-sm"
-                            >
-                                Delete Location
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <ConfirmDialog
+                    title="Delete Location"
+                    message={`Permanently delete "${target.name}" from your organization? This removes it from every initiative that uses it.`}
+                    confirmLabel="Delete Location"
+                    tone="danger"
+                    onConfirm={() => handleDelete(deleteConfirmId)}
+                    onCancel={() => setDeleteConfirmId(null)}
+                />
             )}
         </>
     )

@@ -8,6 +8,7 @@ import StoryCard from '../StoryCard'
 import AddStoryModal from '../AddStoryModal'
 import StoryDetailModal from '../StoryDetailModal'
 import DateRangePicker from '../DateRangePicker'
+import ConfirmDialog from '../ConfirmDialog'
 // Stories can be created by all team members (owners and invited users)
 import toast from 'react-hot-toast'
 
@@ -29,6 +30,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
     const [selectedStory, setSelectedStory] = useState<Story | null>(null)
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
+    const [deleteStoryId, setDeleteStoryId] = useState<string | null>(null)
 
     // Master filter state
     const [datePickerValue, setDatePickerValue] = useState<{
@@ -153,10 +155,12 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
     }
 
     const handleDeleteStory = async (storyId: string) => {
-        if (!confirm('Are you sure you want to delete this story?')) return
         try {
             await apiService.deleteStory(storyId)
             toast.success('Story deleted successfully')
+            setDeleteStoryId(null)
+            setIsDetailModalOpen(false)
+            setSelectedStory(null)
             loadStories()
             onRefresh?.()
         } catch (error) {
@@ -389,7 +393,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                     <>
                         <div className="fixed inset-0 z-[9998]" onClick={() => setShowLocationPicker(false)} />
                         <div
-                            className="fixed bg-white border border-gray-100 rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
+                            className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
                             style={{
                                 top: `${locationDropdownPosition.top}px`,
                                 left: `${locationDropdownPosition.left}px`
@@ -446,7 +450,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                     <>
                         <div className="fixed inset-0 z-[9998]" onClick={() => setShowTagPicker(false)} />
                         <div
-                            className="fixed bg-white border border-gray-100 rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
+                            className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
                             style={{ top: `${tagDropdownPosition.top}px`, left: `${tagDropdownPosition.left}px` }}
                             onClick={(e) => e.stopPropagation()}
                         >
@@ -494,7 +498,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                     <>
                         <div className="fixed inset-0 z-[9998]" onClick={() => setShowBeneficiaryPicker(false)} />
                         <div
-                            className="fixed bg-white border border-gray-100 rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
+                            className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
                             style={{
                                 top: `${beneficiaryDropdownPosition.top}px`,
                                 left: `${beneficiaryDropdownPosition.left}px`
@@ -589,7 +593,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                     }}
                     story={selectedStory}
                     onEdit={handleEditStory}
-                    onDelete={handleDeleteStory}
+                    onDelete={setDeleteStoryId}
                 />
             )}
 
@@ -606,7 +610,17 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                     editData={editingStory}
                 />
             )}
+
+            {deleteStoryId && (
+                <ConfirmDialog
+                    title="Delete Story"
+                    message={`Delete ${stories.find(story => story.id === deleteStoryId)?.title || 'this story'}? This action cannot be undone.`}
+                    confirmLabel="Delete Story"
+                    tone="danger"
+                    onConfirm={() => handleDeleteStory(deleteStoryId)}
+                    onCancel={() => setDeleteStoryId(null)}
+                />
+            )}
         </div>
     )
 }
-

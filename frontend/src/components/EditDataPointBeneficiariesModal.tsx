@@ -4,6 +4,8 @@ import { apiService } from '../services/api'
 import { BeneficiaryGroup } from '../types'
 import { formatDate } from '../utils'
 import toast from 'react-hot-toast'
+import { Button } from './ui/button'
+import ModalFrame from './ModalFrame'
 
 interface EditDataPointBeneficiariesModalProps {
     isOpen: boolean
@@ -72,8 +74,11 @@ export default function EditDataPointBeneficiariesModal({
     if (!isOpen || !dataPoint) return null
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
-            <div className="bg-white rounded-xl max-w-md w-full max-h-[80vh] overflow-y-auto shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)]">
+        <ModalFrame
+            zIndexClass="z-[60]"
+            backdropClassName="bg-black/50"
+            panelClassName="bg-white rounded-xl max-w-md w-full max-h-[80vh] overflow-y-auto shadow-modal"
+        >
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
                     <div>
                         <h2 className="text-xl font-semibold text-gray-900">
@@ -145,24 +150,23 @@ export default function EditDataPointBeneficiariesModal({
                 </div>
 
                 <div className="flex space-x-3 p-6 border-t border-gray-200">
-                    <button
+                    <Button
                         onClick={onClose}
-                        className="btn-secondary flex-1"
+                        variant="secondary"
+                        className="flex-1"
                         disabled={saving}
                     >
                         Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         onClick={handleSave}
-                        className="btn-primary flex-1 flex items-center justify-center space-x-2"
+                        className="flex-1"
                         disabled={saving || loading}
                     >
                         <Save className="w-4 h-4" />
                         <span>{saving ? 'Saving...' : 'Save Changes'}</span>
-                    </button>
+                    </Button>
                 </div>
-            </div>
-        </div>
+        </ModalFrame>
     )
 }
-

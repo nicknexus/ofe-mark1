@@ -14,8 +14,8 @@ function stampVersion() {
 }
 
 // https://vitejs.dev/config/
-export default defineConfig({
-    plugins: [react(), stampVersion()],
+export default defineConfig(({ command }) => ({
+    plugins: [react(), ...(command === 'build' ? [stampVersion()] : [])],
     server: {
         port: 3000,
     },
@@ -34,4 +34,4 @@ export default defineConfig({
     optimizeDeps: {
         include: ['three'],
     },
-})
+}))

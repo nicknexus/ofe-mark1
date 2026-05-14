@@ -5,6 +5,7 @@ import { apiService } from '../services/api'
 import { formatDate } from '../utils'
 import { useUploadManager } from '../context/UploadContext'
 import DateRangePicker from './DateRangePicker'
+import ModalFrame from './ModalFrame'
 import toast from 'react-hot-toast'
 
 interface EasyEvidenceModalProps {
@@ -278,8 +279,13 @@ export default function EasyEvidenceModal({
     ]
 
     return (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center p-0 md:p-4 z-[80]">
-            <div className="bg-white md:bg-white/95 md:backdrop-blur-xl md:border md:border-white/60 md:rounded-3xl w-full h-full md:w-full md:max-w-4xl md:h-auto md:min-h-[75vh] md:max-h-[95vh] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)] overflow-hidden flex flex-col transition-all duration-300">
+        <ModalFrame
+            zIndexClass="z-[80]"
+            backdropClassName="bg-black/20 backdrop-blur-md"
+            paddingClassName="p-0 md:p-4"
+            panelClassName="bg-white md:bg-white/95 md:backdrop-blur-xl md:border md:border-white/60 md:rounded-3xl w-full h-full md:w-full md:max-w-4xl md:h-auto md:min-h-[75vh] md:max-h-[95vh] shadow-dialog-strong overflow-hidden flex flex-col transition-all duration-300"
+            animate={false}
+        >
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 md:p-5 bg-gradient-to-r from-evidence-500 to-evidence-600 flex-shrink-0">
                     <div className="flex items-center gap-3 min-w-0">
@@ -661,7 +667,6 @@ export default function EasyEvidenceModal({
                         </button>
                     )}
                 </div>
-            </div>
-        </div>
+        </ModalFrame>
     )
 }

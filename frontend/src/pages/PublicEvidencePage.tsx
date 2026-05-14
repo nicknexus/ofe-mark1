@@ -11,23 +11,28 @@ import PublicLoader from '../components/public/PublicLoader'
 import PublicTagChip from '../components/public/PublicTagChip'
 import PublicDonateButton from '../components/public/PublicDonateButton'
 import DateRangePicker from '../components/DateRangePicker'
-import { PublicPageBackground } from '../components/public/publicStyles'
+import {
+    PublicPageBackground,
+    PUBLIC_CARD_CLASS,
+    PUBLIC_HEADER_CLASS,
+    PUBLIC_PANEL_STATIC_CLASS,
+} from '../components/public/publicStyles'
 import { getLocalDateString, formatDate } from '../utils'
 
 // Evidence type config
 const evidenceTypeConfig: Record<string, { icon: any; label: string; color: string; bg: string }> = {
-    document: { icon: FileText, label: 'Document', color: 'text-blue-600', bg: 'bg-blue-50' },
-    photo: { icon: Image, label: 'Photo', color: 'text-green-600', bg: 'bg-green-50' },
-    video: { icon: Video, label: 'Video', color: 'text-purple-600', bg: 'bg-purple-50' },
-    recording: { icon: Mic, label: 'Recording', color: 'text-orange-600', bg: 'bg-orange-50' },
-    external_link: { icon: ExternalLink, label: 'External Link', color: 'text-cyan-600', bg: 'bg-cyan-50' },
+    document: { icon: FileText, label: 'Document', color: 'text-evidence-700', bg: 'bg-evidence-50' },
+    photo: { icon: Image, label: 'Photo', color: 'text-impact-700', bg: 'bg-impact-50' },
+    video: { icon: Video, label: 'Video', color: 'text-primary-800', bg: 'bg-primary-50' },
+    recording: { icon: Mic, label: 'Recording', color: 'text-secondary-700', bg: 'bg-secondary-50' },
+    external_link: { icon: ExternalLink, label: 'External Link', color: 'text-evidence-700', bg: 'bg-evidence-50' },
 }
 
 // Category colors for impact claims
 const categoryColors: Record<string, { bg: string; text: string }> = {
     impact: { bg: 'bg-purple-100', text: 'text-purple-700' },
     output: { bg: 'bg-green-100', text: 'text-green-700' },
-    input: { bg: 'bg-blue-100', text: 'text-blue-700' },
+    input: { bg: 'bg-evidence-100', text: 'text-evidence-700' },
 }
 
 export default function PublicEvidencePage() {
@@ -103,7 +108,7 @@ export default function PublicEvidencePage() {
     if (error || !evidence) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center px-6">
-                <div className="rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-12 text-center max-w-md">
+                <div className={`${PUBLIC_PANEL_STATIC_CLASS} rounded-3xl p-12 text-center max-w-md`}>
                     <FileText className="w-16 h-16 text-gray-300 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-gray-800 mb-3">Evidence Not Found</h1>
                     <p className="text-gray-500 mb-8">{error || 'This evidence does not exist.'}</p>
@@ -164,7 +169,7 @@ export default function PublicEvidencePage() {
             <PublicPageBackground brandColor={brandColor} />
 
             {/* Navigation Header */}
-            <div className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
+            <div className={`sticky top-0 ${PUBLIC_HEADER_CLASS}`}>
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 sm:gap-3">
@@ -218,7 +223,7 @@ export default function PublicEvidencePage() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 flex-1 min-h-0">
                     {/* File Preview - Takes 2 columns */}
                     <div className="lg:col-span-2 flex flex-col">
-                        <div className="rounded-xl sm:rounded-2xl bg-white border border-gray-200/80 shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_8px_24px_-6px_rgba(15,23,42,0.14)] overflow-hidden flex-1 flex flex-col">
+                        <div className="rounded-xl sm:rounded-2xl bg-white border border-gray-200/80 shadow-public-feature overflow-hidden flex-1 flex flex-col">
                             {/* Preview Area */}
                             <div className="relative bg-gray-900 flex-1 min-h-[250px] sm:min-h-[400px] max-h-[50vh] sm:max-h-[60vh] flex items-center justify-center">
                                 {currentFile ? (
@@ -335,7 +340,7 @@ export default function PublicEvidencePage() {
                     {/* Details Sidebar */}
                     <div className="flex flex-col gap-3 sm:gap-4 min-h-0">
                         {/* Evidence Info */}
-                        <div className="rounded-xl sm:rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5 flex-shrink-0">
+                        <div className={`${PUBLIC_PANEL_STATIC_CLASS} rounded-xl sm:rounded-2xl p-4 sm:p-5 flex-shrink-0`}>
                             {/* Type Badge */}
                             <div className={`inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full ${typeConfig.bg} ${typeConfig.color} text-xs sm:text-sm font-medium mb-2 sm:mb-3`}>
                                 <TypeIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -374,7 +379,7 @@ export default function PublicEvidencePage() {
 
                         {/* Impact Claims - Scrollable */}
                         {evidence.impact_claims && evidence.impact_claims.length > 0 ? (
-                            <div className="rounded-xl sm:rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5 flex-1 min-h-0 flex flex-col max-h-[200px] sm:max-h-none">
+                            <div className={`${PUBLIC_PANEL_STATIC_CLASS} rounded-xl sm:rounded-2xl p-4 sm:p-5 flex-1 min-h-0 flex flex-col max-h-[200px] sm:max-h-none`}>
                                 <h3 className="text-xs sm:text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2 sm:mb-3 flex-shrink-0">
                                     Supporting Impact Claims
                                 </h3>
@@ -391,7 +396,7 @@ export default function PublicEvidencePage() {
                                             <Link
                                                 key={claim.id}
                                                 to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`}
-                                                className="block p-2.5 sm:p-3 rounded-lg sm:rounded-xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group active:scale-[0.98]"
+                                                className={`${PUBLIC_CARD_CLASS} block p-2.5 sm:p-3 rounded-lg sm:rounded-xl group active:scale-[0.98]`}
                                             >
                                                 <p className="font-semibold text-gray-800 text-xs sm:text-sm group-hover:text-primary-600 transition-colors">
                                                     {claim.value}{claim.kpis?.metric_type === 'percentage' ? '%' : ` ${claim.kpis?.unit_of_measurement || ''}`}
@@ -409,7 +414,7 @@ export default function PublicEvidencePage() {
                                 </div>
                             </div>
                         ) : evidence.linked_kpis && evidence.linked_kpis.length > 0 ? (
-                            <div className="rounded-xl sm:rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5 flex-1 min-h-0 flex flex-col max-h-[200px] sm:max-h-none">
+                            <div className={`${PUBLIC_PANEL_STATIC_CLASS} rounded-xl sm:rounded-2xl p-4 sm:p-5 flex-1 min-h-0 flex flex-col max-h-[200px] sm:max-h-none`}>
                                 <h3 className="text-xs sm:text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2 sm:mb-3 flex-shrink-0">
                                     Linked Metrics
                                 </h3>
@@ -418,7 +423,7 @@ export default function PublicEvidencePage() {
                                         <Link
                                             key={kpi.id}
                                             to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${kpi.title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')}`}
-                                            className="block p-2.5 sm:p-3 rounded-lg sm:rounded-xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group active:scale-[0.98]"
+                                            className={`${PUBLIC_CARD_CLASS} block p-2.5 sm:p-3 rounded-lg sm:rounded-xl group active:scale-[0.98]`}
                                         >
                                             <p className="font-medium text-gray-800 text-xs sm:text-sm group-hover:text-primary-600 transition-colors truncate">
                                                 {kpi.title}
@@ -430,7 +435,7 @@ export default function PublicEvidencePage() {
                         ) : null}
 
                         {/* Initiative Link */}
-                        <div className="rounded-xl sm:rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-3 sm:p-4 flex-shrink-0">
+                        <div className={`${PUBLIC_PANEL_STATIC_CLASS} rounded-xl sm:rounded-2xl p-3 sm:p-4 flex-shrink-0`}>
                             <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide mb-1">From Initiative</p>
                             <Link
                                 to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=evidence`}

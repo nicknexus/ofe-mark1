@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { X, MapPin, Save, Search, Loader2, ChevronDown } from 'lucide-react'
 import { Location } from '../types'
 import { debounce } from '../utils'
+import ModalFrame from './ModalFrame'
 
 interface NominatimResult {
     place_id: number
@@ -229,8 +230,10 @@ export default function LocationModal({
     const hasCoords = formData.latitude && formData.longitude
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[200] animate-fade-in">
-            <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] border border-gray-100 animate-slide-up-fast">
+        <ModalFrame
+            zIndexClass="z-[200]"
+            panelClassName="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden shadow-modal border border-gray-100"
+        >
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
                     <div className="flex items-center gap-2.5">
@@ -412,8 +415,6 @@ export default function LocationModal({
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+        </ModalFrame>
     )
 }
-

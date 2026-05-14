@@ -1017,7 +1017,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             <>
                                 <div className="fixed inset-0 z-[9998]" onClick={() => setShowMetricsPicker(false)} />
                                 <div
-                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
+                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
                                     style={{
                                         top: `${metricsDropdownPosition.top}px`,
                                         left: `${metricsDropdownPosition.left}px`
@@ -1112,7 +1112,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             <>
                                 <div className="fixed inset-0 z-[9998]" onClick={() => setShowLocationPicker(false)} />
                                 <div
-                                    className="fixed bg-white border border-gray-200 rounded-lg shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-2 min-w-[200px] max-h-64 overflow-y-auto"
+                                    className="fixed bg-white border border-gray-200 rounded-lg shadow-modal z-[9999] p-2 min-w-[200px] max-h-64 overflow-y-auto"
                                     style={{
                                         top: `${locationDropdownPosition.top}px`,
                                         left: `${locationDropdownPosition.left}px`
@@ -1202,7 +1202,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             <>
                                 <div className="fixed inset-0 z-[9998]" onClick={() => setShowTagPicker(false)} />
                                 <div
-                                    className="fixed bg-white border border-gray-200 rounded-lg shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-2 min-w-[200px] max-h-64 overflow-y-auto"
+                                    className="fixed bg-white border border-gray-200 rounded-lg shadow-modal z-[9999] p-2 min-w-[200px] max-h-64 overflow-y-auto"
                                     style={{ top: `${tagDropdownPosition.top}px`, left: `${tagDropdownPosition.left}px` }}
                                     onClick={(e) => e.stopPropagation()}
                                 >
@@ -1287,7 +1287,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             <>
                                 <div className="fixed inset-0 z-[9998]" onClick={() => setShowBeneficiaryPicker(false)} />
                                 <div
-                                    className="fixed bg-white border border-gray-200 rounded-lg shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-2 min-w-[200px] max-h-64 overflow-y-auto"
+                                    className="fixed bg-white border border-gray-200 rounded-lg shadow-modal z-[9999] p-2 min-w-[200px] max-h-64 overflow-y-auto"
                                     style={{
                                         top: `${beneficiaryDropdownPosition.top}px`,
                                         left: `${beneficiaryDropdownPosition.left}px`

@@ -872,7 +872,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
                 {/* Step Wizard - Only show if no report generated OR dashboard is hidden */}
                 {(!reportText || !reportDashboardData || !showDashboard) && (
-                    <div className="bg-white/70 backdrop-blur-2xl rounded-3xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.15)] border border-white/60 overflow-hidden">
+                    <div className="bg-white/70 backdrop-blur-2xl rounded-3xl shadow-modal-soft border border-white/60 overflow-hidden">
                         {/* Header */}
                         <div className="flex items-center justify-between px-5 py-3 border-b border-primary-200/40 bg-gradient-to-r from-primary-100/50 to-primary-50/30 backdrop-blur-xl">
                             <div className="flex items-center space-x-2.5 flex-1">

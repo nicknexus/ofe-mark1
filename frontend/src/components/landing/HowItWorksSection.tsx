@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { LineChart, Sparkles, ArrowRight, Check, Image, FileText, Camera } from "lucide-react";
-import { Confetti } from "phosphor-react";
+import { LineChart, Sparkles, ArrowRight, Check, Image, FileText, Camera, PartyPopper } from "lucide-react";
 
 const steps = [
   {
@@ -138,7 +137,7 @@ const PhoneVisual = ({ step, isActive }: { step: typeof steps[0]; isActive: bool
                       <p className="text-xs text-accent font-medium">Impact Claim</p>
                       <p className="text-sm text-foreground flex items-center gap-1">
                       A new well installed for a village in Kenya! 
-                        <Confetti className="w-4 h-4 text-accent inline" weight="fill" />
+                        <PartyPopper className="w-4 h-4 text-accent inline" />
                       </p>
                     </div>
                   </div>
@@ -178,7 +177,7 @@ const PhoneVisual = ({ step, isActive }: { step: typeof steps[0]; isActive: bool
       {isActive && step.visual === "track" && (
         <div className="absolute -top-4 -right-8 glass-card p-3 rounded-xl shadow-glass-lg animate-float">
           <div className="flex items-center gap-2">
-            <Confetti className="w-5 h-5 text-accent" weight="fill" />
+            <PartyPopper className="w-5 h-5 text-accent" />
             <span className="text-xs font-medium text-foreground">Impact received!</span>
           </div>
         </div>
@@ -292,4 +291,3 @@ const HowItWorksSection = () => {
 };
 
 export default HowItWorksSection;
-

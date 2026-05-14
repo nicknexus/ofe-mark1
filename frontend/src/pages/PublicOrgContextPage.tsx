@@ -246,7 +246,7 @@ export default function PublicOrgContextPage() {
                         if (!hasAnyContent) {
                             return (
                                 <div className="max-w-7xl mx-auto px-4 sm:px-6">
-                                    <div className="rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-12 text-center">
+                                    <div className="rounded-3xl bg-white border border-gray-200/80 shadow-public p-12 text-center">
                                         <div
                                             className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
                                             style={PUBLIC_SECTION_CHIP_STYLE}
@@ -338,7 +338,7 @@ export default function PublicOrgContextPage() {
 
                     {/* Footer CTA */}
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-16">
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)]">
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 rounded-3xl bg-white border border-gray-200/80 shadow-public">
                             <div>
                                 <h3 className="text-base font-semibold text-gray-900">See the impact in numbers</h3>
                                 <p className="text-sm text-gray-500">Metrics, stories, and evidence from the field.</p>
@@ -395,7 +395,7 @@ function TextSectionCard({
 }) {
     const Icon = section.icon
     return (
-        <article className="relative rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
+        <article className="relative rounded-3xl bg-white border border-gray-200/80 shadow-public overflow-hidden">
             <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: brandColor }} />
             <div className="p-6 md:p-10 pl-8 md:pl-12">
                 <div className="flex items-center gap-3 mb-5">
@@ -427,7 +427,7 @@ function StatsSectionCards({
     onOpen: (card: PublicStatCard) => void
 }) {
     return (
-        <article className="relative rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
+        <article className="relative rounded-3xl bg-white border border-gray-200/80 shadow-public overflow-hidden">
             <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: brandColor }} />
             <div className="p-6 md:p-10 pl-8 md:pl-12">
                 <div className="flex items-center gap-3 mb-6">
@@ -560,7 +560,7 @@ function TheoryOfChangeSection({
     const hasDescription = !!description
 
     return (
-        <article className="relative rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
+        <article className="relative rounded-3xl bg-white border border-gray-200/80 shadow-public overflow-hidden">
             <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: brandColor }} />
             <div className="p-6 md:p-10 pl-8 md:pl-12">
                 <div className="flex items-center gap-3 mb-6">
@@ -687,7 +687,7 @@ function StrategiesSection({
     brandColor: string
 }) {
     return (
-        <article className="relative rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
+        <article className="relative rounded-3xl bg-white border border-gray-200/80 shadow-public overflow-hidden">
             <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: brandColor }} />
             <div className="p-6 md:p-10 pl-8 md:pl-12">
                 <div className="flex items-center gap-3 mb-6">

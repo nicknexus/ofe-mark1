@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { AuthService } from '../../services/auth'
+import MarketingPageShell, { MarketingLogoHeader } from '../MarketingPageShell'
 import toast from 'react-hot-toast'
 
 interface PWAAuthPageProps {
@@ -65,31 +66,28 @@ export default function PWAAuthPage({ onAuthSuccess }: PWAAuthPageProps) {
     }
 
     return (
-        <div
-            className="min-h-screen flex flex-col bg-[#F9FAFB]"
-            style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+        <MarketingPageShell
+            contentClassName="max-w-sm w-full"
+            centerClassName="flex items-center justify-center px-6 py-8 min-h-screen"
         >
-            <div className="flex-1 flex flex-col justify-center px-6 py-8">
                 {/* App Logo */}
                 <div className="text-center mb-8">
-                    <div className="w-16 h-16 rounded-2xl overflow-hidden mx-auto mb-4 shadow-lg">
-                        <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
-                    </div>
-                    <h1 className="text-2xl font-bold text-gray-900">Nexus Impacts</h1>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <MarketingLogoHeader />
+                    <h1 className="text-2xl font-semibold text-foreground">Nexus Impacts AI</h1>
+                    <p className="text-sm text-muted-foreground mt-1">
                         {isSignUp ? 'Create your account' : 'Sign in to continue'}
                     </p>
                 </div>
 
                 {/* Toggle */}
-                <div className="grid grid-cols-2 gap-1 p-1 bg-gray-100 rounded-xl mb-6 max-w-sm mx-auto w-full">
+                <div className="grid grid-cols-2 gap-1 p-1 bg-white/40 rounded-xl mb-6 w-full border border-white/60">
                     <button
                         type="button"
                         onClick={() => setIsSignUp(false)}
                         className={`py-2.5 text-sm font-medium rounded-lg transition-all ${
                             !isSignUp
-                                ? 'bg-white text-gray-900 shadow-sm'
-                                : 'text-gray-500'
+                                ? 'bg-primary-500 text-gray-800 shadow-sm'
+                                : 'text-gray-600 hover:text-foreground'
                         }`}
                     >
                         Sign In
@@ -99,8 +97,8 @@ export default function PWAAuthPage({ onAuthSuccess }: PWAAuthPageProps) {
                         onClick={() => setIsSignUp(true)}
                         className={`py-2.5 text-sm font-medium rounded-lg transition-all ${
                             isSignUp
-                                ? 'bg-white text-gray-900 shadow-sm'
-                                : 'text-gray-500'
+                                ? 'bg-primary-500 text-gray-800 shadow-sm'
+                                : 'text-gray-600 hover:text-foreground'
                         }`}
                     >
                         Sign Up
@@ -108,16 +106,16 @@ export default function PWAAuthPage({ onAuthSuccess }: PWAAuthPageProps) {
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="space-y-4 max-w-sm mx-auto w-full">
+                <form onSubmit={handleSubmit} className="glass-card p-6 space-y-4 w-full">
                     {isSignUp && (
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                            <label className="block text-sm font-medium text-foreground mb-1">Full Name</label>
                             <input
                                 type="text"
                                 name="name"
                                 value={formData.name}
                                 onChange={handleInputChange}
-                                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 outline-none"
+                                className="w-full px-4 py-3 bg-white/80 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 outline-none"
                                 placeholder="Your full name"
                                 required
                                 autoComplete="name"
@@ -126,13 +124,13 @@ export default function PWAAuthPage({ onAuthSuccess }: PWAAuthPageProps) {
                     )}
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <label className="block text-sm font-medium text-foreground mb-1">Email</label>
                         <input
                             type="email"
                             name="email"
                             value={formData.email}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 outline-none"
+                            className="w-full px-4 py-3 bg-white/80 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 outline-none"
                             placeholder="you@example.com"
                             required
                             autoComplete="email"
@@ -140,13 +138,13 @@ export default function PWAAuthPage({ onAuthSuccess }: PWAAuthPageProps) {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <label className="block text-sm font-medium text-foreground mb-1">Password</label>
                         <input
                             type="password"
                             name="password"
                             value={formData.password}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 outline-none"
+                            className="w-full px-4 py-3 bg-white/80 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 outline-none"
                             placeholder="••••••••"
                             required
                             autoComplete={isSignUp ? 'new-password' : 'current-password'}
@@ -156,26 +154,26 @@ export default function PWAAuthPage({ onAuthSuccess }: PWAAuthPageProps) {
                     {isSignUp && (
                         <>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+                                <label className="block text-sm font-medium text-foreground mb-1">Confirm Password</label>
                                 <input
                                     type="password"
                                     name="confirmPassword"
                                     value={formData.confirmPassword}
                                     onChange={handleInputChange}
-                                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 outline-none"
+                                    className="w-full px-4 py-3 bg-white/80 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 outline-none"
                                     placeholder="••••••••"
                                     required
                                     autoComplete="new-password"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Organization Name</label>
+                                <label className="block text-sm font-medium text-foreground mb-1">Organization Name</label>
                                 <input
                                     type="text"
                                     name="organization"
                                     value={formData.organization}
                                     onChange={handleInputChange}
-                                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 outline-none"
+                                    className="w-full px-4 py-3 bg-white/80 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 outline-none"
                                     placeholder="Your organization"
                                     required
                                     autoComplete="organization"
@@ -193,7 +191,7 @@ export default function PWAAuthPage({ onAuthSuccess }: PWAAuthPageProps) {
                     </button>
                 </form>
 
-                <p className="text-center text-sm text-gray-500 mt-4">
+                <p className="text-center text-sm text-muted-foreground mt-4">
                     {isSignUp ? (
                         <>
                             Already have an account?{' '}
@@ -210,7 +208,6 @@ export default function PWAAuthPage({ onAuthSuccess }: PWAAuthPageProps) {
                         </>
                     )}
                 </p>
-            </div>
-        </div>
+        </MarketingPageShell>
     )
 }

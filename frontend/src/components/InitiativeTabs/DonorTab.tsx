@@ -4,6 +4,7 @@ import { apiService } from '../../services/api'
 import { Donor, InitiativeDashboard } from '../../types'
 import AddDonorModal from '../AddDonorModal'
 import DonorCreditingModal from '../DonorCreditingModal'
+import ConfirmDialog from '../ConfirmDialog'
 import toast from 'react-hot-toast'
 
 interface DonorTabProps {
@@ -20,6 +21,7 @@ export default function DonorTab({ initiativeId, dashboard, onRefresh }: DonorTa
     const [isAddModalOpen, setIsAddModalOpen] = useState(false)
     const [creditingDonor, setCreditingDonor] = useState<Donor | null>(null)
     const [isCreditingModalOpen, setIsCreditingModalOpen] = useState(false)
+    const [deleteDonor, setDeleteDonor] = useState<Donor | null>(null)
 
     useEffect(() => {
         loadDonors()
@@ -41,10 +43,10 @@ export default function DonorTab({ initiativeId, dashboard, onRefresh }: DonorTa
     }
 
     const handleDeleteDonor = async (donorId: string) => {
-        if (!confirm('Are you sure you want to delete this donor? All credits associated with this donor will also be deleted.')) return
         try {
             await apiService.deleteDonor(donorId)
             toast.success('Donor deleted successfully')
+            setDeleteDonor(null)
             loadDonors()
             onRefresh?.()
         } catch (error) {
@@ -205,7 +207,7 @@ export default function DonorTab({ initiativeId, dashboard, onRefresh }: DonorTa
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation()
-                                            handleDeleteDonor(donor.id!)
+                                            setDeleteDonor(donor)
                                         }}
                                         className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
                                         title="Delete"
@@ -247,7 +249,17 @@ export default function DonorTab({ initiativeId, dashboard, onRefresh }: DonorTa
                     dashboard={dashboard}
                 />
             )}
+
+            {deleteDonor && (
+                <ConfirmDialog
+                    title="Delete Donor"
+                    message={`Delete ${deleteDonor.name}? All credits associated with this donor will also be deleted.`}
+                    confirmLabel="Delete Donor"
+                    tone="danger"
+                    onConfirm={() => handleDeleteDonor(deleteDonor.id!)}
+                    onCancel={() => setDeleteDonor(null)}
+                />
+            )}
         </div>
     )
 }
-

@@ -3,6 +3,7 @@ import { X, Calendar, Hash, MapPin, FileText, Users, Plus, ChevronLeft, ChevronR
 import { CreateKPIUpdateForm, BeneficiaryGroup, Location, KPI } from '../types'
 import { apiService } from '../services/api'
 import LocationModal from './LocationModal'
+import ModalFrame from './ModalFrame'
 import DateRangePicker from './DateRangePicker'
 import { getLocalDateString, getCategoryColor } from '../utils'
 import toast from 'react-hot-toast'
@@ -230,8 +231,12 @@ export default function AddKPIUpdateModalWithMetricSelection({
     const kpiTitle = selectedKPI?.title || ''
 
     return (
-        <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-0 md:p-4 z-[60] animate-fade-in">
-            <div className="bg-white md:bg-white/70 md:backdrop-blur-2xl md:rounded-3xl w-full h-full md:max-w-4xl md:w-full md:max-h-[90vh] md:h-auto overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] md:border md:border-white/60 transform transition-all duration-200 ease-out animate-slide-up-fast flex flex-col">
+        <ModalFrame
+            zIndexClass="z-[60]"
+            backdropClassName="bg-black/10 backdrop-blur-md"
+            paddingClassName="p-0 md:p-4"
+            panelClassName="bg-white md:bg-white/70 md:backdrop-blur-2xl md:rounded-3xl w-full h-full md:max-w-4xl md:w-full md:max-h-[90vh] md:h-auto overflow-hidden shadow-modal md:border md:border-white/60 transform transition-all duration-200 ease-out flex flex-col"
+        >
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 md:p-6 border-b border-primary-200/40 bg-gradient-to-r from-primary-100/50 to-primary-50/30 backdrop-blur-xl">
                     <div className="flex items-center space-x-3 flex-1 min-w-0">
@@ -684,8 +689,7 @@ export default function AddKPIUpdateModalWithMetricSelection({
                         initiativeId={initiativeId}
                     />
                 )}
-            </div>
-        </div>
+        </ModalFrame>
     )
 }
 

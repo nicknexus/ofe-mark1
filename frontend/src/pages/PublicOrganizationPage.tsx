@@ -24,7 +24,7 @@ import PublicLoader from '../components/public/PublicLoader'
 import PublicTagFilter from '../components/public/PublicTagFilter'
 import PublicTagChip from '../components/public/PublicTagChip'
 import DateRangePicker from '../components/DateRangePicker'
-import { PublicPageBackground } from '../components/public/publicStyles'
+import { PublicPageBackground, PUBLIC_HEADER_CLASS, PUBLIC_PANEL_STATIC_CLASS } from '../components/public/publicStyles'
 import { formatDate, compareClaimsByEffectiveDateDesc } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import {
@@ -763,7 +763,7 @@ export default function PublicOrganizationPage() {
     if (error || !organization) {
         return (
             <div className="h-screen bg-background flex items-center justify-center px-6">
-                <div className="bg-white border border-gray-100 shadow-sm p-12 rounded-3xl text-center max-w-md">
+                <div className={`${PUBLIC_PANEL_STATIC_CLASS} p-12 rounded-3xl text-center max-w-md`}>
                     <Building2 className="w-16 h-16 text-muted-foreground/50 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-foreground mb-3">Organization Not Found</h1>
                     <p className="text-muted-foreground mb-8">{error}</p>
@@ -780,7 +780,7 @@ export default function PublicOrganizationPage() {
             <PublicPageBackground brandColor={brandColor} />
 
             {/* Header with Filters */}
-            <header className="flex-shrink-0 bg-white border-b border-gray-100 shadow-sm z-50 relative">
+            <header className={PUBLIC_HEADER_CLASS}>
                 <div className="px-2 sm:px-3 md:px-4 py-2">
                     <div className="flex items-center gap-2 sm:gap-3">
                         {/* Left: Nav + Org */}
@@ -903,7 +903,7 @@ export default function PublicOrganizationPage() {
                 <>
                     <div className="fixed inset-0 z-[9998]" onClick={() => setShowInitiativeDropdown(false)} />
                     <div
-                        className="fixed w-64 bg-white rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] border border-gray-100 z-[9999] py-1 max-h-64 overflow-y-auto"
+                        className="fixed w-64 bg-white rounded-xl shadow-modal border border-gray-100 z-[9999] py-1 max-h-64 overflow-y-auto"
                         style={(() => {
                             const rect = initiativeBtnRef.current?.getBoundingClientRect()
                             if (!rect) return {}
@@ -937,7 +937,7 @@ export default function PublicOrganizationPage() {
                 <>
                     <div className="fixed inset-0 z-[9998]" onClick={() => setShowLocationDropdown(false)} />
                     <div
-                        className="fixed w-64 bg-white rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] border border-gray-100 z-[9999] py-1 max-h-64 overflow-y-auto"
+                        className="fixed w-64 bg-white rounded-xl shadow-modal border border-gray-100 z-[9999] py-1 max-h-64 overflow-y-auto"
                         style={(() => {
                             const rect = locationBtnRef.current?.getBoundingClientRect()
                             if (!rect) return {}
@@ -1101,7 +1101,7 @@ export default function PublicOrganizationPage() {
                                     <Link
                                         key={init.id}
                                         to={`${orgLinkBase}/${slug}/${init.slug}`}
-                                        className="px-3 py-2 bg-white rounded-xl border border-gray-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.08),0_1px_3px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_10px_-2px_rgba(15,23,42,0.16),0_10px_20px_-6px_rgba(15,23,42,0.18)] hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group flex flex-col justify-center"
+                                        className="px-3 py-2 bg-white rounded-xl border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group flex flex-col justify-center"
                                     >
                                         <h4 className="font-medium text-foreground text-xs line-clamp-2 group-hover:text-accent transition-colors leading-snug">{init.title}</h4>
                                         {init.region && (
@@ -1542,7 +1542,7 @@ export default function PublicOrganizationPage() {
                                                     <Link
                                                         key={card.id || idx}
                                                         to={`${orgLinkBase}/${slug}/context`}
-                                                        className="group relative rounded-2xl bg-white border border-gray-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.08),0_1px_3px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_10px_-2px_rgba(15,23,42,0.16),0_10px_20px_-6px_rgba(15,23,42,0.18)] hover:border-gray-300 hover:-translate-y-px transition-all duration-200 p-4 flex flex-col overflow-hidden md:min-h-0"
+                                                        className="group relative rounded-2xl bg-white border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 p-4 flex flex-col overflow-hidden md:min-h-0"
                                                     >
                                                         <div
                                                             className="absolute left-0 top-0 bottom-0 w-1"
@@ -1644,7 +1644,7 @@ export default function PublicOrganizationPage() {
                                                 <Link
                                                     key={init.id}
                                                     to={`${orgLinkBase}/${slug}/${init.slug}`}
-                                                    className="block p-4 bg-white rounded-xl border border-gray-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.08),0_1px_3px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_10px_-2px_rgba(15,23,42,0.16),0_10px_20px_-6px_rgba(15,23,42,0.18)] hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group"
+                                                    className="block p-4 bg-white rounded-xl border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group"
                                                 >
                                                     <div className="flex items-start gap-3">
                                                         <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-gray-50 border border-gray-100">
@@ -1834,7 +1834,7 @@ export default function PublicOrganizationPage() {
                                     <Link
                                         key={init.id}
                                         to={`${orgLinkBase}/${slug}/${init.slug}`}
-                                        className="p-3 bg-white rounded-xl border border-gray-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.08),0_1px_3px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_10px_-2px_rgba(15,23,42,0.16),0_10px_20px_-6px_rgba(15,23,42,0.18)] hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group flex flex-col justify-center min-h-[64px]"
+                                        className="p-3 bg-white rounded-xl border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group flex flex-col justify-center min-h-[64px]"
                                     >
                                         <h4 className="font-medium text-foreground text-xs line-clamp-2 group-hover:text-accent transition-colors">{init.title}</h4>
                                         {init.region && (
@@ -1884,7 +1884,7 @@ export default function PublicOrganizationPage() {
                                             <Link
                                                 key={metric.id}
                                                 to={`${orgLinkBase}/${slug}/${metric.initiative_slug}/metric/${generateMetricSlug(metric.title)}`}
-                                                className="group relative rounded-xl bg-white border border-gray-200/80 overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,0.08),0_1px_3px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_10px_-2px_rgba(15,23,42,0.16),0_10px_20px_-6px_rgba(15,23,42,0.18)] hover:border-gray-300 hover:-translate-y-px transition-all duration-200 h-[88px] md:h-[15.5vh] flex flex-col"
+                                                className="group relative rounded-xl bg-white border border-gray-200/80 overflow-hidden shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 h-[88px] md:h-[15.5vh] flex flex-col"
                                             >
                                                 {metric.unit_of_measurement && metric.metric_type !== 'percentage' && (
                                                     <span className="absolute top-1 right-1.5 md:top-1.5 md:right-2 text-[9px] md:text-[10px] font-medium text-gray-400 leading-tight truncate max-w-[60%] text-right">
@@ -1952,7 +1952,7 @@ export default function PublicOrganizationPage() {
                                             <Link
                                                 key={`${claim.id}-${idx}`}
                                                 to={`${orgLinkBase}/${slug}/${claim.initiativeSlug}/claim/${claim.id}?from=org`}
-                                                className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.08),0_1px_3px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_10px_-2px_rgba(15,23,42,0.16),0_10px_20px_-6px_rgba(15,23,42,0.18)] hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group"
+                                                className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group"
                                             >
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div className="flex-1 min-w-0">
@@ -2052,7 +2052,7 @@ export default function PublicOrganizationPage() {
                                             <Link
                                                 key={ev.id}
                                                 to={`${orgLinkBase}/${slug}/${ev.initiative_slug}?tab=evidence`}
-                                                className="rounded-xl overflow-hidden bg-white border border-gray-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.08),0_1px_3px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_10px_-2px_rgba(15,23,42,0.16),0_10px_20px_-6px_rgba(15,23,42,0.18)] hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group h-[120px] md:h-full"
+                                                className="rounded-xl overflow-hidden bg-white border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group h-[120px] md:h-full"
                                             >
                                                 {isImage ? (
                                                     <img src={ev.file_url} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />

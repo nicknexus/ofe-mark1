@@ -7,6 +7,7 @@ import { BeneficiaryGroup, KPIUpdate, Evidence, Story, Location } from '../types
 import { apiService } from '../services/api'
 import { getEvidenceTypeInfo, formatDate } from '../utils'
 import EvidencePreviewModal from './EvidencePreviewModal'
+import ModalFrame from './ModalFrame'
 
 delete (L.Icon.Default.prototype as any)._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -324,8 +325,11 @@ export default function BeneficiaryGroupDetailsModal({
 
     return (
         <>
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[70] animate-fade-in">
-                <div className="bubble-card max-w-[95vw] w-full h-[90vh] max-h-[90vh] overflow-hidden flex flex-col animate-slide-up">
+            <ModalFrame
+                zIndexClass="z-[70]"
+                backdropClassName="bg-black/40 backdrop-blur-sm"
+                panelClassName="bubble-card max-w-[95vw] w-full h-[90vh] max-h-[90vh] overflow-hidden flex flex-col"
+            >
                     {/* Header */}
                     <div className="flex items-start justify-between p-6 border-b border-gray-100 flex-shrink-0">
                         <div className="flex items-start space-x-4 flex-1">
@@ -655,8 +659,7 @@ export default function BeneficiaryGroupDetailsModal({
                             </div>
                         )}
                     </div>
-                </div>
-            </div>
+            </ModalFrame>
 
             {/* Evidence Preview Modal */}
             {selectedEvidence && (

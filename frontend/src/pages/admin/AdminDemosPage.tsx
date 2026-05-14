@@ -17,6 +17,7 @@ import {
     Globe2,
 } from 'lucide-react'
 import { AdminApi, DemoOrg } from '../../services/adminApi'
+import ConfirmDialog from '../../components/ConfirmDialog'
 
 const ACTIVE_ORG_STORAGE_KEY = 'nexus-active-org-id'
 
@@ -32,6 +33,7 @@ export default function AdminDemosPage() {
     const [generationStage, setGenerationStage] = useState('')
     const [showCreate, setShowCreate] = useState(false)
     const [search, setSearch] = useState('')
+    const [deleteConfirm, setDeleteConfirm] = useState<DemoOrg | null>(null)
 
     const q = search.trim().toLowerCase()
     const filteredDemos = q
@@ -132,7 +134,7 @@ export default function AdminDemosPage() {
     }
 
     const handleDelete = async (demo: DemoOrg) => {
-        if (!window.confirm(`Delete demo "${demo.name}"? This cannot be undone.`)) return
+        setDeleteConfirm(null)
         try {
             await AdminApi.deleteDemo(demo.id)
             toast.success(`Deleted "${demo.name}"`)
@@ -445,7 +447,7 @@ export default function AdminDemosPage() {
                                         <Copy className="w-4 h-4" />
                                     </button>
                                     <button
-                                        onClick={() => handleDelete(demo)}
+                                        onClick={() => setDeleteConfirm(demo)}
                                         title="Delete"
                                         className="p-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-full"
                                     >
@@ -457,6 +459,16 @@ export default function AdminDemosPage() {
                     </div>
                 )}
             </div>
+            {deleteConfirm && (
+                <ConfirmDialog
+                    title="Delete demo"
+                    message={`Delete demo "${deleteConfirm.name}"? This cannot be undone.`}
+                    confirmLabel="Delete demo"
+                    tone="danger"
+                    onConfirm={() => handleDelete(deleteConfirm)}
+                    onCancel={() => setDeleteConfirm(null)}
+                />
+            )}
         </div>
     )
 }

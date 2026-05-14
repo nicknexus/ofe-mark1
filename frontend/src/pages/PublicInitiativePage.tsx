@@ -509,7 +509,7 @@ export default function PublicInitiativePage() {
     if (error || !initiative || !dashboard) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center px-6">
-                <div className="rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-12 text-center max-w-md">
+                <div className="rounded-3xl bg-white border border-gray-200/80 shadow-public p-12 text-center max-w-md">
                     <Globe className="w-16 h-16 text-muted-foreground/50 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-foreground mb-3">Initiative Not Found</h1>
                     <p className="text-muted-foreground mb-8">{error || 'This initiative does not exist.'}</p>
@@ -650,7 +650,7 @@ export default function PublicInitiativePage() {
                 <>
                     <div className="fixed inset-0 z-[9998]" onClick={() => setShowInitiativeDropdown(false)} />
                     <div
-                        className="fixed w-64 bg-white rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] border border-gray-100 z-[9999] py-1 max-h-64 overflow-y-auto"
+                        className="fixed w-64 bg-white rounded-xl shadow-modal border border-gray-100 z-[9999] py-1 max-h-64 overflow-y-auto"
                         style={(() => {
                             const rect = initiativeBtnRef.current?.getBoundingClientRect()
                             if (!rect) return {}
@@ -677,7 +677,7 @@ export default function PublicInitiativePage() {
                 <>
                     <div className="fixed inset-0 z-[9998]" onClick={() => setShowLocationDropdown(false)} />
                     <div
-                        className="fixed w-64 bg-white rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] border border-gray-100 z-[9999] py-1 max-h-64 overflow-y-auto"
+                        className="fixed w-64 bg-white rounded-xl shadow-modal border border-gray-100 z-[9999] py-1 max-h-64 overflow-y-auto"
                         style={(() => {
                             const rect = locationBtnRef.current?.getBoundingClientRect()
                             if (!rect) return {}
@@ -704,10 +704,10 @@ export default function PublicInitiativePage() {
                                                 : [...prev, loc.id]
                                         )
                                     }}
-                                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${isSelected ? 'bg-blue-50 font-medium' : 'hover:bg-gray-50'
+                                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${isSelected ? 'bg-primary-50 font-medium' : 'hover:bg-gray-50'
                                     }`}
                                 >
-                                    <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-blue-600 border-2 border-blue-600' : 'border-2 border-gray-300 bg-white'
+                                    <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-primary-600 border-2 border-primary-600' : 'border-2 border-gray-300 bg-white'
                                     }`}>
                                         {isSelected && (
                                             <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -716,7 +716,7 @@ export default function PublicInitiativePage() {
                                         )}
                                     </div>
                                     <div className="min-w-0">
-                                        <span className={`truncate block ${isSelected ? 'text-blue-700' : 'text-gray-900'}`}>{loc.name}</span>
+                                        <span className={`truncate block ${isSelected ? 'text-primary-800' : 'text-gray-900'}`}>{loc.name}</span>
                                         {loc.description && <span className="text-[10px] text-gray-500">{loc.description}</span>}
                                     </div>
                                 </button>
@@ -1250,7 +1250,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
     return (
         <div className="space-y-5">
             {/* Hero Section - Compact */}
-            <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-6">
+            <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-6">
                 <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                     <div className="flex-1">
                         <h1 className="text-2xl font-semibold text-foreground mb-2">{initiative.title}</h1>
@@ -1298,7 +1298,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                             <Link
                                 key={kpi.id}
                                 to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}${dateQS}`}
-                                className="rounded-xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 p-3 transition-all group"
+                                className="rounded-xl bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 p-3 transition-all group"
                             >
                                 <div className="flex items-center justify-between mb-1">
                                     <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: metricColor }} />
@@ -1315,7 +1315,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
             )}
 
             {/* Main Chart */}
-            <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-5">
+            <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-5">
                 <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={PUBLIC_SECTION_CHIP_STYLE}>
@@ -1629,7 +1629,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
             {/* Bottom Row: Stats + Category Breakdown + Locations */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 {/* Stats */}
-                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-5">
+                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-5">
                     <div className="flex items-center gap-2 mb-4">
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={PUBLIC_SECTION_CHIP_STYLE}>
                             <BarChart3 className="w-4 h-4" style={brandIconStyle(brandColor)} />
@@ -1657,7 +1657,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                 </div>
 
                 {/* Category Breakdown */}
-                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-5">
+                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-5">
                     <div className="flex items-center gap-2 mb-4">
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-purple-100">
                             <Layers className="w-4 h-4 text-purple-600" />
@@ -1703,7 +1703,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                 </div>
 
                 {/* Locations Preview */}
-                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-5">
+                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-5">
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-amber-100">
@@ -1781,7 +1781,7 @@ function MetricsTab({ dashboard, orgSlug, initiativeSlug, dateQS = '', tagsById,
 
     if (kpis.length === 0) {
         return (
-            <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-12 text-center">
+            <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-12 text-center">
                 <BarChart3 className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
                 <p className="text-muted-foreground">No metrics available yet.</p>
             </div>
@@ -1792,7 +1792,7 @@ function MetricsTab({ dashboard, orgSlug, initiativeSlug, dateQS = '', tagsById,
         switch (category) {
             case 'impact': return { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200', accent: 'text-purple-600' }
             case 'output': return { bg: 'bg-accent/20', text: 'text-accent', border: 'border-accent/30', accent: 'text-accent' }
-            case 'input': return { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200', accent: 'text-blue-600' }
+            case 'input': return { bg: 'bg-evidence-50', text: 'text-evidence-700', border: 'border-evidence-200', accent: 'text-evidence-700' }
             default: return { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200', accent: 'text-gray-600' }
         }
     }
@@ -1807,7 +1807,7 @@ function MetricsTab({ dashboard, orgSlug, initiativeSlug, dateQS = '', tagsById,
                     <Link
                         key={kpi.id}
                         to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}${dateQS}`}
-                        className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all overflow-hidden group cursor-pointer"
+                        className="rounded-2xl bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 transition-all overflow-hidden group cursor-pointer"
                     >
                         {/* Header */}
                         <div className={`px-5 py-3 ${config.bg} border-b ${config.border}`}>
@@ -1905,7 +1905,7 @@ function StoriesTab({ stories, orgSlug, initiativeSlug, dateQS = '', tagsById, o
                 <Link
                     key={story.id}
                     to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/story/${story.id}${dateQS}`}
-                    className="rounded-2xl overflow-hidden group bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all"
+                    className="rounded-2xl overflow-hidden group bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 transition-all"
                 >
                     <div className="h-44 bg-gradient-to-br from-accent/10 to-accent/5 overflow-hidden">
                         {story.media_url && /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(story.media_url) ? (
@@ -2042,7 +2042,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { loc
     const categoryConfig: Record<string, { bg: string; text: string }> = {
         impact: { bg: 'bg-purple-100', text: 'text-purple-700' },
         output: { bg: 'bg-green-100', text: 'text-green-700' },
-        input: { bg: 'bg-blue-100', text: 'text-blue-700' }
+        input: { bg: 'bg-evidence-100', text: 'text-evidence-700' }
     }
 
     // If a location is selected, show the detail view instead of the map entirely
@@ -2211,7 +2211,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { loc
     ] as [number, number]
 
     return (
-        <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-5">
+        <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-5">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 <div className="lg:col-span-2 h-[450px] rounded-xl overflow-hidden border border-gray-200">
                     <MapContainer center={mapCenter} zoom={locations.length === 1 ? 8 : 3} className="w-full h-full" zoomControl={true} scrollWheelZoom={true}>
@@ -2282,9 +2282,9 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
             color: 'text-pink-500'
         },
         documentation: {
-            bg: 'bg-blue-100 text-blue-700',
+            bg: 'bg-evidence-100 text-evidence-700',
             label: 'Documentation',
-            color: 'text-blue-500'
+            color: 'text-evidence-500'
         },
         testimony: {
             bg: 'bg-orange-100 text-orange-800',
@@ -2553,7 +2553,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                         <button
                             key={item.id}
                             onClick={() => openGallery(filteredIndex)}
-                            className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all overflow-hidden group text-left"
+                            className="rounded-2xl bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 transition-all overflow-hidden group text-left"
                         >
                             {previewUrl ? (
                                 <div className="relative aspect-video bg-gray-100 overflow-hidden">
@@ -2621,7 +2621,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                                         {item.impact_claims.slice(0, 2).map((claim) => {
                                             const matchedKpi = item.kpis?.find(k => k.id === claim.kpi_id)
                                             const cat = matchedKpi?.category || 'output'
-                                            const catColor = cat === 'impact' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' : cat === 'output' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                            const catColor = cat === 'impact' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' : cat === 'output' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-evidence-100 text-evidence-700 hover:bg-evidence-200'
                                             const label = claim.kpis?.title ? `${claim.value} ${claim.kpis.unit_of_measurement || ''}` : `${claim.value}`
                                             return (
                                                 <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/claim/${claim.id}${dateQS}`} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${catColor} transition-colors`} onClick={e => e.stopPropagation()}>
@@ -2636,7 +2636,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                                 ) : item.kpis && item.kpis.length > 0 ? (
                                     <div className="mt-2 flex flex-wrap gap-1" onClick={e => e.stopPropagation()}>
                                         {item.kpis.slice(0, 2).map((kpi) => {
-                                            const catColor = kpi.category === 'impact' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' : kpi.category === 'output' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                            const catColor = kpi.category === 'impact' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' : kpi.category === 'output' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-evidence-100 text-evidence-700 hover:bg-evidence-200'
                                             return (
                                                 <Link key={kpi.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}${dateQS}`} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${catColor} transition-colors`} onClick={e => e.stopPropagation()}>
                                                     {kpi.title}
@@ -2712,7 +2712,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
                             {/* File preview */}
                             <div className="lg:col-span-2 flex flex-col">
-                                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden flex-1 flex flex-col">
+                                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public overflow-hidden flex-1 flex flex-col">
                                     <div className="relative bg-gray-900 flex-1 min-h-[250px] sm:min-h-[400px] max-h-[50vh] sm:max-h-[60vh] flex items-center justify-center">
                                         {galleryFile ? (
                                             isImageFile(galleryFile.file_url) ? (
@@ -2819,7 +2819,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                             {/* Info sidebar - glass card style */}
                             <div className="lg:col-span-1 flex flex-col gap-3 sm:gap-4 min-h-0 overflow-y-auto">
                                 {/* Evidence Info Card */}
-                                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5 flex-shrink-0">
+                                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-4 sm:p-5 flex-shrink-0">
                                     <h2 className="font-semibold text-foreground text-base sm:text-lg mb-1">{galleryItem.title}</h2>
                                     {galleryItem.description && (
                                         <p className="text-muted-foreground text-xs sm:text-sm mb-3 line-clamp-4">{galleryItem.description}</p>
@@ -2839,7 +2839,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
 
                                 {/* Impact Claims Card */}
                                 {galleryItem.impact_claims && galleryItem.impact_claims.length > 0 ? (
-                                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5 flex-shrink-0">
+                                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-4 sm:p-5 flex-shrink-0">
                                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Supporting Impact Claims</h3>
                                         <div className="space-y-2">
                                             {galleryItem.impact_claims.map((claim: any) => {
@@ -2850,7 +2850,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                                                         ? formatDate(claim.date_represented)
                                                         : ''
                                                 return (
-                                                    <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/claim/${claim.id}${dateQS}`} className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group">
+                                                    <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/claim/${claim.id}${dateQS}`} className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 transition-all group">
                                                         <p className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors">
                                                             {claim.value}{claim.kpis?.metric_type === 'percentage' ? '%' : ` ${claim.kpis?.unit_of_measurement || ''}`}
                                                         </p>
@@ -2862,11 +2862,11 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                                         </div>
                                     </div>
                                 ) : galleryItem.kpis && galleryItem.kpis.length > 0 ? (
-                                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5 flex-shrink-0">
+                                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-4 sm:p-5 flex-shrink-0">
                                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Linked Metrics</h3>
                                         <div className="space-y-2">
                                             {galleryItem.kpis.map((kpi) => (
-                                                <Link key={kpi.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}${dateQS}`} className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group">
+                                                <Link key={kpi.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}${dateQS}`} className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 transition-all group">
                                                     <p className="text-sm font-medium text-foreground group-hover:text-accent transition-colors">{kpi.title}</p>
                                                 </Link>
                                             ))}
@@ -2941,7 +2941,7 @@ function BeneficiariesTab({ beneficiaries, orgSlug, initiativeSlug }: { benefici
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {beneficiaries.map((group) => (
-                <Link key={group.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/beneficiary/${group.id}`} className="group rounded-2xl overflow-hidden bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all active:scale-[0.98]">
+                <Link key={group.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/beneficiary/${group.id}`} className="group rounded-2xl overflow-hidden bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 transition-all active:scale-[0.98]">
                     <div className="p-5 pb-3">
                         <div className="flex items-start gap-4">
                             <div className="w-11 h-11 bg-accent/15 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-accent/25 transition-colors">
@@ -2988,7 +2988,7 @@ function BeneficiariesTab({ beneficiaries, orgSlug, initiativeSlug }: { benefici
 
 function LoadingState() {
     return (
-        <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-16 text-center">
+        <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-16 text-center">
             <div className="flex flex-col items-center">
                 {/* Nexus Logo */}
                 <div className="w-12 h-12 mb-4">
@@ -3007,7 +3007,7 @@ function LoadingState() {
 
 function EmptyState({ icon: Icon, message }: { icon: any; message: string }) {
     return (
-        <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-12 text-center">
+        <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-12 text-center">
             <Icon className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
             <p className="text-muted-foreground">{message}</p>
         </div>

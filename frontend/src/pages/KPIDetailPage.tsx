@@ -36,6 +36,8 @@ import AddEvidenceModal from '../components/AddEvidenceModal'
 import EditDataPointBeneficiariesModal from '../components/EditDataPointBeneficiariesModal'
 import TagChip from '../components/MetricTags/TagChip'
 import { MetricTag } from '../types'
+import { Button } from '../components/ui/button'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 // DataPointsList Component
 interface DataPointsListProps {
@@ -374,38 +376,16 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
 
             {/* Delete Confirmation Dialog */}
             {deleteConfirmEvidence && (
-                <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-50">
-                    <div className="bg-white/90 backdrop-blur-xl rounded-3xl max-w-md w-full p-6 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)] border border-white/60">
-                        <div className="flex items-center space-x-3 mb-4">
-                            <div className="p-2.5 bg-red-100/80 rounded-xl">
-                                <Trash2 className="w-5 h-5 text-red-600" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-semibold text-gray-800">Delete Evidence</h3>
-                                <p className="text-sm text-gray-500">This action cannot be undone</p>
-                            </div>
-                        </div>
-
-                        <p className="text-gray-600 mb-6">
-                            Are you sure you want to delete "<strong className="text-gray-800">{deleteConfirmEvidence.title}</strong>"?
-                        </p>
-
-                        <div className="flex space-x-3">
-                            <button
-                                onClick={() => setDeleteConfirmEvidence(null)}
-                                className="flex-1 px-5 py-3 text-gray-600 bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-xl hover:bg-white/80 font-medium transition-all duration-200"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => handleDeleteEvidence(deleteConfirmEvidence)}
-                                className="flex-1 px-5 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all duration-200 font-semibold shadow-lg shadow-red-500/25"
-                            >
-                                Delete Evidence
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <ConfirmDialog
+                    tone="danger"
+                    title="Delete Evidence"
+                    message={`Are you sure you want to delete "${deleteConfirmEvidence.title}"? This cannot be undone.`}
+                    confirmLabel="Delete Evidence"
+                    onConfirm={() => {
+                        void handleDeleteEvidence(deleteConfirmEvidence)
+                    }}
+                    onCancel={() => setDeleteConfirmEvidence(null)}
+                />
             )}
 
             {/* Evidence Preview Modal */}
@@ -619,9 +599,9 @@ export default function KPIDetailPage() {
         return (
             <div className="text-center py-12">
                 <div className="text-red-600 mb-4">{loadingState.error || 'KPI not found'}</div>
-                <Link to={`/initiatives/${initiativeId}`} className="btn-primary">
-                    Back to Initiative
-                </Link>
+                <Button asChild>
+                    <Link to={`/initiatives/${initiativeId}`}>Back to Initiative</Link>
+                </Button>
             </div>
         )
     }

@@ -1,5 +1,4 @@
 import { Heart } from "lucide-react";
-import { Heart as HeartPhosphor } from "phosphor-react";
 
 const Footer = () => {
   return (
@@ -44,7 +43,7 @@ const Footer = () => {
         
         <div className="border-t border-border/50 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-sm text-muted-foreground flex items-center gap-1">
-            © 2025 Nexus. Made with <HeartPhosphor className="w-4 h-4 text-accent inline" weight="fill" /> for a better world.
+            © 2025 Nexus. Made with <Heart className="w-4 h-4 text-accent fill-current inline" /> for a better world.
           </p>
           <div className="flex gap-6 text-sm">
             <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Privacy</a>
@@ -58,4 +57,3 @@ const Footer = () => {
 };
 
 export default Footer;
-

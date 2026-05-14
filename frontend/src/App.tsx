@@ -419,7 +419,7 @@ function App() {
                         const updatedUser = await AuthService.getCurrentUser()
                         if (updatedUser) setUser(updatedUser)
                     }} />
-                    <Toaster position="top-right" />
+                    <Toaster position="top-center" />
                 </>
             )
         }
@@ -433,7 +433,7 @@ function App() {
                         <Route path="/offer/:slug" element={<OfferCheckoutPage />} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
-                    <Toaster position="top-right" />
+                    <Toaster position="top-center" />
                 </Router>
             )
         }
@@ -466,7 +466,7 @@ function App() {
                         />
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
-                    <Toaster position="top-right" />
+                    <Toaster position="top-center" />
                 </Router>
             )
         }
@@ -577,7 +577,7 @@ function App() {
                                     element={<Navigate to={`/invite/${pendingInvite.inviteToken}`} replace />}
                                 />
                             </Routes>
-                            <Toaster position="top-right" />
+                            <Toaster position="top-center" />
                         </Router>
                     )
                 }
@@ -585,7 +585,7 @@ function App() {
                 return (
                     <>
                         <TrialActivationPage onTrialStarted={handleTrialStarted} />
-                        <Toaster position="top-right" />
+                        <Toaster position="top-center" />
                     </>
                 )
             }
@@ -599,7 +599,7 @@ function App() {
                         reason={subscriptionStatus.reason}
                         remainingDays={subscriptionStatus.remainingTrialDays}
                     />
-                    <Toaster position="top-right" />
+                    <Toaster position="top-center" />
                 </>
             )
         }
@@ -709,7 +709,7 @@ function App() {
                     </StorageProvider>
                     <FloatingUploadPanel />
                 </UploadProvider>
-                <Toaster position="top-right" />
+                <Toaster position="top-center" />
             </Router>
         )
     }
@@ -729,7 +729,7 @@ function App() {
                 {/* Homepage for non-authenticated users */}
                 <Route path="/*" element={<HomePage />} />
             </Routes>
-            <Toaster position="top-right" />
+            <Toaster position="top-center" />
         </Router>
     )
 }

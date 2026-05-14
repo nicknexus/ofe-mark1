@@ -51,7 +51,7 @@ export default function TagsWidget({ compact }: TagsWidgetProps) {
     }
 
     return (
-        <div className={`bg-white rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.12)] ring-1 ring-gray-900/[0.04] overflow-hidden flex flex-col ${compact ? '' : 'min-h-0'}`}>
+        <div className={`bg-white rounded-2xl shadow-surface ring-1 ring-gray-900/[0.04] overflow-hidden flex flex-col ${compact ? '' : 'min-h-0'}`}>
             <div className="px-4 py-3 border-b border-gray-100/70 bg-gradient-to-b from-gray-50/50 to-transparent flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-lg bg-primary-50 ring-1 ring-primary-100/50 flex items-center justify-center">

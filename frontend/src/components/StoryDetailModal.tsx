@@ -3,6 +3,8 @@ import { X, Edit, Trash2, MapPin, Calendar, Users, Image, Video, Mic, FileText, 
 import { Story } from '../types'
 import { formatDate } from '../utils'
 import EvidenceTagsList from './MetricTags/EvidenceTagsList'
+import ConfirmDialog from './ConfirmDialog'
+import ModalFrame from './ModalFrame'
 
 interface StoryDetailModalProps {
     isOpen: boolean
@@ -14,21 +16,22 @@ interface StoryDetailModalProps {
 
 export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDelete }: StoryDetailModalProps) {
     const [imageError, setImageError] = useState(false)
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
     const handleImageError = () => setImageError(true)
 
     const handleDelete = () => {
-        if (story?.id && confirm('Are you sure you want to delete this story?')) {
-            onDelete(story.id)
-            onClose()
-        }
+        if (!story?.id) return
+        onDelete(story.id)
+        setShowDeleteConfirm(false)
+        onClose()
     }
 
     if (!isOpen || !story) return null
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80] animate-fade-in">
-            <div className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] transform transition-all duration-200 ease-out animate-slide-up-fast">
+        <>
+        <ModalFrame panelClassName="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-modal transform transition-all duration-200 ease-out">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50 flex-shrink-0">
                     <h2 className="text-2xl font-semibold text-gray-900">{story.title}</h2>
@@ -204,18 +207,27 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
                         <span>Edit</span>
                     </button>
                     <button
-                        onClick={handleDelete}
+                        onClick={() => setShowDeleteConfirm(true)}
                         className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
                     >
                         <Trash2 className="w-4 h-4" />
                         <span>Delete</span>
                     </button>
                 </div>
-            </div>
-        </div>
+        </ModalFrame>
+        {showDeleteConfirm && (
+            <ConfirmDialog
+                title="Delete story"
+                message={`Delete story "${story.title}"? This cannot be undone.`}
+                confirmLabel="Delete story"
+                tone="danger"
+                onConfirm={handleDelete}
+                onCancel={() => setShowDeleteConfirm(false)}
+            />
+        )}
+        </>
     )
 }
-
 
 
 

@@ -223,7 +223,7 @@ export default function PublicBeneficiaryGroupPage() {
     if (error || !data) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center px-6">
-                <div className="rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-12 text-center max-w-md">
+                <div className="rounded-3xl bg-white border border-gray-200/80 shadow-public p-12 text-center max-w-md">
                     <Users className="w-16 h-16 text-gray-300 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-gray-800 mb-3">Beneficiary Group Not Found</h1>
                     <p className="text-gray-500 mb-8">{error || 'This beneficiary group does not exist.'}</p>
@@ -288,7 +288,7 @@ export default function PublicBeneficiaryGroupPage() {
 
                 {/* Group header */}
                 <div className="flex-shrink-0 mb-4 sm:mb-5">
-                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5">
+                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-4 sm:p-5">
                         <div className="flex items-start gap-4">
                             <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={PUBLIC_SECTION_CHIP_STYLE}>
                                 <Users className="w-6 h-6" style={brandIconStyle(brandColor)} />
@@ -312,7 +312,7 @@ export default function PublicBeneficiaryGroupPage() {
                 {/* 4-column grid */}
                 <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 min-h-0 overflow-auto lg:overflow-hidden">
                     {/* Column 1 - Stories */}
-                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] flex flex-col min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden">
+                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public flex flex-col min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden">
                         <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
                             <div className="flex items-center gap-2">
                                 <BookOpen className="w-4 h-4 text-gray-600" />
@@ -332,7 +332,7 @@ export default function PublicBeneficiaryGroupPage() {
                                         <Link
                                             key={story.id}
                                             to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/story/${story.id}`}
-                                            className="block rounded-xl overflow-hidden bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group"
+                                            className="block rounded-xl overflow-hidden bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 transition-all group"
                                         >
                                             {story.media_url && story.media_type === 'photo' && (
                                                 <div className="w-full h-32 bg-gray-100 overflow-hidden">
@@ -372,7 +372,7 @@ export default function PublicBeneficiaryGroupPage() {
                     </div>
 
                     {/* Column 2 - Metrics (impact claims grouped by KPI) */}
-                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] flex flex-col min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden">
+                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public flex flex-col min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden">
                         <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
                             <div className="flex items-center gap-2">
                                 <BarChart3 className="w-4 h-4 text-gray-600" />
@@ -396,7 +396,7 @@ export default function PublicBeneficiaryGroupPage() {
                                             <Link
                                                 key={group.kpi?.id || idx}
                                                 to={slug ? `${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${slug}` : '#'}
-                                                className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group"
+                                                className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 transition-all group"
                                             >
                                                 <div className="flex items-start gap-3">
                                                     <div className={`p-2 rounded-lg flex-shrink-0 ${colors.bg}`}>
@@ -441,7 +441,7 @@ export default function PublicBeneficiaryGroupPage() {
                     </div>
 
                     {/* Column 3 - Evidence grouped by type */}
-                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] flex flex-col min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden">
+                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public flex flex-col min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden">
                         <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
                             <div className="flex items-center gap-2">
                                 <FileText className="w-4 h-4 text-gray-600" />
@@ -516,7 +516,7 @@ export default function PublicBeneficiaryGroupPage() {
                     </div>
 
                     {/* Column 4 - Location map */}
-                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] flex flex-col min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden">
+                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public flex flex-col min-h-[300px] lg:min-h-0 lg:h-full overflow-hidden">
                         <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
                             <div className="flex items-center gap-2">
                                 <MapPin className="w-4 h-4 text-gray-600" />

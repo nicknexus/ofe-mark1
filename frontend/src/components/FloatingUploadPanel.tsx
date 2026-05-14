@@ -23,7 +23,7 @@ function UploadRow({ item, onDismiss, onCancel }: { item: UploadItem; onDismiss:
                     {isFailed && <AlertCircle className="w-5 h-5 text-red-500" />}
                     {item.status === 'cancelled' && <XCircle className="w-5 h-5 text-gray-400" />}
                     {isActive && (
-                        <div className="w-5 h-5 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+                        <div className="w-5 h-5 rounded-full border-2 border-primary-500 border-t-transparent animate-spin" />
                     )}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -38,7 +38,7 @@ function UploadRow({ item, onDismiss, onCancel }: { item: UploadItem; onDismiss:
                             }
                         </span>
                         {isActive && (
-                            <span className="text-xs font-semibold text-blue-600">{item.progress}%</span>
+                            <span className="text-xs font-semibold text-primary-700">{item.progress}%</span>
                         )}
                     </div>
                 </div>
@@ -65,7 +65,7 @@ function UploadRow({ item, onDismiss, onCancel }: { item: UploadItem; onDismiss:
             {isActive && (
                 <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                     <div
-                        className="h-full bg-blue-500 rounded-full transition-all duration-300 ease-out"
+                        className="h-full bg-primary-500 rounded-full transition-all duration-300 ease-out"
                         style={{ width: `${item.progress}%` }}
                     />
                 </div>
@@ -170,7 +170,7 @@ export default function FloatingUploadPanel() {
                 <div className="px-4 py-2">
                     <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                         <div
-                            className="h-full bg-blue-500 rounded-full transition-all duration-300 ease-out"
+                            className="h-full bg-primary-500 rounded-full transition-all duration-300 ease-out"
                             style={{
                                 width: `${Math.round(
                                     uploads

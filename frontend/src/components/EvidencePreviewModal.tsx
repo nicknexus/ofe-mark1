@@ -5,6 +5,8 @@ import { formatDate, getEvidenceTypeInfo } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import { apiService } from '../services/api'
 import EvidenceTagsList from './MetricTags/EvidenceTagsList'
+import { Button } from './ui/button'
+import ModalFrame from './ModalFrame'
 
 interface EvidenceFile {
     id: string
@@ -262,8 +264,12 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
         : formatDate(displayEvidence.date_represented)
 
     return (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-0 md:p-4 z-[70] animate-fade-in">
-            <div className="bg-white md:bubble-card w-full h-full md:max-w-4xl md:w-full md:max-h-[90vh] md:h-auto overflow-hidden animate-slide-up md:rounded-2xl flex flex-col">
+        <ModalFrame
+            zIndexClass="z-[70]"
+            backdropClassName="bg-black/40 backdrop-blur-sm"
+            paddingClassName="p-0 md:p-4"
+            panelClassName="bg-white md:bubble-card w-full h-full md:max-w-4xl md:w-full md:max-h-[90vh] md:h-auto overflow-hidden md:rounded-2xl flex flex-col"
+        >
                 {/* Header - Evidence grey */}
                 <div className="flex items-center justify-between p-4 md:p-5 bg-gradient-to-r from-evidence-500 to-evidence-600 flex-shrink-0">
                     <div className="flex items-center gap-3">
@@ -366,14 +372,19 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
                                                         <ExternalLink className="w-4 h-4" />
                                                         <span>View</span>
                                                     </a>
+                                                    <Button
+                                                        asChild
+                                                        variant="secondary"
+                                                        className="flex-1"
+                                                    >
                                                     <a
                                                         href={currentFile.file_url}
                                                         download={currentFile.file_name}
-                                                        className="flex-1 btn-secondary inline-flex items-center justify-center space-x-2"
                                                     >
                                                         <Download className="w-4 h-4" />
                                                         <span>Download</span>
                                                     </a>
+                                                    </Button>
                                                 </div>
                                             </div>
                                         </div>
@@ -416,14 +427,15 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
                                                 <ExternalLink className="w-4 h-4" />
                                                 <span>View</span>
                                             </a>
+                                            <Button asChild variant="secondary">
                                             <a
                                                 href={currentFile.file_url}
                                                 download={currentFile.file_name}
-                                                className="btn-secondary inline-flex items-center space-x-2"
                                             >
                                                 <Download className="w-4 h-4" />
                                                 <span>Download</span>
                                             </a>
+                                            </Button>
                                         </div>
                                     </div>
                                 ) : null}
@@ -470,13 +482,13 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
                             {/* Download All */}
                             {evidenceFiles.length > 1 && (
                                 <div className="flex justify-center">
-                                    <button
+                                    <Button
                                         onClick={handleDownloadAll}
-                                        className="btn-secondary inline-flex items-center space-x-2 text-sm"
+                                        variant="secondary"
                                     >
                                         <Download className="w-4 h-4" />
                                         <span>Download All ({evidenceFiles.length} files)</span>
-                                    </button>
+                                    </Button>
                                 </div>
                             )}
                         </div>
@@ -756,15 +768,14 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
                                 <span>Edit Evidence</span>
                             </button>
                         )}
-                        <button
+                        <Button
                             onClick={onClose}
-                            className="btn-secondary py-3 md:py-2.5 px-5 text-sm text-center"
+                            variant="secondary"
                         >
                             Close
-                        </button>
+                        </Button>
                     </div>
                 </div>
-            </div>
-        </div>
+        </ModalFrame>
     )
 }

@@ -4,6 +4,7 @@ import { formatDate, getEvidenceTypeInfo } from '../utils'
 import { Evidence, MetricTag } from '../types'
 import EvidenceTagsList from './MetricTags/EvidenceTagsList'
 import { apiService } from '../services/api'
+import ModalFrame from './ModalFrame'
 
 interface AllEvidenceModalProps {
     isOpen: boolean
@@ -77,8 +78,11 @@ export default function AllEvidenceModal({
     ]
 
     return (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[70] animate-fade-in">
-            <div className="bubble-card max-w-4xl w-full max-h-[90vh] overflow-hidden animate-slide-up">
+        <ModalFrame
+            zIndexClass="z-[70]"
+            backdropClassName="bg-black/40 backdrop-blur-sm"
+            panelClassName="bubble-card max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+        >
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-100">
                     <div className="flex items-center gap-4">
@@ -209,8 +213,7 @@ export default function AllEvidenceModal({
                         </div>
                     )}
                 </div>
-            </div>
-        </div>
+        </ModalFrame>
     )
 }
 

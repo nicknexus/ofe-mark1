@@ -25,6 +25,8 @@ interface TextFieldConfig {
     accent: string
 }
 
+// These section accents are intentionally categorical, not brand chrome:
+// they help dense context-editing forms scan as distinct content types.
 const TEXT_FIELDS: TextFieldConfig[] = [
     {
         key: 'problem_statement',

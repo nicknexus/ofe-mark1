@@ -5,6 +5,11 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+    --brand-primary: #c0dfa1;
+    --brand-primary-dark: #90b171;
+}
+
 /* Landing page CSS variables - scoped to landing page only */
 .landing-page {
     --background: 0 0% 100%;
@@ -89,7 +94,7 @@
         --tw-ring-color: #c0dfa1 !important;
     }
 
-    /* Override all very dark text colors with custom grey */
+    /* Product policy: Tailwind's darkest text utilities render as Nexus slate, not near-black. */
     .text-black,
     [class*="text-black"],
     .text-gray-900,
@@ -165,30 +170,9 @@
         @apply border-l-[3px] border-impact-400;
     }
 
-    /* Modern buttons */
     /* Safe area padding for mobile devices */
     .safe-area-pb {
         padding-bottom: env(safe-area-inset-bottom, 0px);
-    }
-
-    .btn-primary {
-        @apply bg-primary-500 hover:bg-primary-600 text-white font-medium py-2.5 px-5 rounded-2xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-2 shadow-bubble-sm;
-    }
-
-    .btn-secondary {
-        @apply bg-white hover:bg-gray-50 text-gray-700 font-medium py-2.5 px-5 rounded-2xl border border-gray-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
-    }
-
-    .btn-danger {
-        @apply bg-red-500 hover:bg-red-600 text-white font-medium py-2.5 px-5 rounded-2xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 shadow-bubble-sm;
-    }
-
-    .btn-evidence {
-        @apply bg-evidence-400 hover:bg-evidence-600 text-white font-medium py-2.5 px-5 rounded-2xl transition-all duration-200 shadow-bubble-sm;
-    }
-
-    .btn-impact {
-        @apply bg-impact-400 hover:bg-impact-600 text-white font-medium py-2.5 px-5 rounded-2xl transition-all duration-200 shadow-bubble-sm;
     }
 
     .card {
@@ -201,14 +185,6 @@
 
     .label {
         @apply block text-sm font-medium text-gray-700 mb-1;
-    }
-
-    .btn-primary-light {
-        @apply bg-primary-100 hover:bg-primary-200 text-primary-700 font-medium py-2 px-4 rounded-2xl transition-colors duration-200;
-    }
-
-    .btn-primary-outline {
-        @apply bg-white hover:bg-primary-50 text-primary-700 font-medium py-2 px-4 rounded-2xl border border-primary-300 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-2;
     }
 
     .evidence-percentage-high {
@@ -456,13 +432,6 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-}
-
-/* Glass morphism effect */
-.glass {
-    background: rgba(255, 255, 255, 0.25);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 /* Custom marker styles */
@@ -724,14 +693,22 @@ body.location-modal-open .leaflet-pane:not(.leaflet-map-in-modal .leaflet-pane) 
         left: 0;
         right: 0;
         display: flex;
-        justify-content: space-evenly;
+        justify-content: flex-start;
         align-items: center;
+        gap: 4px;
         background: white;
         border-top: 1px solid rgba(0, 0, 0, 0.08);
-        padding: 10px 16px;
+        padding: 10px 12px;
         padding-bottom: calc(10px + env(safe-area-inset-bottom));
         z-index: 50;
         box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .mobile-bottom-nav::-webkit-scrollbar {
+        display: none;
     }
 
     .mobile-nav-item {
@@ -739,7 +716,7 @@ body.location-modal-open .leaflet-pane:not(.leaflet-map-in-modal .leaflet-pane) 
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 12px 20px;
+        padding: 10px 12px;
         border-radius: 16px;
         color: #6B7280;
         gap: 4px;
@@ -747,9 +724,9 @@ body.location-modal-open .leaflet-pane:not(.leaflet-map-in-modal .leaflet-pane) 
         background: transparent;
         border: none;
         cursor: pointer;
-        flex: 1;
+        flex: 0 0 72px;
         text-decoration: none;
-        max-width: 120px;
+        min-width: 72px;
     }
 
     .mobile-nav-item:active {
@@ -1542,19 +1519,6 @@ body.location-modal-open .leaflet-pane:not(.leaflet-map-in-modal .leaflet-pane) 
     @apply bg-white/40 backdrop-blur-md border border-white/20;
 }
 
-/* Glass components for landing page - scoped (kept for backwards compatibility) */
-.landing-page .glass {
-    @apply bg-white/70 backdrop-blur-xl border-2 border-white/70 shadow-md;
-}
-
-.landing-page .glass-card {
-    @apply bg-white/60 backdrop-blur-2xl border-2 border-white/80 shadow-lg rounded-2xl;
-}
-
-.landing-page .glass-subtle {
-    @apply bg-white/40 backdrop-blur-md border border-white/20;
-}
-
 .landing-page .text-gradient {
     @apply bg-clip-text text-transparent;
     background-image: linear-gradient(to right, #465360, #6b7280, #465360);
@@ -1822,23 +1786,4 @@ body.location-modal-open .leaflet-pane:not(.leaflet-map-in-modal .leaflet-pane) 
         -webkit-user-select: text;
         user-select: text;
     }
-}
-
-.safe-area-pb {
-    padding-bottom: env(safe-area-inset-bottom);
-}
-
-@keyframes slide-up {
-    from {
-        transform: translateY(100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
-}
-
-.animate-slide-up {
-    animation: slide-up 0.3s ease-out forwards;
 }

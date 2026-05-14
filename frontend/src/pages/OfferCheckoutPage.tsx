@@ -4,6 +4,7 @@ import { CreditCard, ArrowRight, CheckCircle2, Building2 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { SubscriptionService } from '../services/subscription'
 import { OFFERS } from '../config/offers'
+import MarketingPageShell, { MarketingLogoHeader } from '../components/MarketingPageShell'
 import toast from 'react-hot-toast'
 
 export default function OfferCheckoutPage() {
@@ -44,31 +45,11 @@ export default function OfferCheckoutPage() {
         }
     }
 
-    const brandColor = '#c0dfa1'
-
     if (!offer) {
         return (
-            <div className="min-h-screen font-figtree relative">
-                <div
-                    className="fixed inset-0 pointer-events-none"
-                    style={{
-                        background: `
-                            radial-gradient(ellipse 80% 50% at 20% 40%, ${brandColor}90, transparent 60%),
-                            radial-gradient(ellipse 60% 80% at 80% 20%, ${brandColor}70, transparent 55%),
-                            radial-gradient(ellipse 50% 60% at 60% 80%, ${brandColor}60, transparent 55%),
-                            linear-gradient(180deg, white 0%, #fafafa 100%)
-                        `
-                    }}
-                />
-                <div className="relative z-10 flex items-center justify-center px-4 py-8 min-h-screen">
-                    <div className="max-w-lg w-full">
+            <MarketingPageShell contentClassName="max-w-lg w-full">
                         <div className="text-center mb-8">
-                            <div className="flex justify-center items-center gap-2 mb-4">
-                                <div className="w-10 h-10 rounded-lg overflow-hidden">
-                                    <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
-                                </div>
-                                <span className="text-xl font-newsreader font-extralight text-foreground">Nexus Impacts</span>
-                            </div>
+                            <MarketingLogoHeader />
                         </div>
                         <div className="glass-card p-8 text-center">
                             <h1 className="text-2xl font-semibold text-foreground mb-2">Offer Not Found</h1>
@@ -81,9 +62,7 @@ export default function OfferCheckoutPage() {
                                 <ArrowRight className="w-5 h-5" />
                             </Link>
                         </div>
-                    </div>
-                </div>
-            </div>
+            </MarketingPageShell>
         )
     }
 
@@ -99,28 +78,10 @@ export default function OfferCheckoutPage() {
     }
 
     return (
-        <div className="min-h-screen font-figtree relative">
-            <div
-                className="fixed inset-0 pointer-events-none"
-                style={{
-                    background: `
-                        radial-gradient(ellipse 80% 50% at 20% 40%, ${brandColor}90, transparent 60%),
-                        radial-gradient(ellipse 60% 80% at 80% 20%, ${brandColor}70, transparent 55%),
-                        radial-gradient(ellipse 50% 60% at 60% 80%, ${brandColor}60, transparent 55%),
-                        linear-gradient(180deg, white 0%, #fafafa 100%)
-                    `
-                }}
-            />
-            <div className="relative z-10 flex items-center justify-center px-4 py-8 min-h-screen">
-                <div className="max-w-lg w-full">
+        <MarketingPageShell contentClassName="max-w-lg w-full">
                     {/* Logo */}
                     <div className="text-center mb-8">
-                        <div className="flex justify-center items-center gap-2 mb-4">
-                            <div className="w-10 h-10 rounded-lg overflow-hidden">
-                                <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
-                            </div>
-                            <span className="text-xl font-newsreader font-extralight text-foreground">Nexus Impacts</span>
-                        </div>
+                        <MarketingLogoHeader />
                     </div>
 
                     {/* Main Card */}
@@ -194,8 +155,6 @@ export default function OfferCheckoutPage() {
                     <div className="text-center mt-6 text-xs text-muted-foreground">
                         <p>Need help? Contact support@nexusimpacts.com</p>
                     </div>
-                </div>
-            </div>
-        </div>
+        </MarketingPageShell>
     )
 }

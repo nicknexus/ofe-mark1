@@ -15,6 +15,7 @@ import { formatDate, getEvidenceTypeInfo } from '../utils'
 import AddEvidenceModal from './AddEvidenceModal'
 import EvidenceUploadModal from './evidence/EvidenceUploadModal'
 import EvidencePreviewModal from './EvidencePreviewModal'
+import ConfirmDialog from './ConfirmDialog'
 import toast from 'react-hot-toast'
 
 interface KPIEvidenceSectionProps {
@@ -313,38 +314,16 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateF
 
             {/* Delete Confirmation Dialog */}
             {deleteConfirmEvidence && (
-                <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[60]">
-                    <div className="bg-white/90 backdrop-blur-xl rounded-3xl max-w-md w-full p-6 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)] border border-white/60">
-                        <div className="flex items-center space-x-3 mb-4">
-                            <div className="p-2.5 bg-red-100/80 rounded-xl">
-                                <Trash2 className="w-5 h-5 text-red-600" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-semibold text-gray-800">Delete Evidence</h3>
-                                <p className="text-sm text-gray-500">This action cannot be undone</p>
-                            </div>
-                        </div>
-
-                        <p className="text-gray-600 mb-6">
-                            Are you sure you want to delete "<strong className="text-gray-800">{deleteConfirmEvidence.title}</strong>"?
-                        </p>
-
-                        <div className="flex space-x-3">
-                            <button
-                                onClick={() => setDeleteConfirmEvidence(null)}
-                                className="flex-1 px-5 py-3 text-gray-600 bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-xl hover:bg-white/80 font-medium transition-all duration-200"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => handleDeleteEvidence(deleteConfirmEvidence)}
-                                className="flex-1 px-5 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all duration-200 font-semibold shadow-lg shadow-red-500/25"
-                            >
-                                Delete Evidence
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <ConfirmDialog
+                    tone="danger"
+                    title="Delete Evidence"
+                    message={`Are you sure you want to delete "${deleteConfirmEvidence.title}"? This cannot be undone.`}
+                    confirmLabel="Delete Evidence"
+                    onConfirm={() => {
+                        void handleDeleteEvidence(deleteConfirmEvidence)
+                    }}
+                    onCancel={() => setDeleteConfirmEvidence(null)}
+                />
             )}
         </div>
     )

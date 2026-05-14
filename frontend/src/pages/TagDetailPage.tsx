@@ -7,6 +7,7 @@ import { MetricTag, Evidence, Story } from '../types'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import EvidencePreviewModal from '../components/EvidencePreviewModal'
 import StoryDetailModal from '../components/StoryDetailModal'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { formatDate, getEvidenceTypeInfo } from '../utils'
 
 interface TagDetail {
@@ -40,6 +41,7 @@ export default function TagDetailPage() {
     const [editName, setEditName] = useState('')
     const [previewEvidence, setPreviewEvidence] = useState<Evidence | null>(null)
     const [previewStory, setPreviewStory] = useState<Story | null>(null)
+    const [deleteConfirm, setDeleteConfirm] = useState<{ title: string; message: string } | null>(null)
 
     const load = async () => {
         if (!id) return
@@ -72,13 +74,7 @@ export default function TagDetailPage() {
 
     const deleteTag = async () => {
         if (!id || !data) return
-        const evCount = Array.isArray(data.evidence) ? data.evidence.length : 0
-        const stCount = Array.isArray(data.stories) ? data.stories.length : 0
-        const total = (data.kpis.length || 0) + (data.claims.length || 0) + evCount + stCount
-        const msg = total > 0
-            ? `Delete tag "${data.tag.name}"?\n\nIt's currently attached to ${data.kpis.length} metric(s), ${data.claims.length} claim(s), ${evCount} evidence, and ${stCount} stor${stCount === 1 ? 'y' : 'ies'}. They will become untagged but keep all their data.`
-            : `Delete tag "${data.tag.name}"?`
-        if (!window.confirm(msg)) return
+        setDeleteConfirm(null)
         try {
             await apiService.deleteMetricTag(id)
             toast.success('Tag deleted')
@@ -86,6 +82,17 @@ export default function TagDetailPage() {
         } catch (e) {
             toast.error((e as Error).message || 'Failed to delete tag')
         }
+    }
+
+    const requestDeleteTag = () => {
+        if (!data) return
+        const evCount = Array.isArray(data.evidence) ? data.evidence.length : 0
+        const stCount = Array.isArray(data.stories) ? data.stories.length : 0
+        const total = (data.kpis.length || 0) + (data.claims.length || 0) + evCount + stCount
+        const msg = total > 0
+            ? `Delete tag "${data.tag.name}"?\n\nIt's currently attached to ${data.kpis.length} metric(s), ${data.claims.length} claim(s), ${evCount} evidence, and ${stCount} stor${stCount === 1 ? 'y' : 'ies'}. They will become untagged but keep all their data.`
+            : `Delete tag "${data.tag.name}"?`
+        setDeleteConfirm({ title: 'Delete tag', message: msg })
     }
 
     if (loading) {
@@ -172,7 +179,7 @@ export default function TagDetailPage() {
                     <ArrowLeft className="w-4 h-4" /> Back
                 </button>
 
-                <div className="bg-white rounded-2xl ring-1 ring-gray-900/[0.04] shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.12)] overflow-hidden mb-6">
+                <div className="bg-white rounded-2xl ring-1 ring-gray-900/[0.04] shadow-surface overflow-hidden mb-6">
                     <div className="px-6 py-5 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                             <div className="w-12 h-12 rounded-xl bg-primary-50 ring-1 ring-primary-100/50 flex items-center justify-center flex-shrink-0">
@@ -187,7 +194,7 @@ export default function TagDetailPage() {
                                         onKeyDown={(e) => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') { setEditing(false); setEditName(data.tag.name) } }}
                                         className="px-3 py-1.5 text-lg font-semibold border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-400 focus:border-transparent"
                                     />
-                                    <button onClick={saveName} className="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="Save"><Check className="w-4 h-4" /></button>
+                                    <button onClick={saveName} className="p-2 text-primary-700 hover:bg-primary-50 rounded-lg" title="Save"><Check className="w-4 h-4" /></button>
                                     <button onClick={() => { setEditing(false); setEditName(data.tag.name) }} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg" title="Cancel"><X className="w-4 h-4" /></button>
                                 </div>
                             ) : (
@@ -204,13 +211,13 @@ export default function TagDetailPage() {
                         {!editing && (
                             <div className="flex items-center gap-2 flex-shrink-0">
                                 <button onClick={() => setEditing(true)} className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg" title="Rename"><Edit2 className="w-4 h-4" /></button>
-                                <button onClick={deleteTag} className="p-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                                <button onClick={requestDeleteTag} className="p-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 className="w-4 h-4" /></button>
                             </div>
                         )}
                     </div>
                 </div>
 
-                <div className="bg-white rounded-2xl ring-1 ring-gray-900/[0.04] shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.12)] overflow-hidden">
+                <div className="bg-white rounded-2xl ring-1 ring-gray-900/[0.04] shadow-surface overflow-hidden">
                     <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-b from-gray-50/50 to-transparent">
                         <h2 className="text-sm font-semibold text-gray-900">Metrics using this tag</h2>
                     </div>
@@ -248,7 +255,7 @@ export default function TagDetailPage() {
                 </div>
 
                 {evidence.length > 0 && (
-                    <div className="mt-6 bg-white rounded-2xl ring-1 ring-gray-900/[0.04] shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.12)] overflow-hidden">
+                    <div className="mt-6 bg-white rounded-2xl ring-1 ring-gray-900/[0.04] shadow-surface overflow-hidden">
                         <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-b from-gray-50/50 to-transparent flex items-center justify-between">
                             <h2 className="text-sm font-semibold text-gray-900">Evidence with this tag</h2>
                             <span className="text-xs text-gray-500">{evidence.length} item{evidence.length !== 1 ? 's' : ''}</span>
@@ -327,7 +334,7 @@ export default function TagDetailPage() {
                 )}
 
                 {stories.length > 0 && (
-                    <div className="mt-6 bg-white rounded-2xl ring-1 ring-gray-900/[0.04] shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.12)] overflow-hidden">
+                    <div className="mt-6 bg-white rounded-2xl ring-1 ring-gray-900/[0.04] shadow-surface overflow-hidden">
                         <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-b from-gray-50/50 to-transparent flex items-center justify-between">
                             <h2 className="text-sm font-semibold text-gray-900">Stories with this tag</h2>
                             <span className="text-xs text-gray-500">{stories.length} item{stories.length !== 1 ? 's' : ''}</span>
@@ -376,6 +383,16 @@ export default function TagDetailPage() {
                     story={previewStory}
                     onEdit={() => { /* read-only on tag detail */ }}
                     onDelete={() => { /* read-only on tag detail */ }}
+                />
+            )}
+            {deleteConfirm && (
+                <ConfirmDialog
+                    title={deleteConfirm.title}
+                    message={deleteConfirm.message}
+                    confirmLabel="Delete tag"
+                    tone="danger"
+                    onConfirm={deleteTag}
+                    onCancel={() => setDeleteConfirm(null)}
                 />
             )}
         </div>

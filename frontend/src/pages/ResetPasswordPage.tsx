@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AuthService } from '../services/auth'
+import MarketingPageShell, { MarketingLogoHeader } from '../components/MarketingPageShell'
 import toast from 'react-hot-toast'
 
 export default function ResetPasswordPage() {
@@ -31,30 +32,10 @@ export default function ResetPasswordPage() {
         }
     }
 
-    const brandColor = '#c0dfa1'
-
     return (
-        <div className="min-h-screen font-figtree relative">
-            <div
-                className="fixed inset-0 pointer-events-none"
-                style={{
-                    background: `
-                        radial-gradient(ellipse 80% 50% at 20% 40%, ${brandColor}90, transparent 60%),
-                        radial-gradient(ellipse 60% 80% at 80% 20%, ${brandColor}70, transparent 55%),
-                        radial-gradient(ellipse 50% 60% at 60% 80%, ${brandColor}60, transparent 55%),
-                        linear-gradient(180deg, white 0%, #fafafa 100%)
-                    `
-                }}
-            />
-            <div className="relative z-10 flex items-center justify-center px-4 py-8 min-h-screen">
-                <div className="max-w-md w-full space-y-6 sm:space-y-8">
+        <MarketingPageShell>
                     <div className="text-center">
-                        <div className="flex justify-center items-center gap-2 mb-4">
-                            <div className="w-10 h-10 rounded-lg overflow-hidden">
-                                <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
-                            </div>
-                            <span className="text-xl font-newsreader font-extralight text-foreground">Nexus Impacts</span>
-                        </div>
+                        <MarketingLogoHeader />
                         <h1 className="text-2xl sm:text-3xl font-semibold text-foreground">
                             Set New Password
                         </h1>
@@ -98,8 +79,6 @@ export default function ResetPasswordPage() {
                             </button>
                         </form>
                     </div>
-                </div>
-            </div>
-        </div>
+        </MarketingPageShell>
     )
 }

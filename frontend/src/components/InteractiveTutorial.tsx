@@ -11,8 +11,10 @@ interface Slide {
     image?: string
 }
 
-const BRAND = '#c0dfa1'
-const BRAND_DARK = '#90b171'
+const BRAND = 'var(--brand-primary)'
+const BRAND_DARK = 'var(--brand-primary-dark)'
+const brandAlpha = (opacity: number) => `color-mix(in srgb, var(--brand-primary) ${opacity}%, transparent)`
+const brandDarkAlpha = (opacity: number) => `color-mix(in srgb, var(--brand-primary-dark) ${opacity}%, transparent)`
 
 const SLIDES: Slide[] = [
     {
@@ -158,8 +160,8 @@ export default function InteractiveTutorial() {
                                     backgroundColor: i === currentSlide
                                         ? BRAND_DARK
                                         : i < currentSlide
-                                        ? `${BRAND_DARK}60`
-                                        : `${BRAND}80`
+                                        ? brandDarkAlpha(38)
+                                        : brandAlpha(50)
                                 }}
                             />
                         ))}
@@ -206,7 +208,7 @@ export default function InteractiveTutorial() {
                                     <span className="relative inline-block">
                                         <span className="relative z-10">AI</span>
                                         <svg className="absolute -bottom-1 md:-bottom-2 left-0 w-full" viewBox="0 0 200 12" fill="none">
-                                            <path d="M2 8C50 2 150 2 198 8" stroke="#c0dfa1" strokeWidth="4" strokeLinecap="round" />
+                                            <path d="M2 8C50 2 150 2 198 8" stroke={BRAND} strokeWidth="4" strokeLinecap="round" />
                                         </svg>
                                     </span>
                                 </h1>
@@ -236,7 +238,7 @@ export default function InteractiveTutorial() {
                             /* Content slides — two columns on lg */
                             <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-8 lg:gap-12 items-center">
                                 <div className="order-2 lg:order-1">
-                                    <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4 shadow-md border border-white/50" style={{ backgroundColor: `${BRAND}40` }}>
+                                    <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4 shadow-md border border-white/50" style={{ backgroundColor: brandAlpha(25) }}>
                                         <Icon className="w-5 h-5" style={{ color: BRAND_DARK }} />
                                     </div>
 
@@ -253,7 +255,7 @@ export default function InteractiveTutorial() {
                                     <div className="space-y-2">
                                         {slide.bullets.map((bullet, i) => (
                                             <div key={i} className="flex items-start gap-3 bg-white/50 backdrop-blur-xl border border-white/60 rounded-xl px-4 py-2.5 shadow-sm">
-                                                <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: `${BRAND}50` }}>
+                                                <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: brandAlpha(31) }}>
                                                     <span className="text-[10px] font-bold" style={{ color: BRAND_DARK }}>{i + 1}</span>
                                                 </div>
                                                 <p className="text-gray-500 text-sm leading-relaxed">{bullet}</p>

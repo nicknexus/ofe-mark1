@@ -12,6 +12,8 @@ import { SubscriptionService } from '../services/subscription'
 import { TeamService, TeamMember, TeamInvitation, TeamCapacity } from '../services/team'
 import { useTeam } from '../context/TeamContext'
 import { User, SubscriptionStatus } from '../types'
+import ConfirmDialog from '../components/ConfirmDialog'
+import ModalFrame from '../components/ModalFrame'
 import toast from 'react-hot-toast'
 
 interface StorageUsage {
@@ -27,6 +29,13 @@ interface Props {
 }
 
 type TabType = 'account' | 'organization' | 'teams' | 'branding' | 'widget' | 'storage' | 'billing' | 'danger'
+
+type ConfirmState = {
+    title: string
+    message: string
+    confirmLabel: string
+    onConfirm: () => void
+}
 
 export default function AccountPage({ subscriptionStatus }: Props) {
     const navigate = useNavigate()
@@ -70,6 +79,7 @@ export default function AccountPage({ subscriptionStatus }: Props) {
     const [removingMember, setRemovingMember] = useState<string | null>(null)
     const [resendingInvite, setResendingInvite] = useState<string | null>(null)
     const [revokingInvite, setRevokingInvite] = useState<string | null>(null)
+    const [confirmDialog, setConfirmDialog] = useState<ConfirmState | null>(null)
 
     // Logo state
     const [uploadingLogo, setUploadingLogo] = useState(false)
@@ -257,7 +267,6 @@ export default function AccountPage({ subscriptionStatus }: Props) {
     }
 
     const handleRemoveMember = async (member: TeamMember) => {
-        if (!confirm(`Remove ${member.user_email || member.user_name || 'this member'} from the team?`)) return
         setRemovingMember(member.id)
         try {
             await TeamService.removeMember(member.id)
@@ -285,7 +294,6 @@ export default function AccountPage({ subscriptionStatus }: Props) {
     }
 
     const handleRevokeInvite = async (invitation: TeamInvitation) => {
-        if (!confirm(`Revoke invitation for ${invitation.email}?`)) return
         setRevokingInvite(invitation.id)
         try {
             await TeamService.revokeInvite(invitation.id)
@@ -319,7 +327,6 @@ export default function AccountPage({ subscriptionStatus }: Props) {
 
     const handleDeleteLogo = async () => {
         if (!ownedOrganization?.id || !ownedOrganization?.logo_url) return
-        if (!confirm('Are you sure you want to remove the organization logo?')) return
         setDeletingLogo(true)
         try {
             await apiService.deleteOrganizationLogo(ownedOrganization.id)
@@ -480,9 +487,19 @@ export default function AccountPage({ subscriptionStatus }: Props) {
                                 removingMember={removingMember}
                                 resendingInvite={resendingInvite}
                                 revokingInvite={revokingInvite}
-                                handleRemoveMember={handleRemoveMember}
+                                handleRemoveMember={(member: TeamMember) => setConfirmDialog({
+                                    title: 'Remove team member',
+                                    message: `Remove ${member.user_email || member.user_name || 'this member'} from the team?`,
+                                    confirmLabel: 'Remove member',
+                                    onConfirm: () => handleRemoveMember(member),
+                                })}
                                 handleResendInvite={handleResendInvite}
-                                handleRevokeInvite={handleRevokeInvite}
+                                handleRevokeInvite={(invitation: TeamInvitation) => setConfirmDialog({
+                                    title: 'Revoke invitation',
+                                    message: `Revoke invitation for ${invitation.email}?`,
+                                    confirmLabel: 'Revoke invitation',
+                                    onConfirm: () => handleRevokeInvite(invitation),
+                                })}
                                 formatDate={formatDate}
                             />
                         )}
@@ -497,7 +514,12 @@ export default function AccountPage({ subscriptionStatus }: Props) {
                                 deletingLogo={deletingLogo}
                                 logoInputRef={logoInputRef}
                                 handleLogoUpload={handleLogoUpload}
-                                handleDeleteLogo={handleDeleteLogo}
+                                handleDeleteLogo={() => setConfirmDialog({
+                                    title: 'Remove logo',
+                                    message: 'Remove the organization logo?',
+                                    confirmLabel: 'Remove logo',
+                                    onConfirm: handleDeleteLogo,
+                                })}
                                 onBrandColorChange={handleBrandColorChange}
                             />
                         )}
@@ -535,6 +557,20 @@ export default function AccountPage({ subscriptionStatus }: Props) {
                     </div>
                 </div>
             </div>
+            {confirmDialog && (
+                <ConfirmDialog
+                    title={confirmDialog.title}
+                    message={confirmDialog.message}
+                    confirmLabel={confirmDialog.confirmLabel}
+                    tone="danger"
+                    onConfirm={() => {
+                        const action = confirmDialog.onConfirm
+                        setConfirmDialog(null)
+                        action()
+                    }}
+                    onCancel={() => setConfirmDialog(null)}
+                />
+            )}
         </div>
     )
 }
@@ -1351,8 +1387,7 @@ function DangerTab({ hasOwnOrganization, showDeleteModal, setShowDeleteModal, de
 
             {/* Delete Modal */}
             {showDeleteModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+                <ModalFrame zIndexClass="z-50" backdropClassName="bg-black/50" panelClassName="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-red-100 rounded-xl"><AlertTriangle className="w-6 h-6 text-red-600" /></div>
@@ -1382,8 +1417,7 @@ function DangerTab({ hasOwnOrganization, showDeleteModal, setShowDeleteModal, de
                                 </button>
                             </div>
                         </div>
-                    </div>
-                </div>
+                </ModalFrame>
             )}
         </>
     )

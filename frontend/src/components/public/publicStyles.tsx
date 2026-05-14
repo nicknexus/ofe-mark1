@@ -50,7 +50,7 @@ export function PublicPageBackground({ brandColor }: { brandColor?: string | nul
 
 /** Solid white card with the "widget pop" shadow stack and a hover ramp. */
 export const PUBLIC_CARD_CLASS =
-    'bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all'
+    'bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 transition-all'
 
 /** Large panel: `rounded-2xl` + widget card token. Use for top-level sections. */
 export const PUBLIC_PANEL_CLASS = `rounded-2xl ${PUBLIC_CARD_CLASS}`
@@ -64,7 +64,7 @@ export const PUBLIC_TILE_CLASS = `rounded-xl ${PUBLIC_CARD_CLASS}`
  * where the hover lift would be misleading.
  */
 export const PUBLIC_PANEL_STATIC_CLASS =
-    'rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)]'
+    'rounded-2xl bg-white border border-gray-200/80 shadow-public'
 
 /** Header bar matching the public org dashboard. */
 export const PUBLIC_HEADER_CLASS =

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { X, MapPin, Plus, Search, Check } from 'lucide-react'
 import { Location } from '../types'
 import { apiService } from '../services/api'
+import ModalFrame from './ModalFrame'
 import toast from 'react-hot-toast'
 
 interface AddLocationPickerModalProps {
@@ -71,8 +72,7 @@ export default function AddLocationPickerModal({
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80] animate-fade-in">
-            <div className="bg-white rounded-2xl max-w-lg w-full max-h-[80vh] flex flex-col overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] border border-gray-100">
+        <ModalFrame panelClassName="bg-white rounded-2xl max-w-lg w-full max-h-[80vh] flex flex-col overflow-hidden shadow-modal border border-gray-100">
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
                     <div className="flex items-center gap-2">
@@ -174,7 +174,6 @@ export default function AddLocationPickerModal({
                         Done
                     </button>
                 </div>
-            </div>
-        </div>
+        </ModalFrame>
     )
 }

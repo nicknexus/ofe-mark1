@@ -91,7 +91,7 @@ export default function PublicTagFilter({
                 <>
                     <div className="fixed inset-0 z-[9998]" onClick={() => setOpenAnnounced(false)} />
                     <div
-                        className="fixed w-64 bg-white rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] border border-gray-100 z-[9999] py-1 max-h-72 overflow-y-auto"
+                        className="fixed w-64 bg-white rounded-xl shadow-modal border border-gray-100 z-[9999] py-1 max-h-72 overflow-y-auto"
                         style={(() => {
                             const rect = btnRef.current?.getBoundingClientRect()
                             if (!rect) return {}

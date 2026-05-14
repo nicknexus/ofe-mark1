@@ -75,6 +75,21 @@ export default {
                 // Off-white page background
                 page: '#F0F1F4',
                 offWhite: '#F4F5F7',
+                // App-wide semantic tokens used by shadcn-style primitives,
+                // landing pages, marketing gates, and public surfaces.
+                border: '#e5e7eb',
+                input: '#e5e7eb',
+                ring: '#c0dfa1',
+                background: '#ffffff',
+                foreground: '#465360',
+                muted: {
+                    DEFAULT: '#f5f5f5',
+                    foreground: '#6b7280',
+                },
+                accent: {
+                    DEFAULT: '#c0dfa1',
+                    foreground: '#465360',
+                },
                 // Landing page specific colors (prefixed to avoid conflicts)
                 'lp-border': "#e5e7eb",
                 'lp-background': "#ffffff",
@@ -105,6 +120,17 @@ export default {
                 'glass': '0 3px 10px 0 rgba(70, 83, 96, 0.03)',
                 'glass-lg': '0 6px 16px 0 rgba(70, 83, 96, 0.045)',
                 'sage': '0 3px 10px 0 rgba(192, 223, 161, 0.115)',
+                'surface': '0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 32px -16px rgba(15, 23, 42, 0.12)',
+                'surface-hover': '0 2px 4px rgba(15, 23, 42, 0.05), 0 18px 40px -18px rgba(15, 23, 42, 0.18)',
+                'public': '0 2px 8px -1px rgba(15, 23, 42, 0.10), 0 4px 16px -4px rgba(15, 23, 42, 0.10)',
+                'public-hover': '0 4px 12px -2px rgba(15, 23, 42, 0.14), 0 6px 20px -6px rgba(15, 23, 42, 0.14)',
+                'public-feature': '0 4px 12px -2px rgba(15, 23, 42, 0.14), 0 8px 24px -6px rgba(15, 23, 42, 0.14)',
+                'soft-float': '0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 28px -16px rgba(15, 23, 42, 0.14)',
+                'soft-float-hover': '0 2px 4px rgba(15, 23, 42, 0.06), 0 16px 36px -16px rgba(15, 23, 42, 0.20)',
+                'modal': '0 25px 80px -10px rgba(0, 0, 0, 0.30)',
+                'modal-soft': '0 25px 80px -10px rgba(0, 0, 0, 0.15)',
+                'dialog': '0 25px 60px -15px rgba(0, 0, 0, 0.15)',
+                'dialog-strong': '0 25px 60px -15px rgba(0, 0, 0, 0.20)',
             },
             borderRadius: {
                 '2xl': '1rem',

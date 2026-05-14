@@ -1402,7 +1402,7 @@ export default function ExpandableKPICard({
 
                 {deleteConfirmDataPoint && createPortal(
                     <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[80]">
-                        <div className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-3xl max-w-md w-full p-6 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)]">
+                        <div className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-3xl max-w-md w-full p-6 shadow-dialog">
                             <div className="flex items-center space-x-3 mb-4">
                                 <div className="p-2.5 bg-red-100/80 rounded-xl"><Trash2 className="w-5 h-5 text-red-500" /></div>
                                 <div><h3 className="text-lg font-semibold text-gray-800">Delete Impact Claim</h3><p className="text-sm text-gray-500">This action cannot be undone</p></div>
@@ -1419,7 +1419,7 @@ export default function ExpandableKPICard({
 
                 {deleteConfirmEvidence && createPortal(
                     <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[80]">
-                        <div className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-3xl max-w-md w-full p-6 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)]">
+                        <div className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-3xl max-w-md w-full p-6 shadow-dialog">
                             <div className="flex items-center space-x-3 mb-4">
                                 <div className="p-2.5 bg-red-100/80 rounded-xl"><Trash2 className="w-5 h-5 text-red-500" /></div>
                                 <div><h3 className="text-lg font-semibold text-gray-800">Delete Evidence</h3><p className="text-sm text-gray-500">This action cannot be undone</p></div>
@@ -2479,7 +2479,7 @@ export default function ExpandableKPICard({
             {/* Delete Data Point Confirmation */}
             {deleteConfirmDataPoint && createPortal(
                 <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[80]">
-                    <div className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-3xl max-w-md w-full p-6 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)]">
+                    <div className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-3xl max-w-md w-full p-6 shadow-dialog">
                         <div className="flex items-center space-x-3 mb-4">
                             <div className="p-2.5 bg-red-100/80 rounded-xl">
                                 <Trash2 className="w-5 h-5 text-red-500" />
@@ -2516,7 +2516,7 @@ export default function ExpandableKPICard({
             {/* Delete Evidence Confirmation */}
             {deleteConfirmEvidence && createPortal(
                 <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-4 z-[80]">
-                    <div className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-3xl max-w-md w-full p-6 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)]">
+                    <div className="bg-white/90 backdrop-blur-xl border border-white/60 rounded-3xl max-w-md w-full p-6 shadow-dialog">
                         <div className="flex items-center space-x-3 mb-4">
                             <div className="p-2.5 bg-red-100/80 rounded-xl">
                                 <Trash2 className="w-5 h-5 text-red-500" />

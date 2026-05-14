@@ -3,6 +3,7 @@ import { AlertCircle, CreditCard, LogOut, Clock, ArrowRight, Users, Mail, Ticket
 import { AuthService } from '../services/auth'
 import { SubscriptionService } from '../services/subscription'
 import { TeamService } from '../services/team'
+import MarketingPageShell, { MarketingLogoHeader } from '../components/MarketingPageShell'
 import toast from 'react-hot-toast'
 
 interface Props {
@@ -115,11 +116,9 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
         }
     }
 
-    const brandColor = '#c0dfa1'
-
     if (checkingPermissions) {
         return (
-            <div className="min-h-screen font-figtree bg-background flex items-center justify-center px-4">
+            <MarketingPageShell contentClassName="max-w-md w-full">
                 <div className="glass-card p-12 rounded-3xl text-center max-w-md">
                     <div className="w-12 h-12 mb-4 mx-auto">
                         <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
@@ -131,36 +130,17 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
                     </div>
                     <p className="text-muted-foreground text-sm font-medium">Loading...</p>
                 </div>
-            </div>
+            </MarketingPageShell>
         )
     }
 
     const { title, subtitle, icon: Icon } = getMessage()
 
     return (
-        <div className="min-h-screen font-figtree relative">
-            {/* Flowing gradient background - same as public initiative page */}
-            <div
-                className="fixed inset-0 pointer-events-none"
-                style={{
-                    background: `
-                        radial-gradient(ellipse 80% 50% at 20% 40%, ${brandColor}90, transparent 60%),
-                        radial-gradient(ellipse 60% 80% at 80% 20%, ${brandColor}70, transparent 55%),
-                        radial-gradient(ellipse 50% 60% at 60% 80%, ${brandColor}60, transparent 55%),
-                        linear-gradient(180deg, white 0%, #fafafa 100%)
-                    `
-                }}
-            />
-            <div className="relative z-10 flex items-center justify-center px-4 py-8 min-h-screen">
-                <div className="max-w-lg w-full">
+        <MarketingPageShell contentClassName="max-w-lg w-full">
                     {/* Logo - public style */}
                     <div className="text-center mb-8">
-                        <div className="flex justify-center items-center gap-2 mb-4">
-                            <div className="w-10 h-10 rounded-lg overflow-hidden">
-                                <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
-                            </div>
-                            <span className="text-xl font-newsreader font-extralight text-foreground">Nexus Impacts</span>
-                        </div>
+                        <MarketingLogoHeader />
                     </div>
 
                     {/* Main Card - glass style */}
@@ -306,9 +286,6 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
                     <div className="text-center mt-6 text-xs text-muted-foreground">
                         <p>Need help? Contact support@nexusimpacts.com</p>
                     </div>
-                </div>
-            </div>
-        </div>
+        </MarketingPageShell>
     )
 }
-

@@ -10,6 +10,7 @@ import EvidencePreviewModal from '../EvidencePreviewModal'
 import DataPointPreviewModal from '../DataPointPreviewModal'
 import AddEvidenceModal from '../AddEvidenceModal'
 import EvidenceUploadModal from '../evidence/EvidenceUploadModal'
+import ConfirmDialog from '../ConfirmDialog'
 import toast from 'react-hot-toast'
 
 interface EvidenceTabProps {
@@ -33,6 +34,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
     const [selectedDataPointKpi, setSelectedDataPointKpi] = useState<any>(null)
     const [isDataPointPreviewOpen, setIsDataPointPreviewOpen] = useState(false)
     const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
+    const [deleteEvidence, setDeleteEvidence] = useState<Evidence | null>(null)
 
     // Master filter state
     const [datePickerValue, setDatePickerValue] = useState<{
@@ -235,10 +237,12 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
 
     const handleDeleteEvidence = async (evidence: Evidence) => {
         if (!evidence.id) return
-        if (!confirm('Are you sure you want to delete this evidence?')) return
         try {
             await apiService.deleteEvidence(evidence.id)
             toast.success('Evidence deleted successfully')
+            setDeleteEvidence(null)
+            setIsPreviewModalOpen(false)
+            setSelectedEvidence(null)
             loadEvidence()
             onRefresh?.()
         } catch (error) {
@@ -432,7 +436,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                     onClick={() => setShowLocationPicker(false)}
                                 />
                                 <div
-                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
+                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
                                     style={{
                                         top: `${locationDropdownPosition.top}px`,
                                         left: `${locationDropdownPosition.left}px`
@@ -526,7 +530,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                     onClick={() => setShowBeneficiaryPicker(false)}
                                 />
                                 <div
-                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
+                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
                                     style={{
                                         top: `${beneficiaryDropdownPosition.top}px`,
                                         left: `${beneficiaryDropdownPosition.left}px`
@@ -620,7 +624,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                     onClick={() => setShowTagPicker(false)}
                                 />
                                 <div
-                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
+                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
                                     style={{
                                         top: `${tagDropdownPosition.top}px`,
                                         left: `${tagDropdownPosition.left}px`
@@ -714,7 +718,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                     onClick={() => setShowEvidenceTypePicker(false)}
                                 />
                                 <div
-                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
+                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
                                     style={{
                                         top: `${evidenceTypeDropdownPosition.top}px`,
                                         left: `${evidenceTypeDropdownPosition.left}px`
@@ -1064,7 +1068,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                     }}
                     evidence={selectedEvidence}
                     onEdit={handleEditEvidence}
-                    onDelete={handleDeleteEvidence}
+                    onDelete={setDeleteEvidence}
                     onDataPointClick={(dataPoint, kpi) => {
                         setSelectedDataPoint(dataPoint)
                         setSelectedDataPointKpi(kpi)
@@ -1120,7 +1124,17 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                     initiativeId={initiativeId}
                 />
             )}
+
+            {deleteEvidence && (
+                <ConfirmDialog
+                    title="Delete Evidence"
+                    message={`Delete ${deleteEvidence.title || 'this evidence'}? This action cannot be undone.`}
+                    confirmLabel="Delete Evidence"
+                    tone="danger"
+                    onConfirm={() => handleDeleteEvidence(deleteEvidence)}
+                    onCancel={() => setDeleteEvidence(null)}
+                />
+            )}
         </div>
     )
 }
-

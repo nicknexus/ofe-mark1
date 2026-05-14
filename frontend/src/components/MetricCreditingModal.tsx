@@ -3,6 +3,8 @@ import { X, Plus, Trash2, AlertCircle, CheckCircle } from 'lucide-react'
 import { Donor, DonorCredit, KPI, KPIUpdate } from '../types'
 import { apiService } from '../services/api'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
+import ModalFrame from './ModalFrame'
+import ConfirmDialog from './ConfirmDialog'
 import toast from 'react-hot-toast'
 
 interface MetricCreditingModalProps {
@@ -28,6 +30,7 @@ export default function MetricCreditingModal({
     const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null) // null = metric level
     const [newCredits, setNewCredits] = useState<Partial<DonorCredit>[]>([])
     const [editingCredits, setEditingCredits] = useState<Record<string, Partial<DonorCredit>>>({})
+    const [deleteCreditId, setDeleteCreditId] = useState<string | null>(null)
 
     useEffect(() => {
         if (isOpen) {
@@ -109,10 +112,10 @@ export default function MetricCreditingModal({
     }
 
     const handleDeleteCredit = async (creditId: string) => {
-        if (!confirm('Are you sure you want to delete this credit?')) return
         try {
             await apiService.deleteDonorCredit(creditId)
             toast.success('Credit deleted')
+            setDeleteCreditId(null)
             await loadCredits()
             await onSave()
         } catch (error) {
@@ -174,8 +177,8 @@ export default function MetricCreditingModal({
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
-            <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] flex flex-col">
+        <>
+        <ModalFrame panelClassName="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-modal flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
                     <div>
@@ -284,7 +287,7 @@ export default function MetricCreditingModal({
                                                     <div className="text-sm text-gray-500">{donor?.email}</div>
                                                 </div>
                                                 <button
-                                                    onClick={() => handleDeleteCredit(credit.id!)}
+                                                    onClick={() => setDeleteCreditId(credit.id!)}
                                                     className="p-1 text-red-400 hover:text-red-600"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
@@ -427,9 +430,17 @@ export default function MetricCreditingModal({
                         {loading ? 'Saving...' : 'Save Credits'}
                     </button>
                 </div>
-            </div>
-        </div>
+        </ModalFrame>
+        {deleteCreditId && (
+            <ConfirmDialog
+                title="Delete Credit"
+                message="Delete this donor credit? This action cannot be undone."
+                confirmLabel="Delete Credit"
+                tone="danger"
+                onConfirm={() => handleDeleteCredit(deleteCreditId)}
+                onCancel={() => setDeleteCreditId(null)}
+            />
+        )}
+        </>
     )
 }
-
-

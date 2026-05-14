@@ -5,6 +5,8 @@ import { formatDate, getEvidenceTypeInfo, parseLocalDate } from '../utils'
 import { apiService } from '../services/api'
 import { Evidence, Location, BeneficiaryGroup, MetricTag } from '../types'
 import TagChip from './MetricTags/TagChip'
+import { Button } from './ui/button'
+import ModalFrame from './ModalFrame'
 
 interface DataPointPreviewModalProps {
     isOpen: boolean
@@ -255,8 +257,12 @@ export default function DataPointPreviewModal({
     })
 
     return (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-0 md:p-4 z-[70] animate-fade-in">
-            <div className="bg-white md:bubble-card w-full h-full md:max-w-4xl md:w-full md:max-h-[90vh] md:h-auto overflow-hidden animate-slide-up md:rounded-2xl">
+        <ModalFrame
+            zIndexClass="z-[70]"
+            backdropClassName="bg-black/40 backdrop-blur-sm"
+            paddingClassName="p-0 md:p-4"
+            panelClassName="bg-white md:bubble-card w-full h-full md:max-w-4xl md:w-full md:max-h-[90vh] md:h-auto overflow-hidden md:rounded-2xl flex flex-col"
+        >
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 md:p-5 border-b border-gray-100">
                     <div className="flex items-center gap-3">
@@ -555,26 +561,25 @@ export default function DataPointPreviewModal({
                     </div>
                     <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
                         {onEdit && (
-                            <button
+                            <Button
                                 onClick={() => {
                                     onEdit(dataPoint)
                                     onClose()
                                 }}
-                                className="btn-primary flex items-center justify-center gap-2 py-3 md:py-2.5 px-5 text-sm order-first md:order-last"
+                                className="order-first md:order-last"
                             >
                                 <Edit className="w-4 h-4" />
                                 <span>Edit Claim</span>
-                            </button>
+                            </Button>
                         )}
-                        <button
+                        <Button
                             onClick={onClose}
-                            className="btn-secondary py-3 md:py-2.5 px-5 text-sm text-center"
+                            variant="secondary"
                         >
                             Close
-                        </button>
+                        </Button>
                     </div>
                 </div>
-            </div>
-        </div>
+        </ModalFrame>
     )
 }

@@ -314,7 +314,7 @@ export default function DateRangePicker({
                     />
                     {/* Calendar dropdown */}
                     <div 
-                        className="fixed bg-white border border-gray-200 rounded-lg shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] z-[9999] min-w-[280px] flex flex-col"
+                        className="fixed bg-white border border-gray-200 rounded-lg shadow-modal z-[9999] min-w-[280px] flex flex-col"
                         style={{
                             top: `${dropdownPosition.top}px`,
                             left: `${dropdownPosition.left}px`,

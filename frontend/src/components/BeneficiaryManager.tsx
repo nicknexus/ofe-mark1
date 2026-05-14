@@ -21,6 +21,8 @@ import {
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { Button } from './ui/button'
+import ModalFrame from './ModalFrame'
 
 // Sortable Beneficiary Group Card Component - Simple card like StoriesTab
 function SortableBeneficiaryGroupCard({
@@ -196,8 +198,11 @@ function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiativeId }:
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
-            <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <ModalFrame
+            zIndexClass="z-[60]"
+            backdropClassName="bg-black/50"
+            panelClassName="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto"
+        >
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
                     <h2 className="text-xl font-semibold text-gray-900">
                         {editData ? 'Edit Beneficiary Group' : 'Create Beneficiary Group'}
@@ -279,25 +284,25 @@ function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiativeId }:
                     </div>
 
                     <div className="flex space-x-3 pt-4">
-                        <button
+                        <Button
                             type="button"
                             onClick={onClose}
-                            className="btn-secondary flex-1"
+                            variant="secondary"
+                            className="flex-1"
                             disabled={loading}
                         >
                             Cancel
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="submit"
-                            className="btn-primary flex-1"
+                            className="flex-1"
                             disabled={loading || !formData.name}
                         >
                             {loading ? 'Saving...' : editData ? 'Update Group' : 'Create Group'}
-                        </button>
+                        </Button>
                     </div>
                 </form>
-            </div>
-        </div>
+        </ModalFrame>
     )
 }
 
@@ -501,12 +506,12 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
                         <p className="text-gray-600 text-base mb-4">
                             No beneficiary groups yet
                         </p>
-                        <button
+                        <Button
                             onClick={() => setIsCreateModalOpen(true)}
-                            className="btn-primary text-sm"
+                            size="sm"
                         >
                             Create First Group
-                        </button>
+                        </Button>
                     </div>
                 </div>
             ) : (
@@ -601,8 +606,7 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
 
             {/* Delete Confirmation */}
             {deleteConfirmGroup && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
-                    <div className="bg-white rounded-xl max-w-md w-full p-6">
+                <ModalFrame zIndexClass="z-[60]" backdropClassName="bg-black/50" panelClassName="bg-white rounded-xl max-w-md w-full p-6">
                         <div className="flex items-center space-x-3 mb-4">
                             <div className="p-2 bg-red-100 rounded-lg">
                                 <Trash2 className="w-5 h-5 text-red-600" />
@@ -618,12 +622,13 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
                         </p>
 
                         <div className="flex space-x-3">
-                            <button
+                            <Button
                                 onClick={() => setDeleteConfirmGroup(null)}
-                                className="btn-secondary flex-1"
+                                variant="secondary"
+                                className="flex-1"
                             >
                                 Cancel
-                            </button>
+                            </Button>
                             <button
                                 onClick={() => handleDeleteGroup(deleteConfirmGroup)}
                                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
@@ -631,8 +636,7 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
                                 Delete Group
                             </button>
                         </div>
-                    </div>
-                </div>
+                </ModalFrame>
             )}
         </div>
     )

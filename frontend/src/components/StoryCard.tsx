@@ -40,7 +40,7 @@ export default function StoryCard({ story, onView }: StoryCardProps) {
         <button
             type="button"
             onClick={() => onView(story)}
-            className="group relative w-full text-left bg-white rounded-2xl ring-1 ring-gray-900/[0.06] shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.10)] hover:shadow-[0_2px_4px_rgba(15,23,42,0.06),0_20px_40px_-16px_rgba(15,23,42,0.18)] hover:-translate-y-0.5 transition-all duration-200 overflow-hidden flex flex-col"
+            className="group relative w-full text-left bg-white rounded-2xl ring-1 ring-gray-900/[0.06] shadow-surface hover:shadow-surface-hover hover:-translate-y-0.5 transition-all duration-200 overflow-hidden flex flex-col"
         >
             {/* Media */}
             <div className="relative w-full aspect-[16/10] bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden">

@@ -3,6 +3,8 @@ import { X, AlertCircle, CheckCircle, BarChart3 } from 'lucide-react'
 import { Donor, DonorCredit, KPI, InitiativeDashboard } from '../types'
 import { apiService } from '../services/api'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
+import ModalFrame from './ModalFrame'
+import ConfirmDialog from './ConfirmDialog'
 import toast from 'react-hot-toast'
 
 interface DonorCreditingModalProps {
@@ -30,6 +32,7 @@ export default function DonorCreditingModal({
     const [creditsByMetric, setCreditsByMetric] = useState<Record<string, DonorCredit[]>>({})
     const [otherDonorsCredited, setOtherDonorsCredited] = useState<Record<string, number>>({})
     const [loadingTotals, setLoadingTotals] = useState(true)
+    const [deleteCreditId, setDeleteCreditId] = useState<string | null>(null)
 
     useEffect(() => {
         if (isOpen && donor.id && dashboard) {
@@ -172,10 +175,10 @@ export default function DonorCreditingModal({
     }
 
     const handleDeleteCredit = async (creditId: string) => {
-        if (!confirm('Are you sure you want to delete this credit?')) return
         try {
             await apiService.deleteDonorCredit(creditId)
             toast.success('Credit deleted')
+            setDeleteCreditId(null)
             await loadCredits()
             await onSave()
         } catch (error) {
@@ -279,8 +282,8 @@ export default function DonorCreditingModal({
     if (!isOpen || !dashboard) return null
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
-            <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] flex flex-col">
+        <>
+        <ModalFrame panelClassName="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-modal flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
                     <div>
@@ -351,7 +354,7 @@ export default function DonorCreditingModal({
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation()
-                                                        handleDeleteCredit(existingCredits[0].id!)
+                                                        setDeleteCreditId(existingCredits[0].id!)
                                                     }}
                                                     className="text-red-400 hover:text-red-600 text-xs ml-2"
                                                     title="Remove Credit"
@@ -402,8 +405,17 @@ export default function DonorCreditingModal({
                         {loading ? 'Saving...' : 'Save Credits'}
                     </button>
                 </div>
-            </div>
-        </div>
+        </ModalFrame>
+        {deleteCreditId && (
+            <ConfirmDialog
+                title="Delete Credit"
+                message="Delete this donor credit? This action cannot be undone."
+                confirmLabel="Delete Credit"
+                tone="danger"
+                onConfirm={() => handleDeleteCredit(deleteCreditId)}
+                onCancel={() => setDeleteCreditId(null)}
+            />
+        )}
+        </>
     )
 }
-

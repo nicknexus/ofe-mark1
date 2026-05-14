@@ -7,6 +7,7 @@ import { useUploadManager } from '../context/UploadContext'
 import DateRangePicker from './DateRangePicker'
 import LocationModal from './LocationModal'
 import TagPicker from './MetricTags/TagPicker'
+import ModalFrame from './ModalFrame'
 import toast from 'react-hot-toast'
 
 interface AddStoryModalProps {
@@ -236,8 +237,7 @@ export default function AddStoryModal({
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
-            <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] flex flex-col">
+        <ModalFrame panelClassName="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-modal flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
                     <h2 className="text-xl font-semibold text-gray-900">
@@ -595,8 +595,6 @@ export default function AddStoryModal({
                     }}
                     initiativeId={initiativeId}
                 />
-            </div>
-        </div>
+        </ModalFrame>
     )
 }
-

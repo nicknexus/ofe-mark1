@@ -22,6 +22,7 @@ import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifi
 import { CSS } from '@dnd-kit/utilities'
 import { apiService } from '../services/api'
 import { MetricTag } from '../types'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 interface SortableTagRowProps {
     tag: MetricTag
@@ -93,7 +94,7 @@ function SortableTagRow({
                             }}
                             className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-400"
                         />
-                        <button onClick={onSaveEdit} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg">
+                        <button onClick={onSaveEdit} className="p-1.5 text-primary-700 hover:bg-primary-50 rounded-lg">
                             <Check className="w-4 h-4" />
                         </button>
                         <button onClick={onCancelEdit} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg">
@@ -142,6 +143,7 @@ export default function AllTagsPage() {
     const [creating, setCreating] = useState(false)
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editName, setEditName] = useState('')
+    const [deleteConfirm, setDeleteConfirm] = useState<{ tag: MetricTag; message: string } | null>(null)
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -190,14 +192,19 @@ export default function AllTagsPage() {
         }
     }
 
-    const remove = async (tag: MetricTag) => {
+    const requestRemove = (tag: MetricTag) => {
         const used = (tag.metric_count ?? 0) + (tag.claim_count ?? 0)
         const msg = used > 0
             ? `Delete "${tag.name}"?\n\nIt's attached to ${tag.metric_count ?? 0} metric(s) and ${tag.claim_count ?? 0} claim(s). They will become untagged but keep all their data.`
             : `Delete "${tag.name}"?`
-        if (!window.confirm(msg)) return
+        setDeleteConfirm({ tag, message: msg })
+    }
+
+    const remove = async () => {
+        if (!deleteConfirm) return
         try {
-            await apiService.deleteMetricTag(tag.id)
+            await apiService.deleteMetricTag(deleteConfirm.tag.id)
+            setDeleteConfirm(null)
             toast.success('Tag deleted')
             await load()
         } catch (e) {
@@ -248,7 +255,7 @@ export default function AllTagsPage() {
                     <ArrowLeft className="w-4 h-4" /> Back to dashboard
                 </button>
 
-                <div className="bg-white rounded-2xl ring-1 ring-gray-900/[0.04] shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.12)] overflow-hidden">
+                <div className="bg-white rounded-2xl ring-1 ring-gray-900/[0.04] shadow-surface overflow-hidden">
                     <div className="px-6 py-5 border-b border-gray-100/70 bg-gradient-to-b from-gray-50/50 to-transparent flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0">
                             <div className="w-10 h-10 rounded-xl bg-primary-50 ring-1 ring-primary-100/50 flex items-center justify-center flex-shrink-0">
@@ -339,7 +346,7 @@ export default function AllTagsPage() {
                                             onStartEdit={() => { setEditingId(tag.id); setEditName(tag.name) }}
                                             onSaveEdit={() => saveEdit(tag.id)}
                                             onCancelEdit={() => setEditingId(null)}
-                                            onDelete={() => remove(tag)}
+                                            onDelete={() => requestRemove(tag)}
                                             dragDisabled={dragDisabled}
                                         />
                                     ))}
@@ -349,6 +356,16 @@ export default function AllTagsPage() {
                     )}
                 </div>
             </div>
+            {deleteConfirm && (
+                <ConfirmDialog
+                    title="Delete tag"
+                    message={deleteConfirm.message}
+                    confirmLabel="Delete tag"
+                    tone="danger"
+                    onConfirm={remove}
+                    onCancel={() => setDeleteConfirm(null)}
+                />
+            )}
         </div>
     )
 }

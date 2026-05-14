@@ -6,6 +6,7 @@ import { formatDate, getLocalDateString } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import { useUploadManager } from '../context/UploadContext'
 import LocationModal from './LocationModal'
+import ModalFrame from './ModalFrame'
 import DateRangePicker from './DateRangePicker'
 import TagPicker from './MetricTags/TagPicker'
 import toast from 'react-hot-toast'
@@ -613,8 +614,12 @@ export default function AddEvidenceModal({
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center p-0 md:p-3 z-[60] animate-fade-in">
-            <div className="bg-white md:bg-white/70 md:backdrop-blur-2xl md:rounded-2xl w-full h-full md:w-[70vw] md:max-w-[1200px] md:max-h-[97vh] md:h-[97vh] overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] md:border md:border-white/60 transform transition-all duration-200 ease-out animate-slide-up-fast flex flex-col">
+        <ModalFrame
+            zIndexClass="z-[60]"
+            backdropClassName="bg-black/10 backdrop-blur-md"
+            paddingClassName="p-0 md:p-3"
+            panelClassName="bg-white md:bg-white/70 md:backdrop-blur-2xl md:rounded-2xl w-full h-full md:w-[70vw] md:max-w-[1200px] md:max-h-[97vh] md:h-[97vh] overflow-hidden shadow-modal md:border md:border-white/60 transform transition-all duration-200 ease-out flex flex-col"
+        >
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 md:px-6 py-2.5 md:py-3 border-b border-evidence-200/40 bg-gradient-to-r from-evidence-100/50 to-evidence-50/30 backdrop-blur-xl flex-shrink-0">
                     <div className="flex items-center space-x-3 flex-1 min-w-0">
@@ -1333,7 +1338,6 @@ export default function AddEvidenceModal({
                     }}
                     initiativeId={initiativeId}
                 />
-            </div>
-        </div>
+        </ModalFrame>
     )
 } 

@@ -9,6 +9,7 @@ import { formatDate } from '../utils'
 import { AuthService } from '../services/auth'
 import { supabase } from '../services/supabase'
 import { User } from '../types'
+import MarketingPageShell, { MarketingLogoHeader } from '../components/MarketingPageShell'
 import toast from 'react-hot-toast'
 
 interface InviteAcceptPageProps {
@@ -143,35 +144,15 @@ export default function InviteAcceptPage({ onInviteAccepted }: InviteAcceptPageP
         setAccepting(false)
     }
 
-    const brandColor = '#c0dfa1'
-
     const pageWrapper = (children: React.ReactNode) => (
-        <div className="min-h-screen font-figtree relative">
-            <div
-                className="fixed inset-0 pointer-events-none"
-                style={{
-                    background: `
-                        radial-gradient(ellipse 80% 50% at 20% 40%, ${brandColor}90, transparent 60%),
-                        radial-gradient(ellipse 60% 80% at 80% 20%, ${brandColor}70, transparent 55%),
-                        radial-gradient(ellipse 50% 60% at 60% 80%, ${brandColor}60, transparent 55%),
-                        linear-gradient(180deg, white 0%, #fafafa 100%)
-                    `
-                }}
-            />
-            <div className="relative z-10 flex items-center justify-center p-4 min-h-screen">
-                {children}
-            </div>
-        </div>
+        <MarketingPageShell contentClassName="contents" centerClassName="flex items-center justify-center p-4 min-h-screen">
+            {children}
+        </MarketingPageShell>
     )
 
     const logoHeader = () => (
         <div className="text-center mb-6">
-            <div className="flex justify-center items-center gap-2 mb-4">
-                <div className="w-10 h-10 rounded-lg overflow-hidden">
-                    <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
-                </div>
-                <span className="text-xl font-newsreader font-extralight text-foreground">Nexus Impacts</span>
-            </div>
+            <MarketingLogoHeader />
         </div>
     )
 

@@ -29,7 +29,7 @@ import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 const categoryConfig: Record<string, { bg: string; text: string; gradient: string; accent: string }> = {
     impact: { bg: 'bg-purple-500', text: 'text-purple-600', gradient: 'from-purple-500 to-purple-600', accent: '#8b5cf6' },
     output: { bg: 'bg-accent', text: 'text-accent', gradient: 'from-accent to-primary-600', accent: '#c0dfa1' },
-    input: { bg: 'bg-blue-500', text: 'text-blue-600', gradient: 'from-blue-500 to-blue-600', accent: '#3b82f6' }
+    input: { bg: 'bg-evidence-500', text: 'text-evidence-700', gradient: 'from-evidence-500 to-evidence-600', accent: '#82a3a1' }
 }
 
 export default function PublicMetricPage() {
@@ -100,7 +100,7 @@ export default function PublicMetricPage() {
     if (error || !metric) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center px-6">
-                <div className="rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-12 text-center max-w-md">
+                <div className="rounded-3xl bg-white border border-gray-200/80 shadow-public p-12 text-center max-w-md">
                     <BarChart3 className="w-16 h-16 text-gray-300 mx-auto mb-6" />
                     <h1 className="text-2xl font-semibold text-gray-800 mb-3">Metric Not Found</h1>
                     <p className="text-gray-500 mb-8">{error || 'This metric does not exist.'}</p>
@@ -484,7 +484,7 @@ export default function PublicMetricPage() {
                         </div>
 
                         {/* Big Total Card - Full width on mobile */}
-                        <div className="rounded-2xl sm:rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-6 lg:min-w-[200px] lg:max-w-[240px]">
+                        <div className="rounded-2xl sm:rounded-3xl bg-white border border-gray-200/80 shadow-public p-4 sm:p-6 lg:min-w-[200px] lg:max-w-[240px]">
                             <p className="text-gray-500 text-xs sm:text-sm font-medium mb-0.5 sm:mb-1">{metric.metric_type === 'percentage' ? 'Average' : 'Total Impact'}</p>
                             <p className={`text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight ${config.text}`}>
                                 {(hasActiveFilters ? filteredTotal : metric.total_value).toLocaleString()}{metric.metric_type === 'percentage' ? '%' : ''}
@@ -497,7 +497,7 @@ export default function PublicMetricPage() {
                 {/* Dashboard Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-5 sm:mb-8">
                     {/* Chart - Takes 2 columns */}
-                    <div className="lg:col-span-2 rounded-2xl sm:rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
+                    <div className="lg:col-span-2 rounded-2xl sm:rounded-3xl bg-white border border-gray-200/80 shadow-public overflow-hidden">
                         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/40 flex items-center justify-between">
                             <h2 className="font-semibold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
                                 <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
@@ -627,7 +627,7 @@ export default function PublicMetricPage() {
                     </div>
 
                     {/* Impact Claims - Right side scrollable */}
-                    <div className="rounded-2xl sm:rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden flex flex-col max-h-[300px] sm:max-h-[400px]">
+                    <div className="rounded-2xl sm:rounded-3xl bg-white border border-gray-200/80 shadow-public overflow-hidden flex flex-col max-h-[300px] sm:max-h-[400px]">
                         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/40 flex-shrink-0">
                             <h2 className="font-semibold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
                                 <Target className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
@@ -687,7 +687,7 @@ export default function PublicMetricPage() {
                 <>
                     <div className="fixed inset-0 z-[9998]" onClick={() => setShowLocationDropdown(false)} />
                     <div
-                        className="fixed w-64 bg-white rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] border border-gray-100 z-[9999] py-1 max-h-72 overflow-y-auto"
+                        className="fixed w-64 bg-white rounded-xl shadow-modal border border-gray-100 z-[9999] py-1 max-h-72 overflow-y-auto"
                         style={(() => {
                             const rect = locationBtnRef.current?.getBoundingClientRect()
                             if (!rect) return {}
@@ -731,7 +731,7 @@ export default function PublicMetricPage() {
                 <>
                     <div className="fixed inset-0 z-[9998]" onClick={() => setShowBenDropdown(false)} />
                     <div
-                        className="fixed w-64 bg-white rounded-xl shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] border border-gray-100 z-[9999] py-1 max-h-72 overflow-y-auto"
+                        className="fixed w-64 bg-white rounded-xl shadow-modal border border-gray-100 z-[9999] py-1 max-h-72 overflow-y-auto"
                         style={(() => {
                             const rect = benBtnRef.current?.getBoundingClientRect()
                             if (!rect) return {}
@@ -808,7 +808,7 @@ function ImpactClaimCard({ update, unit, isPercentage, config, orgSlug, initiati
     return (
         <Link
             to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/claim/${update.id}`}
-            className="block p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group active:scale-[0.98]"
+            className="block p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 transition-all group active:scale-[0.98]"
         >
             <div className="flex items-start justify-between gap-2 sm:gap-3">
                 <div className="flex-1 min-w-0">
@@ -876,7 +876,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
     const orgLinkBase = useOrgLinkBase()
     const typeConfig: Record<string, { bg: string; label: string }> = {
         visual_proof: { bg: 'bg-pink-100 text-pink-800', label: 'Visual Proof' },
-        documentation: { bg: 'bg-blue-100 text-blue-700', label: 'Documentation' },
+        documentation: { bg: 'bg-evidence-100 text-evidence-700', label: 'Documentation' },
         testimony: { bg: 'bg-orange-100 text-orange-800', label: 'Testimonies' },
         financials: { bg: 'bg-primary-100 text-primary-800', label: 'Financials' }
     }
@@ -990,7 +990,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
 
     return (
         <>
-            <div className="rounded-2xl sm:rounded-3xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden">
+            <div className="rounded-2xl sm:rounded-3xl bg-white border border-gray-200/80 shadow-public overflow-hidden">
                 <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/40 flex items-center justify-between">
                     <h2 className="font-semibold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
                         <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
@@ -1019,7 +1019,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                 <button
                                     key={ev.id}
                                     onClick={() => openGallery(idx)}
-                                    className="rounded-2xl overflow-hidden group text-left bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all"
+                                    className="rounded-2xl overflow-hidden group text-left bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 transition-all"
                                 >
                                     {previewUrl ? (
                                         <div className="relative aspect-video bg-gray-100 overflow-hidden">
@@ -1111,7 +1111,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
                             {/* File preview */}
                             <div className="lg:col-span-2 flex flex-col">
-                                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] overflow-hidden flex-1 flex flex-col">
+                                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public overflow-hidden flex-1 flex flex-col">
                                     <div className="relative bg-gray-900 flex-1 min-h-[250px] sm:min-h-[400px] max-h-[50vh] sm:max-h-[60vh] flex items-center justify-center">
                                         {galleryFile ? (
                                             isImageFile(galleryFile.file_url) ? (
@@ -1183,7 +1183,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
 
                             {/* Sidebar */}
                             <div className="lg:col-span-1 flex flex-col gap-3 sm:gap-4 min-h-0 overflow-y-auto">
-                                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5 flex-shrink-0">
+                                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-4 sm:p-5 flex-shrink-0">
                                     <h2 className="font-semibold text-foreground text-base sm:text-lg mb-1">{galleryItem.title}</h2>
                                     {galleryItem.description && <p className="text-muted-foreground text-xs sm:text-sm mb-3 line-clamp-4">{galleryItem.description}</p>}
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -1201,7 +1201,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
 
                                 {/* Impact Claims */}
                                 {galleryItem.impact_claims && galleryItem.impact_claims.length > 0 ? (
-                                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5 flex-shrink-0">
+                                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-4 sm:p-5 flex-shrink-0">
                                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Supporting Impact Claims</h3>
                                         <div className="space-y-2">
                                             {galleryItem.impact_claims.map((claim: any) => {
@@ -1213,7 +1213,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                                         ? formatDate(claim.date_represented)
                                                         : ''
                                                 return (
-                                                    <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`} className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group">
+                                                    <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}`} className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 transition-all group">
                                                         <p className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors">
                                                             {claim.value}{claim.kpis?.metric_type === 'percentage' ? '%' : ` ${claim.kpis?.unit_of_measurement || ''}`}
                                                         </p>
@@ -1225,11 +1225,11 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                         </div>
                                     </div>
                                 ) : galleryItem.kpis && galleryItem.kpis.length > 0 ? (
-                                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] p-4 sm:p-5 flex-shrink-0">
+                                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-4 sm:p-5 flex-shrink-0">
                                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Linked Metrics</h3>
                                         <div className="space-y-2">
                                             {galleryItem.kpis.map((kpi) => (
-                                                <Link key={kpi.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}`} className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-[0_2px_8px_-1px_rgba(15,23,42,0.10),0_4px_16px_-4px_rgba(15,23,42,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(15,23,42,0.14),0_6px_20px_-6px_rgba(15,23,42,0.14)] hover:border-gray-300 transition-all group">
+                                                <Link key={kpi.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}`} className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 transition-all group">
                                                     <p className="text-sm font-medium text-foreground group-hover:text-accent transition-colors">{kpi.title}</p>
                                                 </Link>
                                             ))}

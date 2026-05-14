@@ -41,7 +41,9 @@ import BeneficiariesTab from '../components/InitiativeTabs/BeneficiariesTab'
 import StoriesTab from '../components/InitiativeTabs/StoriesTab'
 import ReportTab from '../components/InitiativeTabs/ReportTab'
 import MobileBottomNav from '../components/MobileBottomNav'
+import ModalFrame from '../components/ModalFrame'
 import toast from 'react-hot-toast'
+import { Button } from '../components/ui/button'
 export default function InitiativePage() {
     const [user, setUser] = useState<User | null>(null)
     const [organization, setOrganization] = useState<Organization | null>(null)
@@ -546,12 +548,12 @@ export default function InitiativePage() {
             <div className="text-center py-12">
                 <div className="text-red-600 mb-4">{loadingState.error || 'Initiative not found'}</div>
                 <div className="space-x-4">
-                    <Link to="/" className="btn-secondary">
-                        Back to Dashboard
-                    </Link>
-                    <button onClick={loadDashboard} className="btn-primary" disabled={isLoadingDashboard}>
+                    <Button asChild variant="secondary">
+                        <Link to="/">Back to Dashboard</Link>
+                    </Button>
+                    <Button onClick={loadDashboard} disabled={isLoadingDashboard}>
                         {isLoadingDashboard ? 'Loading...' : 'Try Again'}
-                    </button>
+                    </Button>
                 </div>
             </div>
         )
@@ -669,8 +671,7 @@ export default function InitiativePage() {
 
             {/* Modern Delete Confirmation Dialog */}
             {deleteConfirmKPI && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
-                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-bubble-lg border border-gray-100">
+                <ModalFrame zIndexClass="z-[60]" backdropClassName="bg-black/40 backdrop-blur-sm" panelClassName="bg-white rounded-2xl max-w-md w-full p-6 shadow-bubble-lg border border-gray-100">
                         <div className="flex items-start space-x-4 mb-6">
                             <div className="icon-bubble">
                                 <Trash2 className="w-5 h-5 text-red-500" />
@@ -716,8 +717,7 @@ export default function InitiativePage() {
                                 Delete Metric
                             </button>
                         </div>
-                    </div>
-                </div>
+                </ModalFrame>
             )}
         </div>
     )

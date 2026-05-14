@@ -1,8 +1,13 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import {
+    Home,
     BarChart3,
     FileText,
+    MapPin,
+    Users,
+    BookOpen,
+    FileBarChart,
     ArrowLeft
 } from 'lucide-react'
 
@@ -13,8 +18,13 @@ interface MobileBottomNavProps {
 
 export default function MobileBottomNav({ activeTab, onTabChange }: MobileBottomNavProps) {
     const tabs = [
+        { id: 'home', label: 'Home', icon: Home },
         { id: 'metrics', label: 'Metrics', icon: BarChart3 },
         { id: 'evidence', label: 'Evidence', icon: FileText },
+        { id: 'location', label: 'Locations', icon: MapPin },
+        { id: 'beneficiaries', label: 'People', icon: Users },
+        { id: 'stories', label: 'Stories', icon: BookOpen },
+        { id: 'report', label: 'Report', icon: FileBarChart },
     ]
 
     return (
@@ -47,4 +57,3 @@ export default function MobileBottomNav({ activeTab, onTabChange }: MobileBottom
         </div>
     )
 }
-

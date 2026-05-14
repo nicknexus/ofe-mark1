@@ -71,7 +71,7 @@ export default function ExplorePage({ embedded = false }: ExplorePageProps) {
     }
 
     return (
-        <div className={`${embedded ? 'min-h-0 pb-4' : 'min-h-screen'} font-figtree relative animate-fadeIn`}>
+        <div className={`landing-page ${embedded ? 'min-h-0 pb-4' : 'min-h-screen'} font-figtree relative animate-fadeIn`}>
             {/* Flowing gradient background with fading grid */}
             <div className={`${embedded ? 'absolute' : 'fixed'} inset-0 pointer-events-none`}>
                 {/* Subtle grid pattern */}

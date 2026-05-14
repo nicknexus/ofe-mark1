@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { X } from 'lucide-react'
+import ModalFrame from './ModalFrame'
 import { CreateInitiativeForm } from '../types'
 
 interface CreateInitiativeModalProps {
@@ -51,8 +52,10 @@ export default function CreateInitiativeModal({
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60] animate-fade-in">
-            <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-hidden shadow-[0_25px_80px_-10px_rgba(0,0,0,0.3)] transform transition-all duration-200 ease-out animate-slide-up-fast">
+        <ModalFrame
+            zIndexClass="z-[60]"
+            panelClassName="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-hidden shadow-modal transform transition-all duration-200 ease-out"
+        >
                 <div className="overflow-y-auto max-h-[90vh]">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
@@ -141,7 +144,6 @@ export default function CreateInitiativeModal({
                     </div>
                 </form>
                 </div>
-            </div>
-        </div>
+        </ModalFrame>
     )
 } 
