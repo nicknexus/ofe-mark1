@@ -558,7 +558,7 @@ export default function EasyEvidenceModal({
                                                                     }`}
                                                                 >
                                                                     <Icon className={`w-4 h-4 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
-                                                                    <span className={`text-[10px] font-medium ${isSelected ? 'text-evidence-700' : 'text-gray-600'}`}>
+                                                                    <span className={`text-xs font-medium ${isSelected ? 'text-evidence-700' : 'text-gray-600'}`}>
                                                                         {type.label}
                                                                     </span>
                                                                 </button>

@@ -880,7 +880,7 @@ export default function PublicOrganizationPage() {
                             {hasActiveFilters && (
                                 <button
                                     onClick={clearFilters}
-                                    className="flex items-center gap-0.5 px-1.5 py-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                                    className="flex items-center gap-0.5 px-1.5 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
                                 >
                                     <X className="w-3 h-3" /> Clear
                                 </button>
@@ -977,7 +977,7 @@ export default function PublicOrganizationPage() {
                                     </div>
                                     <div className="min-w-0">
                                         <span className={`truncate block ${isSelected ? 'text-blue-700' : 'text-gray-900'}`}>{loc.name}</span>
-                                        {loc.country && <span className="text-[10px] text-gray-500">{loc.country}</span>}
+                                        {loc.country && <span className="text-xs text-gray-500">{loc.country}</span>}
                                     </div>
                                 </button>
                             )
@@ -1069,7 +1069,7 @@ export default function PublicOrganizationPage() {
                                 </div>
                                 <h2 className="font-semibold text-foreground text-sm md:text-base">Initiatives</h2>
                                 <span
-                                    className="px-2 py-0.5 text-[11px] font-semibold rounded-full text-gray-700"
+                                    className="px-2 py-0.5 text-xs font-semibold rounded-full text-gray-700"
                                     style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
                                 >{filteredInitiatives.length}</span>
                             </div>
@@ -1105,7 +1105,7 @@ export default function PublicOrganizationPage() {
                                     >
                                         <h4 className="font-medium text-foreground text-xs line-clamp-2 group-hover:text-accent transition-colors leading-snug">{init.title}</h4>
                                         {init.region && (
-                                            <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                                                 <MapPin className="w-2.5 h-2.5" />{init.region}
                                             </p>
                                         )}
@@ -1277,7 +1277,7 @@ export default function PublicOrganizationPage() {
                                         <h2 className="font-semibold text-foreground">Global Impact</h2>
                                     </div>
                                     <span
-                                        className="px-2 py-0.5 text-[11px] font-semibold rounded-full text-gray-700"
+                                        className="px-2 py-0.5 text-xs font-semibold rounded-full text-gray-700"
                                         style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
                                     >
                                         {filteredLocations.length} locations
@@ -1333,7 +1333,7 @@ export default function PublicOrganizationPage() {
                                             backgroundColor: brandColor,
                                             animation: 'fadeInOut 7s ease-in-out forwards',
                                         }
-                                        const className = "absolute px-2 py-0.5 md:px-3 md:py-1.5 rounded-full text-white text-[10px] md:text-xs font-medium shadow-lg transition-all duration-200 hover:scale-105 hover:brightness-110 hover:shadow-xl whitespace-nowrap max-w-[45%] md:max-w-[40%] flex items-center"
+                                        const className = "absolute px-2 py-0.5 md:px-3 md:py-1.5 rounded-full text-white text-xs font-medium shadow-lg transition-all duration-200 hover:scale-105 hover:brightness-110 hover:shadow-xl whitespace-nowrap max-w-[45%] md:max-w-[40%] flex items-center"
 
                                         return popup.initiative_slug ? (
                                             <Link
@@ -1375,7 +1375,7 @@ export default function PublicOrganizationPage() {
                                         </div>
                                         <h2 className="font-semibold text-foreground">Stories</h2>
                                         <span
-                                            className="px-2 py-0.5 text-[11px] font-semibold rounded-full text-gray-700"
+                                            className="px-2 py-0.5 text-xs font-semibold rounded-full text-gray-700"
                                             style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
                                         >{filteredStories.length}</span>
                                     </div>
@@ -1550,7 +1550,7 @@ export default function PublicOrganizationPage() {
                                                         />
                                                         <div className="flex items-center gap-2 mb-2 pl-1">
                                                             <span
-                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider"
+                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider"
                                                                 style={{ backgroundColor: `${brandColor}30`, color: '#374151' }}
                                                             >
                                                                 {isStat ? 'Stat' : 'Statement'}
@@ -1592,7 +1592,7 @@ export default function PublicOrganizationPage() {
                                                             )}
                                                         </div>
                                                         <div className="pl-1 mt-2 flex items-center justify-between">
-                                                            <span className="text-[11px] font-medium text-gray-500 group-hover:text-gray-800 transition-colors">
+                                                            <span className="text-xs font-medium text-gray-500 group-hover:text-gray-800 transition-colors">
                                                                 Read more
                                                             </span>
                                                             <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-gray-800 transition-colors" />
@@ -1625,7 +1625,7 @@ export default function PublicOrganizationPage() {
                                         </div>
                                         <h2 className="font-semibold text-foreground">Initiatives</h2>
                                         <span
-                                            className="px-2 py-0.5 text-[11px] font-semibold rounded-full text-gray-700"
+                                            className="px-2 py-0.5 text-xs font-semibold rounded-full text-gray-700"
                                             style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
                                         >{filteredInitiatives.length}</span>
                                     </div>
@@ -1719,7 +1719,7 @@ export default function PublicOrganizationPage() {
                                                             </defs>
                                                             <XAxis
                                                                 dataKey="date"
-                                                                tick={{ fontSize: 10, fill: '#6b7280' }}
+                                                                tick={{ fontSize: 11, fill: '#6b7280' }}
                                                                 tickLine={false}
                                                                 axisLine={false}
                                                                 angle={-45}
@@ -1727,7 +1727,7 @@ export default function PublicOrganizationPage() {
                                                                 height={50}
                                                             />
                                                             <YAxis
-                                                                tick={{ fontSize: 10, fill: '#6b7280' }}
+                                                                tick={{ fontSize: 11, fill: '#6b7280' }}
                                                                 tickLine={false}
                                                                 axisLine={false}
                                                                 tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
@@ -1802,7 +1802,7 @@ export default function PublicOrganizationPage() {
                                 </div>
                                 <h2 className="font-semibold text-foreground text-sm">Initiatives</h2>
                                 <span
-                                    className="px-2 py-0.5 text-[11px] font-semibold rounded-full text-gray-700"
+                                    className="px-2 py-0.5 text-xs font-semibold rounded-full text-gray-700"
                                     style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
                                 >{filteredInitiatives.length}</span>
                             </div>
@@ -1838,7 +1838,7 @@ export default function PublicOrganizationPage() {
                                     >
                                         <h4 className="font-medium text-foreground text-xs line-clamp-2 group-hover:text-accent transition-colors">{init.title}</h4>
                                         {init.region && (
-                                            <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
+                                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                                                 <MapPin className="w-2.5 h-2.5" />{init.region}
                                             </p>
                                         )}
@@ -1865,7 +1865,7 @@ export default function PublicOrganizationPage() {
                                     </div>
                                     <h2 className="font-semibold text-foreground text-sm md:text-base">Key Metrics</h2>
                                     <span
-                                        className="px-2 py-0.5 text-[11px] font-semibold rounded-full text-gray-700"
+                                        className="px-2 py-0.5 text-xs font-semibold rounded-full text-gray-700"
                                         style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
                                     >{filteredMetrics.length}</span>
                                 </div>
@@ -1887,7 +1887,7 @@ export default function PublicOrganizationPage() {
                                                 className="group relative rounded-xl bg-white border border-gray-200/80 overflow-hidden shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 h-[88px] md:h-[15.5vh] flex flex-col"
                                             >
                                                 {metric.unit_of_measurement && metric.metric_type !== 'percentage' && (
-                                                    <span className="absolute top-1 right-1.5 md:top-1.5 md:right-2 text-[9px] md:text-[10px] font-medium text-gray-400 leading-tight truncate max-w-[60%] text-right">
+                                                    <span className="absolute top-1 right-1.5 md:top-1.5 md:right-2 text-xs font-medium text-gray-400 leading-tight truncate max-w-[60%] text-right">
                                                         {metric.unit_of_measurement}
                                                     </span>
                                                 )}
@@ -1933,7 +1933,7 @@ export default function PublicOrganizationPage() {
                                     </div>
                                     <h2 className="font-semibold text-foreground text-sm md:text-base">Impact Claims</h2>
                                     <span
-                                        className="px-2 py-0.5 text-[11px] font-semibold rounded-full text-gray-700"
+                                        className="px-2 py-0.5 text-xs font-semibold rounded-full text-gray-700"
                                         style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
                                     >{allImpactClaims.length}</span>
                                 </div>
@@ -1964,7 +1964,7 @@ export default function PublicOrganizationPage() {
                                                             {claim.metricType !== 'percentage' && <span className="text-xs text-muted-foreground">{claim.metricUnit}</span>}
                                                         </div>
                                                         <p className="text-xs text-muted-foreground truncate mt-0.5">{claim.metricTitle}</p>
-                                                        <p className="text-[10px] text-muted-foreground/70 truncate">{claim.initiativeTitle}</p>
+                                                        <p className="text-xs text-muted-foreground/70 truncate">{claim.initiativeTitle}</p>
                                                         {claim.tag_id && tagsById.get(claim.tag_id) && (
                                                             <div className="mt-1 flex">
                                                                 <PublicTagChip
@@ -1977,10 +1977,10 @@ export default function PublicOrganizationPage() {
                                                         )}
                                                     </div>
                                                     <div className="text-right flex-shrink-0">
-                                                        <span className={`px-1.5 py-0.5 text-[9px] font-semibold rounded-full ${claim.category === 'impact' ? 'bg-purple-100/80 text-purple-700' :
+                                                        <span className={`px-1.5 py-0.5 text-xs font-semibold rounded-full ${claim.category === 'impact' ? 'bg-purple-100/80 text-purple-700' :
                                                                 claim.category === 'output' ? 'bg-green-100/80 text-green-700' : 'bg-blue-100/80 text-blue-700'
                                                             }`}>{claim.category}</span>
-                                                        <p className="text-[10px] text-muted-foreground mt-1">
+                                                        <p className="text-xs text-muted-foreground mt-1">
                                                             {formatDate(claim.date_represented)}
                                                         </p>
                                                     </div>
@@ -2008,7 +2008,7 @@ export default function PublicOrganizationPage() {
                                 </div>
                                 <h2 className="font-semibold text-foreground text-sm">Evidence</h2>
                                 <span
-                                    className="px-2 py-0.5 text-[11px] font-semibold rounded-full text-gray-700"
+                                    className="px-2 py-0.5 text-xs font-semibold rounded-full text-gray-700"
                                     style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
                                 >{filteredEvidence.length}</span>
                             </div>
@@ -2085,7 +2085,7 @@ export default function PublicOrganizationPage() {
                                                         >
                                                             <FileText className="w-4 h-4 md:w-6 md:h-6 text-white" />
                                                         </div>
-                                                        <span className="text-[10px] md:text-xs font-medium text-muted-foreground px-1 md:px-2 text-center line-clamp-1 md:line-clamp-2">{ev.title || 'Document'}</span>
+                                                        <span className="text-xs font-medium text-muted-foreground px-1 md:px-2 text-center line-clamp-1 md:line-clamp-2">{ev.title || 'Document'}</span>
                                                     </div>
                                                 )}
                                             </Link>

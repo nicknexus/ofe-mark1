@@ -86,7 +86,7 @@ function UploadModeChooser({
                         <div>
                             <div className="flex items-center gap-2">
                                 <h3 className="text-sm font-semibold text-gray-900">Simple</h3>
-                                <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">Classic</span>
+                                <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">Classic</span>
                             </div>
                             <p className="text-xs text-gray-600 mt-1 leading-relaxed">
                                 For evidence that's all the same — same impact claim, date, and location. One guided form, one record.
@@ -104,7 +104,7 @@ function UploadModeChooser({
                         <div>
                             <div className="flex items-center gap-2">
                                 <h3 className="text-sm font-semibold text-gray-900">Advanced</h3>
-                                <span className="text-[10px] font-medium text-evidence-700 bg-evidence-100 px-1.5 py-0.5 rounded">New</span>
+                                <span className="text-xs font-medium text-evidence-700 bg-evidence-100 px-1.5 py-0.5 rounded">New</span>
                             </div>
                             <p className="text-xs text-gray-600 mt-1 leading-relaxed">
                                 For uploads that span multiple impact claims, dates, or locations. Drop everything in, then organize it into groups.

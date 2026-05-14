@@ -336,7 +336,7 @@ export default function Layout({ user, children }: LayoutProps) {
                                                 {user.name || user.email}
                                             </span>
                                             {(activeOrganization || organization) && (
-                                                <span className="text-[10px] text-gray-500 truncate w-full leading-tight">
+                                                <span className="text-xs text-gray-500 truncate w-full leading-tight">
                                                     {activeOrganization?.name || organization?.name}
                                                 </span>
                                             )}

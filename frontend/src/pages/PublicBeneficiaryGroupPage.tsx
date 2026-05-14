@@ -484,7 +484,7 @@ export default function PublicBeneficiaryGroupPage() {
                                                                 <div className={`w-1.5 h-1.5 rounded-full ${colors.dotColor} flex-shrink-0`} />
                                                                 <div className="min-w-0 flex-1">
                                                                     <p className="text-xs font-medium text-gray-900 truncate">{ev.title}</p>
-                                                                    {ev.description && <p className="text-[10px] text-gray-500 mt-0.5 line-clamp-1">{ev.description}</p>}
+                                                                    {ev.description && <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{ev.description}</p>}
                                                                     {ev.tag_ids && ev.tag_ids.length > 0 && (
                                                                         <div className="flex flex-wrap gap-1 mt-1" onClick={(e) => e.preventDefault()}>
                                                                             {ev.tag_ids.slice(0, 2).map(id => {

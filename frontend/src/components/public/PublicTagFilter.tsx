@@ -61,7 +61,7 @@ export default function PublicTagFilter({
             <button
                 ref={btnRef}
                 onClick={() => setOpenAnnounced(!open)}
-                className={`flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all border shadow-sm flex-shrink-0 ${className}`}
+                className={`flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-xs font-medium transition-all border shadow-sm flex-shrink-0 ${className}`}
                 style={selectedTagIds.length > 0 && activeColor
                     ? {
                         borderColor: activeColor,

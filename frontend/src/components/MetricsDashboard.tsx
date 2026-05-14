@@ -941,7 +941,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                         <div key={k.id} style={{ marginBottom: 6 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                                 <span style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: color, display: 'inline-block' }} />
-                                <span style={{ fontWeight: 500, color: '#0f172a', fontSize: 11 }}>{k.title}</span>
+                                <span style={{ fontWeight: 500, color: '#0f172a', fontSize: 12 }}>{k.title}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, paddingLeft: 14 }}>
                                 <span style={{ color: '#94a3b8' }}>This month</span>
@@ -1007,7 +1007,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             </div>
                             <span className="ml-2">Metrics</span>
                             {visibleKPIs.size > 0 && visibleKPIs.size < kpis.length && (
-                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
+                                <span className="ml-1 bg-primary-500 text-white text-xs px-1 rounded-full">
                                     {visibleKPIs.size}
                                 </span>
                             )}
@@ -1102,7 +1102,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             </div>
                             <span className="ml-2">Location</span>
                             {selectedLocations.length > 0 && (
-                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
+                                <span className="ml-1 bg-primary-500 text-white text-xs px-1 rounded-full">
                                     {selectedLocations.length}
                                 </span>
                             )}
@@ -1192,7 +1192,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             </div>
                             <span className="ml-2">Tag</span>
                             {selectedTags.length > 0 && (
-                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
+                                <span className="ml-1 bg-primary-500 text-white text-xs px-1 rounded-full">
                                     {selectedTags.length}
                                 </span>
                             )}
@@ -1277,7 +1277,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             </div>
                             <span className="ml-2">Groups</span>
                             {selectedBeneficiaryGroups.length > 0 && (
-                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
+                                <span className="ml-1 bg-primary-500 text-white text-xs px-1 rounded-full">
                                     {selectedBeneficiaryGroups.length}
                                 </span>
                             )}
@@ -1378,7 +1378,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                         {user.name || user.email}
                                     </span>
                                     {organization && (
-                                        <span className="text-[10px] text-gray-500 truncate w-full leading-tight">
+                                        <span className="text-xs text-gray-500 truncate w-full leading-tight">
                                             {organization.name}
                                         </span>
                                     )}
@@ -1537,7 +1537,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                     <XAxis
                                         dataKey="date"
                                         stroke="#cbd5e1"
-                                        fontSize={10}
+                                        fontSize={11}
                                         tickLine={false}
                                         axisLine={false}
                                         tick={{ fill: '#94a3b8' }}
@@ -1550,7 +1550,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                     />
                                     <YAxis
                                         stroke="#cbd5e1"
-                                        fontSize={10}
+                                        fontSize={11}
                                         tickLine={false}
                                         axisLine={false}
                                         tick={{ fill: '#94a3b8' }}
@@ -1595,7 +1595,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                         />
                                     )}
                                     <Legend
-                                        wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
+                                        wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
                                         formatter={(value) => {
                                             const kpi = kpis.find(k => k.id === value)
                                             return kpi ? kpi.title : value
@@ -1726,7 +1726,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                             <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
                                 <BarChart3 className="w-4 h-4 text-primary-500" />
                             </div>
-                            <span className="text-[11px] font-medium text-gray-600">Impact Claims</span>
+                            <span className="text-xs font-medium text-gray-600">Impact Claims</span>
                         </div>
                         <span className="text-sm font-semibold text-primary-500">{filteredUpdates.length.toLocaleString()}</span>
                     </div>
@@ -1734,7 +1734,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     <div className="flex-1 bg-white rounded-xl shadow-bubble-sm border border-gray-100 evidence-border px-3 py-1.5 flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                             <Target className="w-3.5 h-3.5 text-evidence-400" />
-                            <span className="text-[11px] font-medium text-gray-600">Evidence Coverage</span>
+                            <span className="text-xs font-medium text-gray-600">Evidence Coverage</span>
                         </div>
                         <span className="text-sm font-semibold text-evidence-500">{stats.evidence_coverage_percentage}%</span>
                     </div>
@@ -1742,7 +1742,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                     <div className="flex-1 bg-white rounded-xl shadow-bubble-sm border border-gray-100 evidence-border px-3 py-1.5 flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                             <FileText className="w-3.5 h-3.5 text-evidence-400" />
-                            <span className="text-[11px] font-medium text-gray-600">Evidence Uploaded</span>
+                            <span className="text-xs font-medium text-gray-600">Evidence Uploaded</span>
                         </div>
                         <span className="text-sm font-semibold text-evidence-500">{(stats.total_evidence || 0).toLocaleString()}</span>
                     </div>

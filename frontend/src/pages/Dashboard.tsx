@@ -261,7 +261,7 @@ function ContextScoreCard({
                     <Compass className="w-4 h-4 text-primary-600" />
                 </div>
                 <h3 className="text-[13px] font-semibold text-gray-900 tracking-tight flex-1">Context Page</h3>
-                <span className="text-[11px] font-semibold text-gray-500">{score.done}/{score.total}</span>
+                <span className="text-xs font-semibold text-gray-500">{score.done}/{score.total}</span>
                 <ArrowRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all" />
             </div>
             <div className="w-full h-1.5 bg-gray-100/80 rounded-full overflow-hidden">
@@ -274,7 +274,7 @@ function ContextScoreCard({
                 {checks.map(c => (
                     <span
                         key={c.id}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${c.done
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${c.done
                                 ? 'bg-green-50 text-green-700 ring-1 ring-green-100'
                                 : 'bg-gray-50 text-gray-500 ring-1 ring-gray-100'
                             }`}
@@ -318,7 +318,7 @@ function NextStepsCard({
                             <Check className="w-5 h-5 text-green-600" />
                         </div>
                         <p className="text-xs font-medium text-gray-700">All caught up!</p>
-                        <p className="text-[11px] text-gray-500 mt-0.5">Your dashboard is in great shape.</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Your dashboard is in great shape.</p>
                     </div>
                 ) : (
                     steps.map(s => {

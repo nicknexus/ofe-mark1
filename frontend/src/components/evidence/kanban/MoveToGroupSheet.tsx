@@ -35,7 +35,7 @@ export default function MoveToGroupSheet({
                         <h3 className="text-base font-semibold text-gray-900">
                             Move {selectedCount} file{selectedCount === 1 ? '' : 's'} to…
                         </h3>
-                        <p className="text-[11px] text-gray-500">Tap an evidence group or create a new one.</p>
+                        <p className="text-xs text-gray-500">Tap an evidence group or create a new one.</p>
                     </div>
                     <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100" aria-label="Close">
                         <X className="w-5 h-5 text-gray-500" />
@@ -67,16 +67,16 @@ export default function MoveToGroupSheet({
                                         <div className="flex items-center gap-1.5">
                                             <span className="text-sm font-semibold text-gray-800 truncate">{g.name}</span>
                                             {isCurrent && (
-                                                <span className="text-[10px] text-gray-400">(current)</span>
+                                                <span className="text-xs text-gray-400">(current)</span>
                                             )}
                                         </div>
                                         <div className="mt-0.5">
                                             {v.ready ? (
-                                                <span className="inline-flex items-center gap-1 text-[10px] text-green-700 font-semibold">
+                                                <span className="inline-flex items-center gap-1 text-xs text-green-700 font-semibold">
                                                     <Check className="w-2.5 h-2.5" /> Ready
                                                 </span>
                                             ) : (
-                                                <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 font-semibold">
+                                                <span className="inline-flex items-center gap-1 text-xs text-amber-700 font-semibold">
                                                     <AlertTriangle className="w-2.5 h-2.5" />
                                                     Missing: {v.missing.join(', ')}
                                                 </span>
@@ -98,7 +98,7 @@ export default function MoveToGroupSheet({
                     </button>
                 </div>
 
-                <div className="px-4 py-2 border-t border-gray-200 bg-gray-50 text-[10px] text-gray-500 flex-shrink-0">
+                <div className="px-4 py-2 border-t border-gray-200 bg-gray-50 text-xs text-gray-500 flex-shrink-0">
                     Tip: tap a group's header to fill in its title, date, location, and metric.
                 </div>
             </div>

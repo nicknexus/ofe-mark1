@@ -123,12 +123,12 @@ export default function AllEvidenceModal({
                         {tagFilter !== 'all' && (
                             <button
                                 onClick={() => setTagFilter('all')}
-                                className="text-[11px] text-gray-500 hover:text-gray-700 ml-1"
+                                className="text-xs text-gray-500 hover:text-gray-700 ml-1"
                             >
                                 Clear
                             </button>
                         )}
-                        <span className="ml-auto text-[11px] text-gray-500">{filteredEvidence.length} of {evidence.length}</span>
+                        <span className="ml-auto text-xs text-gray-500">{filteredEvidence.length} of {evidence.length}</span>
                     </div>
                 )}
 
@@ -189,7 +189,7 @@ export default function AllEvidenceModal({
                                                                         {ev.description}
                                                                     </p>
                                                                 )}
-                                                                <div className="flex items-center space-x-2 text-[10px] text-gray-500">
+                                                                <div className="flex items-center space-x-2 text-xs text-gray-500">
                                                                     <Calendar className="w-2.5 h-2.5" />
                                                                     <span>{displayDate}</span>
                                                                 </div>

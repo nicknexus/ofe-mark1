@@ -294,7 +294,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                             </div>
                             <span className="ml-3">Location</span>
                             {selectedLocations.length > 0 && (
-                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
+                                <span className="ml-1 bg-primary-500 text-white text-xs px-1 rounded-full">
                                     {selectedLocations.length}
                                 </span>
                             )}
@@ -328,7 +328,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                             </div>
                             <span className="ml-3">Tag</span>
                             {selectedTags.length > 0 && (
-                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
+                                <span className="ml-1 bg-primary-500 text-white text-xs px-1 rounded-full">
                                     {selectedTags.length}
                                 </span>
                             )}
@@ -369,7 +369,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                             </div>
                             <span className="ml-3">Beneficiary Group</span>
                             {selectedBeneficiaryGroups.length > 0 && (
-                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
+                                <span className="ml-1 bg-primary-500 text-white text-xs px-1 rounded-full">
                                     {selectedBeneficiaryGroups.length}
                                 </span>
                             )}

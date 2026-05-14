@@ -109,6 +109,10 @@ export default {
                 newsreader: ['Newsreader', 'serif'],
                 figtree: ['Figtree', 'system-ui', 'sans-serif'],
             },
+            /** 12px floor for UI copy; same rem as `text-xs`, semantic alias for chips/metadata. */
+            fontSize: {
+                caption: ['0.75rem', { lineHeight: '1.25' }],
+            },
             boxShadow: {
                 // Soft floating card shadows
                 'bubble': '0 4px 20px rgba(0, 0, 0, 0.06)',

@@ -518,7 +518,7 @@ function StatOrStatementCard({
             </span>
 
             {(hasSource || addedLabel) && (
-                <div className="mt-4 pt-3 border-t border-gray-100 text-[11px] uppercase tracking-wider text-gray-400 font-medium flex flex-wrap items-center gap-x-2 gap-y-1">
+                <div className="mt-4 pt-3 border-t border-gray-100 text-xs uppercase tracking-wider text-gray-400 font-medium flex flex-wrap items-center gap-x-2 gap-y-1">
                     {hasSource && (
                         sourceUrl ? (
                             <a
@@ -665,7 +665,7 @@ function TheoryStagesGrid({
                             </div>
                             {stage.description.trim() && (
                                 <div
-                                    className="text-[11px] mt-1 font-medium transition-colors"
+                                    className="text-xs mt-1 font-medium transition-colors"
                                     style={{ color: brandColor }}
                                 >
                                     Tap for details

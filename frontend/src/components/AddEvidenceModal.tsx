@@ -724,7 +724,7 @@ export default function AddEvidenceModal({
                                                 <Icon className={`w-5 h-5 flex-shrink-0 ${formData.type === value ? 'text-primary-500' : 'text-gray-400'}`} />
                                                 <div className="min-w-0">
                                                     <div className="text-xs font-semibold text-gray-900 truncate">{label}</div>
-                                                    <div className="text-[10px] text-gray-500 truncate">{description}</div>
+                                                    <div className="text-xs text-gray-500 truncate">{description}</div>
                                                 </div>
                                             </label>
                                         ))}
@@ -774,7 +774,7 @@ export default function AddEvidenceModal({
                                             <button
                                                 type="button"
                                                 onClick={() => setIsLocationModalOpen(true)}
-                                                className="px-2 py-1 border border-gray-300 rounded-md hover:bg-gray-50 text-[11px] font-medium text-gray-700 flex items-center gap-1 transition-colors"
+                                                className="px-2 py-1 border border-gray-300 rounded-md hover:bg-gray-50 text-xs font-medium text-gray-700 flex items-center gap-1 transition-colors"
                                                 title="Add new location"
                                             >
                                                 <Plus className="w-3 h-3" />
@@ -863,7 +863,7 @@ export default function AddEvidenceModal({
                                                         setHasChangedKPIs(hasChanged)
                                                     }
                                                 }}
-                                                className="text-[11px] px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-700 font-medium transition-colors"
+                                                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-700 font-medium transition-colors"
                                             >
                                                 Select All
                                             </button>
@@ -900,12 +900,12 @@ export default function AddEvidenceModal({
                                         <div className="flex-1 min-w-0 flex items-center gap-2">
                                             <span className="text-base font-medium text-gray-800 truncate">{kpi.title}</span>
                                                     {isPreSelected && (
-                                                                    <span className="inline-flex items-center px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-medium rounded-full flex-shrink-0">
+                                                                    <span className="inline-flex items-center px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full flex-shrink-0">
                                                             Pre-selected
                                                         </span>
                                                     )}
                                                 {'total_updates' in kpi && kpi.total_updates > 0 && (
-                                                                    <span className="inline-flex items-center justify-center w-4 h-4 bg-primary-500 text-white text-[10px] font-bold rounded-full flex-shrink-0">
+                                                                    <span className="inline-flex items-center justify-center w-4 h-4 bg-primary-500 text-white text-xs font-bold rounded-full flex-shrink-0">
                                                         {kpi.total_updates > 99 ? '99+' : kpi.total_updates}
                                                     </span>
                                                 )}
@@ -1020,7 +1020,7 @@ export default function AddEvidenceModal({
                                             <div className="flex gap-1.5">
                                                 <button
                                                     type="button"
-                                                    className="text-[11px] px-2 py-1 bg-white hover:bg-blue-50 border border-blue-200 rounded-md text-blue-700 font-medium transition-colors"
+                                                    className="text-xs px-2 py-1 bg-white hover:bg-blue-50 border border-blue-200 rounded-md text-blue-700 font-medium transition-colors"
                                                     onClick={() => {
                                                         setSelectedBeneficiaryGroupIds(beneficiaryGroups.map(g => g.id!))
                                                         if (editData) setHasChangedBeneficiaryGroups(true)
@@ -1030,7 +1030,7 @@ export default function AddEvidenceModal({
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    className="text-[11px] px-2 py-1 bg-white hover:bg-gray-50 border border-gray-200 rounded-md text-gray-600 font-medium transition-colors"
+                                                    className="text-xs px-2 py-1 bg-white hover:bg-gray-50 border border-gray-200 rounded-md text-gray-600 font-medium transition-colors"
                                                     onClick={() => {
                                                         setSelectedBeneficiaryGroupIds([])
                                                         if (editData) setHasChangedBeneficiaryGroups(true)

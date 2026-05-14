@@ -79,7 +79,7 @@ export default function ContextDetailModal({
 
                 <div className="flex items-start justify-between px-6 md:px-8 pt-6 pl-7 md:pl-9">
                     <span
-                        className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wider"
+                        className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider"
                         style={{ backgroundColor: `${brandColor}22`, color: brandColor }}
                     >
                         {typeBadge}
@@ -116,7 +116,7 @@ export default function ContextDetailModal({
                 </div>
 
                 {(hasSource || dateLabel) && (
-                    <div className="border-t border-gray-100 px-6 md:px-8 py-4 pl-7 md:pl-9 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] uppercase tracking-wider text-gray-400 font-medium bg-gray-50/50">
+                    <div className="border-t border-gray-100 px-6 md:px-8 py-4 pl-7 md:pl-9 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs uppercase tracking-wider text-gray-400 font-medium bg-gray-50/50">
                         {hasSource && (
                             srcUrl ? (
                                 <a

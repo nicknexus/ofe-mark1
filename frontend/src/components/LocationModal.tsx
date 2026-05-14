@@ -347,11 +347,11 @@ export default function LocationModal({
                                 <div className="min-w-0">
                                     <p className="text-xs font-semibold text-gray-700">Coordinates</p>
                                     {hasCoords ? (
-                                        <p className="text-[11px] text-gray-500 mt-0.5 font-mono truncate">
+                                        <p className="text-xs text-gray-500 mt-0.5 font-mono truncate">
                                             {parseFloat(formData.latitude).toFixed(5)}, {parseFloat(formData.longitude).toFixed(5)}
                                         </p>
                                     ) : (
-                                        <p className="text-[11px] text-gray-500 mt-0.5">Auto-filled from search, or enter manually</p>
+                                        <p className="text-xs text-gray-500 mt-0.5">Auto-filled from search, or enter manually</p>
                                     )}
                                 </div>
                                 <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${showCoords ? 'rotate-180' : ''}`} />
@@ -359,7 +359,7 @@ export default function LocationModal({
                             {showCoords && (
                                 <div className="px-3.5 pb-3 grid grid-cols-2 gap-2.5">
                                     <div>
-                                        <label className="block text-[11px] font-medium text-gray-500 mb-1">Latitude</label>
+                                        <label className="block text-xs font-medium text-gray-500 mb-1">Latitude</label>
                                         <input
                                             type="number"
                                             step="any"
@@ -373,7 +373,7 @@ export default function LocationModal({
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-[11px] font-medium text-gray-500 mb-1">Longitude</label>
+                                        <label className="block text-xs font-medium text-gray-500 mb-1">Longitude</label>
                                         <input
                                             type="number"
                                             step="any"

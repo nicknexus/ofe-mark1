@@ -424,7 +424,7 @@ export default function LocationDetailsModal({
                                                                                 {ev.title}
                                                                             </div>
                                                                             {ev.description && (
-                                                                                <div className="text-[10px] text-gray-500 mt-0.5 line-clamp-1">
+                                                                                <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">
                                                                                     {ev.description}
                                                                                 </div>
                                                                             )}

@@ -135,7 +135,7 @@ export default function GroupColumn({
                     <div className="flex items-center justify-between gap-2">
                         <button
                             onClick={onEditGroup}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md ${palette.chipBg} border ${palette.chipBorder} ${palette.chipText} text-[11px] font-semibold hover:bg-gray-50 transition-all`}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md ${palette.chipBg} border ${palette.chipBorder} ${palette.chipText} text-xs font-semibold hover:bg-gray-50 transition-all`}
                             title="Edit this evidence group"
                         >
                             <Pencil className="w-3 h-3" />
@@ -143,13 +143,13 @@ export default function GroupColumn({
                         </button>
                         <div className="flex items-center gap-1 flex-shrink-0">
                             <span className={`inline-block w-1.5 h-1.5 rounded-full ${v.ready ? 'bg-emerald-500' : 'bg-gray-500'}`} />
-                            <span className={`text-[10px] font-medium ${v.ready ? 'text-emerald-700' : 'text-gray-700'}`}>
+                            <span className={`text-xs font-medium ${v.ready ? 'text-emerald-700' : 'text-gray-700'}`}>
                                 {v.ready ? 'Ready' : `${v.missing.length} left`}
                             </span>
                         </div>
                     </div>
                 </div>
-                <div className="px-3.5 pb-2 text-[10px] text-gray-500 font-medium border-t border-gray-100">
+                <div className="px-3.5 pb-2 text-xs text-gray-500 font-medium border-t border-gray-100">
                     {files.length} file{files.length === 1 ? '' : 's'}
                 </div>
             </div>
@@ -158,7 +158,7 @@ export default function GroupColumn({
             {canReceive && (
                 <button
                     onClick={onMoveSelectedHere}
-                    className={`mx-2 mt-2 flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-medium border ${palette.chipBorder} ${palette.chipText} ${palette.chipBg} hover:bg-gray-50 rounded-md transition-colors flex-shrink-0`}
+                    className={`mx-2 mt-2 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium border ${palette.chipBorder} ${palette.chipText} ${palette.chipBg} hover:bg-gray-50 rounded-md transition-colors flex-shrink-0`}
                 >
                     <MoveRight className="w-3 h-3" />
                     Move {selectedFileIds.length} selected here
@@ -171,7 +171,7 @@ export default function GroupColumn({
                 className="flex-1 overflow-y-auto p-2 space-y-1.5 min-h-0 bg-white"
             >
                 {files.length === 0 ? (
-                    <div className={`text-center text-[11px] py-10 border border-dashed rounded-lg transition-colors ${
+                    <div className={`text-center text-xs py-10 border border-dashed rounded-lg transition-colors ${
                         bodyOver
                             ? `${palette.softBorder} ${palette.softText} ${palette.chipBg}`
                             : 'border-gray-200 text-gray-400 bg-gray-50/40'
@@ -282,7 +282,7 @@ function SetChip({
 }) {
     return (
         <span
-            className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold rounded-md ${palette.chipBg} border ${palette.chipBorder} ${palette.chipText} max-w-full`}
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-semibold rounded-md ${palette.chipBg} border ${palette.chipBorder} ${palette.chipText} max-w-full`}
         >
             <Icon className="w-2.5 h-2.5 flex-shrink-0" />
             <span className="truncate max-w-[160px]">{children}</span>
@@ -302,7 +302,7 @@ function MissingChip({
     return (
         <button
             onClick={(e) => { e.stopPropagation(); onClick() }}
-            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-md border border-dashed border-gray-400 text-gray-600 bg-white/70 hover:border-gray-500 hover:text-gray-800 hover:bg-white transition-colors"
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded-md border border-dashed border-gray-400 text-gray-600 bg-white/70 hover:border-gray-500 hover:text-gray-800 hover:bg-white transition-colors"
         >
             <Plus className="w-2.5 h-2.5 flex-shrink-0" />
             <Icon className="w-2.5 h-2.5 flex-shrink-0" />

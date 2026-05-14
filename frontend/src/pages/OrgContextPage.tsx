@@ -669,10 +669,10 @@ function TextCard({
             complete={complete}
         >
             <div className="flex items-center justify-between mb-2 pt-3">
-                <label htmlFor={`ctx-${config.key}`} className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">
+                <label htmlFor={`ctx-${config.key}`} className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Text
                 </label>
-                <span className="text-[11px] text-gray-400">{value.length.toLocaleString()} chars</span>
+                <span className="text-xs text-gray-400">{value.length.toLocaleString()} chars</span>
             </div>
             <textarea
                 id={`ctx-${config.key}`}
@@ -816,7 +816,7 @@ function StatCardEditor({
                             <button
                                 type="button"
                                 onClick={() => onUpdate(card.id, { type: 'statement' })}
-                                className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1 ${!isStat ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'
+                                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${!isStat ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'
                                     }`}
                             >
                                 <Quote className="w-3 h-3" />
@@ -825,7 +825,7 @@ function StatCardEditor({
                             <button
                                 type="button"
                                 onClick={() => onUpdate(card.id, { type: 'stat' })}
-                                className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1 ${isStat ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'
+                                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${isStat ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'
                                     }`}
                             >
                                 <Hash className="w-3 h-3" />
@@ -833,7 +833,7 @@ function StatCardEditor({
                             </button>
                         </div>
                     ) : (
-                        <span className="text-[10px] uppercase tracking-wider font-medium text-gray-400">
+                        <span className="text-xs uppercase tracking-wider font-medium text-gray-400">
                             {isStat ? 'Stat' : 'Statement'}
                         </span>
                     )}
@@ -872,7 +872,7 @@ function StatCardEditor({
             <div className="p-4 space-y-3">
                 {isStat && (
                     <div>
-                        <label className="block text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-1">
+                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
                             Number / Stat <span className="text-rose-500 normal-case">*</span>
                         </label>
                         <input
@@ -887,7 +887,7 @@ function StatCardEditor({
                     </div>
                 )}
                 <div>
-                    <label className="block text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-1">
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
                         {isStat ? 'Title' : 'Headline'} {!isStat && <span className="text-rose-500 normal-case">*</span>}
                     </label>
                     <input
@@ -901,7 +901,7 @@ function StatCardEditor({
                     />
                 </div>
                 <div>
-                    <label className="block text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-1">
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
                         Description
                     </label>
                     <textarea
@@ -916,7 +916,7 @@ function StatCardEditor({
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label className="block text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-1">
+                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
                             Source title <span className="text-gray-300 normal-case font-normal">(optional)</span>
                         </label>
                         <input
@@ -930,7 +930,7 @@ function StatCardEditor({
                         />
                     </div>
                     <div>
-                        <label className="block text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-1">
+                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
                             Source link <span className="text-gray-300 normal-case font-normal">(optional)</span>
                         </label>
                         <input
@@ -945,7 +945,7 @@ function StatCardEditor({
                     </div>
                 </div>
                 {(card.source_url || '').trim() && !(card.source || '').trim() && (
-                    <p className="text-[11px] text-gray-400 -mt-1">
+                    <p className="text-xs text-gray-400 -mt-1">
                         No source title — the link will show as "Source" on the public card.
                     </p>
                 )}
@@ -989,10 +989,10 @@ function TheorySection({
             {/* Overview text */}
             <div className="pt-3">
                 <div className="flex items-center justify-between mb-2">
-                    <label htmlFor={`ctx-${textConfig.key}`} className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">
+                    <label htmlFor={`ctx-${textConfig.key}`} className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Overview
                     </label>
-                    <span className="text-[11px] text-gray-400">{textValue.length.toLocaleString()} chars</span>
+                    <span className="text-xs text-gray-400">{textValue.length.toLocaleString()} chars</span>
                 </div>
                 <textarea
                     id={`ctx-${textConfig.key}`}
@@ -1010,7 +1010,7 @@ function TheorySection({
             <div className="mt-6 pt-5 border-t border-gray-100">
                 <div className="flex items-center gap-2 mb-3">
                     <Workflow className="w-4 h-4 text-violet-500" />
-                    <h4 className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider">Stages</h4>
+                    <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Stages</h4>
                 </div>
 
                 {stages.length === 0 ? (
@@ -1121,7 +1121,7 @@ function StageEditor({
             </div>
             <div className="p-4 space-y-3">
                 <div>
-                    <label className="block text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-1">
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
                         Title
                     </label>
                     <input
@@ -1135,7 +1135,7 @@ function StageEditor({
                     />
                 </div>
                 <div>
-                    <label className="block text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-1">
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
                         Description
                     </label>
                     <textarea
@@ -1286,7 +1286,7 @@ function StrategyEditor({
             </div>
             <div className="p-4 space-y-3">
                 <div>
-                    <label className="block text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-1">
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
                         Title
                     </label>
                     <input
@@ -1300,7 +1300,7 @@ function StrategyEditor({
                     />
                 </div>
                 <div>
-                    <label className="block text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-1">
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
                         Description
                     </label>
                     <textarea

@@ -35,7 +35,7 @@ export default function MobileBottomNav({ activeTab, onTabChange }: MobileBottom
                 className="mobile-nav-item"
             >
                 <ArrowLeft className="w-6 h-6" />
-                <span className="text-xs font-semibold">Back</span>
+                <span className="text-sm font-semibold">Back</span>
             </Link>
 
             {/* Tab Items */}
@@ -50,7 +50,7 @@ export default function MobileBottomNav({ activeTab, onTabChange }: MobileBottom
                         className={`mobile-nav-item ${isActive ? 'mobile-nav-item-active' : ''}`}
                     >
                         <Icon className="w-6 h-6" />
-                        <span className="text-xs font-semibold">{tab.label}</span>
+                        <span className="text-sm font-semibold">{tab.label}</span>
                     </button>
                 )
             })}

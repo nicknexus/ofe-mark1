@@ -85,7 +85,7 @@ export default function FileTile({
                         <Icon className="w-4 h-4 text-gray-500" />
                     )}
                     {groupDragBadge && (
-                        <span className="absolute -top-1 -right-1 bg-evidence-500 text-white text-[9px] font-semibold rounded-full w-4 h-4 flex items-center justify-center">
+                        <span className="absolute -top-1 -right-1 bg-evidence-500 text-white text-xs font-semibold rounded-full min-w-[1.25rem] h-5 px-0.5 flex items-center justify-center">
                             {groupDragBadge}
                         </span>
                     )}
@@ -93,7 +93,7 @@ export default function FileTile({
 
                 <div className="min-w-0 flex-1 overflow-hidden">
                     <p className="text-xs font-medium text-gray-800 truncate" title={file.file.name}>{file.file.name}</p>
-                    <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
                         <span>{(file.file.size / 1024 / 1024).toFixed(1)} MB</span>
                         {file.status === 'uploading' && (
                             <span className="inline-flex items-center gap-0.5 text-evidence-600">

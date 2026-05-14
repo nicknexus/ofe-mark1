@@ -256,7 +256,7 @@ export default function InteractiveTutorial() {
                                         {slide.bullets.map((bullet, i) => (
                                             <div key={i} className="flex items-start gap-3 bg-white/50 backdrop-blur-xl border border-white/60 rounded-xl px-4 py-2.5 shadow-sm">
                                                 <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: brandAlpha(31) }}>
-                                                    <span className="text-[10px] font-bold" style={{ color: BRAND_DARK }}>{i + 1}</span>
+                                                    <span className="text-xs font-bold" style={{ color: BRAND_DARK }}>{i + 1}</span>
                                                 </div>
                                                 <p className="text-gray-500 text-sm leading-relaxed">{bullet}</p>
                                             </div>

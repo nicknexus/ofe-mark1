@@ -422,7 +422,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                         : `${selectedLocations.length} locations`}
                             </span>
                             {selectedLocations.length > 0 && (
-                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
+                                <span className="ml-1 bg-primary-500 text-white text-xs px-1 rounded-full">
                                     {selectedLocations.length}
                                 </span>
                             )}
@@ -516,7 +516,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                         : `${selectedBeneficiaryGroups.length} groups`}
                             </span>
                             {selectedBeneficiaryGroups.length > 0 && (
-                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
+                                <span className="ml-1 bg-primary-500 text-white text-xs px-1 rounded-full">
                                     {selectedBeneficiaryGroups.length}
                                 </span>
                             )}
@@ -610,7 +610,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                         : `${selectedTags.length} tags`}
                             </span>
                             {selectedTags.length > 0 && (
-                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
+                                <span className="ml-1 bg-primary-500 text-white text-xs px-1 rounded-full">
                                     {selectedTags.length}
                                 </span>
                             )}
@@ -704,7 +704,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                         : `${selectedEvidenceTypes.length} types`}
                             </span>
                             {selectedEvidenceTypes.length > 0 && (
-                                <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">
+                                <span className="ml-1 bg-primary-500 text-white text-xs px-1 rounded-full">
                                     {selectedEvidenceTypes.length}
                                 </span>
                             )}

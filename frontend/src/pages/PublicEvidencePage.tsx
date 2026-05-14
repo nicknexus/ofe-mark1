@@ -316,7 +316,7 @@ export default function PublicEvidencePage() {
                                 <span className="text-xs sm:text-sm text-gray-600 truncate flex-1">
                                     {currentFile?.file_name}
                                     {hasMultipleFiles && (
-                                        <span className="text-[10px] sm:text-xs text-gray-400 ml-1 sm:ml-2">
+                                        <span className="text-xs text-gray-400 ml-1 sm:ml-2">
                                             ({currentFileIndex + 1}/{allFiles.length})
                                         </span>
                                     )}
@@ -371,7 +371,7 @@ export default function PublicEvidencePage() {
 
                             {/* Date Range */}
                             {evidence.date_range_start && evidence.date_range_end && (
-                                <p className="text-[10px] sm:text-xs text-gray-400 mt-1">
+                                <p className="text-xs text-gray-400 mt-1">
                                     Covers: {formatDate(evidence.date_range_start)} - {formatDate(evidence.date_range_end)}
                                 </p>
                             )}
@@ -401,8 +401,8 @@ export default function PublicEvidencePage() {
                                                 <p className="font-semibold text-gray-800 text-xs sm:text-sm group-hover:text-primary-600 transition-colors">
                                                     {claim.value}{claim.kpis?.metric_type === 'percentage' ? '%' : ` ${claim.kpis?.unit_of_measurement || ''}`}
                                                 </p>
-                                                <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">{metricTitle}</p>
-                                                {dateLabel && <p className="text-[10px] text-gray-400 mt-0.5">{dateLabel}</p>}
+                                                <p className="text-xs text-gray-500 mt-0.5">{metricTitle}</p>
+                                                {dateLabel && <p className="text-xs text-gray-400 mt-0.5">{dateLabel}</p>}
                                                 {claim.tag_id && tagsById.get(claim.tag_id) && (
                                                     <div className="mt-1" onClick={(e) => e.preventDefault()}>
                                                         <PublicTagChip name={tagsById.get(claim.tag_id)!.name} size="xs" />
@@ -436,7 +436,7 @@ export default function PublicEvidencePage() {
 
                         {/* Initiative Link */}
                         <div className={`${PUBLIC_PANEL_STATIC_CLASS} rounded-xl sm:rounded-2xl p-3 sm:p-4 flex-shrink-0`}>
-                            <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide mb-1">From Initiative</p>
+                            <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">From Initiative</p>
                             <Link
                                 to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=evidence`}
                                 className="flex items-center justify-between text-gray-800 hover:text-primary-600 font-medium transition-colors group"

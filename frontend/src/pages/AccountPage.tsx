@@ -1600,7 +1600,7 @@ function WidgetTab({ orgSlug, isPublic }: { orgSlug?: string; isPublic?: boolean
                         />
                     </div>
                 </div>
-                <p className="mt-2 text-[11px] text-gray-400 text-center">
+                <p className="mt-2 text-xs text-gray-400 text-center">
                     {previewMode === 'desktop'
                         ? `Shown at ${Math.round(scale * 100)}% of desktop size — donors see it full-size on their site.`
                         : 'Mobile preview at native width.'}

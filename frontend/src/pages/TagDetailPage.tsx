@@ -284,7 +284,7 @@ export default function TagDetailPage() {
                                                         </div>
                                                         <div className="min-w-0 flex-1">
                                                             <p className="text-sm font-semibold text-gray-900 truncate">{ev.title || 'Untitled'}</p>
-                                                            <p className="text-[11px] text-gray-500 mt-0.5">
+                                                            <p className="text-xs text-gray-500 mt-0.5">
                                                                 {ev.date_range_start && ev.date_range_end
                                                                     ? `${formatDate(ev.date_range_start)} – ${formatDate(ev.date_range_end)}`
                                                                     : formatDate(ev.date_represented)}
@@ -317,7 +317,7 @@ export default function TagDetailPage() {
                                                     </div>
                                                     <div className="min-w-0 flex-1">
                                                         <p className="text-sm font-semibold text-gray-900 truncate">{ev.title || 'Untitled'}</p>
-                                                        <p className="text-[11px] text-gray-500 mt-0.5">
+                                                        <p className="text-xs text-gray-500 mt-0.5">
                                                             {ev.date_range_start && ev.date_range_end
                                                                 ? `${formatDate(ev.date_range_start)} – ${formatDate(ev.date_range_end)}`
                                                                 : formatDate(ev.date_represented)}
@@ -355,7 +355,7 @@ export default function TagDetailPage() {
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <p className="text-sm font-semibold text-gray-900 truncate">{s.title || 'Untitled'}</p>
-                                                <p className="text-[11px] text-gray-500 mt-0.5">
+                                                <p className="text-xs text-gray-500 mt-0.5">
                                                     {s.date_represented ? formatDate(s.date_represented) : ''}
                                                 </p>
                                             </div>

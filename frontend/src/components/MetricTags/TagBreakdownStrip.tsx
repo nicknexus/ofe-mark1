@@ -144,7 +144,7 @@ export default function TagBreakdownStrip({ kpi, kpiUpdates, allTags, compact }:
     const isPct = kpi.metric_type === 'percentage'
     const padX = compact ? 'px-2.5' : 'px-3'
     const padY = compact ? 'py-1' : 'py-1.5'
-    const titleSize = compact ? 'text-[11px]' : 'text-xs'
+    const titleSize = 'text-xs'
     const valueSize = compact ? 'text-xs' : 'text-sm'
 
     const handleDragEnd = async (event: DragEndEvent) => {

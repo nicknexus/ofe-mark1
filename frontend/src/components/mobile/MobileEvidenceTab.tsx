@@ -378,7 +378,7 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh, autoAdd }: 
                                         <TypeIcon className="w-10 h-10 text-gray-400" />
                                     )}
                                     <div className="absolute top-2 right-2">
-                                        <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${typeInfo.color}`}>
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${typeInfo.color}`}>
                                             {typeInfo.label}
                                         </span>
                                     </div>
@@ -591,7 +591,7 @@ function MobileEvidencePreview({ evidence, onClose, onEdit, onDelete }: MobileEv
                                 <Calendar className="w-4 h-4 text-primary-600" />
                             </div>
                             <div>
-                                <p className="text-[10px] text-gray-500 uppercase font-medium">Date</p>
+                                <p className="text-xs text-gray-500 uppercase font-medium">Date</p>
                                 <span className="text-gray-800 font-medium">{displayDate}</span>
                             </div>
                         </div>
@@ -603,7 +603,7 @@ function MobileEvidencePreview({ evidence, onClose, onEdit, onDelete }: MobileEv
                                     <MapPin className="w-4 h-4 text-primary-600" />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] text-gray-500 uppercase font-medium">
+                                    <p className="text-xs text-gray-500 uppercase font-medium">
                                         {locations.length > 1 ? 'Locations' : 'Location'}
                                     </p>
                                     {loadingLocations ? (
@@ -988,7 +988,7 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
                                             <Icon className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
                                             <div className="min-w-0">
                                                 <div className={`text-xs font-semibold truncate ${isSelected ? 'text-evidence-600' : 'text-gray-700'}`}>{type.label}</div>
-                                                <div className="text-[10px] text-gray-500 truncate">{type.description}</div>
+                                                <div className="text-xs text-gray-500 truncate">{type.description}</div>
                                             </div>
                                         </button>
                                     )

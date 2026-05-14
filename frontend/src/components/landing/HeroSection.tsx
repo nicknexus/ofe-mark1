@@ -119,7 +119,7 @@ const HeroSection = ({ onGetStarted }: HeroSectionProps) => {
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-foreground">Nairobi, Kenya</p>
-                  <p className="text-[10px] text-muted-foreground">8K students educated</p>
+                  <p className="text-xs text-muted-foreground">8K students educated</p>
                 </div>
               </div>
             </div>
@@ -131,7 +131,7 @@ const HeroSection = ({ onGetStarted }: HeroSectionProps) => {
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-foreground">New Delhi, India</p>
-                  <p className="text-[10px] text-muted-foreground">15K vaccines delivered</p>
+                  <p className="text-xs text-muted-foreground">15K vaccines delivered</p>
                 </div>
               </div>
             </div>
@@ -143,7 +143,7 @@ const HeroSection = ({ onGetStarted }: HeroSectionProps) => {
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-foreground">São Paulo, Brazil</p>
-                  <p className="text-[10px] text-muted-foreground">5K families housed</p>
+                  <p className="text-xs text-muted-foreground">5K families housed</p>
                 </div>
               </div>
             </div>

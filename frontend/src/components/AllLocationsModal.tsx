@@ -168,7 +168,7 @@ export default function AllLocationsModal({ isOpen, onClose }: AllLocationsModal
                                                         <p className="text-xs text-gray-500 mt-0.5 truncate">{loc.country}</p>
                                                     )}
                                                     {(loc.initiative_ids?.length ?? 0) > 0 && (
-                                                        <p className="text-[11px] text-gray-400 mt-1">
+                                                        <p className="text-xs text-gray-400 mt-1">
                                                             Linked to {loc.initiative_ids!.length} initiative{loc.initiative_ids!.length === 1 ? '' : 's'}
                                                         </p>
                                                     )}

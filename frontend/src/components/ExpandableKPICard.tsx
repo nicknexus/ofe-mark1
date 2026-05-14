@@ -1108,9 +1108,9 @@ export default function ExpandableKPICard({
                                     <div className="flex flex-col items-end flex-shrink-0">
                                         <div className="flex items-baseline gap-0.5 px-2.5 lg:px-3 py-1 lg:py-1.5 bg-primary-50 rounded-lg border border-primary-100">
                                             <span className="text-lg lg:text-2xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}{isPercentageMetric ? '%' : ''}</span>
-                                            {!isPercentageMetric && kpi.unit_of_measurement && <span className="text-[11px] lg:text-xs text-primary-500 ml-1">{kpi.unit_of_measurement}</span>}
+                                            {!isPercentageMetric && kpi.unit_of_measurement && <span className="text-xs text-primary-500 ml-1">{kpi.unit_of_measurement}</span>}
                                         </div>
-                                        {isPercentageMetric && <span className="text-[10px] lg:text-[11px] uppercase tracking-wide text-gray-400 mt-0.5">Average</span>}
+                                        {isPercentageMetric && <span className="text-xs uppercase tracking-wide text-gray-400 mt-0.5">Average</span>}
                                     </div>
                                 </div>
                             </div>
@@ -1170,18 +1170,18 @@ export default function ExpandableKPICard({
                                         <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
                                             <div className="flex-shrink-0 min-w-0">
                                                 <h5 className="text-sm lg:text-base font-semibold text-gray-900 truncate">{isPercentageMetric ? 'Percentage Over Time' : (isCumulative ? 'Cumulative Progress' : 'Monthly Progress')}</h5>
-                                                {!isPercentageMetric && <p className="text-[10px] lg:text-xs text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals'}</p>}
+                                                {!isPercentageMetric && <p className="text-xs text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals'}</p>}
                                             </div>
                                             <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
                                                 {!isPercentageMetric && timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
                                                     <div className="flex items-center bg-gray-100 rounded-md lg:rounded-lg p-0.5">
-                                                        <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
-                                                        <button onClick={() => setIsCumulative(true)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
+                                                        <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
+                                                        <button onClick={() => setIsCumulative(true)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
                                                     </div>
                                                 )}
                                                 <div className="flex bg-gray-100 rounded-md lg:rounded-lg p-0.5">
                                                     {['all', '1month', '6months', '1year', '5years'].map((tf) => (
-                                                        <button key={tf} onClick={() => { setTimeFrame(tf as any); setDatePickerValue({}); setIsCumulative(true) }} className={`px-1.5 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${timeFrame === tf && !datePickerValue.singleDate && !datePickerValue.startDate ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+                                                        <button key={tf} onClick={() => { setTimeFrame(tf as any); setDatePickerValue({}); setIsCumulative(true) }} className={`px-1.5 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${timeFrame === tf && !datePickerValue.singleDate && !datePickerValue.startDate ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
                                                             {tf === 'all' ? 'All' : tf === '1month' ? '1M' : tf === '6months' ? '6M' : tf === '1year' ? '1Y' : '5Y'}
                                                         </button>
                                                     ))}
@@ -1193,12 +1193,12 @@ export default function ExpandableKPICard({
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                                                         <CartesianGrid vertical={false} stroke="#f1f5f9" strokeDasharray="3 3" />
-                                                        <XAxis dataKey="date" stroke="#cbd5e1" fontSize={10} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} angle={-45} textAnchor="end" height={50} interval={getXAxisInterval()} tickMargin={6} tickFormatter={effectiveIsCumulative ? formatXAxisTick : undefined} />
-                                                        <YAxis stroke="#cbd5e1" fontSize={10} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} domain={isPercentageMetric ? [0, percentageYMax] : (maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax'])} ticks={isPercentageMetric ? percentageYTicks : (yTicks.length > 0 ? yTicks : undefined)} tickFormatter={isPercentageMetric ? ((value: any) => `${Math.round(value)}%`) : ((value) => { if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`; if (value >= 1000) return `${(value / 1000).toFixed(1)}K`; return value.toString() })} />
+                                                        <XAxis dataKey="date" stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} angle={-45} textAnchor="end" height={50} interval={getXAxisInterval()} tickMargin={6} tickFormatter={effectiveIsCumulative ? formatXAxisTick : undefined} />
+                                                        <YAxis stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} domain={isPercentageMetric ? [0, percentageYMax] : (maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax'])} ticks={isPercentageMetric ? percentageYTicks : (yTicks.length > 0 ? yTicks : undefined)} tickFormatter={isPercentageMetric ? ((value: any) => `${Math.round(value)}%`) : ((value) => { if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`; if (value >= 1000) return `${(value / 1000).toFixed(1)}K`; return value.toString() })} />
                                                         {isPercentageMetric ? (
                                                             <Tooltip content={<PercentageTooltip />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
                                                         ) : (
-                                                            <Tooltip contentStyle={{ backgroundColor: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(8px)', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '8px 12px', fontSize: '11px', boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }} formatter={(value: any) => [typeof value === 'number' ? value.toLocaleString() + (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '') : value, 'Cumulative Total']} labelFormatter={(label) => { const dp = chartData.find(d => d.date === label); return dp?.fullDate ? formatDate(dp.fullDate) : `Date: ${label}` }} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                                                            <Tooltip contentStyle={{ backgroundColor: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(8px)', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '8px 12px', fontSize: '12px', boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }} formatter={(value: any) => [typeof value === 'number' ? value.toLocaleString() + (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '') : value, 'Cumulative Total']} labelFormatter={(label) => { const dp = chartData.find(d => d.date === label); return dp?.fullDate ? formatDate(dp.fullDate) : `Date: ${label}` }} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
                                                         )}
                                                         {isPercentageMetric && totalMetricValue > 0 && (
                                                             <ReferenceLine y={totalMetricValue} stroke={chartColor} strokeOpacity={0.5} strokeWidth={1.25} strokeDasharray="5 4" ifOverflow="extendDomain" />
@@ -1223,19 +1223,19 @@ export default function ExpandableKPICard({
                                             <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-2 shadow-soft-float">
                                                 <div className="flex items-center space-x-2">
                                                     <div className="p-1.5 bg-primary-100/80 rounded-lg"><BarChart3 className="w-3.5 h-3.5 text-primary-500" /></div>
-                                                    <div className="min-w-0"><p className="text-[10px] text-gray-500 truncate">Impact Claims</p><p className="text-base font-bold text-primary-500">{kpi.total_updates}</p></div>
+                                                    <div className="min-w-0"><p className="text-xs text-gray-500 truncate">Impact Claims</p><p className="text-base font-bold text-primary-500">{kpi.total_updates}</p></div>
                                                 </div>
                                             </div>
                                             <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-xl p-2 shadow-soft-float">
                                                 <div className="flex items-center space-x-2">
                                                     <div className="p-1.5 bg-evidence-100/80 rounded-lg"><FileText className="w-3.5 h-3.5 text-evidence-500" /></div>
-                                                    <div className="min-w-0"><p className="text-[10px] text-gray-500 truncate">Evidence Items</p><p className="text-base font-bold text-evidence-500">{kpi.evidence_count}</p></div>
+                                                    <div className="min-w-0"><p className="text-xs text-gray-500 truncate">Evidence Items</p><p className="text-base font-bold text-evidence-500">{kpi.evidence_count}</p></div>
                                                 </div>
                                             </div>
                                             <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-2 shadow-soft-float">
                                                 <div className="flex items-center space-x-2">
                                                     <div className="p-1.5 bg-primary-100/80 rounded-lg"><Target className="w-3.5 h-3.5 text-primary-500" /></div>
-                                                    <div className="min-w-0"><p className="text-[10px] text-gray-500 truncate">Coverage</p><p className="text-base font-bold text-primary-500">{kpi.evidence_percentage}%</p></div>
+                                                    <div className="min-w-0"><p className="text-xs text-gray-500 truncate">Coverage</p><p className="text-base font-bold text-primary-500">{kpi.evidence_percentage}%</p></div>
                                                 </div>
                                             </div>
                                         </div>
@@ -1251,7 +1251,7 @@ export default function ExpandableKPICard({
                                                     <div key={type} className="flex items-center gap-1.5 flex-1 min-w-0">
                                                         <IconComponent className={`w-3.5 h-3.5 ${colorClasses} flex-shrink-0`} />
                                                         <div className="flex flex-col items-start min-w-0 flex-1 overflow-hidden">
-                                                            <span className="text-[9px] font-medium text-gray-700 truncate w-full leading-tight">{typeInfo.label}</span>
+                                                            <span className="text-xs font-medium text-gray-700 truncate w-full leading-tight">{typeInfo.label}</span>
                                                             <span className="text-[8px] font-bold text-gray-600 leading-tight whitespace-nowrap">{percentage}%</span>
                                                         </div>
                                                     </div>
@@ -1274,7 +1274,7 @@ export default function ExpandableKPICard({
                                                             <div className="flex items-center justify-between">
                                                                 <div className="min-w-0 flex-1">
                                                                     <span className="text-xs font-semibold text-primary-600">{update.value?.toLocaleString()}{isPercentageMetric ? '%' : (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '')}</span>
-                                                                    <div className="flex items-center space-x-1.5 mt-0.5"><Calendar className="w-2.5 h-2.5 text-gray-400" /><span className="text-[10px] text-gray-500">{update.date_range_start && update.date_range_end ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}` : formatDate(update.date_represented)}</span></div>
+                                                                    <div className="flex items-center space-x-1.5 mt-0.5"><Calendar className="w-2.5 h-2.5 text-gray-400" /><span className="text-xs text-gray-500">{update.date_range_start && update.date_range_end ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}` : formatDate(update.date_represented)}</span></div>
                                                                 </div>
                                                                 <div className="flex items-center gap-1.5">
                                                                     {update.tag_id && allTags.length > 0 && (() => {
@@ -1287,7 +1287,7 @@ export default function ExpandableKPICard({
                                                                         return (
                                                                             <>
                                                                                 {supportPercentage > 0 && (
-                                                                                    <div className={`flex items-center justify-center px-2 py-1 rounded-md text-[10px] font-medium whitespace-nowrap ${supportPercentage === 100
+                                                                                    <div className={`flex items-center justify-center px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap ${supportPercentage === 100
                                                                                         ? 'bg-primary-100 text-primary-700'
                                                                                         : 'bg-yellow-100 text-yellow-700'
                                                                                         }`}>
@@ -1295,14 +1295,14 @@ export default function ExpandableKPICard({
                                                                                     </div>
                                                                                 )}
                                                                                 {supportPercentage === 0 && !loadingEvidence && (
-                                                                                    <div className="flex items-center justify-center px-2 py-1 rounded-md text-[10px] font-medium whitespace-nowrap bg-red-100 text-red-700">
+                                                                                    <div className="flex items-center justify-center px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap bg-red-100 text-red-700">
                                                                                         <span>0 | 0% Coverage</span>
                                                                                     </div>
                                                                                 )}
                                                                                 <button
                                                                                     type="button"
                                                                                     onClick={(e) => handleAddEvidenceForClaim(update, e)}
-                                                                                    className="flex items-center gap-1 px-2 py-1 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-[10px] font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
+                                                                                    className="flex items-center gap-1 px-2 py-1 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-xs font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
                                                                                     title="Add supporting evidence for this claim"
                                                                                 >
                                                                                     <Upload className="w-2.5 h-2.5" />
@@ -1499,7 +1499,7 @@ export default function ExpandableKPICard({
                     <div className="w-[70%] p-3 flex flex-col">
                         {/* Category Badge */}
                         <div className="mb-2">
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${getCategoryColor(kpi.category)}`}>
+                            <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${getCategoryColor(kpi.category)}`}>
                                 {kpi.category}
                             </span>
                         </div>
@@ -1528,7 +1528,7 @@ export default function ExpandableKPICard({
                     <div className="w-[30%] p-3 flex flex-col border-l border-gray-100">
                         {/* Impact Claims */}
                         <div className="mb-2">
-                            <div className="text-[9px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">
+                            <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-0.5">
                                 Impact Claims
                             </div>
                             <div className="text-2xl font-extrabold text-primary-500">
@@ -1538,7 +1538,7 @@ export default function ExpandableKPICard({
 
                         {/* Evidence Items */}
                         <div className="mb-3">
-                            <div className="text-[9px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">
+                            <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-0.5">
                                 Evidence Items
                             </div>
                             <div className="text-2xl font-extrabold text-evidence-500">
@@ -1578,7 +1578,7 @@ export default function ExpandableKPICard({
 
                 {/* Progress Bar Section - Full width at bottom */}
                 <div className="px-3 py-2.5 border-t border-gray-100">
-                    <div className="flex items-center justify-between text-[10px] mb-1">
+                    <div className="flex items-center justify-between text-xs mb-1">
                         <span className="font-semibold text-gray-600">Evidence Coverage</span>
                         <span className={`font-bold ${(kpi.evidence_percentage || 0) >= 80
                             ? 'text-primary-500'
@@ -1632,7 +1632,7 @@ export default function ExpandableKPICard({
                                             <span className="text-2xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}{isPercentageMetric ? '%' : ''}</span>
                                             {!isPercentageMetric && kpi.unit_of_measurement && <span className="text-xs text-primary-500 ml-1">{kpi.unit_of_measurement}</span>}
                                         </div>
-                                        {isPercentageMetric && <span className="text-[11px] uppercase tracking-wide text-gray-400 mt-0.5">Average</span>}
+                                        {isPercentageMetric && <span className="text-xs uppercase tracking-wide text-gray-400 mt-0.5">Average</span>}
                                     </div>
                                 </div>
                             </div>
@@ -1754,7 +1754,7 @@ export default function ExpandableKPICard({
                                             <div key={type} className="flex items-center gap-1.5 flex-1 min-w-0">
                                                 <IconComponent className={`w-3.5 h-3.5 ${colorClasses} flex-shrink-0`} />
                                                 <div className="flex flex-col items-start min-w-0 flex-1 overflow-hidden">
-                                                    <span className="text-[9px] font-medium text-gray-700 truncate w-full leading-tight">
+                                                    <span className="text-xs font-medium text-gray-700 truncate w-full leading-tight">
                                                         {typeInfo.label}
                                                     </span>
                                                     <span className="text-[8px] font-bold text-gray-600 leading-tight whitespace-nowrap">
@@ -1795,13 +1795,13 @@ export default function ExpandableKPICard({
                                             <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
                                                 {!isPercentageMetric && timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
                                                     <div className="flex items-center bg-gray-100 rounded-md lg:rounded-lg p-0.5">
-                                                        <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
-                                                        <button onClick={() => setIsCumulative(true)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
+                                                        <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
+                                                        <button onClick={() => setIsCumulative(true)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
                                                     </div>
                                                 )}
                                                 <div className="flex bg-gray-100 rounded-md lg:rounded-lg p-0.5">
                                                     {['all', '1month', '6months', '1year', '5years'].map((tf) => (
-                                                        <button key={tf} onClick={() => { setTimeFrame(tf as any); setDatePickerValue({}); setIsCumulative(true) }} className={`px-1.5 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${timeFrame === tf && !datePickerValue.singleDate && !datePickerValue.startDate ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+                                                        <button key={tf} onClick={() => { setTimeFrame(tf as any); setDatePickerValue({}); setIsCumulative(true) }} className={`px-1.5 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${timeFrame === tf && !datePickerValue.singleDate && !datePickerValue.startDate ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
                                                             {tf === 'all' ? 'All' : tf === '1month' ? '1M' : tf === '6months' ? '6M' : tf === '1year' ? '1Y' : '5Y'}
                                                         </button>
                                                     ))}
@@ -1956,7 +1956,7 @@ export default function ExpandableKPICard({
                                             <span className="text-2xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}{isPercentageMetric ? '%' : ''}</span>
                                             {!isPercentageMetric && kpi.unit_of_measurement && <span className="text-xs text-primary-500 ml-1">{kpi.unit_of_measurement}</span>}
                                         </div>
-                                        {isPercentageMetric && <span className="text-[11px] uppercase tracking-wide text-gray-400 mt-0.5">Average</span>}
+                                        {isPercentageMetric && <span className="text-xs uppercase tracking-wide text-gray-400 mt-0.5">Average</span>}
                                     </div>
                                 </div>
                             </div>
@@ -2082,7 +2082,7 @@ export default function ExpandableKPICard({
                                             >
                                                 <IconComponent className={`w-3.5 h-3.5 ${colorClasses} flex-shrink-0`} />
                                                 <div className="flex flex-col items-start min-w-0 flex-1 overflow-hidden">
-                                                    <span className="text-[9px] font-medium text-gray-700 truncate w-full leading-tight">
+                                                    <span className="text-xs font-medium text-gray-700 truncate w-full leading-tight">
                                                         {typeInfo.label}
                                                     </span>
                                                     <span className="text-[8px] font-bold text-gray-600 leading-tight whitespace-nowrap">
@@ -2123,13 +2123,13 @@ export default function ExpandableKPICard({
                                             <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
                                                 {!isPercentageMetric && timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
                                                     <div className="flex items-center bg-gray-100 rounded-md lg:rounded-lg p-0.5">
-                                                        <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
-                                                        <button onClick={() => setIsCumulative(true)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
+                                                        <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
+                                                        <button onClick={() => setIsCumulative(true)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
                                                     </div>
                                                 )}
                                                 <div className="flex bg-gray-100 rounded-md lg:rounded-lg p-0.5">
                                                     {['all', '1month', '6months', '1year', '5years'].map((tf) => (
-                                                        <button key={tf} onClick={() => { setTimeFrame(tf as any); setDatePickerValue({}); setIsCumulative(true) }} className={`px-1.5 lg:px-2.5 py-0.5 lg:py-1 text-[10px] lg:text-xs rounded-sm lg:rounded-md font-medium transition-colors ${timeFrame === tf && !datePickerValue.singleDate && !datePickerValue.startDate ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+                                                        <button key={tf} onClick={() => { setTimeFrame(tf as any); setDatePickerValue({}); setIsCumulative(true) }} className={`px-1.5 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${timeFrame === tf && !datePickerValue.singleDate && !datePickerValue.startDate ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
                                                             {tf === 'all' ? 'All' : tf === '1month' ? '1M' : tf === '6months' ? '6M' : tf === '1year' ? '1Y' : '5Y'}
                                                         </button>
                                                     ))}

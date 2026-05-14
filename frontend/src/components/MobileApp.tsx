@@ -236,7 +236,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
                                 {activeOrganization?.name || 'Select Organization'}
                             </span>
                             {isSharedMember && (
-                                <span className="text-[10px] bg-purple-200 text-purple-700 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                                <span className="text-xs bg-purple-200 text-purple-700 px-1.5 py-0.5 rounded-full flex-shrink-0">
                                     Team
                                 </span>
                             )}
@@ -247,7 +247,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
                     {orgDropdownOpen && (
                         <div className="absolute left-4 right-4 mt-1 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden z-50">
                             <div className="p-1.5">
-                                <p className="px-3 py-1.5 text-[10px] font-medium text-gray-400 uppercase tracking-wider">
+                                <p className="px-3 py-1.5 text-xs font-medium text-gray-400 uppercase tracking-wider">
                                     Switch Organization
                                 </p>
                                 {accessibleOrganizations.map((org) => (

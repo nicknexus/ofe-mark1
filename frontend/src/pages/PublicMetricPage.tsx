@@ -359,7 +359,7 @@ export default function PublicMetricPage() {
                                     maxDate={getLocalDateString(new Date())}
                                     placeholder="Date"
                                     activeColor={brandColor}
-                                    className="[&>button]:h-7 [&>button]:text-[11px] [&>button]:pr-1.5 sm:[&>button]:pr-2.5 [&>button>div]:w-7 [&>button>div]:h-7 [&>button>div>svg]:w-3.5 [&>button>div>svg]:h-3.5 [&>button>span]:ml-1 sm:[&>button>span]:ml-1.5"
+                                    className="[&>button]:h-7 [&>button]:text-xs [&>button]:pr-1.5 sm:[&>button]:pr-2.5 [&>button>div]:w-7 [&>button>div]:h-7 [&>button>div>svg]:w-3.5 [&>button>div>svg]:h-3.5 [&>button>span]:ml-1 sm:[&>button>span]:ml-1.5"
                                 />
                             </div>
 
@@ -367,7 +367,7 @@ export default function PublicMetricPage() {
                                 <button
                                     ref={locationBtnRef}
                                     onClick={() => { setShowLocationDropdown(!showLocationDropdown); setShowBenDropdown(false) }}
-                                    className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all flex-shrink-0"
+                                    className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-xs font-medium transition-all flex-shrink-0"
                                     style={publicActiveFilterStyle(brandColor, selectedLocationIds.length > 0)}
                                 >
                                     <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
@@ -396,7 +396,7 @@ export default function PublicMetricPage() {
                                 <button
                                     ref={benBtnRef}
                                     onClick={() => { setShowBenDropdown(!showBenDropdown); setShowLocationDropdown(false) }}
-                                    className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all flex-shrink-0"
+                                    className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-xs font-medium transition-all flex-shrink-0"
                                     style={publicActiveFilterStyle(brandColor, selectedBenGroupIds.length > 0)}
                                 >
                                     <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
@@ -416,7 +416,7 @@ export default function PublicMetricPage() {
                             {hasActiveFilters && (
                                 <button
                                     onClick={clearAllFilters}
-                                    className="flex items-center gap-0.5 px-1.5 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                                    className="flex items-center gap-0.5 px-1.5 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
                                 >
                                     <X className="w-2.5 h-2.5" /> Clear
                                 </button>
@@ -452,7 +452,7 @@ export default function PublicMetricPage() {
                         {/* Metric Info */}
                         <div className="flex-1">
                             <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-                                <span className={`px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-full text-white ${config.bg} uppercase tracking-wide`}>
+                                <span className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs font-bold rounded-full text-white ${config.bg} uppercase tracking-wide`}>
                                     {metric.category}
                                 </span>
                                 <span className="text-xs sm:text-sm text-gray-500 flex items-center gap-1">
@@ -503,7 +503,7 @@ export default function PublicMetricPage() {
                                 <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
                                 {isPercentage ? 'Percentage Over Time' : 'Cumulative Progress'}
                             </h2>
-                            <span className="text-[10px] sm:text-xs text-gray-500 bg-gray-100 px-2 sm:px-3 py-1 rounded-full">
+                            <span className="text-xs text-gray-500 bg-gray-100 px-2 sm:px-3 py-1 rounded-full">
                                 {hasActiveFilters ? 'Filtered' : 'All time'}
                             </span>
                         </div>
@@ -524,7 +524,7 @@ export default function PublicMetricPage() {
                                             <XAxis
                                                 dataKey="date"
                                                 stroke="#cbd5e1"
-                                                fontSize={10}
+                                                fontSize={11}
                                                 tickLine={false}
                                                 axisLine={false}
                                                 tick={{ fill: '#94a3b8' }}
@@ -532,7 +532,7 @@ export default function PublicMetricPage() {
                                             />
                                             <YAxis
                                                 stroke="#cbd5e1"
-                                                fontSize={10}
+                                                fontSize={11}
                                                 tickLine={false}
                                                 axisLine={false}
                                                 tick={{ fill: '#94a3b8' }}
@@ -550,7 +550,7 @@ export default function PublicMetricPage() {
                                                     strokeWidth={1.25}
                                                     strokeDasharray="5 4"
                                                     ifOverflow="extendDomain"
-                                                    label={{ value: `Avg ${Math.round(percentageOverallAvg)}%`, position: 'right', fill: config.accent, fontSize: 10, fontWeight: 500, offset: 6 }}
+                                                    label={{ value: `Avg ${Math.round(percentageOverallAvg)}%`, position: 'right', fill: config.accent, fontSize: 12, fontWeight: 500, offset: 6 }}
                                                 />
                                             )}
                                             <Line
@@ -584,13 +584,13 @@ export default function PublicMetricPage() {
                                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                                             <XAxis
                                                 dataKey="date"
-                                                tick={{ fontSize: 9, fill: '#94a3b8' }}
+                                                tick={{ fontSize: 11, fill: '#94a3b8' }}
                                                 axisLine={{ stroke: '#e2e8f0' }}
                                                 tickLine={false}
                                                 interval="preserveStartEnd"
                                             />
                                             <YAxis
-                                                tick={{ fontSize: 9, fill: '#94a3b8' }}
+                                                tick={{ fontSize: 11, fill: '#94a3b8' }}
                                                 axisLine={false}
                                                 tickLine={false}
                                                 tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value.toString()}
@@ -816,9 +816,9 @@ function ImpactClaimCard({ update, unit, isPercentage, config, orgSlug, initiati
                         <span className={`text-lg sm:text-xl font-bold ${config.text}`}>
                             {isPercentage ? '' : '+'}{parseFloat(update.value).toLocaleString()}{isPercentage ? '%' : ''}
                         </span>
-                        {!isPercentage && <span className="text-[10px] sm:text-xs text-gray-500">{unit}</span>}
+                        {!isPercentage && <span className="text-xs text-gray-500">{unit}</span>}
                     </div>
-                    <div className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs text-gray-500">
+                    <div className="flex items-center gap-1 sm:gap-1.5 text-xs text-gray-500">
                         <Calendar className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                         <span>{displayDate}</span>
                     </div>
@@ -826,7 +826,7 @@ function ImpactClaimCard({ update, unit, isPercentage, config, orgSlug, initiati
                 <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-accent/50 group-hover:text-accent transition-colors flex-shrink-0" />
             </div>
             {update.location && (
-                <div className="mt-1.5 sm:mt-2 flex items-center gap-1 text-[10px] sm:text-xs text-gray-500">
+                <div className="mt-1.5 sm:mt-2 flex items-center gap-1 text-xs text-gray-500">
                     <MapPin className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                     <span>{update.location.name}</span>
                 </div>
@@ -842,7 +842,7 @@ function ImpactClaimCard({ update, unit, isPercentage, config, orgSlug, initiati
                 </div>
             )}
             {update.note && (
-                <p className="mt-1.5 sm:mt-2 text-[10px] sm:text-xs text-gray-500 line-clamp-2 italic">"{update.note}"</p>
+                <p className="mt-1.5 sm:mt-2 text-xs text-gray-500 line-clamp-2 italic">"{update.note}"</p>
             )}
         </Link>
     )
@@ -996,7 +996,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                         <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
                         Supporting Evidence
                     </h2>
-                    <span className={`text-[10px] sm:text-xs font-semibold px-2 sm:px-3 py-1 rounded-full ${config.bg} text-white`}>
+                    <span className={`text-xs font-semibold px-2 sm:px-3 py-1 rounded-full ${config.bg} text-white`}>
                         {evidenceCount} item{evidenceCount !== 1 ? 's' : ''}
                     </span>
                 </div>
@@ -1071,7 +1071,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                                     )
                                                 })}
                                                 {ev.tag_ids.length > 3 && (
-                                                    <span className="text-[10px] text-gray-500 px-1">+{ev.tag_ids.length - 3}</span>
+                                                    <span className="text-xs text-gray-500 px-1">+{ev.tag_ids.length - 3}</span>
                                                 )}
                                             </div>
                                         )}
@@ -1168,7 +1168,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                     <div className="px-3 sm:px-4 py-2 sm:py-3 bg-white/30 border-t border-white/30 flex items-center justify-between gap-2">
                                         <span className="text-xs sm:text-sm text-gray-600 truncate flex-1">
                                             {galleryFile?.file_name}
-                                            {galleryFiles.length > 1 && <span className="text-[10px] sm:text-xs text-gray-400 ml-2">({currentFileIndex + 1}/{galleryFiles.length})</span>}
+                                            {galleryFiles.length > 1 && <span className="text-xs text-gray-400 ml-2">({currentFileIndex + 1}/{galleryFiles.length})</span>}
                                         </span>
                                         {galleryFile?.file_url && (
                                             <a href={galleryFile.file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors text-xs font-medium flex-shrink-0">
@@ -1193,7 +1193,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                     {galleryItem.locations && galleryItem.locations.length > 0 && (
                                         <div className="mt-3 flex flex-wrap gap-1">
                                             {galleryItem.locations.map((loc) => (
-                                                <span key={loc.id} className="text-[10px] bg-accent/10 text-accent px-2 py-0.5 rounded font-medium">{loc.name}</span>
+                                                <span key={loc.id} className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded font-medium">{loc.name}</span>
                                             ))}
                                         </div>
                                     )}
@@ -1218,7 +1218,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                                             {claim.value}{claim.kpis?.metric_type === 'percentage' ? '%' : ` ${claim.kpis?.unit_of_measurement || ''}`}
                                                         </p>
                                                         <p className="text-xs text-muted-foreground mt-0.5">{metricTitle}</p>
-                                                        {dateLabel && <p className="text-[10px] text-muted-foreground mt-0.5">{dateLabel}</p>}
+                                                        {dateLabel && <p className="text-xs text-muted-foreground mt-0.5">{dateLabel}</p>}
                                                     </Link>
                                                 )
                                             })}

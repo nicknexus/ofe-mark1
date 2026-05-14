@@ -387,7 +387,7 @@ export default function EmbedPage() {
                             href="https://nexusimpacts.ai"
                             target="_top"
                             rel="noopener"
-                            className="mt-3 text-[11px] text-gray-400 hover:text-gray-700 transition-colors"
+                            className="mt-3 text-xs text-gray-400 hover:text-gray-700 transition-colors"
                         >
                             Powered by Nexus Impacts
                         </a>
@@ -460,7 +460,7 @@ export default function EmbedPage() {
                                         href={publicUrl}
                                         target="_top"
                                         rel="noopener"
-                                        className="inline-flex items-center gap-1 text-[10.5px] sm:text-[11px] uppercase tracking-[0.08em] font-semibold whitespace-nowrap transition-colors"
+                                        className="inline-flex items-center gap-1 text-[10.5px] sm:text-xs uppercase tracking-[0.08em] font-semibold whitespace-nowrap transition-colors"
                                         style={{ color: brand, filter: 'saturate(1.15) brightness(0.85)' }}
                                     >
                                         View all stories
@@ -609,7 +609,7 @@ export default function EmbedPage() {
                     href="https://nexusimpacts.ai"
                     target="_top"
                     rel="noopener"
-                    className="inline-flex items-center gap-1 text-[11px] sm:text-[11.5px] font-semibold uppercase tracking-[0.06em] whitespace-nowrap transition-colors hover:underline"
+                    className="inline-flex items-center gap-1 text-xs sm:text-[11.5px] font-semibold uppercase tracking-[0.06em] whitespace-nowrap transition-colors hover:underline"
                     style={{ color: brand, filter: 'saturate(1.15) brightness(0.85)' }}
                 >
                     Learn more

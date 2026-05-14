@@ -386,7 +386,7 @@ export default function AdminDemosPage() {
                                     <div className="flex items-center gap-2">
                                         <h3 className="text-base font-semibold text-gray-900 truncate">{demo.name}</h3>
                                         {demo.demo_public_share && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-semibold uppercase tracking-wide">
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-semibold uppercase tracking-wide">
                                                 <Share2 className="w-3 h-3" />
                                                 Shared
                                             </span>

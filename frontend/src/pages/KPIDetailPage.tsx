@@ -854,11 +854,11 @@ export default function KPIDetailPage() {
                                     <XAxis
                                         dataKey="date"
                                         stroke="#9ca3af"
-                                        fontSize={11}
+                                        fontSize={12}
                                     />
                                     <YAxis
                                         stroke="#9ca3af"
-                                        fontSize={11}
+                                        fontSize={12}
                                     />
                                     <Tooltip
                                         contentStyle={{

@@ -119,7 +119,7 @@ export default function KPIFilterBar({
                                 : `${selectedLocations.length} locations`}
                     </span>
                     {selectedLocations.length > 0 && (
-                        <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">{selectedLocations.length}</span>
+                        <span className="ml-1 bg-primary-500 text-white text-xs px-1 rounded-full">{selectedLocations.length}</span>
                     )}
                     <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showLocationPicker ? 'rotate-180' : ''}`} />
                 </button>
@@ -188,7 +188,7 @@ export default function KPIFilterBar({
                                 : `${selectedTags.length} tags`}
                     </span>
                     {selectedTags.length > 0 && (
-                        <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">{selectedTags.length}</span>
+                        <span className="ml-1 bg-primary-500 text-white text-xs px-1 rounded-full">{selectedTags.length}</span>
                     )}
                     <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showTagPicker ? 'rotate-180' : ''}`} />
                 </button>
@@ -257,7 +257,7 @@ export default function KPIFilterBar({
                                 : `${selectedBeneficiaryGroups.length} groups`}
                     </span>
                     {selectedBeneficiaryGroups.length > 0 && (
-                        <span className="ml-1 bg-primary-500 text-white text-[10px] px-1 rounded-full">{selectedBeneficiaryGroups.length}</span>
+                        <span className="ml-1 bg-primary-500 text-white text-xs px-1 rounded-full">{selectedBeneficiaryGroups.length}</span>
                     )}
                     <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showBeneficiaryPicker ? 'rotate-180' : ''}`} />
                 </button>

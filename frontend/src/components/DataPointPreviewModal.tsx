@@ -311,7 +311,7 @@ export default function DataPointPreviewModal({
                                         <span>{supportPercentage}% Supported</span>
                                     </div>
                                     {supportPercentage < 100 && linkedEvidence.length > 0 && (
-                                        <p className="text-[10px] text-gray-500 mt-1.5">
+                                        <p className="text-xs text-gray-500 mt-1.5">
                                             {100 - supportPercentage}% of date range needs evidence
                                         </p>
                                     )}
@@ -327,12 +327,12 @@ export default function DataPointPreviewModal({
                                     <Calendar className="w-4 h-4 text-primary-600" />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">
+                                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                                         {hasDateRange ? 'Date Range' : 'Date'}
                                     </p>
                                     <p className="text-sm font-semibold text-gray-800">{displayDate}</p>
                                     {hasDateRange && (
-                                        <p className="text-[10px] text-gray-500">
+                                        <p className="text-xs text-gray-500">
                                             {Math.ceil((parseLocalDate(dataPoint.date_range_end).getTime() - parseLocalDate(dataPoint.date_range_start).getTime()) / (1000 * 60 * 60 * 24)) + 1} days
                                         </p>
                                     )}
@@ -348,7 +348,7 @@ export default function DataPointPreviewModal({
                                     <MapPin className="w-4 h-4 text-primary-600" />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Location</p>
+                                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Location</p>
                                     {loadingLocation ? (
                                         <div className="animate-pulse h-4 bg-gray-200 rounded w-24"></div>
                                     ) : location ? (
@@ -456,7 +456,7 @@ export default function DataPointPreviewModal({
                                     >
                                         <div className="flex items-center gap-2 mb-2">
                                             <IconComponent className={`w-4 h-4 ${colors.headerIcon}`} />
-                                            <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide truncate">{typeInfo.label}</span>
+                                            <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide truncate">{typeInfo.label}</span>
                                         </div>
                                         <div className="flex items-baseline gap-1.5">
                                             <span className={`text-xl font-bold ${colors.statText}`}>{count}</span>

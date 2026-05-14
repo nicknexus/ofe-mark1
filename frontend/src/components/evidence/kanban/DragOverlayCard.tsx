@@ -38,12 +38,12 @@ export default function DragOverlayCard({ primary, count }: DragOverlayCardProps
                 <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-gray-800 truncate">{primary.file.name}</p>
                     {count > 1 ? (
-                        <p className="inline-flex items-center gap-1 text-[10px] font-semibold text-evidence-600">
+                        <p className="inline-flex items-center gap-1 text-xs font-semibold text-evidence-600">
                             <Files className="w-2.5 h-2.5" />
                             Moving {count} files
                         </p>
                     ) : (
-                        <p className="text-[10px] text-gray-500">{(primary.file.size / 1024 / 1024).toFixed(1)} MB</p>
+                        <p className="text-xs text-gray-500">{(primary.file.size / 1024 / 1024).toFixed(1)} MB</p>
                     )}
                 </div>
             </div>

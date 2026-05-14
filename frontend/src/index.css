@@ -528,7 +528,7 @@
     backdrop-filter: blur(8px);
     border-radius: 8px !important;
     padding: 4px 8px !important;
-    font-size: 10px !important;
+    font-size: 11px !important;
     color: #6B7280 !important;
     margin: 8px !important;
     border: 1px solid rgba(0, 0, 0, 0.04) !important;
@@ -911,7 +911,7 @@ body.location-modal-open .leaflet-pane:not(.leaflet-map-in-modal .leaflet-pane) 
     }
 
     .mobile-evidence-type {
-        font-size: 10px;
+        font-size: 12px;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;

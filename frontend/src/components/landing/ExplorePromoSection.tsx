@@ -171,13 +171,13 @@ function MetricsSlide() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 10, fill: "#94a3b8" }}
+                tick={{ fontSize: 11, fill: "#94a3b8" }}
                 axisLine={{ stroke: "#e2e8f0" }}
                 tickLine={false}
                 interval="preserveStartEnd"
               />
               <YAxis
-                tick={{ fontSize: 10, fill: "#94a3b8" }}
+                tick={{ fontSize: 11, fill: "#94a3b8" }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`)}
@@ -254,7 +254,7 @@ function EvidenceSlide() {
           Documenting students during the hands-on pad-making workshop.
         </p>
         <div className="flex flex-wrap gap-1">
-          <span className="text-[10px] bg-accent/10 text-accent px-1.5 py-0.5 rounded">
+          <span className="text-xs bg-accent/10 text-accent px-1.5 py-0.5 rounded">
             Engucwini
           </span>
         </div>

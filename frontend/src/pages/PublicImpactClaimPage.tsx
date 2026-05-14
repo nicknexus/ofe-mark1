@@ -224,7 +224,7 @@ export default function PublicImpactClaimPage() {
                                 <span className="text-lg sm:text-xl font-bold text-gray-800">
                                     Impact Claim
                                 </span>
-                                <span className={`px-3 sm:px-4 py-1 sm:py-1.5 text-[10px] sm:text-xs font-semibold rounded-full uppercase tracking-wide border ${claim.metric.category === 'impact' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' :
+                                <span className={`px-3 sm:px-4 py-1 sm:py-1.5 text-xs font-semibold rounded-full uppercase tracking-wide border ${claim.metric.category === 'impact' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' :
                                         claim.metric.category === 'input' ? 'bg-evidence-500/10 text-evidence-700 border-evidence-500/20' :
                                             'bg-accent/15 text-accent-foreground border-accent/25'
                                     }`}>
@@ -268,7 +268,7 @@ export default function PublicImpactClaimPage() {
                         <div className="p-4 sm:p-6 space-y-4">
                             {/* Date */}
                             <div>
-                                <p className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wide mb-1">Date</p>
+                                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Date</p>
                                 <div className="flex items-center gap-2 text-sm text-gray-800">
                                     <Calendar className="w-4 h-4 text-gray-400" />
                                     {displayDate}
@@ -278,7 +278,7 @@ export default function PublicImpactClaimPage() {
                             {/* Location */}
                             {claim.location && (
                                 <div>
-                                    <p className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wide mb-1">Location</p>
+                                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Location</p>
                                     <div className="flex items-center gap-2 text-sm text-gray-800">
                                         <MapPin className="w-4 h-4 text-gray-400" />
                                         {claim.location.name}
@@ -292,7 +292,7 @@ export default function PublicImpactClaimPage() {
                             {/* Note */}
                             {claim.note && (
                                 <div>
-                                    <p className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wide mb-1">Note</p>
+                                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Note</p>
                                     <p className="text-sm text-gray-700 italic">"{claim.note}"</p>
                                 </div>
                             )}
@@ -300,14 +300,14 @@ export default function PublicImpactClaimPage() {
                             {/* Label */}
                             {claim.label && (
                                 <div>
-                                    <p className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wide mb-1">Label</p>
+                                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Label</p>
                                     <span className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 font-medium shadow-sm">{claim.label}</span>
                                 </div>
                             )}
 
                             {/* Metric Link */}
                             <div className="pt-3 border-t border-gray-100">
-                                <p className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wide mb-1.5">Part of Metric</p>
+                                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">Part of Metric</p>
                                 <Link
                                     to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${claim.metric.slug}`}
                                     className="flex items-center gap-2 p-3 rounded-xl bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 transition-all group"
@@ -315,7 +315,7 @@ export default function PublicImpactClaimPage() {
                                     <BarChart3 className={`w-5 h-5 ${config.text} flex-shrink-0`} />
                                     <div className="min-w-0 flex-1">
                                         <p className="text-sm font-medium text-gray-800 group-hover:text-accent transition-colors truncate">{claim.metric.title}</p>
-                                        <p className="text-[10px] text-gray-500">{claim.metric.unit_of_measurement} • {claim.metric.category}</p>
+                                        <p className="text-xs text-gray-500">{claim.metric.unit_of_measurement} • {claim.metric.category}</p>
                                     </div>
                                 </Link>
                             </div>
@@ -633,7 +633,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                             </button>
                         )}
 
-                        <span className={`text-[10px] sm:text-xs font-semibold px-2 sm:px-3 py-1 rounded-full ${config.bg} text-white`}>
+                        <span className={`text-xs font-semibold px-2 sm:px-3 py-1 rounded-full ${config.bg} text-white`}>
                             {selectedTypes.length > 0 ? `${filteredEvidence.length} of ${evidenceCount}` : `${evidenceCount}`} item{(selectedTypes.length > 0 ? filteredEvidence.length : evidenceCount) !== 1 ? 's' : ''}
                         </span>
                     </div>
@@ -795,7 +795,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                     <div className="px-3 sm:px-4 py-2 sm:py-3 bg-white/30 border-t border-white/30 flex items-center justify-between gap-2">
                                         <span className="text-xs sm:text-sm text-gray-600 truncate flex-1">
                                             {galleryFile?.file_name}
-                                            {galleryFiles.length > 1 && <span className="text-[10px] sm:text-xs text-gray-400 ml-2">({currentFileIndex + 1}/{galleryFiles.length})</span>}
+                                            {galleryFiles.length > 1 && <span className="text-xs text-gray-400 ml-2">({currentFileIndex + 1}/{galleryFiles.length})</span>}
                                         </span>
                                         {galleryFile?.file_url && (
                                             <a href={galleryFile.file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors text-xs font-medium flex-shrink-0">
@@ -820,7 +820,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                     {galleryItem.locations && galleryItem.locations.length > 0 && (
                                         <div className="mt-3 flex flex-wrap gap-1">
                                             {galleryItem.locations.map((loc) => (
-                                                <span key={loc.id} className="text-[10px] bg-accent/10 text-accent px-2 py-0.5 rounded font-medium">{loc.name}</span>
+                                                <span key={loc.id} className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded font-medium">{loc.name}</span>
                                             ))}
                                         </div>
                                     )}
@@ -845,7 +845,7 @@ function EvidenceGallerySection({ evidence, evidenceCount, config, galleryIndex,
                                                             {claim.value}{claim.kpis?.metric_type === 'percentage' ? '%' : ` ${claim.kpis?.unit_of_measurement || ''}`}
                                                         </p>
                                                         <p className="text-xs text-muted-foreground mt-0.5">{metricTitle}</p>
-                                                        {dateLabel && <p className="text-[10px] text-muted-foreground mt-0.5">{dateLabel}</p>}
+                                                        {dateLabel && <p className="text-xs text-muted-foreground mt-0.5">{dateLabel}</p>}
                                                     </Link>
                                                 )
                                             })}

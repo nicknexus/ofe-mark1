@@ -520,7 +520,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
                                         <Calendar className="w-4 h-4 text-primary-600" />
                                     </div>
                                     <div>
-                                        <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">
+                                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                                             {hasDateRange ? 'Date Range' : 'Date'}
                                         </p>
                                         <p className="text-sm font-semibold text-gray-800">{displayDate}</p>
@@ -539,7 +539,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
                                             <MapPin className="w-4 h-4 text-primary-600" />
                                         </div>
                                         <div>
-                                            <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">
+                                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                                                 {locations.length > 1 ? 'Locations' : 'Location'}
                                             </p>
                                             {loadingLocations ? (
@@ -564,7 +564,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
                                                 <Users className="w-4 h-4 text-primary-600" />
                                             </div>
                                             <div>
-                                                <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">
+                                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                                                     {beneficiaryGroups.length > 1 ? 'Beneficiary Groups' : 'Beneficiary Group'}
                                                 </p>
                                                 {loadingBeneficiaryGroups ? (
@@ -592,7 +592,7 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
                         {/* Tags */}
                         {Array.isArray(displayEvidence.tag_ids) && displayEvidence.tag_ids.length > 0 && (
                             <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
-                                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Tags</p>
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Tags</p>
                                 <EvidenceTagsList tagIds={displayEvidence.tag_ids} size="sm" />
                             </div>
                         )}
@@ -699,13 +699,13 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
                                                                                         <span className="text-xs font-semibold text-gray-900">
                                                                                             {dataPoint.value?.toLocaleString()} {group.kpi?.unit_of_measurement || ''}
                                                                                         </span>
-                                                                                        <span className="text-[10px] text-gray-500 flex items-center">
+                                                                                        <span className="text-xs text-gray-500 flex items-center">
                                                                                             <Calendar className="w-2.5 h-2.5 mr-0.5" />
                                                                                             {dpDisplayDate.length > 20 ? dpDisplayDate.substring(0, 20) + '...' : dpDisplayDate}
                                                                                         </span>
                                                                                     </div>
                                                                                     {dataPointLocation && (
-                                                                                        <div className="flex items-center space-x-1 text-[10px] text-gray-500 mt-0.5">
+                                                                                        <div className="flex items-center space-x-1 text-xs text-gray-500 mt-0.5">
                                                                                             <MapPin className="w-2.5 h-2.5" />
                                                                                             <span className="truncate">{dataPointLocation.name}</span>
                                                                                         </div>

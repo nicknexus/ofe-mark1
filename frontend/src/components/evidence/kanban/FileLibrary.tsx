@@ -49,7 +49,7 @@ export default function FileLibrary({
                     {selectedCount > 0 && (
                         <button
                             onClick={onClearSelection}
-                            className="text-[11px] text-gray-500 hover:text-gray-700"
+                            className="text-xs text-gray-500 hover:text-gray-700"
                         >
                             Clear ({selectedCount})
                         </button>
@@ -67,7 +67,7 @@ export default function FileLibrary({
                 </div>
                 <button
                     onClick={() => onSelectAllVisible(!allVisibleSelected, visible.map(f => f.id))}
-                    className="flex items-center gap-1.5 text-[11px] text-gray-600 hover:text-gray-900"
+                    className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900"
                 >
                     {allVisibleSelected ? (
                         <CheckSquare className="w-3.5 h-3.5 text-evidence-600" />
@@ -77,7 +77,7 @@ export default function FileLibrary({
                     {allVisibleSelected ? 'Deselect all' : 'Select all'}
                 </button>
                 {selectedCount > 0 && (
-                    <p className="text-[10px] text-gray-500 leading-tight">
+                    <p className="text-xs text-gray-500 leading-tight">
                         Drag any selected file to move all {selectedCount} together.
                     </p>
                 )}
@@ -108,7 +108,7 @@ export default function FileLibrary({
             </div>
 
             {files.some(f => f.status === 'uploading') && (
-                <div className="px-3 py-2 border-t border-gray-200 bg-evidence-50/40 flex items-center gap-2 text-[11px] text-evidence-700 flex-shrink-0">
+                <div className="px-3 py-2 border-t border-gray-200 bg-evidence-50/40 flex items-center gap-2 text-xs text-evidence-700 flex-shrink-0">
                     <Loader2 className="w-3 h-3 animate-spin" />
                     Uploading {files.filter(f => f.status === 'uploading').length} file
                     {files.filter(f => f.status === 'uploading').length === 1 ? '' : 's'}…

@@ -567,7 +567,7 @@ export default function PublicInitiativePage() {
                             <button
                                 ref={initiativeBtnRef}
                                 onClick={() => { setShowInitiativeDropdown(!showInitiativeDropdown); setShowLocationDropdown(false) }}
-                                className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all flex-shrink-0"
+                                className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-xs font-medium transition-all flex-shrink-0"
                                 style={publicActiveFilterStyle(brandColor, true)}
                             >
                                 <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
@@ -587,7 +587,7 @@ export default function PublicInitiativePage() {
                                     maxDate={getLocalDateString(new Date())}
                                     placeholder="Date"
                                     activeColor={brandColor}
-                                    className="[&>button]:h-7 [&>button]:text-[11px] [&>button]:pr-1.5 sm:[&>button]:pr-2.5 [&>button>div]:w-7 [&>button>div]:h-7 [&>button>div>svg]:w-3.5 [&>button>div>svg]:h-3.5 [&>button>span]:ml-1 sm:[&>button>span]:ml-1.5"
+                                    className="[&>button]:h-7 [&>button]:text-xs [&>button]:pr-1.5 sm:[&>button]:pr-2.5 [&>button>div]:w-7 [&>button>div]:h-7 [&>button>div>svg]:w-3.5 [&>button>div>svg]:h-3.5 [&>button>span]:ml-1 sm:[&>button>span]:ml-1.5"
                                 />
                             </div>
 
@@ -596,7 +596,7 @@ export default function PublicInitiativePage() {
                                 <button
                                     ref={locationBtnRef}
                                     onClick={() => { setShowLocationDropdown(!showLocationDropdown); setShowInitiativeDropdown(false) }}
-                                    className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[11px] font-medium transition-all flex-shrink-0"
+                                    className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-xs font-medium transition-all flex-shrink-0"
                                     style={publicActiveFilterStyle(brandColor, selectedLocationIds.length > 0)}
                                 >
                                     <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
@@ -627,7 +627,7 @@ export default function PublicInitiativePage() {
                             {hasActiveFilters && (
                                 <button
                                     onClick={clearFilters}
-                                    className="flex items-center gap-0.5 px-1.5 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                                    className="flex items-center gap-0.5 px-1.5 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
                                 >
                                     <X className="w-2.5 h-2.5" /> Clear
                                 </button>
@@ -717,7 +717,7 @@ export default function PublicInitiativePage() {
                                     </div>
                                     <div className="min-w-0">
                                         <span className={`truncate block ${isSelected ? 'text-primary-800' : 'text-gray-900'}`}>{loc.name}</span>
-                                        {loc.description && <span className="text-[10px] text-gray-500">{loc.description}</span>}
+                                        {loc.description && <span className="text-xs text-gray-500">{loc.description}</span>}
                                     </div>
                                 </button>
                             )
@@ -769,15 +769,15 @@ export default function PublicInitiativePage() {
                                 <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/50">
                                     <div className="text-center p-2 rounded-lg bg-gray-50 border border-gray-100">
                                         <p className="text-lg font-bold text-foreground">{dashboard.stats.kpis}</p>
-                                        <p className="text-[10px] text-muted-foreground font-medium">Metrics</p>
+                                        <p className="text-xs text-muted-foreground font-medium">Metrics</p>
                                     </div>
                                     <div className="text-center p-2 rounded-lg bg-gray-50 border border-gray-100">
                                         <p className="text-lg font-bold text-foreground">{dashboard.stats.evidence}</p>
-                                        <p className="text-[10px] text-muted-foreground font-medium">Evidence</p>
+                                        <p className="text-xs text-muted-foreground font-medium">Evidence</p>
                                     </div>
                                     <div className="text-center p-2 rounded-lg bg-gray-50 border border-gray-100">
                                         <p className="text-lg font-bold text-foreground">{dashboard.stats.stories}</p>
-                                        <p className="text-[10px] text-muted-foreground font-medium">Stories</p>
+                                        <p className="text-xs text-muted-foreground font-medium">Stories</p>
                                     </div>
                                 </div>
                             </div>
@@ -826,7 +826,7 @@ export default function PublicInitiativePage() {
                                     <div className={`p-1.5 rounded-lg transition-colors ${activeTab === tab.id ? 'bg-primary-100' : ''}`}>
                                         <tab.icon className={`w-5 h-5 ${activeTab === tab.id ? 'text-primary-600' : ''}`} />
                                     </div>
-                                    <span className="text-[9px] font-medium">{tab.label}</span>
+                                    <span className="text-xs font-medium">{tab.label}</span>
                                 </button>
                             ))}
                         </div>
@@ -1195,7 +1195,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                         <div key={k.id} style={{ marginBottom: 6 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                                 <span style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: color, display: 'inline-block' }} />
-                                <span style={{ fontWeight: 500, color: '#0f172a', fontSize: 11 }}>{k.title}</span>
+                                <span style={{ fontWeight: 500, color: '#0f172a', fontSize: 12 }}>{k.title}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, paddingLeft: 14 }}>
                                 <span style={{ color: '#94a3b8' }}>This month</span>
@@ -1302,7 +1302,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                             >
                                 <div className="flex items-center justify-between mb-1">
                                     <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: metricColor }} />
-                                    <span className="text-[10px] text-gray-400 truncate ml-1">{kpi.metric_type === 'percentage' ? 'avg' : kpi.unit_of_measurement}</span>
+                                    <span className="text-xs text-gray-400 truncate ml-1">{kpi.metric_type === 'percentage' ? 'avg' : kpi.unit_of_measurement}</span>
                                 </div>
                                 <div className="text-xs font-medium text-gray-700 truncate mb-1 group-hover:text-accent transition-colors">{kpi.title}</div>
                                 <div className="text-lg font-bold" style={{ color: metricColor }}>
@@ -1342,7 +1342,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                                             : `${visibleKPIs.size} metrics`}
                                 </span>
                                 {visibleKPIs.size < dashboard.kpis.length && (
-                                    <span className="bg-accent text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                                    <span className="bg-accent text-white text-xs px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                                         {visibleKPIs.size}
                                     </span>
                                 )}
@@ -1473,7 +1473,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                                         <XAxis
                                             dataKey="date"
                                             stroke="#cbd5e1"
-                                            fontSize={10}
+                                            fontSize={11}
                                             tickLine={false}
                                             axisLine={false}
                                             tick={{ fill: '#94a3b8' }}
@@ -1484,7 +1484,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                                         />
                                         <YAxis
                                             stroke="#cbd5e1"
-                                            fontSize={10}
+                                            fontSize={11}
                                             tickLine={false}
                                             axisLine={false}
                                             tick={{ fill: '#94a3b8' }}
@@ -1558,7 +1558,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                                 <XAxis
                                     dataKey="date"
                                     stroke="#9ca3af"
-                                    fontSize={10}
+                                    fontSize={11}
                                     tickLine={false}
                                     axisLine={false}
                                     angle={-45}
@@ -1568,7 +1568,7 @@ function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug,
                                 />
                                 <YAxis
                                     stroke="#9ca3af"
-                                    fontSize={10}
+                                    fontSize={11}
                                     tickLine={false}
                                     axisLine={false}
                                     tickFormatter={(value) => {
@@ -1850,7 +1850,7 @@ function MetricsTab({ dashboard, orgSlug, initiativeSlug, dateQS = '', tagsById,
                                         )
                                     })}
                                     {kpi.tag_ids.length > 5 && (
-                                        <span className="text-[10px] text-muted-foreground px-1">+{kpi.tag_ids.length - 5}</span>
+                                        <span className="text-xs text-muted-foreground px-1">+{kpi.tag_ids.length - 5}</span>
                                     )}
                                 </div>
                             )}
@@ -1948,7 +1948,7 @@ function StoriesTab({ stories, orgSlug, initiativeSlug, dateQS = '', tagsById, o
                                     )
                                 })}
                                 {story.tag_ids.length > 4 && (
-                                    <span className="text-[10px] text-muted-foreground px-1">+{story.tag_ids.length - 4}</span>
+                                    <span className="text-xs text-muted-foreground px-1">+{story.tag_ids.length - 4}</span>
                                 )}
                             </div>
                         )}
@@ -2005,7 +2005,7 @@ function ClickableLocationMarker({ location, onClick }: { location: PublicLocati
                 <div className="font-sans">
                     <p className="font-semibold text-sm">{location.name}</p>
                     {location.description && <p className="text-xs text-gray-500">{location.description}</p>}
-                    <p className="text-[10px] text-accent mt-1">Click to explore</p>
+                    <p className="text-xs text-accent mt-1">Click to explore</p>
                 </div>
             </Tooltip>
         </Marker>
@@ -2094,7 +2094,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { loc
                                         <BookOpen className="w-4 h-4 text-accent" />
                                         <h3 className="font-semibold text-gray-800 text-sm">Stories</h3>
                                     </div>
-                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent">{locationDetail.stories.length}</span>
+                                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent">{locationDetail.stories.length}</span>
                                 </div>
                                 <div className="space-y-2 max-h-[500px] overflow-y-auto">
                                     {locationDetail.stories.length === 0 ? (
@@ -2110,7 +2110,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { loc
                                             )}
                                             <h4 className="text-sm font-medium text-foreground">{story.title}</h4>
                                             {story.description && <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{story.description}</p>}
-                                            <p className="text-[10px] text-muted-foreground mt-1">{formatDate(story.date_represented)}</p>
+                                            <p className="text-xs text-muted-foreground mt-1">{formatDate(story.date_represented)}</p>
                                         </Link>
                                     ))}
                                 </div>
@@ -2123,7 +2123,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { loc
                                         <BarChart3 className="w-4 h-4 text-accent" />
                                         <h3 className="font-semibold text-gray-800 text-sm">Metrics</h3>
                                     </div>
-                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent">{locationDetail.metrics.length}</span>
+                                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent">{locationDetail.metrics.length}</span>
                                 </div>
                                 <div className="space-y-2 max-h-[500px] overflow-y-auto">
                                     {locationDetail.metrics.length === 0 ? (
@@ -2140,9 +2140,9 @@ function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { loc
                                                     <div className="min-w-0">
                                                         <p className="text-sm font-medium text-foreground">{m.title}</p>
                                                         <p className="text-lg font-bold text-foreground mt-0.5">{m.total_value.toLocaleString()}{m.metric_type === 'percentage' ? '%' : ''} <span className="text-xs font-normal text-muted-foreground">{m.metric_type === 'percentage' ? 'avg' : m.unit_of_measurement}</span></p>
-                                                        <p className="text-[10px] text-muted-foreground">{m.claim_count} claim{m.claim_count !== 1 ? 's' : ''} at this location</p>
+                                                        <p className="text-xs text-muted-foreground">{m.claim_count} claim{m.claim_count !== 1 ? 's' : ''} at this location</p>
                                                     </div>
-                                                    <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${cat.bg} ${cat.text} capitalize`}>{m.category}</span>
+                                                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${cat.bg} ${cat.text} capitalize`}>{m.category}</span>
                                                 </div>
                                             </Link>
                                         )
@@ -2157,7 +2157,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { loc
                                         <FileText className="w-4 h-4 text-accent" />
                                         <h3 className="font-semibold text-gray-800 text-sm">Evidence</h3>
                                     </div>
-                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent">{locationDetail.evidence.length}</span>
+                                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent">{locationDetail.evidence.length}</span>
                                 </div>
                                 <div className="space-y-2 max-h-[500px] overflow-y-auto">
                                     {locationDetail.evidence.length === 0 ? (
@@ -2185,7 +2185,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { loc
                                                         )}
                                                     </div>
                                                 )}
-                                                <span className="text-[10px] text-muted-foreground">{evType[ev.type] || ev.type}</span>
+                                                <span className="text-xs text-muted-foreground">{evType[ev.type] || ev.type}</span>
                                                 <h4 className="text-sm font-medium text-foreground mt-0.5">{ev.title}</h4>
                                                 {ev.description && <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{ev.description}</p>}
                                             </Link>
@@ -2236,7 +2236,7 @@ function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }: { loc
                                 <div className="min-w-0">
                                     <h4 className="font-medium text-foreground text-sm group-hover:text-accent transition-colors">{location.name}</h4>
                                     {location.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{location.description}</p>}
-                                    <p className="text-[10px] text-muted-foreground mt-1">{location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">{location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}</p>
                                 </div>
                                 <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-accent flex-shrink-0 mt-2 transition-colors" />
                             </div>
@@ -2611,7 +2611,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                                             )
                                         })}
                                         {item.tag_ids.length > 4 && (
-                                            <span className="text-[10px] text-muted-foreground px-1">+{item.tag_ids.length - 4}</span>
+                                            <span className="text-xs text-muted-foreground px-1">+{item.tag_ids.length - 4}</span>
                                         )}
                                     </div>
                                 )}
@@ -2624,13 +2624,13 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                                             const catColor = cat === 'impact' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' : cat === 'output' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-evidence-100 text-evidence-700 hover:bg-evidence-200'
                                             const label = claim.kpis?.title ? `${claim.value} ${claim.kpis.unit_of_measurement || ''}` : `${claim.value}`
                                             return (
-                                                <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/claim/${claim.id}${dateQS}`} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${catColor} transition-colors`} onClick={e => e.stopPropagation()}>
+                                                <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/claim/${claim.id}${dateQS}`} className={`text-xs px-1.5 py-0.5 rounded font-medium ${catColor} transition-colors`} onClick={e => e.stopPropagation()}>
                                                     {claim.kpis?.title || label}
                                                 </Link>
                                             )
                                         })}
                                         {item.impact_claims.length > 2 && (
-                                            <span className="text-[10px] text-muted-foreground">+{item.impact_claims.length - 2}</span>
+                                            <span className="text-xs text-muted-foreground">+{item.impact_claims.length - 2}</span>
                                         )}
                                     </div>
                                 ) : item.kpis && item.kpis.length > 0 ? (
@@ -2638,20 +2638,20 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                                         {item.kpis.slice(0, 2).map((kpi) => {
                                             const catColor = kpi.category === 'impact' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' : kpi.category === 'output' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-evidence-100 text-evidence-700 hover:bg-evidence-200'
                                             return (
-                                                <Link key={kpi.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}${dateQS}`} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${catColor} transition-colors`} onClick={e => e.stopPropagation()}>
+                                                <Link key={kpi.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}${dateQS}`} className={`text-xs px-1.5 py-0.5 rounded font-medium ${catColor} transition-colors`} onClick={e => e.stopPropagation()}>
                                                     {kpi.title}
                                                 </Link>
                                             )
                                         })}
                                         {item.kpis.length > 2 && (
-                                            <span className="text-[10px] text-muted-foreground">+{item.kpis.length - 2}</span>
+                                            <span className="text-xs text-muted-foreground">+{item.kpis.length - 2}</span>
                                         )}
                                     </div>
                                 ) : null}
                                 {item.locations && item.locations.length > 0 && (
                                     <div className="mt-1.5 flex flex-wrap gap-1">
                                         {item.locations.map((loc) => (
-                                            <span key={loc.id} className="text-[10px] bg-accent/10 text-accent px-1.5 py-0.5 rounded">{loc.name}</span>
+                                            <span key={loc.id} className="text-xs bg-accent/10 text-accent px-1.5 py-0.5 rounded">{loc.name}</span>
                                         ))}
                                     </div>
                                 )}
@@ -2795,7 +2795,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                                         <span className="text-xs sm:text-sm text-gray-600 truncate flex-1">
                                             {galleryFile?.file_name}
                                             {galleryFiles.length > 1 && (
-                                                <span className="text-[10px] sm:text-xs text-gray-400 ml-2">
+                                                <span className="text-xs text-gray-400 ml-2">
                                                     ({currentFileIndex + 1}/{galleryFiles.length})
                                                 </span>
                                             )}
@@ -2831,7 +2831,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                                     {galleryItem.locations && galleryItem.locations.length > 0 && (
                                         <div className="mt-3 flex flex-wrap gap-1">
                                             {galleryItem.locations.map((loc) => (
-                                                <span key={loc.id} className="text-[10px] bg-accent/10 text-accent px-2 py-0.5 rounded font-medium">{loc.name}</span>
+                                                <span key={loc.id} className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded font-medium">{loc.name}</span>
                                             ))}
                                         </div>
                                     )}
@@ -2855,7 +2855,7 @@ function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById,
                                                             {claim.value}{claim.kpis?.metric_type === 'percentage' ? '%' : ` ${claim.kpis?.unit_of_measurement || ''}`}
                                                         </p>
                                                         <p className="text-xs text-muted-foreground mt-0.5">{metricTitle}</p>
-                                                        {dateLabel && <p className="text-[10px] text-muted-foreground mt-0.5">{dateLabel}</p>}
+                                                        {dateLabel && <p className="text-xs text-muted-foreground mt-0.5">{dateLabel}</p>}
                                                     </Link>
                                                 )
                                             })}

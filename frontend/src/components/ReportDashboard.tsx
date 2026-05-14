@@ -190,7 +190,7 @@ export default function ReportDashboard({
                         </div>
                         <div
                             className="text-right"
-                            style={{ fontSize: '10px' }}
+                            style={{ fontSize: '12px' }}
                         >
                             <div className="font-semibold mb-0.5">Nexus Impacts</div>
                             <div style={{ fontSize: '9px' }}>Know Your Mark On The World</div>
@@ -235,7 +235,7 @@ export default function ReportDashboard({
                                         </div>
                                     )}
                                     <div className="p-4 flex-1 flex flex-col">
-                                        <div className="flex items-center gap-2 mb-2" style={{ fontSize: '10px', color: '#6b7280' }}>
+                                        <div className="flex items-center gap-2 mb-2" style={{ fontSize: '12px', color: '#6b7280' }}>
                                             {selectedStory.location_name && (
                                                 <div className="flex items-center gap-1">
                                                     <MapPin className="w-3 h-3" />
@@ -265,13 +265,13 @@ export default function ReportDashboard({
                                                 value={selectedStory.description || ''}
                                                 onChange={(e) => onStoryDescriptionChange?.(e.target.value)}
                                                 className="w-full leading-relaxed resize-none border border-primary-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1"
-                                                style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4', minHeight: '100px' }}
+                                                style={{ fontSize: '12px', color: '#1f2937', lineHeight: '1.4', minHeight: '100px' }}
                                                 placeholder="Story description..."
                                             />
                                         ) : selectedStory.description ? (
                                             <p
                                                 className="leading-relaxed"
-                                                style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4', marginBottom: 'auto' }}
+                                                style={{ fontSize: '12px', color: '#1f2937', lineHeight: '1.4', marginBottom: 'auto' }}
                                             >
                                                 {selectedStory.description}
                                             </p>
@@ -368,12 +368,12 @@ export default function ReportDashboard({
                                             value={overviewSummary}
                                             onChange={(e) => onOverviewChange?.(e.target.value)}
                                             className="w-full leading-relaxed resize-none border border-primary-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                            style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4', minHeight: '60px' }}
+                                            style={{ fontSize: '12px', color: '#1f2937', lineHeight: '1.4', minHeight: '60px' }}
                                         />
                                     ) : (
                                         <p
                                             className="leading-relaxed"
-                                            style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4' }}
+                                            style={{ fontSize: '12px', color: '#1f2937', lineHeight: '1.4' }}
                                         >
                                             {overviewSummary}
                                         </p>
@@ -404,12 +404,12 @@ export default function ReportDashboard({
                                                 value={beneficiaryText}
                                                 onChange={(e) => onBeneficiaryTextChange?.(e.target.value)}
                                                 className="w-full leading-relaxed resize-none border border-primary-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                                style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4', minHeight: '60px' }}
+                                                style={{ fontSize: '12px', color: '#1f2937', lineHeight: '1.4', minHeight: '60px' }}
                                             />
                                         ) : (
                                             <p
                                                 className="leading-relaxed"
-                                                style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4' }}
+                                                style={{ fontSize: '12px', color: '#1f2937', lineHeight: '1.4' }}
                                             >
                                                 {beneficiaryText}
                                             </p>
@@ -439,7 +439,7 @@ export default function ReportDashboard({
                                                         <BarChart3 className="w-3 h-3" style={{ color: '#608341' }} />
                                                         <h3
                                                             className="font-bold"
-                                                            style={{ fontSize: '11px', color: '#608341' }}
+                                                            style={{ fontSize: '12px', color: '#608341' }}
                                                         >
                                                             Metric Totals
                                                         </h3>
@@ -462,11 +462,11 @@ export default function ReportDashboard({
                                                                 angle={-45}
                                                                 textAnchor="end"
                                                                 height={60}
-                                                                tick={{ fontSize: 9, fill: '#6b7280' }}
+                                                                tick={{ fontSize: 11, fill: '#6b7280' }}
                                                                 interval={0}
                                                             />
                                                             <YAxis
-                                                                tick={{ fontSize: 9, fill: '#6b7280' }}
+                                                                tick={{ fontSize: 11, fill: '#6b7280' }}
                                                                 tickFormatter={(value) => {
                                                                     if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
                                                                     if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
@@ -478,7 +478,7 @@ export default function ReportDashboard({
                                                                     backgroundColor: 'white',
                                                                     border: '1px solid rgba(96, 131, 65, 0.2)',
                                                                     borderRadius: '6px',
-                                                                    fontSize: '11px',
+                                                                    fontSize: '12px',
                                                                     padding: '6px 8px'
                                                                 }}
                                                                 formatter={(value: number) => [value.toLocaleString(), 'Total']}
@@ -513,7 +513,7 @@ export default function ReportDashboard({
                                                             <MapPin className="w-3 h-3" style={{ color: '#608341' }} />
                                                             <h3
                                                                 className="font-bold"
-                                                                style={{ fontSize: '11px', color: '#608341' }}
+                                                                style={{ fontSize: '12px', color: '#608341' }}
                                                             >
                                                                 Locations
                                                             </h3>
@@ -656,12 +656,12 @@ export default function ReportDashboard({
                                             value={overviewSummary}
                                             onChange={(e) => onOverviewChange?.(e.target.value)}
                                             className="w-full leading-relaxed resize-none border border-primary-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                            style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4', minHeight: '60px' }}
+                                            style={{ fontSize: '12px', color: '#1f2937', lineHeight: '1.4', minHeight: '60px' }}
                                         />
                                     ) : (
                                         <p
                                             className="leading-relaxed"
-                                            style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4' }}
+                                            style={{ fontSize: '12px', color: '#1f2937', lineHeight: '1.4' }}
                                         >
                                             {overviewSummary}
                                         </p>
@@ -692,12 +692,12 @@ export default function ReportDashboard({
                                                 value={beneficiaryText}
                                                 onChange={(e) => onBeneficiaryTextChange?.(e.target.value)}
                                                 className="w-full leading-relaxed resize-none border border-primary-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                                style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4', minHeight: '60px' }}
+                                                style={{ fontSize: '12px', color: '#1f2937', lineHeight: '1.4', minHeight: '60px' }}
                                             />
                                         ) : (
                                             <p
                                                 className="leading-relaxed"
-                                                style={{ fontSize: '11px', color: '#1f2937', lineHeight: '1.4' }}
+                                                style={{ fontSize: '12px', color: '#1f2937', lineHeight: '1.4' }}
                                             >
                                                 {beneficiaryText}
                                             </p>
@@ -724,7 +724,7 @@ export default function ReportDashboard({
                                                     <BarChart3 className="w-3 h-3" style={{ color: '#608341' }} />
                                                     <h3
                                                         className="font-bold"
-                                                        style={{ fontSize: '11px', color: '#608341' }}
+                                                        style={{ fontSize: '12px', color: '#608341' }}
                                                     >
                                                         Metric Totals
                                                     </h3>
@@ -747,11 +747,11 @@ export default function ReportDashboard({
                                                             angle={-45}
                                                             textAnchor="end"
                                                             height={60}
-                                                            tick={{ fontSize: 9, fill: '#6b7280' }}
+                                                            tick={{ fontSize: 11, fill: '#6b7280' }}
                                                             interval={0}
                                                         />
                                                         <YAxis
-                                                            tick={{ fontSize: 9, fill: '#6b7280' }}
+                                                            tick={{ fontSize: 11, fill: '#6b7280' }}
                                                             tickFormatter={(value) => {
                                                                 if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
                                                                 if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
@@ -763,7 +763,7 @@ export default function ReportDashboard({
                                                                 backgroundColor: 'white',
                                                                 border: '1px solid rgba(96, 131, 65, 0.2)',
                                                                 borderRadius: '6px',
-                                                                fontSize: '11px',
+                                                                fontSize: '12px',
                                                                 padding: '6px 8px'
                                                             }}
                                                             formatter={(value: number) => [value.toLocaleString(), 'Total']}
@@ -798,7 +798,7 @@ export default function ReportDashboard({
                                                         <MapPin className="w-3 h-3" style={{ color: '#608341' }} />
                                                         <h3
                                                             className="font-bold"
-                                                            style={{ fontSize: '11px', color: '#608341' }}
+                                                            style={{ fontSize: '12px', color: '#608341' }}
                                                         >
                                                             Locations
                                                         </h3>
@@ -855,7 +855,7 @@ export default function ReportDashboard({
                         style={{
                             borderColor: 'rgba(96, 131, 65, 0.2)',
                             color: '#6b7280',
-                            fontSize: '10px'
+                            fontSize: '12px'
                         }}
                     >
                         <div className="font-semibold mb-0.5" style={{ color: '#608341' }}>

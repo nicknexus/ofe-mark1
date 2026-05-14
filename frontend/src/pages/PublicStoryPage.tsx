@@ -294,7 +294,7 @@ export default function PublicStoryPage() {
                                         : story.location?.name}
                                 </span>
                             )}
-                            <span className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 bg-gray-100 rounded-full text-[10px] sm:text-xs font-medium">
+                            <span className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 bg-gray-100 rounded-full text-xs font-medium">
                                 {story.media_type}
                             </span>
                         </div>
@@ -351,7 +351,7 @@ export default function PublicStoryPage() {
                                     >
                                         <ChevronLeft className="w-4 h-4 flex-shrink-0 group-hover:-translate-x-0.5 transition-transform" />
                                         <div className="min-w-0 text-left">
-                                            <p className="text-[10px] text-muted-foreground">Previous</p>
+                                            <p className="text-xs text-muted-foreground">Previous</p>
                                             <p className="truncate text-xs">{prevStory.title}</p>
                                         </div>
                                     </button>
@@ -367,7 +367,7 @@ export default function PublicStoryPage() {
                                         className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-gray-50 border border-gray-200 text-foreground rounded-xl transition-colors text-sm font-medium shadow-sm group min-w-0 flex-1 justify-end"
                                     >
                                         <div className="min-w-0 text-right">
-                                            <p className="text-[10px] text-muted-foreground">Next</p>
+                                            <p className="text-xs text-muted-foreground">Next</p>
                                             <p className="truncate text-xs">{nextStory.title}</p>
                                         </div>
                                         <ChevronRight className="w-4 h-4 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />

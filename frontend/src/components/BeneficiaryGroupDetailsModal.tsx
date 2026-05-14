@@ -588,7 +588,7 @@ export default function BeneficiaryGroupDetailsModal({
                                                                                     {ev.title}
                                                                                 </div>
                                                                                 {ev.description && (
-                                                                                    <div className="text-[10px] text-gray-500 mt-0.5 line-clamp-1">
+                                                                                    <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">
                                                                                         {ev.description}
                                                                                     </div>
                                                                                 )}
@@ -646,7 +646,7 @@ export default function BeneficiaryGroupDetailsModal({
                                                             <Tooltip direction="top" offset={[0, -16]} permanent={mapLocations.length <= 3}>
                                                                 <span className="text-xs font-medium">{loc.name}</span>
                                                                 {loc.country && (
-                                                                    <span className="text-[10px] text-gray-500 ml-1">({loc.country})</span>
+                                                                    <span className="text-xs text-gray-500 ml-1">({loc.country})</span>
                                                                 )}
                                                             </Tooltip>
                                                         </Marker>

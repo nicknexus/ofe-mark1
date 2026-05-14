@@ -102,7 +102,7 @@ export default function StoryCard({ story, onView }: StoryCardProps) {
 
                 {/* Media type badge */}
                 {badge && (
-                    <div className="absolute top-3 left-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/90 backdrop-blur-sm text-[11px] font-medium text-gray-700 shadow-sm">
+                    <div className="absolute top-3 left-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/90 backdrop-blur-sm text-xs font-medium text-gray-700 shadow-sm">
                         <badge.Icon className="w-3 h-3" />
                         {badge.label}
                     </div>
