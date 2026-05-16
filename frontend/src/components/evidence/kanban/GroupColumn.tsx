@@ -185,6 +185,7 @@ export default function GroupColumn({
                             file={f}
                             palette={palette}
                             selectionDragCount={selectionDragCount}
+                            dragOrigin="group"
                             onToggleSelect={() => onToggleFileSelect(f.id)}
                             onEdit={() => onEditFile(f.id)}
                             onRemove={() => onRemoveFile(f.id)}

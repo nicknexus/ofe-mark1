@@ -14,6 +14,11 @@ interface FileTileProps {
     selectionDragCount?: number
     /** Library column only: bold colored frame + white interior; kanban tiles omit this. */
     palette?: GroupPalette
+    /** Where this tile is rendered. The same file appears in both the
+     *  FileLibrary AND in its current GroupColumn — dnd-kit rejects duplicate
+     *  ids, so the draggable id is namespaced by origin and the file's real id
+     *  travels in the data payload. */
+    dragOrigin?: 'library' | 'group'
 }
 
 function fileIcon(file: File) {
@@ -31,13 +36,14 @@ export default function FileTile({
     draggable = true,
     selectionDragCount,
     palette,
+    dragOrigin = 'group',
 }: FileTileProps) {
     const Icon = fileIcon(file.file)
     const isImage = file.file.type.startsWith('image/')
 
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-        id: file.id,
-        data: { fileId: file.id },
+        id: `${dragOrigin}-${file.id}`,
+        data: { fileId: file.id, origin: dragOrigin },
         disabled: !draggable,
     })
 

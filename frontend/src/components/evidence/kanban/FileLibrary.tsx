@@ -98,6 +98,7 @@ export default function FileLibrary({
                                 file={f}
                                 selectionDragCount={selectedCount}
                                 palette={palette}
+                                dragOrigin="library"
                                 onToggleSelect={() => onToggleSelect(f.id)}
                                 onEdit={() => onEditFile(f.id)}
                                 onRemove={() => onRemoveFile(f.id)}

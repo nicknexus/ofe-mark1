@@ -82,7 +82,11 @@ export default function OrganizeStep({
     )
 
     const handleDragStart = useCallback((e: DragStartEvent) => {
-        const draggedId = e.active.id as string
+        // The draggable id is namespaced (`library-<id>` / `group-<id>`) so the
+        // same file rendered in both columns has unique handles. The real file
+        // id always travels in the data payload.
+        const data = e.active.data?.current as { fileId?: string } | undefined
+        const draggedId = data?.fileId ?? (e.active.id as string)
         const dragged = files.find(f => f.id === draggedId)
         if (!dragged) return
 
