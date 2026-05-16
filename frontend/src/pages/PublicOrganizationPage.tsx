@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
@@ -277,24 +277,7 @@ export default function PublicOrganizationPage() {
         return [...filtered].sort((a, b) => (b.total_value ?? 0) - (a.total_value ?? 0))
     }, [metrics, selectedInitiative, selectedLocationIds, startDate, endDate, selectedTagIds])
 
-    const [keyMetricsRowPx, setKeyMetricsRowPx] = useState<number | null>(null)
-    useLayoutEffect(() => {
-        const el = keyMetricsScrollRef.current
-        if (!el || filteredMetrics.length === 0) {
-            setKeyMetricsRowPx(null)
-            return
-        }
-        const gapPx = 8
-        const measure = () => {
-            const h = el.clientHeight
-            if (h <= 0) return
-            setKeyMetricsRowPx(Math.max(124, Math.floor((h - gapPx) / 2)))
-        }
-        measure()
-        const ro = new ResizeObserver(measure)
-        ro.observe(el)
-        return () => ro.disconnect()
-    }, [filteredMetrics.length, loading])
+    const [keyMetricsRowPx] = useState<number | null>(null)
 
     const filteredStories = useMemo(() => {
         let filtered = stories

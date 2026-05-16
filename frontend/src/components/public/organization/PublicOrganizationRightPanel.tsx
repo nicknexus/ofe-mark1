@@ -170,50 +170,49 @@ export function PublicOrganizationRightPanel(props: Props) {
                                     </div>
                                 ) : (
                                     <div
-                                        className="grid grid-cols-2 gap-2"
-                                        style={{
-                                            gridAutoRows: keyMetricsRowPx != null
-                                                ? `${keyMetricsRowPx}px`
-                                                : 'minmax(118px, 22vh)',
-                                        }}
+                                        className="grid grid-cols-2 gap-2 h-full"
+                                        style={{ gridAutoRows: 'calc(50% - 4px)' }}
                                     >
                                         {filteredMetrics.map((metric) => {
                                             const isPct = metric.metric_type === 'percentage'
                                             const unit = metric.unit_of_measurement?.trim()
+                                            const hasTarget = metric.target_value != null && metric.total_value != null
+                                            const subLabel = isPct ? 'average' : unit
                                             return (
                                                 <Link
                                                     key={metric.id}
                                                     to={`${orgLinkBase}/${slug}/${metric.initiative_slug}/metric/${generateMetricSlug(metric.title)}`}
-                                                    className="group relative min-h-0 h-full rounded-xl overflow-hidden border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300/90 hover:-translate-y-px transition-all duration-200 flex flex-col bg-white"
+                                                    className="group relative h-full min-h-0 rounded-xl border border-gray-200/80 bg-white shadow-surface hover:shadow-surface-hover hover:border-gray-300/90 hover:-translate-y-px transition-all duration-200 flex flex-col overflow-hidden"
                                                 >
                                                     <span
                                                         className="absolute top-0 left-0 right-0 h-[3px] pointer-events-none z-[1]"
                                                         style={{ backgroundColor: brandColor, opacity: 0.85 }}
                                                         aria-hidden
                                                     />
-                                                    <ArrowUpRight className="absolute top-3 right-2.5 w-3.5 h-3.5 shrink-0 z-[1] text-gray-300 group-hover:text-gray-500 transition-colors" aria-hidden />
+                                                    <ArrowUpRight
+                                                        className="absolute top-2.5 right-2.5 w-3.5 h-3.5 z-[1] text-gray-300 group-hover:text-gray-500 transition-colors"
+                                                        aria-hidden
+                                                    />
 
-                                                    <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col items-center justify-center px-3 pt-7 pb-1 md:px-4 md:pt-9 md:pb-2">
+                                                    <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center px-2 pt-5 pb-2 gap-1 overflow-hidden">
                                                         <span
-                                                            className="text-4xl md:text-5xl lg:text-[3.5rem] font-bold leading-none tabular-nums tracking-tight text-center max-w-full min-w-0 shrink truncate"
+                                                            className="font-bold leading-none tabular-nums tracking-tight text-xl md:text-2xl lg:text-3xl xl:text-4xl 2xl:text-6xl"
                                                             style={{ color: brandColor, filter: 'saturate(1.1) brightness(0.78)' }}
                                                         >
                                                             {formatAbbreviatedMetricTotal(metric.total_value, { isPercentage: isPct })}{isPct ? '%' : ''}
                                                         </span>
-                                                        {!isPct && unit ? (
-                                                            <span className="mt-1.5 text-[11px] md:text-xs font-semibold text-gray-400 text-center line-clamp-1 shrink-0">{unit}</span>
-                                                        ) : isPct ? (
-                                                            <span className="mt-1.5 text-[11px] md:text-xs font-semibold text-gray-400 text-center shrink-0">average</span>
-                                                        ) : null}
+                                                        {subLabel && (
+                                                            <span className="text-[10px] md:text-[11px] font-semibold text-gray-400 line-clamp-1">{subLabel}</span>
+                                                        )}
                                                     </div>
 
-                                                    {metric.target_value != null && metric.total_value != null && (
-                                                        <div className="px-3 md:px-4 pb-2 pt-1 bg-white shrink-0">
+                                                    {hasTarget && (
+                                                        <div className="px-3 pb-2">
                                                             <div className="h-1 rounded-full bg-black/5 overflow-hidden">
                                                                 <div
                                                                     className="h-full rounded-full"
                                                                     style={{
-                                                                        width: `${Math.min(100, (metric.total_value / metric.target_value) * 100).toFixed(1)}%`,
+                                                                        width: `${Math.min(100, ((metric.total_value as number) / (metric.target_value as number)) * 100).toFixed(1)}%`,
                                                                         backgroundColor: brandColor,
                                                                         opacity: 0.55,
                                                                     }}
@@ -223,13 +222,13 @@ export function PublicOrganizationRightPanel(props: Props) {
                                                     )}
 
                                                     <div
-                                                        className="shrink-0 h-[3.875rem] md:h-[4.125rem] border-t px-3 py-0 flex items-center justify-center overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]"
+                                                        className="border-t px-2 h-10 flex items-center justify-center text-center shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]"
                                                         style={{
                                                             background: `linear-gradient(180deg, ${brandColor}14 0%, ${brandColor}26 100%)`,
                                                             borderColor: `${brandColor}38`,
                                                         }}
                                                     >
-                                                        <p className="text-xs md:text-sm font-semibold text-foreground/90 text-center leading-snug line-clamp-3 w-full px-0.5 min-h-0">
+                                                        <p className="text-xs md:text-sm font-semibold text-foreground/90 leading-snug line-clamp-2">
                                                             {metric.title}
                                                         </p>
                                                     </div>
