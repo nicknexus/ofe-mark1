@@ -137,8 +137,11 @@ export function PublicOrganizationRightPanel(props: Props) {
 
                     {/* Top Row - Metrics + Impact Claims (larger) */}
                     <div className="flex flex-col md:flex-row gap-2 md:gap-3 md:h-[68%]">
-                        {/* Key Metrics (Scrollable 2x2 Grid) */}
-                        <div className="w-full md:w-[62%] overflow-hidden flex flex-col max-h-[320px] md:max-h-none md:min-h-0">
+                        {/* Key Metrics (Scrollable 2x2 Grid)
+                            Mobile: tall enough to fit a full 2x2 of cards
+                            comfortably with the same square-ish proportions as
+                            desktop. Desktop sizing (`md:*`) untouched. */}
+                        <div className="w-full md:w-[62%] overflow-hidden flex flex-col max-h-[440px] md:max-h-none md:min-h-0">
                             <div className="px-2 md:px-4 py-2 flex items-center justify-between flex-shrink-0">
                                 <div className="flex items-center gap-2">
                                     <div
@@ -169,9 +172,13 @@ export function PublicOrganizationRightPanel(props: Props) {
                                         </div>
                                     </div>
                                 ) : (
+                                    // Mobile: fixed `auto-rows: minmax(160px, 1fr)`
+                                    // so cards never stretch into elongated
+                                    // rectangles when fewer than 4 metrics
+                                    // exist. Desktop (`md:`) keeps the original
+                                    // 50%-of-height behaviour to fill the panel.
                                     <div
-                                        className="grid grid-cols-2 gap-2 h-full"
-                                        style={{ gridAutoRows: 'calc(50% - 4px)' }}
+                                        className="grid grid-cols-2 gap-2 h-full [grid-auto-rows:minmax(160px,1fr)] md:[grid-auto-rows:calc(50%-4px)]"
                                     >
                                         {filteredMetrics.map((metric) => {
                                             const isPct = metric.metric_type === 'percentage'
@@ -196,7 +203,7 @@ export function PublicOrganizationRightPanel(props: Props) {
 
                                                     <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center px-2 pt-5 pb-2 gap-1 overflow-hidden">
                                                         <span
-                                                            className="font-bold leading-none tabular-nums tracking-tight text-xl md:text-2xl lg:text-3xl xl:text-4xl 2xl:text-6xl"
+                                                            className="font-bold leading-none tabular-nums tracking-tight text-3xl sm:text-4xl md:text-2xl lg:text-3xl xl:text-4xl 2xl:text-6xl"
                                                             style={{ color: brandColor, filter: 'saturate(1.1) brightness(0.78)' }}
                                                         >
                                                             {formatAbbreviatedMetricTotal(metric.total_value, { isPercentage: isPct })}{isPct ? '%' : ''}

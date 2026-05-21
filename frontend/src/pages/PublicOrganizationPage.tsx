@@ -125,7 +125,7 @@ export default function PublicOrganizationPage() {
                 c?.type === 'stat'
                     ? !!(c.value || '').trim()
                     : !!((c?.title || '').trim() || (c?.description || '').trim())
-            ).slice(0, 2)
+            ).slice(0, 4)
             setHighlightCards(valid)
         } catch (err) {
             setError('Failed to load organization')
@@ -232,20 +232,24 @@ export default function PublicOrganizationPage() {
                 .filter((m): m is NonNullable<typeof m> => m !== null)
         }
         if (selectedTagIds.length > 0) {
-            // Keep metrics that either carry the tag themselves, or have at
-            // least one update tagged with one of the selected ids.
-            filtered = filtered.filter(m => {
-                if (tagMatchesAny(m.tag_ids)) return true
-                return (m.updates || []).some(u => tagMatchesSingle(u.tag_id))
-            })
-            // Recompute totals using only matching updates so dashboard
-            // numbers reflect "tagged X" totals.
-            filtered = filtered.map(m => {
-                const matching = (m.updates || []).filter(u => tagMatchesSingle(u.tag_id))
-                if (matching.length === 0) return m
-                const newTotal = aggregateKpiUpdates(matching as any, m.metric_type)
-                return { ...m, total_value: newTotal, update_count: matching.length, updates: matching }
-            })
+            // Drop metrics with no claims tagged with any of the selected ids,
+            // and recompute totals from just the matching claims so the cards
+            // reflect "tagged X" numbers (not the metric's all-time total).
+            //
+            // Note: we deliberately ignore KPI-level `tag_ids` here. A tag
+            // attached to the parent metric only declares which tags its
+            // claims *may* use — it does NOT mean any claim actually carries
+            // that tag. Showing the metric's full unfiltered total in that
+            // case is misleading (e.g. a freshly-created tag with no claims
+            // yet would still surface every metric it's bound to).
+            filtered = filtered
+                .map(m => {
+                    const matching = (m.updates || []).filter(u => tagMatchesSingle(u.tag_id))
+                    if (matching.length === 0) return null
+                    const newTotal = aggregateKpiUpdates(matching as any, m.metric_type)
+                    return { ...m, total_value: newTotal, update_count: matching.length, updates: matching }
+                })
+                .filter((m): m is NonNullable<typeof m> => m !== null)
         }
         if (startDate || endDate) {
             filtered = filtered.filter(m => {
@@ -594,12 +598,29 @@ export default function PublicOrganizationPage() {
             }))
     }, [filteredLocations])
 
+    // Cumulative-sum and "latest %" don't share an axis, so the chart can't
+    // mix metric types. Rule: if any number metric is in the filtered set,
+    // hide percentage metrics and chart numbers only. If the filtered set is
+    // *purely* percentage, chart all of them in percentage mode (latest value
+    // as of each month, formatted with `%`).
+    const chartMetricsPool = useMemo(() => {
+        const hasNumber = filteredMetrics.some(m => m.metric_type !== 'percentage')
+        return hasNumber
+            ? filteredMetrics.filter(m => m.metric_type !== 'percentage')
+            : filteredMetrics
+    }, [filteredMetrics])
+
+    const isPercentageChart = useMemo(
+        () => chartMetricsPool.length > 0 && chartMetricsPool.every(m => m.metric_type === 'percentage'),
+        [chartMetricsPool]
+    )
+
     // Determine how many metrics to show per initiative (aim for ~6 total)
     const chartMetrics = useMemo(() => {
         // Group metrics by initiative
         const metricsByInitiative = new Map<string, { metrics: PublicKPI[]; initiative: PublicInitiative }>()
 
-        filteredMetrics.forEach(metric => {
+        chartMetricsPool.forEach(metric => {
             const init = initiatives.find(i => i.id === metric.initiative_id)
             if (!init) return
 
@@ -642,7 +663,7 @@ export default function PublicOrganizationPage() {
         })
 
         return result
-    }, [filteredMetrics, initiatives])
+    }, [chartMetricsPool, initiatives])
 
     // Chart data: selected metrics over time (cumulative monthly, anchored to today's date)
     const initiativeChartData = useMemo(() => {
@@ -692,11 +713,16 @@ export default function PublicOrganizationPage() {
             const dataPoint: any = { date: label, fullDate: new Date(currentDate) }
 
             chartMetrics.forEach(({ metric }) => {
-                // Calculate cumulative total up to this date
-                const cumulative = (updatesByMetric[metric.id] || [])
+                const upTo = (updatesByMetric[metric.id] || [])
                     .filter(u => u.date <= currentDate)
-                    .reduce((sum, u) => sum + u.value, 0)
-                dataPoint[metric.id] = cumulative
+                if (metric.metric_type === 'percentage') {
+                    // Snapshot value: the most recent reported % as of this
+                    // month. Summing percentages across updates is meaningless
+                    // and would push the line past 100%.
+                    dataPoint[metric.id] = upTo.length > 0 ? upTo[upTo.length - 1].value : null
+                } else {
+                    dataPoint[metric.id] = upTo.reduce((sum, u) => sum + u.value, 0)
+                }
             })
             dataPoints.push(dataPoint)
 
@@ -986,6 +1012,7 @@ export default function PublicOrganizationPage() {
                     organization={organization}
                     initiativeChartData={initiativeChartData}
                     chartInitiatives={chartInitiatives}
+                    isPercentageChart={isPercentageChart}
                 />
                 <PublicOrganizationRightPanel
                     slug={slug!}

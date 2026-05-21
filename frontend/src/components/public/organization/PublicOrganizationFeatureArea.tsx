@@ -60,6 +60,10 @@ type Props = {
     organization: PublicOrganization
     initiativeChartData: any[]
     chartInitiatives: { metric: PublicKPI; initiative: PublicInitiative }[]
+    /** True when the chart pool is entirely percentage metrics. Switches the
+     * Y-axis + tooltip to `%` formatting and updates the title; numbers and
+     * percentages can never be mixed (the page filters one out). */
+    isPercentageChart?: boolean
 }
 
 export function PublicOrganizationFeatureArea(props: Props) {
@@ -80,6 +84,7 @@ export function PublicOrganizationFeatureArea(props: Props) {
         organization,
         initiativeChartData,
         chartInitiatives,
+        isPercentageChart = false,
     } = props
     return (
         <div className={`w-full md:w-[45%] flex-shrink-0 pt-0 pb-2 md:pb-4 px-2 md:px-0 md:pr-2 ${activeView === 'graph' ? 'h-[72vh]' : 'h-[50vh]'} md:h-auto`}>
@@ -348,9 +353,15 @@ export function PublicOrganizationFeatureArea(props: Props) {
                                         View all <ChevronRight className="w-3 h-3" />
                                     </Link>
                                 </div>
-                                {/* Mobile: vertical stack with auto height + scroll if needed.
-                                    Desktop: original 2-row grid kept unchanged. */}
-                                <div className="flex-1 px-4 pb-4 pt-0 overflow-y-auto md:overflow-visible">
+                                {/* Layout per count:
+                                      1   →  1 col × 1 row (full bleed)
+                                      2   →  1 col × 2 rows
+                                      3-4 →  2 cols × 2 rows (last cell empty when 3)
+                                    `auto-rows-fr` divides the available height
+                                    equally so cards never overflow the section.
+                                    Mobile keeps a 1-col stack that scrolls when
+                                    content is denser than the viewport. */}
+                                <div className="flex-1 px-4 pb-4 pt-0 overflow-y-auto md:overflow-hidden">
                                     {highlightCards.length === 0 ? (
                                         <div className="h-full flex items-center justify-center text-muted-foreground">
                                             <div className="text-center">
@@ -358,8 +369,14 @@ export function PublicOrganizationFeatureArea(props: Props) {
                                                 <p>No context yet</p>
                                             </div>
                                         </div>
-                                    ) : (
-                                        <div className={`flex flex-col gap-3 md:h-full md:grid ${highlightCards.length === 1 ? 'md:grid-rows-1' : 'md:grid-rows-2'}`}>
+                                    ) : (() => {
+                                        const count = highlightCards.length
+                                        const dense = count >= 3
+                                        const desktopGrid = dense
+                                            ? 'md:grid-cols-2 md:auto-rows-fr'
+                                            : 'md:grid-cols-1 md:auto-rows-fr'
+                                        return (
+                                        <div className={`grid grid-cols-1 gap-2 md:gap-3 md:h-full ${desktopGrid}`}>
                                             {highlightCards.map((card, idx) => {
                                                 const isStat = card.type === 'stat'
                                                 const title = (card.title || '').trim()
@@ -369,15 +386,15 @@ export function PublicOrganizationFeatureArea(props: Props) {
                                                     <Link
                                                         key={card.id || idx}
                                                         to={`${orgLinkBase}/${slug}/context`}
-                                                        className="group relative rounded-2xl bg-white border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 p-4 flex flex-col overflow-hidden md:min-h-0"
+                                                        className="group relative rounded-2xl bg-white border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 p-3 md:p-4 flex flex-col overflow-hidden md:min-h-0"
                                                     >
                                                         <div
                                                             className="absolute left-0 top-0 bottom-0 w-1"
                                                             style={{ backgroundColor: brandColor }}
                                                         />
-                                                        <div className="flex items-center gap-2 mb-2 pl-1">
+                                                        <div className="flex items-center gap-2 mb-1.5 md:mb-2 pl-1">
                                                             <span
-                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider text-gray-800"
+                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] md:text-xs font-semibold uppercase tracking-wider text-gray-800"
                                                                 style={{ backgroundColor: `${brandColor}30` }}
                                                             >
                                                                 {isStat ? 'Stat' : 'Statement'}
@@ -387,18 +404,22 @@ export function PublicOrganizationFeatureArea(props: Props) {
                                                             {isStat ? (
                                                                 <div className="flex flex-col h-full">
                                                                     <div
-                                                                        className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight mb-1 break-words"
+                                                                        className={`font-bold leading-tight mb-1 break-words ${
+                                                                            dense
+                                                                                ? 'text-xl sm:text-2xl md:text-2xl lg:text-3xl'
+                                                                                : 'text-2xl sm:text-3xl md:text-4xl'
+                                                                        }`}
                                                                         style={{ color: brandColor, filter: 'saturate(1.2) brightness(0.8)' }}
                                                                     >
                                                                         {value}
                                                                     </div>
                                                                     {title && (
-                                                                        <h3 className="text-sm font-semibold text-foreground line-clamp-2 md:line-clamp-1">
+                                                                        <h3 className="text-sm font-semibold text-foreground line-clamp-1">
                                                                             {title}
                                                                         </h3>
                                                                     )}
                                                                     {description && (
-                                                                        <p className="text-xs text-muted-foreground line-clamp-3 md:line-clamp-2 mt-1">
+                                                                        <p className={`text-xs text-muted-foreground mt-1 ${dense ? 'line-clamp-2' : 'line-clamp-3 md:line-clamp-2'}`}>
                                                                             {description}
                                                                         </p>
                                                                     )}
@@ -406,19 +427,23 @@ export function PublicOrganizationFeatureArea(props: Props) {
                                                             ) : (
                                                                 <div className="flex flex-col h-full">
                                                                     {title && (
-                                                                        <h3 className="text-base md:text-lg font-bold text-foreground leading-snug line-clamp-3 md:line-clamp-2">
+                                                                        <h3 className={`font-bold text-foreground leading-snug ${
+                                                                            dense
+                                                                                ? 'text-sm md:text-base line-clamp-2'
+                                                                                : 'text-base md:text-lg line-clamp-3 md:line-clamp-2'
+                                                                        }`}>
                                                                             {title}
                                                                         </h3>
                                                                     )}
                                                                     {description && (
-                                                                        <p className="text-xs text-muted-foreground line-clamp-3 md:line-clamp-2 mt-1">
+                                                                        <p className={`text-xs text-muted-foreground mt-1 ${dense ? 'line-clamp-3' : 'line-clamp-3 md:line-clamp-2'}`}>
                                                                             {description}
                                                                         </p>
                                                                     )}
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        <div className="pl-1 mt-2 flex items-center justify-between">
+                                                        <div className="pl-1 mt-1.5 md:mt-2 flex items-center justify-between">
                                                             <span className="text-xs font-medium text-gray-500 group-hover:text-gray-800 transition-colors">
                                                                 Read more
                                                             </span>
@@ -428,7 +453,8 @@ export function PublicOrganizationFeatureArea(props: Props) {
                                                 )
                                             })}
                                         </div>
-                                    )}
+                                        )
+                                    })()}
                                 </div>
                             </div>
                         </div>
@@ -519,7 +545,7 @@ export function PublicOrganizationFeatureArea(props: Props) {
                                                 style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
                                             />
                                         </div>
-                                        <h2 className="font-semibold text-foreground">Cumulative Impact</h2>
+                                        <h2 className="font-semibold text-foreground">{isPercentageChart ? 'Performance Over Time' : 'Cumulative Impact'}</h2>
                                     </div>
                                 </div>
                                 <div className="flex-1 p-4 pt-0 overflow-hidden flex flex-col">
@@ -556,7 +582,10 @@ export function PublicOrganizationFeatureArea(props: Props) {
                                                                 tick={{ fontSize: 11, fill: '#6b7280' }}
                                                                 tickLine={false}
                                                                 axisLine={false}
-                                                                tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
+                                                                tickFormatter={(v) => isPercentageChart
+                                                                    ? `${Math.round(v)}%`
+                                                                    : (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v)}
+                                                                domain={isPercentageChart ? [0, 100] : ['auto', 'auto']}
                                                                 width={40}
                                                             />
                                                             <RechartsTooltip
@@ -569,7 +598,13 @@ export function PublicOrganizationFeatureArea(props: Props) {
                                                                 }}
                                                                 formatter={(value: number, name: string) => {
                                                                     const entry = chartInitiatives.find(c => c.metric.id === name)
-                                                                    return [value.toLocaleString(), entry?.metric.title || name]
+                                                                    const isPct = entry?.metric.metric_type === 'percentage'
+                                                                    const display = value == null
+                                                                        ? '—'
+                                                                        : isPct
+                                                                            ? `${Math.round(value)}%`
+                                                                            : value.toLocaleString()
+                                                                    return [display, entry?.metric.title || name]
                                                                 }}
                                                             />
                                                             {chartInitiatives.map(({ initiative, metric }, index) => (
@@ -582,6 +617,7 @@ export function PublicOrganizationFeatureArea(props: Props) {
                                                                     fill={`url(#gradient-${metric.id})`}
                                                                     dot={false}
                                                                     activeDot={{ r: 4, strokeWidth: 2 }}
+                                                                    connectNulls
                                                                 />
                                                             ))}
                                                         </AreaChart>

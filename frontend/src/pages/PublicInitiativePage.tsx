@@ -288,12 +288,13 @@ export default function PublicInitiativePage() {
         })
 
         if (selectedTagIds.length > 0) {
-            // Drop KPIs that have neither matching tags nor matching updates so
-            // the metrics list reflects the filter instead of zeroed-out cards.
-            filteredKpis = filteredKpis.filter(kpi => {
-                if (tagMatchesAny(kpi.tag_ids)) return true
-                return (kpi.updates || []).length > 0
-            })
+            // Drop KPIs whose claims are not tagged with any of the selected
+            // ids. A tag attached at the KPI level only declares which tags
+            // its claims *may* carry, so falling back to `kpi.tag_ids` here
+            // would surface metrics whose claims have nothing to do with the
+            // selected tag (e.g. a freshly-created tag bound to a metric but
+            // not yet applied to any claim).
+            filteredKpis = filteredKpis.filter(kpi => (kpi.updates || []).length > 0)
         }
 
         if (selectedLocationIds.length > 0) {
