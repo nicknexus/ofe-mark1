@@ -563,27 +563,52 @@ export default function PublicOrganizationPage() {
     }, [evidence, selectedInitiative, selectedLocationIds, startDate, endDate, selectedTagIds])
 
     // Evidence pagination (must be after filteredEvidence).
-    // Bias the order so the first page lands on viewable photos: images first,
-    // then videos/YouTube (still inline-viewable), then everything else (PDFs,
-    // unknown docs). Within each tier we preserve the original order, so the
-    // overall feel stays "newest-ish first" while making the bottom-right tile
-    // grid look intentional rather than dominated by document placeholders.
+    //
+    // Two-stage strategy so the org's bottom-right tile grid always looks
+    // intentional, even when an org leans heavily on documentation:
+    //
+    //  1. Prefer evidence whose **app-level category** is `visual_proof`
+    //     (the user's deliberate classification). A `documentation` row that
+    //     happens to have a photo attached is still a document conceptually
+    //     and is intentionally excluded here — visual_proof tiles read as
+    //     story-driven imagery, document tiles read as receipts/PDFs.
+    //  2. Within visual_proof, sort items that actually carry an
+    //     image/video/YouTube preview ahead of any visual_proof rows missing
+    //     a file (rare but possible) so the first page never lands on
+    //     placeholder cards. Both `file_url` and `files[]` are probed to
+    //     handle multi-file gallery uploads where `file_url` is empty.
+    //  3. Fall back to the full filtered set only when the org has zero
+    //     visual_proof evidence — better to show document tiles than an
+    //     empty slot.
     const evidencePerPage = 4
-    const evidenceVisualTier = useMemo(() => {
-        const isImageUrl = (url?: string | null) => !!url && /\.(jpg|jpeg|png|gif|webp)$/i.test(url)
-        const isVideoUrl = (url?: string | null) => !!url && (
-            /\.(mp4|webm|mov|avi|mkv)$/i.test(url) ||
-            /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(url)
-        )
-        return (e: PublicEvidence) => {
-            if (isImageUrl(e.file_url)) return 0
-            if (isVideoUrl(e.file_url)) return 1
-            return 2
+    const evidenceMedia = useMemo(() => {
+        const stripQuery = (url: string) => url.split('?')[0]
+        const extOf = (url?: string | null) => {
+            if (!url) return ''
+            const path = stripQuery(url)
+            const dot = path.lastIndexOf('.')
+            return dot >= 0 ? path.slice(dot + 1).toLowerCase() : ''
         }
+        const imgExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif']
+        const vidExts = ['mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v']
+        const ytRe = /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/
+        const hasPreview = (e: PublicEvidence) => {
+            const urls = [e.file_url, ...(e.files || []).map(f => f.file_url)].filter(Boolean) as string[]
+            return urls.some(u => imgExts.includes(extOf(u)) || vidExts.includes(extOf(u)) || ytRe.test(u))
+        }
+        return { hasPreview }
     }, [])
     const sortedEvidence = useMemo(() => {
-        return [...filteredEvidence].sort((a, b) => evidenceVisualTier(a) - evidenceVisualTier(b))
-    }, [filteredEvidence, evidenceVisualTier])
+        const visualProof = filteredEvidence.filter(e => e.type === 'visual_proof')
+        const pool = visualProof.length > 0 ? visualProof : filteredEvidence
+        // Within the chosen pool: items with a renderable preview first,
+        // preserving original (date-desc) order inside each bucket.
+        return [...pool].sort((a, b) => {
+            const av = evidenceMedia.hasPreview(a) ? 0 : 1
+            const bv = evidenceMedia.hasPreview(b) ? 0 : 1
+            return av - bv
+        })
+    }, [filteredEvidence, evidenceMedia])
     const totalEvidencePages = Math.ceil(sortedEvidence.length / evidencePerPage)
     const displayedEvidence = sortedEvidence.slice(evidencePage * evidencePerPage, (evidencePage + 1) * evidencePerPage)
 

@@ -372,22 +372,43 @@ export function PublicOrganizationRightPanel(props: Props) {
                             ) : (
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 h-full">
                                     {displayedEvidence.map((ev) => {
-                                        const isImage = ev.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(ev.file_url)
-                                        const isVid = ev.file_url && /\.(mp4|webm|mov|avi|mkv)$/i.test(ev.file_url)
-                                        const isYT = ev.file_url && /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(ev.file_url)
-                                        const ytMatch = isYT && ev.file_url ? ev.file_url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) : null
-                                        const ytId = ytMatch ? ytMatch[1] : null
+                                        // Probe file_url AND files[] so multi-file
+                                        // evidence rows (where file_url is empty
+                                        // or document-typed but the gallery has
+                                        // images/videos) still render a preview.
+                                        // Strip query strings before checking the
+                                        // extension so signed URLs classify the
+                                        // same as plain ones.
+                                        const stripQ = (u: string) => u.split('?')[0]
+                                        const ext = (u?: string | null) => {
+                                            if (!u) return ''
+                                            const p = stripQ(u)
+                                            const i = p.lastIndexOf('.')
+                                            return i >= 0 ? p.slice(i + 1).toLowerCase() : ''
+                                        }
+                                        const imgExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif']
+                                        const vidExts = ['mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v']
+                                        const ytRe = /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/
+                                        const ytIdRe = /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+                                        const candidates: string[] = [
+                                            ev.file_url || '',
+                                            ...((ev.files || []).map(f => f.file_url || '')),
+                                        ].filter(Boolean)
+                                        const imageUrl = candidates.find(u => imgExts.includes(ext(u)))
+                                        const videoUrl = !imageUrl ? candidates.find(u => vidExts.includes(ext(u))) : undefined
+                                        const ytUrl = !imageUrl && !videoUrl ? candidates.find(u => ytRe.test(u)) : undefined
+                                        const ytId = ytUrl ? (ytUrl.match(ytIdRe)?.[1] ?? null) : null
                                         return (
                                             <Link
                                                 key={ev.id}
                                                 to={`${orgLinkBase}/${slug}/${ev.initiative_slug}?tab=evidence`}
                                                 className="rounded-xl overflow-hidden bg-white border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group h-[120px] md:h-full"
                                             >
-                                                {isImage ? (
-                                                    <img src={ev.file_url} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                                                ) : isVid ? (
+                                                {imageUrl ? (
+                                                    <img src={imageUrl} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                ) : videoUrl ? (
                                                     <div className="relative w-full h-full">
-                                                        <video src={ev.file_url} className="w-full h-full object-cover" muted preload="metadata" />
+                                                        <video src={videoUrl} className="w-full h-full object-cover" muted preload="metadata" />
                                                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                                             <div className="w-8 h-8 md:w-10 md:h-10 bg-black/60 rounded-full flex items-center justify-center shadow-lg">
                                                                 <svg className="w-3.5 h-3.5 md:w-4 md:h-4 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>

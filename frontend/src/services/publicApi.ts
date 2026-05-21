@@ -541,6 +541,8 @@ export interface PublicEvidenceDetail {
         tag_id?: string | null
     }>
     tag_ids?: string[]
+    locations?: { id: string; name: string }[]
+    beneficiary_groups?: { id: string; name: string }[]
     initiative: {
         id: string
         title: string

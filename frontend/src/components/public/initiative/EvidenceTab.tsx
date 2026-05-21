@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useOrgLinkBase } from '../../../hooks/useOrgLinkBase'
 import {
     ArrowLeft,
+    BarChart3,
     Calendar,
     Camera,
     ChevronDown,
@@ -11,7 +12,11 @@ import {
     DollarSign,
     ExternalLink,
     FileText,
+    MapPin,
     MessageSquare,
+    Tag as TagIcon,
+    Target,
+    Users,
     X,
 } from 'lucide-react'
 import { PublicEvidence, PublicMetricTag } from '../../../services/publicApi'
@@ -19,8 +24,14 @@ import PublicTagChip from '../PublicTagChip'
 import { formatDate } from '../../../utils'
 import { generateMetricSlug } from './metricColors'
 import { EmptyState, LoadingState } from './PublicInitiativeTabStates'
+import {
+    PUBLIC_PANEL_STATIC_CLASS,
+    PUBLIC_SECTION_CHIP_STYLE,
+    brandIconStyle,
+    DEFAULT_PUBLIC_BRAND,
+} from '../publicStyles'
 
-export function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById, onTagClick, selectedTagIds }: {
+export function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById, onTagClick, selectedTagIds, brandColor: brandColorProp }: {
     evidence: PublicEvidence[] | null
     orgSlug: string
     initiativeSlug: string
@@ -28,7 +39,10 @@ export function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', ta
     tagsById?: Map<string, PublicMetricTag>
     onTagClick?: (id: string) => void
     selectedTagIds?: string[]
+    /** Brand colour for section icon tints — falls back to public default. */
+    brandColor?: string
 }) {
+    const brandColor = brandColorProp || DEFAULT_PUBLIC_BRAND
     const orgLinkBase = useOrgLinkBase()
     const [displayCount, setDisplayCount] = useState(8)
     const [selectedTypes, setSelectedTypes] = useState<string[]>([])
@@ -325,7 +339,7 @@ export function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', ta
                         <button
                             key={item.id}
                             onClick={() => openGallery(filteredIndex)}
-                            className="rounded-2xl bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 transition-all overflow-hidden group text-left"
+                            className="rounded-2xl bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 transition-all overflow-hidden group text-left flex flex-col h-full"
                         >
                             {previewUrl ? (
                                 <div className="relative aspect-video bg-gray-100 overflow-hidden">
@@ -358,75 +372,67 @@ export function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', ta
                                     </div>
                                 </div>
                             )}
-                            <div className="p-4">
-                                <div className="flex items-start justify-between mb-2">
-                                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${typeConfig[item.type]?.bg || 'bg-gray-100 text-gray-600'}`}>
+                            {/* Body — uniform layout. Every section has a
+                                bounded height so all cards in a row equalize:
+                                  • title: 1 line (line-clamp-1, min-h)
+                                  • description: 2 lines (always reserves the
+                                    space, even when empty, via min-h)
+                                  • metadata footer: a single row of pills,
+                                    capped at 1 tag + 1 metric/claim + 1
+                                    location, each with a `+N` indicator. The
+                                    full lists are revealed in the gallery
+                                    detail panel. */}
+                            <div className="p-4 flex-1 flex flex-col">
+                                <div className="flex items-center justify-between gap-2 mb-2">
+                                    <span className={`px-2 py-0.5 text-[11px] font-medium rounded-full whitespace-nowrap ${typeConfig[item.type]?.bg || 'bg-gray-100 text-gray-600'}`}>
                                         {typeConfig[item.type]?.label || item.type}
                                     </span>
-                                    <span className="text-xs text-muted-foreground">{formatDate(item.date_represented)}</span>
+                                    <span className="text-xs text-muted-foreground whitespace-nowrap">{formatDate(item.date_represented)}</span>
                                 </div>
-                                <h3 className="font-semibold text-foreground text-sm mb-1 group-hover:text-accent transition-colors">{item.title}</h3>
-                                {item.description && <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{item.description}</p>}
-                                {tagsById && item.tag_ids && item.tag_ids.length > 0 && (
-                                    <div className="mt-1 mb-2 flex flex-wrap gap-1" onClick={e => e.stopPropagation()}>
-                                        {item.tag_ids.slice(0, 4).map(id => {
-                                            const t = tagsById.get(id)
-                                            if (!t) return null
-                                            return (
+                                <h3 className="font-semibold text-foreground text-sm line-clamp-1 group-hover:text-accent transition-colors min-h-[1.25rem]">{item.title}</h3>
+                                <p className="text-xs text-muted-foreground line-clamp-2 mt-1 min-h-[2rem]">{item.description || '\u00a0'}</p>
+
+                                {/* Footer row: 1 tag + 1 metric/claim + 1 loc,
+                                    each followed by +N when more exist. Pinned
+                                    to the bottom so cards align cleanly. */}
+                                <div className="mt-auto pt-3 flex items-center gap-1.5 flex-wrap" onClick={e => e.stopPropagation()}>
+                                    {tagsById && item.tag_ids && item.tag_ids.length > 0 && (() => {
+                                        const firstId = item.tag_ids[0]
+                                        const firstTag = tagsById.get(firstId)
+                                        const remaining = item.tag_ids.length - 1
+                                        if (!firstTag) return null
+                                        return (
+                                            <div className="inline-flex items-center gap-1">
                                                 <PublicTagChip
-                                                    key={id}
-                                                    name={t.name}
+                                                    name={firstTag.name}
                                                     size="xs"
-                                                    selected={selectedTagIds?.includes(id)}
-                                                    onClick={onTagClick ? () => onTagClick(id) : undefined}
+                                                    nameMaxWidthClass="max-w-[90px]"
+                                                    selected={selectedTagIds?.includes(firstId)}
+                                                    onClick={onTagClick ? () => onTagClick(firstId) : undefined}
                                                 />
-                                            )
-                                        })}
-                                        {item.tag_ids.length > 4 && (
-                                            <span className="text-xs text-muted-foreground px-1">+{item.tag_ids.length - 4}</span>
-                                        )}
-                                    </div>
-                                )}
-                                {/* Impact Claims */}
-                                {item.impact_claims && item.impact_claims.length > 0 ? (
-                                    <div className="mt-2 flex flex-wrap gap-1" onClick={e => e.stopPropagation()}>
-                                        {item.impact_claims.slice(0, 2).map((claim) => {
-                                            const matchedKpi = item.kpis?.find(k => k.id === claim.kpi_id)
-                                            const cat = matchedKpi?.category || 'output'
-                                            const catColor = cat === 'impact' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' : cat === 'output' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-evidence-100 text-evidence-700 hover:bg-evidence-200'
-                                            const label = claim.kpis?.title ? `${claim.value} ${claim.kpis.unit_of_measurement || ''}` : `${claim.value}`
-                                            return (
-                                                <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/claim/${claim.id}${dateQS}`} className={`text-xs px-1.5 py-0.5 rounded font-medium ${catColor} transition-colors`} onClick={e => e.stopPropagation()}>
-                                                    {claim.kpis?.title || label}
-                                                </Link>
-                                            )
-                                        })}
-                                        {item.impact_claims.length > 2 && (
-                                            <span className="text-xs text-muted-foreground">+{item.impact_claims.length - 2}</span>
-                                        )}
-                                    </div>
-                                ) : item.kpis && item.kpis.length > 0 ? (
-                                    <div className="mt-2 flex flex-wrap gap-1" onClick={e => e.stopPropagation()}>
-                                        {item.kpis.slice(0, 2).map((kpi) => {
-                                            const catColor = kpi.category === 'impact' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' : kpi.category === 'output' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-evidence-100 text-evidence-700 hover:bg-evidence-200'
-                                            return (
-                                                <Link key={kpi.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}${dateQS}`} className={`text-xs px-1.5 py-0.5 rounded font-medium ${catColor} transition-colors`} onClick={e => e.stopPropagation()}>
-                                                    {kpi.title}
-                                                </Link>
-                                            )
-                                        })}
-                                        {item.kpis.length > 2 && (
-                                            <span className="text-xs text-muted-foreground">+{item.kpis.length - 2}</span>
-                                        )}
-                                    </div>
-                                ) : null}
-                                {item.locations && item.locations.length > 0 && (
-                                    <div className="mt-1.5 flex flex-wrap gap-1">
-                                        {item.locations.map((loc) => (
-                                            <span key={loc.id} className="text-xs bg-accent/10 text-accent px-1.5 py-0.5 rounded">{loc.name}</span>
-                                        ))}
-                                    </div>
-                                )}
+                                                {remaining > 0 && (
+                                                    <span className="text-[11px] font-medium text-muted-foreground">+{remaining}</span>
+                                                )}
+                                            </div>
+                                        )
+                                    })()}
+
+                                    {item.locations && item.locations.length > 0 && (() => {
+                                        const first = item.locations[0]
+                                        const remaining = item.locations.length - 1
+                                        return (
+                                            <div className="inline-flex items-center gap-1">
+                                                <span className="inline-flex items-center gap-0.5 text-[11px] bg-gray-100 text-gray-700 border border-gray-200 px-1.5 py-0.5 rounded font-medium max-w-[110px] truncate">
+                                                    <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
+                                                    <span className="truncate">{first.name}</span>
+                                                </span>
+                                                {remaining > 0 && (
+                                                    <span className="text-[11px] font-medium text-muted-foreground">+{remaining}</span>
+                                                )}
+                                            </div>
+                                        )
+                                    })()}
+                                </div>
                             </div>
                         </button>
                     )
@@ -588,63 +594,229 @@ export function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', ta
                                 </div>
                             </div>
 
-                            {/* Info sidebar - glass card style */}
+                            {/* Info sidebar — modern, modular cards using
+                                shared public tokens. Each section is its own
+                                panel with a brand-tinted icon chip header so
+                                the right column reads as a hierarchy of facts
+                                rather than one long block. Everything is
+                                scrollable on small/medium so nothing gets cut
+                                off. */}
                             <div className="lg:col-span-1 flex flex-col gap-3 sm:gap-4 min-h-0 overflow-y-auto">
-                                {/* Evidence Info Card */}
-                                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-4 sm:p-5 flex-shrink-0">
-                                    <h2 className="font-semibold text-foreground text-base sm:text-lg mb-1">{galleryItem.title}</h2>
-                                    {galleryItem.description && (
-                                        <p className="text-muted-foreground text-xs sm:text-sm mb-3 line-clamp-4">{galleryItem.description}</p>
-                                    )}
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                        <Calendar className="w-3.5 h-3.5" />
-                                        {formatDate(galleryItem.date_represented)}
+                                {/* Overview */}
+                                <div className={`${PUBLIC_PANEL_STATIC_CLASS} p-4 sm:p-5 flex-shrink-0`}>
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <span
+                                            className={`px-2 py-0.5 text-[11px] font-medium rounded-full whitespace-nowrap ${typeConfig[galleryItem.type]?.bg || 'bg-gray-100 text-gray-600'}`}
+                                        >
+                                            {typeConfig[galleryItem.type]?.label || galleryItem.type}
+                                        </span>
+                                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                                            <Calendar className="w-3.5 h-3.5" />
+                                            {formatDate(galleryItem.date_represented)}
+                                        </span>
                                     </div>
-                                    {galleryItem.locations && galleryItem.locations.length > 0 && (
-                                        <div className="mt-3 flex flex-wrap gap-1">
-                                            {galleryItem.locations.map((loc) => (
-                                                <span key={loc.id} className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded font-medium">{loc.name}</span>
-                                            ))}
-                                        </div>
+                                    <h2 className="font-semibold text-foreground text-lg sm:text-xl leading-snug mb-2">
+                                        {galleryItem.title}
+                                    </h2>
+                                    {galleryItem.description && (
+                                        <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">
+                                            {galleryItem.description}
+                                        </p>
                                     )}
                                 </div>
 
-                                {/* Impact Claims Card */}
-                                {galleryItem.impact_claims && galleryItem.impact_claims.length > 0 ? (
-                                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-4 sm:p-5 flex-shrink-0">
-                                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Supporting Impact Claims</h3>
+                                {/* Tags & Locations — only render when present
+                                    so empty evidence doesn't show stub cards. */}
+                                {((tagsById && galleryItem.tag_ids && galleryItem.tag_ids.length > 0) ||
+                                    (galleryItem.locations && galleryItem.locations.length > 0)) && (
+                                    <div className={`${PUBLIC_PANEL_STATIC_CLASS} p-4 sm:p-5 flex-shrink-0 space-y-4`}>
+                                        {tagsById && galleryItem.tag_ids && galleryItem.tag_ids.length > 0 && (
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div
+                                                        className="w-7 h-7 rounded-lg flex items-center justify-center"
+                                                        style={PUBLIC_SECTION_CHIP_STYLE}
+                                                    >
+                                                        <TagIcon className="w-3.5 h-3.5" style={brandIconStyle(brandColor)} />
+                                                    </div>
+                                                    <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">
+                                                        Tags
+                                                    </h3>
+                                                    <span className="text-xs text-muted-foreground font-medium">
+                                                        {galleryItem.tag_ids.length}
+                                                    </span>
+                                                </div>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {galleryItem.tag_ids.map(id => {
+                                                        const t = tagsById.get(id)
+                                                        if (!t) return null
+                                                        return (
+                                                            <PublicTagChip
+                                                                key={id}
+                                                                name={t.name}
+                                                                size="sm"
+                                                                selected={selectedTagIds?.includes(id)}
+                                                                onClick={onTagClick ? () => onTagClick(id) : undefined}
+                                                            />
+                                                        )
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {galleryItem.locations && galleryItem.locations.length > 0 && (
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div
+                                                        className="w-7 h-7 rounded-lg flex items-center justify-center"
+                                                        style={PUBLIC_SECTION_CHIP_STYLE}
+                                                    >
+                                                        <MapPin className="w-3.5 h-3.5" style={brandIconStyle(brandColor)} />
+                                                    </div>
+                                                    <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">
+                                                        Locations
+                                                    </h3>
+                                                    <span className="text-xs text-muted-foreground font-medium">
+                                                        {galleryItem.locations.length}
+                                                    </span>
+                                                </div>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {galleryItem.locations.map(loc => (
+                                                        <span
+                                                            key={loc.id}
+                                                            className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-700 border border-gray-200 px-2 py-1 rounded-full font-medium"
+                                                        >
+                                                            <MapPin className="w-3 h-3" />
+                                                            {loc.name}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Beneficiaries */}
+                                {galleryItem.beneficiary_groups && galleryItem.beneficiary_groups.length > 0 && (
+                                    <div className={`${PUBLIC_PANEL_STATIC_CLASS} p-4 sm:p-5 flex-shrink-0`}>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <div
+                                                className="w-7 h-7 rounded-lg flex items-center justify-center"
+                                                style={PUBLIC_SECTION_CHIP_STYLE}
+                                            >
+                                                <Users className="w-3.5 h-3.5" style={brandIconStyle(brandColor)} />
+                                            </div>
+                                            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">
+                                                Beneficiaries
+                                            </h3>
+                                            <span className="text-xs text-muted-foreground font-medium">
+                                                {galleryItem.beneficiary_groups.length}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {galleryItem.beneficiary_groups.map(g => (
+                                                <Link
+                                                    key={g.id}
+                                                    to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/beneficiary/${g.id}`}
+                                                    className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 px-2 py-1 rounded-full font-medium transition-colors"
+                                                >
+                                                    {g.name}
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Impact Claims */}
+                                {galleryItem.impact_claims && galleryItem.impact_claims.length > 0 && (
+                                    <div className={`${PUBLIC_PANEL_STATIC_CLASS} p-4 sm:p-5 flex-shrink-0`}>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <div
+                                                className="w-7 h-7 rounded-lg flex items-center justify-center"
+                                                style={PUBLIC_SECTION_CHIP_STYLE}
+                                            >
+                                                <BarChart3 className="w-3.5 h-3.5" style={brandIconStyle(brandColor)} />
+                                            </div>
+                                            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">
+                                                Supporting Claims
+                                            </h3>
+                                            <span className="text-xs text-muted-foreground font-medium">
+                                                {galleryItem.impact_claims.length}
+                                            </span>
+                                        </div>
                                         <div className="space-y-2">
                                             {galleryItem.impact_claims.map((claim: any) => {
                                                 const metricTitle = claim.kpis?.title || 'Unknown Metric'
+                                                const unit = claim.kpis?.metric_type === 'percentage' ? '%' : ` ${claim.kpis?.unit_of_measurement || ''}`
                                                 const dateLabel = claim.date_range_start && claim.date_range_end
                                                     ? `${formatDate(claim.date_range_start, { month: 'short', day: 'numeric' })} – ${formatDate(claim.date_range_end)}`
                                                     : claim.date_represented
                                                         ? formatDate(claim.date_represented)
                                                         : ''
                                                 return (
-                                                    <Link key={claim.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/claim/${claim.id}${dateQS}`} className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 transition-all group">
-                                                        <p className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors">
-                                                            {claim.value}{claim.kpis?.metric_type === 'percentage' ? '%' : ` ${claim.kpis?.unit_of_measurement || ''}`}
+                                                    <Link
+                                                        key={claim.id}
+                                                        to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/claim/${claim.id}${dateQS}`}
+                                                        className="block p-3 rounded-xl border border-gray-200/80 bg-white hover:border-gray-300 hover:shadow-public-hover transition-all group"
+                                                    >
+                                                        <div className="flex items-baseline justify-between gap-2">
+                                                            <span
+                                                                className="text-base font-bold tabular-nums tracking-tight"
+                                                                style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
+                                                            >
+                                                                {claim.value}{unit}
+                                                            </span>
+                                                            {dateLabel && (
+                                                                <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                                                                    {dateLabel}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs text-muted-foreground mt-0.5 group-hover:text-foreground transition-colors line-clamp-2">
+                                                            {metricTitle}
                                                         </p>
-                                                        <p className="text-xs text-muted-foreground mt-0.5">{metricTitle}</p>
-                                                        {dateLabel && <p className="text-xs text-muted-foreground mt-0.5">{dateLabel}</p>}
                                                     </Link>
                                                 )
                                             })}
                                         </div>
                                     </div>
-                                ) : galleryItem.kpis && galleryItem.kpis.length > 0 ? (
-                                    <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-4 sm:p-5 flex-shrink-0">
-                                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Linked Metrics</h3>
+                                )}
+
+                                {/* Linked Metrics — only when no impact claims,
+                                    otherwise the supporting-claims card already
+                                    surfaces the metric titles. */}
+                                {(!galleryItem.impact_claims || galleryItem.impact_claims.length === 0) &&
+                                    galleryItem.kpis && galleryItem.kpis.length > 0 && (
+                                    <div className={`${PUBLIC_PANEL_STATIC_CLASS} p-4 sm:p-5 flex-shrink-0`}>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <div
+                                                className="w-7 h-7 rounded-lg flex items-center justify-center"
+                                                style={PUBLIC_SECTION_CHIP_STYLE}
+                                            >
+                                                <Target className="w-3.5 h-3.5" style={brandIconStyle(brandColor)} />
+                                            </div>
+                                            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">
+                                                Linked Metrics
+                                            </h3>
+                                            <span className="text-xs text-muted-foreground font-medium">
+                                                {galleryItem.kpis.length}
+                                            </span>
+                                        </div>
                                         <div className="space-y-2">
-                                            {galleryItem.kpis.map((kpi) => (
-                                                <Link key={kpi.id} to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}${dateQS}`} className="block p-3 rounded-xl bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 transition-all group">
-                                                    <p className="text-sm font-medium text-foreground group-hover:text-accent transition-colors">{kpi.title}</p>
+                                            {galleryItem.kpis.map(kpi => (
+                                                <Link
+                                                    key={kpi.id}
+                                                    to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${generateMetricSlug(kpi.title)}${dateQS}`}
+                                                    className="block p-3 rounded-xl border border-gray-200/80 bg-white hover:border-gray-300 hover:shadow-public-hover transition-all group"
+                                                >
+                                                    <p className="text-sm font-medium text-foreground group-hover:text-accent transition-colors">
+                                                        {kpi.title}
+                                                    </p>
                                                 </Link>
                                             ))}
                                         </div>
                                     </div>
-                                ) : null}
+                                )}
                             </div>
                         </div>
 

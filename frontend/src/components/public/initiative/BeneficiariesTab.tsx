@@ -28,7 +28,7 @@ export function BeneficiariesTab({ beneficiaries, orgSlug, initiativeSlug }: { b
                     {(group.total_number || group.age_range_start || group.age_range_end || group.location?.name) && (
                         <div className="px-5 pb-3 flex flex-wrap gap-2">
                             {group.total_number != null && (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent/10 text-accent text-xs font-semibold">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 border border-gray-200 text-xs font-semibold">
                                     <Users className="w-3 h-3" />
                                     {group.total_number.toLocaleString()}
                                 </span>

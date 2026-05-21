@@ -222,7 +222,7 @@ export function PublicMetricEvidenceGallerySection({ evidence, evidenceCount, co
                                                         <PublicTagChip
                                                             key={id}
                                                             name={t.name}
-                                                            size="xs"
+                                                            size="sm"
                                                             selected={selectedTagIds?.includes(id)}
                                                             onClick={onToggleTag ? () => onToggleTag(id) : undefined}
                                                         />
@@ -351,7 +351,7 @@ export function PublicMetricEvidenceGallerySection({ evidence, evidenceCount, co
                                     {galleryItem.locations && galleryItem.locations.length > 0 && (
                                         <div className="mt-3 flex flex-wrap gap-1">
                                             {galleryItem.locations.map((loc) => (
-                                                <span key={loc.id} className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded font-medium">{loc.name}</span>
+                                                <span key={loc.id} className="text-xs bg-gray-100 text-gray-700 border border-gray-200 px-2 py-0.5 rounded font-medium">{loc.name}</span>
                                             ))}
                                         </div>
                                     )}

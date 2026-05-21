@@ -1414,7 +1414,9 @@ export class PublicService {
                 id, title, description, type, file_url, date_represented, date_range_start, date_range_end, created_at,
                 evidence_files(id, file_url, file_name, file_type, display_order),
                 evidence_kpis(kpi_id, kpis(id, title, description, unit_of_measurement, category)),
-                evidence_kpi_updates(kpi_updates(id, value, date_represented, date_range_start, date_range_end, kpi_id, kpis(id, title, unit_of_measurement, metric_type)))
+                evidence_kpi_updates(kpi_updates(id, value, date_represented, date_range_start, date_range_end, kpi_id, kpis(id, title, unit_of_measurement, metric_type))),
+                evidence_locations(locations(id, name)),
+                evidence_beneficiary_groups(beneficiary_groups(id, name))
             `)
             .eq('id', evidenceId)
             .eq('initiative_id', initiative.id)
@@ -1441,6 +1443,19 @@ export class PublicService {
             .map((eu: any) => eu.kpi_updates)
             .filter(Boolean);
 
+        // Flatten the join rows into the shape the frontend already uses for
+        // org-level evidence (`locations: [{id, name}]`, etc.) so the same
+        // chip components can render on the standalone detail page.
+        const locations = (evidence.evidence_locations || [])
+            .map((el: any) => el.locations)
+            .filter(Boolean)
+            .map((l: any) => ({ id: l.id, name: l.name }));
+
+        const beneficiaryGroups = (evidence.evidence_beneficiary_groups || [])
+            .map((eb: any) => eb.beneficiary_groups)
+            .filter(Boolean)
+            .map((g: any) => ({ id: g.id, name: g.name }));
+
         const [evTagIds, tagByEvClaim] = await Promise.all([
             MetricTagService.getTagIdsForEvidence(evidenceId),
             MetricTagService.getTagIdsForUpdates(linkedClaims.map((c: any) => c.id)),
@@ -1458,6 +1473,8 @@ export class PublicService {
             date_range_end: evidence.date_range_end,
             created_at: evidence.created_at,
             tag_ids: evTagIds,
+            locations,
+            beneficiary_groups: beneficiaryGroups,
             linked_kpis: linkedKpis,
             impact_claims: linkedClaims.map((c: any) => ({ ...c, tag_id: tagByEvClaim[c.id] || null })),
             initiative: {

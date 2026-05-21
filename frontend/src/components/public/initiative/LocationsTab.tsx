@@ -90,7 +90,7 @@ export function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }
                                         <BookOpen className="w-4 h-4 text-accent" />
                                         <h3 className="font-semibold text-gray-800 text-sm">Stories</h3>
                                     </div>
-                                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent">{locationDetail.stories.length}</span>
+                                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">{locationDetail.stories.length}</span>
                                 </div>
                                 <div className="space-y-2 max-h-[500px] overflow-y-auto">
                                     {locationDetail.stories.length === 0 ? (
@@ -119,7 +119,7 @@ export function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }
                                         <BarChart3 className="w-4 h-4 text-accent" />
                                         <h3 className="font-semibold text-gray-800 text-sm">Metrics</h3>
                                     </div>
-                                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent">{locationDetail.metrics.length}</span>
+                                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">{locationDetail.metrics.length}</span>
                                 </div>
                                 <div className="space-y-2 max-h-[500px] overflow-y-auto">
                                     {locationDetail.metrics.length === 0 ? (
@@ -153,7 +153,7 @@ export function LocationsTab({ locations, orgSlug, initiativeSlug, dateQS = '' }
                                         <FileText className="w-4 h-4 text-accent" />
                                         <h3 className="font-semibold text-gray-800 text-sm">Evidence</h3>
                                     </div>
-                                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent">{locationDetail.evidence.length}</span>
+                                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">{locationDetail.evidence.length}</span>
                                 </div>
                                 <div className="space-y-2 max-h-[500px] overflow-y-auto">
                                     {locationDetail.evidence.length === 0 ? (

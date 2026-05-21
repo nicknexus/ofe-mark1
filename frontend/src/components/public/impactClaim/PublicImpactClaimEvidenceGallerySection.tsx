@@ -313,7 +313,7 @@ export function PublicImpactClaimEvidenceGallerySection({ evidence, evidenceCoun
                                                 {(ev as any).tag_ids.slice(0, 3).map((id: string) => {
                                                     const t = tagsById.get(id)
                                                     if (!t) return null
-                                                    return <PublicTagChip key={id} name={t.name} size="xs" />
+                                                    return <PublicTagChip key={id} name={t.name} size="sm" />
                                                 })}
                                             </div>
                                         )}
@@ -435,7 +435,7 @@ export function PublicImpactClaimEvidenceGallerySection({ evidence, evidenceCoun
                                     {galleryItem.locations && galleryItem.locations.length > 0 && (
                                         <div className="mt-3 flex flex-wrap gap-1">
                                             {galleryItem.locations.map((loc) => (
-                                                <span key={loc.id} className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded font-medium">{loc.name}</span>
+                                                <span key={loc.id} className="text-xs bg-gray-100 text-gray-700 border border-gray-200 px-2 py-0.5 rounded font-medium">{loc.name}</span>
                                             ))}
                                         </div>
                                     )}

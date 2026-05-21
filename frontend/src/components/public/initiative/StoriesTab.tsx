@@ -61,7 +61,7 @@ export function StoriesTab({ stories, orgSlug, initiativeSlug, dateQS = '', tags
                                         <PublicTagChip
                                             key={id}
                                             name={t.name}
-                                            size="xs"
+                                            size="sm"
                                             selected={selectedTagIds?.includes(id)}
                                             onClick={onTagClick ? () => onTagClick(id) : undefined}
                                         />

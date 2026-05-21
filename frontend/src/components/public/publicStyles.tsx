@@ -82,6 +82,24 @@ export function brandIconStyle(brandColor: string): React.CSSProperties {
     return { color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }
 }
 
+/**
+ * Neutral pill used for small descriptive chips (locations, beneficiary
+ * facets, etc). The previous default was `bg-accent/10 text-accent`, which
+ * resolved to *light sage on light sage* outside `.landing-page` and was
+ * unreadable. Anchoring on the same neutral palette as `PublicTagChip`
+ * keeps every chip visually consistent and high-contrast across all
+ * public-facing pages.
+ */
+export const PUBLIC_NEUTRAL_CHIP_CLASS =
+    'inline-flex items-center gap-1 rounded-full bg-gray-100 text-gray-700 border border-gray-200 px-2 py-0.5 text-xs font-medium'
+
+/**
+ * Compact neutral count badge (e.g. "12 stories") next to a section title.
+ * Same swap rationale as `PUBLIC_NEUTRAL_CHIP_CLASS`.
+ */
+export const PUBLIC_COUNT_PILL_CLASS =
+    'inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold'
+
 /** Brand-tinted count / status badge sitting next to a section title. */
 export function publicCountBadgeStyle(brandColor: string): React.CSSProperties {
     return {

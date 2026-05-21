@@ -82,7 +82,7 @@ export function MetricsTab({ dashboard, orgSlug, initiativeSlug, dateQS = '', ta
                                             <PublicTagChip
                                                 key={id}
                                                 name={t.name}
-                                                size="xs"
+                                                size="sm"
                                                 selected={selectedTagIds?.includes(id)}
                                                 onClick={onTagClick ? () => onTagClick(id) : undefined}
                                             />

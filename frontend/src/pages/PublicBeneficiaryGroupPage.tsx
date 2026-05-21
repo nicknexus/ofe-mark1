@@ -351,7 +351,7 @@ export default function PublicBeneficiaryGroupPage() {
                                                                 <PublicTagChip
                                                                     key={id}
                                                                     name={t.name}
-                                                                    size="xs"
+                                                                    size="sm"
                                                                     selected={selectedTagIds.includes(id)}
                                                                     onClick={() => setSelectedTagIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
                                                                 />
@@ -421,7 +421,7 @@ export default function PublicBeneficiaryGroupPage() {
                                                                             <PublicTagChip
                                                                                 key={id}
                                                                                 name={t.name}
-                                                                                size="xs"
+                                                                                size="sm"
                                                                                 selected={selectedTagIds.includes(id)}
                                                                                 onClick={() => setSelectedTagIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
                                                                             />
@@ -494,7 +494,7 @@ export default function PublicBeneficiaryGroupPage() {
                                                                                     <PublicTagChip
                                                                                         key={id}
                                                                                         name={t.name}
-                                                                                        size="xs"
+                                                                                        size="sm"
                                                                                         selected={selectedTagIds.includes(id)}
                                                                                         onClick={() => setSelectedTagIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
                                                                                     />

@@ -53,7 +53,7 @@ export function PublicMetricImpactClaimCard({ update, unit, isPercentage, config
                 <div className="mt-1.5 sm:mt-2 flex">
                     <PublicTagChip
                         name={tag.name}
-                        size="xs"
+                        size="sm"
                         selected={selectedTagIds?.includes(tag.id)}
                         onClick={onToggleTag ? () => onToggleTag(tag.id) : undefined}
                     />

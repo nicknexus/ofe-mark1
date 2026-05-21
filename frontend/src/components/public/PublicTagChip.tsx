@@ -17,6 +17,12 @@ interface PublicTagChipProps {
     /** Render with no icon. Useful for very tight spaces. */
     iconless?: boolean
     className?: string
+    /**
+     * Tailwind max-width class applied to the name span. Defaults to
+     * `max-w-[180px]` (good for detail panels). Pass something tighter for
+     * cramped contexts like card footers, e.g. `max-w-[90px]`.
+     */
+    nameMaxWidthClass?: string
     title?: string
 }
 
@@ -51,6 +57,7 @@ export default function PublicTagChip({
     size = 'sm',
     iconless = false,
     className = '',
+    nameMaxWidthClass = 'max-w-[180px]',
     title,
 }: PublicTagChipProps) {
     const interactive = !!onClick
@@ -64,7 +71,7 @@ export default function PublicTagChip({
             {!iconless && (
                 <TagIcon className={`${iconSize[size]} ${selected ? SELECTED_ICON : BASE_ICON}`} />
             )}
-            <span className="truncate max-w-[180px]">{name}</span>
+            <span className={`truncate ${nameMaxWidthClass}`}>{name}</span>
         </>
     )
 

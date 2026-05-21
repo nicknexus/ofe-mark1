@@ -3,7 +3,7 @@ import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
 import {
     ArrowLeft, Calendar, FileText, ChevronLeft, ChevronRight,
-    Image, File, Video, Mic, ExternalLink
+    Image, File, Video, Mic, ExternalLink, MapPin, Users, Tag as TagIcon
 } from 'lucide-react'
 import { publicApi, PublicEvidenceDetail, PublicMetricTag } from '../services/publicApi'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
@@ -16,6 +16,9 @@ import {
     PUBLIC_CARD_CLASS,
     PUBLIC_HEADER_CLASS,
     PUBLIC_PANEL_STATIC_CLASS,
+    PUBLIC_NEUTRAL_CHIP_CLASS,
+    PUBLIC_SECTION_CHIP_STYLE,
+    brandIconStyle,
 } from '../components/public/publicStyles'
 import { getLocalDateString, formatDate } from '../utils'
 
@@ -350,17 +353,7 @@ export default function PublicEvidencePage() {
                             <h1 className="text-base sm:text-lg font-bold text-gray-900 mb-1 sm:mb-2">{evidence.title}</h1>
 
                             {evidence.description && (
-                                <p className="text-gray-600 text-xs sm:text-sm mb-2 sm:mb-3 line-clamp-2">{evidence.description}</p>
-                            )}
-
-                            {evidence.tag_ids && evidence.tag_ids.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mb-2 sm:mb-3">
-                                    {evidence.tag_ids.map(id => {
-                                        const t = tagsById.get(id)
-                                        if (!t) return null
-                                        return <PublicTagChip key={id} name={t.name} size="xs" />
-                                    })}
-                                </div>
+                                <p className="text-gray-600 text-xs sm:text-sm mb-2 sm:mb-3 leading-relaxed whitespace-pre-line">{evidence.description}</p>
                             )}
 
                             {/* Date */}
@@ -376,6 +369,89 @@ export default function PublicEvidencePage() {
                                 </p>
                             )}
                         </div>
+
+                        {/* Tags / Locations / Beneficiaries — only render when
+                            at least one section has content so the sidebar
+                            stays compact on minimal evidence. Uses the shared
+                            neutral chip token instead of light-sage `accent`
+                            backgrounds, which were illegible on the public
+                            background. */}
+                        {((evidence.tag_ids && evidence.tag_ids.length > 0) ||
+                            (evidence.locations && evidence.locations.length > 0) ||
+                            (evidence.beneficiary_groups && evidence.beneficiary_groups.length > 0)) && (
+                            <div className={`${PUBLIC_PANEL_STATIC_CLASS} rounded-xl sm:rounded-2xl p-4 sm:p-5 flex-shrink-0 space-y-4`}>
+                                {evidence.tag_ids && evidence.tag_ids.length > 0 && (
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <div
+                                                className="w-7 h-7 rounded-lg flex items-center justify-center"
+                                                style={PUBLIC_SECTION_CHIP_STYLE}
+                                            >
+                                                <TagIcon className="w-3.5 h-3.5" style={brandIconStyle(brandColor)} />
+                                            </div>
+                                            <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Tags</h3>
+                                            <span className="text-xs text-gray-500 font-medium">{evidence.tag_ids.length}</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {evidence.tag_ids.map(id => {
+                                                const t = tagsById.get(id)
+                                                if (!t) return null
+                                                return <PublicTagChip key={id} name={t.name} size="sm" />
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {evidence.locations && evidence.locations.length > 0 && (
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <div
+                                                className="w-7 h-7 rounded-lg flex items-center justify-center"
+                                                style={PUBLIC_SECTION_CHIP_STYLE}
+                                            >
+                                                <MapPin className="w-3.5 h-3.5" style={brandIconStyle(brandColor)} />
+                                            </div>
+                                            <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Locations</h3>
+                                            <span className="text-xs text-gray-500 font-medium">{evidence.locations.length}</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {evidence.locations.map(loc => (
+                                                <span key={loc.id} className={PUBLIC_NEUTRAL_CHIP_CLASS}>
+                                                    <MapPin className="w-3 h-3" />
+                                                    {loc.name}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {evidence.beneficiary_groups && evidence.beneficiary_groups.length > 0 && (
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <div
+                                                className="w-7 h-7 rounded-lg flex items-center justify-center"
+                                                style={PUBLIC_SECTION_CHIP_STYLE}
+                                            >
+                                                <Users className="w-3.5 h-3.5" style={brandIconStyle(brandColor)} />
+                                            </div>
+                                            <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Beneficiaries</h3>
+                                            <span className="text-xs text-gray-500 font-medium">{evidence.beneficiary_groups.length}</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {evidence.beneficiary_groups.map(g => (
+                                                <Link
+                                                    key={g.id}
+                                                    to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/beneficiary/${g.id}`}
+                                                    className={`${PUBLIC_NEUTRAL_CHIP_CLASS} hover:bg-gray-200 transition-colors`}
+                                                >
+                                                    {g.name}
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* Impact Claims - Scrollable */}
                         {evidence.impact_claims && evidence.impact_claims.length > 0 ? (
@@ -405,7 +481,7 @@ export default function PublicEvidencePage() {
                                                 {dateLabel && <p className="text-xs text-gray-400 mt-0.5">{dateLabel}</p>}
                                                 {claim.tag_id && tagsById.get(claim.tag_id) && (
                                                     <div className="mt-1" onClick={(e) => e.preventDefault()}>
-                                                        <PublicTagChip name={tagsById.get(claim.tag_id)!.name} size="xs" />
+                                                        <PublicTagChip name={tagsById.get(claim.tag_id)!.name} size="sm" />
                                                     </div>
                                                 )}
                                             </Link>
