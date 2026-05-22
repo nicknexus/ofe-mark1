@@ -60,6 +60,9 @@ export default function PublicOrganizationPage() {
 
     // Feature view toggle state
     const [activeView, setActiveView] = useState<FeatureView>('globe')
+    // Sub-mode for the Globe section. Lifted out of the feature area so the
+    // autoplay sequence can drive globe → map → stories from one place.
+    const [globeMode, setGlobeMode] = useState<'globe' | 'map'>('globe')
 
     // Story carousel state
     const [storyIndex, setStoryIndex] = useState(0)
@@ -401,18 +404,9 @@ export default function PublicOrganizationPage() {
         return filtered
     }, [initiatives, selectedInitiative, locationMatchedInitiativeIds])
 
-    // Auto-cycle stories. When a story is deep-linked (?story=...), we hold
-    // off auto-rotation so the focused story stays put instead of rotating
-    // past the user.
+    // Stories carousel no longer auto-rotates — first story stays pinned
+    // until the visitor uses the prev/next chevrons or progress dots.
     const hasStoryDeepLink = !!searchParams.get('story')
-    useEffect(() => {
-        if (filteredStories.length <= 1) return
-        if (hasStoryDeepLink) return
-        const interval = setInterval(() => {
-            setStoryIndex(prev => (prev + 1) % filteredStories.length)
-        }, 10000)
-        return () => clearInterval(interval)
-    }, [filteredStories.length, hasStoryDeepLink])
 
     // Reset indices when filters change
     useEffect(() => {
@@ -444,34 +438,54 @@ export default function PublicOrganizationPage() {
         deepLinkApplied.current = true
     }, [loading, stories, searchParams])
 
-    // Initial load behaviour: show the globe for the first 10 seconds, then
-    // auto-switch to stories. The timer is cancelled the moment the user picks
-    // any view (see `chooseView` below). Skipped entirely when a deep-link
-    // specified a view.
-    const autoSwitchTimerRef = useRef<number | null>(null)
+    // Initial load behaviour: cycle Globe (10s) → Map (10s) → Stories, then
+    // stop. Any user interaction (outer view chooser OR the in-section
+    // Globe/Map toggle) cancels every pending step so we never override a
+    // visitor's click a second later. Skipped entirely when a deep-link
+    // already pinned a specific view.
+    const autoSwitchTimerIds = useRef<number[]>([])
+    const autoplayCancelled = useRef(false)
+    const cancelAutoplay = () => {
+        autoplayCancelled.current = true
+        for (const id of autoSwitchTimerIds.current) window.clearTimeout(id)
+        autoSwitchTimerIds.current = []
+    }
     useEffect(() => {
         if (loading) return
         if (searchParams.get('view')) return
-        autoSwitchTimerRef.current = window.setTimeout(() => {
-            autoSwitchTimerRef.current = null
+        // Reset on (re)entry; deps are stable so this only fires when loading
+        // flips false the first time.
+        autoplayCancelled.current = false
+        autoSwitchTimerIds.current = []
+
+        // Step 1 (t = 10s): swap globe view to the map sub-mode.
+        autoSwitchTimerIds.current.push(window.setTimeout(() => {
+            if (autoplayCancelled.current) return
+            setGlobeMode('map')
+        }, 10000))
+
+        // Step 2 (t = 20s): leave the section entirely and show stories.
+        autoSwitchTimerIds.current.push(window.setTimeout(() => {
+            if (autoplayCancelled.current) return
             setActiveView(prev => (prev === 'globe' ? 'stories' : prev))
-        }, 10000)
-        return () => {
-            if (autoSwitchTimerRef.current) {
-                window.clearTimeout(autoSwitchTimerRef.current)
-                autoSwitchTimerRef.current = null
-            }
-        }
+        }, 20000))
+
+        return cancelAutoplay
     }, [loading, searchParams])
 
     // User-driven view change: cancel the pending auto-switch immediately so
     // we never override their click a second later.
     const chooseView = (v: FeatureView) => {
-        if (autoSwitchTimerRef.current) {
-            window.clearTimeout(autoSwitchTimerRef.current)
-            autoSwitchTimerRef.current = null
-        }
+        cancelAutoplay()
         setActiveView(v)
+    }
+
+    // Mirror for the in-section Globe/Map toggle. Cancels the same chain so
+    // a visitor who explicitly clicked Map doesn't get bumped to Stories
+    // eight seconds later.
+    const chooseGlobeMode = (m: 'globe' | 'map') => {
+        cancelAutoplay()
+        setGlobeMode(m)
     }
 
     const hasActiveFilters = selectedInitiative !== 'all' || startDate || endDate || selectedLocationIds.length > 0 || selectedTagIds.length > 0
@@ -1070,6 +1084,8 @@ export default function PublicOrganizationPage() {
                     initiativeChartData={initiativeChartData}
                     chartInitiatives={chartInitiatives}
                     isPercentageChart={isPercentageChart}
+                    globeMode={globeMode}
+                    onGlobeModeChange={chooseGlobeMode}
                 />
                 <PublicOrganizationRightPanel
                     slug={slug!}

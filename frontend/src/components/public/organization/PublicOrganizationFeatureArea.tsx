@@ -8,9 +8,11 @@ import {
     FileText,
     Globe,
     LineChart,
+    Map as MapIcon,
     MapPin,
     Target,
 } from 'lucide-react'
+import { PublicOrgLocationsMap } from './PublicOrgLocationsMap'
 import {
     Area,
     AreaChart,
@@ -64,6 +66,11 @@ type Props = {
      * Y-axis + tooltip to `%` formatting and updates the title; numbers and
      * percentages can never be mixed (the page filters one out). */
     isPercentageChart?: boolean
+    /** Controlled Globe/Map sub-mode for the Globe section. The page owns
+     * this state so the autoplay sequence (globe → map → stories) and any
+     * user click can cancel from the same source. */
+    globeMode: 'globe' | 'map'
+    onGlobeModeChange: (mode: 'globe' | 'map') => void
 }
 
 export function PublicOrganizationFeatureArea(props: Props) {
@@ -85,7 +92,10 @@ export function PublicOrganizationFeatureArea(props: Props) {
         initiativeChartData,
         chartInitiatives,
         isPercentageChart = false,
+        globeMode,
+        onGlobeModeChange,
     } = props
+
     return (
         <div className={`w-full md:w-[45%] flex-shrink-0 pt-0 pb-2 md:pb-4 px-2 md:px-0 md:pr-2 ${activeView === 'graph' ? 'h-[72vh]' : 'h-[50vh]'} md:h-auto`}>
                     <div className="h-full overflow-hidden relative">
@@ -95,32 +105,83 @@ export function PublicOrganizationFeatureArea(props: Props) {
                                 : 'opacity-0 -translate-x-8 z-0 pointer-events-none'
                             }`}>
                             <div className="h-full flex flex-col">
-                                <div className="px-4 py-3 flex items-center justify-between ">
-                                    <div className="flex items-center gap-2">
+                                <div className="px-4 py-3 flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 min-w-0">
                                         <div
-                                            className="w-8 h-8 rounded-lg flex items-center justify-center"
+                                            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                                             style={{ backgroundColor: '#ffffff', boxShadow: '0 1px 2px rgba(15,23,42,0.06), inset 0 0 0 1px rgba(15,23,42,0.06)' }}
                                         >
-                                            <Globe
-                                                className="w-4 h-4"
-                                                style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
-                                            />
+                                            {globeMode === 'globe' ? (
+                                                <Globe
+                                                    className="w-4 h-4"
+                                                    style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
+                                                />
+                                            ) : (
+                                                <MapIcon
+                                                    className="w-4 h-4"
+                                                    style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
+                                                />
+                                            )}
                                         </div>
-                                        <h2 className="font-semibold text-foreground">Global Impact</h2>
+                                        <h2 className="font-semibold text-foreground truncate">Global Impact</h2>
                                     </div>
-                                    <span
-                                        className="px-2 py-0.5 text-xs font-semibold rounded-full text-gray-700"
-                                        style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
-                                    >
-                                        {filteredLocations.length} locations
-                                    </span>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                        {/* Globe / Map sub-toggle. Lives inside the
+                                            section so it doesn't pollute the outer
+                                            view chooser. Brand-tinted active pill
+                                            keeps it visually consistent with the
+                                            location count chip. */}
+                                        <div
+                                            className="inline-flex items-center p-0.5 rounded-full bg-gray-100"
+                                            role="tablist"
+                                            aria-label="Choose globe or map view"
+                                        >
+                                            <button
+                                                type="button"
+                                                role="tab"
+                                                aria-selected={globeMode === 'globe'}
+                                                onClick={() => onGlobeModeChange('globe')}
+                                                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
+                                                    globeMode === 'globe'
+                                                        ? 'bg-white text-gray-900 shadow-sm'
+                                                        : 'text-gray-500 hover:text-gray-700'
+                                                }`}
+                                            >
+                                                <Globe className="w-3 h-3" />
+                                                <span>Globe</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                role="tab"
+                                                aria-selected={globeMode === 'map'}
+                                                onClick={() => onGlobeModeChange('map')}
+                                                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
+                                                    globeMode === 'map'
+                                                        ? 'bg-white text-gray-900 shadow-sm'
+                                                        : 'text-gray-500 hover:text-gray-700'
+                                                }`}
+                                            >
+                                                <MapIcon className="w-3 h-3" />
+                                                <span>Map</span>
+                                            </button>
+                                        </div>
+                                        <span
+                                            className="px-2 py-0.5 text-xs font-semibold rounded-full text-gray-700 whitespace-nowrap"
+                                            style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}
+                                        >
+                                            {filteredLocations.length} locations
+                                        </span>
+                                    </div>
                                 </div>
                                 <div className="flex-1 relative overflow-hidden">
-                                    {/* Mount the globe only when its view is active. The
-                                        component is heavy (Three.js scene + animation
-                                        loop) so leaving it mounted in the background
-                                        burns CPU/GPU even when invisible. */}
-                                    {activeView === 'globe' ? (
+                                    {/* Mount the globe only when its view is active AND
+                                        the user hasn't switched to map. The component
+                                        is heavy (Three.js scene + animation loop) so
+                                        leaving it mounted in the background burns
+                                        CPU/GPU even when invisible. The map is also
+                                        only mounted when selected so leaflet doesn't
+                                        eagerly fetch tiles for an unseen view. */}
+                                    {activeView === 'globe' && globeMode === 'globe' ? (
                                         <OrganizationGlobeErrorBoundary>
                                             <Suspense fallback={
                                                 <div className="w-full h-full flex items-center justify-center">
@@ -135,15 +196,21 @@ export function PublicOrganizationFeatureArea(props: Props) {
                                                 />
                                             </Suspense>
                                         </OrganizationGlobeErrorBoundary>
+                                    ) : activeView === 'globe' && globeMode === 'map' ? (
+                                        <PublicOrgLocationsMap locations={filteredLocations} />
                                     ) : (
                                         <div className="w-full h-full" />
                                     )}
 
-                                    {/* Location Popups.
-                                        whitespace-nowrap + truncate + max-w cap keeps each
-                                        popup as a single-line pill regardless of name length.
-                                        Right-band popups anchor with `right` instead of `left`
-                                        so long labels never bleed off the screen edge. */}
+                                    {/* Location Popups (globe mode only — the leaflet
+                                        map already shows location names via marker
+                                        tooltips, so the floating brand pills would
+                                        just collide with them). whitespace-nowrap +
+                                        truncate + max-w cap keeps each popup as a
+                                        single-line pill; right-anchored popups use
+                                        `right` instead of `left` so long labels
+                                        never bleed off the screen edge. */}
+                                    {globeMode === 'globe' && (<>
                                     {activePopups.map(popup => {
                                         const label = `${popup.name}${popup.country ? `, ${popup.country}` : ''}`
                                         const inner = (
@@ -182,6 +249,7 @@ export function PublicOrganizationFeatureArea(props: Props) {
                                             </div>
                                         )
                                     })}
+                                    </>)}
                                 </div>
                             </div>
                         </div>
