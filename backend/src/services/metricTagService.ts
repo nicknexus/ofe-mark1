@@ -1,6 +1,16 @@
 import { supabase } from '../utils/supabase'
 import { MetricTag } from '../types'
 import { InitiativeService } from './initiativeService'
+// Lazy-import EvidenceService inside reconcile call sites to avoid the
+// circular import that would otherwise form between the two services.
+type ReconcileFns = {
+    reconcileLinksForEvidence: (evidenceId: string, userId: string) => Promise<unknown>
+    reconcileLinksForUpdate: (updateId: string, userId: string) => Promise<unknown>
+}
+async function loadReconcile(): Promise<ReconcileFns> {
+    const mod = await import('./evidenceService')
+    return mod.EvidenceService as unknown as ReconcileFns
+}
 
 export class MetricTagService {
     /**
@@ -154,13 +164,41 @@ export class MetricTagService {
      * Delete a tag. Cascades via FKs:
      *   - kpi_metric_tags rows for this tag are removed.
      *   - kpi_update_metric_tags rows for this tag are removed (claims become untagged).
+     *   - evidence_metric_tags rows for this tag are removed.
+     *
+     * Snapshot the affected claim/evidence ids BEFORE the cascade runs so we
+     * can reconcile their evidence-support links once the tag is gone. The
+     * symmetric tag-gate rule means losing a tag often invalidates the link.
      */
     static async delete(id: string, userId: string, requestedOrgId?: string): Promise<void> {
         const tag = await this.getById(id, userId, requestedOrgId)
         if (!tag) throw new Error('Metric tag not found or access denied')
 
+        const [{ data: claimLinks }, { data: evidenceLinks }] = await Promise.all([
+            supabase.from('kpi_update_metric_tags').select('kpi_update_id').eq('tag_id', id),
+            supabase.from('evidence_metric_tags').select('evidence_id').eq('tag_id', id),
+        ])
+        const affectedClaimIds = Array.from(new Set((claimLinks || []).map((l: any) => l.kpi_update_id)))
+        const affectedEvidenceIds = Array.from(new Set((evidenceLinks || []).map((l: any) => l.evidence_id)))
+
         const { error } = await supabase.from('metric_tags').delete().eq('id', id)
         if (error) throw new Error(`Failed to delete metric tag: ${error.message}`)
+
+        if (affectedClaimIds.length === 0 && affectedEvidenceIds.length === 0) return
+
+        const fns = await loadReconcile()
+        await Promise.all([
+            ...affectedClaimIds.map(cid =>
+                fns.reconcileLinksForUpdate(cid, userId).catch(err =>
+                    console.error('tag delete reconcile (claim) failed for', cid, err)
+                )
+            ),
+            ...affectedEvidenceIds.map(eid =>
+                fns.reconcileLinksForEvidence(eid, userId).catch(err =>
+                    console.error('tag delete reconcile (evidence) failed for', eid, err)
+                )
+            ),
+        ])
     }
 
     /**
@@ -225,8 +263,18 @@ export class MetricTagService {
             .eq('kpi_id', kpiId)
 
         const updateIds = (updates || []).map((u: any) => u.id)
+        // Track every claim whose tag state changed so we can reconcile the
+        // evidence-support links after the cascade runs. Otherwise a metric
+        // that drops a tag would silently leave stale evidence_kpi_updates
+        // rows for any claim that previously matched on that tag.
+        const affectedClaimIds = new Set<string>()
         if (updateIds.length > 0) {
             if (tagIds.length === 0) {
+                const { data: linksToDelete } = await supabase
+                    .from('kpi_update_metric_tags')
+                    .select('kpi_update_id')
+                    .in('kpi_update_id', updateIds)
+                ;(linksToDelete || []).forEach((l: any) => affectedClaimIds.add(l.kpi_update_id))
                 await supabase
                     .from('kpi_update_metric_tags')
                     .delete()
@@ -234,12 +282,13 @@ export class MetricTagService {
             } else {
                 const { data: existingClaimLinks } = await supabase
                     .from('kpi_update_metric_tags')
-                    .select('id, tag_id')
+                    .select('id, kpi_update_id, tag_id')
                     .in('kpi_update_id', updateIds)
                 const allowed = new Set(tagIds)
-                const orphanIds = (existingClaimLinks || [])
+                const orphans = (existingClaimLinks || [])
                     .filter((l: any) => !allowed.has(l.tag_id))
-                    .map((l: any) => l.id)
+                orphans.forEach((l: any) => affectedClaimIds.add(l.kpi_update_id))
+                const orphanIds = orphans.map((l: any) => l.id)
                 if (orphanIds.length > 0) {
                     await supabase
                         .from('kpi_update_metric_tags')
@@ -247,6 +296,17 @@ export class MetricTagService {
                         .in('id', orphanIds)
                 }
             }
+        }
+
+        if (affectedClaimIds.size > 0) {
+            const fns = await loadReconcile()
+            await Promise.all(
+                Array.from(affectedClaimIds).map(id =>
+                    fns.reconcileLinksForUpdate(id, userId).catch(err =>
+                        console.error('replaceTagsForKpi reconcile failed for', id, err)
+                    )
+                )
+            )
         }
     }
 
@@ -298,28 +358,37 @@ export class MetricTagService {
     /**
      * Set or clear the single tag attached to a kpi_update.
      * tagId === null clears it. Otherwise tag must be in the parent KPI's tags.
+     *
+     * After the tag write commits we re-run the evidence-support reconciler
+     * for this claim. That's how stripping the tag actually breaks any
+     * auto-link that was created BECAUSE of the tag — without this step the
+     * `evidence_kpi_updates` row would survive even though the gate now
+     * fails. `userId` is optional; when not supplied we fall back to the
+     * row's existing `user_id` so the reconciler still has an authoring id
+     * for any new links it inserts.
      */
-    static async setTagForUpdate(updateId: string, tagId: string | null, kpiId: string): Promise<void> {
+    static async setTagForUpdate(updateId: string, tagId: string | null, kpiId: string, userId?: string): Promise<void> {
         if (tagId === null || tagId === undefined || tagId === '') {
             await supabase.from('kpi_update_metric_tags').delete().eq('kpi_update_id', updateId)
-            return
+        } else {
+            // Validate the tag is on the parent KPI.
+            const { data: link } = await supabase
+                .from('kpi_metric_tags')
+                .select('id')
+                .eq('kpi_id', kpiId)
+                .eq('tag_id', tagId)
+                .maybeSingle()
+            if (!link) throw new Error('Tag is not attached to the parent metric')
+
+            // Upsert (UNIQUE on kpi_update_id enforces single tag).
+            await supabase.from('kpi_update_metric_tags').delete().eq('kpi_update_id', updateId)
+            const { error } = await supabase
+                .from('kpi_update_metric_tags')
+                .insert([{ kpi_update_id: updateId, tag_id: tagId }])
+            if (error) throw new Error(`Failed to attach tag to claim: ${error.message}`)
         }
 
-        // Validate the tag is on the parent KPI.
-        const { data: link } = await supabase
-            .from('kpi_metric_tags')
-            .select('id')
-            .eq('kpi_id', kpiId)
-            .eq('tag_id', tagId)
-            .maybeSingle()
-        if (!link) throw new Error('Tag is not attached to the parent metric')
-
-        // Upsert (UNIQUE on kpi_update_id enforces single tag).
-        await supabase.from('kpi_update_metric_tags').delete().eq('kpi_update_id', updateId)
-        const { error } = await supabase
-            .from('kpi_update_metric_tags')
-            .insert([{ kpi_update_id: updateId, tag_id: tagId }])
-        if (error) throw new Error(`Failed to attach tag to claim: ${error.message}`)
+        await this.reconcileAfterTagChange({ updateId, userId })
     }
 
     static async getTagIdForUpdate(updateId: string): Promise<string | null> {
@@ -374,6 +443,8 @@ export class MetricTagService {
             const { error } = await supabase.from('evidence_metric_tags').insert(links)
             if (error) throw new Error(`Failed to attach tags to evidence: ${error.message}`)
         }
+
+        await this.reconcileAfterTagChange({ evidenceId, userId })
     }
 
     static async getTagIdsForEvidence(evidenceId: string): Promise<string[]> {
@@ -603,21 +674,63 @@ export class MetricTagService {
     }
 
     /**
+     * Internal helper: dispatch to the right reconciler after a tag mutation.
+     * Falls back gracefully when an `evidence_kpi_updates.user_id` lookup
+     * fails so we never silently swallow a real error in the caller's path.
+     */
+    private static async reconcileAfterTagChange(args: {
+        evidenceId?: string
+        updateId?: string
+        userId?: string
+    }): Promise<void> {
+        try {
+            const fns = await loadReconcile()
+            const userId = args.userId || await this.lookupUserIdForLink(args)
+            if (args.evidenceId) {
+                await fns.reconcileLinksForEvidence(args.evidenceId, userId)
+            }
+            if (args.updateId) {
+                await fns.reconcileLinksForUpdate(args.updateId, userId)
+            }
+        } catch (err) {
+            console.error('reconcileAfterTagChange failed:', err)
+        }
+    }
+
+    /** Use any existing link's `user_id` if the caller didn't supply one. */
+    private static async lookupUserIdForLink(args: { evidenceId?: string; updateId?: string }): Promise<string> {
+        const q = supabase.from('evidence_kpi_updates').select('user_id').limit(1)
+        if (args.evidenceId) q.eq('evidence_id', args.evidenceId)
+        if (args.updateId) q.eq('kpi_update_id', args.updateId)
+        const { data } = await q
+        return (data && data[0]?.user_id) || '00000000-0000-0000-0000-000000000000'
+    }
+
+    /**
      * Tag-based gate for evidence supporting a claim.
-     * - Claim has no tag → match (no tag filter applied).
-     * - Claim has a tag → evidence must include that tag in its tag set.
      *
-     * Mirrors BeneficiaryService.beneficiaryGroupsMatch in spirit, but a
-     * claim has at most one tag and evidence can have many, so this is a
-     * set-membership check rather than an intersection.
+     * Symmetric rule (introduced to fix the "removing a tag doesn't break
+     * the link" bug):
+     *   - Claim has tag `T`  → evidence must include `T`.
+     *   - Claim has no tag   → evidence must also have NO tags.
+     *
+     * The previous loose rule ("untagged claim = no constraint") meant that
+     * stripping a tag from one side left the auto-linked support row in
+     * place. Owners reasonably expected the connection to die with the tag
+     * it was created from. This stricter rule makes tag state load-bearing
+     * for the link: any divergence in tag state on either side fails the
+     * gate, and the per-entity reconcilers in `EvidenceService` clean up
+     * the now-stale row.
+     *
+     * Tag-free orgs are unaffected: both sides untagged → match.
      */
     static evidenceMatchesClaimTag(
         claimTagId: string | null | undefined,
         evidenceTagIds: string[] | null | undefined
     ): boolean {
-        if (!claimTagId) return true
-        if (!evidenceTagIds || evidenceTagIds.length === 0) return false
-        return evidenceTagIds.includes(claimTagId)
+        const evTags = evidenceTagIds || []
+        if (!claimTagId) return evTags.length === 0
+        return evTags.includes(claimTagId)
     }
 }
 

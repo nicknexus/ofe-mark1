@@ -326,7 +326,7 @@ export class KPIService {
 
         // Attach single tag if provided. Validates tag is on parent KPI.
         if (tag_id !== undefined && data.kpi_id) {
-            await MetricTagService.setTagForUpdate(data.id, tag_id || null, data.kpi_id)
+            await MetricTagService.setTagForUpdate(data.id, tag_id || null, data.kpi_id, userId)
         }
 
         // Auto-link existing evidence that matches this impact claim
@@ -627,7 +627,7 @@ export class KPIService {
 
         // Apply tag change if provided.
         if (tag_id !== undefined) {
-            await MetricTagService.setTagForUpdate(id, tag_id || null, data.kpi_id)
+            await MetricTagService.setTagForUpdate(id, tag_id || null, data.kpi_id, userId)
         }
 
         // Whether any field that affects evidence-claim matching changed.
