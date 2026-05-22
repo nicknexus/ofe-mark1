@@ -498,29 +498,69 @@ export class PublicService {
     }
 
     static async getOrganizationEvidence(orgSlug: string, limit?: number): Promise<any[]> {
-        let query = supabase
-            .from('evidence')
-            .select(`
+        // NOTE: keep this select aligned with `getInitiativeEvidence` so the
+        // public org page can apply the same client-side filters (locations,
+        // claims, tags). Previously this returned only files+tags, which made
+        // the org-level location filter wipe out evidence that *was* tagged
+        // to those locations.
+        const SELECT = `
                 id, title, description, type, file_url, date_represented, initiative_id,
                 initiatives!inner(id, slug, title, organization_id,
                     organizations!inner(slug, is_public)
                 ),
-                evidence_files(id, file_url, file_name, file_type, display_order)
-            `)
-            .eq('initiatives.organizations.slug', orgSlug)
-            .eq('initiatives.organizations.is_public', true)
-            .order('date_represented', { ascending: false });
+                evidence_files(id, file_url, file_name, file_type, display_order),
+                evidence_locations(locations(id, name)),
+                evidence_kpis(kpis(id, title, category, unit_of_measurement, metric_type)),
+                evidence_kpi_updates(kpi_updates(id, value, date_represented, date_range_start, date_range_end, kpi_id, location_id, kpis(id, title, unit_of_measurement, metric_type)))
+            `;
 
-        if (limit) {
-            query = query.limit(limit);
+        // Two-pass fetch so `visual_proof` rows are guaranteed to be in the
+        // result window even when an org has many more recent documentation
+        // rows. A single date-ordered query was clipping Haiti Empowered's
+        // visual evidence — the older photos sat below 20+ newer docs.
+        const buildQuery = () =>
+            supabase
+                .from('evidence')
+                .select(SELECT)
+                .eq('initiatives.organizations.slug', orgSlug)
+                .eq('initiatives.organizations.is_public', true)
+                .order('date_represented', { ascending: false });
+
+        const cap = limit && limit > 0 ? limit : undefined;
+        const visualPromise = (() => {
+            let q = buildQuery().eq('type', 'visual_proof');
+            if (cap) q = q.limit(cap);
+            return q;
+        })();
+        const restPromise = (() => {
+            let q = buildQuery().neq('type', 'visual_proof');
+            if (cap) q = q.limit(cap);
+            return q;
+        })();
+
+        const [visualRes, restRes] = await Promise.all([visualPromise, restPromise]);
+        if (visualRes.error) throw new Error(`Failed to fetch evidence: ${visualRes.error.message}`);
+        if (restRes.error) throw new Error(`Failed to fetch evidence: ${restRes.error.message}`);
+
+        // Stitch: visual_proof first, then everything else, deduping by id
+        // (defensive — should never collide given the disjoint type filters).
+        const seen = new Set<string>();
+        const stitched: any[] = [];
+        for (const r of [...(visualRes.data || []), ...(restRes.data || [])]) {
+            if (!seen.has(r.id)) {
+                seen.add(r.id);
+                stitched.push(r);
+            }
         }
-
-        const { data, error } = await query;
-
-        if (error) throw new Error(`Failed to fetch evidence: ${error.message}`);
-
-        const rows = data || [];
-        const tagsByEv = await MetricTagService.getTagIdsForEvidences(rows.map((e: any) => e.id));
+        const rows = cap ? stitched.slice(0, cap) : stitched;
+        const evidenceIds = rows.map((e: any) => e.id);
+        const allClaimIds = rows.flatMap((e: any) =>
+            (e.evidence_kpi_updates || []).map((eu: any) => eu.kpi_updates?.id).filter(Boolean)
+        );
+        const [tagsByEv, tagByClaim] = await Promise.all([
+            MetricTagService.getTagIdsForEvidences(evidenceIds),
+            MetricTagService.getTagIdsForUpdates(allClaimIds),
+        ]);
 
         return rows.map((e: any) => ({
             id: e.id,
@@ -534,6 +574,12 @@ export class PublicService {
             initiative_slug: e.initiatives?.slug,
             initiative_title: e.initiatives?.title,
             org_slug: e.initiatives?.organizations?.slug,
+            locations: e.evidence_locations?.map((el: any) => el.locations).filter(Boolean) || [],
+            kpis: e.evidence_kpis?.map((ek: any) => ek.kpis).filter(Boolean) || [],
+            impact_claims: (e.evidence_kpi_updates || [])
+                .map((eu: any) => eu.kpi_updates)
+                .filter(Boolean)
+                .map((c: any) => ({ ...c, tag_id: tagByClaim[c.id] || null })),
             tag_ids: tagsByEv[e.id] || [],
         }));
     }

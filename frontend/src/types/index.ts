@@ -177,6 +177,16 @@ export interface Evidence {
     type: 'visual_proof' | 'documentation' | 'testimony' | 'financials';
     file_url?: string;
     file_type?: string;
+    /** Gallery files when an evidence item has more than one. The legacy
+     * `file_url` is kept populated only for single-file uploads; multi-file
+     * rows hydrate this array instead. */
+    files?: {
+        id: string;
+        file_url: string;
+        file_name?: string;
+        file_type?: string;
+        display_order?: number;
+    }[];
     date_represented: string;
     date_range_start?: string;
     date_range_end?: string;

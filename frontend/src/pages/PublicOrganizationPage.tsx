@@ -110,7 +110,7 @@ export default function PublicOrganizationPage() {
                 publicApi.getOrganizationMetrics(slug!),
                 publicApi.getOrganizationStories(slug!, 20),
                 publicApi.getOrganizationLocations(slug!),
-                publicApi.getOrganizationEvidence(slug!, 20),
+                publicApi.getOrganizationEvidence(slug!, 100),
                 publicApi.getOrganizationContext(slug!).catch(() => null),
                 publicApi.getOrganizationTags(slug!).catch(() => [])
             ])
@@ -582,31 +582,63 @@ export default function PublicOrganizationPage() {
     //     empty slot.
     const evidencePerPage = 4
     const evidenceMedia = useMemo(() => {
+        // Detect previewable media from three sources, in order of
+        // reliability:
+        //   1. The file's MIME `file_type` (always trustworthy when present).
+        //   2. The original `file_name` extension (preserved on upload).
+        //   3. The storage URL itself (useful for legacy `file_url` rows
+        //      that don't have an associated `evidence_files` entry).
+        // Earlier rev only checked (3), which silently failed for orgs
+        // whose Supabase storage URLs don't carry the extension (e.g. UUID
+        // object keys) — Haiti Empowered's photos were the trigger here.
         const stripQuery = (url: string) => url.split('?')[0]
-        const extOf = (url?: string | null) => {
-            if (!url) return ''
-            const path = stripQuery(url)
+        const extOf = (s?: string | null) => {
+            if (!s) return ''
+            const path = stripQuery(s)
             const dot = path.lastIndexOf('.')
             return dot >= 0 ? path.slice(dot + 1).toLowerCase() : ''
         }
         const imgExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif']
         const vidExts = ['mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v']
         const ytRe = /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/
-        const hasPreview = (e: PublicEvidence) => {
-            const urls = [e.file_url, ...(e.files || []).map(f => f.file_url)].filter(Boolean) as string[]
-            return urls.some(u => imgExts.includes(extOf(u)) || vidExts.includes(extOf(u)) || ytRe.test(u))
+        const isPreviewableFile = (
+            file_url?: string | null,
+            file_name?: string | null,
+            file_type?: string | null,
+        ) => {
+            const mime = (file_type || '').toLowerCase()
+            if (mime.startsWith('image/') || mime.startsWith('video/')) return true
+            const nameExt = extOf(file_name)
+            if (imgExts.includes(nameExt) || vidExts.includes(nameExt)) return true
+            const urlExt = extOf(file_url)
+            if (imgExts.includes(urlExt) || vidExts.includes(urlExt)) return true
+            if (file_url && ytRe.test(file_url)) return true
+            return false
         }
-        return { hasPreview }
+        const hasPreview = (e: PublicEvidence) => {
+            if (isPreviewableFile(e.file_url, undefined, undefined)) return true
+            return (e.files || []).some(f =>
+                isPreviewableFile(f.file_url, f.file_name, f.file_type),
+            )
+        }
+        return { hasPreview, isPreviewableFile, extOf, imgExts, vidExts, ytRe }
     }, [])
     const sortedEvidence = useMemo(() => {
-        const visualProof = filteredEvidence.filter(e => e.type === 'visual_proof')
-        const pool = visualProof.length > 0 ? visualProof : filteredEvidence
-        // Within the chosen pool: items with a renderable preview first,
-        // preserving original (date-desc) order inside each bucket.
+        // Earlier rev short-listed by `type === 'visual_proof'` first, then
+        // sorted by preview availability. That broke for orgs (e.g. Haiti
+        // Empowered) whose actually-visual JPGs are stored with
+        // `type: 'documentation'` — those photos got pushed below text-only
+        // doc tiles even though they're the prettier option to show.
+        //
+        // New strategy: pick items that *actually render* a preview first.
+        // Within that pool, items explicitly typed `visual_proof` still
+        // bubble up so well-tagged orgs keep their existing ordering.
+        const withPreview = filteredEvidence.filter(evidenceMedia.hasPreview)
+        const pool = withPreview.length > 0 ? withPreview : filteredEvidence
         return [...pool].sort((a, b) => {
-            const av = evidenceMedia.hasPreview(a) ? 0 : 1
-            const bv = evidenceMedia.hasPreview(b) ? 0 : 1
-            return av - bv
+            const ta = a.type === 'visual_proof' ? 0 : 1
+            const tb = b.type === 'visual_proof' ? 0 : 1
+            return ta - tb
         })
     }, [filteredEvidence, evidenceMedia])
     const totalEvidencePages = Math.ceil(sortedEvidence.length / evidencePerPage)

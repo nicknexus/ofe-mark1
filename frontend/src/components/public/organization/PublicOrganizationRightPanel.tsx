@@ -379,10 +379,15 @@ export function PublicOrganizationRightPanel(props: Props) {
                                         // Strip query strings before checking the
                                         // extension so signed URLs classify the
                                         // same as plain ones.
+                                        // Use MIME type, original file_name, AND
+                                        // URL extension as fallbacks. Some
+                                        // storage backends return URLs without
+                                        // an extension (UUID object keys), so
+                                        // URL-only sniffing misses real images.
                                         const stripQ = (u: string) => u.split('?')[0]
-                                        const ext = (u?: string | null) => {
-                                            if (!u) return ''
-                                            const p = stripQ(u)
+                                        const ext = (s?: string | null) => {
+                                            if (!s) return ''
+                                            const p = stripQ(s)
                                             const i = p.lastIndexOf('.')
                                             return i >= 0 ? p.slice(i + 1).toLowerCase() : ''
                                         }
@@ -390,13 +395,22 @@ export function PublicOrganizationRightPanel(props: Props) {
                                         const vidExts = ['mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v']
                                         const ytRe = /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/
                                         const ytIdRe = /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/
-                                        const candidates: string[] = [
-                                            ev.file_url || '',
-                                            ...((ev.files || []).map(f => f.file_url || '')),
-                                        ].filter(Boolean)
-                                        const imageUrl = candidates.find(u => imgExts.includes(ext(u)))
-                                        const videoUrl = !imageUrl ? candidates.find(u => vidExts.includes(ext(u))) : undefined
-                                        const ytUrl = !imageUrl && !videoUrl ? candidates.find(u => ytRe.test(u)) : undefined
+                                        type Cand = { url: string; name?: string; type?: string }
+                                        const candidates: Cand[] = [
+                                            { url: ev.file_url || '' },
+                                            ...((ev.files || []).map(f => ({ url: f.file_url || '', name: f.file_name, type: f.file_type }))),
+                                        ].filter(c => c.url)
+                                        const isImg = (c: Cand) =>
+                                            (c.type || '').toLowerCase().startsWith('image/') ||
+                                            imgExts.includes(ext(c.name)) ||
+                                            imgExts.includes(ext(c.url))
+                                        const isVid = (c: Cand) =>
+                                            (c.type || '').toLowerCase().startsWith('video/') ||
+                                            vidExts.includes(ext(c.name)) ||
+                                            vidExts.includes(ext(c.url))
+                                        const imageUrl = candidates.find(isImg)?.url
+                                        const videoUrl = !imageUrl ? candidates.find(isVid)?.url : undefined
+                                        const ytUrl = !imageUrl && !videoUrl ? candidates.find(c => ytRe.test(c.url))?.url : undefined
                                         const ytId = ytUrl ? (ytUrl.match(ytIdRe)?.[1] ?? null) : null
                                         return (
                                             <Link

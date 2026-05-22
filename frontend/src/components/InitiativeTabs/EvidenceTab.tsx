@@ -325,19 +325,56 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
         setDatePickerValue({})
     }
 
-    const isImage = (fileUrl?: string) => {
-        if (!fileUrl) return false
-        return fileUrl.includes('.jpg') ||
-            fileUrl.includes('.jpeg') ||
-            fileUrl.includes('.png') ||
-            fileUrl.includes('.gif') ||
-            fileUrl.includes('.webp')
+    // ---- Preview detection -------------------------------------------------
+    // We probe MIME type, original filename, AND URL extension because some
+    // storage backends (Supabase) return URLs without an extension when the
+    // object key is a UUID. URL-only sniffing was the source of "won't
+    // preview" reports for orgs with multi-file (`evidence_files`) uploads.
+    const stripQuery = (s: string) => s.split('?')[0]
+    const extOf = (s?: string | null) => {
+        if (!s) return ''
+        const path = stripQuery(s)
+        const dot = path.lastIndexOf('.')
+        return dot >= 0 ? path.slice(dot + 1).toLowerCase() : ''
+    }
+    const IMG_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif']
+    const VID_EXTS = ['mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v']
+
+    type FileLike = { file_url?: string; file_name?: string; file_type?: string }
+    const isImageFile = (f?: FileLike | null) => {
+        if (!f) return false
+        if ((f.file_type || '').toLowerCase().startsWith('image/')) return true
+        if (IMG_EXTS.includes(extOf(f.file_name))) return true
+        if (IMG_EXTS.includes(extOf(f.file_url))) return true
+        return false
+    }
+    const isVideoFile = (f?: FileLike | null) => {
+        if (!f) return false
+        if ((f.file_type || '').toLowerCase().startsWith('video/')) return true
+        if (VID_EXTS.includes(extOf(f.file_name))) return true
+        if (VID_EXTS.includes(extOf(f.file_url))) return true
+        return false
     }
 
-    const isVideo = (fileUrl?: string) => {
-        if (!fileUrl) return false
-        const lower = fileUrl.toLowerCase()
-        return lower.includes('.mp4') || lower.includes('.webm') || lower.includes('.mov') || lower.includes('.avi') || lower.includes('.mkv')
+    const isImage = (fileUrl?: string) => isImageFile({ file_url: fileUrl })
+    const isVideo = (fileUrl?: string) => isVideoFile({ file_url: fileUrl })
+
+    /** Pick the best preview URL across `file_url` + the gallery. Returns
+     *  `{ kind, url }` so the renderer can pick the right element. */
+    const getPreview = (
+        ev: Evidence,
+    ): { kind: 'image' | 'video' | 'youtube'; url: string } | null => {
+        const candidates: FileLike[] = [
+            { file_url: ev.file_url, file_type: ev.file_type },
+            ...((ev.files || []) as FileLike[]),
+        ].filter(c => !!c.file_url)
+        const img = candidates.find(isImageFile)
+        if (img?.file_url) return { kind: 'image', url: img.file_url }
+        const vid = candidates.find(isVideoFile)
+        if (vid?.file_url) return { kind: 'video', url: vid.file_url }
+        const yt = candidates.find(c => isYouTubeUrl(c.file_url))
+        if (yt?.file_url) return { kind: 'youtube', url: yt.file_url }
+        return null
     }
 
     const isYouTubeUrl = (url?: string) => {
@@ -954,10 +991,12 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                             const bgColor = typeInfo.color.split(' ')[0]
                             const evidenceType = evidenceTypes.find(et => et.value === ev.type)
                             const IconComponent = evidenceType?.icon || FileText
-                            const hasImagePreview = isImage(ev.file_url)
-                            const hasVideoPreview = isVideo(ev.file_url)
-                            const hasYouTubePreview = isYouTubeUrl(ev.file_url)
-                            const youTubeId = hasYouTubePreview && ev.file_url ? getYouTubeVideoId(ev.file_url) : null
+                            const preview = getPreview(ev)
+                            const hasImagePreview = preview?.kind === 'image'
+                            const hasVideoPreview = preview?.kind === 'video'
+                            const hasYouTubePreview = preview?.kind === 'youtube'
+                            const previewUrl = preview?.url
+                            const youTubeId = hasYouTubePreview && previewUrl ? getYouTubeVideoId(previewUrl) : null
 
                             return (
                                 <div
@@ -967,10 +1006,10 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                 >
                                     {/* Preview Image/Icon - smaller on mobile */}
                                     <div className="relative w-full aspect-video md:aspect-square bg-gray-100 overflow-hidden">
-                                        {hasImagePreview && ev.file_url ? (
+                                        {hasImagePreview && previewUrl ? (
                                             <>
                                                 <img
-                                                    src={ev.file_url}
+                                                    src={previewUrl}
                                                     alt={ev.title || 'Evidence preview'}
                                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                                                     onError={(e) => {
@@ -984,10 +1023,10 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                                     <IconComponent className="w-12 h-12 text-gray-400" />
                                                 </div>
                                             </>
-                                        ) : hasVideoPreview && ev.file_url ? (
+                                        ) : hasVideoPreview && previewUrl ? (
                                             <>
                                                 <video
-                                                    src={ev.file_url}
+                                                    src={previewUrl}
                                                     className="w-full h-full object-cover"
                                                     muted
                                                     preload="metadata"

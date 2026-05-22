@@ -157,11 +157,20 @@ export class EvidenceService {
     static async getAll(initiativeId?: string, kpiId?: string, beneficiaryGroupId?: string): Promise<Evidence[]> {
         let query;
 
+        // Always pull `evidence_files` alongside the row so the dashboard
+        // (and any consumer of `getAll`) can render gallery previews. The
+        // legacy `file_url` column is empty for multi-file uploads, so
+        // omitting this join made photo-only evidence look like blank
+        // "documentation" tiles in the owner UI.
+        const evidenceFilesSelect =
+            'evidence_files(id, file_url, file_name, file_type, display_order)';
+
         if (kpiId && beneficiaryGroupId) {
             query = supabase
                 .from('evidence')
                 .select(`
                     *,
+                    ${evidenceFilesSelect},
                     evidence_kpis!inner(kpi_id),
                     evidence_kpi_updates(kpi_update_id),
                     evidence_locations(location_id),
@@ -175,6 +184,7 @@ export class EvidenceService {
                 .from('evidence')
                 .select(`
                     *,
+                    ${evidenceFilesSelect},
                     evidence_kpis!inner(kpi_id),
                     evidence_kpi_updates(kpi_update_id),
                     evidence_locations(location_id),
@@ -187,6 +197,7 @@ export class EvidenceService {
                 .from('evidence')
                 .select(`
                     *,
+                    ${evidenceFilesSelect},
                     evidence_kpis(kpi_id),
                     evidence_kpi_updates(kpi_update_id),
                     evidence_locations(location_id),
@@ -199,6 +210,7 @@ export class EvidenceService {
                 .from('evidence')
                 .select(`
                     *,
+                    ${evidenceFilesSelect},
                     evidence_kpis(kpi_id),
                     evidence_kpi_updates(kpi_update_id),
                     evidence_locations(location_id),
@@ -220,11 +232,19 @@ export class EvidenceService {
             const kpi_update_ids = item.evidence_kpi_updates?.map((link: any) => link.kpi_update_id).filter(Boolean) || [];
             const location_ids = item.evidence_locations?.map((link: any) => link.location_id).filter(Boolean) || [];
             const beneficiary_group_ids = item.evidence_beneficiary_groups?.map((link: any) => link.beneficiary_group_id).filter(Boolean) || [];
+            // Surface gallery files under `files` (matches the public-side
+            // shape) so the dashboard can render previews without an extra
+            // `/files` round-trip per row. Sort by display_order to keep the
+            // owner UI consistent with the public gallery.
+            const files = (item.evidence_files || [])
+                .slice()
+                .sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0));
             return {
                 ...item,
                 kpi_update_ids,
                 location_ids,
-                beneficiary_group_ids
+                beneficiary_group_ids,
+                files,
             };
         });
 
