@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { ReportService } from '../services/reportService';
+import { OrgAccessService } from '../services/orgAccessService';
 import { openai, isOpenAIConfigured } from '../utils/openai';
 import { supabase } from '../utils/supabase';
 
@@ -56,7 +57,6 @@ router.post('/generate-report', authenticateUser, async (req: AuthenticatedReque
             deepLink
         } = req.body;
 
-        // Validate required fields (selectedStory is now optional)
         if (!initiativeId || !initiativeTitle) {
             console.error('Missing required fields:', {
                 initiativeId: !!initiativeId,
@@ -65,6 +65,19 @@ router.post('/generate-report', authenticateUser, async (req: AuthenticatedReque
                 selectedStory: !!selectedStory
             });
             res.status(400).json({ error: 'Missing required fields: initiativeId and initiativeTitle are required' });
+            return;
+        }
+
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        try {
+            await OrgAccessService.assertInitiativeAccess(
+                initiativeId,
+                req.user!.id,
+                requestedOrgId
+            );
+        } catch (e) {
+            const status = (e as any).status || 403;
+            res.status(status).json({ error: (e as Error).message });
             return;
         }
 

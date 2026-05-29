@@ -133,7 +133,7 @@ export class KPIService {
         const kpisWithEvidence = await Promise.all((data || []).map(async (kpi: any) => {
             try {
                 // Get detailed evidence data for this KPI using our improved method
-                const evidenceByDates = await this.getEvidenceByDates(kpi.id, userId);
+                const evidenceByDates = await this.getEvidenceByDates(kpi.id, userId, requestedOrgId);
 
                 // Calculate overall evidence percentage from all data points
                 const allDataPoints = evidenceByDates.flatMap(group => group.dataPoints);
@@ -751,8 +751,10 @@ export class KPIService {
     }
 
     // Get evidence grouped by dates for a specific KPI
-    static async getEvidenceByDates(kpiId: string, userId: string) {
-        // Get KPI updates for this KPI (access controlled at route level)
+    static async getEvidenceByDates(kpiId: string, userId: string, requestedOrgId?: string) {
+        const kpi = await this.getById(kpiId, userId, requestedOrgId);
+        if (!kpi) throw new Error('KPI not found or access denied');
+
         const { data: updates, error: updatesError } = await supabase
             .from('kpi_updates')
             .select('*')

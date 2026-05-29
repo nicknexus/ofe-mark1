@@ -288,23 +288,36 @@ export class TeamService {
     }
 
     /**
-     * Get user's team membership (where they are a shared member)
-     * If organizationId is provided, returns membership for that specific org
+     * All team memberships for a user (multi-org safe).
      */
-    static async getUserTeamMembership(userId: string, organizationId?: string): Promise<TeamMember | null> {
+    static async getUserTeamMemberships(
+        userId: string,
+        organizationId?: string
+    ): Promise<TeamMember[]> {
         let query = supabase
             .from('team_members')
             .select('*')
-            .eq('user_id', userId);
+            .eq('user_id', userId)
+            .order('joined_at', { ascending: true });
 
         if (organizationId) {
             query = query.eq('organization_id', organizationId);
         }
 
-        const { data, error } = await query.maybeSingle();
+        const { data, error } = await query;
+        if (error) {
+            console.error('[getUserTeamMemberships] error:', error.message);
+            return [];
+        }
+        return data ?? [];
+    }
 
-        if (error || !data) return null;
-        return data;
+    /**
+     * Single membership row when org is known; never use maybeSingle() without org filter.
+     */
+    static async getUserTeamMembership(userId: string, organizationId?: string): Promise<TeamMember | null> {
+        const rows = await this.getUserTeamMemberships(userId, organizationId);
+        return rows[0] ?? null;
     }
 
     /**
@@ -456,87 +469,43 @@ export class TeamService {
      * @param activeOrgId - Optional: The organization ID from X-Organization-Id header
      */
     static async getUserPermissions(userId: string, activeOrgId?: string): Promise<UserPermissions> {
-        // First check if user owns an organization
-        const ownedOrg = await this.getUserOwnedOrganization(userId);
+        const { OrgAccessService } = await import('./orgAccessService');
+        const ctx = await OrgAccessService.resolveOrgContext(userId, activeOrgId);
 
-        // Check if user is a team member — scope to active org if provided
-        const membership = await this.getUserTeamMembership(userId, activeOrgId || undefined);
-
-        // If activeOrgId is provided, use it to determine context
-        if (activeOrgId) {
-            // Check if user owns this specific org
-            if (ownedOrg && ownedOrg.id === activeOrgId) {
-                return {
-                    isOwner: true,
-                    isSharedMember: false,
-                    canAddImpactClaims: true,
-                    canDelete: true,
-                    organizationId: ownedOrg.id,
-                    organizationName: ownedOrg.name
-                };
-            }
-
-            // Check if user is a member of this specific org
-            if (membership && membership.organization_id === activeOrgId) {
-                const { data: org } = await supabase
-                    .from('organizations')
-                    .select('name')
-                    .eq('id', membership.organization_id)
-                    .single();
-
-                // Phase 1 (full-access baseline): team members get owner-equivalent
-                // data privileges. Org-account-level edits remain owner-only via
-                // OrganizationService.update's owner_id check. Per-action
-                // restrictions (can_add_impact_claims, can_edit_evidence) will be
-                // re-introduced in Phase 7.
-                return {
-                    isOwner: false,
-                    isSharedMember: true,
-                    canAddImpactClaims: true,
-                    canDelete: true,
-                    organizationId: membership.organization_id,
-                    organizationName: org?.name
-                };
-            }
+        if (!ctx) {
+            return {
+                isOwner: false,
+                isSharedMember: false,
+                canAddImpactClaims: false,
+                canDelete: false,
+            };
         }
 
-        // No activeOrgId provided or didn't match - use default priority (owned org first)
-        if (ownedOrg) {
+        const { data: org } = await supabase
+            .from('organizations')
+            .select('name')
+            .eq('id', ctx.organizationId)
+            .maybeSingle();
+
+        if (ctx.isOwner) {
             return {
                 isOwner: true,
                 isSharedMember: false,
                 canAddImpactClaims: true,
                 canDelete: true,
-                organizationId: ownedOrg.id,
-                organizationName: ownedOrg.name
+                organizationId: ctx.organizationId,
+                organizationName: org?.name,
             };
         }
 
-        // Check if user is a team member
-        if (membership) {
-            // Get org name
-            const { data: org } = await supabase
-                .from('organizations')
-                .select('name')
-                .eq('id', membership.organization_id)
-                .single();
-
-            return {
-                isOwner: false,
-                isSharedMember: true,
-                canAddImpactClaims: true,
-                canDelete: true,
-                organizationId: membership.organization_id,
-                organizationName: org?.name
-            };
-        }
-
-        // User has no organization context
+        // Phase 1: full operational access for team members until restriction phases.
         return {
             isOwner: false,
-            isSharedMember: false,
-            canAddImpactClaims: false,
-            canDelete: false
+            isSharedMember: true,
+            canAddImpactClaims: true,
+            canDelete: true,
+            organizationId: ctx.organizationId,
+            organizationName: org?.name,
         };
     }
 
@@ -891,12 +860,44 @@ export class TeamService {
     }
 
     /**
+     * Ensure a team_members row belongs to the given organization (owner management).
+     */
+    static async assertMemberInOrganization(memberId: string, organizationId: string): Promise<void> {
+        const { data, error } = await supabase
+            .from('team_members')
+            .select('organization_id')
+            .eq('id', memberId)
+            .maybeSingle();
+
+        if (error || !data || data.organization_id !== organizationId) {
+            throw new Error('Team member not found');
+        }
+    }
+
+    /**
+     * Ensure a team_invitations row belongs to the given organization.
+     */
+    static async assertInvitationInOrganization(invitationId: string, organizationId: string): Promise<void> {
+        const { data, error } = await supabase
+            .from('team_invitations')
+            .select('organization_id')
+            .eq('id', invitationId)
+            .maybeSingle();
+
+        if (error || !data || data.organization_id !== organizationId) {
+            throw new Error('Invitation not found');
+        }
+    }
+
+    /**
      * Update team member permissions
      */
     static async updateMemberPermissions(
         memberId: string,
+        organizationId: string,
         updates: { canAddImpactClaims?: boolean; canEditEvidence?: boolean }
     ): Promise<TeamMember> {
+        await this.assertMemberInOrganization(memberId, organizationId);
         const updateData: Record<string, boolean> = {};
         if (updates.canAddImpactClaims !== undefined) updateData.can_add_impact_claims = updates.canAddImpactClaims;
         if (updates.canEditEvidence !== undefined) updateData.can_edit_evidence = updates.canEditEvidence;
@@ -918,7 +919,9 @@ export class TeamService {
     /**
      * Remove a team member
      */
-    static async removeMember(memberId: string): Promise<void> {
+    static async removeMember(memberId: string, organizationId: string): Promise<void> {
+        await this.assertMemberInOrganization(memberId, organizationId);
+
         const { error } = await supabase
             .from('team_members')
             .delete()
@@ -932,7 +935,9 @@ export class TeamService {
     /**
      * Revoke an invitation
      */
-    static async revokeInvitation(invitationId: string): Promise<void> {
+    static async revokeInvitation(invitationId: string, organizationId: string): Promise<void> {
+        await this.assertInvitationInOrganization(invitationId, organizationId);
+
         const { error } = await supabase
             .from('team_invitations')
             .update({ status: 'revoked' })
@@ -975,7 +980,9 @@ export class TeamService {
     /**
      * Resend an invitation (generates new token and extends expiry)
      */
-    static async resendInvitation(invitationId: string): Promise<TeamInvitation> {
+    static async resendInvitation(invitationId: string, organizationId: string): Promise<TeamInvitation> {
+        await this.assertInvitationInOrganization(invitationId, organizationId);
+
         const newToken = this.generateToken();
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + INVITE_EXPIRY_DAYS);

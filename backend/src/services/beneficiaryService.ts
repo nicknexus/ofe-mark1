@@ -1,6 +1,7 @@
 import { supabase } from '../utils/supabase'
 import { BeneficiaryGroup } from '../types'
 import { InitiativeService } from './initiativeService'
+import { OrgAccessService } from './orgAccessService'
 
 export class BeneficiaryService {
     /**
@@ -166,7 +167,14 @@ export class BeneficiaryService {
         return map
     }
 
-    static async replaceLinksForUpdate(kpiUpdateId: string, groupIds: string[], userId: string) {
+    static async replaceLinksForUpdate(
+        kpiUpdateId: string,
+        groupIds: string[],
+        userId: string,
+        requestedOrgId?: string
+    ) {
+        await OrgAccessService.assertKpiUpdateAccess(kpiUpdateId, userId, requestedOrgId);
+
         // Delete existing
         await supabase
             .from('kpi_update_beneficiary_groups')
@@ -220,7 +228,16 @@ export class BeneficiaryService {
     /**
      * Batch get derived locations for multiple ben groups.
      */
-    static async getBulkDerivedLocations(groupIds: string[]): Promise<Record<string, string[]>> {
+    static async getBulkDerivedLocations(
+        groupIds: string[],
+        userId: string,
+        requestedOrgId?: string
+    ): Promise<Record<string, string[]>> {
+        if (groupIds.length === 0) return {}
+
+        const accessibleGroups = await this.getAll(userId, undefined, requestedOrgId);
+        const accessibleIds = new Set(accessibleGroups.map(g => g.id));
+        groupIds = groupIds.filter(id => accessibleIds.has(id));
         if (groupIds.length === 0) return {}
 
         // Claim locations

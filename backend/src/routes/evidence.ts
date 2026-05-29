@@ -8,7 +8,10 @@ const router = express.Router();
 router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const { initiative_id, kpi_id, beneficiary_group_id } = req.query;
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
         const evidence = await EvidenceService.getAll(
+            req.user!.id,
+            requestedOrgId,
             initiative_id as string,
             kpi_id as string,
             beneficiary_group_id as string
@@ -51,7 +54,16 @@ router.post('/backfill-links', authenticateUser, async (req: AuthenticatedReques
 router.get('/stats/by-type', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const { initiative_id } = req.query;
-        const stats = await EvidenceService.getEvidenceStats(initiative_id as string);
+        if (!initiative_id) {
+            res.status(400).json({ error: 'initiative_id is required' });
+            return;
+        }
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const stats = await EvidenceService.getEvidenceStats(
+            req.user!.id,
+            requestedOrgId,
+            initiative_id as string
+        );
         res.json(stats);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
@@ -62,7 +74,12 @@ router.get('/stats/by-type', authenticateUser, async (req: AuthenticatedRequest,
 // Get evidence linked to a specific data point (KPI update) - MUST come before /:id route
 router.get('/for-kpi-update/:updateId', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const evidence = await EvidenceService.getEvidenceForUpdate(req.params.updateId);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const evidence = await EvidenceService.getEvidenceForUpdate(
+            req.params.updateId,
+            req.user!.id,
+            requestedOrgId
+        );
         res.json(evidence);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
@@ -73,7 +90,8 @@ router.get('/for-kpi-update/:updateId', authenticateUser, async (req: Authentica
 // Get evidence by ID
 router.get('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const evidence = await EvidenceService.getById(req.params.id);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const evidence = await EvidenceService.getById(req.params.id, req.user!.id, requestedOrgId);
         if (!evidence) {
             res.status(404).json({ error: 'Evidence not found' });
             return;
@@ -88,7 +106,12 @@ router.get('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
 // Get data points linked to a specific evidence
 router.get('/:id/data-points', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const dataPoints = await EvidenceService.getDataPointsForEvidence(req.params.id);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const dataPoints = await EvidenceService.getDataPointsForEvidence(
+            req.params.id,
+            req.user!.id,
+            requestedOrgId
+        );
         res.json(dataPoints);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
@@ -99,7 +122,12 @@ router.get('/:id/data-points', authenticateUser, async (req: AuthenticatedReques
 // Get files for a specific evidence
 router.get('/:id/files', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const files = await EvidenceService.getFilesForEvidence(req.params.id);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const files = await EvidenceService.getFilesForEvidence(
+            req.params.id,
+            req.user!.id,
+            requestedOrgId
+        );
         res.json(files);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
@@ -125,7 +153,8 @@ router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
 // Phase 1 (full-access baseline): any team member of the org can delete.
 router.delete('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        await EvidenceService.delete(req.params.id, req.user!.id);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        await EvidenceService.delete(req.params.id, req.user!.id, requestedOrgId);
         res.status(204).send();
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });

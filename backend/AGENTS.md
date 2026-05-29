@@ -21,7 +21,7 @@
 
 1. **Auth** — Use existing `middleware/auth` (and related) for protected routes; do not bypass without an explicit product/security reason.
 2. **Admin** — Gate platform operations with `requireAdmin` (or equivalent) consistently with sibling admin routes.
-3. **Team permissions** — Respect `teamPermissions` middleware where initiatives/resources are team-scoped.
+3. **Team / tenant security** — `OrgAccessService` enforces organization membership in **services** (not routes). `X-Organization-Id` is a routing hint only. `PermissionService` handles business roles; owners always via `organizations.owner_id`, never `role_id`. Never use content `user_id` / `created_by` as authority. Denials: log internally (`permissionDenialLog`), return 404 externally.
 4. **Errors** — Return appropriate HTTP statuses and JSON messages consistent with neighboring routes; use existing error-handling style in the file you edit.
 5. **Types** — Prefer shared types from `src/types/index.ts` for request/response shapes; extend there when adding public contracts.
 

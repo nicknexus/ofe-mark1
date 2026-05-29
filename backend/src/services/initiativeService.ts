@@ -2,7 +2,7 @@ import { supabase } from '../utils/supabase';
 import { Initiative } from '../types';
 import { OrganizationService } from './organizationService';
 import { TeamService } from './teamService';
-import { PlatformAdminService } from './platformAdminService';
+import { OrgAccessService } from './orgAccessService';
 
 export class InitiativeService {
     /**
@@ -10,42 +10,17 @@ export class InitiativeService {
      * @param userId - The user's ID
      * @param requestedOrgId - Optional: specific org ID requested by the user
      */
+    /** Delegates to OrgAccessService — X-Organization-Id is a hint, not authority. */
     static async getEffectiveOrganizationId(userId: string, requestedOrgId?: string): Promise<string | null> {
-        if (requestedOrgId) {
-            const ownsRequested = await TeamService.isUserOwnerOfOrganization(userId, requestedOrgId);
-            if (ownsRequested) return requestedOrgId;
-
-            const membership = await TeamService.getUserTeamMembership(userId, requestedOrgId);
-            if (membership) return requestedOrgId;
-
-            // Platform admins can act inside any demo org (admin sandbox),
-            // even ones created by another admin.
-            const isAdmin = await PlatformAdminService.isAdmin(userId);
-            if (isAdmin) {
-                const { data: org } = await supabase
-                    .from('organizations')
-                    .select('id, is_demo')
-                    .eq('id', requestedOrgId)
-                    .maybeSingle();
-                if (org?.is_demo) return requestedOrgId;
-            }
-        }
-
-        const ownedOrg = await TeamService.getUserOwnedOrganization(userId);
-        if (ownedOrg) return ownedOrg.id;
-
-        const membership = await TeamService.getUserTeamMembership(userId);
-        if (membership) return membership.organization_id;
-
-        return null;
+        return OrgAccessService.resolveActiveOrganizationId(userId, requestedOrgId);
     }
 
     /**
      * Check if user is a shared member (part of a team they don't own)
      */
     static async isSharedMember(userId: string): Promise<boolean> {
-        const membership = await TeamService.getUserTeamMembership(userId);
-        return !!membership;
+        const memberships = await TeamService.getUserTeamMemberships(userId);
+        return memberships.length > 0;
     }
     // Generate slug from initiative title
     static generateSlug(title: string): string {

@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth'
 import { BeneficiaryService } from '../services/beneficiaryService'
+import { OrgAccessService } from '../services/orgAccessService'
 import { supabase } from '../utils/supabase'
 
 const router = Router()
@@ -55,7 +56,13 @@ router.delete('/:id', authenticateUser, async (req: AuthenticatedRequest, res) =
 router.post('/link-kpi-update', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const { kpi_update_id, beneficiary_group_ids } = req.body
-        const result = await BeneficiaryService.replaceLinksForUpdate(kpi_update_id, beneficiary_group_ids || [], req.user!.id)
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const result = await BeneficiaryService.replaceLinksForUpdate(
+            kpi_update_id,
+            beneficiary_group_ids || [],
+            req.user!.id,
+            requestedOrgId
+        )
         res.json(result)
     } catch (error) {
         res.status(500).json({ error: (error as Error).message })
@@ -149,9 +156,15 @@ router.post('/bulk-data-point-counts', authenticateUser, async (req: Authenticat
 // Get beneficiary groups linked to a KPI update
 router.get('/for-kpi-update/:updateId', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        // The kpi_update -> kpi -> initiative chain governs access. We rely on
-        // the caller already having access to the parent KPI update via the
-        // KPI/initiative routes; here we just return the linked groups.
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        try {
+            await OrgAccessService.assertKpiUpdateAccess(req.params.updateId, req.user!.id, requestedOrgId)
+        } catch (e) {
+            const status = (e as any).status || 404
+            res.status(status).json({ error: (e as Error).message })
+            return
+        }
+
         const { data, error } = await supabase
             .from('kpi_update_beneficiary_groups')
             .select(`
@@ -161,8 +174,6 @@ router.get('/for-kpi-update/:updateId', authenticateUser, async (req: Authentica
 
         if (error) throw new Error(`Failed to fetch linked beneficiary groups: ${error.message}`)
 
-        // Filter to groups whose initiative the caller can access.
-        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
         const accessibleGroups = await BeneficiaryService.getAll(req.user!.id, undefined, requestedOrgId)
         const accessibleIds = new Set(accessibleGroups.map(g => g.id))
 
@@ -184,7 +195,12 @@ router.post('/bulk-derived-locations', authenticateUser, async (req: Authenticat
             res.json({})
             return
         }
-        const result = await BeneficiaryService.getBulkDerivedLocations(group_ids)
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const result = await BeneficiaryService.getBulkDerivedLocations(
+            group_ids,
+            req.user!.id,
+            requestedOrgId
+        )
         res.json(result)
     } catch (error) {
         res.status(500).json({ error: (error as Error).message })

@@ -240,49 +240,40 @@ export class SubscriptionService {
      * Check if user has inherited access via team membership
      */
     static async checkInheritedAccess(userId: string): Promise<{ hasAccess: boolean; organizationId?: string }> {
-        // Check if user is a team member
-        const membership = await TeamService.getUserTeamMembership(userId);
-        if (!membership) {
-            return { hasAccess: false };
-        }
+        const memberships = await TeamService.getUserTeamMemberships(userId);
 
-        // Get organization owner's user ID
-        const ownerId = await TeamService.getOrganizationOwnerId(membership.organization_id);
-        if (!ownerId) {
-            return { hasAccess: false };
-        }
+        for (const membership of memberships) {
+            const ownerId = await TeamService.getOrganizationOwnerId(membership.organization_id);
+            if (!ownerId) continue;
 
-        // Check owner's subscription
-        const ownerSubscription = await this.getByUserId(ownerId);
-        if (!ownerSubscription) {
-            return { hasAccess: false };
-        }
+            const ownerSubscription = await this.getByUserId(ownerId);
+            if (!ownerSubscription) continue;
 
-        // Check if owner has active access
-        switch (ownerSubscription.status) {
-            case 'trial':
-                if (ownerSubscription.trial_ends_at && new Date(ownerSubscription.trial_ends_at) > new Date()) {
+            switch (ownerSubscription.status) {
+                case 'trial':
+                    if (ownerSubscription.trial_ends_at && new Date(ownerSubscription.trial_ends_at) > new Date()) {
+                        return { hasAccess: true, organizationId: membership.organization_id };
+                    }
+                    break;
+
+                case 'active':
+                    if (ownerSubscription.current_period_end && new Date(ownerSubscription.current_period_end) > new Date()) {
+                        return { hasAccess: true, organizationId: membership.organization_id };
+                    }
                     return { hasAccess: true, organizationId: membership.organization_id };
-                }
-                return { hasAccess: false };
 
-            case 'active':
-                if (ownerSubscription.current_period_end && new Date(ownerSubscription.current_period_end) > new Date()) {
-                    return { hasAccess: true, organizationId: membership.organization_id };
-                }
-                // Period might be ongoing (handled by webhooks)
-                return { hasAccess: true, organizationId: membership.organization_id };
+                case 'cancelled':
+                    if (ownerSubscription.current_period_end && new Date(ownerSubscription.current_period_end) > new Date()) {
+                        return { hasAccess: true, organizationId: membership.organization_id };
+                    }
+                    break;
 
-            case 'cancelled':
-                // Still active until period end
-                if (ownerSubscription.current_period_end && new Date(ownerSubscription.current_period_end) > new Date()) {
-                    return { hasAccess: true, organizationId: membership.organization_id };
-                }
-                return { hasAccess: false };
-
-            default:
-                return { hasAccess: false };
+                default:
+                    break;
+            }
         }
+
+        return { hasAccess: false };
     }
 
     /**

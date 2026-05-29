@@ -129,7 +129,12 @@ router.delete('/updates/:updateId', authenticateUser, async (req: AuthenticatedR
 // Get KPI evidence grouped by dates
 router.get('/:id/evidence-by-dates', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const evidenceByDates = await KPIService.getEvidenceByDates(req.params.id, req.user!.id);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const evidenceByDates = await KPIService.getEvidenceByDates(
+            req.params.id,
+            req.user!.id,
+            requestedOrgId
+        );
         res.json(evidenceByDates);
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });

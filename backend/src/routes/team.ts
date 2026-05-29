@@ -189,7 +189,7 @@ router.post('/invite/:id/resend', authenticateUser, async (req: AuthenticatedReq
         }
 
         // Resend (generates new token)
-        const invitation = await TeamService.resendInvitation(req.params.id);
+        const invitation = await TeamService.resendInvitation(req.params.id, org.id);
 
         // Send email
         const emailResult = await sendTeamInvitationEmail({
@@ -236,7 +236,7 @@ router.delete('/invite/:id', authenticateUser, async (req: AuthenticatedRequest,
             return;
         }
 
-        await TeamService.revokeInvitation(req.params.id);
+        await TeamService.revokeInvitation(req.params.id, org.id);
         res.status(204).send();
     } catch (error) {
         console.error('Error revoking invitation:', error);
@@ -332,7 +332,11 @@ router.put('/members/:id', authenticateUser, async (req: AuthenticatedRequest, r
             return;
         }
 
-        const member = await TeamService.updateMemberPermissions(req.params.id, { canAddImpactClaims, canEditEvidence });
+        const member = await TeamService.updateMemberPermissions(
+            req.params.id,
+            org.id,
+            { canAddImpactClaims, canEditEvidence }
+        );
         res.json(member);
     } catch (error) {
         console.error('Error updating member:', error);
@@ -353,7 +357,7 @@ router.delete('/members/:id', authenticateUser, async (req: AuthenticatedRequest
             return;
         }
 
-        await TeamService.removeMember(req.params.id);
+        await TeamService.removeMember(req.params.id, org.id);
         res.status(204).send();
     } catch (error) {
         console.error('Error removing member:', error);

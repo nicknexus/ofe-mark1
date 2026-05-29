@@ -104,7 +104,7 @@ router.get('/:id/dashboard', authenticateUser, async (req: AuthenticatedRequest,
         const [initiative, kpis, evidenceStats] = await Promise.all([
             InitiativeService.getById(req.params.id, req.user!.id, requestedOrgId),
             KPIService.getWithEvidence(req.user!.id, req.params.id, requestedOrgId),
-            EvidenceService.getEvidenceStats(req.params.id)
+            EvidenceService.getEvidenceStats(req.user!.id, requestedOrgId, req.params.id)
         ]);
 
         if (!initiative) {

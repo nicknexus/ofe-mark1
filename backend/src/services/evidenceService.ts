@@ -5,6 +5,7 @@ import { StorageService } from './storageService'
 import { BeneficiaryService } from './beneficiaryService'
 import { MetricTagService } from './metricTagService'
 import { InitiativeService } from './initiativeService'
+import { OrgAccessService } from './orgAccessService'
 
 export class EvidenceService {
     /**
@@ -31,6 +32,22 @@ export class EvidenceService {
     static async create(evidence: Evidence, userId: string, requestedOrgId?: string): Promise<Evidence> {
         // Extract linkage fields and file_urls/file_sizes before inserting into evidence table
         const { kpi_ids, kpi_update_ids, file_urls, file_sizes, location_ids, beneficiary_group_ids, tag_ids, ...evidenceData } = evidence as any;
+
+        if (!evidenceData.initiative_id) {
+            throw new Error('initiative_id is required');
+        }
+
+        await OrgAccessService.assertEvidenceLinkageConsistency(
+            evidenceData.initiative_id,
+            userId,
+            requestedOrgId,
+            {
+                kpi_ids: kpi_ids as string[] | undefined,
+                kpi_update_ids: kpi_update_ids as string[] | undefined,
+                location_ids: location_ids as string[] | undefined,
+                beneficiary_group_ids: beneficiary_group_ids as string[] | undefined,
+            }
+        );
 
         const { data, error } = await supabase
             .from('evidence')
@@ -154,7 +171,33 @@ export class EvidenceService {
         return { ...data, tag_ids: Array.isArray(tag_ids) ? tag_ids : [] };
     }
 
-    static async getAll(initiativeId?: string, kpiId?: string, beneficiaryGroupId?: string): Promise<Evidence[]> {
+    static async getAll(
+        userId: string,
+        requestedOrgId: string | undefined,
+        initiativeId?: string,
+        kpiId?: string,
+        beneficiaryGroupId?: string
+    ): Promise<Evidence[]> {
+        if (kpiId) {
+            await OrgAccessService.assertKpiAccess(kpiId, userId, requestedOrgId);
+        }
+        if (beneficiaryGroupId) {
+            const { data: group } = await supabase
+                .from('beneficiary_groups')
+                .select('initiative_id')
+                .eq('id', beneficiaryGroupId)
+                .maybeSingle();
+            if (!group?.initiative_id) return [];
+            await OrgAccessService.assertInitiativeAccess(group.initiative_id, userId, requestedOrgId);
+        }
+
+        const accessibleInitiativeIds = await OrgAccessService.getAccessibleInitiativeIds(userId, requestedOrgId);
+        if (accessibleInitiativeIds.length === 0) return [];
+
+        if (initiativeId) {
+            await OrgAccessService.assertInitiativeAccess(initiativeId, userId, requestedOrgId);
+        }
+
         let query;
 
         // Always pull `evidence_files` alongside the row so the dashboard
@@ -221,6 +264,8 @@ export class EvidenceService {
 
         if (initiativeId) {
             query = query.eq('initiative_id', initiativeId);
+        } else {
+            query = query.in('initiative_id', accessibleInitiativeIds);
         }
 
         const { data, error } = await query.order('created_at', { ascending: false });
@@ -254,7 +299,14 @@ export class EvidenceService {
         return transformedData.map((e: any) => ({ ...e, tag_ids: tagMap[e.id] || [] }));
     }
 
-    static async getById(id: string): Promise<Evidence | null> {
+    static async getById(id: string, userId: string, requestedOrgId?: string): Promise<Evidence | null> {
+        try {
+            await OrgAccessService.assertEvidenceAccess(id, userId, requestedOrgId);
+        } catch (e) {
+            if ((e as any).status === 404) return null;
+            throw e;
+        }
+
         const { data, error } = await supabase
             .from('evidence')
             .select(`
@@ -286,8 +338,27 @@ export class EvidenceService {
     }
 
     static async update(id: string, evidence: Partial<Evidence>, userId: string, requestedOrgId?: string): Promise<Evidence> {
+        const { initiativeId } = await OrgAccessService.assertEvidenceAccess(id, userId, requestedOrgId);
+
         // Extract linkage fields for separate handling
         const { kpi_ids, kpi_update_ids, location_ids, beneficiary_group_ids, tag_ids, ...evidenceData } = evidence as any;
+
+        const targetInitiativeId = evidenceData.initiative_id ?? initiativeId;
+        if (evidenceData.initiative_id && evidenceData.initiative_id !== initiativeId) {
+            await OrgAccessService.assertInitiativeAccess(evidenceData.initiative_id, userId, requestedOrgId);
+        }
+
+        await OrgAccessService.assertEvidenceLinkageConsistency(
+            targetInitiativeId,
+            userId,
+            requestedOrgId,
+            {
+                kpi_ids: kpi_ids as string[] | undefined,
+                kpi_update_ids: kpi_update_ids as string[] | undefined,
+                location_ids: location_ids as string[] | undefined,
+                beneficiary_group_ids: beneficiary_group_ids as string[] | undefined,
+            }
+        );
 
         // Get existing evidence to check if file_url is changing
         const { data: existingEvidence } = await supabase
@@ -501,10 +572,9 @@ export class EvidenceService {
         return data;
     }
 
-    static async delete(id: string, userId: string): Promise<void> {
-        // Get evidence record first to delete associated file and track storage
-        // Note: We don't filter by user_id here because the route middleware (requireOwnerPermission)
-        // already verifies the user is an org owner who can delete any evidence in their org
+    static async delete(id: string, userId: string, requestedOrgId?: string): Promise<void> {
+        await OrgAccessService.assertEvidenceAccess(id, userId, requestedOrgId);
+
         const { data: evidence, error: fetchError } = await supabase
             .from('evidence')
             .select('file_url, initiative_id')
@@ -557,8 +627,6 @@ export class EvidenceService {
             .delete()
             .eq('evidence_id', id);
 
-        // Delete evidence record
-        // Note: We don't filter by user_id - authorization is handled by route middleware
         const { error } = await supabase
             .from('evidence')
             .delete()
@@ -582,14 +650,17 @@ export class EvidenceService {
         return;
     }
 
-    static async getEvidenceStats(initiativeId?: string): Promise<Record<string, number>> {
+    static async getEvidenceStats(
+        userId: string,
+        requestedOrgId: string | undefined,
+        initiativeId: string
+    ): Promise<Record<string, number>> {
+        await OrgAccessService.assertInitiativeAccess(initiativeId, userId, requestedOrgId);
+
         let query = supabase
             .from('evidence')
-            .select('type');
-
-        if (initiativeId) {
-            query = query.eq('initiative_id', initiativeId);
-        }
+            .select('type')
+            .eq('initiative_id', initiativeId);
 
         const { data, error } = await query;
 
@@ -604,7 +675,13 @@ export class EvidenceService {
         return stats;
     }
 
-    static async getEvidenceForUpdate(updateId: string): Promise<Evidence[]> {
+    static async getEvidenceForUpdate(
+        updateId: string,
+        userId: string,
+        requestedOrgId?: string
+    ): Promise<Evidence[]> {
+        await OrgAccessService.assertKpiUpdateAccess(updateId, userId, requestedOrgId);
+
         const { data, error } = await supabase
             .from('evidence_kpi_updates')
             .select(`
@@ -642,7 +719,18 @@ export class EvidenceService {
         });
     }
 
-    static async getFilesForEvidence(evidenceId: string): Promise<any[]> {
+    static async getFilesForEvidence(
+        evidenceId: string,
+        userId: string,
+        requestedOrgId?: string
+    ): Promise<any[]> {
+        try {
+            await OrgAccessService.assertEvidenceAccess(evidenceId, userId, requestedOrgId);
+        } catch (e) {
+            if ((e as any).status === 404) return [];
+            throw e;
+        }
+
         const { data: evidence, error: evidenceError } = await supabase
             .from('evidence')
             .select('id, file_url, file_type')
@@ -692,7 +780,13 @@ export class EvidenceService {
         return files;
     }
 
-    static async getDataPointsForEvidence(evidenceId: string): Promise<any[]> {
+    static async getDataPointsForEvidence(
+        evidenceId: string,
+        userId: string,
+        requestedOrgId?: string
+    ): Promise<any[]> {
+        await OrgAccessService.assertEvidenceAccess(evidenceId, userId, requestedOrgId);
+
         const { data, error } = await supabase
             .from('evidence_kpi_updates')
             .select(`

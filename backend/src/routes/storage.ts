@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { StorageService, PLACEHOLDER_MAX_STORAGE_BYTES } from '../services/storageService';
+import { OrgAccessService } from '../services/orgAccessService';
 import { getCompressionStatus } from '../utils/imageCompression';
 
 const router = Router();
@@ -78,6 +79,8 @@ router.get('/usage/:organizationId', authenticateUser, async (req: Authenticated
             return;
         }
 
+        await OrgAccessService.assertOrgAccess(req.user.id, req.params.organizationId);
+
         const usage = await StorageService.getUsage(req.params.organizationId);
 
         res.json({
@@ -87,8 +90,9 @@ router.get('/usage/:organizationId', authenticateUser, async (req: Authenticated
         });
     } catch (error) {
         console.error('Storage usage error:', error);
+        const status = (error as any).status || 500;
         const errorMessage = error instanceof Error ? error.message : 'Failed to get storage usage';
-        res.status(500).json({ error: errorMessage });
+        res.status(status).json({ error: errorMessage });
     }
 });
 
@@ -99,6 +103,8 @@ router.post('/recalculate/:organizationId', authenticateUser, async (req: Authen
             res.status(401).json({ error: 'User not authenticated' });
             return;
         }
+
+        await OrgAccessService.assertOrgAccess(req.user.id, req.params.organizationId);
 
         const newTotal = await StorageService.recalculateStorage(req.params.organizationId);
 
