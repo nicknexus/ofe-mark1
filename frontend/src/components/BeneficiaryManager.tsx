@@ -316,7 +316,7 @@ function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiativeId }:
 }
 
 export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryClick, onMetricClick }: BeneficiaryManagerProps) {
-    const { canEditBeneficiaries, canDelete } = useTeam()
+    const { canEditBeneficiaries } = useTeam()
     const [groups, setGroups] = useState<BeneficiaryGroup[]>([])
     const [orderedGroups, setOrderedGroups] = useState<BeneficiaryGroup[]>([])
     const [loading, setLoading] = useState(true)
@@ -567,7 +567,7 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
                                             setDeleteConfirmGroup(group)
                                         }}
                                         canEdit={canEditBeneficiaries}
-                                        canDelete={canDelete}
+                                        canDelete={canEditBeneficiaries}
                                     />
                                 )
                             })}

@@ -2,6 +2,7 @@ import { supabase } from '../utils/supabase'
 import { BeneficiaryGroup } from '../types'
 import { InitiativeService } from './initiativeService'
 import { OrgAccessService } from './orgAccessService'
+import { PermissionService } from './permissionService'
 
 export class BeneficiaryService {
     /**
@@ -65,6 +66,9 @@ export class BeneficiaryService {
             const initiative = await InitiativeService.getById(group.initiative_id, userId, requestedOrgId)
             if (!initiative) throw new Error('Initiative not found or access denied')
         }
+        await PermissionService.assert(userId, requestedOrgId, 'beneficiaries', 'edit', {
+            initiativeId: group.initiative_id,
+        })
 
         // Get max display_order across the initiative (org-wide, not user-scoped).
         let maxOrder = 0
@@ -94,6 +98,10 @@ export class BeneficiaryService {
     static async update(id: string, updates: Partial<BeneficiaryGroup>, userId: string, requestedOrgId?: string): Promise<BeneficiaryGroup> {
         const access = await this.assertAccessByGroupId(id, userId, requestedOrgId)
         if (!access) throw new Error('Beneficiary group not found or access denied')
+        await PermissionService.assert(userId, requestedOrgId, 'beneficiaries', 'edit', {
+            resourceId: id,
+            initiativeId: access.initiative_id,
+        })
 
         const { data, error } = await supabase
             .from('beneficiary_groups')
@@ -107,9 +115,12 @@ export class BeneficiaryService {
     }
 
     static async delete(id: string, userId: string, requestedOrgId?: string): Promise<void> {
-        // Phase 1 (full-access baseline): any team member of the org can delete.
         const access = await this.assertAccessByGroupId(id, userId, requestedOrgId)
         if (!access) throw new Error('Beneficiary group not found or access denied')
+        await PermissionService.assert(userId, requestedOrgId, 'beneficiaries', 'edit', {
+            resourceId: id,
+            initiativeId: access.initiative_id,
+        })
 
         const { error } = await supabase
             .from('beneficiary_groups')

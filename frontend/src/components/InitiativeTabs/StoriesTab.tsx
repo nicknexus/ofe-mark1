@@ -19,7 +19,7 @@ interface StoriesTabProps {
 }
 
 export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: StoriesTabProps) {
-    const { canEditStories, canDelete } = useTeam()
+    const { canEditStories } = useTeam()
     const [stories, setStories] = useState<Story[]>([])
     const [loading, setLoading] = useState(false)
     const [locations, setLocations] = useState<Location[]>([])
@@ -596,7 +596,7 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                     }}
                     story={selectedStory}
                     onEdit={canEditStories ? handleEditStory : undefined}
-                    onDelete={canDelete ? setDeleteStoryId : undefined}
+                    onDelete={canEditStories ? setDeleteStoryId : undefined}
                 />
             )}
 

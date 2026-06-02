@@ -2,6 +2,7 @@ import { supabase } from '../utils/supabase'
 import { Story } from '../types'
 import { InitiativeService } from './initiativeService'
 import { MetricTagService } from './metricTagService'
+import { PermissionService } from './permissionService'
 
 export class StoryService {
     /**
@@ -160,6 +161,9 @@ export class StoryService {
             const initiative = await InitiativeService.getById(storyData.initiative_id, userId, requestedOrgId)
             if (!initiative) throw new Error('Initiative not found or access denied')
         }
+        await PermissionService.assert(userId, requestedOrgId, 'stories', 'edit', {
+            initiativeId: storyData.initiative_id,
+        })
 
         const { data: storyRecord, error: storyError } = await supabase
             .from('stories')
@@ -220,6 +224,10 @@ export class StoryService {
     static async update(id: string, updates: Partial<Story>, userId: string, requestedOrgId?: string): Promise<Story> {
         const access = await this.assertAccessByStoryId(id, userId, requestedOrgId)
         if (!access) throw new Error('Story not found or access denied')
+        await PermissionService.assert(userId, requestedOrgId, 'stories', 'edit', {
+            resourceId: id,
+            initiativeId: access.initiative_id,
+        })
 
         const { beneficiary_group_ids, location_ids, locations: _locs, location, tag_ids, ...storyData } = updates
 
@@ -282,9 +290,12 @@ export class StoryService {
     }
 
     static async delete(id: string, userId: string, requestedOrgId?: string): Promise<void> {
-        // Phase 1 (full-access baseline): any team member of the org can delete.
         const access = await this.assertAccessByStoryId(id, userId, requestedOrgId)
         if (!access) throw new Error('Story not found or access denied')
+        await PermissionService.assert(userId, requestedOrgId, 'stories', 'edit', {
+            resourceId: id,
+            initiativeId: access.initiative_id,
+        })
 
         const { error } = await supabase
             .from('stories')

@@ -30,7 +30,7 @@ interface MobileStoriesTabProps {
 }
 
 export default function MobileStoriesTab({ initiativeId, autoAdd }: MobileStoriesTabProps) {
-    const { canEditStories, canDelete } = useTeam()
+    const { canEditStories } = useTeam()
     const [stories, setStories] = useState<Story[]>([])
     const [loading, setLoading] = useState(true)
     const [showCreateFlow, setShowCreateFlow] = useState(!!autoAdd)
@@ -204,7 +204,7 @@ export default function MobileStoriesTab({ initiativeId, autoAdd }: MobileStorie
                     }}
                     story={selectedStory}
                     onEdit={canEditStories ? () => {} : undefined}
-                    onDelete={canDelete ? handleDeleteStory : undefined}
+                    onDelete={canEditStories ? handleDeleteStory : undefined}
                 />
             )}
         </div>
