@@ -55,12 +55,14 @@ import { Button } from '../components/ui/button'
 // to the backend (display_order) and reflected on the public org page.
 function SortableInitiativeCard({
     initiative,
-    canManageInitiatives,
+    canEditInitiatives,
+    canDeleteInitiatives,
     openEditModal,
     openDeleteConfirm,
 }: {
     initiative: Initiative
-    canManageInitiatives: boolean
+    canEditInitiatives: boolean
+    canDeleteInitiatives: boolean
     openEditModal: (i: Initiative) => void
     openDeleteConfirm: (i: Initiative) => void
 }) {
@@ -107,37 +109,41 @@ function SortableInitiativeCard({
                 </div>
             </Link>
 
-            {/* Edit/Delete buttons - top right (any team member). */}
-            {canManageInitiatives && (
+            {/* Edit/Delete buttons - top right, gated per granular permission. */}
+            {(canEditInitiatives || canDeleteInitiatives) && (
                 <div className="absolute top-2 right-8 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
-                    <button
-                        onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            openEditModal(initiative)
-                        }}
-                        className="p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
-                        title="Edit Initiative"
-                    >
-                        <Edit className="w-3 h-3 text-gray-500" />
-                    </button>
-                    <button
-                        onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            openDeleteConfirm(initiative)
-                        }}
-                        className="p-1.5 bg-white border border-red-200 rounded-lg shadow-sm hover:bg-red-50 hover:border-red-300 transition-all duration-200"
-                        title="Delete Initiative"
-                    >
-                        <Trash2 className="w-3 h-3 text-red-500" />
-                    </button>
+                    {canEditInitiatives && (
+                        <button
+                            onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                openEditModal(initiative)
+                            }}
+                            className="p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
+                            title="Edit Initiative"
+                        >
+                            <Edit className="w-3 h-3 text-gray-500" />
+                        </button>
+                    )}
+                    {canDeleteInitiatives && (
+                        <button
+                            onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                openDeleteConfirm(initiative)
+                            }}
+                            className="p-1.5 bg-white border border-red-200 rounded-lg shadow-sm hover:bg-red-50 hover:border-red-300 transition-all duration-200"
+                            title="Delete Initiative"
+                        >
+                            <Trash2 className="w-3 h-3 text-red-500" />
+                        </button>
+                    )}
                 </div>
             )}
 
             {/* Drag handle - bottom right, desktop only (MouseSensor excludes touch).
                 Hidden until hover so it doesn't fight the rest of the layout. */}
-            {canManageInitiatives && (
+            {canEditInitiatives && (
                 <button
                     type="button"
                     {...attributes}
@@ -348,15 +354,24 @@ function NextStepsCard({
 export default function Dashboard() {
     const navigate = useNavigate()
     const { startTutorial } = useTutorial()
-    const { isOwner, isSharedMember, organizationName, ownedOrganization, activeOrganization } = useTeam()
-    // Phase 1 (full-access baseline): team members see the full dashboard, including
-    // the right rail (Context Score / Next Steps / Tags). All of those read from
-    // activeOrganization so a team member sees the org they're scoped into, not a
-    // missing ownedOrganization.
+    const {
+        isOwner,
+        isSharedMember,
+        organizationName,
+        ownedOrganization,
+        activeOrganization,
+        canCreateInitiatives,
+        canEditInitiatives,
+        canDelete,
+        canEditLocations,
+    } = useTeam()
+    // Team members see the full dashboard, including the right rail (Context Score /
+    // Next Steps / Tags). Those read from activeOrganization so a team member sees the
+    // org they're scoped into, not a missing ownedOrganization.
     const dashboardOrg = activeOrganization || ownedOrganization
-    // Phase 1 (full-access baseline): any member of the active org can create/edit/delete
-    // initiatives. Account-level widgets (logo, branding, public toggle) remain owner-only.
-    const canManageInitiatives = isOwner || isSharedMember
+    // Granular gating: create / edit / delete are independent grants.
+    // Account-level widgets (logo, branding, public toggle) remain owner-only.
+    const canManageInitiatives = canEditInitiatives || canDelete || canCreateInitiatives
     const [initiatives, setInitiatives] = useState<Initiative[]>([])
     const [allKPIs, setAllKPIs] = useState<KPI[]>([])
     const [allLocations, setAllLocations] = useState<Location[]>([])
@@ -771,7 +786,7 @@ export default function Dashboard() {
                                         <GraduationCap className="w-4 h-4" />
                                         <span className="hidden sm:inline">Tutorial</span>
                                     </button>
-                                    {canManageInitiatives && (
+                                    {canCreateInitiatives && (
                                         <button
                                             onClick={() => setShowCreateModal(true)}
                                             className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-all duration-200 flex items-center gap-1.5 shadow-bubble-sm"
@@ -797,7 +812,7 @@ export default function Dashboard() {
                                                 ? `Your organization doesn't have any initiatives yet. Create the first one to start tracking impact.`
                                                 : 'Create your first initiative to start tracking impact.'}
                                         </p>
-                                        {canManageInitiatives && (
+                                        {canCreateInitiatives && (
                                             <button
                                                 onClick={() => setShowCreateModal(true)}
                                                 className="px-5 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-all duration-200 shadow-bubble-sm"
@@ -821,7 +836,8 @@ export default function Dashboard() {
                                                     <SortableInitiativeCard
                                                         key={initiative.id}
                                                         initiative={initiative}
-                                                        canManageInitiatives={canManageInitiatives}
+                                                        canEditInitiatives={canEditInitiatives}
+                                                        canDeleteInitiatives={canDelete}
                                                         openEditModal={openEditModal}
                                                         openDeleteConfirm={openDeleteConfirm}
                                                     />
@@ -854,14 +870,16 @@ export default function Dashboard() {
                                         <ExternalLink className="w-3 h-3" />
                                         <span>View All</span>
                                     </button>
-                                    <button
-                                        onClick={() => setShowAllLocationsModal(true)}
-                                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-xs font-medium transition-all shadow-bubble-sm"
-                                        title="Add location"
-                                    >
-                                        <Plus className="w-3 h-3" />
-                                        <span>Add</span>
-                                    </button>
+                                    {canEditLocations && (
+                                        <button
+                                            onClick={() => setShowAllLocationsModal(true)}
+                                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-xs font-medium transition-all shadow-bubble-sm"
+                                            title="Add location"
+                                        >
+                                            <Plus className="w-3 h-3" />
+                                            <span>Add</span>
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 

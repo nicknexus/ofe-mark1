@@ -17,6 +17,15 @@ import { apiService } from '../services/api'
 import { SubscriptionService } from '../services/subscription'
 import { TeamService, TeamMember, TeamInvitation, TeamCapacity } from '../services/team'
 import { useTeam } from '../context/TeamContext'
+import {
+    defaultTeamMemberToggles,
+    fullScope,
+    togglesToGrants,
+    validateTeamMemberInvite,
+    type MemberType,
+    type TeamMemberPermissionToggles,
+    type TeamMemberScope,
+} from '../types/teamPermissions'
 import { User } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 import toast from 'react-hot-toast'
@@ -33,7 +42,7 @@ import { WidgetTab } from '../components/account/WidgetTab'
 export default function AccountPage({ subscriptionStatus }: AccountPageOuterProps) {
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
-    const { isOwner, isSharedMember, organizationName, hasOwnOrganization, ownedOrganization: realOwnedOrganization, editableOrganization, loading: teamLoading, refreshPermissions } = useTeam()
+    const { isOwner, isSharedMember, canManageTeam, organizationName, hasOwnOrganization, ownedOrganization: realOwnedOrganization, editableOrganization, activeOrganization, loading: teamLoading, refreshPermissions } = useTeam()
     // `ownedOrganization` throughout this page refers to whichever org the user
     // is currently editing — their real org, or a demo if they're inside one.
     const ownedOrganization = editableOrganization || realOwnedOrganization
@@ -68,6 +77,9 @@ export default function AccountPage({ subscriptionStatus }: AccountPageOuterProp
     const [capacity, setCapacity] = useState<TeamCapacity | null>(null)
     const [teamLoading2, setTeamLoading2] = useState(true)
     const [inviteEmail, setInviteEmail] = useState('')
+    const [inviteMemberType, setInviteMemberType] = useState<MemberType>('admin')
+    const [invitePermissionToggles, setInvitePermissionToggles] = useState<TeamMemberPermissionToggles>(defaultTeamMemberToggles)
+    const [inviteScope, setInviteScope] = useState<TeamMemberScope>(fullScope)
     const [sending, setSending] = useState(false)
     const [removingMember, setRemovingMember] = useState<string | null>(null)
     const [resendingInvite, setResendingInvite] = useState<string | null>(null)
@@ -143,10 +155,10 @@ export default function AccountPage({ subscriptionStatus }: AccountPageOuterProp
     }, [])
 
     useEffect(() => {
-        if (hasOwnOrganization && activeTab === 'teams') {
+        if (canManageTeam && activeTab === 'teams') {
             loadTeamData()
         }
-    }, [hasOwnOrganization, activeTab])
+    }, [canManageTeam, activeTab])
 
     const loadTeamData = async () => {
         try {
@@ -245,12 +257,33 @@ export default function AccountPage({ subscriptionStatus }: AccountPageOuterProp
     const handleSendInvite = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!inviteEmail.trim()) { toast.error('Please enter an email address'); return }
+
+        if (inviteMemberType === 'team_member') {
+            const validationError = validateTeamMemberInvite(inviteMemberType, invitePermissionToggles, inviteScope)
+            if (validationError) {
+                toast.error(validationError)
+                return
+            }
+        }
+
         setSending(true)
         try {
-            const result = await TeamService.sendInvite(inviteEmail.trim())
+            const result = await TeamService.sendInvite({
+                email: inviteEmail.trim(),
+                memberType: inviteMemberType,
+                canAddImpactClaims: invitePermissionToggles.addImpactClaims,
+                permissions:
+                    inviteMemberType === 'team_member'
+                        ? togglesToGrants(invitePermissionToggles)
+                        : undefined,
+                scope: inviteMemberType === 'team_member' ? inviteScope : undefined,
+            })
             if (result.emailSent) toast.success(`Invitation sent to ${inviteEmail}`)
             else toast.success('Invitation created, but email could not be sent.')
             setInviteEmail('')
+            setInviteMemberType('admin')
+            setInvitePermissionToggles(defaultTeamMemberToggles)
+            setInviteScope(fullScope)
             loadTeamData()
         } catch (error) {
             toast.error((error as Error).message)
@@ -405,6 +438,7 @@ export default function AccountPage({ subscriptionStatus }: AccountPageOuterProp
                         <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-2 sticky top-28">
                             <nav className="space-y-1">
                                 {tabs.map((tab) => {
+                                    if (tab.id === 'teams' && !canManageTeam) return null
                                     if (tab.requiresOrg && !hasOwnOrganization) return null
                                     const showNotPublicIndicator = tab.id === 'account' && hasOwnOrganization && !ownedOrganization?.is_public
                                     return (
@@ -466,15 +500,21 @@ export default function AccountPage({ subscriptionStatus }: AccountPageOuterProp
                             />
                         )}
 
-                        {activeTab === 'teams' && hasOwnOrganization && (
+                        {activeTab === 'teams' && canManageTeam && (
                             <TeamsTab
-                                organizationName={organizationName}
+                                organizationName={activeOrganization?.name || organizationName}
                                 members={members}
                                 invitations={invitations}
                                 capacity={capacity}
                                 loading={teamLoading2}
                                 inviteEmail={inviteEmail}
                                 setInviteEmail={setInviteEmail}
+                                memberType={inviteMemberType}
+                                setMemberType={setInviteMemberType}
+                                permissionToggles={invitePermissionToggles}
+                                setPermissionToggles={setInvitePermissionToggles}
+                                inviteScope={inviteScope}
+                                setInviteScope={setInviteScope}
                                 sending={sending}
                                 handleSendInvite={handleSendInvite}
                                 removingMember={removingMember}
@@ -494,6 +534,7 @@ export default function AccountPage({ subscriptionStatus }: AccountPageOuterProp
                                     onConfirm: () => handleRevokeInvite(invitation),
                                 })}
                                 formatDate={formatDate}
+                                onTeamDataChanged={loadTeamData}
                             />
                         )}
 

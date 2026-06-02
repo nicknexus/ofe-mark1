@@ -49,6 +49,11 @@ export class EvidenceService {
             }
         );
 
+        const { PermissionService } = await import('./permissionService');
+        await PermissionService.assert(userId, requestedOrgId, 'evidence', 'create', {
+            initiativeId: evidenceData.initiative_id,
+        });
+
         const { data, error } = await supabase
             .from('evidence')
             .insert([{ ...evidenceData, user_id: userId }])
@@ -360,6 +365,12 @@ export class EvidenceService {
             }
         );
 
+        const { PermissionService } = await import('./permissionService');
+        await PermissionService.assert(userId, requestedOrgId, 'evidence', 'edit', {
+            resourceId: id,
+            initiativeId: targetInitiativeId,
+        });
+
         // Get existing evidence to check if file_url is changing
         const { data: existingEvidence } = await supabase
             .from('evidence')
@@ -573,7 +584,13 @@ export class EvidenceService {
     }
 
     static async delete(id: string, userId: string, requestedOrgId?: string): Promise<void> {
-        await OrgAccessService.assertEvidenceAccess(id, userId, requestedOrgId);
+        const { initiativeId } = await OrgAccessService.assertEvidenceAccess(id, userId, requestedOrgId);
+
+        const { PermissionService } = await import('./permissionService');
+        await PermissionService.assert(userId, requestedOrgId, 'evidence', 'delete', {
+            resourceId: id,
+            initiativeId,
+        });
 
         const { data: evidence, error: fetchError } = await supabase
             .from('evidence')

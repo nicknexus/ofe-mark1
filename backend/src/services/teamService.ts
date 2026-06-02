@@ -1,12 +1,32 @@
 import { supabase } from '../utils/supabase';
 import crypto from 'crypto';
 import { PlatformAdminService } from './platformAdminService';
+import {
+    legacyBooleansToGrants,
+    grantsAllow,
+    MemberType,
+    PermissionGrant,
+    TeamMemberScope,
+    FULL_SCOPE,
+    EMPTY_SCOPE,
+    normalizeScope,
+    normalizePermissionsBlob,
+} from '../constants/teamPermissionMatrix';
+import {
+    resolveInvitationMemberType,
+    resolveMemberType,
+    TeamMemberPermissionsService,
+    MemberCapabilities,
+    fullCapabilities,
+    noCapabilities,
+} from './teamMemberPermissionsService';
 
 export interface TeamInvitation {
     id: string;
     organization_id: string;
     email: string;
     invited_by: string;
+    member_type?: 'admin' | 'team_member' | null;
     token: string;
     status: 'pending' | 'accepted' | 'expired' | 'revoked';
     expires_at: string;
@@ -21,6 +41,7 @@ export interface TeamMember {
     id: string;
     organization_id: string;
     user_id: string;
+    member_type?: 'admin' | 'team_member' | null;
     can_add_impact_claims: boolean;
     can_edit_evidence: boolean;
     invited_by?: string;
@@ -45,14 +66,34 @@ export interface InviteDetails {
 export interface UserPermissions {
     isOwner: boolean;
     isSharedMember: boolean;
+    /** admin | team_member — existing members backfilled as admin */
+    memberType?: 'admin' | 'team_member';
+    isAdmin?: boolean;
     canAddImpactClaims: boolean;
+    canEditEvidence: boolean;
     canDelete: boolean;
+    /** Full granular capability set for frontend gating. */
+    capabilities?: MemberCapabilities;
+    /** team_member scope; owners/admins are unrestricted (FULL_SCOPE). */
+    scope?: TeamMemberScope;
     organizationId?: string;
     organizationName?: string;
 }
 
 const INVITE_EXPIRY_DAYS = 7;
 const DEFAULT_TEAM_MEMBERS_LIMIT = 5;
+
+/** Derive the two legacy boolean columns from a grant set (kept in sync for old code). */
+function legacyBooleansFromGrants(grants: PermissionGrant[]): {
+    can_add_impact_claims: boolean;
+    can_edit_evidence: boolean;
+} {
+    return {
+        can_add_impact_claims: grantsAllow(grants, 'impact_claims', 'create'),
+        can_edit_evidence:
+            grantsAllow(grants, 'evidence', 'edit') || grantsAllow(grants, 'evidence', 'create'),
+    };
+}
 
 export class TeamService {
     /**
@@ -477,7 +518,9 @@ export class TeamService {
                 isOwner: false,
                 isSharedMember: false,
                 canAddImpactClaims: false,
+                canEditEvidence: false,
                 canDelete: false,
+                capabilities: noCapabilities(),
             };
         }
 
@@ -492,21 +535,77 @@ export class TeamService {
                 isOwner: true,
                 isSharedMember: false,
                 canAddImpactClaims: true,
+                canEditEvidence: true,
                 canDelete: true,
+                capabilities: fullCapabilities(),
+                scope: { ...FULL_SCOPE },
                 organizationId: ctx.organizationId,
                 organizationName: org?.name,
             };
         }
 
-        // Phase 1: full operational access for team members until restriction phases.
+        const membership = await this.getUserTeamMembership(userId, ctx.organizationId);
+        if (!membership) {
+            return {
+                isOwner: false,
+                isSharedMember: false,
+                canAddImpactClaims: false,
+                canEditEvidence: false,
+                canDelete: false,
+                capabilities: noCapabilities(),
+            };
+        }
+
+        const memberType = resolveMemberType(membership.member_type);
+        const blob = normalizePermissionsBlob((membership as any).permissions);
+        const caps = TeamMemberPermissionsService.capabilitiesFromBlob(memberType, blob, {
+            canAddImpactClaims: membership.can_add_impact_claims,
+            canEditEvidence: membership.can_edit_evidence,
+        });
+
         return {
             isOwner: false,
             isSharedMember: true,
-            canAddImpactClaims: true,
-            canDelete: true,
+            memberType,
+            isAdmin: memberType === 'admin',
+            canAddImpactClaims: caps.canAddImpactClaims,
+            canEditEvidence: caps.canEditEvidence,
+            canDelete: caps.canDelete,
+            capabilities: caps,
+            // Admin = unrestricted; team_member = stored scope.
+            scope: memberType === 'admin' ? { ...FULL_SCOPE } : blob.scope,
             organizationId: ctx.organizationId,
             organizationName: org?.name,
         };
+    }
+
+    /**
+     * Org id the user may manage team for (owner or admin in active org context).
+     */
+    static async getOrganizationSummary(organizationId: string): Promise<{ id: string; name: string } | null> {
+        const { data, error } = await supabase
+            .from('organizations')
+            .select('id, name')
+            .eq('id', organizationId)
+            .maybeSingle();
+        if (error || !data) return null;
+        return data;
+    }
+
+    static async resolveTeamManagementOrganizationId(
+        userId: string,
+        requestedOrgId?: string
+    ): Promise<string | null> {
+        const { OrgAccessService } = await import('./orgAccessService');
+        const ctx = await OrgAccessService.resolveOrgContext(userId, requestedOrgId);
+        if (!ctx) return null;
+        if (ctx.isOwner) return ctx.organizationId;
+
+        const membership = await this.getUserTeamMembership(userId, ctx.organizationId);
+        if (membership && resolveMemberType(membership.member_type) === 'admin') {
+            return ctx.organizationId;
+        }
+        return null;
     }
 
     /**
@@ -516,8 +615,15 @@ export class TeamService {
         organizationId: string,
         email: string,
         invitedBy: string,
-        canAddImpactClaims: boolean = false
+        options: {
+            canAddImpactClaims?: boolean;
+            memberType?: MemberType;
+            permissions?: PermissionGrant[];
+            scope?: TeamMemberScope;
+        } = {}
     ): Promise<TeamInvitation> {
+        const canAddImpactClaims = options.canAddImpactClaims ?? false;
+        const memberType: MemberType = options.memberType ?? 'team_member';
         // Check team member limit
         const limitCheck = await this.canAddTeamMember(organizationId);
         if (!limitCheck.canAdd) {
@@ -573,6 +679,19 @@ export class TeamService {
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + INVITE_EXPIRY_DAYS);
 
+        // team_member: grants come from explicit permissions or legacy boolean fallback.
+        // admin: blob is irrelevant (capabilities fixed in code) → store empty.
+        const grants =
+            memberType === 'team_member'
+                ? options.permissions?.length
+                    ? options.permissions
+                    : legacyBooleansToGrants(canAddImpactClaims, false)
+                : [];
+        // Scope only applies to team_member; admins are unrestricted.
+        const scope: TeamMemberScope =
+            memberType === 'team_member' ? normalizeScope(options.scope) : { ...FULL_SCOPE };
+        const legacy = legacyBooleansFromGrants(grants);
+
         const { data, error } = await supabase
             .from('team_invitations')
             .insert([{
@@ -582,7 +701,10 @@ export class TeamService {
                 token,
                 status: 'pending',
                 expires_at: expiresAt.toISOString(),
-                can_add_impact_claims: canAddImpactClaims
+                // Legacy boolean kept in sync so the old deployed backend keeps working.
+                can_add_impact_claims: memberType === 'admin' ? true : legacy.can_add_impact_claims,
+                member_type: memberType,
+                permissions: { grants, scope },
             }])
             .select()
             .single();
@@ -783,6 +905,26 @@ export class TeamService {
             throw new Error('This organization has reached its team member limit. Contact the owner.');
         }
 
+        const memberType = resolveInvitationMemberType(invite.member_type);
+
+        // Snapshot the invitation's permissions blob (grants + scope). Fall back to
+        // legacy booleans for invites created before the JSONB column existed.
+        const inviteBlob = normalizePermissionsBlob(invite.permissions);
+        const grants =
+            memberType === 'admin'
+                ? []
+                : inviteBlob.grants.length > 0
+                    ? inviteBlob.grants
+                    : legacyBooleansToGrants(
+                          invite.can_add_impact_claims,
+                          invite.can_edit_evidence ?? false
+                      );
+        const scope: TeamMemberScope =
+            memberType === 'team_member'
+                ? (inviteBlob.scope ?? { ...FULL_SCOPE })
+                : { ...FULL_SCOPE };
+        const legacy = legacyBooleansFromGrants(grants);
+
         // Create team member record
         console.log(`[acceptInvitation] Creating team member for org: ${invite.organization_id}`);
         const { data: member, error: memberError } = await supabase
@@ -790,8 +932,12 @@ export class TeamService {
             .insert([{
                 organization_id: invite.organization_id,
                 user_id: userId,
-                can_add_impact_claims: invite.can_add_impact_claims,
-                invited_by: invite.invited_by
+                // Legacy booleans kept in sync for the old deployed backend.
+                can_add_impact_claims: memberType === 'admin' ? true : legacy.can_add_impact_claims,
+                can_edit_evidence: memberType === 'admin' ? true : legacy.can_edit_evidence,
+                member_type: memberType,
+                invited_by: invite.invited_by,
+                permissions: { grants, scope },
             }])
             .select()
             .single();
@@ -890,27 +1036,119 @@ export class TeamService {
     }
 
     /**
-     * Update team member permissions
+     * Update team member role and permission matrix.
      */
-    static async updateMemberPermissions(
+    static async updateTeamMember(
         memberId: string,
         organizationId: string,
-        updates: { canAddImpactClaims?: boolean; canEditEvidence?: boolean }
+        updates: {
+            memberType: MemberType;
+            permissions?: PermissionGrant[];
+            scope?: TeamMemberScope;
+        }
     ): Promise<TeamMember> {
         await this.assertMemberInOrganization(memberId, organizationId);
-        const updateData: Record<string, boolean> = {};
-        if (updates.canAddImpactClaims !== undefined) updateData.can_add_impact_claims = updates.canAddImpactClaims;
-        if (updates.canEditEvidence !== undefined) updateData.can_edit_evidence = updates.canEditEvidence;
+
+        const grants =
+            updates.memberType === 'team_member'
+                ? updates.permissions?.length
+                    ? updates.permissions
+                    : legacyBooleansToGrants(false, false)
+                : [];
+        const scope: TeamMemberScope =
+            updates.memberType === 'team_member' ? normalizeScope(updates.scope) : { ...FULL_SCOPE };
+        const legacy =
+            updates.memberType === 'admin'
+                ? { can_add_impact_claims: true, can_edit_evidence: true }
+                : legacyBooleansFromGrants(grants);
 
         const { data, error } = await supabase
             .from('team_members')
-            .update(updateData)
+            .update({
+                member_type: updates.memberType,
+                can_add_impact_claims: legacy.can_add_impact_claims,
+                can_edit_evidence: legacy.can_edit_evidence,
+                permissions: { grants, scope },
+            })
             .eq('id', memberId)
             .select()
             .single();
 
         if (error) {
             throw new Error(`Failed to update member: ${error.message}`);
+        }
+
+        return data;
+    }
+
+    /** @deprecated Use updateTeamMember — kept for backwards-compatible API clients */
+    static async updateMemberPermissions(
+        memberId: string,
+        organizationId: string,
+        updates: { canAddImpactClaims?: boolean; canEditEvidence?: boolean }
+    ): Promise<TeamMember> {
+        return this.updateTeamMember(memberId, organizationId, {
+            memberType: 'team_member',
+            permissions: legacyBooleansToGrants(
+                updates.canAddImpactClaims ?? false,
+                updates.canEditEvidence ?? false
+            ),
+        });
+    }
+
+    /**
+     * Update a pending invitation's role and permissions.
+     */
+    static async updatePendingInvitation(
+        invitationId: string,
+        organizationId: string,
+        updates: {
+            memberType: MemberType;
+            permissions?: PermissionGrant[];
+            scope?: TeamMemberScope;
+        }
+    ): Promise<TeamInvitation> {
+        await this.assertInvitationInOrganization(invitationId, organizationId);
+
+        const { data: invite, error: fetchError } = await supabase
+            .from('team_invitations')
+            .select('id, status')
+            .eq('id', invitationId)
+            .single();
+
+        if (fetchError || !invite) {
+            throw new Error('Invitation not found');
+        }
+        if (invite.status !== 'pending') {
+            throw new Error('Only pending invitations can be edited');
+        }
+
+        const grants =
+            updates.memberType === 'team_member'
+                ? updates.permissions?.length
+                    ? updates.permissions
+                    : legacyBooleansToGrants(false, false)
+                : [];
+        const scope: TeamMemberScope =
+            updates.memberType === 'team_member' ? normalizeScope(updates.scope) : { ...FULL_SCOPE };
+        const legacy =
+            updates.memberType === 'admin'
+                ? { can_add_impact_claims: true }
+                : legacyBooleansFromGrants(grants);
+
+        const { data, error } = await supabase
+            .from('team_invitations')
+            .update({
+                member_type: updates.memberType,
+                can_add_impact_claims: legacy.can_add_impact_claims,
+                permissions: { grants, scope },
+            })
+            .eq('id', invitationId)
+            .select()
+            .single();
+
+        if (error) {
+            throw new Error(`Failed to update invitation: ${error.message}`);
         }
 
         return data;

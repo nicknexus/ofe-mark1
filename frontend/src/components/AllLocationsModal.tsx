@@ -6,6 +6,7 @@ import LocationMap from './LocationMap'
 import LocationModal from './LocationModal'
 import ModalFrame from './ModalFrame'
 import ConfirmDialog from './ConfirmDialog'
+import { useTeam } from '../context/TeamContext'
 import toast from 'react-hot-toast'
 
 interface AllLocationsModalProps {
@@ -14,6 +15,7 @@ interface AllLocationsModalProps {
 }
 
 export default function AllLocationsModal({ isOpen, onClose }: AllLocationsModalProps) {
+    const { canEditLocations, canDelete } = useTeam()
     const [locations, setLocations] = useState<Location[]>([])
     const [loading, setLoading] = useState(false)
     const [search, setSearch] = useState('')
@@ -89,13 +91,15 @@ export default function AllLocationsModal({ isOpen, onClose }: AllLocationsModal
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => setIsCreateOpen(true)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl text-sm font-medium transition-all shadow-bubble-sm"
-                            >
-                                <Plus className="w-4 h-4" />
-                                Add Location
-                            </button>
+                            {canEditLocations && (
+                                <button
+                                    onClick={() => setIsCreateOpen(true)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl text-sm font-medium transition-all shadow-bubble-sm"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    Add Location
+                                </button>
+                            )}
                             <button
                                 onClick={onClose}
                                 className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
@@ -142,7 +146,7 @@ export default function AllLocationsModal({ isOpen, onClose }: AllLocationsModal
                                         <p className="text-sm text-gray-500 mb-3">
                                             {locations.length === 0 ? 'No locations yet' : 'No matches'}
                                         </p>
-                                        {locations.length === 0 && (
+                                        {locations.length === 0 && canEditLocations && (
                                             <button
                                                 onClick={() => setIsCreateOpen(true)}
                                                 className="text-sm text-primary-600 hover:text-primary-700 font-medium"
@@ -173,16 +177,18 @@ export default function AllLocationsModal({ isOpen, onClose }: AllLocationsModal
                                                         </p>
                                                     )}
                                                 </div>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        setDeleteConfirmId(loc.id || null)
-                                                    }}
-                                                    title="Delete (org-wide)"
-                                                    className="p-1 text-gray-400 hover:text-red-500 transition-colors rounded opacity-0 group-hover:opacity-100"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
+                                                {canDelete && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            setDeleteConfirmId(loc.id || null)
+                                                        }}
+                                                        title="Delete (org-wide)"
+                                                        className="p-1 text-gray-400 hover:text-red-500 transition-colors rounded opacity-0 group-hover:opacity-100"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     ))

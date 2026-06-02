@@ -58,7 +58,15 @@ const actions = [
 ]
 
 export default function MobileActionsTab({ initiatives, onAction }: MobileActionsTabProps) {
-    const { organizationName } = useTeam()
+    const { organizationName, canEditEvidence, canAddImpactClaims, canEditStories, canEditLocations } = useTeam()
+
+    const visibleActions = actions.filter((action) => {
+        if (action.id === 'evidence') return canEditEvidence
+        if (action.id === 'impact_claim') return canAddImpactClaims
+        if (action.id === 'story') return canEditStories
+        if (action.id === 'location') return canEditLocations
+        return true
+    })
     const [pendingAction, setPendingAction] = useState<ActionType | null>(null)
 
     const handleActionClick = (actionId: ActionType) => {
@@ -76,7 +84,7 @@ export default function MobileActionsTab({ initiatives, onAction }: MobileAction
         setPendingAction(null)
     }
 
-    const pendingActionMeta = pendingAction ? actions.find(a => a.id === pendingAction) : null
+    const pendingActionMeta = pendingAction ? visibleActions.find(a => a.id === pendingAction) : null
 
     return (
         <div className="min-h-screen">
@@ -109,7 +117,7 @@ export default function MobileActionsTab({ initiatives, onAction }: MobileAction
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-3">
-                        {actions.map((action) => {
+                        {visibleActions.map((action) => {
                             const Icon = action.icon
                             return (
                                 <button

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { cn } from '../lib/utils'
 
 interface ModalFrameProps {
@@ -19,6 +19,12 @@ export default function ModalFrame({
     paddingClassName = 'p-4',
     animate = true,
 }: ModalFrameProps) {
+    useEffect(() => {
+        const prev = document.body.style.overflow
+        document.body.style.overflow = 'hidden'
+        return () => { document.body.style.overflow = prev }
+    }, [])
+
     return (
         <div className={cn('fixed inset-0 flex items-center justify-center', paddingClassName, zIndexClass, backdropClassName, animate && 'animate-fade-in')}>
             <div className={cn(panelClassName, animate && 'animate-slide-up-fast')}>

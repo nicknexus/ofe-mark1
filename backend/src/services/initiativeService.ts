@@ -3,6 +3,7 @@ import { Initiative } from '../types';
 import { OrganizationService } from './organizationService';
 import { TeamService } from './teamService';
 import { OrgAccessService } from './orgAccessService';
+import { PermissionService } from './permissionService';
 
 export class InitiativeService {
     /**
@@ -50,6 +51,10 @@ export class InitiativeService {
             }
             organizationId = userOrg[0].id;
         }
+
+        // Capability gate: only members granted initiative creation may create.
+        // (Owners always pass; a user creating their very first org is its owner.)
+        await PermissionService.assert(userId, requestedOrgId, 'initiatives', 'create');
 
         // Generate slug from title
         let baseSlug = this.generateSlug(initiative.title);
@@ -139,7 +144,12 @@ export class InitiativeService {
             .order('created_at', { ascending: true });
 
         if (error) throw new Error(`Failed to fetch initiatives: ${error.message}`);
-        return data || [];
+        const initiatives = data || [];
+
+        // team_member scope: hide initiatives outside their allow-list.
+        const sr = await OrgAccessService.resolveScope(userId, requestedOrgId);
+        if (sr.unrestricted || sr.scope.allInitiatives) return initiatives;
+        return initiatives.filter((i: any) => sr.scope.initiativeIds.includes(i.id));
     }
 
     static async getById(id: string, userId: string, requestedOrgId?: string): Promise<Initiative | null> {
@@ -160,6 +170,14 @@ export class InitiativeService {
             if (error.code === 'PGRST116') return null;
             throw new Error(`Failed to fetch initiative: ${error.message}`);
         }
+        if (!data) return null;
+
+        // team_member scope: a scoped-out initiative reads as "not found" everywhere
+        // (KPI/evidence access authorize through this method).
+        const sr = await OrgAccessService.resolveScope(userId, requestedOrgId);
+        if (!sr.unrestricted && !sr.scope.allInitiatives && !sr.scope.initiativeIds.includes(id)) {
+            return null;
+        }
         return data;
     }
 
@@ -168,6 +186,11 @@ export class InitiativeService {
         if (!organizationId) {
             throw new Error('No organization context');
         }
+
+        await PermissionService.assert(userId, requestedOrgId, 'initiatives', 'edit', {
+            resourceId: id,
+            initiativeId: id,
+        });
 
         // If title is being updated, regenerate slug
         if (updates.title) {
@@ -216,6 +239,11 @@ export class InitiativeService {
         if (!organizationId) {
             throw new Error('No organization context');
         }
+
+        await PermissionService.assert(userId, requestedOrgId, 'initiatives', 'delete', {
+            resourceId: id,
+            initiativeId: id,
+        });
 
         const { error } = await supabase
             .from('initiatives')

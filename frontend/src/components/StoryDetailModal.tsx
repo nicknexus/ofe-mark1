@@ -10,8 +10,8 @@ interface StoryDetailModalProps {
     isOpen: boolean
     onClose: () => void
     story: Story | null
-    onEdit: (story: Story) => void
-    onDelete: (storyId: string) => void
+    onEdit?: (story: Story) => void
+    onDelete?: (storyId: string) => void
 }
 
 export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDelete }: StoryDetailModalProps) {
@@ -22,7 +22,7 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
 
     const handleDelete = () => {
         if (!story?.id) return
-        onDelete(story.id)
+        onDelete?.(story.id)
         setShowDeleteConfirm(false)
         onClose()
     }
@@ -196,23 +196,27 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
                     >
                         Close
                     </button>
-                    <button
-                        onClick={() => {
-                            onEdit(story)
-                            onClose()
-                        }}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-                    >
-                        <Edit className="w-4 h-4" />
-                        <span>Edit</span>
-                    </button>
-                    <button
-                        onClick={() => setShowDeleteConfirm(true)}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                        <span>Delete</span>
-                    </button>
+                    {onEdit && (
+                        <button
+                            onClick={() => {
+                                onEdit(story)
+                                onClose()
+                            }}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                        >
+                            <Edit className="w-4 h-4" />
+                            <span>Edit</span>
+                        </button>
+                    )}
+                    {onDelete && (
+                        <button
+                            onClick={() => setShowDeleteConfirm(true)}
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                            <span>Delete</span>
+                        </button>
+                    )}
                 </div>
         </ModalFrame>
         {showDeleteConfirm && (

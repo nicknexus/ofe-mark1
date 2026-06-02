@@ -25,7 +25,7 @@ export default function MobileMetricDetail({
     onDataPointClick,
     initiativeId
 }: MobileMetricDetailProps) {
-    const { canAddImpactClaims } = useTeam()
+    const { canAddImpactClaims, canEditEvidence } = useTeam()
     const [isEasyEvidenceOpen, setIsEasyEvidenceOpen] = useState(false)
     const [selectedClaim, setSelectedClaim] = useState<any>(null)
 
@@ -75,12 +75,14 @@ export default function MobileMetricDetail({
                     <h2 className="text-base font-semibold text-gray-800">
                         Impact Claims ({kpiUpdates.length})
                     </h2>
-                    <button
-                        onClick={onAddUpdate}
-                        className="p-2.5 bg-primary-500 text-white rounded-xl shadow-lg active:scale-95 transition-transform"
-                    >
-                        <Plus className="w-5 h-5" />
-                    </button>
+                    {canAddImpactClaims && (
+                        <button
+                            onClick={onAddUpdate}
+                            className="p-2.5 bg-primary-500 text-white rounded-xl shadow-lg active:scale-95 transition-transform"
+                        >
+                            <Plus className="w-5 h-5" />
+                        </button>
+                    )}
                 </div>
 
                 {kpiUpdates.length === 0 ? (
@@ -138,19 +140,20 @@ export default function MobileMetricDetail({
                                         </p>
                                     )}
                                 </div>
-                                {/* Add Evidence button */}
-                                <div className="px-4 pb-3 pt-0">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            openEasyEvidence(update)
-                                        }}
-                                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-evidence-50 text-evidence-600 rounded-xl text-sm font-medium border border-evidence-100 active:scale-[0.98] transition-transform"
-                                    >
-                                        <FileText className="w-4 h-4" />
-                                        <span>Add Evidence</span>
-                                    </button>
-                                </div>
+                                {canEditEvidence && (
+                                    <div className="px-4 pb-3 pt-0">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                openEasyEvidence(update)
+                                            }}
+                                            className="w-full flex items-center justify-center gap-2 py-2.5 bg-evidence-50 text-evidence-600 rounded-xl text-sm font-medium border border-evidence-100 active:scale-[0.98] transition-transform"
+                                        >
+                                            <FileText className="w-4 h-4" />
+                                            <span>Add Evidence</span>
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </>

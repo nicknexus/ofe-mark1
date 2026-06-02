@@ -23,16 +23,17 @@ import { CSS } from '@dnd-kit/utilities'
 import { apiService } from '../services/api'
 import { MetricTag } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { useTeam } from '../context/TeamContext'
 
 interface SortableTagRowProps {
     tag: MetricTag
     isEditing: boolean
     editName: string
     onEditNameChange: (v: string) => void
-    onStartEdit: () => void
+    onStartEdit?: () => void
     onSaveEdit: () => void
     onCancelEdit: () => void
-    onDelete: () => void
+    onDelete?: () => void
     dragDisabled: boolean
 }
 
@@ -111,22 +112,26 @@ function SortableTagRow({
                     </Link>
                 )}
             </div>
-            {!isEditing && (
+            {!isEditing && (onStartEdit || onDelete) && (
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                        onClick={onStartEdit}
-                        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
-                        title="Rename"
-                    >
-                        <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                        onClick={onDelete}
-                        className="p-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                        title="Delete"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
+                    {onStartEdit && (
+                        <button
+                            onClick={onStartEdit}
+                            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+                            title="Rename"
+                        >
+                            <Edit2 className="w-4 h-4" />
+                        </button>
+                    )}
+                    {onDelete && (
+                        <button
+                            onClick={onDelete}
+                            className="p-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                            title="Delete"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    )}
                 </div>
             )}
         </div>
@@ -135,6 +140,7 @@ function SortableTagRow({
 
 export default function AllTagsPage() {
     const navigate = useNavigate()
+    const { canEditTags, canDelete } = useTeam()
     const [tags, setTags] = useState<MetricTag[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
@@ -220,9 +226,10 @@ export default function AllTagsPage() {
 
     // Drag is disabled while a search filter is active — reordering a filtered
     // subset would shuffle the underlying list in confusing ways.
-    const dragDisabled = search.trim().length > 0
+    const dragDisabled = search.trim().length > 0 || !canEditTags
 
     const handleDragEnd = async (event: DragEndEvent) => {
+        if (!canEditTags) return
         const { active, over } = event
         if (!over || active.id === over.id) return
 
@@ -268,14 +275,16 @@ export default function AllTagsPage() {
                                 </p>
                             </div>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => setShowInput(s => !s)}
-                            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors flex-shrink-0"
-                        >
-                            <Plus className="w-4 h-4" />
-                            New tag
-                        </button>
+                        {canEditTags && (
+                            <button
+                                type="button"
+                                onClick={() => setShowInput(s => !s)}
+                                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors flex-shrink-0"
+                            >
+                                <Plus className="w-4 h-4" />
+                                New tag
+                            </button>
+                        )}
                     </div>
 
                     {showInput && (
@@ -343,10 +352,10 @@ export default function AllTagsPage() {
                                             isEditing={editingId === tag.id}
                                             editName={editName}
                                             onEditNameChange={setEditName}
-                                            onStartEdit={() => { setEditingId(tag.id); setEditName(tag.name) }}
+                                            onStartEdit={canEditTags ? () => { setEditingId(tag.id); setEditName(tag.name) } : undefined}
                                             onSaveEdit={() => saveEdit(tag.id)}
                                             onCancelEdit={() => setEditingId(null)}
-                                            onDelete={() => requestRemove(tag)}
+                                            onDelete={canDelete ? () => requestRemove(tag) : undefined}
                                             dragDisabled={dragDisabled}
                                         />
                                     ))}

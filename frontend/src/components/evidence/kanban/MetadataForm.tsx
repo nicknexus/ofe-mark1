@@ -7,6 +7,7 @@ import LocationModal from '../../LocationModal'
 import TagPicker from '../../MetricTags/TagPicker'
 import { apiService } from '../../../services/api'
 import { getLocalDateString } from '../../../utils'
+import { useTeam } from '../../../context/TeamContext'
 import toast from 'react-hot-toast'
 
 export interface MetadataFormHandle {
@@ -49,9 +50,11 @@ export default function MetadataForm({
     titleRequired = true,
     extraHeader,
 }: MetadataFormProps) {
+    const { canAccessLocation, canEditLocations } = useTeam()
     const [metadata, setMetadata] = useState<GroupMetadata>(initialMetadata)
     const [dateValue, setDateValue] = useState<{ singleDate?: string; startDate?: string; endDate?: string }>({})
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
+    const visibleLocations = locations.filter((l) => !l.id || canAccessLocation(l.id))
 
     useEffect(() => {
         setMetadata(initialMetadata)
@@ -157,20 +160,22 @@ export default function MetadataForm({
                 label={`Locations (${metadata.location_ids.length})`}
                 required
                 action={
-                    <button
-                        type="button"
-                        onClick={() => setIsLocationModalOpen(true)}
-                        className="text-xs inline-flex items-center gap-1 px-2 py-1 border border-gray-200 rounded-md hover:bg-gray-50 text-gray-700"
-                    >
-                        <Plus className="w-3 h-3" /> New
-                    </button>
+                    canEditLocations ? (
+                        <button
+                            type="button"
+                            onClick={() => setIsLocationModalOpen(true)}
+                            className="text-xs inline-flex items-center gap-1 px-2 py-1 border border-gray-200 rounded-md hover:bg-gray-50 text-gray-700"
+                        >
+                            <Plus className="w-3 h-3" /> New
+                        </button>
+                    ) : undefined
                 }
             >
-                {locations.length === 0 ? (
-                    <EmptyHint text="No locations yet — create one." />
+                {visibleLocations.length === 0 ? (
+                    <EmptyHint text="No locations available." />
                 ) : (
                     <CheckboxGrid
-                        items={locations.map(l => ({ id: l.id!, label: l.name }))}
+                        items={visibleLocations.map(l => ({ id: l.id!, label: l.name }))}
                         selected={metadata.location_ids}
                         onToggle={id => toggleArray('location_ids', id)}
                     />

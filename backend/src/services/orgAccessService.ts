@@ -2,6 +2,22 @@ import { supabase } from '../utils/supabase';
 import { TeamService } from './teamService';
 import { PlatformAdminService } from './platformAdminService';
 import { logPermissionDenial, PermissionDenialEntry } from '../utils/permissionDenialLog';
+import { resolveMemberType } from './teamMemberPermissionsService';
+import {
+    TeamMemberScope,
+    FULL_SCOPE,
+    EMPTY_SCOPE,
+    normalizePermissionsBlob,
+    scopeAllowsInitiative,
+    scopeAllowsLocation,
+} from '../constants/teamPermissionMatrix';
+
+export interface ScopeResolution {
+    /** Owner or admin → no scope restriction. */
+    unrestricted: boolean;
+    organizationId: string | null;
+    scope: TeamMemberScope;
+}
 
 export interface ResolvedOrgContext {
     organizationId: string;
@@ -26,6 +42,34 @@ export class OrgAccessService {
         const err = new Error(message);
         (err as any).status = 404;
         return err;
+    }
+
+    /** User-facing message for in-org capability denials (resource exists, member lacks the grant). */
+    static readonly CAPABILITY_DENIED_MESSAGE =
+        "You don't have permission to do this. Ask an owner or admin of this organization to grant you access.";
+
+    /**
+     * Capability denial within the user's own org: log, then throw a 403 with a
+     * friendly message. Unlike `deny` (404, used to hide foreign/IDOR resources),
+     * this is safe to surface because the resource is in the caller's org.
+     */
+    static denyCapability(params: DenyParams): never {
+        logPermissionDenial({
+            kind: params.kind,
+            userId: params.userId,
+            requestedOrgId: params.requestedOrgId,
+            resolvedOrgId: params.resolvedOrgId,
+            organizationId: params.organizationId,
+            resource: params.resource,
+            resourceId: params.resourceId,
+            action: params.action,
+            reason: params.reason,
+            detail: params.detail,
+        });
+        const err = new Error(params.message ?? OrgAccessService.CAPABILITY_DENIED_MESSAGE);
+        (err as any).status = 403;
+        (err as any).code = 'permission_denied';
+        throw err;
     }
 
     /** Log internally, then throw 404. */
@@ -111,6 +155,30 @@ export class OrgAccessService {
         return ctx?.organizationId ?? null;
     }
 
+    /**
+     * Resolve the caller's initiative/location scope for the active org.
+     * Owners and admins are unrestricted. team_members carry an explicit,
+     * fail-closed scope stored in team_members.permissions.scope.
+     */
+    static async resolveScope(userId: string, requestedOrgId?: string): Promise<ScopeResolution> {
+        const ctx = await this.resolveOrgContext(userId, requestedOrgId);
+        if (!ctx) {
+            return { unrestricted: false, organizationId: null, scope: { ...EMPTY_SCOPE } };
+        }
+        if (ctx.isOwner) {
+            return { unrestricted: true, organizationId: ctx.organizationId, scope: { ...FULL_SCOPE } };
+        }
+        const membership = await TeamService.getUserTeamMembership(userId, ctx.organizationId);
+        if (!membership) {
+            return { unrestricted: false, organizationId: ctx.organizationId, scope: { ...EMPTY_SCOPE } };
+        }
+        if (resolveMemberType(membership.member_type) === 'admin') {
+            return { unrestricted: true, organizationId: ctx.organizationId, scope: { ...FULL_SCOPE } };
+        }
+        const blob = normalizePermissionsBlob((membership as any).permissions);
+        return { unrestricted: false, organizationId: ctx.organizationId, scope: blob.scope };
+    }
+
     static async assertOrgContext(
         userId: string,
         requestedOrgId?: string
@@ -174,6 +242,20 @@ export class OrgAccessService {
                 resource: 'initiatives',
                 resourceId: initiativeId,
                 reason: 'initiative_not_in_active_org',
+            });
+        }
+        // team_member scope: initiative must be in their allow-list.
+        const sr = await this.resolveScope(userId, requestedOrgId);
+        if (!sr.unrestricted && !scopeAllowsInitiative(sr.scope, initiativeId)) {
+            this.deny({
+                kind: 'org_access',
+                userId,
+                requestedOrgId,
+                resolvedOrgId: ctx.organizationId,
+                organizationId: row.organization_id,
+                resource: 'initiatives',
+                resourceId: initiativeId,
+                reason: 'initiative_out_of_scope',
             });
         }
         return { organizationId: ctx.organizationId, initiativeId };
@@ -296,6 +378,19 @@ export class OrgAccessService {
                 resource: 'locations',
                 resourceId: locationId,
                 reason: 'location_org_mismatch',
+            });
+        }
+        // team_member location scope (optional narrowing within scoped initiatives).
+        const sr = await this.resolveScope(userId, requestedOrgId);
+        if (!sr.unrestricted && !scopeAllowsLocation(sr.scope, locationId)) {
+            this.deny({
+                kind: 'resource_chain',
+                userId,
+                requestedOrgId,
+                resolvedOrgId: organizationId,
+                resource: 'locations',
+                resourceId: locationId,
+                reason: 'location_out_of_scope',
             });
         }
     }
@@ -434,6 +529,21 @@ export class OrgAccessService {
             .select('id')
             .eq('organization_id', ctx.organizationId);
         if (error) throw new Error(`Failed to list initiatives: ${error.message}`);
-        return (data ?? []).map((r: { id: string }) => r.id).filter(Boolean);
+        const allIds = (data ?? []).map((r: { id: string }) => r.id).filter(Boolean);
+
+        const sr = await this.resolveScope(userId, requestedOrgId);
+        if (sr.unrestricted || sr.scope.allInitiatives) return allIds;
+        return allIds.filter((id) => sr.scope.initiativeIds.includes(id));
+    }
+
+    /** Filter an arbitrary set of initiative ids down to what the caller may access. */
+    static async filterInitiativeIdsByScope(
+        userId: string,
+        requestedOrgId: string | undefined,
+        initiativeIds: string[]
+    ): Promise<string[]> {
+        const sr = await this.resolveScope(userId, requestedOrgId);
+        if (sr.unrestricted || sr.scope.allInitiatives) return initiativeIds;
+        return initiativeIds.filter((id) => sr.scope.initiativeIds.includes(id));
     }
 }

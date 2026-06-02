@@ -53,6 +53,7 @@ interface DataPointWithEvidence extends KPIUpdate {
 }
 
 function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
+    const { canEditEvidence, canDelete } = useTeam()
     const [expandedPoints, setExpandedPoints] = useState<string[]>([])
     const [dataPointsWithEvidence, setDataPointsWithEvidence] = useState<DataPointWithEvidence[]>([])
     const [loading, setLoading] = useState(false)
@@ -320,26 +321,30 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
                                                                     <ExternalLink className="w-3 h-3" />
                                                                 </div>
                                                             )}
-                                                            <button
-                                                                className="text-gray-400 hover:text-gray-600"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation()
-                                                                    handleEditEvidence(evidence)
-                                                                }}
-                                                                title="Edit Evidence"
-                                                            >
-                                                                <Edit className="w-3 h-3" />
-                                                            </button>
-                                                            <button
-                                                                className="text-gray-400 hover:text-red-600"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation()
-                                                                    setDeleteConfirmEvidence(evidence)
-                                                                }}
-                                                                title="Delete Evidence"
-                                                            >
-                                                                <Trash2 className="w-3 h-3" />
-                                                            </button>
+                                                            {canEditEvidence && (
+                                                                <button
+                                                                    className="text-gray-400 hover:text-gray-600"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        handleEditEvidence(evidence)
+                                                                    }}
+                                                                    title="Edit Evidence"
+                                                                >
+                                                                    <Edit className="w-3 h-3" />
+                                                                </button>
+                                                            )}
+                                                            {canDelete && (
+                                                                <button
+                                                                    className="text-gray-400 hover:text-red-600"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        setDeleteConfirmEvidence(evidence)
+                                                                    }}
+                                                                    title="Delete Evidence"
+                                                                >
+                                                                    <Trash2 className="w-3 h-3" />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 ))}
@@ -393,15 +398,15 @@ function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
                 isOpen={isEvidencePreviewOpen}
                 onClose={() => setIsEvidencePreviewOpen(false)}
                 evidence={selectedEvidence}
-                onEdit={(evidence) => {
+                onEdit={canEditEvidence ? (evidence) => {
                     setSelectedEvidence(evidence)
                     setIsEvidencePreviewOpen(false)
                     setIsEditEvidenceModalOpen(true)
-                }}
-                onDelete={(evidence) => {
+                } : undefined}
+                onDelete={canDelete ? (evidence) => {
                     setDeleteConfirmEvidence(evidence)
                     setIsEvidencePreviewOpen(false)
-                }}
+                } : undefined}
             />
 
             {/* Edit Data Point Beneficiaries Modal */}

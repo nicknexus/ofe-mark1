@@ -141,11 +141,10 @@ function normalizeTitledList<T extends { id: string; title: string; description:
 }
 
 export default function OrgContextPage() {
-    const { activeOrganization, loading: teamLoading } = useTeam()
+    const { activeOrganization, loading: teamLoading, canEditOrgContext } = useTeam()
     const orgId = activeOrganization?.id
-    // Phase 1 (full-access baseline): any member of the active org can edit
-    // the organization context. Phase 7 may reintroduce gating.
-    const canEditContext = !!activeOrganization
+    // Org context editing is owner/admin only (no team_member grant for org_context:edit).
+    const canEditContext = !!activeOrganization && canEditOrgContext
 
     const [featuredVideoUrl, setFeaturedVideoUrl] = useState('')
     const [initialFeaturedVideoUrl, setInitialFeaturedVideoUrl] = useState('')

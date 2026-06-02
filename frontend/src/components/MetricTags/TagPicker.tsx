@@ -3,6 +3,7 @@ import { Plus, Tag as TagIcon, Loader2 } from 'lucide-react'
 import { MetricTag } from '../../types'
 import { apiService } from '../../services/api'
 import TagChip from './TagChip'
+import { useTeam } from '../../context/TeamContext'
 import toast from 'react-hot-toast'
 
 interface TagPickerProps {
@@ -55,8 +56,9 @@ export default function TagPicker({
     const [creating, setCreating] = useState(false)
     const [newName, setNewName] = useState('')
     const [showCreateInput, setShowCreateInput] = useState(false)
+    const { canEditTags } = useTeam()
 
-    const allowCreate = canCreate ?? (mode === 'multi')
+    const allowCreate = (canCreate ?? (mode === 'multi')) && canEditTags
 
     useEffect(() => {
         let active = true

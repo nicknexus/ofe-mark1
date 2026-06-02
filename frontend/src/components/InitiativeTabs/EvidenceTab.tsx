@@ -12,6 +12,7 @@ import AddEvidenceModal from '../AddEvidenceModal'
 import EvidenceUploadModal from '../evidence/EvidenceUploadModal'
 import ConfirmDialog from '../ConfirmDialog'
 import toast from 'react-hot-toast'
+import { useTeam } from '../../context/TeamContext'
 
 interface EvidenceTabProps {
     initiativeId: string
@@ -19,6 +20,7 @@ interface EvidenceTabProps {
 }
 
 export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProps) {
+    const { canEditEvidence, canDelete } = useTeam()
     const [evidence, setEvidence] = useState<Evidence[]>([])
     const [loading, setLoading] = useState(false)
     const [locations, setLocations] = useState<Location[]>([])
@@ -396,17 +398,19 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                         <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Evidence</h2>
                         <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">View and manage all evidence uploaded for this initiative</p>
                     </div>
-                    <button
-                        onClick={() => {
-                            setEditingEvidence(null)
-                            setIsAddModalOpen(true)
-                        }}
-                        className="flex items-center space-x-2 px-4 sm:px-5 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25 active:scale-95"
-                    >
-                        <Plus className="w-4 sm:w-4 h-4 sm:h-4" />
-                        <span className="hidden sm:inline">Add Evidence</span>
-                        <span className="sm:hidden">Add</span>
-                    </button>
+                    {canEditEvidence && (
+                        <button
+                            onClick={() => {
+                                setEditingEvidence(null)
+                                setIsAddModalOpen(true)
+                            }}
+                            className="flex items-center space-x-2 px-4 sm:px-5 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25 active:scale-95"
+                        >
+                            <Plus className="w-4 sm:w-4 h-4 sm:h-4" />
+                            <span className="hidden sm:inline">Add Evidence</span>
+                            <span className="sm:hidden">Add</span>
+                        </button>
+                    )}
                 </div>
 
                 {/* Search Bar - hidden on mobile */}
@@ -865,7 +869,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                 ? 'Try adjusting your filters or search query'
                                 : 'Add your first evidence to support your impact claims'}
                         </p>
-                        {!hasActiveFilters && !searchQuery && (
+                        {!hasActiveFilters && !searchQuery && canEditEvidence && (
                             <button
                                 onClick={() => {
                                     setEditingEvidence(null)
@@ -967,16 +971,18 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                                             >
                                                 <Eye className="w-4 h-4" />
                                             </button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    handleEditEvidence(ev)
-                                                }}
-                                                className="p-1.5 text-gray-400 hover:text-evidence-400 rounded-lg hover:bg-evidence-50 transition-all duration-200 opacity-0 group-hover:opacity-100"
-                                                title="Edit"
-                                            >
-                                                <Edit className="w-4 h-4" />
-                                            </button>
+                                            {canEditEvidence && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleEditEvidence(ev)
+                                                    }}
+                                                    className="p-1.5 text-gray-400 hover:text-evidence-400 rounded-lg hover:bg-evidence-50 transition-all duration-200 opacity-0 group-hover:opacity-100"
+                                                    title="Edit"
+                                                >
+                                                    <Edit className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 )
@@ -1106,8 +1112,8 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
                         setSelectedEvidence(null)
                     }}
                     evidence={selectedEvidence}
-                    onEdit={handleEditEvidence}
-                    onDelete={setDeleteEvidence}
+                    onEdit={canEditEvidence ? handleEditEvidence : undefined}
+                    onDelete={canDelete ? setDeleteEvidence : undefined}
                     onDataPointClick={(dataPoint, kpi) => {
                         setSelectedDataPoint(dataPoint)
                         setSelectedDataPointKpi(kpi)

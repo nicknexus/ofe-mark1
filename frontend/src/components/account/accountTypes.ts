@@ -5,7 +5,9 @@ import type {
     TeamMember,
     TeamInvitation,
     TeamCapacity,
+    MemberType,
 } from '../../services/team'
+import type { TeamMemberPermissionToggles, TeamMemberScope } from '../../types/teamPermissions'
 
 export interface StorageUsage {
     storage_used_bytes: number
@@ -76,6 +78,12 @@ export type TeamsTabProps = {
     loading: boolean
     inviteEmail: string
     setInviteEmail: Dispatch<SetStateAction<string>>
+    memberType: MemberType
+    setMemberType: Dispatch<SetStateAction<MemberType>>
+    permissionToggles: TeamMemberPermissionToggles
+    setPermissionToggles: Dispatch<SetStateAction<TeamMemberPermissionToggles>>
+    inviteScope: TeamMemberScope
+    setInviteScope: Dispatch<SetStateAction<TeamMemberScope>>
     sending: boolean
     handleSendInvite: (e: FormEvent) => Promise<void>
     removingMember: string | null
@@ -85,6 +93,7 @@ export type TeamsTabProps = {
     handleResendInvite: (invitation: TeamInvitation) => Promise<void>
     handleRevokeInvite: (invitation: TeamInvitation) => void
     formatDate: (d: string | Date) => string
+    onTeamDataChanged: () => void
 }
 
 export type BrandingTabProps = {

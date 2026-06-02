@@ -22,8 +22,7 @@ export default function MobileDashboard({
     loading,
     onNavigateToAccount
 }: MobileDashboardProps) {
-    const { isOwner, isSharedMember, organizationName } = useTeam()
-    const canManageInitiatives = isOwner || isSharedMember
+    const { isSharedMember, organizationName, canCreateInitiatives, canEditInitiatives, canDelete } = useTeam()
     const [showCreateModal, setShowCreateModal] = useState(false)
     const [showEditModal, setShowEditModal] = useState(false)
     const [editingInitiative, setEditingInitiative] = useState<Initiative | null>(null)
@@ -124,8 +123,8 @@ export default function MobileDashboard({
                 </p>
             </div>
 
-            {/* Create Button - any org member */}
-            {canManageInitiatives && (
+            {/* Create Button */}
+            {canCreateInitiatives && (
                 <button
                     onClick={() => setShowCreateModal(true)}
                     className="w-full mb-6 flex items-center justify-center gap-2 px-4 py-4 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-semibold text-base transition-colors shadow-lg shadow-primary-500/25 active:scale-[0.98]"
@@ -179,8 +178,8 @@ export default function MobileDashboard({
                                     <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
                                 </button>
 
-                                {/* Settings menu - any org member */}
-                                {canManageInitiatives && (
+                                {/* Settings menu */}
+                                {(canEditInitiatives || canDelete) && (
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation()
@@ -213,27 +212,31 @@ export default function MobileDashboard({
                                 <p className="text-sm font-semibold text-gray-800 truncate">{initiative.title}</p>
                             </div>
                             <div className="py-1">
-                                <button
-                                    onClick={() => {
-                                        setEditingInitiative(initiative)
-                                        setShowEditModal(true)
-                                        setOpenMenuId(null)
-                                    }}
-                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors"
-                                >
-                                    <Edit className="w-4 h-4 text-gray-400" />
-                                    Edit Initiative
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setDeleteConfirmInitiative(initiative)
-                                        setOpenMenuId(null)
-                                    }}
-                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 active:bg-red-100 transition-colors"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                    Delete
-                                </button>
+                                {canEditInitiatives && (
+                                    <button
+                                        onClick={() => {
+                                            setEditingInitiative(initiative)
+                                            setShowEditModal(true)
+                                            setOpenMenuId(null)
+                                        }}
+                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                                    >
+                                        <Edit className="w-4 h-4 text-gray-400" />
+                                        Edit Initiative
+                                    </button>
+                                )}
+                                {canDelete && (
+                                    <button
+                                        onClick={() => {
+                                            setDeleteConfirmInitiative(initiative)
+                                            setOpenMenuId(null)
+                                        }}
+                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 active:bg-red-100 transition-colors"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                        Delete
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>,

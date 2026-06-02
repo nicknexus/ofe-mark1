@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTeam } from '../context/TeamContext'
 import {
     Upload,
     Edit,
@@ -30,6 +31,7 @@ interface KPIEvidenceSectionProps {
 }
 
 export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateFilter }: KPIEvidenceSectionProps) {
+    const { canEditEvidence, canDelete } = useTeam()
     const [evidence, setEvidence] = useState<Evidence[]>([])
     const [loading, setLoading] = useState(true)
     const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false)
@@ -161,14 +163,16 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateF
                         <div className="text-lg font-bold text-evidence-500">{dateFilter?.isActive ? filteredEvidence.length : evidence.length}</div>
                         <div className="text-xs text-gray-500">Items</div>
                     </div>
-                    <button
-                        onClick={() => setIsEvidenceModalOpen(true)}
-                        className="flex items-center justify-center space-x-2 px-4 py-2 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
-                    >
-                        <Upload className="w-4 h-4" />
-                        <span className="hidden sm:inline">Add Evidence</span>
-                        <span className="sm:hidden">Add</span>
-                    </button>
+                    {canEditEvidence && (
+                        <button
+                            onClick={() => setIsEvidenceModalOpen(true)}
+                            className="flex items-center justify-center space-x-2 px-4 py-2 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
+                        >
+                            <Upload className="w-4 h-4" />
+                            <span className="hidden sm:inline">Add Evidence</span>
+                            <span className="sm:hidden">Add</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -240,24 +244,28 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateF
                                                                 <ExternalLink className="w-3 h-3" />
                                                             </div>
                                                         )}
-                                                        <button
-                                                            className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100/50"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation()
-                                                                handleEditEvidence(evidenceItem)
-                                                            }}
-                                                        >
-                                                            <Edit className="w-3 h-3" />
-                                                        </button>
-                                                        <button
-                                                            className="text-gray-400 hover:text-red-500 p-1 rounded-lg hover:bg-red-50/50"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation()
-                                                                setDeleteConfirmEvidence(evidenceItem)
-                                                            }}
-                                                        >
-                                                            <Trash2 className="w-3 h-3" />
-                                                        </button>
+                                                        {canEditEvidence && (
+                                                            <button
+                                                                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100/50"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    handleEditEvidence(evidenceItem)
+                                                                }}
+                                                            >
+                                                                <Edit className="w-3 h-3" />
+                                                            </button>
+                                                        )}
+                                                        {canDelete && (
+                                                            <button
+                                                                className="text-gray-400 hover:text-red-500 p-1 rounded-lg hover:bg-red-50/50"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    setDeleteConfirmEvidence(evidenceItem)
+                                                                }}
+                                                            >
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -284,15 +292,15 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateF
                     evidence={selectedEvidence}
                     isOpen={isEvidencePreviewOpen}
                     onClose={() => setIsEvidencePreviewOpen(false)}
-                    onEdit={(evidence) => {
+                    onEdit={canEditEvidence ? (evidence) => {
                         setSelectedEvidence(evidence)
                         setIsEvidencePreviewOpen(false)
                         setIsEditEvidenceModalOpen(true)
-                    }}
-                    onDelete={(evidence) => {
+                    } : undefined}
+                    onDelete={canDelete ? (evidence) => {
                         setDeleteConfirmEvidence(evidence)
                         setIsEvidencePreviewOpen(false)
-                    }}
+                    } : undefined}
                 />
             )}
 

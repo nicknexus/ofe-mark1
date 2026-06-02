@@ -35,11 +35,11 @@ interface MetricsTabProps {
     expandedKPIs: Set<string>
     setExpandedKPIs: React.Dispatch<React.SetStateAction<Set<string>>>
     allKPIUpdates: any[]
-    onAddKPI: () => void
+    onAddKPI?: () => void
     onAddUpdate: (kpi: any) => void
-    onAddEvidence: (kpi?: any) => void
-    onEditKPI: (kpi: any) => void
-    onDeleteKPI: (kpi: any) => void
+    onAddEvidence?: (kpi?: any) => void
+    onEditKPI?: (kpi: any) => void
+    onDeleteKPI?: (kpi: any) => void
     onToggleKPIExpansion: (kpiId: string) => void
     initiativeId?: string
     onRefresh?: () => void
@@ -123,9 +123,9 @@ export default function MetricsTab({
                         renderAsPage={true}
                         onToggleExpand={() => expandedKpi.id && onToggleKPIExpansion(expandedKpi.id)}
                         onAddUpdate={() => onAddUpdate(expandedKpi)}
-                        onAddEvidence={() => onAddEvidence(expandedKpi)}
-                        onEdit={() => onEditKPI(expandedKpi)}
-                        onDelete={() => onDeleteKPI(expandedKpi)}
+                        onAddEvidence={onAddEvidence ? () => onAddEvidence(expandedKpi) : undefined}
+                        onEdit={onEditKPI ? () => onEditKPI(expandedKpi) : undefined}
+                        onDelete={onDeleteKPI ? () => onDeleteKPI(expandedKpi) : undefined}
                         kpiUpdates={kpiUpdatesForMetric}
                         initiativeId={initiativeId || initiative.id || ''}
                         onRefresh={onRefresh}
@@ -162,25 +162,29 @@ export default function MetricsTab({
                         </div>
                         <h3 className="mobile-empty-title">No Metrics Yet</h3>
                         <p className="mobile-empty-text">Add your first metric to track impact</p>
-                        <button
-                            onClick={onAddKPI}
-                            className="mt-6 inline-flex items-center space-x-2 px-5 py-3 bg-primary-500 text-white rounded-2xl text-sm font-semibold shadow-lg active:scale-95 transition-transform"
-                        >
-                            <Plus className="w-5 h-5" />
-                            <span>Add Metric</span>
-                        </button>
+                        {onAddKPI && (
+                            <button
+                                onClick={onAddKPI}
+                                className="mt-6 inline-flex items-center space-x-2 px-5 py-3 bg-primary-500 text-white rounded-2xl text-sm font-semibold shadow-lg active:scale-95 transition-transform"
+                            >
+                                <Plus className="w-5 h-5" />
+                                <span>Add Metric</span>
+                            </button>
+                        )}
                     </div>
                 ) : (
                     /* Mobile Metrics List */
                     <div className="space-y-3">
                         <div className="flex items-center justify-between mb-3">
                             <h2 className="mobile-section-title mb-0">Your Metrics</h2>
-                            <button
-                                onClick={onAddKPI}
-                                className="p-2.5 bg-primary-500 text-white rounded-xl shadow-lg active:scale-95 transition-transform"
-                            >
-                                <Plus className="w-5 h-5" />
-                            </button>
+                            {onAddKPI && (
+                                <button
+                                    onClick={onAddKPI}
+                                    className="p-2.5 bg-primary-500 text-white rounded-xl shadow-lg active:scale-95 transition-transform"
+                                >
+                                    <Plus className="w-5 h-5" />
+                                </button>
+                            )}
                         </div>
 
                         {filteredKpis.map((kpi) => {
@@ -219,13 +223,15 @@ export default function MetricsTab({
                             </div>
                             <h3 className="text-lg font-semibold text-gray-800 mb-2">No Metrics Yet</h3>
                             <p className="text-gray-500 mb-6">Create your first metric to start tracking your initiative's impact</p>
-                            <button
-                                onClick={onAddKPI}
-                                className="inline-flex items-center space-x-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl text-sm font-medium transition-all duration-200 shadow-bubble-sm"
-                            >
-                                <Plus className="w-4 h-4" />
-                                <span>Add Metric</span>
-                            </button>
+                            {onAddKPI && (
+                                <button
+                                    onClick={onAddKPI}
+                                    className="inline-flex items-center space-x-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl text-sm font-medium transition-all duration-200 shadow-bubble-sm"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    <span>Add Metric</span>
+                                </button>
+                            )}
                         </div>
                     </div>
                 ) : (
@@ -282,13 +288,15 @@ export default function MetricsTab({
                                         </button>
                                     </div>
 
-                                    <button
-                                        onClick={onAddKPI}
-                                        className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl text-sm font-medium transition-all duration-200 shadow-bubble-sm"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                        <span>Add Metric</span>
-                                    </button>
+                                    {onAddKPI && (
+                                        <button
+                                            onClick={onAddKPI}
+                                            className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl text-sm font-medium transition-all duration-200 shadow-bubble-sm"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                            <span>Add Metric</span>
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 
@@ -318,9 +326,9 @@ export default function MetricsTab({
                                                 isExpanded={expandedKPIs.has(kpi.id)}
                                                 onToggleExpand={() => kpi.id && onToggleKPIExpansion(kpi.id)}
                                                 onAddUpdate={() => onAddUpdate(kpi)}
-                                                onAddEvidence={() => onAddEvidence(kpi)}
-                                                onEdit={() => onEditKPI(kpi)}
-                                                onDelete={() => onDeleteKPI(kpi)}
+                                                onAddEvidence={onAddEvidence ? () => onAddEvidence(kpi) : undefined}
+                                                onEdit={onEditKPI ? () => onEditKPI(kpi) : undefined}
+                                                onDelete={onDeleteKPI ? () => onDeleteKPI(kpi) : undefined}
                                                 kpiUpdates={allKPIUpdates.filter(update => update.kpi_id === kpi.id)}
                                                 initiativeId={initiativeId || initiative.id || ''}
                                                 onRefresh={onRefresh}

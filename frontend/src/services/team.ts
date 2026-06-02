@@ -10,25 +10,72 @@ async function getAuthHeaders() {
         throw new Error('No authenticated session')
     }
 
-    return {
+    const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`
+        'Authorization': `Bearer ${session.access_token}`,
     }
+
+    const activeOrgId = localStorage.getItem('nexus-active-org-id')
+    if (activeOrgId) {
+        headers['X-Organization-Id'] = activeOrgId
+    }
+
+    return headers
+}
+
+import type { MemberType, PermissionGrant, TeamMemberScope } from '../types/teamPermissions'
+
+export type { MemberType, PermissionGrant, TeamMemberScope }
+
+export interface CapabilityFlags {
+    canAddImpactClaims: boolean
+    canEditEvidence: boolean
+    canEditMetrics: boolean
+    canEditInitiatives: boolean
+    canCreateInitiatives: boolean
+    canEditLocations: boolean
+    canEditBeneficiaries: boolean
+    canEditStories: boolean
+    canEditTags: boolean
+    canExportReports: boolean
+    canEditOrgContext: boolean
+    canDelete: boolean
 }
 
 export interface UserPermissions {
     isOwner: boolean
     isSharedMember: boolean
+    memberType?: MemberType
+    isAdmin?: boolean
     canAddImpactClaims: boolean
+    canEditEvidence?: boolean
     canDelete: boolean
+    /** Full granular capability set for UI gating. */
+    capabilities?: CapabilityFlags
+    /** Owners/admins are unrestricted; team_members carry an explicit scope. */
+    scope?: TeamMemberScope
     organizationId?: string
     organizationName?: string
+}
+
+export interface MemberPermissionsResult {
+    grants: PermissionGrant[]
+    scope: TeamMemberScope
+}
+
+export interface SendInvitePayload {
+    email: string
+    memberType: MemberType
+    canAddImpactClaims?: boolean
+    permissions?: PermissionGrant[]
+    scope?: TeamMemberScope
 }
 
 export interface TeamMember {
     id: string
     organization_id: string
     user_id: string
+    member_type?: MemberType | null
     can_add_impact_claims: boolean
     can_edit_evidence: boolean
     invited_by?: string
@@ -43,6 +90,7 @@ export interface TeamInvitation {
     organization_id: string
     email: string
     invited_by: string
+    member_type?: MemberType | null
     token: string
     status: 'pending' | 'accepted' | 'expired' | 'revoked'
     expires_at: string
@@ -137,7 +185,7 @@ export class TeamService {
     /**
      * Send a team invitation
      */
-    static async sendInvite(email: string, canAddImpactClaims: boolean = false): Promise<{
+    static async sendInvite(payload: SendInvitePayload): Promise<{
         success: boolean
         invitation: Partial<TeamInvitation>
         emailSent: boolean
@@ -145,10 +193,24 @@ export class TeamService {
     }> {
         const headers = await getAuthHeaders()
 
+        const body: Record<string, unknown> = {
+            email: payload.email,
+            memberType: payload.memberType,
+        }
+        if (payload.memberType === 'team_member') {
+            if (payload.permissions?.length) {
+                body.permissions = payload.permissions
+            }
+            body.canAddImpactClaims = payload.canAddImpactClaims ?? false
+            if (payload.scope) {
+                body.scope = payload.scope
+            }
+        }
+
         const response = await fetch(`${API_BASE_URL}/api/team/invite`, {
             method: 'POST',
             headers,
-            body: JSON.stringify({ email, canAddImpactClaims })
+            body: JSON.stringify(body)
         })
 
         if (!response.ok) {
@@ -329,23 +391,82 @@ export class TeamService {
         return response.json()
     }
 
-    /**
-     * Update member permissions
-     */
+    static async getMemberPermissions(memberId: string): Promise<MemberPermissionsResult> {
+        const headers = await getAuthHeaders()
+        const response = await fetch(`${API_BASE_URL}/api/team/members/${memberId}/permissions`, { headers })
+        if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Failed to load member permissions')
+        }
+        const data = await response.json()
+        return { grants: data.grants ?? [], scope: data.scope ?? { allInitiatives: true, initiativeIds: [], locationIds: [] } }
+    }
+
+    static async getInvitationPermissions(invitationId: string): Promise<MemberPermissionsResult> {
+        const headers = await getAuthHeaders()
+        const response = await fetch(`${API_BASE_URL}/api/team/invite/${invitationId}/permissions`, { headers })
+        if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Failed to load invitation permissions')
+        }
+        const data = await response.json()
+        return { grants: data.grants ?? [], scope: data.scope ?? { allInitiatives: true, initiativeIds: [], locationIds: [] } }
+    }
+
+    static async updateMember(
+        memberId: string,
+        payload: { memberType: MemberType; permissions?: PermissionGrant[]; scope?: TeamMemberScope }
+    ): Promise<TeamMember> {
+        const headers = await getAuthHeaders()
+        const response = await fetch(`${API_BASE_URL}/api/team/members/${memberId}`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({
+                memberType: payload.memberType,
+                permissions: payload.permissions,
+                scope: payload.scope,
+            }),
+        })
+        if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Failed to update member')
+        }
+        return response.json()
+    }
+
+    static async updateInvitation(
+        invitationId: string,
+        payload: { memberType: MemberType; permissions?: PermissionGrant[]; scope?: TeamMemberScope }
+    ): Promise<TeamInvitation> {
+        const headers = await getAuthHeaders()
+        const response = await fetch(`${API_BASE_URL}/api/team/invite/${invitationId}`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({
+                memberType: payload.memberType,
+                permissions: payload.permissions,
+                scope: payload.scope,
+            }),
+        })
+        if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Failed to update invitation')
+        }
+        return response.json()
+    }
+
+    /** @deprecated Use updateMember */
     static async updateMemberPermissions(memberId: string, updates: { canAddImpactClaims?: boolean; canEditEvidence?: boolean }): Promise<TeamMember> {
         const headers = await getAuthHeaders()
-
         const response = await fetch(`${API_BASE_URL}/api/team/members/${memberId}`, {
             method: 'PUT',
             headers,
             body: JSON.stringify(updates)
         })
-
         if (!response.ok) {
             const error = await response.json()
             throw new Error(error.error || 'Failed to update member')
         }
-
         return response.json()
     }
 

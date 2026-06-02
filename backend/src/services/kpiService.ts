@@ -4,6 +4,8 @@ import { InitiativeService } from './initiativeService';
 import { BeneficiaryService } from './beneficiaryService';
 import { MetricTagService } from './metricTagService';
 import { aggregateKpiUpdates } from '../utils/kpiAggregation';
+import { PermissionService } from './permissionService';
+import { OrgAccessService } from './orgAccessService';
 
 export class KPIService {
     static async create(kpi: KPI, userId: string, requestedOrgId?: string): Promise<KPI> {
@@ -14,6 +16,11 @@ export class KPIService {
                 throw new Error('Initiative not found or access denied');
             }
         }
+
+        // Capability gate: only members granted metric editing may create metrics.
+        await PermissionService.assert(userId, requestedOrgId, 'metrics', 'edit', {
+            initiativeId: kpi.initiative_id,
+        });
 
         // Get max display_order for this initiative to set the new item at the end
         let maxOrder = 0
@@ -252,6 +259,11 @@ export class KPIService {
         const kpi = await this.getById(id, userId, requestedOrgId);
         if (!kpi) throw new Error('KPI not found or access denied');
 
+        await PermissionService.assert(userId, requestedOrgId, 'metrics', 'edit', {
+            resourceId: id,
+            initiativeId: (kpi as any).initiative_id,
+        });
+
         const { tag_ids, ...rest } = (updates as any)
 
         const { data, error } = await supabase
@@ -272,10 +284,14 @@ export class KPIService {
     }
 
     static async delete(id: string, userId: string, requestedOrgId?: string): Promise<void> {
-        // Phase 1 (full-access baseline): any team member of the org can delete.
-        // getById authorizes via the org context.
+        // getById authorizes via org context + scope.
         const kpi = await this.getById(id, userId, requestedOrgId);
         if (!kpi) throw new Error('KPI not found or access denied');
+
+        await PermissionService.assert(userId, requestedOrgId, 'metrics', 'delete', {
+            resourceId: id,
+            initiativeId: (kpi as any).initiative_id,
+        });
 
         const { error } = await supabase
             .from('kpis')
@@ -296,6 +312,26 @@ export class KPIService {
         if (update.kpi_id) {
             const kpi = await this.getById(update.kpi_id, userId, requestedOrgId)
             if (!kpi) throw new Error('KPI not found or access denied')
+
+            const { PermissionService } = await import('./permissionService')
+            await PermissionService.assert(userId, requestedOrgId, 'impact_claims', 'create', {
+                resourceId: update.kpi_id,
+                initiativeId: kpi.initiative_id,
+            })
+
+            // Enforce location scope: team_members narrowed to specific locations
+            // may only file claims against those locations.
+            const { organizationId } = await OrgAccessService.assertInitiativeAccess(
+                kpi.initiative_id!,
+                userId,
+                requestedOrgId
+            )
+            await OrgAccessService.assertLocationInOrg(
+                update.location_id!,
+                organizationId,
+                userId,
+                requestedOrgId
+            )
         }
 
         // Support optional beneficiary_group_ids and tag_id on creation
@@ -594,6 +630,27 @@ export class KPIService {
         const kpi = await this.getById(existingUpdate.kpi_id, userId, requestedOrgId);
         if (!kpi) throw new Error('Access denied');
 
+        const { PermissionService } = await import('./permissionService');
+        await PermissionService.assert(userId, requestedOrgId, 'metrics', 'edit', {
+            resourceId: existingUpdate.kpi_id,
+            initiativeId: kpi.initiative_id,
+        });
+
+        // If the claim's location is being changed, enforce the caller's location scope.
+        if ('location_id' in updateData && updateData.location_id) {
+            const { organizationId } = await OrgAccessService.assertInitiativeAccess(
+                kpi.initiative_id!,
+                userId,
+                requestedOrgId
+            )
+            await OrgAccessService.assertLocationInOrg(
+                updateData.location_id!,
+                organizationId,
+                userId,
+                requestedOrgId
+            )
+        }
+
         const { data, error } = await supabase
             .from('kpi_updates')
             .update(updateData)
@@ -741,6 +798,12 @@ export class KPIService {
         // Verify user has access to the KPI via org context.
         const kpi = await this.getById(existingUpdate.kpi_id, userId, requestedOrgId);
         if (!kpi) throw new Error('Access denied');
+
+        const { PermissionService } = await import('./permissionService');
+        await PermissionService.assert(userId, requestedOrgId, 'metrics', 'delete', {
+            resourceId: existingUpdate.kpi_id,
+            initiativeId: kpi.initiative_id,
+        });
 
         const { error } = await supabase
             .from('kpi_updates')

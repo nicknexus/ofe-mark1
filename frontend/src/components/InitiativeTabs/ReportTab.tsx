@@ -8,6 +8,7 @@ import L from 'leaflet'
 import html2canvas from 'html2canvas'
 import ReportDashboard from '../ReportDashboard'
 import { convertReportToPDF } from '../../utils/reportToPDF'
+import { useTeam } from '../../context/TeamContext'
 
 interface ReportTabProps {
     initiativeId: string
@@ -60,6 +61,7 @@ interface ReportData {
 }
 
 export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
+    const { canExportReports } = useTeam()
     // Filter state
     const [dateRange, setDateRange] = useState<{
         singleDate?: string
@@ -716,15 +718,18 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
     }
 
     // New Report Button Component
-    const NewReportButton = () => (
-        <button
-            onClick={handleStartNewReport}
-            className="flex items-center space-x-2 px-6 py-3 bg-primary-100 text-primary-700 rounded-2xl hover:bg-primary-200 font-semibold transition-all duration-200 shadow-bubble-sm"
-        >
-            <Plus className="w-5 h-5" />
-            <span>Make New Report</span>
-        </button>
-    )
+    const NewReportButton = () => {
+        if (!canExportReports) return null
+        return (
+            <button
+                onClick={handleStartNewReport}
+                className="flex items-center space-x-2 px-6 py-3 bg-primary-100 text-primary-700 rounded-2xl hover:bg-primary-200 font-semibold transition-all duration-200 shadow-bubble-sm"
+            >
+                <Plus className="w-5 h-5" />
+                <span>Make New Report</span>
+            </button>
+        )
+    }
 
     return (
         <div ref={containerRef} className="h-screen overflow-y-auto relative">
@@ -765,7 +770,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-base font-semibold text-gray-800">Report Dashboard</h2>
                                 <div className="flex items-center gap-2">
-                                    {isEditingReport ? (
+                                    {canExportReports && (isEditingReport ? (
                                         <button
                                             onClick={() => setIsEditingReport(false)}
                                             className="px-4 py-2 bg-primary-500 text-white rounded-2xl hover:bg-primary-600 flex items-center space-x-2 text-sm font-medium transition-all duration-200 shadow-bubble-sm"
@@ -781,7 +786,8 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                             <Pencil className="w-4 h-4" />
                                             <span>Edit Text</span>
                                         </button>
-                                    )}
+                                    ))}
+                                    {canExportReports && (
                                     <button
                                         onClick={async () => {
                                             try {
@@ -814,6 +820,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                         <Download className="w-4 h-4" />
                                         <span>Download as PDF</span>
                                     </button>
+                                    )}
                                     <button
                                         onClick={() => {
                                             setShowDashboard(false)
@@ -1302,7 +1309,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                                 </>
                                             )}
                                         </button>
-                                    ) : (
+                                    ) : canExportReports ? (
                                         <button
                                             type="button"
                                             onClick={handleGenerateReport}
@@ -1321,7 +1328,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
                                                 </>
                                             )}
                                         </button>
-                                    )}
+                                    ) : null}
                                 </div>
                             </div>
                         </div>

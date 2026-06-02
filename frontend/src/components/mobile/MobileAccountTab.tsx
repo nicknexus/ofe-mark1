@@ -25,6 +25,15 @@ import { apiService } from '../../services/api'
 import { SubscriptionService } from '../../services/subscription'
 import { TeamService, TeamMember, TeamInvitation } from '../../services/team'
 import { useTeam } from '../../context/TeamContext'
+import {
+    defaultTeamMemberToggles,
+    togglesToGrants,
+    validateTeamMemberInvite,
+    type MemberType,
+    type TeamMemberPermissionToggles,
+} from '../../types/teamPermissions'
+import { TeamMemberEditModal } from '../account/TeamMemberEditModal'
+import { Pencil } from 'lucide-react'
 import { User, SubscriptionStatus, Organization } from '../../types'
 import toast from 'react-hot-toast'
 
@@ -44,7 +53,7 @@ interface StorageUsage {
 type SettingsView = 'menu' | 'profile' | 'subscription' | 'organization' | 'teams' | 'branding' | 'storage' | 'danger'
 
 export default function MobileAccountTab({ user, subscriptionStatus }: MobileAccountTabProps) {
-    const { isOwner, isSharedMember, organizationName, hasOwnOrganization } = useTeam()
+    const { isOwner, isSharedMember, canManageTeam, organizationName, hasOwnOrganization } = useTeam()
     const [activeView, setActiveView] = useState<SettingsView>('menu')
     const [name, setName] = useState(user.name || '')
     const [saving, setSaving] = useState(false)
@@ -59,9 +68,13 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
     const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
     const [pendingInvites, setPendingInvites] = useState<TeamInvitation[]>([])
     const [inviteEmail, setInviteEmail] = useState('')
-    const [inviteAllowClaims, setInviteAllowClaims] = useState(false)
+    const [inviteMemberType, setInviteMemberType] = useState<MemberType>('admin')
+    const [invitePermissionToggles, setInvitePermissionToggles] = useState<TeamMemberPermissionToggles>(defaultTeamMemberToggles)
     const [sendingInvite, setSendingInvite] = useState(false)
     const [loadingTeam, setLoadingTeam] = useState(false)
+    const [editTarget, setEditTarget] = useState<
+        { kind: 'member'; record: TeamMember } | { kind: 'invitation'; record: TeamInvitation } | null
+    >(null)
 
     // Org state
     const [orgMission, setOrgMission] = useState('')
@@ -182,12 +195,28 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
 
     const handleSendInvite = async () => {
         if (!inviteEmail.trim()) return
+        if (inviteMemberType === 'team_member') {
+            const err = validateTeamMemberInvite(inviteMemberType, invitePermissionToggles)
+            if (err) {
+                toast.error(err)
+                return
+            }
+        }
         setSendingInvite(true)
         try {
-            await TeamService.sendInvite(inviteEmail.trim(), inviteAllowClaims)
+            await TeamService.sendInvite({
+                email: inviteEmail.trim(),
+                memberType: inviteMemberType,
+                canAddImpactClaims: invitePermissionToggles.addImpactClaims,
+                permissions:
+                    inviteMemberType === 'team_member'
+                        ? togglesToGrants(invitePermissionToggles)
+                        : undefined,
+            })
             toast.success('Invitation sent')
             setInviteEmail('')
-            setInviteAllowClaims(false)
+            setInviteMemberType('admin')
+            setInvitePermissionToggles(defaultTeamMemberToggles)
             loadTeamData()
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'Failed to send invitation')
@@ -473,17 +502,29 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
         }
         return (
             <div className="min-h-full bg-gray-50">
+                <TeamMemberEditModal
+                    target={editTarget}
+                    onClose={() => setEditTarget(null)}
+                    onSaved={loadTeamData}
+                />
                 <ViewHeader title="Team" onBack={() => setActiveView('menu')} />
                 <div className="p-4 space-y-4">
                     {/* Invite */}
-                    {isOwner && (
+                    {canManageTeam && (
                         <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
                             <h3 className="text-sm font-semibold text-gray-800">Invite Team Member</h3>
                             <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="team@example.com" className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-primary-300 focus:ring-1 focus:ring-primary-200 outline-none" />
-                            <label className="flex items-center gap-2.5 py-1">
-                                <input type="checkbox" checked={inviteAllowClaims} onChange={e => setInviteAllowClaims(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-400" />
-                                <span className="text-sm text-gray-600">Allow creating Impact Claims</span>
-                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button type="button" onClick={() => setInviteMemberType('admin')} className={`py-2 rounded-xl text-xs font-semibold border ${inviteMemberType === 'admin' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600'}`}>Admin</button>
+                                <button type="button" onClick={() => setInviteMemberType('team_member')} className={`py-2 rounded-xl text-xs font-semibold border ${inviteMemberType === 'team_member' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600'}`}>Team member</button>
+                            </div>
+                            {inviteMemberType === 'team_member' && (
+                                <div className="space-y-2 text-sm text-gray-600">
+                                    <label className="flex items-center gap-2"><input type="checkbox" checked={invitePermissionToggles.addImpactClaims} onChange={e => setInvitePermissionToggles({ ...invitePermissionToggles, addImpactClaims: e.target.checked })} className="rounded" /> Add impact claims</label>
+                                    <label className="flex items-center gap-2"><input type="checkbox" checked={invitePermissionToggles.addEditEvidence} onChange={e => setInvitePermissionToggles({ ...invitePermissionToggles, addEditEvidence: e.target.checked })} className="rounded" /> Add & edit evidence</label>
+                                    <label className="flex items-center gap-2"><input type="checkbox" checked={invitePermissionToggles.deleteContent} onChange={e => setInvitePermissionToggles({ ...invitePermissionToggles, deleteContent: e.target.checked })} className="rounded" /> Delete content</label>
+                                </div>
+                            )}
                             <button onClick={handleSendInvite} disabled={sendingInvite || !inviteEmail.trim()} className="w-full py-2.5 bg-primary-500 text-white rounded-xl font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-50 active:bg-primary-600">
                                 <Send className="w-4 h-4" />
                                 {sendingInvite ? 'Sending...' : 'Send Invitation'}
@@ -516,8 +557,13 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
                                             <div className="text-sm font-medium text-gray-900 truncate">{member.user_name || member.user_email || 'Team Member'}</div>
                                             <div className="text-xs text-gray-400 truncate">{member.user_email}</div>
                                         </div>
-                                        {isOwner && (
-                                            <button onClick={() => handleRemoveMember(member.id)} className="text-xs text-red-500 font-medium px-2 py-1 rounded-lg active:bg-red-50">Remove</button>
+                                        {canManageTeam && (
+                                            <>
+                                                <button type="button" onClick={() => setEditTarget({ kind: 'member', record: member })} className="p-1.5 text-gray-400 active:text-primary-500">
+                                                    <Pencil className="w-4 h-4" />
+                                                </button>
+                                                <button onClick={() => handleRemoveMember(member.id)} className="text-xs text-red-500 font-medium px-2 py-1 rounded-lg active:bg-red-50">Remove</button>
+                                            </>
                                         )}
                                     </div>
                                 ))}
@@ -541,8 +587,13 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
                                             <div className="text-sm font-medium text-gray-900 truncate">{invite.email}</div>
                                             <div className="text-xs text-gray-400">Pending</div>
                                         </div>
-                                        {isOwner && (
-                                            <button onClick={() => handleRevokeInvite(invite.id)} className="text-xs text-red-500 font-medium px-2 py-1 rounded-lg active:bg-red-50">Revoke</button>
+                                        {canManageTeam && (
+                                            <>
+                                                <button type="button" onClick={() => setEditTarget({ kind: 'invitation', record: invite })} className="p-1.5 text-gray-400 active:text-primary-500">
+                                                    <Pencil className="w-4 h-4" />
+                                                </button>
+                                                <button onClick={() => handleRevokeInvite(invite.id)} className="text-xs text-red-500 font-medium px-2 py-1 rounded-lg active:bg-red-50">Revoke</button>
+                                            </>
                                         )}
                                     </div>
                                 ))}
@@ -707,9 +758,12 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
                     <div className="bg-white border-y border-gray-100">
                         <MenuItem icon={Building2} label="Organization" subtitle="Mission, website, visibility" onClick={() => setActiveView('organization')} iconBg="bg-blue-50" iconColor="text-blue-600" />
                         <div className="h-px bg-gray-100 mx-4" />
-                        <MenuItem icon={Users} label="Team" subtitle="Invite and manage members" onClick={() => { setActiveView('teams'); loadTeamData() }} iconBg="bg-purple-50" iconColor="text-purple-600" />
-                        <div className="h-px bg-gray-100 mx-4" />
                         <MenuItem icon={Palette} label="Branding" subtitle="Logo and brand color" onClick={() => setActiveView('branding')} iconBg="bg-pink-50" iconColor="text-pink-600" />
+                    </div>
+                )}
+                {canManageTeam && (
+                    <div className="bg-white border-y border-gray-100">
+                        <MenuItem icon={Users} label="Team" subtitle="Invite and manage members" onClick={() => { setActiveView('teams'); loadTeamData() }} iconBg="bg-purple-50" iconColor="text-purple-600" />
                     </div>
                 )}
 

@@ -14,6 +14,7 @@ import {
 import { apiService } from '../../services/api'
 import { Location } from '../../types'
 import { debounce } from '../../utils'
+import { useTeam } from '../../context/TeamContext'
 import toast from 'react-hot-toast'
 
 interface MobileLocationsTabProps {
@@ -29,6 +30,7 @@ interface NominatimResult {
 }
 
 export default function MobileLocationsTab({ initiativeId, autoAdd }: MobileLocationsTabProps) {
+    const { canEditLocations, canDelete } = useTeam()
     const [locations, setLocations] = useState<Location[]>([])
     const [loading, setLoading] = useState(true)
     const [showAddFlow, setShowAddFlow] = useState(!!autoAdd)
@@ -90,13 +92,15 @@ export default function MobileLocationsTab({ initiativeId, autoAdd }: MobileLoca
                     <h1 className="text-xl font-bold text-gray-900">Locations</h1>
                     <p className="text-sm text-gray-500">{locations.length} location{locations.length !== 1 ? 's' : ''}</p>
                 </div>
-                <button
-                    onClick={() => setShowAddFlow(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-primary-500 text-white rounded-xl font-semibold text-sm shadow-lg shadow-primary-500/25 active:scale-[0.98]"
-                >
-                    <Plus className="w-4 h-4" />
-                    Add
-                </button>
+                {canEditLocations && (
+                    <button
+                        onClick={() => setShowAddFlow(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-primary-500 text-white rounded-xl font-semibold text-sm shadow-lg shadow-primary-500/25 active:scale-[0.98]"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Add
+                    </button>
+                )}
             </div>
 
             {/* Locations List */}
@@ -113,12 +117,14 @@ export default function MobileLocationsTab({ initiativeId, autoAdd }: MobileLoca
                     <p className="text-gray-500 text-sm px-6 mb-6">
                         Add locations where your initiative operates.
                     </p>
-                    <button
-                        onClick={() => setShowAddFlow(true)}
-                        className="px-6 py-3 bg-primary-500 text-white rounded-xl font-medium text-sm"
-                    >
-                        Add Location
-                    </button>
+                    {canEditLocations && (
+                        <button
+                            onClick={() => setShowAddFlow(true)}
+                            className="px-6 py-3 bg-primary-500 text-white rounded-xl font-medium text-sm"
+                        >
+                            Add Location
+                        </button>
+                    )}
                 </div>
             ) : (
                 <div className="space-y-3">
@@ -142,13 +148,15 @@ export default function MobileLocationsTab({ initiativeId, autoAdd }: MobileLoca
                                         {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
                                     </p>
                                 </div>
-                                <button
-                                    onClick={() => setOpenMenuId(openMenuId === location.id ? null : location.id!)}
-                                    className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors flex-shrink-0"
-                                    aria-label="Options"
-                                >
-                                    <Settings className="w-5 h-5" />
-                                </button>
+                                {(canEditLocations || canDelete) && (
+                                    <button
+                                        onClick={() => setOpenMenuId(openMenuId === location.id ? null : location.id!)}
+                                        className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors flex-shrink-0"
+                                        aria-label="Options"
+                                    >
+                                        <Settings className="w-5 h-5" />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -170,26 +178,30 @@ export default function MobileLocationsTab({ initiativeId, autoAdd }: MobileLoca
                                 <p className="text-sm font-semibold text-gray-800 truncate">{location.name}</p>
                             </div>
                             <div className="py-1">
-                                <button
-                                    onClick={() => {
-                                        setEditingLocation(location)
-                                        setOpenMenuId(null)
-                                    }}
-                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors"
-                                >
-                                    <Edit className="w-4 h-4 text-gray-400" />
-                                    Edit Location
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setDeleteConfirmId(location.id!)
-                                        setOpenMenuId(null)
-                                    }}
-                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 active:bg-red-100 transition-colors"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                    Delete
-                                </button>
+                                {canEditLocations && (
+                                    <button
+                                        onClick={() => {
+                                            setEditingLocation(location)
+                                            setOpenMenuId(null)
+                                        }}
+                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                                    >
+                                        <Edit className="w-4 h-4 text-gray-400" />
+                                        Edit Location
+                                    </button>
+                                )}
+                                {canDelete && (
+                                    <button
+                                        onClick={() => {
+                                            setDeleteConfirmId(location.id!)
+                                            setOpenMenuId(null)
+                                        }}
+                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 active:bg-red-100 transition-colors"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                        Delete
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>,

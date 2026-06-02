@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TeamService, UserPermissions, AccessibleOrganization } from '../services/team'
+import type { TeamMemberScope } from '../types/teamPermissions'
 import { apiService } from '../services/api'
 
 interface TeamContextType {
@@ -9,26 +10,37 @@ interface TeamContextType {
     error: string | null
     isOwner: boolean
     isSharedMember: boolean
+    isAdmin: boolean
+    memberType?: 'admin' | 'team_member'
+    canManageTeam: boolean
     canAddImpactClaims: boolean
     canEditEvidence: boolean
     canDelete: boolean
+    canEditMetrics: boolean
+    canEditInitiatives: boolean
+    canCreateInitiatives: boolean
+    canEditLocations: boolean
+    canEditBeneficiaries: boolean
+    canEditStories: boolean
+    canEditTags: boolean
+    canExportReports: boolean
+    canEditOrgContext: boolean
+    /** team_member initiative/location scope; owners/admins are unrestricted. */
+    scope?: TeamMemberScope
+    /** True when the caller may access the given initiative under their scope. */
+    canAccessInitiative: (initiativeId: string) => boolean
+    /** True when the caller may use/see the given location under their scope. */
+    canAccessLocation: (locationId: string) => boolean
     organizationId?: string
     organizationName?: string
-    // Organization switching
     accessibleOrganizations: AccessibleOrganization[]
-    // Same as accessibleOrganizations but with demo / sandbox orgs filtered out.
-    // Use this for the top-nav org switcher so demos stay confined to the admin dash.
     switcherOrganizations: AccessibleOrganization[]
     activeOrganization: AccessibleOrganization | null
     switchOrganization: (orgId: string) => void
     hasMultipleOrgs: boolean
     refreshPermissions: () => Promise<void>
-    // Does user own ANY organization (regardless of which one is active)
     hasOwnOrganization: boolean
     ownedOrganization: AccessibleOrganization | null
-    // The org currently being edited in Settings / branding / logo flows.
-    // Equal to activeOrganization when the user owns it (real org or demo),
-    // otherwise null (e.g. when viewing as a shared member).
     editableOrganization: AccessibleOrganization | null
 }
 
@@ -36,7 +48,7 @@ const defaultPermissions: UserPermissions = {
     isOwner: false,
     isSharedMember: false,
     canAddImpactClaims: false,
-    canDelete: false
+    canDelete: false,
 }
 
 const TeamContext = createContext<TeamContextType>({
@@ -45,9 +57,22 @@ const TeamContext = createContext<TeamContextType>({
     error: null,
     isOwner: false,
     isSharedMember: false,
+    isAdmin: false,
+    canManageTeam: false,
     canAddImpactClaims: false,
-    canEditEvidence: true,
+    canEditEvidence: false,
     canDelete: false,
+    canEditMetrics: false,
+    canEditInitiatives: false,
+    canCreateInitiatives: false,
+    canEditLocations: false,
+    canEditBeneficiaries: false,
+    canEditStories: false,
+    canEditTags: false,
+    canExportReports: false,
+    canEditOrgContext: false,
+    canAccessInitiative: () => true,
+    canAccessLocation: () => true,
     accessibleOrganizations: [],
     switcherOrganizations: [],
     activeOrganization: null,
@@ -56,7 +81,7 @@ const TeamContext = createContext<TeamContextType>({
     refreshPermissions: async () => { },
     hasOwnOrganization: false,
     ownedOrganization: null,
-    editableOrganization: null
+    editableOrganization: null,
 })
 
 const ACTIVE_ORG_STORAGE_KEY = 'nexus-active-org-id'
@@ -71,45 +96,38 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
+    const loadPermissionsForActiveOrg = useCallback(async () => {
+        try {
+            const perms = await TeamService.getPermissions()
+            setPermissions(perms)
+        } catch (err) {
+            console.error('Error fetching permissions:', err)
+            setPermissions(defaultPermissions)
+        }
+    }, [])
+
     const fetchData = useCallback(async () => {
         try {
             setLoading(true)
             setError(null)
 
-            // Fetch accessible orgs - this gives us everything we need
-            // Permissions can be derived from the active organization's role
             const orgs = await TeamService.getAccessibleOrganizations()
-
             setAccessibleOrganizations(orgs)
 
-            // Derive permissions from orgs instead of separate call
-            const hasOwnedOrg = orgs.some(o => o.role === 'owner')
-            const derivedPerms: UserPermissions = {
-                isOwner: hasOwnedOrg,
-                isSharedMember: orgs.some(o => o.role === 'member'),
-                canAddImpactClaims: true, // Will be overridden based on active org
-                canDelete: hasOwnedOrg,
-                organizationId: orgs[0]?.id,
-                organizationName: orgs[0]?.name
-            }
-            setPermissions(derivedPerms)
-
-            // Set active org if not already set or if current one is invalid
             if (orgs.length > 0) {
                 const savedOrgId = localStorage.getItem(ACTIVE_ORG_STORAGE_KEY)
                 const savedOrgValid = savedOrgId && orgs.some(o => o.id === savedOrgId)
 
                 if (!savedOrgValid) {
-                    // Default to team membership org if available, otherwise the user's
-                    // REAL owned org. Demo / sandbox orgs are explicitly excluded from
-                    // the default selection — they are opened only from the admin dash.
                     const teamOrg = orgs.find(o => o.role === 'member' && !o.is_demo)
-                    const realOwnedOrg = orgs.find(o => !o.is_demo)
+                    const realOwnedOrg = orgs.find(o => o.role === 'owner' && !o.is_demo)
                     const defaultOrg = teamOrg || realOwnedOrg || orgs[0]
                     setActiveOrgId(defaultOrg.id)
                     localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, defaultOrg.id)
                 }
             }
+
+            await loadPermissionsForActiveOrg()
         } catch (err) {
             console.error('Error fetching team data:', err)
             setError((err as Error).message)
@@ -117,58 +135,90 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
         } finally {
             setLoading(false)
         }
-    }, [])
+    }, [loadPermissionsForActiveOrg])
 
     useEffect(() => {
         fetchData()
     }, [fetchData])
+
+    useEffect(() => {
+        if (!activeOrgId || loading) return
+        loadPermissionsForActiveOrg()
+    }, [activeOrgId, loading, loadPermissionsForActiveOrg])
 
     const switchOrganization = useCallback((orgId: string) => {
         const org = accessibleOrganizations.find(o => o.id === orgId)
         if (!org) return
         if (orgId === activeOrgId) return
 
-        // Flush every cached payload. Cache keys include the active org id, so
-        // future requests will repopulate cleanly under the new org. Pages that
-        // depend on `activeOrganization?.id` will re-fetch automatically.
         apiService.clearCache()
         localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, orgId)
         setActiveOrgId(orgId)
-        // Most internal routes are org-scoped (initiative ids, metric slugs,
-        // location ids belong to the previous org). Land the user on the
-        // dashboard so they don't get a 404 / forbidden after the switch.
         if (typeof window !== 'undefined' && window.location.pathname !== '/') {
             navigate('/', { replace: true })
         }
     }, [accessibleOrganizations, activeOrgId, navigate])
 
     const activeOrganization = accessibleOrganizations.find(o => o.id === activeOrgId) || null
-    // Real (non-demo) owned org — this is what the app treats as "my organization".
     const ownedOrganization = accessibleOrganizations.find(o => o.role === 'owner' && !o.is_demo) || null
-    // Whichever org Settings / branding should edit right now. When the admin
-    // is inside a demo, this is the demo. When on the real app, it's their real org.
     const editableOrganization = activeOrganization?.role === 'owner'
         ? activeOrganization
         : ownedOrganization
-    // Orgs visible in the top-nav switcher — demos are confined to the admin dash.
     const switcherOrganizations = accessibleOrganizations.filter(o => !o.is_demo)
 
-    // Determine if viewing as shared member based on active org
-    const isViewingAsSharedMember = activeOrganization?.role === 'member'
+    const isOwner = permissions?.isOwner ?? false
+    const isSharedMember = permissions?.isSharedMember ?? (activeOrganization?.role === 'member')
+    const isAdmin = permissions?.isAdmin ?? permissions?.memberType === 'admin'
+    const canManageTeam = isOwner || isAdmin
+
+    const scope = permissions?.scope
+    const unrestricted = isOwner || isAdmin
+    const caps = permissions?.capabilities
+    // unrestricted (owner/admin) → all true; else read granular caps from API.
+    const cap = (key: keyof NonNullable<UserPermissions['capabilities']>) =>
+        unrestricted ? true : caps?.[key] ?? false
+    const canAccessInitiative = useCallback(
+        (initiativeId: string) => {
+            if (unrestricted || !scope) return true
+            if (scope.allInitiatives) return true
+            return scope.initiativeIds.includes(initiativeId)
+        },
+        [unrestricted, scope]
+    )
+    const canAccessLocation = useCallback(
+        (locationId: string) => {
+            if (unrestricted || !scope) return true
+            // Empty locationIds = no location narrowing (all locations in scope).
+            if (scope.locationIds.length === 0) return true
+            return scope.locationIds.includes(locationId)
+        },
+        [unrestricted, scope]
+    )
 
     const value: TeamContextType = {
         permissions,
         loading,
         error,
-        isOwner: !isViewingAsSharedMember,
-        isSharedMember: isViewingAsSharedMember,
-        // Phase 1 (full-access baseline): team members get owner-equivalent data
-        // privileges. Org-account fields (name/branding/billing/team) remain
-        // gated by `isOwner` in the UI. Phase 7 will reintroduce per-member
-        // restrictions using activeOrganization.canAddImpactClaims / canEditEvidence.
-        canAddImpactClaims: true,
-        canEditEvidence: true,
-        canDelete: true,
+        isOwner,
+        isSharedMember,
+        isAdmin,
+        memberType: permissions?.memberType,
+        canManageTeam,
+        canAddImpactClaims: cap('canAddImpactClaims'),
+        canEditEvidence: cap('canEditEvidence'),
+        canDelete: cap('canDelete'),
+        canEditMetrics: cap('canEditMetrics'),
+        canEditInitiatives: cap('canEditInitiatives'),
+        canCreateInitiatives: cap('canCreateInitiatives'),
+        canEditLocations: cap('canEditLocations'),
+        canEditBeneficiaries: cap('canEditBeneficiaries'),
+        canEditStories: cap('canEditStories'),
+        canEditTags: cap('canEditTags'),
+        canExportReports: cap('canExportReports'),
+        canEditOrgContext: cap('canEditOrgContext'),
+        scope,
+        canAccessInitiative,
+        canAccessLocation,
         organizationId: activeOrganization?.id || permissions?.organizationId,
         organizationName: activeOrganization?.name || permissions?.organizationName,
         accessibleOrganizations,
@@ -179,7 +229,7 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
         refreshPermissions: fetchData,
         hasOwnOrganization: ownedOrganization !== null,
         ownedOrganization,
-        editableOrganization
+        editableOrganization,
     }
 
     return (
@@ -197,7 +247,6 @@ export function useTeam() {
     return context
 }
 
-// Hook to check if current user can perform an action
 export function useCanDelete() {
     const { canDelete } = useTeam()
     return canDelete
@@ -206,6 +255,11 @@ export function useCanDelete() {
 export function useCanAddImpactClaims() {
     const { canAddImpactClaims } = useTeam()
     return canAddImpactClaims
+}
+
+export function useCanEditEvidence() {
+    const { canEditEvidence } = useTeam()
+    return canEditEvidence
 }
 
 export function useIsOwner() {

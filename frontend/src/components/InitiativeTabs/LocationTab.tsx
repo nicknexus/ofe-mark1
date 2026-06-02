@@ -7,6 +7,7 @@ import LocationMap from '../LocationMap'
 import LocationModal from '../LocationModal'
 import LocationDetailsModal from '../LocationDetailsModal'
 import AddLocationPickerModal from '../AddLocationPickerModal'
+import { useTeam } from '../../context/TeamContext'
 import toast from 'react-hot-toast'
 import {
     DndContext,
@@ -35,7 +36,9 @@ function SortableLocationCard({
     onUnlinkClick,
     onDeleteClick,
     locationCardRefs,
-    country
+    country,
+    canEdit,
+    canDelete,
 }: {
     location: Location
     selectedLocationId: string | null
@@ -45,6 +48,8 @@ function SortableLocationCard({
     onDeleteClick: (e: React.MouseEvent) => void
     locationCardRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>
     country?: string | null
+    canEdit: boolean
+    canDelete: boolean
 }) {
     const {
         attributes,
@@ -80,7 +85,7 @@ function SortableLocationCard({
             <div
                 {...attributes}
                 {...listeners}
-                className="absolute top-1 right-1 cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded-lg z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                className={`absolute top-1 right-1 cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded-lg z-10 opacity-0 group-hover:opacity-100 transition-opacity ${canEdit ? '' : 'hidden'}`}
                 style={{ opacity: isDragging ? 1 : undefined }}
                 onClick={(e) => e.stopPropagation()}
             >
@@ -94,36 +99,42 @@ function SortableLocationCard({
                     )}
                 </div>
                 <div className="flex items-center space-x-1">
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation()
-                            onEditClick(location, e)
-                        }}
-                        title="Edit"
-                        className="p-1 text-gray-400 hover:text-primary-500 transition-colors rounded"
-                    >
-                        <Edit className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation()
-                            onUnlinkClick(e)
-                        }}
-                        title="Remove from this initiative"
-                        className="p-1 text-gray-400 transition-colors rounded hover:text-[#d97706]"
-                    >
-                        <Link2Off className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation()
-                            onDeleteClick(e)
-                        }}
-                        title="Delete (org-wide)"
-                        className="p-1 text-gray-400 hover:text-red-500 transition-colors rounded"
-                    >
-                        <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {canEdit && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                onEditClick(location, e)
+                            }}
+                            title="Edit"
+                            className="p-1 text-gray-400 hover:text-primary-500 transition-colors rounded"
+                        >
+                            <Edit className="w-3.5 h-3.5" />
+                        </button>
+                    )}
+                    {canEdit && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                onUnlinkClick(e)
+                            }}
+                            title="Remove from this initiative"
+                            className="p-1 text-gray-400 transition-colors rounded hover:text-[#d97706]"
+                        >
+                            <Link2Off className="w-3.5 h-3.5" />
+                        </button>
+                    )}
+                    {canDelete && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                onDeleteClick(e)
+                            }}
+                            title="Delete (org-wide)"
+                            className="p-1 text-gray-400 hover:text-red-500 transition-colors rounded"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                    )}
                 </div>
             </div>
             {location.description && (
@@ -142,6 +153,7 @@ interface LocationTabProps {
 
 export default function LocationTab({ onStoryClick, onMetricClick }: LocationTabProps) {
     const { id: initiativeId } = useParams<{ id: string }>()
+    const { canEditLocations, canDelete } = useTeam()
     const [locations, setLocations] = useState<Location[]>([])
     const [orderedLocations, setOrderedLocations] = useState<Location[]>([])
     const [loading, setLoading] = useState(true)
@@ -363,14 +375,16 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
                                 <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">Manage geographic locations for your initiative</p>
                             </div>
                         </div>
-                        <button
-                            onClick={handleAddClick}
-                            className="inline-flex items-center space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl sm:rounded-2xl text-sm font-medium transition-all duration-200 shadow-bubble-sm"
-                        >
-                            <Plus className="w-4 h-4" />
-                            <span className="hidden sm:inline">Add Location</span>
-                            <span className="sm:hidden">Add</span>
-                        </button>
+                        {canEditLocations && (
+                            <button
+                                onClick={handleAddClick}
+                                className="inline-flex items-center space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl sm:rounded-2xl text-sm font-medium transition-all duration-200 shadow-bubble-sm"
+                            >
+                                <Plus className="w-4 h-4" />
+                                <span className="hidden sm:inline">Add Location</span>
+                                <span className="sm:hidden">Add</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -446,6 +460,8 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
                                                 }}
                                                 locationCardRefs={locationCardRefs}
                                                 country={location.country}
+                                                canEdit={canEditLocations}
+                                                canDelete={canDelete}
                                             />
                                         ))}
                                     </SortableContext>

@@ -5,6 +5,7 @@ import { apiService } from '../services/api'
 import { formatDate, getLocalDateString } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import { useUploadManager } from '../context/UploadContext'
+import { useTeam } from '../context/TeamContext'
 import LocationModal from './LocationModal'
 import ModalFrame from './ModalFrame'
 import DateRangePicker from './DateRangePicker'
@@ -58,9 +59,12 @@ export default function AddEvidenceModal({
     const [isFetchingMatches, setIsFetchingMatches] = useState(false)
     const [kpiDataSummaries, setKpiDataSummaries] = useState<any[]>([])
     const [selectedUpdateIds, setSelectedUpdateIds] = useState<string[]>([])
+    const { canAccessLocation, canEditLocations } = useTeam()
     const [locations, setLocations] = useState<Location[]>([])
     const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([])
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
+    // Scoped team_members only see (and can attach) their allowed locations.
+    const visibleLocations = locations.filter((l) => !l.id || canAccessLocation(l.id))
     const [hasChangedDataPoints, setHasChangedDataPoints] = useState(false)
     const [hasChangedKPIs, setHasChangedKPIs] = useState(false)
     const [initialKpiIds, setInitialKpiIds] = useState<string[]>([])
@@ -771,31 +775,35 @@ export default function AddEvidenceModal({
                                                     ({selectedLocationIds.length})
                                                 </span>
                                             </span>
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsLocationModalOpen(true)}
-                                                className="px-2 py-1 border border-gray-300 rounded-md hover:bg-gray-50 text-xs font-medium text-gray-700 flex items-center gap-1 transition-colors"
-                                                title="Add new location"
-                                            >
-                                                <Plus className="w-3 h-3" />
-                                                <span>New</span>
-                                            </button>
+                                            {canEditLocations && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsLocationModalOpen(true)}
+                                                    className="px-2 py-1 border border-gray-300 rounded-md hover:bg-gray-50 text-xs font-medium text-gray-700 flex items-center gap-1 transition-colors"
+                                                    title="Add new location"
+                                                >
+                                                    <Plus className="w-3 h-3" />
+                                                    <span>New</span>
+                                                </button>
+                                            )}
                                         </label>
                                         <div className="space-y-2">
-                                            {locations.length === 0 ? (
+                                            {visibleLocations.length === 0 ? (
                                                 <div className="text-center py-6 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
                                                     <p className="text-gray-500 text-sm">No locations available.</p>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setIsLocationModalOpen(true)}
-                                                        className="mt-2 text-sm text-primary-500 hover:text-primary-600 font-medium"
-                                                    >
-                                                        Create your first location
-                                                    </button>
+                                                    {canEditLocations && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setIsLocationModalOpen(true)}
+                                                            className="mt-2 text-sm text-primary-500 hover:text-primary-600 font-medium"
+                                                        >
+                                                            Create your first location
+                                                        </button>
+                                                    )}
                                                 </div>
                                             ) : (
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto p-1">
-                                                    {locations.map((location) => {
+                                                    {visibleLocations.map((location) => {
                                                         const isChecked = selectedLocationIds.includes(location.id!)
                                                         return (
                                                             <label

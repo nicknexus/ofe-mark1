@@ -9,6 +9,7 @@ import EvidencePreviewModal from '../components/EvidencePreviewModal'
 import StoryDetailModal from '../components/StoryDetailModal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { formatDate, getEvidenceTypeInfo } from '../utils'
+import { useTeam } from '../context/TeamContext'
 
 interface TagDetail {
     tag: MetricTag
@@ -35,6 +36,7 @@ interface TagDetail {
 export default function TagDetailPage() {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
+    const { canEditTags, canDelete } = useTeam()
     const [data, setData] = useState<TagDetail | null>(null)
     const [loading, setLoading] = useState(true)
     const [editing, setEditing] = useState(false)
@@ -208,10 +210,14 @@ export default function TagDetailPage() {
                                 </div>
                             )}
                         </div>
-                        {!editing && (
+                        {!editing && (canEditTags || canDelete) && (
                             <div className="flex items-center gap-2 flex-shrink-0">
-                                <button onClick={() => setEditing(true)} className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg" title="Rename"><Edit2 className="w-4 h-4" /></button>
-                                <button onClick={requestDeleteTag} className="p-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                                {canEditTags && (
+                                    <button onClick={() => setEditing(true)} className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg" title="Rename"><Edit2 className="w-4 h-4" /></button>
+                                )}
+                                {canDelete && (
+                                    <button onClick={requestDeleteTag} className="p-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                                )}
                             </div>
                         )}
                     </div>

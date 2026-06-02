@@ -9,7 +9,7 @@ import AddStoryModal from '../AddStoryModal'
 import StoryDetailModal from '../StoryDetailModal'
 import DateRangePicker from '../DateRangePicker'
 import ConfirmDialog from '../ConfirmDialog'
-// Stories can be created by all team members (owners and invited users)
+import { useTeam } from '../../context/TeamContext'
 import toast from 'react-hot-toast'
 
 interface StoriesTabProps {
@@ -19,8 +19,7 @@ interface StoriesTabProps {
 }
 
 export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: StoriesTabProps) {
-    // Stories can be added by all team members (owners and invited users)
-    // canAddImpactClaims only controls KPI updates, not stories
+    const { canEditStories, canDelete } = useTeam()
     const [stories, setStories] = useState<Story[]>([])
     const [loading, setLoading] = useState(false)
     const [locations, setLocations] = useState<Location[]>([])
@@ -228,13 +227,15 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                                 <h2 className="text-xl font-semibold text-gray-800">Stories</h2>
                                 <p className="text-sm text-gray-500">Showcase your impact with photos and stories</p>
                             </div>
-                            <button
-                                onClick={handleAddStory}
-                                className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-medium transition-colors shadow-bubble-sm"
-                            >
-                                <Plus className="w-5 h-5" />
-                                <span>Add Story</span>
-                            </button>
+                            {canEditStories && (
+                                <button
+                                    onClick={handleAddStory}
+                                    className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-medium transition-colors shadow-bubble-sm"
+                                >
+                                    <Plus className="w-5 h-5" />
+                                    <span>Add Story</span>
+                                </button>
+                            )}
                         </div>
 
                         {/* Search Bar */}
@@ -561,12 +562,14 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                     <div className="flex flex-col items-center justify-center h-64 text-gray-500">
                         <p className="text-lg font-medium mb-2">No stories yet</p>
                         <p className="text-sm mb-4">Add your first story to showcase your impact</p>
-                        <button
-                            onClick={handleAddStory}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-                        >
-                            Add Story
-                        </button>
+                        {canEditStories && (
+                            <button
+                                onClick={handleAddStory}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                            >
+                                Add Story
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
@@ -592,8 +595,8 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
                         setSelectedStory(null)
                     }}
                     story={selectedStory}
-                    onEdit={handleEditStory}
-                    onDelete={setDeleteStoryId}
+                    onEdit={canEditStories ? handleEditStory : undefined}
+                    onDelete={canDelete ? setDeleteStoryId : undefined}
                 />
             )}
 

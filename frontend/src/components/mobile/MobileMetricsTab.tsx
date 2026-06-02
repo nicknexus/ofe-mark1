@@ -17,6 +17,7 @@ import { formatDate, getLocalDateString, compareClaimsByEffectiveDateDesc } from
 import { aggregateKpiUpdates } from '../../utils/kpiAggregation'
 import DateRangePicker from '../DateRangePicker'
 import TagPicker from '../MetricTags/TagPicker'
+import { useTeam } from '../../context/TeamContext'
 import toast from 'react-hot-toast'
 
 interface MobileMetricsTabProps {
@@ -150,6 +151,7 @@ interface MetricDetailProps {
 }
 
 function MobileMetricDetail({ kpi, initiativeId, onBack, autoAdd }: MetricDetailProps) {
+    const { canAddImpactClaims, canDelete } = useTeam()
     const [updates, setUpdates] = useState<KPIUpdate[]>([])
     const [loading, setLoading] = useState(true)
     const [showAddForm, setShowAddForm] = useState(false)
@@ -208,13 +210,15 @@ function MobileMetricDetail({ kpi, initiativeId, onBack, autoAdd }: MetricDetail
                     <h1 className="text-lg font-bold text-gray-900 truncate">{kpi.title}</h1>
                     <p className="text-xs text-gray-500">{kpi.unit_of_measurement} · {kpi.category}</p>
                 </div>
-                <button
-                    onClick={() => setShowAddForm(true)}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-primary-500 text-white rounded-xl font-semibold text-sm shadow-lg shadow-primary-500/25 active:scale-[0.98]"
-                >
-                    <Plus className="w-4 h-4" />
-                    Add
-                </button>
+                {canAddImpactClaims && (
+                    <button
+                        onClick={() => setShowAddForm(true)}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-primary-500 text-white rounded-xl font-semibold text-sm shadow-lg shadow-primary-500/25 active:scale-[0.98]"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Add
+                    </button>
+                )}
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-4">
@@ -252,12 +256,14 @@ function MobileMetricDetail({ kpi, initiativeId, onBack, autoAdd }: MetricDetail
                     <BarChart3 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
                     <h3 className="text-base font-semibold text-gray-800 mb-1">No Impact Claims</h3>
                     <p className="text-sm text-gray-500 px-6 mb-4">Add your first data point for this metric.</p>
-                    <button
-                        onClick={() => setShowAddForm(true)}
-                        className="px-5 py-2.5 bg-primary-500 text-white rounded-xl font-medium text-sm"
-                    >
-                        Add Impact Claim
-                    </button>
+                    {canAddImpactClaims && (
+                        <button
+                            onClick={() => setShowAddForm(true)}
+                            className="px-5 py-2.5 bg-primary-500 text-white rounded-xl font-medium text-sm"
+                        >
+                            Add Impact Claim
+                        </button>
+                    )}
                 </div>
             ) : (
                 <div className="space-y-2">
@@ -286,12 +292,14 @@ function MobileMetricDetail({ kpi, initiativeId, onBack, autoAdd }: MetricDetail
                                         }
                                     </span>
                                 </div>
-                                <button
-                                    onClick={() => setDeleteConfirmId(update.id!)}
-                                    className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
+                                {canDelete && (
+                                    <button
+                                        onClick={() => setDeleteConfirmId(update.id!)}
+                                        className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -339,6 +347,7 @@ interface AddClaimFlowProps {
 }
 
 function MobileAddClaimFlow({ kpi, initiativeId, onClose, onSuccess }: AddClaimFlowProps) {
+    const { canAccessLocation } = useTeam()
     const [step, setStep] = useState(1)
     const [saving, setSaving] = useState(false)
     const [locations, setLocations] = useState<Location[]>([])
@@ -357,8 +366,10 @@ function MobileAddClaimFlow({ kpi, initiativeId, onClose, onSuccess }: AddClaimF
     const [selectedTagId, setSelectedTagId] = useState<string | null>(null)
 
     useEffect(() => {
-        apiService.getLocations(initiativeId).then(locs => setLocations(locs || []))
-    }, [initiativeId])
+        apiService
+            .getLocations(initiativeId)
+            .then(locs => setLocations((locs || []).filter(l => !l.id || canAccessLocation(l.id))))
+    }, [initiativeId, canAccessLocation])
 
     const totalSteps = 3
 

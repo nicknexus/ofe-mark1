@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Tag as TagIcon, Plus, ArrowRight } from 'lucide-react'
 import { MetricTag } from '../../types'
 import { apiService } from '../../services/api'
+import { useTeam } from '../../context/TeamContext'
 import toast from 'react-hot-toast'
 
 interface TagsWidgetProps {
@@ -14,6 +15,7 @@ interface TagsWidgetProps {
 }
 
 export default function TagsWidget({ compact }: TagsWidgetProps) {
+    const { canEditTags } = useTeam()
     const [tags, setTags] = useState<MetricTag[]>([])
     const [loading, setLoading] = useState(true)
     const [creating, setCreating] = useState(false)
@@ -67,14 +69,16 @@ export default function TagsWidget({ compact }: TagsWidgetProps) {
                         See all
                         <ArrowRight className="w-3 h-3" />
                     </Link>
-                    <button
-                        type="button"
-                        onClick={() => setShowInput(s => !s)}
-                        className="px-2 py-1 text-xs font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors flex items-center gap-1"
-                    >
-                        <Plus className="w-3.5 h-3.5" />
-                        New
-                    </button>
+                    {canEditTags && (
+                        <button
+                            type="button"
+                            onClick={() => setShowInput(s => !s)}
+                            className="px-2 py-1 text-xs font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors flex items-center gap-1"
+                        >
+                            <Plus className="w-3.5 h-3.5" />
+                            New
+                        </button>
+                    )}
                 </div>
             </div>
 

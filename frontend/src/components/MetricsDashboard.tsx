@@ -76,7 +76,7 @@ interface MetricsDashboardProps {
 }
 
 export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = [], initiativeId, onNavigateToLocations, onMetricCardClick, onAddKPI, onStoryClick, user, organization, onOrderChange, onAddImpactClaim, onAddEvidence }: MetricsDashboardProps) {
-    const { canAddImpactClaims, ownedOrganization, hasOwnOrganization } = useTeam()
+    const { canAddImpactClaims, canEditEvidence, canEditMetrics, ownedOrganization, hasOwnOrganization } = useTeam()
     const [timeFrame, setTimeFrame] = useState<'all' | '1month' | '6months' | '1year' | '5years'>('all')
     const [isCumulative, setIsCumulative] = useState(false)
     const [isPercentageMode, setIsPercentageMode] = useState(false)
@@ -125,6 +125,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
 
     // Handle drag end
     const handleDragEnd = async (event: DragEndEvent) => {
+        if (!canEditMetrics) return
         const { active, over } = event
 
         if (!over || active.id === over.id) return
@@ -764,7 +765,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                         </button>
                     )}
                     {/* Add Evidence Button */}
-                    {onAddEvidence && (
+                    {onAddEvidence && canEditEvidence && (
                         <button
                             onClick={onAddEvidence}
                             className="flex items-center space-x-2 px-4 py-2 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25"
@@ -833,6 +834,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
                                         metricColor={metricColor}
                                         filteredTotal={filteredTotals[kpi.id] || 0}
                                         onMetricCardClick={onMetricCardClick}
+                                        disabled={!canEditMetrics}
                                     />
                                     {/* Small plus button on right edge of last card when exactly 6 metrics */}
                                     {isLastInFirstRow && onAddKPI && (

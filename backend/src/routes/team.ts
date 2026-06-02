@@ -5,13 +5,21 @@ import { sendTeamInvitationEmail } from '../utils/email';
 
 const router = Router();
 
+async function requireTeamManagementOrg(req: AuthenticatedRequest): Promise<{ id: string; name: string } | null> {
+    const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+    const orgId = await TeamService.resolveTeamManagementOrganizationId(req.user!.id, requestedOrgId);
+    if (!orgId) return null;
+    return TeamService.getOrganizationSummary(orgId);
+}
+
 /**
  * GET /api/team/permissions
  * Get current user's permissions (owner vs shared member)
  */
 router.get('/permissions', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const permissions = await TeamService.getUserPermissions(req.user!.id);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const permissions = await TeamService.getUserPermissions(req.user!.id, requestedOrgId);
         res.json(permissions);
     } catch (error) {
         console.error('Error getting permissions:', error);
@@ -67,27 +75,36 @@ router.get('/my-pending-invite', authenticateUser, async (req: AuthenticatedRequ
  */
 router.post('/invite', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const { email, canAddImpactClaims } = req.body;
+        const { email, canAddImpactClaims, memberType, permissions, scope } = req.body;
 
         if (!email || typeof email !== 'string') {
             res.status(400).json({ error: 'Email is required' });
             return;
         }
 
-        // Get user's organization
-        const org = await TeamService.getUserOwnedOrganization(req.user!.id);
-        if (!org) {
-            res.status(403).json({ error: 'You must be an organization owner to invite team members' });
+        if (memberType !== undefined && memberType !== 'admin' && memberType !== 'team_member') {
+            res.status(400).json({ error: 'memberType must be admin or team_member' });
             return;
         }
 
-        // Create invitation
-        const invitation = await TeamService.createInvitation(
-            org.id,
-            email,
-            req.user!.id,
-            canAddImpactClaims || false
-        );
+        if (memberType === 'team_member' && permissions !== undefined && !Array.isArray(permissions)) {
+            res.status(400).json({ error: 'permissions must be an array when provided' });
+            return;
+        }
+
+        const org = await requireTeamManagementOrg(req);
+        if (!org) {
+            res.status(403).json({ error: 'Only organization owners or admins can invite team members' });
+            return;
+        }
+
+        // Create invitation (legacy body → team_member + booleans; explicit memberType optional)
+        const invitation = await TeamService.createInvitation(org.id, email, req.user!.id, {
+            canAddImpactClaims: canAddImpactClaims || false,
+            memberType: memberType as 'admin' | 'team_member' | undefined,
+            permissions: Array.isArray(permissions) ? permissions : undefined,
+            scope,
+        });
 
         // Send email
         const emailResult = await sendTeamInvitationEmail({
@@ -112,7 +129,8 @@ router.post('/invite', authenticateUser, async (req: AuthenticatedRequest, res) 
                 email: invitation.email,
                 status: invitation.status,
                 expires_at: invitation.expires_at,
-                can_add_impact_claims: invitation.can_add_impact_claims
+                can_add_impact_claims: invitation.can_add_impact_claims,
+                member_type: invitation.member_type ?? 'team_member',
             },
             emailSent: emailResult.success,
             emailError: emailResult.error
@@ -181,10 +199,9 @@ router.post('/invite/:token/accept', authenticateUser, async (req: Authenticated
  */
 router.post('/invite/:id/resend', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        // Verify ownership
-        const org = await TeamService.getUserOwnedOrganization(req.user!.id);
+        const org = await requireTeamManagementOrg(req);
         if (!org) {
-            res.status(403).json({ error: 'Only organization owners can resend invitations' });
+            res.status(403).json({ error: 'Only organization owners or admins can resend invitations' });
             return;
         }
 
@@ -250,9 +267,9 @@ router.delete('/invite/:id', authenticateUser, async (req: AuthenticatedRequest,
  */
 router.get('/capacity', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const org = await TeamService.getUserOwnedOrganization(req.user!.id);
+        const org = await requireTeamManagementOrg(req);
         if (!org) {
-            res.status(403).json({ error: 'Only organization owners can view team capacity' });
+            res.status(403).json({ error: 'Only organization owners or admins can view team capacity' });
             return;
         }
 
@@ -272,11 +289,11 @@ router.get('/members', authenticateUser, async (req: AuthenticatedRequest, res) 
     try {
         console.log(`[Team Members] User ID: ${req.user!.id}, Email: ${req.user!.email}`);
         
-        const org = await TeamService.getUserOwnedOrganization(req.user!.id);
-        console.log(`[Team Members] Owned org:`, org ? org.name : 'NONE');
+        const org = await requireTeamManagementOrg(req);
+        console.log(`[Team Members] Managed org:`, org ? org.name : 'NONE');
         
         if (!org) {
-            res.status(403).json({ error: 'Only organization owners can view team members' });
+            res.status(403).json({ error: 'Only organization owners or admins can view team members' });
             return;
         }
 
@@ -294,9 +311,9 @@ router.get('/members', authenticateUser, async (req: AuthenticatedRequest, res) 
  */
 router.get('/invitations', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const org = await TeamService.getUserOwnedOrganization(req.user!.id);
+        const org = await requireTeamManagementOrg(req);
         if (!org) {
-            res.status(403).json({ error: 'Only organization owners can view invitations' });
+            res.status(403).json({ error: 'Only organization owners or admins can view invitations' });
             return;
         }
 
@@ -309,38 +326,119 @@ router.get('/invitations', authenticateUser, async (req: AuthenticatedRequest, r
 });
 
 /**
+ * GET /api/team/members/:id/permissions
+ */
+router.get('/members/:id/permissions', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const org = await requireTeamManagementOrg(req);
+        if (!org) {
+            res.status(403).json({ error: 'Not allowed' });
+            return;
+        }
+        await TeamService.assertMemberInOrganization(req.params.id, org.id);
+        const { TeamMemberPermissionsService } = await import('../services/teamMemberPermissionsService');
+        const blob = await TeamMemberPermissionsService.getMemberBlob(req.params.id);
+        res.json({ grants: blob.grants, scope: blob.scope });
+    } catch (error) {
+        console.error('Error fetching member permissions:', error);
+        res.status(404).json({ error: (error as Error).message });
+    }
+});
+
+/**
  * PUT /api/team/members/:id
- * Update member permissions (owner only)
+ * Update member role and permissions (owner or admin)
  */
 router.put('/members/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const { canAddImpactClaims, canEditEvidence } = req.body;
+        const { memberType, permissions, scope, canAddImpactClaims, canEditEvidence } = req.body;
 
-        if (canAddImpactClaims !== undefined && typeof canAddImpactClaims !== 'boolean') {
-            res.status(400).json({ error: 'canAddImpactClaims must be a boolean' });
-            return;
-        }
-        if (canEditEvidence !== undefined && typeof canEditEvidence !== 'boolean') {
-            res.status(400).json({ error: 'canEditEvidence must be a boolean' });
-            return;
-        }
-
-        // Verify ownership
-        const org = await TeamService.getUserOwnedOrganization(req.user!.id);
+        const org = await requireTeamManagementOrg(req);
         if (!org) {
-            res.status(403).json({ error: 'Only organization owners can update member permissions' });
+            res.status(403).json({ error: 'Only organization owners or admins can update members' });
             return;
         }
 
-        const member = await TeamService.updateMemberPermissions(
-            req.params.id,
-            org.id,
-            { canAddImpactClaims, canEditEvidence }
-        );
+        let member;
+        if (memberType === 'admin' || memberType === 'team_member') {
+            if (memberType === 'team_member' && permissions !== undefined && !Array.isArray(permissions)) {
+                res.status(400).json({ error: 'permissions must be an array' });
+                return;
+            }
+            member = await TeamService.updateTeamMember(req.params.id, org.id, {
+                memberType,
+                permissions: Array.isArray(permissions) ? permissions : undefined,
+                scope,
+            });
+        } else if (canAddImpactClaims !== undefined || canEditEvidence !== undefined) {
+            member = await TeamService.updateMemberPermissions(req.params.id, org.id, {
+                canAddImpactClaims,
+                canEditEvidence,
+            });
+        } else {
+            res.status(400).json({ error: 'memberType (admin | team_member) is required' });
+            return;
+        }
+
         res.json(member);
     } catch (error) {
         console.error('Error updating member:', error);
         res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * GET /api/team/invite/:id/permissions
+ */
+router.get('/invite/:id/permissions', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const org = await requireTeamManagementOrg(req);
+        if (!org) {
+            res.status(403).json({ error: 'Not allowed' });
+            return;
+        }
+        await TeamService.assertInvitationInOrganization(req.params.id, org.id);
+        const { TeamMemberPermissionsService } = await import('../services/teamMemberPermissionsService');
+        const blob = await TeamMemberPermissionsService.getInvitationBlob(req.params.id);
+        res.json({ grants: blob.grants, scope: blob.scope });
+    } catch (error) {
+        console.error('Error fetching invitation permissions:', error);
+        res.status(404).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * PUT /api/team/invite/:id
+ * Update pending invitation role and permissions
+ */
+router.put('/invite/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const { memberType, permissions, scope } = req.body;
+
+        if (memberType !== 'admin' && memberType !== 'team_member') {
+            res.status(400).json({ error: 'memberType must be admin or team_member' });
+            return;
+        }
+        if (memberType === 'team_member' && permissions !== undefined && !Array.isArray(permissions)) {
+            res.status(400).json({ error: 'permissions must be an array' });
+            return;
+        }
+
+        const org = await requireTeamManagementOrg(req);
+        if (!org) {
+            res.status(403).json({ error: 'Only organization owners or admins can update invitations' });
+            return;
+        }
+
+        const invitation = await TeamService.updatePendingInvitation(req.params.id, org.id, {
+            memberType,
+            permissions: Array.isArray(permissions) ? permissions : undefined,
+            scope,
+        });
+        res.json(invitation);
+    } catch (error) {
+        console.error('Error updating invitation:', error);
+        res.status(400).json({ error: (error as Error).message });
     }
 });
 
@@ -350,10 +448,9 @@ router.put('/members/:id', authenticateUser, async (req: AuthenticatedRequest, r
  */
 router.delete('/members/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        // Verify ownership
-        const org = await TeamService.getUserOwnedOrganization(req.user!.id);
+        const org = await requireTeamManagementOrg(req);
         if (!org) {
-            res.status(403).json({ error: 'Only organization owners can remove team members' });
+            res.status(403).json({ error: 'Only organization owners or admins can remove team members' });
             return;
         }
 

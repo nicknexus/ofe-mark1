@@ -44,7 +44,10 @@ import MobileBottomNav from '../components/MobileBottomNav'
 import ModalFrame from '../components/ModalFrame'
 import toast from 'react-hot-toast'
 import { Button } from '../components/ui/button'
+import { useTeam } from '../context/TeamContext'
+
 export default function InitiativePage() {
+    const { canAddImpactClaims, canEditEvidence, canEditMetrics, canDelete } = useTeam()
     const [user, setUser] = useState<User | null>(null)
     const [organization, setOrganization] = useState<Organization | null>(null)
     const { id, kpiId } = useParams<{ id: string; kpiId?: string }>()
@@ -453,7 +456,7 @@ export default function InitiativePage() {
                             initiativeId={id}
                             onNavigateToLocations={() => setActiveTab('location')}
                             onMetricCardClick={handleMetricCardClick}
-                            onAddKPI={() => setIsKPIModalOpen(true)}
+                            onAddKPI={canEditMetrics ? () => setIsKPIModalOpen(true) : undefined}
                             onStoryClick={(storyId) => {
                                 setInitialStoryId(storyId)
                                 setActiveTab('stories')
@@ -461,11 +464,11 @@ export default function InitiativePage() {
                             user={user}
                             organization={organization}
                             onOrderChange={setOrderedKPIIds}
-                            onAddImpactClaim={() => setIsImpactClaimModalWithSelectionOpen(true)}
-                            onAddEvidence={() => {
+                            onAddImpactClaim={canAddImpactClaims ? () => setIsImpactClaimModalWithSelectionOpen(true) : undefined}
+                            onAddEvidence={canEditEvidence ? () => {
                                 setSelectedKPI(null)
                                 setIsEvidenceModalOpen(true)
-                            }}
+                            } : undefined}
                         />
                     </div>
                 )}
@@ -491,11 +494,11 @@ export default function InitiativePage() {
                         expandedKPIs={expandedKPIs}
                         setExpandedKPIs={setExpandedKPIs}
                         allKPIUpdates={allKPIUpdates}
-                        onAddKPI={() => setIsKPIModalOpen(true)}
+                        onAddKPI={canEditMetrics ? () => setIsKPIModalOpen(true) : undefined}
                         onAddUpdate={openUpdateModal}
-                        onAddEvidence={openEvidenceModal}
-                        onEditKPI={openEditModal}
-                        onDeleteKPI={openDeleteConfirm}
+                        onAddEvidence={canEditEvidence ? openEvidenceModal : undefined}
+                        onEditKPI={canEditMetrics ? openEditModal : undefined}
+                        onDeleteKPI={canDelete ? openDeleteConfirm : undefined}
                         orderedKPIIds={orderedKPIIds}
                         onToggleKPIExpansion={toggleKPIExpansion}
                         initiativeId={id}

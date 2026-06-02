@@ -6,6 +6,7 @@ import LocationModal from './LocationModal'
 import ModalFrame from './ModalFrame'
 import DateRangePicker from './DateRangePicker'
 import { getLocalDateString, getCategoryColor } from '../utils'
+import { useTeam } from '../context/TeamContext'
 import toast from 'react-hot-toast'
 
 interface AddKPIUpdateModalWithMetricSelectionProps {
@@ -40,10 +41,12 @@ export default function AddKPIUpdateModalWithMetricSelection({
     const [loading, setLoading] = useState(false)
     const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
     const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
+    const { canAccessLocation, canEditLocations } = useTeam()
     const [locations, setLocations] = useState<Location[]>([])
     const [selectedLocationId, setSelectedLocationId] = useState<string>('')
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
+    const visibleLocations = locations.filter((l) => !l.id || canAccessLocation(l.id))
     const totalSteps = 4
     const formContentRef = useRef<HTMLFormElement>(null)
 
@@ -494,13 +497,13 @@ export default function AddKPIUpdateModalWithMetricSelection({
                                                 required
                                             >
                                                 <option value="">Select a location...</option>
-                                                {locations.map((location) => (
+                                                {visibleLocations.map((location) => (
                                                     <option key={location.id} value={location.id}>
                                                         {location.name}
                                                     </option>
                                                 ))}
                                             </select>
-                                            {initiativeId && (
+                                            {initiativeId && canEditLocations && (
                                                 <button
                                                     type="button"
                                                     onClick={() => setIsLocationModalOpen(true)}

@@ -65,9 +65,9 @@ interface ExpandableKPICardProps {
     renderAsPage?: boolean // When true, renders as full page instead of portal overlay
     onToggleExpand: () => void
     onAddUpdate: () => void
-    onAddEvidence: () => void
-    onEdit: () => void
-    onDelete: () => void
+    onAddEvidence?: () => void
+    onEdit?: () => void
+    onDelete?: () => void
     kpiUpdates?: any[] // Add KPI updates data for this specific KPI
     initiativeId?: string // Initiative ID for fetching evidence
     onRefresh?: () => void // Optional callback to refresh data after updates
@@ -96,7 +96,7 @@ export default function ExpandableKPICard({
     const chartColor = metricColor || DEFAULT_METRIC_COLOR
 
     // Team permissions
-    const { canAddImpactClaims } = useTeam()
+    const { canAddImpactClaims, canEditEvidence, canEditMetrics, canDelete } = useTeam()
 
     // Lock body scroll when expanded (only for portal mode, not page mode)
     useEffect(() => {
@@ -418,6 +418,7 @@ export default function ExpandableKPICard({
     const handleAddEvidenceForClaim = (claim: any, e: React.MouseEvent) => {
         e.stopPropagation()
         e.preventDefault()
+        if (!canEditEvidence) return
         setSelectedClaimForEvidence(claim)
         setIsEasyEvidenceModalOpen(true)
     }
@@ -517,17 +518,23 @@ export default function ExpandableKPICard({
                                         <span className="sm:hidden">Claim</span>
                                     </button>
                                 )}
-                                <button onClick={(e) => { e.stopPropagation(); onAddEvidence() }} className="flex items-center gap-1.5 px-2.5 lg:px-4 py-1.5 lg:py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-lg lg:rounded-xl font-semibold text-xs lg:text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25 whitespace-nowrap">
-                                    <Upload className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
-                                    <span className="hidden sm:inline">Add Evidence</span>
-                                    <span className="sm:hidden">Evidence</span>
-                                </button>
-                                <button onClick={(e) => { e.stopPropagation(); onEdit() }} className="p-1.5 lg:p-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/60 text-gray-600 rounded-lg lg:rounded-xl transition-all duration-200">
-                                    <Edit className="w-4 h-4 lg:w-5 lg:h-5" />
-                                </button>
-                                <button onClick={(e) => { e.stopPropagation(); onDelete() }} className="p-1.5 lg:p-2.5 bg-red-50/80 hover:bg-red-100 text-red-500 rounded-lg lg:rounded-xl transition-all duration-200">
-                                    <Trash2 className="w-4 h-4 lg:w-5 lg:h-5" />
-                                </button>
+                                {canEditEvidence && (
+                                    <button onClick={(e) => { e.stopPropagation(); onAddEvidence?.() }} className="flex items-center gap-1.5 px-2.5 lg:px-4 py-1.5 lg:py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-lg lg:rounded-xl font-semibold text-xs lg:text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25 whitespace-nowrap">
+                                        <Upload className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+                                        <span className="hidden sm:inline">Add Evidence</span>
+                                        <span className="sm:hidden">Evidence</span>
+                                    </button>
+                                )}
+                                {canEditMetrics && (
+                                    <button onClick={(e) => { e.stopPropagation(); onEdit?.() }} className="p-1.5 lg:p-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/60 text-gray-600 rounded-lg lg:rounded-xl transition-all duration-200">
+                                        <Edit className="w-4 h-4 lg:w-5 lg:h-5" />
+                                    </button>
+                                )}
+                                {canDelete && (
+                                    <button onClick={(e) => { e.stopPropagation(); onDelete?.() }} className="p-1.5 lg:p-2.5 bg-red-50/80 hover:bg-red-100 text-red-500 rounded-lg lg:rounded-xl transition-all duration-200">
+                                        <Trash2 className="w-4 h-4 lg:w-5 lg:h-5" />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -694,15 +701,17 @@ export default function ExpandableKPICard({
                                                                                         <span>0 | 0% Coverage</span>
                                                                                     </div>
                                                                                 )}
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={(e) => handleAddEvidenceForClaim(update, e)}
-                                                                                    className="flex items-center gap-1 px-2 py-1 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-xs font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
-                                                                                    title="Add supporting evidence for this claim"
-                                                                                >
-                                                                                    <Upload className="w-2.5 h-2.5" />
-                                                                                    <span>Add Evidence</span>
-                                                                                </button>
+                                                                                {canEditEvidence && (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={(e) => handleAddEvidenceForClaim(update, e)}
+                                                                                        className="flex items-center gap-1 px-2 py-1 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-xs font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
+                                                                                        title="Add supporting evidence for this claim"
+                                                                                    >
+                                                                                        <Upload className="w-2.5 h-2.5" />
+                                                                                        <span>Add Evidence</span>
+                                                                                    </button>
+                                                                                )}
                                                                             </>
                                                                         )
                                                                     })()}
@@ -746,10 +755,10 @@ export default function ExpandableKPICard({
                         kpi={selectedDataPoint.kpi || kpi}
                         isOpen={isDataPointPreviewOpen}
                         onClose={() => { setIsDataPointPreviewOpen(false); setSelectedDataPoint(null) }}
-                        onEdit={(dp) => { setEditingDataPoint(dp); setIsDataPointPreviewOpen(false); setSelectedDataPoint(null); setIsEditDataPointModalOpen(true) }}
-                        onDelete={(dp) => { setDeleteConfirmDataPoint(dp); setIsDataPointPreviewOpen(false); setSelectedDataPoint(null) }}
+                        onEdit={canEditMetrics ? (dp) => { setEditingDataPoint(dp); setIsDataPointPreviewOpen(false); setSelectedDataPoint(null); setIsEditDataPointModalOpen(true) } : undefined}
+                        onDelete={canDelete ? (dp) => { setDeleteConfirmDataPoint(dp); setIsDataPointPreviewOpen(false); setSelectedDataPoint(null) } : undefined}
                         onEvidenceClick={(ev) => { setSelectedEvidence(ev); setIsDataPointPreviewOpen(false); setIsEvidencePreviewOpen(true) }}
-                        onAddEvidence={(dp) => { setIsDataPointPreviewOpen(false); setSelectedDataPoint(null); setSelectedClaimForEvidence(dp); setIsEasyEvidenceModalOpen(true) }}
+                        onAddEvidence={canEditEvidence ? (dp) => { setIsDataPointPreviewOpen(false); setSelectedDataPoint(null); setSelectedClaimForEvidence(dp); setIsEasyEvidenceModalOpen(true) } : undefined}
                     />,
                     document.body
                 )}
@@ -759,8 +768,8 @@ export default function ExpandableKPICard({
                         evidence={selectedEvidence}
                         isOpen={isEvidencePreviewOpen}
                         onClose={() => setIsEvidencePreviewOpen(false)}
-                        onEdit={(ev) => { setSelectedEvidence(ev); setIsEvidencePreviewOpen(false); setIsEditEvidenceModalOpen(true) }}
-                        onDelete={(ev) => { setDeleteConfirmEvidence(ev); setIsEvidencePreviewOpen(false) }}
+                        onEdit={canEditEvidence ? (ev) => { setSelectedEvidence(ev); setIsEvidencePreviewOpen(false); setIsEditEvidenceModalOpen(true) } : undefined}
+                        onDelete={canDelete ? (ev) => { setDeleteConfirmEvidence(ev); setIsEvidencePreviewOpen(false) } : undefined}
                         onDataPointClick={(dp) => { setSelectedDataPoint(dp); setIsEvidencePreviewOpen(false); setIsDataPointPreviewOpen(true) }}
                     />,
                     document.body
@@ -1038,11 +1047,11 @@ export default function ExpandableKPICard({
                                         <span>Add Impact Claim</span>
                                     </button>
                                 )}
-                                {kpi.total_updates > 0 && (
+                                {canEditEvidence && kpi.total_updates > 0 && (
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation()
-                                            onAddEvidence()
+                                            onAddEvidence?.()
                                         }}
                                         className="flex items-center space-x-2 px-4 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
                                     >
@@ -1062,25 +1071,29 @@ export default function ExpandableKPICard({
                                         <span>Credit to Donor</span>
                                     </button>
                                 )}
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        onEdit()
-                                    }}
-                                    className="flex items-center space-x-2 px-4 py-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/60 text-gray-600 rounded-xl text-sm font-medium transition-all duration-200"
-                                >
-                                    <Edit className="w-4 h-4" />
-                                    <span>Edit</span>
-                                </button>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        onDelete()
-                                    }}
-                                    className="p-2.5 bg-red-50/80 hover:bg-red-100 text-red-500 rounded-xl transition-all duration-200"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
+                                {canEditMetrics && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            onEdit?.()
+                                        }}
+                                        className="flex items-center space-x-2 px-4 py-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/60 text-gray-600 rounded-xl text-sm font-medium transition-all duration-200"
+                                    >
+                                        <Edit className="w-4 h-4" />
+                                        <span>Edit</span>
+                                    </button>
+                                )}
+                                {canDelete && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            onDelete?.()
+                                        }}
+                                        className="p-2.5 bg-red-50/80 hover:bg-red-100 text-red-500 rounded-xl transition-all duration-200"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -1273,15 +1286,17 @@ export default function ExpandableKPICard({
                                                                                         <span>0 | 0% Coverage</span>
                                                                                     </div>
                                                                                 )}
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={(e) => handleAddEvidenceForClaim(update, e)}
-                                                                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-xs font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
-                                                                                    title="Add supporting evidence for this claim"
-                                                                                >
-                                                                                    <Upload className="w-3 h-3" />
-                                                                                    <span>Add Evidence</span>
-                                                                                </button>
+                                                                                {canEditEvidence && (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={(e) => handleAddEvidenceForClaim(update, e)}
+                                                                                        className="flex items-center gap-1 px-2.5 py-1.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-xs font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
+                                                                                        title="Add supporting evidence for this claim"
+                                                                                    >
+                                                                                        <Upload className="w-3 h-3" />
+                                                                                        <span>Add Evidence</span>
+                                                                                    </button>
+                                                                                )}
                                                                             </>
                                                                         )
                                                                     })()}
@@ -1362,11 +1377,11 @@ export default function ExpandableKPICard({
                                         <span>Add Impact Claim</span>
                                     </button>
                                 )}
-                                {kpi.total_updates > 0 && (
+                                {canEditEvidence && kpi.total_updates > 0 && (
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation()
-                                            onAddEvidence()
+                                            onAddEvidence?.()
                                         }}
                                         className="flex items-center space-x-2 px-4 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
                                     >
@@ -1386,25 +1401,29 @@ export default function ExpandableKPICard({
                                         <span>Credit to Donor</span>
                                     </button>
                                 )}
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        onEdit()
-                                    }}
-                                    className="flex items-center space-x-2 px-4 py-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/60 text-gray-600 rounded-xl text-sm font-medium transition-all duration-200"
-                                >
-                                    <Edit className="w-4 h-4" />
-                                    <span>Edit</span>
-                                </button>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        onDelete()
-                                    }}
-                                    className="p-2.5 bg-red-50/80 hover:bg-red-100 text-red-500 rounded-xl transition-all duration-200"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
+                                {canEditMetrics && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            onEdit?.()
+                                        }}
+                                        className="flex items-center space-x-2 px-4 py-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/60 text-gray-600 rounded-xl text-sm font-medium transition-all duration-200"
+                                    >
+                                        <Edit className="w-4 h-4" />
+                                        <span>Edit</span>
+                                    </button>
+                                )}
+                                {canDelete && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            onDelete?.()
+                                        }}
+                                        className="p-2.5 bg-red-50/80 hover:bg-red-100 text-red-500 rounded-xl transition-all duration-200"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -1709,15 +1728,17 @@ export default function ExpandableKPICard({
                                                                                             <span>0 | 0% Coverage</span>
                                                                                         </div>
                                                                                     )}
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={(e) => handleAddEvidenceForClaim(update, e)}
-                                                                                        className="flex items-center gap-1 px-2.5 py-1.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-xs font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
-                                                                                        title="Add supporting evidence for this claim"
-                                                                                    >
-                                                                                        <Upload className="w-3 h-3" />
-                                                                                        <span>Add Evidence</span>
-                                                                                    </button>
+                                                                                    {canEditEvidence && (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={(e) => handleAddEvidenceForClaim(update, e)}
+                                                                                            className="flex items-center gap-1 px-2.5 py-1.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-xs font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
+                                                                                            title="Add supporting evidence for this claim"
+                                                                                        >
+                                                                                            <Upload className="w-3 h-3" />
+                                                                                            <span>Add Evidence</span>
+                                                                                        </button>
+                                                                                    )}
                                                                                 </>
                                                                             )
                                                                         })()}
@@ -1779,28 +1800,28 @@ export default function ExpandableKPICard({
                         setIsDataPointPreviewOpen(false)
                         setSelectedDataPoint(null)
                     }}
-                    onEdit={(dataPoint) => {
+                    onEdit={canEditMetrics ? (dataPoint) => {
                         setEditingDataPoint(dataPoint)
                         setIsDataPointPreviewOpen(false)
                         setSelectedDataPoint(null)
                         setIsEditDataPointModalOpen(true)
-                    }}
-                    onDelete={(dataPoint) => {
+                    } : undefined}
+                    onDelete={canDelete ? (dataPoint) => {
                         setDeleteConfirmDataPoint(dataPoint)
                         setIsDataPointPreviewOpen(false)
                         setSelectedDataPoint(null)
-                    }}
+                    } : undefined}
                     onEvidenceClick={(evidence) => {
                         setSelectedEvidence(evidence)
                         setIsDataPointPreviewOpen(false)
                         setIsEvidencePreviewOpen(true)
                     }}
-                    onAddEvidence={(dp) => {
+                    onAddEvidence={canEditEvidence ? (dp) => {
                         setIsDataPointPreviewOpen(false)
                         setSelectedDataPoint(null)
                         setSelectedClaimForEvidence(dp)
                         setIsEasyEvidenceModalOpen(true)
-                    }}
+                    } : undefined}
                 />,
                 document.body
             )}
@@ -1811,15 +1832,15 @@ export default function ExpandableKPICard({
                     evidence={selectedEvidence}
                     isOpen={isEvidencePreviewOpen}
                     onClose={() => setIsEvidencePreviewOpen(false)}
-                    onEdit={(evidence) => {
+                    onEdit={canEditEvidence ? (evidence) => {
                         setSelectedEvidence(evidence)
                         setIsEvidencePreviewOpen(false)
                         setIsEditEvidenceModalOpen(true)
-                    }}
-                    onDelete={(evidence) => {
+                    } : undefined}
+                    onDelete={canDelete ? (evidence) => {
                         setDeleteConfirmEvidence(evidence)
                         setIsEvidencePreviewOpen(false)
-                    }}
+                    } : undefined}
                     onDataPointClick={(dataPoint, kpiData) => {
                         setSelectedDataPoint(dataPoint)
                         setIsEvidencePreviewOpen(false)

@@ -23,6 +23,7 @@ import {
     Users
 } from 'lucide-react'
 import { apiService } from '../../services/api'
+import { useTeam } from '../../context/TeamContext'
 import { Evidence, Location, KPI, BeneficiaryGroup } from '../../types'
 import { formatDate, getEvidenceTypeInfo, getLocalDateString } from '../../utils'
 import { aggregateKpiUpdates } from '../../utils/kpiAggregation'
@@ -38,6 +39,7 @@ interface MobileEvidenceTabProps {
 }
 
 export default function MobileEvidenceTab({ initiativeId, onRefresh, autoAdd }: MobileEvidenceTabProps) {
+    const { canEditEvidence, canDelete } = useTeam()
     const [evidence, setEvidence] = useState<Evidence[]>([])
     const [loading, setLoading] = useState(true)
     const [showUploadFlow, setShowUploadFlow] = useState(!!autoAdd)
@@ -160,7 +162,7 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh, autoAdd }: 
     }
 
     // Show upload flow for new evidence
-    if (showUploadFlow) {
+    if (showUploadFlow && canEditEvidence) {
         return (
             <MobileEvidenceUploadFlow
                 initiativeId={initiativeId}
@@ -212,13 +214,15 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh, autoAdd }: 
                         <Filter className="w-4 h-4" />
                         {hasActiveFilters && <span className="w-1.5 h-1.5 rounded-full bg-evidence-500"></span>}
                     </button>
-                    <button
-                        onClick={() => setShowUploadFlow(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-evidence-500 text-white rounded-xl font-semibold text-sm shadow-lg shadow-evidence-500/25 active:scale-[0.98]"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Add
-                    </button>
+                    {canEditEvidence && (
+                        <button
+                            onClick={() => setShowUploadFlow(true)}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-evidence-500 text-white rounded-xl font-semibold text-sm shadow-lg shadow-evidence-500/25 active:scale-[0.98]"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Add
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -316,12 +320,14 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh, autoAdd }: 
                     <p className="text-gray-500 text-sm px-6 mb-6">
                         Add photos, documents, or recordings to support your impact claims.
                     </p>
-                    <button
-                        onClick={() => setShowUploadFlow(true)}
-                        className="px-6 py-3 bg-evidence-500 text-white rounded-xl font-medium text-sm"
-                    >
-                        Add Evidence
-                    </button>
+                    {canEditEvidence && (
+                        <button
+                            onClick={() => setShowUploadFlow(true)}
+                            className="px-6 py-3 bg-evidence-500 text-white rounded-xl font-medium text-sm"
+                        >
+                            Add Evidence
+                        </button>
+                    )}
                 </div>
             ) : filteredEvidence.length === 0 ? (
                 <div className="text-center py-12 bg-white rounded-2xl border border-gray-100">
@@ -411,8 +417,8 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh, autoAdd }: 
                         setShowPreview(false)
                         setSelectedEvidence(null)
                     }}
-                    onEdit={() => handleEditEvidence(selectedEvidence)}
-                    onDelete={() => handleDeleteEvidence(selectedEvidence)}
+                    onEdit={canEditEvidence ? () => handleEditEvidence(selectedEvidence) : undefined}
+                    onDelete={canDelete ? () => handleDeleteEvidence(selectedEvidence) : undefined}
                 />
             )}
         </div>
@@ -423,8 +429,8 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh, autoAdd }: 
 interface MobileEvidencePreviewProps {
     evidence: Evidence
     onClose: () => void
-    onEdit: () => void
-    onDelete: () => void
+    onEdit?: () => void
+    onDelete?: () => void
 }
 
 function MobileEvidencePreview({ evidence, onClose, onEdit, onDelete }: MobileEvidencePreviewProps) {
@@ -717,20 +723,24 @@ function MobileEvidencePreview({ evidence, onClose, onEdit, onDelete }: MobileEv
             {/* Footer Actions */}
             <div className="bg-white border-t border-gray-100 p-4 safe-area-pb">
                 <div className="flex gap-3">
-                    <button
-                        onClick={() => setShowDeleteConfirm(true)}
-                        className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-50 text-red-600 rounded-xl font-medium text-sm"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                        Delete
-                    </button>
-                    <button
-                        onClick={onEdit}
-                        className="flex-1 flex items-center justify-center gap-2 py-3 bg-evidence-500 text-white rounded-xl font-semibold text-sm"
-                    >
-                        <Edit className="w-4 h-4" />
-                        Edit
-                    </button>
+                    {onDelete && (
+                        <button
+                            onClick={() => setShowDeleteConfirm(true)}
+                            className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-50 text-red-600 rounded-xl font-medium text-sm"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                            Delete
+                        </button>
+                    )}
+                    {onEdit && (
+                        <button
+                            onClick={onEdit}
+                            className="flex-1 flex items-center justify-center gap-2 py-3 bg-evidence-500 text-white rounded-xl font-semibold text-sm"
+                        >
+                            <Edit className="w-4 h-4" />
+                            Edit
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -760,7 +770,7 @@ function MobileEvidencePreview({ evidence, onClose, onEdit, onDelete }: MobileEv
                             <button
                                 onClick={() => {
                                     setShowDeleteConfirm(false)
-                                    onDelete()
+                                    onDelete?.()
                                 }}
                                 className="flex-1 py-3 px-4 bg-red-500 text-white rounded-xl font-medium text-sm"
                             >
@@ -782,6 +792,7 @@ interface UploadFlowProps {
 }
 
 function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFlowProps) {
+    const { canAccessLocation } = useTeam()
     const [step, setStep] = useState(1)
     const [loading, setLoading] = useState(false)
     const [locations, setLocations] = useState<Location[]>([])
@@ -817,11 +828,11 @@ function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFl
             apiService.getKPIs(initiativeId),
             apiService.getBeneficiaryGroups(initiativeId)
         ]).then(([locs, kpiData, bgs]) => {
-            setLocations(locs || [])
+            setLocations((locs || []).filter(l => !l.id || canAccessLocation(l.id)))
             setKPIs(kpiData || [])
             setBeneficiaryGroups((bgs as BeneficiaryGroup[]) || [])
         })
-    }, [initiativeId])
+    }, [initiativeId, canAccessLocation])
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -1365,6 +1376,7 @@ interface EditFlowProps {
 type EvidenceType = 'visual_proof' | 'documentation' | 'testimony' | 'financials'
 
 function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: EditFlowProps) {
+    const { canAccessLocation } = useTeam()
     const [loading, setLoading] = useState(false)
     const [locations, setLocations] = useState<Location[]>([])
     const [kpis, setKPIs] = useState<KPI[]>([])
@@ -1401,10 +1413,10 @@ function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: 
             apiService.getLocations(initiativeId),
             apiService.getKPIs(initiativeId)
         ]).then(([locs, kpiData]) => {
-            setLocations(locs || [])
+            setLocations((locs || []).filter(l => !l.id || canAccessLocation(l.id)))
             setKPIs(kpiData || [])
         })
-    }, [initiativeId])
+    }, [initiativeId, canAccessLocation])
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]

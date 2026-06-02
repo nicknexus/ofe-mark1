@@ -1,3 +1,4 @@
+-- DEPRECATED: use add_team_member_types.sql instead (owner/admin/team_member model).
 -- Team roles & permissions (backwards-compatible Phase 2)
 -- Owners remain on organizations.owner_id — never team_members.role_id.
 -- Existing can_add_impact_claims / can_edit_evidence columns are kept.

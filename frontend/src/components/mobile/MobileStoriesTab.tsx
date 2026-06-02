@@ -21,6 +21,7 @@ import DateRangePicker from '../DateRangePicker'
 import StoryDetailModal from '../StoryDetailModal'
 import TagPicker from '../MetricTags/TagPicker'
 import EvidenceTagsList from '../MetricTags/EvidenceTagsList'
+import { useTeam } from '../../context/TeamContext'
 import toast from 'react-hot-toast'
 
 interface MobileStoriesTabProps {
@@ -29,6 +30,7 @@ interface MobileStoriesTabProps {
 }
 
 export default function MobileStoriesTab({ initiativeId, autoAdd }: MobileStoriesTabProps) {
+    const { canEditStories, canDelete } = useTeam()
     const [stories, setStories] = useState<Story[]>([])
     const [loading, setLoading] = useState(true)
     const [showCreateFlow, setShowCreateFlow] = useState(!!autoAdd)
@@ -85,13 +87,15 @@ export default function MobileStoriesTab({ initiativeId, autoAdd }: MobileStorie
                     <h1 className="text-xl font-bold text-gray-900">Stories</h1>
                     <p className="text-sm text-gray-500">{stories.length} stor{stories.length !== 1 ? 'ies' : 'y'}</p>
                 </div>
-                <button
-                    onClick={() => setShowCreateFlow(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-primary-500 text-white rounded-xl font-semibold text-sm shadow-lg shadow-primary-500/25 active:scale-[0.98]"
-                >
-                    <Plus className="w-4 h-4" />
-                    Add
-                </button>
+                {canEditStories && (
+                    <button
+                        onClick={() => setShowCreateFlow(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-primary-500 text-white rounded-xl font-semibold text-sm shadow-lg shadow-primary-500/25 active:scale-[0.98]"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Add
+                    </button>
+                )}
             </div>
 
             {/* Stories Grid */}
@@ -108,12 +112,14 @@ export default function MobileStoriesTab({ initiativeId, autoAdd }: MobileStorie
                     <p className="text-gray-500 text-sm px-6 mb-6">
                         Share your impact with photos and stories.
                     </p>
-                    <button
-                        onClick={() => setShowCreateFlow(true)}
-                        className="px-6 py-3 bg-primary-500 text-white rounded-xl font-medium text-sm"
-                    >
-                        Create Story
-                    </button>
+                    {canEditStories && (
+                        <button
+                            onClick={() => setShowCreateFlow(true)}
+                            className="px-6 py-3 bg-primary-500 text-white rounded-xl font-medium text-sm"
+                        >
+                            Create Story
+                        </button>
+                    )}
                 </div>
             ) : (
                 <div className="grid grid-cols-2 gap-3">
@@ -197,8 +203,8 @@ export default function MobileStoriesTab({ initiativeId, autoAdd }: MobileStorie
                         setSelectedStory(null)
                     }}
                     story={selectedStory}
-                    onEdit={() => {}}
-                    onDelete={handleDeleteStory}
+                    onEdit={canEditStories ? () => {} : undefined}
+                    onDelete={canDelete ? handleDeleteStory : undefined}
                 />
             )}
         </div>

@@ -42,7 +42,8 @@ export default function Layout({ user, children }: LayoutProps) {
         hasMultipleOrgs,
         isSharedMember,
         ownedOrganization,
-        hasOwnOrganization
+        hasOwnOrganization,
+        canEditOrgContext
     } = useTeam()
     const isDemoOrg = !!activeOrganization?.is_demo
 
@@ -247,7 +248,7 @@ export default function Layout({ user, children }: LayoutProps) {
                             {/* Right side: Explore, Tutorial, Settings, User Profile */}
                             <div className="flex items-center gap-3">
                                 {/* Context Button */}
-                                {activeOrganization && (
+                                {activeOrganization && canEditOrgContext && (
                                     <Link
                                         to="/context"
                                         className="hidden lg:flex items-center gap-2 px-4 py-2 bg-white/80 hover:bg-white border border-gray-200 hover:border-gray-300 rounded-full transition-all duration-200 shadow-bubble-sm"
@@ -395,7 +396,7 @@ export default function Layout({ user, children }: LayoutProps) {
                                         <Compass className="w-5 h-5" />
                                         <span>Explore Organizations</span>
                                     </Link>
-                                    {activeOrganization && (
+                                    {activeOrganization && canEditOrgContext && (
                                         <Link
                                             to="/context"
                                             onClick={() => setMobileMenuOpen(false)}

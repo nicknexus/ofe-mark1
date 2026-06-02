@@ -23,6 +23,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { Button } from './ui/button'
 import ModalFrame from './ModalFrame'
+import { useTeam } from '../context/TeamContext'
 
 // Sortable Beneficiary Group Card Component - Simple card like StoriesTab
 function SortableBeneficiaryGroupCard({
@@ -33,6 +34,8 @@ function SortableBeneficiaryGroupCard({
     onClick,
     onEdit,
     onDelete,
+    canEdit,
+    canDelete,
 }: {
     group: BeneficiaryGroup
     locationNames: string[]
@@ -41,6 +44,8 @@ function SortableBeneficiaryGroupCard({
     onClick: () => void
     onEdit: (e: React.MouseEvent) => void
     onDelete: (e: React.MouseEvent) => void
+    canEdit: boolean
+    canDelete: boolean
 }) {
     const {
         attributes,
@@ -89,26 +94,30 @@ function SortableBeneficiaryGroupCard({
                         </div>
                     </div>
                     <div className="flex items-center space-x-1 flex-shrink-0">
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                onEdit(e)
-                            }}
-                            className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors opacity-0 group-hover:opacity-100"
-                            title="Edit Group"
-                        >
-                            <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                onDelete(e)
-                            }}
-                            className="p-1.5 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
-                            title="Delete Group"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </button>
+                        {canEdit && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    onEdit(e)
+                                }}
+                                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors opacity-0 group-hover:opacity-100"
+                                title="Edit Group"
+                            >
+                                <Edit className="w-4 h-4" />
+                            </button>
+                        )}
+                        {canDelete && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    onDelete(e)
+                                }}
+                                className="p-1.5 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                                title="Delete Group"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                        )}
                     </div>
                 </div>
                 <div className="flex items-center gap-2 pt-3 border-t border-gray-100 min-w-0">
@@ -307,6 +316,7 @@ function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiativeId }:
 }
 
 export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryClick, onMetricClick }: BeneficiaryManagerProps) {
+    const { canEditBeneficiaries, canDelete } = useTeam()
     const [groups, setGroups] = useState<BeneficiaryGroup[]>([])
     const [orderedGroups, setOrderedGroups] = useState<BeneficiaryGroup[]>([])
     const [loading, setLoading] = useState(true)
@@ -490,13 +500,15 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
                 <h3 className="text-base sm:text-lg font-semibold text-gray-900">
                     Beneficiary Groups ({orderedGroups.length})
                 </h3>
-                <button
-                    onClick={() => setIsCreateModalOpen(true)}
-                    className="flex items-center justify-center sm:justify-start gap-2 px-3 py-2 sm:py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm font-medium transition-colors border border-blue-200 w-full sm:w-auto"
-                >
-                    <Plus className="w-4 h-4 flex-shrink-0" />
-                    <span>Add Group</span>
-                </button>
+                {canEditBeneficiaries && (
+                    <button
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="flex items-center justify-center sm:justify-start gap-2 px-3 py-2 sm:py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm font-medium transition-colors border border-blue-200 w-full sm:w-auto"
+                    >
+                        <Plus className="w-4 h-4 flex-shrink-0" />
+                        <span>Add Group</span>
+                    </button>
+                )}
             </div>
 
             {groups.length === 0 ? (
@@ -506,12 +518,14 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
                         <p className="text-gray-600 text-base mb-4">
                             No beneficiary groups yet
                         </p>
-                        <Button
-                            onClick={() => setIsCreateModalOpen(true)}
-                            size="sm"
-                        >
-                            Create First Group
-                        </Button>
+                        {canEditBeneficiaries && (
+                            <Button
+                                onClick={() => setIsCreateModalOpen(true)}
+                                size="sm"
+                            >
+                                Create First Group
+                            </Button>
+                        )}
                     </div>
                 </div>
             ) : (
@@ -552,6 +566,8 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
                                             e.stopPropagation()
                                             setDeleteConfirmGroup(group)
                                         }}
+                                        canEdit={canEditBeneficiaries}
+                                        canDelete={canDelete}
                                     />
                                 )
                             })}
