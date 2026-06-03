@@ -1,13 +1,18 @@
-import React, { useCallback, useEffect } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import {
     ArrowLeft,
     Calendar,
+    Camera,
+    ChevronDown,
     ChevronLeft,
     ChevronRight,
+    DollarSign,
     ExternalLink,
     FileText,
+    Filter,
+    MessageSquare,
     X,
 } from 'lucide-react'
 import { useOrgLinkBase } from '../../../hooks/useOrgLinkBase'
@@ -32,6 +37,27 @@ export function PublicMetricEvidenceGallerySection({ evidence, evidenceCount, co
     onToggleTag?: (id: string) => void
 }) {
     const orgLinkBase = useOrgLinkBase()
+    const [selectedTypes, setSelectedTypes] = useState<string[]>([])
+    const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false)
+
+    const evidenceTypeConfig = [
+        { value: 'visual_proof', label: 'Visual Support', icon: Camera },
+        { value: 'documentation', label: 'Documentation', icon: FileText },
+        { value: 'testimony', label: 'Testimonies', icon: MessageSquare },
+        { value: 'financials', label: 'Financials', icon: DollarSign },
+    ] as const
+
+    const typeCounts: Record<string, number> = {}
+    evidence.forEach(ev => { typeCounts[ev.type] = (typeCounts[ev.type] || 0) + 1 })
+
+    const toggleType = (type: string) => {
+        setSelectedTypes(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type])
+    }
+
+    const typeFilteredEvidence = selectedTypes.length > 0
+        ? evidence.filter(ev => selectedTypes.includes(ev.type))
+        : evidence
+
     const typeConfig: Record<string, { bg: string; label: string }> = {
         visual_proof: { bg: 'bg-pink-100 text-pink-800', label: 'Visual Proof' },
         documentation: { bg: 'bg-evidence-100 text-evidence-700', label: 'Documentation' },
@@ -98,7 +124,7 @@ export function PublicMetricEvidenceGallerySection({ evidence, evidenceCount, co
         return []
     }
 
-    const galleryItem = galleryIndex !== null ? evidence[galleryIndex] : null
+    const galleryItem = galleryIndex !== null ? typeFilteredEvidence[galleryIndex] : null
     const galleryFiles = galleryItem ? getAllFiles(galleryItem) : []
     const galleryFile = galleryFiles[currentFileIndex] || null
 
@@ -107,15 +133,15 @@ export function PublicMetricEvidenceGallerySection({ evidence, evidenceCount, co
 
     const goToPrev = useCallback(() => {
         if (galleryIndex === null) return
-        setGalleryIndex(galleryIndex === 0 ? evidence.length - 1 : galleryIndex - 1)
+        setGalleryIndex(galleryIndex === 0 ? typeFilteredEvidence.length - 1 : galleryIndex - 1)
         setCurrentFileIndex(0)
-    }, [galleryIndex, evidence.length, setGalleryIndex, setCurrentFileIndex])
+    }, [galleryIndex, typeFilteredEvidence.length, setGalleryIndex, setCurrentFileIndex])
 
     const goToNext = useCallback(() => {
         if (galleryIndex === null) return
-        setGalleryIndex((galleryIndex + 1) % evidence.length)
+        setGalleryIndex((galleryIndex + 1) % typeFilteredEvidence.length)
         setCurrentFileIndex(0)
-    }, [galleryIndex, evidence.length, setGalleryIndex, setCurrentFileIndex])
+    }, [galleryIndex, typeFilteredEvidence.length, setGalleryIndex, setCurrentFileIndex])
 
     // Keyboard nav
     useEffect(() => {
@@ -149,14 +175,79 @@ export function PublicMetricEvidenceGallerySection({ evidence, evidenceCount, co
     return (
         <>
             <div className="rounded-2xl sm:rounded-3xl bg-white border border-gray-200/80 shadow-public overflow-hidden">
-                <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/40 flex items-center justify-between">
+                <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/40 flex items-center justify-between gap-3">
                     <h2 className="font-semibold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
                         <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
                         Supporting Evidence
                     </h2>
-                    <span className={`text-xs font-semibold px-2 sm:px-3 py-1 rounded-full ${config.bg} text-white`}>
-                        {evidenceCount} item{evidenceCount !== 1 ? 's' : ''}
-                    </span>
+                    <div className="flex items-center gap-2">
+                        {/* Type filter dropdown */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setIsTypeDropdownOpen(o => !o)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${selectedTypes.length > 0
+                                    ? 'bg-accent/10 text-accent border-accent/30'
+                                    : 'bg-white text-gray-600 hover:bg-gray-50 border-gray-200'
+                                }`}
+                            >
+                                <Filter className="w-3.5 h-3.5" />
+                                {selectedTypes.length > 0
+                                    ? `${selectedTypes.length} type${selectedTypes.length > 1 ? 's' : ''}`
+                                    : 'Filter'}
+                                <ChevronDown className="w-3 h-3" />
+                            </button>
+                            {isTypeDropdownOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setIsTypeDropdownOpen(false)} />
+                                    <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1 overflow-hidden">
+                                        {selectedTypes.length > 0 && (
+                                            <>
+                                                <button
+                                                    onClick={() => { setSelectedTypes([]); setIsTypeDropdownOpen(false) }}
+                                                    className="w-full px-4 py-2 text-left text-xs text-muted-foreground hover:bg-gray-50 border-b border-gray-100"
+                                                >
+                                                    Clear filter
+                                                </button>
+                                            </>
+                                        )}
+                                        {evidenceTypeConfig.map(type => {
+                                            const count = typeCounts[type.value] || 0
+                                            const isSelected = selectedTypes.includes(type.value)
+                                            const TypeIcon = type.icon
+                                            return (
+                                                <label
+                                                    key={type.value}
+                                                    className={`w-full px-4 py-2.5 text-sm flex items-center gap-3 hover:bg-gray-50 transition-colors cursor-pointer ${count === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        disabled={count === 0}
+                                                        onChange={() => count > 0 && toggleType(type.value)}
+                                                        className="rounded border-gray-300 text-accent focus:ring-accent"
+                                                    />
+                                                    <TypeIcon className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                                    <span className="flex-1">{type.label}</span>
+                                                    <span className="text-xs text-gray-400">{count}</span>
+                                                </label>
+                                            )
+                                        })}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                        {selectedTypes.length > 0 && (
+                            <button
+                                onClick={() => setSelectedTypes([])}
+                                className="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                <X className="w-3 h-3" /> Clear
+                            </button>
+                        )}
+                        <span className={`text-xs font-semibold px-2 sm:px-3 py-1 rounded-full ${config.bg} text-white`}>
+                            {selectedTypes.length > 0 ? `${typeFilteredEvidence.length} of ${evidenceCount}` : evidenceCount} item{(selectedTypes.length > 0 ? typeFilteredEvidence.length : evidenceCount) !== 1 ? 's' : ''}
+                        </span>
+                    </div>
                 </div>
 
                 {evidence.length === 0 ? (
@@ -165,9 +256,15 @@ export function PublicMetricEvidenceGallerySection({ evidence, evidenceCount, co
                         <p className="text-sm sm:text-lg font-medium mb-1">No evidence linked yet</p>
                         <p className="text-xs sm:text-sm">Evidence will appear here when linked to this metric</p>
                     </div>
+                ) : typeFilteredEvidence.length === 0 ? (
+                    <div className="py-10 sm:py-16 text-center text-gray-500 px-4">
+                        <Filter className="w-10 h-10 sm:w-14 sm:h-14 mx-auto mb-3 sm:mb-4 opacity-20" />
+                        <p className="text-sm sm:text-lg font-medium mb-1">No evidence matches the filter</p>
+                        <button onClick={() => setSelectedTypes([])} className="text-xs text-accent hover:underline mt-1">Clear filter</button>
+                    </div>
                 ) : (
                     <div className="p-3 sm:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-                        {evidence.map((ev, idx) => {
+                        {typeFilteredEvidence.map((ev, idx) => {
                             const previewUrl = getPreviewUrl(ev)
                             const videoUrl = !previewUrl ? getVideoPreviewUrl(ev) : null
                             const fileCount = ev.files?.length || (ev.file_url ? 1 : 0)
@@ -258,7 +355,7 @@ export function PublicMetricEvidenceGallerySection({ evidence, evidenceCount, co
                                 <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${typeConfig[galleryItem.type]?.bg || 'bg-gray-100 text-gray-600'}`}>
                                     {typeConfig[galleryItem.type]?.label || galleryItem.type}
                                 </span>
-                                <span className="text-muted-foreground text-sm">{galleryIndex + 1} of {evidence.length}</span>
+                                <span className="text-muted-foreground text-sm">{galleryIndex + 1} of {typeFilteredEvidence.length}</span>
                             </div>
                             <button onClick={closeGallery} className="w-9 h-9 rounded-full bg-white hover:bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors shadow-sm">
                                 <X className="w-4 h-4" />
@@ -405,7 +502,7 @@ export function PublicMetricEvidenceGallerySection({ evidence, evidenceCount, co
                             </button>
 
                             <div className="flex items-center gap-1.5 overflow-x-auto max-w-[50vw] scrollbar-hide px-2">
-                                {evidence.map((item, i) => {
+                                {typeFilteredEvidence.map((item, i) => {
                                     const thumb = getPreviewUrl(item)
                                     const vidThumb = !thumb ? getVideoPreviewUrl(item) : null
                                     return (

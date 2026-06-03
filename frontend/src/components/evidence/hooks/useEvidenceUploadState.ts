@@ -15,6 +15,7 @@ export interface State {
 type Action =
     | { type: 'init'; preSelectedKPIId?: string }
     | { type: 'addFiles'; files: { file: File; uploadId: string }[] }
+    | { type: 'addLink'; url: string }
     | { type: 'removeFile'; fileId: string }
     | { type: 'setFileStatus'; fileId: string; patch: { status?: FileUploadStatus; progress?: number; uploadedUrl?: string; uploadedSize?: number; error?: string; previewUrl?: string } }
     | { type: 'setFileSelected'; fileId: string; selected: boolean }
@@ -54,6 +55,22 @@ function reducer(state: State, action: Action): State {
                 selected: false,
             }))
             return { ...state, files: [...state.files, ...newFiles] }
+        }
+        case 'addLink': {
+            const id = newId('link')
+            const linkFile: FileItem = {
+                id,
+                file: new File([], action.url, { type: 'text/uri-list' }),
+                uploadId: id,
+                status: 'done',
+                progress: 100,
+                uploadedUrl: action.url,
+                groupId: state.initialGroupId,
+                selected: false,
+                isLink: true,
+                linkUrl: action.url,
+            }
+            return { ...state, files: [...state.files, linkFile] }
         }
         case 'removeFile': {
             return { ...state, files: state.files.filter(f => f.id !== action.fileId) }

@@ -34,6 +34,8 @@ export interface FileItem {
     groupId: string
     selected: boolean
     previewUrl?: string
+    isLink?: boolean
+    linkUrl?: string
 }
 
 export function emptyMetadata(overrides?: Partial<GroupMetadata>): GroupMetadata {

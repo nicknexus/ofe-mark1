@@ -307,9 +307,13 @@ export default function DateRangePicker({
                     <div 
                         className="fixed inset-0 z-[9998]" 
                         onClick={() => {
-                            setIsOpen(false)
-                            setTempStartDate(appliedStartDate)
-                            setTempEndDate(appliedEndDate)
+                            if (tempStartDate) {
+                                handleApply()
+                            } else {
+                                setIsOpen(false)
+                                setTempStartDate(appliedStartDate)
+                                setTempEndDate(appliedEndDate)
+                            }
                         }} 
                     />
                     {/* Calendar dropdown */}

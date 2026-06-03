@@ -143,7 +143,7 @@ function NewEvidenceUploadModal({
     useEffect(() => {
         const urls: string[] = []
         state.files.forEach(f => {
-            if (!f.previewUrl && f.file.type.startsWith('image/')) {
+            if (!f.isLink && !f.previewUrl && f.file.type.startsWith('image/')) {
                 const url = URL.createObjectURL(f.file)
                 urls.push(url)
                 dispatch({ type: 'setFileStatus', fileId: f.id, patch: { previewUrl: url } })
@@ -196,13 +196,13 @@ function NewEvidenceUploadModal({
         }
 
         // Block if any files still uploading.
-        const stillUploading = state.files.filter(f => f.status === 'uploading')
+        const stillUploading = state.files.filter(f => !f.isLink && f.status === 'uploading')
         if (stillUploading.length > 0) {
             toast.error(`Wait for ${stillUploading.length} upload${stillUploading.length === 1 ? '' : 's'} to finish`)
             return
         }
         // Block if any files in submittable groups failed to upload.
-        const failedFiles = groupsToSubmit.flatMap(gp => gp.files.filter(f => f.status === 'error' || !f.uploadedUrl))
+        const failedFiles = groupsToSubmit.flatMap(gp => gp.files.filter(f => !f.isLink && (f.status === 'error' || !f.uploadedUrl)))
         if (failedFiles.length > 0) {
             toast.error(`${failedFiles.length} file${failedFiles.length === 1 ? '' : 's'} failed to upload — remove or retry`)
             return
@@ -296,6 +296,7 @@ function NewEvidenceUploadModal({
                             files={state.files}
                             onAddFiles={handleAddFiles}
                             onRemoveFile={(id) => dispatch({ type: 'removeFile', fileId: id })}
+                            onAddLink={(url) => dispatch({ type: 'addLink', url })}
                         />
                     ) : (
                         <OrganizeStep
