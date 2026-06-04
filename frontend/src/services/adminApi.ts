@@ -12,17 +12,29 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
     }
 }
 
+export type DemoGenerationStatus = 'draft' | 'generating' | 'ready' | 'failed' | null
+
 export interface DemoOrg extends Omit<Organization, 'id' | 'name' | 'slug'> {
     id: string
     name: string
     slug: string
     is_demo: true
+    demo_folder?: string | null
+    demo_generation_status?: DemoGenerationStatus
 }
 
 export interface CreateDemoInput {
     name: string
     brand_color?: string
     description?: string
+    demo_folder?: string
+}
+
+export interface CreateDemoShellInput {
+    name: string
+    demo_folder?: string
+    website_url?: string
+    brand_color?: string
 }
 
 export interface GenerateDemoFromWebsiteInput {
@@ -39,6 +51,7 @@ export interface PatchDemoInput {
     website_url?: string
     donation_url?: string
     demo_public_share?: boolean
+    demo_folder?: string | null
 }
 
 export class AdminApi {
@@ -63,6 +76,30 @@ export class AdminApi {
     static async createDemoFromWebsite(input: GenerateDemoFromWebsiteInput): Promise<DemoOrg> {
         const headers = await getAuthHeaders()
         const resp = await fetch(`${API_BASE_URL}/api/admin/demos/generate-from-url`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(input),
+        })
+        if (!resp.ok) throw new Error((await resp.json()).error || 'Failed to generate demo')
+        return resp.json()
+    }
+
+    /** Create an empty demo shell immediately (so it + its folder exist before generation). */
+    static async createDemoShell(input: CreateDemoShellInput): Promise<DemoOrg> {
+        const headers = await getAuthHeaders()
+        const resp = await fetch(`${API_BASE_URL}/api/admin/demos/shell`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(input),
+        })
+        if (!resp.ok) throw new Error((await resp.json()).error || 'Failed to create demo')
+        return resp.json()
+    }
+
+    /** Run website generation into an existing demo shell. */
+    static async generateInto(id: string, input: GenerateDemoFromWebsiteInput): Promise<DemoOrg> {
+        const headers = await getAuthHeaders()
+        const resp = await fetch(`${API_BASE_URL}/api/admin/demos/${id}/generate`, {
             method: 'POST',
             headers,
             body: JSON.stringify(input),

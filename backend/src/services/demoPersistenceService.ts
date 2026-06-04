@@ -225,6 +225,42 @@ export class DemoPersistenceService {
         }
     }
 
+    /**
+     * Populate an ALREADY-EXISTING demo org (created as a lightweight shell)
+     * with generated content. Unlike createGeneratedDemo this never creates or
+     * deletes the org — a generation failure leaves the editable shell intact so
+     * the admin can retry. The org's name/slug are preserved (the admin already
+     * named the shell); only profile fields are filled in from the draft.
+     */
+    static async populateExistingDemo(
+        organizationId: string,
+        userId: string,
+        draft: GeneratedDemoDraft
+    ): Promise<any> {
+        const { error: updateErr } = await supabase
+            .from('organizations')
+            .update({
+                description: draft.organization.description || null,
+                statement: draft.organization.statement || null,
+                website_url: draft.organization.website_url || null,
+                donation_url: draft.organization.donation_url || null,
+                logo_url: draft.organization.logo_url || null,
+                brand_color: draft.organization.brand_color || null,
+            })
+            .eq('id', organizationId);
+        if (updateErr) throw new Error(`Failed to update demo org profile: ${updateErr.message}`);
+
+        await this.seedGeneratedContent(organizationId, userId, draft);
+
+        const { data: org, error } = await supabase
+            .from('organizations')
+            .select()
+            .eq('id', organizationId)
+            .single();
+        if (error || !org) throw new Error(`Failed to reload populated demo org: ${error?.message}`);
+        return org;
+    }
+
     static async seedGeneratedContent(
         organizationId: string,
         userId: string,

@@ -845,7 +845,11 @@ function normalizeDraft(raw: any, sourceUrl: string, hints: { nameOverride?: str
 }
 
 export class DemoGenerationService {
-    static async generateFromWebsite(userId: string, input: { website_url: unknown; name?: unknown }): Promise<any> {
+    static async generateFromWebsite(
+        userId: string,
+        input: { website_url: unknown; name?: unknown },
+        organizationId?: string
+    ): Promise<any> {
         const traceId = newTraceId();
         const overallStart = Date.now();
 
@@ -931,8 +935,13 @@ export class DemoGenerationService {
         });
 
         const persistStart = Date.now();
-        logStep(traceId, '5/6 PERSIST', 'writing demo org to database');
-        const persisted = await DemoPersistenceService.createGeneratedDemo(userId, draft, nameOverride);
+        logStep(traceId, '5/6 PERSIST', 'writing demo org to database', {
+            mode: organizationId ? 'populate-existing' : 'create-new',
+            organizationId: organizationId || null,
+        });
+        const persisted = organizationId
+            ? await DemoPersistenceService.populateExistingDemo(organizationId, userId, draft)
+            : await DemoPersistenceService.createGeneratedDemo(userId, draft, nameOverride);
         logStep(traceId, '5/6 PERSIST', 'demo org created', {
             ms: Date.now() - persistStart,
             organizationId: (persisted as any)?.id ?? (persisted as any)?.organization?.id ?? null,

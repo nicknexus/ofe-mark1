@@ -20,7 +20,7 @@ router.get('/demos', async (_req: AuthenticatedRequest, res) => {
         const { data, error } = await supabase
             .from('organizations')
             .select(
-                'id, name, slug, description, statement, logo_url, brand_color, website_url, donation_url, is_public, is_demo, demo_public_share, owner_id, created_at, updated_at'
+                'id, name, slug, description, statement, logo_url, brand_color, website_url, donation_url, is_public, is_demo, demo_public_share, demo_folder, demo_generation_status, owner_id, created_at, updated_at'
             )
             .eq('is_demo', true)
             .order('created_at', { ascending: false });
@@ -40,7 +40,7 @@ router.get('/demos', async (_req: AuthenticatedRequest, res) => {
  */
 router.post('/demos', async (req: AuthenticatedRequest, res) => {
     try {
-        const { name, brand_color, description } = req.body || {};
+        const { name, brand_color, description, demo_folder } = req.body || {};
         if (!name || typeof name !== 'string' || !name.trim()) {
             res.status(400).json({ error: 'name is required' });
             return;
@@ -48,6 +48,7 @@ router.post('/demos', async (req: AuthenticatedRequest, res) => {
 
         const userId = req.user!.id;
         const trimmed = name.trim();
+        const folder = typeof demo_folder === 'string' && demo_folder.trim() ? demo_folder.trim() : null;
 
         // Unique slug (demo orgs share the slug namespace with real orgs)
         let baseSlug = OrganizationService.generateSlug(trimmed) || 'demo';
@@ -75,6 +76,7 @@ router.post('/demos', async (req: AuthenticatedRequest, res) => {
                     slug,
                     description: description || null,
                     brand_color: brand_color || null,
+                    demo_folder: folder,
                     owner_id: userId,
                     is_public: true,
                     is_demo: true,
@@ -156,6 +158,134 @@ router.post('/demos/generate-from-url', async (req: AuthenticatedRequest, res) =
 });
 
 /**
+ * POST /api/admin/demos/shell
+ * Creates a lightweight demo org "shell" (no seeded content) and returns it
+ * immediately. Used so a demo (and its folder) exists instantly before the
+ * slow website generation runs. Marked demo_generation_status='generating' so
+ * the UI can show a spinner; the caller then hits /demos/:id/generate.
+ * Body: { name: string; demo_folder?: string; website_url?: string; brand_color?: string }
+ */
+router.post('/demos/shell', async (req: AuthenticatedRequest, res) => {
+    try {
+        const { name, demo_folder, website_url, brand_color } = req.body || {};
+        if (!name || typeof name !== 'string' || !name.trim()) {
+            res.status(400).json({ error: 'name is required' });
+            return;
+        }
+
+        const userId = req.user!.id;
+        const trimmed = name.trim();
+        const folder = typeof demo_folder === 'string' && demo_folder.trim() ? demo_folder.trim() : null;
+
+        let baseSlug = OrganizationService.generateSlug(trimmed) || 'demo';
+        let slug = baseSlug;
+        let attempt = 0;
+        while (attempt < 100) {
+            const { data: check } = await supabase
+                .from('organizations')
+                .select('id')
+                .eq('slug', slug)
+                .maybeSingle();
+            if (!check) break;
+            attempt++;
+            slug = `${baseSlug}-${attempt}`;
+        }
+
+        const { data: org, error: orgErr } = await supabase
+            .from('organizations')
+            .insert([
+                {
+                    name: trimmed,
+                    slug,
+                    website_url: typeof website_url === 'string' && website_url.trim() ? website_url.trim() : null,
+                    brand_color: brand_color || null,
+                    demo_folder: folder,
+                    owner_id: userId,
+                    is_public: true,
+                    is_demo: true,
+                    demo_public_share: true,
+                    demo_generation_status: 'draft',
+                },
+            ])
+            .select()
+            .single();
+
+        if (orgErr || !org) {
+            throw new Error(`Failed to create demo shell: ${orgErr?.message}`);
+        }
+
+        try {
+            await OrganizationService.addUserToOrganization(userId, org.id, 'owner');
+        } catch (e) {
+            console.warn('[admin/demos/shell] addUserToOrganization skipped:', (e as Error).message);
+        }
+
+        res.status(201).json(org);
+    } catch (error) {
+        console.error('[admin] create demo shell error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * POST /api/admin/demos/:id/generate
+ * Runs website generation INTO an existing demo shell. On success the org is
+ * populated and marked 'ready'; on failure it is marked 'failed' but kept so
+ * the admin can retry or edit it manually.
+ * Body: { website_url: string; name?: string }
+ */
+router.post('/demos/:id/generate', async (req: AuthenticatedRequest, res) => {
+    const { id } = req.params;
+    try {
+        const { data: existing, error: findErr } = await supabase
+            .from('organizations')
+            .select('id, is_demo')
+            .eq('id', id)
+            .maybeSingle();
+        if (findErr) throw findErr;
+        if (!existing || !existing.is_demo) {
+            res.status(404).json({ error: 'Demo org not found' });
+            return;
+        }
+
+        await supabase
+            .from('organizations')
+            .update({ demo_generation_status: 'generating' })
+            .eq('id', id);
+
+        try {
+            await DemoGenerationService.generateFromWebsite(
+                req.user!.id,
+                { website_url: req.body?.website_url, name: req.body?.name },
+                id
+            );
+        } catch (genErr) {
+            await supabase
+                .from('organizations')
+                .update({ demo_generation_status: 'failed' })
+                .eq('id', id);
+            if (genErr instanceof DemoGenerationError) {
+                res.status(genErr.status).json({ error: genErr.publicMessage, code: genErr.code });
+                return;
+            }
+            throw genErr;
+        }
+
+        const { data: org, error } = await supabase
+            .from('organizations')
+            .update({ demo_generation_status: 'ready' })
+            .eq('id', id)
+            .select()
+            .single();
+        if (error) throw error;
+        res.json(org);
+    } catch (error) {
+        console.error('[admin] generate into demo error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+/**
  * PATCH /api/admin/demos/:id
  * Allowed fields: name, description, statement, brand_color, logo_url,
  * website_url, donation_url, demo_public_share.
@@ -186,6 +316,7 @@ router.patch('/demos/:id', async (req: AuthenticatedRequest, res) => {
             'website_url',
             'donation_url',
             'demo_public_share',
+            'demo_folder',
         ] as const;
 
         const updates: Record<string, unknown> = {};
