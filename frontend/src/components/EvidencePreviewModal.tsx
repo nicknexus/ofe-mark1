@@ -7,775 +7,775 @@ import { apiService } from '../services/api'
 import EvidenceTagsList from './MetricTags/EvidenceTagsList'
 import { Button } from './ui/button'
 import ModalFrame from './ModalFrame'
+import { SectionLoader, Spinner } from './ui'
 
 interface EvidenceFile {
-    id: string
-    file_url: string
-    file_name: string
-    file_type: string
-    display_order: number
+ id: string
+ file_url: string
+ file_name: string
+ file_type: string
+ display_order: number
 }
 
 interface EvidencePreviewModalProps {
-    isOpen: boolean
-    onClose: () => void
-    evidence: Evidence | null
-    onEdit?: (evidence: Evidence) => void
-    onDelete?: (evidence: Evidence) => void
-    onDataPointClick?: (dataPoint: any, kpi: any) => void
+ isOpen: boolean
+ onClose: () => void
+ evidence: Evidence | null
+ onEdit?: (evidence: Evidence) => void
+ onDelete?: (evidence: Evidence) => void
+ onDataPointClick?: (dataPoint: any, kpi: any) => void
 }
 
 export default function EvidencePreviewModal({ isOpen, onClose, evidence: evidenceProp, onEdit, onDelete, onDataPointClick }: EvidencePreviewModalProps) {
-    const [evidence, setEvidence] = useState<Evidence | null>(null)
-    const [linkedDataPoints, setLinkedDataPoints] = useState<any[]>([])
-    const [loadingDataPoints, setLoadingDataPoints] = useState(false)
-    const [locations, setLocations] = useState<Location[]>([])
-    const [loadingLocations, setLoadingLocations] = useState(false)
-    const [dataPointLocations, setDataPointLocations] = useState<Record<string, Location>>({})
-    const [imageLoading, setImageLoading] = useState(true)
-    const [evidenceFiles, setEvidenceFiles] = useState<EvidenceFile[]>([])
-    const [loadingFiles, setLoadingFiles] = useState(false)
-    const [currentFileIndex, setCurrentFileIndex] = useState(0)
-    const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
-    const [loadingBeneficiaryGroups, setLoadingBeneficiaryGroups] = useState(false)
+ const [evidence, setEvidence] = useState<Evidence | null>(null)
+ const [linkedDataPoints, setLinkedDataPoints] = useState<any[]>([])
+ const [loadingDataPoints, setLoadingDataPoints] = useState(false)
+ const [locations, setLocations] = useState<Location[]>([])
+ const [loadingLocations, setLoadingLocations] = useState(false)
+ const [dataPointLocations, setDataPointLocations] = useState<Record<string, Location>>({})
+ const [imageLoading, setImageLoading] = useState(true)
+ const [evidenceFiles, setEvidenceFiles] = useState<EvidenceFile[]>([])
+ const [loadingFiles, setLoadingFiles] = useState(false)
+ const [currentFileIndex, setCurrentFileIndex] = useState(0)
+ const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
+ const [loadingBeneficiaryGroups, setLoadingBeneficiaryGroups] = useState(false)
 
-    // Fetch full evidence data including location_ids when modal opens
-    useEffect(() => {
-        if (isOpen && evidenceProp?.id) {
-            setImageLoading(true)
-            setCurrentFileIndex(0)
-            // Fetch fresh evidence data to ensure we have location_ids
-            apiService.getEvidenceItem(evidenceProp.id).then(fullEvidence => {
-                setEvidence(fullEvidence)
-            }).catch(() => {
-                // Fallback to prop if fetch fails
-                setEvidence(evidenceProp)
-            })
-            loadLinkedDataPoints()
-            loadEvidenceFiles()
-        } else if (!isOpen) {
-            setImageLoading(true)
-            setEvidenceFiles([])
-            setCurrentFileIndex(0)
-            setLocations([])
-            setBeneficiaryGroups([])
-            setEvidence(null)
-        }
-    }, [isOpen, evidenceProp?.id])
+ // Fetch full evidence data including location_ids when modal opens
+ useEffect(() => {
+ if (isOpen && evidenceProp?.id) {
+ setImageLoading(true)
+ setCurrentFileIndex(0)
+ // Fetch fresh evidence data to ensure we have location_ids
+ apiService.getEvidenceItem(evidenceProp.id).then(fullEvidence => {
+ setEvidence(fullEvidence)
+ }).catch(() => {
+ // Fallback to prop if fetch fails
+ setEvidence(evidenceProp)
+ })
+ loadLinkedDataPoints()
+ loadEvidenceFiles()
+ } else if (!isOpen) {
+ setImageLoading(true)
+ setEvidenceFiles([])
+ setCurrentFileIndex(0)
+ setLocations([])
+ setBeneficiaryGroups([])
+ setEvidence(null)
+ }
+ }, [isOpen, evidenceProp?.id])
 
-    // Load locations when evidence data is available
-    useEffect(() => {
-        if (evidence) {
-            loadLocations()
-        }
-    }, [evidence?.location_ids, evidence?.location_id])
+ // Load locations when evidence data is available
+ useEffect(() => {
+ if (evidence) {
+ loadLocations()
+ }
+ }, [evidence?.location_ids, evidence?.location_id])
 
-    // Load beneficiary groups when evidence data is available
-    useEffect(() => {
-        if (evidence?.beneficiary_group_ids?.length && evidence.initiative_id) {
-            loadBeneficiaryGroups()
-        } else {
-            setBeneficiaryGroups([])
-        }
-    }, [evidence?.beneficiary_group_ids, evidence?.initiative_id])
+ // Load beneficiary groups when evidence data is available
+ useEffect(() => {
+ if (evidence?.beneficiary_group_ids?.length && evidence.initiative_id) {
+ loadBeneficiaryGroups()
+ } else {
+ setBeneficiaryGroups([])
+ }
+ }, [evidence?.beneficiary_group_ids, evidence?.initiative_id])
 
-    const loadEvidenceFiles = async () => {
-        if (!evidenceProp?.id) return
-        const evidenceId = evidenceProp.id
-        try {
-            setLoadingFiles(true)
-            const files = await apiService.getEvidenceFiles(evidenceId)
-            if (files && files.length > 0) {
-                setEvidenceFiles(files)
-            } else if (evidenceProp.file_url) {
-                setEvidenceFiles([{
-                    id: evidenceId,
-                    file_url: evidenceProp.file_url,
-                    file_name: evidenceProp.file_url.split('/').pop() || 'file',
-                    file_type: evidenceProp.file_type || 'unknown',
-                    display_order: 0
-                }])
-            } else {
-                setEvidenceFiles([])
-            }
-        } catch (error) {
-            console.error('Failed to load evidence files:', error)
-            if (evidenceProp.file_url) {
-                setEvidenceFiles([{
-                    id: evidenceId,
-                    file_url: evidenceProp.file_url,
-                    file_name: evidenceProp.file_url.split('/').pop() || 'file',
-                    file_type: evidenceProp.file_type || 'unknown',
-                    display_order: 0
-                }])
-            }
-        } finally {
-            setLoadingFiles(false)
-        }
-    }
+ const loadEvidenceFiles = async () => {
+ if (!evidenceProp?.id) return
+ const evidenceId = evidenceProp.id
+ try {
+ setLoadingFiles(true)
+ const files = await apiService.getEvidenceFiles(evidenceId)
+ if (files && files.length > 0) {
+ setEvidenceFiles(files)
+ } else if (evidenceProp.file_url) {
+ setEvidenceFiles([{
+ id: evidenceId,
+ file_url: evidenceProp.file_url,
+ file_name: evidenceProp.file_url.split('/').pop() || 'file',
+ file_type: evidenceProp.file_type || 'unknown',
+ display_order: 0
+ }])
+ } else {
+ setEvidenceFiles([])
+ }
+ } catch (error) {
+ console.error('Failed to load evidence files:', error)
+ if (evidenceProp.file_url) {
+ setEvidenceFiles([{
+ id: evidenceId,
+ file_url: evidenceProp.file_url,
+ file_name: evidenceProp.file_url.split('/').pop() || 'file',
+ file_type: evidenceProp.file_type || 'unknown',
+ display_order: 0
+ }])
+ }
+ } finally {
+ setLoadingFiles(false)
+ }
+ }
 
-    const handlePrevFile = () => {
-        setCurrentFileIndex(prev => (prev > 0 ? prev - 1 : evidenceFiles.length - 1))
-        setImageLoading(true)
-    }
+ const handlePrevFile = () => {
+ setCurrentFileIndex(prev => (prev > 0 ? prev - 1 : evidenceFiles.length - 1))
+ setImageLoading(true)
+ }
 
-    const handleNextFile = () => {
-        setCurrentFileIndex(prev => (prev < evidenceFiles.length - 1 ? prev + 1 : 0))
-        setImageLoading(true)
-    }
+ const handleNextFile = () => {
+ setCurrentFileIndex(prev => (prev < evidenceFiles.length - 1 ? prev + 1 : 0))
+ setImageLoading(true)
+ }
 
-    const handleDownloadAll = async () => {
-        for (const file of evidenceFiles) {
-            const link = document.createElement('a')
-            link.href = file.file_url
-            link.download = file.file_name
-            link.target = '_blank'
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-            await new Promise(resolve => setTimeout(resolve, 300))
-        }
-    }
+ const handleDownloadAll = async () => {
+ for (const file of evidenceFiles) {
+ const link = document.createElement('a')
+ link.href = file.file_url
+ link.download = file.file_name
+ link.target = '_blank'
+ document.body.appendChild(link)
+ link.click()
+ document.body.removeChild(link)
+ await new Promise(resolve => setTimeout(resolve, 300))
+ }
+ }
 
-    const loadLinkedDataPoints = async () => {
-        if (!evidenceProp?.id) return
-        try {
-            setLoadingDataPoints(true)
-            const dataPoints = await apiService.getDataPointsForEvidence(evidenceProp.id)
-            setLinkedDataPoints(dataPoints || [])
-            
-            const locationIds = dataPoints
-                .filter((dp: any) => dp.location_id)
-                .map((dp: any) => dp.location_id)
-            
-            if (locationIds.length > 0) {
-                const locationPromises = locationIds.map((id: string) =>
-                    apiService.getLocation(id).catch(() => null)
-                )
-                const locations = await Promise.all(locationPromises)
-                const locationMap: Record<string, Location> = {}
-                locationIds.forEach((id: string, index: number) => {
-                    if (locations[index]) {
-                        locationMap[id] = locations[index]
-                    }
-                })
-                setDataPointLocations(locationMap)
-            } else {
-                setDataPointLocations({})
-            }
-        } catch (error) {
-            console.error('Failed to load linked data points:', error)
-            setLinkedDataPoints([])
-            setDataPointLocations({})
-        } finally {
-            setLoadingDataPoints(false)
-        }
-    }
+ const loadLinkedDataPoints = async () => {
+ if (!evidenceProp?.id) return
+ try {
+ setLoadingDataPoints(true)
+ const dataPoints = await apiService.getDataPointsForEvidence(evidenceProp.id)
+ setLinkedDataPoints(dataPoints || [])
+ 
+ const locationIds = dataPoints
+ .filter((dp: any) => dp.location_id)
+ .map((dp: any) => dp.location_id)
+ 
+ if (locationIds.length > 0) {
+ const locationPromises = locationIds.map((id: string) =>
+ apiService.getLocation(id).catch(() => null)
+ )
+ const locations = await Promise.all(locationPromises)
+ const locationMap: Record<string, Location> = {}
+ locationIds.forEach((id: string, index: number) => {
+ if (locations[index]) {
+ locationMap[id] = locations[index]
+ }
+ })
+ setDataPointLocations(locationMap)
+ } else {
+ setDataPointLocations({})
+ }
+ } catch (error) {
+ console.error('Failed to load linked data points:', error)
+ setLinkedDataPoints([])
+ setDataPointLocations({})
+ } finally {
+ setLoadingDataPoints(false)
+ }
+ }
 
-    const loadLocations = async () => {
-        // Support both new location_ids array and legacy location_id
-        const locationIds = evidence?.location_ids || (evidence?.location_id ? [evidence.location_id] : [])
-        if (locationIds.length === 0) {
-            setLocations([])
-            return
-        }
-        try {
-            setLoadingLocations(true)
-            const locationPromises = locationIds.map((id: string) =>
-                apiService.getLocation(id).catch(() => null)
-            )
-            const loadedLocations = await Promise.all(locationPromises)
-            setLocations(loadedLocations.filter(Boolean) as Location[])
-        } catch (error) {
-            console.error('Failed to load locations:', error)
-            setLocations([])
-        } finally {
-            setLoadingLocations(false)
-        }
-    }
+ const loadLocations = async () => {
+ // Support both new location_ids array and legacy location_id
+ const locationIds = evidence?.location_ids || (evidence?.location_id ? [evidence.location_id] : [])
+ if (locationIds.length === 0) {
+ setLocations([])
+ return
+ }
+ try {
+ setLoadingLocations(true)
+ const locationPromises = locationIds.map((id: string) =>
+ apiService.getLocation(id).catch(() => null)
+ )
+ const loadedLocations = await Promise.all(locationPromises)
+ setLocations(loadedLocations.filter(Boolean) as Location[])
+ } catch (error) {
+ console.error('Failed to load locations:', error)
+ setLocations([])
+ } finally {
+ setLoadingLocations(false)
+ }
+ }
 
-    const loadBeneficiaryGroups = async () => {
-        const groupIds = evidence?.beneficiary_group_ids
-        if (!groupIds?.length || !evidence?.initiative_id) return
-        try {
-            setLoadingBeneficiaryGroups(true)
-            const allGroups = await apiService.getBeneficiaryGroups(evidence.initiative_id)
-            const linked = allGroups.filter(g => g.id && groupIds.includes(g.id))
-            setBeneficiaryGroups(linked)
-        } catch (error) {
-            console.error('Failed to load beneficiary groups:', error)
-            setBeneficiaryGroups([])
-        } finally {
-            setLoadingBeneficiaryGroups(false)
-        }
-    }
+ const loadBeneficiaryGroups = async () => {
+ const groupIds = evidence?.beneficiary_group_ids
+ if (!groupIds?.length || !evidence?.initiative_id) return
+ try {
+ setLoadingBeneficiaryGroups(true)
+ const allGroups = await apiService.getBeneficiaryGroups(evidence.initiative_id)
+ const linked = allGroups.filter(g => g.id && groupIds.includes(g.id))
+ setBeneficiaryGroups(linked)
+ } catch (error) {
+ console.error('Failed to load beneficiary groups:', error)
+ setBeneficiaryGroups([])
+ } finally {
+ setLoadingBeneficiaryGroups(false)
+ }
+ }
 
-    if (!isOpen || !evidenceProp) return null
-    
-    // Use fresh evidence data if loaded, otherwise fall back to prop
-    const displayEvidence = evidence || evidenceProp
+ if (!isOpen || !evidenceProp) return null
+ 
+ // Use fresh evidence data if loaded, otherwise fall back to prop
+ const displayEvidence = evidence || evidenceProp
 
-    const getEvidenceIcon = (type: string) => {
-        switch (type) {
-            case 'visual_proof': return Camera
-            case 'documentation': return FileText
-            case 'testimony': return MessageSquare
-            case 'financials': return DollarSign
-            default: return FileText
-        }
-    }
+ const getEvidenceIcon = (type: string) => {
+ switch (type) {
+ case 'visual_proof': return Camera
+ case 'documentation': return FileText
+ case 'testimony': return MessageSquare
+ case 'financials': return DollarSign
+ default: return FileText
+ }
+ }
 
-    const typeInfo = getEvidenceTypeInfo(displayEvidence.type)
-    const IconComponent = getEvidenceIcon(displayEvidence.type)
-    const currentFile = evidenceFiles[currentFileIndex]
+ const typeInfo = getEvidenceTypeInfo(displayEvidence.type)
+ const IconComponent = getEvidenceIcon(displayEvidence.type)
+ const currentFile = evidenceFiles[currentFileIndex]
 
-    const isImage = (fileUrl: string) => {
-        return fileUrl && (
-            fileUrl.includes('.jpg') ||
-            fileUrl.includes('.jpeg') ||
-            fileUrl.includes('.png') ||
-            fileUrl.includes('.gif') ||
-            fileUrl.includes('.webp')
-        )
-    }
+ const isImage = (fileUrl: string) => {
+ return fileUrl && (
+ fileUrl.includes('.jpg') ||
+ fileUrl.includes('.jpeg') ||
+ fileUrl.includes('.png') ||
+ fileUrl.includes('.gif') ||
+ fileUrl.includes('.webp')
+ )
+ }
 
-    const isPDF = (fileUrl: string) => fileUrl && fileUrl.includes('.pdf')
+ const isPDF = (fileUrl: string) => fileUrl && fileUrl.includes('.pdf')
 
-    const isVideo = (fileUrl: string) => {
-        if (!fileUrl) return false
-        const lower = fileUrl.toLowerCase()
-        return lower.includes('.mp4') || lower.includes('.webm') || lower.includes('.mov') || lower.includes('.avi') || lower.includes('.mkv')
-    }
+ const isVideo = (fileUrl: string) => {
+ if (!fileUrl) return false
+ const lower = fileUrl.toLowerCase()
+ return lower.includes('.mp4') || lower.includes('.webm') || lower.includes('.mov') || lower.includes('.avi') || lower.includes('.mkv')
+ }
 
-    const isYouTubeUrl = (url: string) => {
-        if (!url) return false
-        return /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(url)
-    }
+ const isYouTubeUrl = (url: string) => {
+ if (!url) return false
+ return /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(url)
+ }
 
-    const getYouTubeVideoId = (url: string): string | null => {
-        if (!url) return null
-        const match = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
-        return match ? match[1] : null
-    }
+ const getYouTubeVideoId = (url: string): string | null => {
+ if (!url) return null
+ const match = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+ return match ? match[1] : null
+ }
 
-    const hasDateRange = displayEvidence.date_range_start && displayEvidence.date_range_end
-    const displayDate = hasDateRange
-        ? `${formatDate(displayEvidence.date_range_start!)} - ${formatDate(displayEvidence.date_range_end!)}`
-        : formatDate(displayEvidence.date_represented)
+ const hasDateRange = displayEvidence.date_range_start && displayEvidence.date_range_end
+ const displayDate = hasDateRange
+ ? `${formatDate(displayEvidence.date_range_start!)} - ${formatDate(displayEvidence.date_range_end!)}`
+ : formatDate(displayEvidence.date_represented)
 
-    return (
-        <ModalFrame
-            zIndexClass="z-[70]"
-            backdropClassName="bg-black/40 backdrop-blur-sm"
-            paddingClassName="p-0 md:p-4"
-            panelClassName="bg-white md:bubble-card w-full h-full md:max-w-4xl md:w-full md:max-h-[90vh] md:h-auto overflow-hidden md:rounded-2xl flex flex-col"
-        >
-                {/* Header - Evidence grey */}
-                <div className="flex items-center justify-between p-4 md:p-5 bg-gradient-to-r from-evidence-500 to-evidence-600 flex-shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
-                            <FileText className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                        </div>
-                        <div>
-                            <h2 className="text-base md:text-lg font-bold text-white">Evidence</h2>
-                            <p className="text-xs md:text-sm text-white/80">{typeInfo.label}</p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 rounded-xl hover:bg-white/20 transition-colors"
-                    >
-                        <X className="w-5 h-5 text-white" />
-                    </button>
-                </div>
+ return (
+ <ModalFrame
+ zIndexClass="z-[70]"
+ paddingClassName="p-0 md:p-4"
+ panelClassName="bg-white md:app-card w-full h-full md:max-w-5xl md:w-full md:max-h-[90vh] md:h-auto overflow-hidden md:rounded-xl flex flex-col"
+ >
+ {/* Header - Evidence grey */}
+ <div className="flex items-center justify-between p-4 md:p-5 bg-gradient-to-r from-evidence-500 to-evidence-600 flex-shrink-0">
+ <div className="flex items-center gap-3">
+ <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-white/25 flex items-center justify-center border border-white/30">
+ <FileText className="w-4 h-4 md:w-5 md:h-5 text-white" />
+ </div>
+ <div>
+ <h2 className="text-base md:text-lg font-bold text-white">Evidence</h2>
+ <p className="text-xs md:text-sm text-white/80">{typeInfo.label}</p>
+ </div>
+ </div>
+ <button
+ onClick={onClose}
+ className="p-2 rounded-xl hover:bg-white/25 transition-colors"
+ >
+ <X className="w-5 h-5 text-white" />
+ </button>
+ </div>
 
-                {/* Content */}
-                <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-y-auto md:overflow-visible">
-                    {/* Left Side - File Preview - hidden on mobile */}
-                    {evidenceFiles.length > 0 && (
-                        <div className="hidden md:block w-full lg:w-1/2 p-5 border-r border-gray-200 overflow-y-auto">
-                            <div className="sticky top-0 bg-white pb-3 mb-3 border-b border-gray-100">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-7 h-7 rounded-lg bg-evidence-500 flex items-center justify-center shadow-lg shadow-evidence-500/25">
-                                            <FileText className="w-3.5 h-3.5 text-white" />
-                                        </div>
-                                        <h3 className="text-sm font-semibold text-gray-700">Files</h3>
-                                        <span className="text-xs bg-evidence-100 text-evidence-700 px-2 py-0.5 rounded-full font-medium">{evidenceFiles.length}</span>
-                                    </div>
-                                    {evidenceFiles.length > 1 && (
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={handlePrevFile}
-                                                className="p-1.5 bg-white rounded-lg shadow-sm hover:bg-gray-50 transition-colors border border-gray-200"
-                                            >
-                                                <ChevronLeft className="w-4 h-4 text-gray-600" />
-                                            </button>
-                                            <span className="text-xs text-gray-500 font-medium px-2">
-                                                {currentFileIndex + 1} of {evidenceFiles.length}
-                                            </span>
-                                            <button
-                                                onClick={handleNextFile}
-                                                className="p-1.5 bg-white rounded-lg shadow-sm hover:bg-gray-50 transition-colors border border-gray-200"
-                                            >
-                                                <ChevronRight className="w-4 h-4 text-gray-600" />
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+ {/* Content */}
+ <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-y-auto md:overflow-visible">
+ {/* Left Side - File Preview - hidden on mobile */}
+ {evidenceFiles.length > 0 && (
+ <div className="hidden md:block w-full lg:w-1/2 p-5 border-r border-gray-200 overflow-y-auto">
+ <div className="sticky top-0 bg-white pb-3 mb-3 border-b border-gray-100">
+ <div className="flex items-center justify-between">
+ <div className="flex items-center gap-2">
+ <div className="w-7 h-7 rounded-lg bg-evidence-500 flex items-center justify-center shadow-lg shadow-evidence-500/25">
+ <FileText className="w-3.5 h-3.5 text-white" />
+ </div>
+ <h3 className="text-sm font-semibold text-gray-700">Files</h3>
+ <span className="text-xs bg-evidence-100 text-evidence-700 px-2 py-0.5 rounded-full font-medium">{evidenceFiles.length}</span>
+ </div>
+ {evidenceFiles.length > 1 && (
+ <div className="flex items-center gap-2">
+ <button
+ onClick={handlePrevFile}
+ className="p-1.5 bg-white rounded-lg shadow-sm hover:bg-gray-50 transition-colors border border-gray-200"
+ >
+ <ChevronLeft className="w-4 h-4 text-gray-600" />
+ </button>
+ <span className="text-xs text-gray-500 font-medium px-2">
+ {currentFileIndex + 1} of {evidenceFiles.length}
+ </span>
+ <button
+ onClick={handleNextFile}
+ className="p-1.5 bg-white rounded-lg shadow-sm hover:bg-gray-50 transition-colors border border-gray-200"
+ >
+ <ChevronRight className="w-4 h-4 text-gray-600" />
+ </button>
+ </div>
+ )}
+ </div>
+ </div>
 
-                            {/* File Preview */}
-                            <div className="flex items-center justify-center min-h-[350px] bg-gray-50 rounded-xl p-5 mb-3">
-                                {loadingFiles ? (
-                                    <div className="flex flex-col items-center space-y-2">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-evidence-500"></div>
-                                        <p className="text-sm text-gray-500">Loading files...</p>
-                                    </div>
-                                ) : currentFile && isImage(currentFile.file_url) ? (
-                                    <div className="max-w-full max-h-[400px] relative">
-                                        {imageLoading && (
-                                            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg z-10">
-                                                <div className="flex flex-col items-center space-y-2">
-                                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-evidence-500"></div>
-                                                    <p className="text-xs text-gray-500">Loading image...</p>
-                                                </div>
-                                            </div>
-                                        )}
-                                        <img
-                                            src={currentFile.file_url}
-                                            alt={currentFile.file_name}
-                                            className="max-w-full max-h-[400px] object-contain rounded-lg shadow-lg"
-                                            onLoad={() => setImageLoading(false)}
-                                            onError={() => setImageLoading(false)}
-                                        />
-                                        <p className="text-xs text-gray-500 text-center mt-2">{currentFile.file_name}</p>
-                                    </div>
-                                ) : currentFile && isPDF(currentFile.file_url) ? (
-                                    <div className="w-full max-w-md">
-                                        <div className="bg-white rounded-lg border-2 border-gray-200 shadow-lg p-6">
-                                            <div className="flex flex-col items-center space-y-4">
-                                                <div className="p-4 bg-red-50 rounded-full">
-                                                    <FileText className="w-12 h-12 text-red-600" />
-                                                </div>
-                                                <div className="text-center">
-                                                    <h3 className="text-lg font-semibold text-gray-900 mb-1">PDF Document</h3>
-                                                    <p className="text-sm text-gray-500 mb-4">{currentFile.file_name}</p>
-                                                </div>
-                                                <div className="flex space-x-3 w-full">
-                                                    <a
-                                                        href={currentFile.file_url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="flex-1 bg-evidence-500 hover:bg-evidence-600 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-200 inline-flex items-center justify-center space-x-2 shadow-lg shadow-evidence-500/25"
-                                                    >
-                                                        <ExternalLink className="w-4 h-4" />
-                                                        <span>View</span>
-                                                    </a>
-                                                    <Button
-                                                        asChild
-                                                        variant="secondary"
-                                                        className="flex-1"
-                                                    >
-                                                    <a
-                                                        href={currentFile.file_url}
-                                                        download={currentFile.file_name}
-                                                    >
-                                                        <Download className="w-4 h-4" />
-                                                        <span>Download</span>
-                                                    </a>
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : currentFile && isVideo(currentFile.file_url) ? (
-                                    <div className="w-full">
-                                        <video
-                                            src={currentFile.file_url}
-                                            controls
-                                            className="w-full max-h-[400px] rounded-xl shadow-lg"
-                                            preload="metadata"
-                                            onLoadedData={() => setImageLoading(false)}
-                                        />
-                                        <p className="text-xs text-gray-500 text-center mt-2">{currentFile.file_name}</p>
-                                    </div>
-                                ) : currentFile && isYouTubeUrl(currentFile.file_url) ? (
-                                    <div className="w-full">
-                                        <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-                                            <iframe
-                                                src={`https://www.youtube.com/embed/${getYouTubeVideoId(currentFile.file_url)}`}
-                                                title="YouTube video"
-                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                                allowFullScreen
-                                                className="absolute inset-0 w-full h-full rounded-lg"
-                                            />
-                                        </div>
-                                    </div>
-                                ) : currentFile ? (
-                                    <div className="text-center">
-                                        <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                                        <p className="text-sm font-medium text-gray-700 mb-2">{currentFile.file_name}</p>
-                                        <p className="text-gray-500 mb-4">Preview not available for this file type</p>
-                                        <div className="flex space-x-3 justify-center">
-                                            <a
-                                                href={currentFile.file_url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="bg-evidence-500 hover:bg-evidence-600 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-200 inline-flex items-center space-x-2 shadow-lg shadow-evidence-500/25"
-                                            >
-                                                <ExternalLink className="w-4 h-4" />
-                                                <span>View</span>
-                                            </a>
-                                            <Button asChild variant="secondary">
-                                            <a
-                                                href={currentFile.file_url}
-                                                download={currentFile.file_name}
-                                            >
-                                                <Download className="w-4 h-4" />
-                                                <span>Download</span>
-                                            </a>
-                                            </Button>
-                                        </div>
-                                    </div>
-                                ) : null}
-                            </div>
+ {/* File Preview */}
+ <div className="flex items-center justify-center min-h-[350px] bg-gray-50 rounded-xl p-5 mb-3">
+ {loadingFiles ? (
+ <div className="flex flex-col items-center space-y-2">
+ <Spinner className="w-8 h-8 border-evidence-500 border-t-transparent" />
+ <p className="text-sm text-gray-500">Loading files...</p>
+ </div>
+ ) : currentFile && isImage(currentFile.file_url) ? (
+ <div className="max-w-full max-h-[400px] relative">
+ {imageLoading && (
+ <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg z-10">
+ <div className="flex flex-col items-center space-y-2">
+ <Spinner className="w-6 h-6 border-evidence-500 border-t-transparent" />
+ <p className="text-xs text-gray-500">Loading image...</p>
+ </div>
+ </div>
+ )}
+ <img
+ src={currentFile.file_url}
+ alt={currentFile.file_name}
+ className="max-w-full max-h-[400px] object-contain rounded-lg shadow-lg"
+ onLoad={() => setImageLoading(false)}
+ onError={() => setImageLoading(false)}
+ />
+ <p className="text-xs text-gray-500 text-center mt-2">{currentFile.file_name}</p>
+ </div>
+ ) : currentFile && isPDF(currentFile.file_url) ? (
+ <div className="w-full max-w-md">
+ <div className="bg-white rounded-lg border-2 border-gray-200 shadow-lg p-6">
+ <div className="flex flex-col items-center space-y-4">
+ <div className="p-4 bg-red-50 rounded-full">
+ <FileText className="w-12 h-12 text-red-600" />
+ </div>
+ <div className="text-center">
+ <h3 className="text-lg font-semibold text-gray-900 mb-1">PDF Document</h3>
+ <p className="text-sm text-gray-500 mb-4">{currentFile.file_name}</p>
+ </div>
+ <div className="flex space-x-3 w-full">
+ <a
+ href={currentFile.file_url}
+ target="_blank"
+ rel="noopener noreferrer"
+ className="flex-1 bg-evidence-500 hover:bg-evidence-600 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-200 inline-flex items-center justify-center space-x-2 shadow-lg shadow-evidence-500/25"
+ >
+ <ExternalLink className="w-4 h-4" />
+ <span>View</span>
+ </a>
+ <Button
+ asChild
+ variant="secondary"
+ className="flex-1"
+ >
+ <a
+ href={currentFile.file_url}
+ download={currentFile.file_name}
+ >
+ <Download className="w-4 h-4" />
+ <span>Download</span>
+ </a>
+ </Button>
+ </div>
+ </div>
+ </div>
+ </div>
+ ) : currentFile && isVideo(currentFile.file_url) ? (
+ <div className="w-full">
+ <video
+ src={currentFile.file_url}
+ controls
+ className="w-full max-h-[400px] rounded-xl shadow-lg"
+ preload="metadata"
+ onLoadedData={() => setImageLoading(false)}
+ />
+ <p className="text-xs text-gray-500 text-center mt-2">{currentFile.file_name}</p>
+ </div>
+ ) : currentFile && isYouTubeUrl(currentFile.file_url) ? (
+ <div className="w-full">
+ <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+ <iframe
+ src={`https://www.youtube.com/embed/${getYouTubeVideoId(currentFile.file_url)}`}
+ title="YouTube video"
+ allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+ allowFullScreen
+ className="absolute inset-0 w-full h-full rounded-lg"
+ />
+ </div>
+ </div>
+ ) : currentFile ? (
+ <div className="text-center">
+ <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+ <p className="text-sm font-medium text-gray-700 mb-2">{currentFile.file_name}</p>
+ <p className="text-gray-500 mb-4">Preview not available for this file type</p>
+ <div className="flex space-x-3 justify-center">
+ <a
+ href={currentFile.file_url}
+ target="_blank"
+ rel="noopener noreferrer"
+ className="bg-evidence-500 hover:bg-evidence-600 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-200 inline-flex items-center space-x-2 shadow-lg shadow-evidence-500/25"
+ >
+ <ExternalLink className="w-4 h-4" />
+ <span>View</span>
+ </a>
+ <Button asChild variant="secondary">
+ <a
+ href={currentFile.file_url}
+ download={currentFile.file_name}
+ >
+ <Download className="w-4 h-4" />
+ <span>Download</span>
+ </a>
+ </Button>
+ </div>
+ </div>
+ ) : null}
+ </div>
 
-                            {/* Thumbnail strip */}
-                            {evidenceFiles.length > 1 && (
-                                <div className="flex justify-center space-x-2 overflow-x-auto py-2 mb-3">
-                                    {evidenceFiles.map((file, index) => (
-                                        <button
-                                            key={file.id}
-                                            onClick={() => {
-                                                setCurrentFileIndex(index)
-                                                setImageLoading(true)
-                                            }}
-                                            className={`flex-shrink-0 w-12 h-12 rounded-lg border-2 overflow-hidden transition-all ${
-                                                index === currentFileIndex 
-                                                    ? 'border-evidence-500 ring-2 ring-evidence-200' 
-                                                    : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                        >
-                                            {isImage(file.file_url) ? (
-                                                <img 
-                                                    src={file.file_url} 
-                                                    alt={file.file_name}
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            ) : isYouTubeUrl(file.file_url) ? (
-                                                <img
-                                                    src={`https://img.youtube.com/vi/${getYouTubeVideoId(file.file_url)}/default.jpg`}
-                                                    alt="YouTube"
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                                                    <FileText className="w-5 h-5 text-gray-400" />
-                                                </div>
-                                            )}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
+ {/* Thumbnail strip */}
+ {evidenceFiles.length > 1 && (
+ <div className="flex justify-center space-x-2 overflow-x-auto py-2 mb-3">
+ {evidenceFiles.map((file, index) => (
+ <button
+ key={file.id}
+ onClick={() => {
+ setCurrentFileIndex(index)
+ setImageLoading(true)
+ }}
+ className={`flex-shrink-0 w-12 h-12 rounded-lg border-2 overflow-hidden transition-all ${
+ index === currentFileIndex 
+ ? 'border-evidence-500 ring-2 ring-evidence-200' 
+ : 'border-gray-200 hover:border-gray-300'
+ }`}
+ >
+ {isImage(file.file_url) ? (
+ <img 
+ src={file.file_url} 
+ alt={file.file_name}
+ className="w-full h-full object-cover"
+ />
+ ) : isYouTubeUrl(file.file_url) ? (
+ <img
+ src={`https://img.youtube.com/vi/${getYouTubeVideoId(file.file_url)}/default.jpg`}
+ alt="YouTube"
+ className="w-full h-full object-cover"
+ />
+ ) : (
+ <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+ <FileText className="w-5 h-5 text-gray-400" />
+ </div>
+ )}
+ </button>
+ ))}
+ </div>
+ )}
 
-                            {/* Download All */}
-                            {evidenceFiles.length > 1 && (
-                                <div className="flex justify-center">
-                                    <Button
-                                        onClick={handleDownloadAll}
-                                        variant="secondary"
-                                    >
-                                        <Download className="w-4 h-4" />
-                                        <span>Download All ({evidenceFiles.length} files)</span>
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
-                    )}
+ {/* Download All */}
+ {evidenceFiles.length > 1 && (
+ <div className="flex justify-center">
+ <Button
+ onClick={handleDownloadAll}
+ variant="secondary"
+ >
+ <Download className="w-4 h-4" />
+ <span>Download All ({evidenceFiles.length} files)</span>
+ </Button>
+ </div>
+ )}
+ </div>
+ )}
 
-                    {/* Right Side - Details */}
-                    <div className={`w-full ${evidenceFiles.length > 0 ? 'lg:w-1/2' : ''} p-4 md:p-5 overflow-y-auto`}>
-                        {/* Main Evidence Banner - Title, Type, Date, Location */}
-                        <div className="bg-gradient-to-br from-evidence-50/80 to-evidence-50/40 rounded-2xl border border-evidence-100/60 overflow-hidden mb-4">
-                            {/* Top Row - Title and Type */}
-                            <div className="p-4 md:p-5 pb-3">
-                                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-xs font-semibold text-evidence-600 mb-1.5 uppercase tracking-wider">Evidence Title</p>
-                                        <h3 className="text-lg md:text-xl font-bold text-gray-900 line-clamp-2">{displayEvidence.title}</h3>
-                                    </div>
-                                    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${typeInfo.color} self-start`}>
-                                        <IconComponent className="w-4 h-4" />
-                                        <span className="text-xs font-semibold">{typeInfo.label}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            {/* Bottom Row - Date and Location */}
-                            <div className="px-4 md:px-5 pb-4 pt-2 flex flex-col md:flex-row md:flex-wrap md:items-center gap-3 md:gap-5 border-t border-evidence-100/40">
-                                {/* Date */}
-                                <div className="flex items-center gap-2.5">
-                                    <div className="w-8 h-8 rounded-lg bg-white/80 flex items-center justify-center border border-evidence-200/40">
-                                        <Calendar className="w-4 h-4 text-primary-600" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                                            {hasDateRange ? 'Date Range' : 'Date'}
-                                        </p>
-                                        <p className="text-sm font-semibold text-gray-800">{displayDate}</p>
-                                    </div>
-                                </div>
-                                
-                                {/* Divider */}
-                                {(locations.length > 0 || loadingLocations) && (
-                                    <div className="hidden md:block w-px h-10 bg-evidence-200/40"></div>
-                                )}
-                                
-                                {/* Locations */}
-                                {(locations.length > 0 || loadingLocations) && (
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="w-8 h-8 rounded-lg bg-white/80 flex items-center justify-center border border-evidence-200/40">
-                                            <MapPin className="w-4 h-4 text-primary-600" />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                                                {locations.length > 1 ? 'Locations' : 'Location'}
-                                            </p>
-                                            {loadingLocations ? (
-                                                <div className="animate-pulse h-4 bg-gray-200 rounded w-20"></div>
-                                            ) : locations.length > 0 ? (
-                                                <p className="text-sm font-semibold text-gray-800">
-                                                    {locations.map(loc => loc.name).join(', ')}
-                                                </p>
-                                            ) : (
-                                                <p className="text-sm text-gray-400 italic">Not found</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
+ {/* Right Side - Details */}
+ <div className={`w-full ${evidenceFiles.length > 0 ? 'lg:w-1/2' : ''} p-4 md:p-5 overflow-y-auto`}>
+ {/* Main Evidence Banner - Title, Type, Date, Location */}
+ <div className="bg-gradient-to-br from-evidence-50/80 to-evidence-50/40 rounded-xl border border-evidence-100/60 overflow-hidden mb-4">
+ {/* Top Row - Title and Type */}
+ <div className="p-4 md:p-5 pb-3">
+ <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+ <div className="flex-1 min-w-0">
+ <p className="text-xs font-semibold text-evidence-600 mb-1.5 uppercase tracking-wider">Evidence Title</p>
+ <h3 className="text-lg md:text-xl font-bold text-gray-900 line-clamp-2">{displayEvidence.title}</h3>
+ </div>
+ <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${typeInfo.color} self-start`}>
+ <IconComponent className="w-4 h-4" />
+ <span className="text-xs font-semibold">{typeInfo.label}</span>
+ </div>
+ </div>
+ </div>
+ 
+ {/* Bottom Row - Date and Location */}
+ <div className="px-4 md:px-5 pb-4 pt-2 flex flex-col md:flex-row md:flex-wrap md:items-center gap-3 md:gap-5 border-t border-evidence-100/40">
+ {/* Date */}
+ <div className="flex items-center gap-2.5">
+ <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center border border-evidence-200/40">
+ <Calendar className="w-4 h-4 text-primary-600" />
+ </div>
+ <div>
+ <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+ {hasDateRange ? 'Date Range' : 'Date'}
+ </p>
+ <p className="text-sm font-semibold text-gray-800">{displayDate}</p>
+ </div>
+ </div>
+ 
+ {/* Divider */}
+ {(locations.length > 0 || loadingLocations) && (
+ <div className="hidden md:block w-px h-10 bg-evidence-200/40"></div>
+ )}
+ 
+ {/* Locations */}
+ {(locations.length > 0 || loadingLocations) && (
+ <div className="flex items-center gap-2.5">
+ <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center border border-evidence-200/40">
+ <MapPin className="w-4 h-4 text-primary-600" />
+ </div>
+ <div>
+ <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+ {locations.length > 1 ? 'Locations' : 'Location'}
+ </p>
+ {loadingLocations ? (
+ <div className="animate-pulse h-4 bg-gray-200 rounded w-20"></div>
+ ) : locations.length > 0 ? (
+ <p className="text-sm font-semibold text-gray-800">
+ {locations.map(loc => loc.name).join(', ')}
+ </p>
+ ) : (
+ <p className="text-sm text-gray-400 italic">Not found</p>
+ )}
+ </div>
+ </div>
+ )}
 
-                                {/* Beneficiary Groups */}
-                                {(beneficiaryGroups.length > 0 || loadingBeneficiaryGroups) && (
-                                    <>
-                                        <div className="hidden md:block w-px h-10 bg-evidence-200/40"></div>
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="w-8 h-8 rounded-lg bg-white/80 flex items-center justify-center border border-evidence-200/40">
-                                                <Users className="w-4 h-4 text-primary-600" />
-                                            </div>
-                                            <div>
-                                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                                                    {beneficiaryGroups.length > 1 ? 'Beneficiary Groups' : 'Beneficiary Group'}
-                                                </p>
-                                                {loadingBeneficiaryGroups ? (
-                                                    <div className="animate-pulse h-4 bg-gray-200 rounded w-24"></div>
-                                                ) : (
-                                                    <div className="flex flex-wrap gap-1.5 mt-0.5">
-                                                        {beneficiaryGroups.map(group => (
-                                                            <span
-                                                                key={group.id}
-                                                                className="inline-flex items-center gap-1 text-xs font-semibold text-gray-800 bg-white/80 border border-evidence-200/40 rounded-lg px-2 py-0.5"
-                                                            >
-                                                                <Users className="w-3 h-3 text-primary-500" />
-                                                                {group.name}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        </div>
+ {/* Beneficiary Groups */}
+ {(beneficiaryGroups.length > 0 || loadingBeneficiaryGroups) && (
+ <>
+ <div className="hidden md:block w-px h-10 bg-evidence-200/40"></div>
+ <div className="flex items-center gap-2.5">
+ <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center border border-evidence-200/40">
+ <Users className="w-4 h-4 text-primary-600" />
+ </div>
+ <div>
+ <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+ {beneficiaryGroups.length > 1 ? 'Beneficiary Groups' : 'Beneficiary Group'}
+ </p>
+ {loadingBeneficiaryGroups ? (
+ <div className="animate-pulse h-4 bg-gray-200 rounded w-24"></div>
+ ) : (
+ <div className="flex flex-wrap gap-1.5 mt-0.5">
+ {beneficiaryGroups.map(group => (
+ <span
+ key={group.id}
+ className="inline-flex items-center gap-1 text-xs font-semibold text-gray-800 bg-gray-50 border border-evidence-200/40 rounded-lg px-2 py-0.5"
+ >
+ <Users className="w-3 h-3 text-primary-500" />
+ {group.name}
+ </span>
+ ))}
+ </div>
+ )}
+ </div>
+ </div>
+ </>
+ )}
+ </div>
+ </div>
 
-                        {/* Tags */}
-                        {Array.isArray(displayEvidence.tag_ids) && displayEvidence.tag_ids.length > 0 && (
-                            <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
-                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Tags</p>
-                                <EvidenceTagsList tagIds={displayEvidence.tag_ids} size="sm" />
-                            </div>
-                        )}
+ {/* Tags */}
+ {Array.isArray(displayEvidence.tag_ids) && displayEvidence.tag_ids.length > 0 && (
+ <div className="app-card app-pad mb-4">
+ <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Tags</p>
+ <EvidenceTagsList tagIds={displayEvidence.tag_ids} size="sm" />
+ </div>
+ )}
 
-                        {/* Description - Green accent */}
-                        {displayEvidence.description && (
-                            <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
-                                <div className="flex items-start gap-3">
-                                    <div className="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
-                                        <MessageSquare className="w-4 h-4 text-primary-600" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-xs font-semibold text-primary-600 mb-1 uppercase tracking-wider">Description</p>
-                                        <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{displayEvidence.description}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+ {/* Description - Green accent */}
+ {displayEvidence.description && (
+ <div className="app-card app-pad mb-4">
+ <div className="flex items-start gap-3">
+ <div className="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
+ <MessageSquare className="w-4 h-4 text-primary-600" />
+ </div>
+ <div className="flex-1 min-w-0">
+ <p className="text-xs font-semibold text-primary-600 mb-1 uppercase tracking-wider">Description</p>
+ <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{displayEvidence.description}</p>
+ </div>
+ </div>
+ </div>
+ )}
 
-                        {/* Linked Impact Claims */}
-                        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-                            {/* Header */}
-                            <div className="p-4 border-b border-gray-100 bg-gray-50/50">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center shadow-lg shadow-primary-500/25">
-                                        <BarChart3 className="w-4 h-4 text-white" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Supporting Impact Claims</p>
-                                        <p className="text-lg font-bold text-gray-900">{linkedDataPoints.length} <span className="text-sm font-normal text-gray-500">claims</span></p>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div className="p-4">
-                                {loadingDataPoints ? (
-                                    <div className="flex items-center justify-center py-8">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
-                                    </div>
-                                ) : linkedDataPoints.length > 0 ? (
-                                    (() => {
-                                        const groupedByKPI: Record<string, { kpi: any, dataPoints: any[] }> = {}
-                                        
-                                        linkedDataPoints.forEach((dataPoint) => {
-                                            const kpiId = dataPoint.kpi?.id || 'unknown'
-                                            if (!groupedByKPI[kpiId]) {
-                                                groupedByKPI[kpiId] = {
-                                                    kpi: dataPoint.kpi,
-                                                    dataPoints: []
-                                                }
-                                            }
-                                            groupedByKPI[kpiId].dataPoints.push(dataPoint)
-                                        })
-                                        
-                                        return (
-                                            <div className="space-y-3">
-                                                {Object.values(groupedByKPI).map((group, groupIndex) => {
-                                                    const total = aggregateKpiUpdates(group.dataPoints as any, group.kpi?.metric_type)
-                                                    
-                                                    return (
-                                                        <div key={group.kpi?.id || groupIndex} className="bg-gradient-to-br from-primary-50/50 to-primary-50/30 rounded-xl border border-primary-100/60 overflow-hidden">
-                                                            {/* Metric Card Header */}
-                                                            <div className="px-4 py-3 bg-gradient-to-r from-primary-100/80 to-primary-100/60 border-b border-primary-200/40">
-                                                                <div className="flex items-center space-x-2 min-w-0">
-                                                                    <BarChart3 className="w-4 h-4 text-primary-700 flex-shrink-0" />
-                                                                    <div className="min-w-0 flex-1">
-                                                                        <div className="text-sm font-bold text-gray-900 truncate">
-                                                                            {group.kpi?.title || 'Unknown Metric'}
-                                                                        </div>
-                                                                        <div className="flex items-baseline space-x-1 mt-0.5">
-                                                                            <span className="text-sm font-bold text-primary-700">
-                                                                                {total.toLocaleString()}
-                                                                            </span>
-                                                                            <span className="text-xs text-gray-600 font-medium">
-                                                                                {group.kpi?.unit_of_measurement || ''}
-                                                                            </span>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            
-                                                            {/* Impact Claims List */}
-                                                            <div className={`px-3 py-2 space-y-1 ${group.dataPoints.length > 3 ? 'max-h-[150px] overflow-y-auto' : ''}`}>
-                                                                {group.dataPoints.map((dataPoint, idx) => {
-                                                                    const hasDateRange = dataPoint.date_range_start && dataPoint.date_range_end
-                                                                    const dpDisplayDate = hasDateRange
-                                                                        ? `${formatDate(dataPoint.date_range_start)} - ${formatDate(dataPoint.date_range_end)}`
-                                                                        : formatDate(dataPoint.date_represented)
-                                                                    
-                                                                    const dataPointLocation = dataPoint.location_id ? dataPointLocations[dataPoint.location_id] : null
+ {/* Linked Impact Claims */}
+ <div className="app-card overflow-hidden">
+ {/* Header */}
+ <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+ <div className="flex items-center gap-3">
+ <div className="w-8 h-8 rounded-lg bg-primary-500 text-secondary-900 flex items-center justify-center shadow-card">
+ <BarChart3 className="w-4 h-4 text-white" />
+ </div>
+ <div>
+ <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Supporting Impact Claims</p>
+ <p className="text-lg font-bold text-gray-900">{linkedDataPoints.length} <span className="text-sm font-normal text-gray-500">claims</span></p>
+ </div>
+ </div>
+ </div>
+ 
+ <div className="p-4">
+ {loadingDataPoints ? (
+ <div className="flex items-center justify-center py-8">
+ <Spinner className="w-8 h-8" />
+ </div>
+ ) : linkedDataPoints.length > 0 ? (
+ (() => {
+ const groupedByKPI: Record<string, { kpi: any, dataPoints: any[] }> = {}
+ 
+ linkedDataPoints.forEach((dataPoint) => {
+ const kpiId = dataPoint.kpi?.id || 'unknown'
+ if (!groupedByKPI[kpiId]) {
+ groupedByKPI[kpiId] = {
+ kpi: dataPoint.kpi,
+ dataPoints: []
+ }
+ }
+ groupedByKPI[kpiId].dataPoints.push(dataPoint)
+ })
+ 
+ return (
+ <div className="space-y-3">
+ {Object.values(groupedByKPI).map((group, groupIndex) => {
+ const total = aggregateKpiUpdates(group.dataPoints as any, group.kpi?.metric_type)
+ 
+ return (
+ <div key={group.kpi?.id || groupIndex} className="bg-gradient-to-br from-primary-50/50 to-primary-50/30 rounded-xl border border-primary-100/60 overflow-hidden">
+ {/* Metric Card Header */}
+ <div className="px-4 py-3 bg-gradient-to-r from-primary-100/80 to-primary-100/60 border-b border-primary-200/40">
+ <div className="flex items-center space-x-2 min-w-0">
+ <BarChart3 className="w-4 h-4 text-primary-700 flex-shrink-0" />
+ <div className="min-w-0 flex-1">
+ <div className="text-sm font-bold text-gray-900 truncate">
+ {group.kpi?.title || 'Unknown Metric'}
+ </div>
+ <div className="flex items-baseline space-x-1 mt-0.5">
+ <span className="text-sm font-bold text-primary-700">
+ {total.toLocaleString()}
+ </span>
+ <span className="text-xs text-gray-600 font-medium">
+ {group.kpi?.unit_of_measurement || ''}
+ </span>
+ </div>
+ </div>
+ </div>
+ </div>
+ 
+ {/* Impact Claims List */}
+ <div className={`px-3 py-2 space-y-1 ${group.dataPoints.length > 3 ? 'max-h-[150px] overflow-y-auto' : ''}`}>
+ {group.dataPoints.map((dataPoint, idx) => {
+ const hasDateRange = dataPoint.date_range_start && dataPoint.date_range_end
+ const dpDisplayDate = hasDateRange
+ ? `${formatDate(dataPoint.date_range_start)} - ${formatDate(dataPoint.date_range_end)}`
+ : formatDate(dataPoint.date_represented)
+ 
+ const dataPointLocation = dataPoint.location_id ? dataPointLocations[dataPoint.location_id] : null
 
-                                                                    return (
-                                                                        <div 
-                                                                            key={dataPoint.id} 
-                                                                            onClick={() => onDataPointClick?.(dataPoint, group.kpi)}
-                                                                            className={`flex items-center justify-between py-2 px-2.5 rounded-lg transition-all ${
-                                                                                onDataPointClick ? 'hover:bg-white/80 cursor-pointer hover:shadow-sm' : ''
-                                                                            } ${idx < group.dataPoints.length - 1 ? 'border-b border-primary-100/40' : ''}`}
-                                                                        >
-                                                                            <div className="flex items-center space-x-2 min-w-0 flex-1">
-                                                                                <div className="w-2 h-2 rounded-full bg-primary-400 flex-shrink-0"></div>
-                                                                                <div className="min-w-0 flex-1">
-                                                                                    <div className="flex items-center space-x-2">
-                                                                                        <span className="text-xs font-semibold text-gray-900">
-                                                                                            {dataPoint.value?.toLocaleString()} {group.kpi?.unit_of_measurement || ''}
-                                                                                        </span>
-                                                                                        <span className="text-xs text-gray-500 flex items-center">
-                                                                                            <Calendar className="w-2.5 h-2.5 mr-0.5" />
-                                                                                            {dpDisplayDate.length > 20 ? dpDisplayDate.substring(0, 20) + '...' : dpDisplayDate}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    {dataPointLocation && (
-                                                                                        <div className="flex items-center space-x-1 text-xs text-gray-500 mt-0.5">
-                                                                                            <MapPin className="w-2.5 h-2.5" />
-                                                                                            <span className="truncate">{dataPointLocation.name}</span>
-                                                                                        </div>
-                                                                                    )}
-                                                                                </div>
-                                                                            </div>
-                                                                            {onDataPointClick && (
-                                                                                <Eye className="w-3.5 h-3.5 text-gray-400 ml-2 flex-shrink-0" />
-                                                                            )}
-                                                                        </div>
-                                                                    )
-                                                                })}
-                                                            </div>
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
-                                        )
-                                    })()
-                                ) : (
-                                    <div className="text-center py-8">
-                                        <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                                            <BarChart3 className="w-5 h-5 text-gray-400" />
-                                        </div>
-                                        <p className="text-sm font-medium text-gray-600 mb-1">No Linked Claims</p>
-                                        <p className="text-xs text-gray-500">This evidence is not linked to any impact claims</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
+ return (
+ <div 
+ key={dataPoint.id} 
+ onClick={() => onDataPointClick?.(dataPoint, group.kpi)}
+ className={`flex items-center justify-between py-2 px-2.5 rounded-lg transition-all ${
+ onDataPointClick ? 'hover:bg-gray-50 cursor-pointer hover:shadow-sm' : ''
+ } ${idx < group.dataPoints.length - 1 ? 'border-b border-primary-100/40' : ''}`}
+ >
+ <div className="flex items-center space-x-2 min-w-0 flex-1">
+ <div className="w-2 h-2 rounded-full bg-primary-400 flex-shrink-0"></div>
+ <div className="min-w-0 flex-1">
+ <div className="flex items-center space-x-2">
+ <span className="text-xs font-semibold text-gray-900">
+ {dataPoint.value?.toLocaleString()} {group.kpi?.unit_of_measurement || ''}
+ </span>
+ <span className="text-xs text-gray-500 flex items-center">
+ <Calendar className="w-2.5 h-2.5 mr-0.5" />
+ {dpDisplayDate.length > 20 ? dpDisplayDate.substring(0, 20) + '...' : dpDisplayDate}
+ </span>
+ </div>
+ {dataPointLocation && (
+ <div className="flex items-center space-x-1 text-xs text-gray-500 mt-0.5">
+ <MapPin className="w-2.5 h-2.5" />
+ <span className="truncate">{dataPointLocation.name}</span>
+ </div>
+ )}
+ </div>
+ </div>
+ {onDataPointClick && (
+ <Eye className="w-3.5 h-3.5 text-gray-400 ml-2 flex-shrink-0" />
+ )}
+ </div>
+ )
+ })}
+ </div>
+ </div>
+ )
+ })}
+ </div>
+ )
+ })()
+ ) : (
+ <div className="text-center py-8">
+ <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+ <BarChart3 className="w-5 h-5 text-gray-400" />
+ </div>
+ <p className="text-sm font-medium text-gray-600 mb-1">No Linked Claims</p>
+ <p className="text-xs text-gray-500">This evidence is not linked to any impact claims</p>
+ </div>
+ )}
+ </div>
+ </div>
+ </div>
+ </div>
 
-                {/* Footer Actions - Mobile optimized */}
-                <div className="flex flex-col-reverse md:flex-row items-stretch md:items-center justify-between p-4 border-t border-gray-100 bg-gray-50/50 gap-3 md:gap-0 flex-shrink-0">
-                    <div className="hidden md:block">
-                        {onDelete && (
-                            <button
-                                onClick={() => {
-                                    onDelete(displayEvidence)
-                                    onClose()
-                                }}
-                                className="flex items-center gap-2 px-4 py-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-colors text-sm font-medium"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                                <span>Delete Evidence</span>
-                            </button>
-                        )}
-                    </div>
-                    <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
-                        {onEdit && (
-                            <button
-                                onClick={() => {
-                                    onEdit(displayEvidence)
-                                    onClose()
-                                }}
-                                className="flex items-center justify-center gap-2 py-3 md:py-2.5 px-5 text-sm bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25 order-first md:order-last"
-                            >
-                                <Edit className="w-4 h-4" />
-                                <span>Edit Evidence</span>
-                            </button>
-                        )}
-                        <Button
-                            onClick={onClose}
-                            variant="secondary"
-                        >
-                            Close
-                        </Button>
-                    </div>
-                </div>
-        </ModalFrame>
-    )
+ {/* Footer Actions - Mobile optimized */}
+ <div className="flex flex-col-reverse md:flex-row items-stretch md:items-center justify-between p-4 border-t border-gray-100 bg-gray-50/50 gap-3 md:gap-0 flex-shrink-0">
+ <div className="hidden md:block">
+ {onDelete && (
+ <button
+ onClick={() => {
+ onDelete(displayEvidence)
+ onClose()
+ }}
+ className="flex items-center gap-2 px-4 py-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-colors text-sm font-medium"
+ >
+ <Trash2 className="w-4 h-4" />
+ <span>Delete Evidence</span>
+ </button>
+ )}
+ </div>
+ <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+ {onEdit && (
+ <button
+ onClick={() => {
+ onEdit(displayEvidence)
+ onClose()
+ }}
+ className="flex items-center justify-center gap-2 py-3 md:py-2.5 px-5 text-sm bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25 order-first md:order-last"
+ >
+ <Edit className="w-4 h-4" />
+ <span>Edit Evidence</span>
+ </button>
+ )}
+ <Button
+ onClick={onClose}
+ variant="secondary"
+ >
+ Close
+ </Button>
+ </div>
+ </div>
+ </ModalFrame>
+ )
 }

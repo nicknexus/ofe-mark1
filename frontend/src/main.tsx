@@ -5,13 +5,13 @@ import './index.css'
 import 'leaflet/dist/leaflet.css'
 
 if ('serviceWorker' in navigator && /Mobi|Android/i.test(navigator.userAgent)) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js').catch(() => {})
-    })
+ window.addEventListener('load', () => {
+ navigator.serviceWorker.register('/service-worker.js').catch(() => {})
+ })
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-    <React.StrictMode>
-        <App />
-    </React.StrictMode>,
+ <React.StrictMode>
+ <App />
+ </React.StrictMode>,
 ) 

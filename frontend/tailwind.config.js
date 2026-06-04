@@ -114,7 +114,14 @@ export default {
                 caption: ['0.75rem', { lineHeight: '1.25' }],
             },
             boxShadow: {
-                // Soft floating card shadows
+                // === APP MASTER (private/SaaS tier) — flat, crisp card shadows ===
+                // Single source of truth for authenticated surfaces. Prefer these
+                // over arbitrary shadow-[...] strings. See MASTER_STYLE_GUIDE.md.
+                'card': '0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 1px rgba(16, 24, 40, 0.03)',
+                'card-hover': '0 2px 6px -1px rgba(16, 24, 40, 0.08), 0 10px 24px -8px rgba(16, 24, 40, 0.10)',
+                'card-lg': '0 4px 12px -2px rgba(16, 24, 40, 0.08), 0 16px 36px -10px rgba(16, 24, 40, 0.12)',
+                'app-modal': '0 8px 24px -8px rgba(16, 24, 40, 0.16), 0 24px 56px -16px rgba(16, 24, 40, 0.22)',
+                // Soft floating card shadows (legacy / public + landing tiers)
                 'bubble': '0 4px 20px rgba(0, 0, 0, 0.06)',
                 'bubble-hover': '0 8px 28px rgba(0, 0, 0, 0.08)',
                 'bubble-sm': '0 2px 10px rgba(0, 0, 0, 0.05)',

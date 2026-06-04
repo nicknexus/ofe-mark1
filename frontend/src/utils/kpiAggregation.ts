@@ -9,48 +9,48 @@ export type MetricType = 'number' | 'percentage' | string | null | undefined
 const PERCENTAGE_STRATEGY: AggregationStrategy = 'mean'
 
 export function getAggregationStrategy(metricType: MetricType): AggregationStrategy {
-    return metricType === 'percentage' ? PERCENTAGE_STRATEGY : 'sum'
+ return metricType === 'percentage' ? PERCENTAGE_STRATEGY : 'sum'
 }
 
 export interface AggregatableUpdate {
-    value: number | string | null | undefined
-    date_represented?: string | null
-    date_range_start?: string | null
-    date_range_end?: string | null
+ value: number | string | null | undefined
+ date_represented?: string | null
+ date_range_start?: string | null
+ date_range_end?: string | null
 }
 
 // Effective representative date — end-of-range for ranges, otherwise date_represented.
 function effectiveDateString(u: AggregatableUpdate): string {
-    return (u.date_range_end || u.date_represented || u.date_range_start || '') as string
+ return (u.date_range_end || u.date_represented || u.date_range_start || '') as string
 }
 
 export function aggregateKpiUpdates(
-    updates: AggregatableUpdate[] | null | undefined,
-    metricType: MetricType
+ updates: AggregatableUpdate[] | null | undefined,
+ metricType: MetricType
 ): number {
-    if (!updates || updates.length === 0) return 0
+ if (!updates || updates.length === 0) return 0
 
-    const strategy = getAggregationStrategy(metricType)
-    const nums = updates
-        .map(u => Number(u?.value ?? 0))
-        .filter(n => Number.isFinite(n))
+ const strategy = getAggregationStrategy(metricType)
+ const nums = updates
+ .map(u => Number(u?.value ?? 0))
+ .filter(n => Number.isFinite(n))
 
-    if (nums.length === 0) return 0
+ if (nums.length === 0) return 0
 
-    switch (strategy) {
-        case 'mean': {
-            const sum = nums.reduce((s, n) => s + n, 0)
-            return Math.round(sum / nums.length)
-        }
-        case 'latest': {
-            const sorted = [...updates]
-                .filter(u => Number.isFinite(Number(u?.value ?? 0)))
-                .sort((a, b) => effectiveDateString(b).localeCompare(effectiveDateString(a)))
-            const v = Number(sorted[0]?.value ?? 0)
-            return metricType === 'percentage' ? Math.round(v) : v
-        }
-        case 'sum':
-        default:
-            return nums.reduce((s, n) => s + n, 0)
-    }
+ switch (strategy) {
+ case 'mean': {
+ const sum = nums.reduce((s, n) => s + n, 0)
+ return Math.round(sum / nums.length)
+ }
+ case 'latest': {
+ const sorted = [...updates]
+ .filter(u => Number.isFinite(Number(u?.value ?? 0)))
+ .sort((a, b) => effectiveDateString(b).localeCompare(effectiveDateString(a)))
+ const v = Number(sorted[0]?.value ?? 0)
+ return metricType === 'percentage' ? Math.round(v) : v
+ }
+ case 'sum':
+ default:
+ return nums.reduce((s, n) => s + n, 0)
+ }
 }

@@ -1,5 +1,7 @@
 # Frontend consistency audit — handoff for cleanup
 
+> **Update (2026):** The **authenticated (private) tier** is now standardized on the **APP MASTER** system (`frontend/MASTER_STYLE_GUIDE.md`, `app-*` classes in `index.css`, `src/components/ui/*`). Many items below for tier C (buttons, cards, toasts, modals) are addressed in app code; landing/marketing/public tiers may still match this audit.
+
 **Purpose:** Single source of truth for styling and structural inconsistencies across the OFE/Nexus frontend. Use this to prioritize refactors without rediscovering issues.
 
 **Stack:** React 18, Vite, Tailwind 3, `index.css` (large custom layer), Radix Slot + CVA for one `Button`, Supabase auth, `react-hot-toast`, `lucide-react` (+ stray `phosphor-react`).

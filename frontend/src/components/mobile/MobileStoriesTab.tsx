@@ -1,18 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useUploadManager } from '../../context/UploadContext'
 import { 
-    Plus, 
-    BookOpen, 
-    Camera, 
-    Video, 
-    Mic, 
-    FileText,
-    Upload,
-    X,
-    Check,
-    MapPin,
-    Calendar,
-    Loader2
+ Plus, 
+ BookOpen, 
+ Camera, 
+ Video, 
+ Mic, 
+ FileText,
+ Upload,
+ X,
+ Check,
+ MapPin,
+ Calendar,
 } from 'lucide-react'
 import { apiService } from '../../services/api'
 import { Story, Location, BeneficiaryGroup } from '../../types'
@@ -22,601 +21,594 @@ import StoryDetailModal from '../StoryDetailModal'
 import TagPicker from '../MetricTags/TagPicker'
 import EvidenceTagsList from '../MetricTags/EvidenceTagsList'
 import { useTeam } from '../../context/TeamContext'
-import toast from 'react-hot-toast'
+import { notify } from '../../lib/notify'
+import { EmptyState, SectionLoader, Spinner } from '../ui'
 
 interface MobileStoriesTabProps {
-    initiativeId: string
-    autoAdd?: boolean
+ initiativeId: string
+ autoAdd?: boolean
 }
 
 export default function MobileStoriesTab({ initiativeId, autoAdd }: MobileStoriesTabProps) {
-    const { canEditStories } = useTeam()
-    const [stories, setStories] = useState<Story[]>([])
-    const [loading, setLoading] = useState(true)
-    const [showCreateFlow, setShowCreateFlow] = useState(!!autoAdd)
-    const [selectedStory, setSelectedStory] = useState<Story | null>(null)
-    const [isDetailOpen, setIsDetailOpen] = useState(false)
+ const { canEditStories } = useTeam()
+ const [stories, setStories] = useState<Story[]>([])
+ const [loading, setLoading] = useState(true)
+ const [showCreateFlow, setShowCreateFlow] = useState(!!autoAdd)
+ const [selectedStory, setSelectedStory] = useState<Story | null>(null)
+ const [isDetailOpen, setIsDetailOpen] = useState(false)
 
-    useEffect(() => {
-        loadStories()
-    }, [initiativeId])
+ useEffect(() => {
+ loadStories()
+ }, [initiativeId])
 
-    const loadStories = async () => {
-        try {
-            setLoading(true)
-            const data = await apiService.getStories(initiativeId)
-            setStories(data || [])
-        } catch (error) {
-            console.error('Error loading stories:', error)
-            toast.error('Failed to load stories')
-        } finally {
-            setLoading(false)
-        }
-    }
+ const loadStories = async () => {
+ try {
+ setLoading(true)
+ const data = await apiService.getStories(initiativeId)
+ setStories(data || [])
+ } catch (error) {
+ console.error('Error loading stories:', error)
+ notify.error('Failed to load stories')
+ } finally {
+ setLoading(false)
+ }
+ }
 
-    const handleDeleteStory = async (storyId: string) => {
-        try {
-            await apiService.deleteStory(storyId)
-            toast.success('Story deleted')
-            setIsDetailOpen(false)
-            setSelectedStory(null)
-            loadStories()
-        } catch (error) {
-            toast.error('Failed to delete story')
-        }
-    }
+ const handleDeleteStory = async (storyId: string) => {
+ try {
+ await apiService.deleteStory(storyId)
+ notify.success('Story deleted')
+ setIsDetailOpen(false)
+ setSelectedStory(null)
+ loadStories()
+ } catch (error) {
+ notify.error('Failed to delete story')
+ }
+ }
 
-    if (showCreateFlow) {
-        return (
-            <MobileStoryForm
-                initiativeId={initiativeId}
-                onClose={() => setShowCreateFlow(false)}
-                onSuccess={() => {
-                    setShowCreateFlow(false)
-                    loadStories()
-                }}
-            />
-        )
-    }
+ if (showCreateFlow) {
+ return (
+ <MobileStoryForm
+ initiativeId={initiativeId}
+ onClose={() => setShowCreateFlow(false)}
+ onSuccess={() => {
+ setShowCreateFlow(false)
+ loadStories()
+ }}
+ />
+ )
+ }
 
-    return (
-        <div className="p-4">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-                <div>
-                    <h1 className="text-xl font-bold text-gray-900">Stories</h1>
-                    <p className="text-sm text-gray-500">{stories.length} stor{stories.length !== 1 ? 'ies' : 'y'}</p>
-                </div>
-                {canEditStories && (
-                    <button
-                        onClick={() => setShowCreateFlow(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-primary-500 text-white rounded-xl font-semibold text-sm shadow-lg shadow-primary-500/25 active:scale-[0.98]"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Add
-                    </button>
-                )}
-            </div>
+ return (
+ <div className="p-4">
+ {/* Header */}
+ <div className="flex items-center justify-between mb-4">
+ <div>
+ <h1 className="text-xl font-bold text-gray-900">Stories</h1>
+ <p className="text-sm text-gray-500">{stories.length} stor{stories.length !== 1 ? 'ies' : 'y'}</p>
+ </div>
+ {canEditStories && (
+ <button
+ onClick={() => setShowCreateFlow(true)}
+ className="app-btn app-btn-primary app-btn-sm active:scale-[0.98]"
+ >
+ <Plus className="w-4 h-4" />
+ Add
+ </button>
+ )}
+ </div>
 
-            {/* Stories Grid */}
-            {loading ? (
-                <div className="flex items-center justify-center h-64">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
-                </div>
-            ) : stories.length === 0 ? (
-                <div className="text-center py-12 bg-white rounded-2xl border border-gray-100">
-                    <div className="w-16 h-16 bg-primary-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <BookOpen className="w-8 h-8 text-primary-400" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">No Stories Yet</h3>
-                    <p className="text-gray-500 text-sm px-6 mb-6">
-                        Share your impact with photos and stories.
-                    </p>
-                    {canEditStories && (
-                        <button
-                            onClick={() => setShowCreateFlow(true)}
-                            className="px-6 py-3 bg-primary-500 text-white rounded-xl font-medium text-sm"
-                        >
-                            Create Story
-                        </button>
-                    )}
-                </div>
-            ) : (
-                <div className="grid grid-cols-2 gap-3">
-                    {stories.map((story) => {
-                        const mediaIcon = 
-                            story.media_type === 'photo' ? Camera :
-                            story.media_type === 'video' ? Video :
-                            story.media_type === 'recording' ? Mic :
-                            FileText
+ {/* Stories Grid */}
+ {loading ? (
+ <SectionLoader className="h-64" />
+ ) : stories.length === 0 ? (
+ <EmptyState
+ className="app-card"
+ icon={BookOpen}
+ title="No Stories Yet"
+ description="Share your impact with photos and stories."
+ action={
+ canEditStories ? (
+ <button type="button" onClick={() => setShowCreateFlow(true)} className="app-btn app-btn-primary">
+ Create Story
+ </button>
+ ) : undefined
+ }
+ />
+ ) : (
+ <div className="grid grid-cols-2 gap-3">
+ {stories.map((story) => {
+ const mediaIcon = 
+ story.media_type === 'photo' ? Camera :
+ story.media_type === 'video' ? Video :
+ story.media_type === 'recording' ? Mic :
+ FileText
 
-                        return (
-                            <button
-                                key={story.id}
-                                onClick={() => {
-                                    setSelectedStory(story)
-                                    setIsDetailOpen(true)
-                                }}
-                                className="bg-white rounded-xl border border-gray-100 overflow-hidden text-left active:scale-[0.98] transition-transform"
-                            >
-                                {/* Media Preview */}
-                                <div className="aspect-square bg-gray-100 relative overflow-hidden">
-                                    {story.media_url && /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(story.media_url) ? (
-                                        <>
-                                            <img
-                                                src={`https://img.youtube.com/vi/${(story.media_url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) || [])[1]}/hqdefault.jpg`}
-                                                alt={story.title}
-                                                className="w-full h-full object-cover"
-                                            />
-                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
-                                                    <svg className="w-4 h-4 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-                                                </div>
-                                            </div>
-                                        </>
-                                    ) : story.media_url && (story.media_type === 'photo' || !story.media_type) ? (
-                                        <img
-                                            src={story.media_url}
-                                            alt={story.title}
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                                (e.target as HTMLImageElement).style.display = 'none'
-                                            }}
-                                        />
-                                    ) : story.media_url && story.media_type === 'video' ? (
-                                        <video
-                                            src={story.media_url}
-                                            className="w-full h-full object-cover"
-                                        />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center">
-                                            {React.createElement(mediaIcon, { className: 'w-10 h-10 text-gray-300' })}
-                                        </div>
-                                    )}
-                                </div>
-                                {/* Info */}
-                                <div className="p-3">
-                                    <h3 className="font-medium text-gray-800 text-sm truncate">
-                                        {story.title}
-                                    </h3>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        {formatDate(story.date_represented)}
-                                    </p>
-                                    {story.tag_ids && story.tag_ids.length > 0 && (
-                                        <div className="mt-1.5">
-                                            <EvidenceTagsList tagIds={story.tag_ids} visibleCap={3} clickable={false} size="xs" />
-                                        </div>
-                                    )}
-                                </div>
-                            </button>
-                        )
-                    })}
-                </div>
-            )}
+ return (
+ <button
+ key={story.id}
+ onClick={() => {
+ setSelectedStory(story)
+ setIsDetailOpen(true)
+ }}
+ className="app-card-interactive overflow-hidden text-left active:scale-[0.98] transition-transform"
+ >
+ {/* Media Preview */}
+ <div className="aspect-square bg-gray-100 relative overflow-hidden">
+ {story.media_url && /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(story.media_url) ? (
+ <>
+ <img
+ src={`https://img.youtube.com/vi/${(story.media_url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) || [])[1]}/hqdefault.jpg`}
+ alt={story.title}
+ className="w-full h-full object-cover"
+ />
+ <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+ <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
+ <svg className="w-4 h-4 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+ </div>
+ </div>
+ </>
+ ) : story.media_url && (story.media_type === 'photo' || !story.media_type) ? (
+ <img
+ src={story.media_url}
+ alt={story.title}
+ className="w-full h-full object-cover"
+ onError={(e) => {
+ (e.target as HTMLImageElement).style.display = 'none'
+ }}
+ />
+ ) : story.media_url && story.media_type === 'video' ? (
+ <video
+ src={story.media_url}
+ className="w-full h-full object-cover"
+ />
+ ) : (
+ <div className="w-full h-full flex items-center justify-center">
+ {React.createElement(mediaIcon, { className: 'w-10 h-10 text-gray-300' })}
+ </div>
+ )}
+ </div>
+ {/* Info */}
+ <div className="p-3">
+ <h3 className="font-medium text-gray-800 text-sm truncate">
+ {story.title}
+ </h3>
+ <p className="text-xs text-gray-500 mt-1">
+ {formatDate(story.date_represented)}
+ </p>
+ {story.tag_ids && story.tag_ids.length > 0 && (
+ <div className="mt-1.5">
+ <EvidenceTagsList tagIds={story.tag_ids} visibleCap={3} clickable={false} size="xs" />
+ </div>
+ )}
+ </div>
+ </button>
+ )
+ })}
+ </div>
+ )}
 
-            {/* Story Detail Modal */}
-            {isDetailOpen && selectedStory && (
-                <StoryDetailModal
-                    isOpen={isDetailOpen}
-                    onClose={() => {
-                        setIsDetailOpen(false)
-                        setSelectedStory(null)
-                    }}
-                    story={selectedStory}
-                    onEdit={canEditStories ? () => {} : undefined}
-                    onDelete={canEditStories ? handleDeleteStory : undefined}
-                />
-            )}
-        </div>
-    )
+ {/* Story Detail Modal */}
+ {isDetailOpen && selectedStory && (
+ <StoryDetailModal
+ isOpen={isDetailOpen}
+ onClose={() => {
+ setIsDetailOpen(false)
+ setSelectedStory(null)
+ }}
+ story={selectedStory}
+ onEdit={canEditStories ? () => {} : undefined}
+ onDelete={canEditStories ? handleDeleteStory : undefined}
+ />
+ )}
+ </div>
+ )
 }
 
 // Mobile Story Form
 interface StoryFormProps {
-    initiativeId: string
-    onClose: () => void
-    onSuccess: () => void
+ initiativeId: string
+ onClose: () => void
+ onSuccess: () => void
 }
 
 function MobileStoryForm({ initiativeId, onClose, onSuccess }: StoryFormProps) {
-    const [loading, setLoading] = useState(false)
-    const [locations, setLocations] = useState<Location[]>([])
-    const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
-    const fileInputRef = useRef<HTMLInputElement>(null)
-    const { queueUpload } = useUploadManager()
+ const [loading, setLoading] = useState(false)
+ const [locations, setLocations] = useState<Location[]>([])
+ const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
+ const fileInputRef = useRef<HTMLInputElement>(null)
+ const { queueUpload } = useUploadManager()
 
-    const [formData, setFormData] = useState({
-        title: '',
-        description: '',
-        media_type: 'photo' as 'photo' | 'video' | 'recording' | 'text',
-        media_url: '',
-        file: null as File | null,
-        date_represented: getLocalDateString(new Date()),
-        location_ids: [] as string[],
-        beneficiary_group_ids: [] as string[],
-        tag_ids: [] as string[]
-    })
+ const [formData, setFormData] = useState({
+ title: '',
+ description: '',
+ media_type: 'photo' as 'photo' | 'video' | 'recording' | 'text',
+ media_url: '',
+ file: null as File | null,
+ date_represented: getLocalDateString(new Date()),
+ location_ids: [] as string[],
+ beneficiary_group_ids: [] as string[],
+ tag_ids: [] as string[]
+ })
 
-    const mediaTypes = [
-        { value: 'photo', label: 'Photo', icon: Camera },
-        { value: 'video', label: 'Video', icon: Video },
-        { value: 'recording', label: 'Audio', icon: Mic },
-        { value: 'text', label: 'Text', icon: FileText }
-    ]
+ const mediaTypes = [
+ { value: 'photo', label: 'Photo', icon: Camera },
+ { value: 'video', label: 'Video', icon: Video },
+ { value: 'recording', label: 'Audio', icon: Mic },
+ { value: 'text', label: 'Text', icon: FileText }
+ ]
 
-    useEffect(() => {
-        Promise.all([
-            apiService.getLocations(initiativeId),
-            apiService.getBeneficiaryGroups(initiativeId)
-        ]).then(([locs, groups]) => {
-            setLocations(locs || [])
-            setBeneficiaryGroups(groups || [])
-        })
-    }, [initiativeId])
+ useEffect(() => {
+ Promise.all([
+ apiService.getLocations(initiativeId),
+ apiService.getBeneficiaryGroups(initiativeId)
+ ]).then(([locs, groups]) => {
+ setLocations(locs || [])
+ setBeneficiaryGroups(groups || [])
+ })
+ }, [initiativeId])
 
-    const handleFileSelect = async (file: File) => {
-        setFormData(prev => ({ ...prev, file }))
-    }
+ const handleFileSelect = async (file: File) => {
+ setFormData(prev => ({ ...prev, file }))
+ }
 
-    const handleSubmit = async () => {
-        if (!formData.title.trim()) {
-            toast.error('Please enter a title')
-            return
-        }
-        if (!formData.location_ids || formData.location_ids.length === 0) {
-            toast.error('Please select at least one location')
-            return
-        }
+ const handleSubmit = async () => {
+ if (!formData.title.trim()) {
+ notify.error('Please enter a title')
+ return
+ }
+ if (!formData.location_ids || formData.location_ids.length === 0) {
+ notify.error('Please select at least one location')
+ return
+ }
 
-        // If there's a file to upload, queue it in background and close immediately
-        if (formData.file) {
-            const capturedFormData = { ...formData }
-            const capturedFile = formData.file
-            const capturedOnSuccess = onSuccess
+ // If there's a file to upload, queue it in background and close immediately
+ if (formData.file) {
+ const capturedFormData = { ...formData }
+ const capturedFile = formData.file
+ const capturedOnSuccess = onSuccess
 
-            onClose()
+ onClose()
 
-            queueUpload({
-                file: capturedFile,
-                onComplete: async (result) => {
-                    try {
-                        await apiService.createStory({
-                            title: capturedFormData.title.trim(),
-                            description: capturedFormData.description.trim(),
-                            media_type: capturedFormData.media_type,
-                            media_url: result.file_url,
-                            date_represented: capturedFormData.date_represented,
-                            location_ids: capturedFormData.location_ids,
-                            beneficiary_group_ids: capturedFormData.beneficiary_group_ids,
-                            tag_ids: capturedFormData.tag_ids,
-                            initiative_id: initiativeId
-                        })
-                        toast.success('Story created!')
-                        capturedOnSuccess()
-                    } catch (err) {
-                        toast.error(`Failed to create story: ${err instanceof Error ? err.message : 'Unknown error'}`)
-                    }
-                },
-                onError: (error) => {
-                    if (error.message !== 'Upload cancelled') {
-                        toast.error(`Upload failed for ${capturedFile.name}`)
-                    }
-                }
-            })
-            return
-        }
+ queueUpload({
+ file: capturedFile,
+ onComplete: async (result) => {
+ try {
+ await apiService.createStory({
+ title: capturedFormData.title.trim(),
+ description: capturedFormData.description.trim(),
+ media_type: capturedFormData.media_type,
+ media_url: result.file_url,
+ date_represented: capturedFormData.date_represented,
+ location_ids: capturedFormData.location_ids,
+ beneficiary_group_ids: capturedFormData.beneficiary_group_ids,
+ tag_ids: capturedFormData.tag_ids,
+ initiative_id: initiativeId
+ })
+ notify.success('Story created!')
+ capturedOnSuccess()
+ } catch (err) {
+ notify.error(`Failed to create story: ${err instanceof Error ? err.message : 'Unknown error'}`)
+ }
+ },
+ onError: (error) => {
+ if (error.message !== 'Upload cancelled') {
+ notify.error(`Upload failed for ${capturedFile.name}`)
+ }
+ }
+ })
+ return
+ }
 
-        setLoading(true)
-        try {
-            await apiService.createStory({
-                title: formData.title.trim(),
-                description: formData.description.trim(),
-                media_type: formData.media_type,
-                media_url: formData.media_url || undefined,
-                date_represented: formData.date_represented,
-                location_ids: formData.location_ids,
-                beneficiary_group_ids: formData.beneficiary_group_ids,
-                tag_ids: formData.tag_ids,
-                initiative_id: initiativeId
-            })
-            toast.success('Story created!')
-            onSuccess()
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to create story'
-            toast.error(message)
-        } finally {
-            setLoading(false)
-        }
-    }
+ setLoading(true)
+ try {
+ await apiService.createStory({
+ title: formData.title.trim(),
+ description: formData.description.trim(),
+ media_type: formData.media_type,
+ media_url: formData.media_url || undefined,
+ date_represented: formData.date_represented,
+ location_ids: formData.location_ids,
+ beneficiary_group_ids: formData.beneficiary_group_ids,
+ tag_ids: formData.tag_ids,
+ initiative_id: initiativeId
+ })
+ notify.success('Story created!')
+ onSuccess()
+ } catch (error) {
+ const message = error instanceof Error ? error.message : 'Failed to create story'
+ notify.error(message)
+ } finally {
+ setLoading(false)
+ }
+ }
 
-    return (
-        <div className="fixed inset-0 bg-white z-[100] flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-100">
-                <button onClick={onClose} className="p-2 -ml-2">
-                    <X className="w-5 h-5 text-gray-500" />
-                </button>
-                <span className="font-semibold text-gray-800">Create Story</span>
-                <div className="w-9" />
-            </div>
+ return (
+ <div className="fixed inset-0 bg-white z-[100] flex flex-col">
+ {/* Header */}
+ <div className="flex items-center justify-between p-4 border-b border-gray-100">
+ <button onClick={onClose} className="p-2 -ml-2">
+ <X className="w-5 h-5 text-gray-500" />
+ </button>
+ <span className="font-semibold text-gray-800">Create Story</span>
+ <div className="w-9" />
+ </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {/* Title */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Title <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                        type="text"
-                        value={formData.title}
-                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                        placeholder="Enter story title"
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm"
-                    />
-                </div>
+ {/* Content */}
+ <div className="flex-1 overflow-y-auto p-4 space-y-4">
+ {/* Title */}
+ <div>
+ <label className="app-label">
+ Title <span className="text-red-500">*</span>
+ </label>
+ <input
+ type="text"
+ value={formData.title}
+ onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+ placeholder="Enter story title"
+ className="app-input"
+ />
+ </div>
 
-                {/* Description */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Description
-                    </label>
-                    <textarea
-                        value={formData.description}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        placeholder="Tell the story..."
-                        rows={4}
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm resize-none"
-                    />
-                </div>
+ {/* Description */}
+ <div>
+ <label className="app-label">Description</label>
+ <textarea
+ value={formData.description}
+ onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+ placeholder="Tell the story..."
+ rows={4}
+ className="app-input resize-none"
+ />
+ </div>
 
-                {/* Media Type */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Media Type
-                    </label>
-                    <div className="grid grid-cols-4 gap-2">
-                        {mediaTypes.map((type) => {
-                            const Icon = type.icon
-                            const isSelected = formData.media_type === type.value
-                            return (
-                                <button
-                                    key={type.value}
-                                    type="button"
-                                    onClick={() => setFormData({ ...formData, media_type: type.value as any })}
-                                    className={`p-3 rounded-xl border-2 transition-all ${
-                                        isSelected 
-                                            ? 'border-primary-500 bg-primary-50' 
-                                            : 'border-gray-200'
-                                    }`}
-                                >
-                                    <Icon className={`w-5 h-5 mx-auto ${isSelected ? 'text-primary-500' : 'text-gray-400'}`} />
-                                    <div className={`text-xs mt-1 ${isSelected ? 'text-primary-600 font-medium' : 'text-gray-500'}`}>
-                                        {type.label}
-                                    </div>
-                                </button>
-                            )
-                        })}
-                    </div>
-                </div>
+ {/* Media Type */}
+ <div>
+ <label className="app-label">
+ Media Type
+ </label>
+ <div className="grid grid-cols-4 gap-2">
+ {mediaTypes.map((type) => {
+ const Icon = type.icon
+ const isSelected = formData.media_type === type.value
+ return (
+ <button
+ key={type.value}
+ type="button"
+ onClick={() => setFormData({ ...formData, media_type: type.value as any })}
+ className={`p-3 rounded-xl border-2 transition-all ${
+ isSelected 
+ ? 'border-primary-500 bg-primary-50' 
+ : 'border-gray-200'
+ }`}
+ >
+ <Icon className={`w-5 h-5 mx-auto ${isSelected ? 'text-primary-500' : 'text-gray-400'}`} />
+ <div className={`text-xs mt-1 ${isSelected ? 'text-primary-600 font-medium' : 'text-gray-500'}`}>
+ {type.label}
+ </div>
+ </button>
+ )
+ })}
+ </div>
+ </div>
 
-                {/* File Upload - only for non-text types */}
-                {formData.media_type !== 'text' && (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Upload {formData.media_type === 'photo' ? 'Photo' : formData.media_type === 'video' ? 'Video' : 'Audio'}
-                        </label>
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            onChange={(e) => {
-                                const file = e.target.files?.[0]
-                                if (file) handleFileSelect(file)
-                            }}
-                            accept={
-                                formData.media_type === 'photo' ? 'image/*' :
-                                formData.media_type === 'video' ? 'video/*' :
-                                'audio/*'
-                            }
-                            className="hidden"
-                        />
+ {/* File Upload - only for non-text types */}
+ {formData.media_type !== 'text' && (
+ <div>
+ <label className="app-label">
+ Upload {formData.media_type === 'photo' ? 'Photo' : formData.media_type === 'video' ? 'Video' : 'Audio'}
+ </label>
+ <input
+ ref={fileInputRef}
+ type="file"
+ onChange={(e) => {
+ const file = e.target.files?.[0]
+ if (file) handleFileSelect(file)
+ }}
+ accept={
+ formData.media_type === 'photo' ? 'image/*' :
+ formData.media_type === 'video' ? 'video/*' :
+ 'audio/*'
+ }
+ className="hidden"
+ />
 
-                        {formData.media_url ? (
-                            <div className="bg-primary-50 border-2 border-primary-300 rounded-xl p-4 text-center">
-                                {formData.media_type === 'photo' && (
-                                    <img 
-                                        src={formData.media_url} 
-                                        alt="Preview" 
-                                        className="max-h-48 mx-auto rounded-lg mb-2"
-                                    />
-                                )}
-                                <p className="text-sm text-primary-700 font-medium">File uploaded</p>
-                                <button
-                                    onClick={() => setFormData({ ...formData, media_url: '' })}
-                                    className="mt-2 text-sm text-red-600 font-medium"
-                                >
-                                    Remove
-                                </button>
-                            </div>
-                        ) : (
-                            <>
-                                <button
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-primary-400 transition-colors"
-                                >
-                                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                                    <p className="text-sm text-gray-600">Tap to upload</p>
-                                </button>
+ {formData.media_url ? (
+ <div className="bg-primary-50 border-2 border-primary-300 rounded-xl p-4 text-center">
+ {formData.media_type === 'photo' && (
+ <img 
+ src={formData.media_url} 
+ alt="Preview" 
+ className="max-h-48 mx-auto rounded-lg mb-2"
+ />
+ )}
+ <p className="text-sm text-primary-700 font-medium">File uploaded</p>
+ <button
+ onClick={() => setFormData({ ...formData, media_url: '' })}
+ className="mt-2 text-sm text-red-600 font-medium"
+ >
+ Remove
+ </button>
+ </div>
+ ) : (
+ <>
+ <button
+ onClick={() => fileInputRef.current?.click()}
+ className="w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-primary-400 transition-colors"
+ >
+ <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+ <p className="text-sm text-gray-600">Tap to upload</p>
+ </button>
 
-                                <div className="mt-4 space-y-3">
-                                    <div className="flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200/60 rounded-xl">
-                                        <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                                            <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                                            </svg>
-                                        </div>
-                                        <input
-                                            type="url"
-                                            value={formData.media_url || ''}
-                                            onChange={(e) => setFormData({ ...formData, media_url: e.target.value })}
-                                            className="flex-1 bg-transparent border-none outline-none text-sm text-gray-800 placeholder-red-400/70 focus:ring-0 p-0"
-                                            placeholder="Paste a YouTube link"
-                                        />
-                                    </div>
-                                    <div className="relative flex items-center">
-                                        <div className="flex-1 border-t border-gray-200"></div>
-                                        <span className="px-3 text-xs text-gray-400 font-medium">or paste any link</span>
-                                        <div className="flex-1 border-t border-gray-200"></div>
-                                    </div>
-                                    <input
-                                        type="url"
-                                        value={formData.media_url || ''}
-                                        onChange={(e) => setFormData({ ...formData, media_url: e.target.value })}
-                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                                        placeholder="Paste a link to media (https://...)"
-                                    />
-                                </div>
-                            </>
-                        )}
-                    </div>
-                )}
+ <div className="mt-4 space-y-3">
+ <div className="flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200/60 rounded-xl">
+ <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0">
+ <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+ <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+ </svg>
+ </div>
+ <input
+ type="url"
+ value={formData.media_url || ''}
+ onChange={(e) => setFormData({ ...formData, media_url: e.target.value })}
+ className="flex-1 bg-transparent border-none outline-none text-sm text-gray-800 placeholder-red-400/70 focus:ring-0 p-0"
+ placeholder="Paste a YouTube link"
+ />
+ </div>
+ <div className="relative flex items-center">
+ <div className="flex-1 border-t border-gray-200"></div>
+ <span className="px-3 text-xs text-gray-400 font-medium">or paste any link</span>
+ <div className="flex-1 border-t border-gray-200"></div>
+ </div>
+ <input
+ type="url"
+ value={formData.media_url || ''}
+ onChange={(e) => setFormData({ ...formData, media_url: e.target.value })}
+ className="app-input"
+ placeholder="Paste a link to media (https://...)"
+ />
+ </div>
+ </>
+ )}
+ </div>
+ )}
 
-                {/* Date */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <Calendar className="w-4 h-4 inline mr-1" />
-                        Date
-                    </label>
-                    <DateRangePicker
-                        value={{ singleDate: formData.date_represented }}
-                        onChange={(value) => setFormData({ 
-                            ...formData, 
-                            date_represented: value.singleDate || getLocalDateString(new Date())
-                        })}
-                        placeholder="Select date"
-                    />
-                </div>
+ {/* Date */}
+ <div>
+ <label className="app-label">
+ <Calendar className="w-4 h-4 inline mr-1" />
+ Date
+ </label>
+ <DateRangePicker
+ value={{ singleDate: formData.date_represented }}
+ onChange={(value) => setFormData({ 
+ ...formData, 
+ date_represented: value.singleDate || getLocalDateString(new Date())
+ })}
+ placeholder="Select date"
+ />
+ </div>
 
-                {/* Locations */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <MapPin className="w-4 h-4 inline mr-1" />
-                        Locations <span className="text-red-500">*</span>
-                    </label>
-                    {locations.length === 0 ? (
-                        <div className="text-center py-4 bg-gray-50 rounded-xl">
-                            <p className="text-sm text-gray-500">No locations available</p>
-                            <p className="text-xs text-gray-400">Add locations in the Locations tab</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-2 max-h-40 overflow-y-auto">
-                            {locations.map((location) => {
-                                const isSelected = formData.location_ids.includes(location.id!)
-                                return (
-                                    <button
-                                        key={location.id}
-                                        onClick={() => setFormData(prev => ({
-                                            ...prev,
-                                            location_ids: isSelected
-                                                ? prev.location_ids.filter(id => id !== location.id)
-                                                : [...prev.location_ids, location.id!]
-                                        }))}
-                                        className={`w-full p-3 rounded-xl border-2 text-left transition-all ${
-                                            isSelected 
-                                                ? 'border-primary-500 bg-primary-50' 
-                                                : 'border-gray-200'
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-medium text-gray-800 text-sm">{location.name}</span>
-                                            {isSelected && <Check className="w-4 h-4 text-primary-500" />}
-                                        </div>
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    )}
-                </div>
+ {/* Locations */}
+ <div>
+ <label className="app-label">
+ <MapPin className="w-4 h-4 inline mr-1" />
+ Locations <span className="text-red-500">*</span>
+ </label>
+ {locations.length === 0 ? (
+ <div className="text-center py-4 bg-gray-50 rounded-xl">
+ <p className="text-sm text-gray-500">No locations available</p>
+ <p className="text-xs text-gray-400">Add locations in the Locations tab</p>
+ </div>
+ ) : (
+ <div className="space-y-2 max-h-40 overflow-y-auto">
+ {locations.map((location) => {
+ const isSelected = formData.location_ids.includes(location.id!)
+ return (
+ <button
+ key={location.id}
+ onClick={() => setFormData(prev => ({
+ ...prev,
+ location_ids: isSelected
+ ? prev.location_ids.filter(id => id !== location.id)
+ : [...prev.location_ids, location.id!]
+ }))}
+ className={`w-full p-3 rounded-xl border-2 text-left transition-all ${
+ isSelected 
+ ? 'border-primary-500 bg-primary-50' 
+ : 'border-gray-200'
+ }`}
+ >
+ <div className="flex items-center justify-between">
+ <span className="font-medium text-gray-800 text-sm">{location.name}</span>
+ {isSelected && <Check className="w-4 h-4 text-primary-500" />}
+ </div>
+ </button>
+ )
+ })}
+ </div>
+ )}
+ </div>
 
-                {/* Beneficiary Groups (optional) */}
-                {beneficiaryGroups.length > 0 && (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Beneficiary Groups (optional)
-                        </label>
-                        <div className="space-y-2 max-h-32 overflow-y-auto">
-                            {beneficiaryGroups.map((group) => {
-                                const isSelected = formData.beneficiary_group_ids.includes(group.id!)
-                                return (
-                                    <button
-                                        key={group.id}
-                                        onClick={() => {
-                                            setFormData(prev => ({
-                                                ...prev,
-                                                beneficiary_group_ids: isSelected
-                                                    ? prev.beneficiary_group_ids.filter(id => id !== group.id)
-                                                    : [...prev.beneficiary_group_ids, group.id!]
-                                            }))
-                                        }}
-                                        className={`w-full p-3 rounded-xl border-2 text-left transition-all ${
-                                            isSelected 
-                                                ? 'border-primary-500 bg-primary-50' 
-                                                : 'border-gray-200'
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm text-gray-800">{group.name}</span>
-                                            {isSelected && <Check className="w-4 h-4 text-primary-500" />}
-                                        </div>
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    </div>
-                )}
+ {/* Beneficiary Groups (optional) */}
+ {beneficiaryGroups.length > 0 && (
+ <div>
+ <label className="app-label">
+ Beneficiary Groups (optional)
+ </label>
+ <div className="space-y-2 max-h-32 overflow-y-auto">
+ {beneficiaryGroups.map((group) => {
+ const isSelected = formData.beneficiary_group_ids.includes(group.id!)
+ return (
+ <button
+ key={group.id}
+ onClick={() => {
+ setFormData(prev => ({
+ ...prev,
+ beneficiary_group_ids: isSelected
+ ? prev.beneficiary_group_ids.filter(id => id !== group.id)
+ : [...prev.beneficiary_group_ids, group.id!]
+ }))
+ }}
+ className={`w-full p-3 rounded-xl border-2 text-left transition-all ${
+ isSelected 
+ ? 'border-primary-500 bg-primary-50' 
+ : 'border-gray-200'
+ }`}
+ >
+ <div className="flex items-center justify-between">
+ <span className="text-sm text-gray-800">{group.name}</span>
+ {isSelected && <Check className="w-4 h-4 text-primary-500" />}
+ </div>
+ </button>
+ )
+ })}
+ </div>
+ </div>
+ )}
 
-                {/* Tags (optional) */}
-                <div>
-                    <TagPicker
-                        mode="multi"
-                        selectedIds={formData.tag_ids}
-                        onChange={(ids) => setFormData(prev => ({ ...prev, tag_ids: ids }))}
-                        label="Tags (optional)"
-                        helperText="Tag this story so it shows up when filtering by tag."
-                    />
-                </div>
-            </div>
+ {/* Tags (optional) */}
+ <div>
+ <TagPicker
+ mode="multi"
+ selectedIds={formData.tag_ids}
+ onChange={(ids) => setFormData(prev => ({ ...prev, tag_ids: ids }))}
+ label="Tags (optional)"
+ helperText="Tag this story so it shows up when filtering by tag."
+ />
+ </div>
+ </div>
 
-            {/* Footer */}
-            <div className="p-4 border-t border-gray-100 safe-area-pb">
-                <div className="flex gap-3">
-                    <button
-                        onClick={onClose}
-                        className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium text-sm"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={loading}
-                        className="flex-1 py-3 bg-primary-500 text-white rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                        {loading ? (
-                            <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Creating...
-                            </>
-                        ) : (
-                            <>
-                                <Check className="w-4 h-4" />
-                                Create Story
-                            </>
-                        )}
-                    </button>
-                </div>
-            </div>
-        </div>
-    )
+ {/* Footer */}
+ <div className="p-4 border-t border-gray-100 safe-area-pb">
+ <div className="flex gap-3">
+ <button
+ onClick={onClose}
+ className="app-btn app-btn-secondary flex-1 py-3"
+ >
+ Cancel
+ </button>
+ <button
+ onClick={handleSubmit}
+ disabled={loading}
+ className="app-btn app-btn-primary flex-1 py-3"
+ >
+ {loading ? (
+ <>
+ <Spinner className="w-4 h-4" />
+ Creating...
+ </>
+ ) : (
+ <>
+ <Check className="w-4 h-4" />
+ Create Story
+ </>
+ )}
+ </button>
+ </div>
+ </div>
+ </div>
+ )
 }
 
 

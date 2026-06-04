@@ -11,1175 +11,1177 @@ import DataPointPreviewModal from '../DataPointPreviewModal'
 import AddEvidenceModal from '../AddEvidenceModal'
 import EvidenceUploadModal from '../evidence/EvidenceUploadModal'
 import ConfirmDialog from '../ConfirmDialog'
-import toast from 'react-hot-toast'
+import { notify } from '../../lib/notify'
 import { useTeam } from '../../context/TeamContext'
+import { SectionLoader, EmptyState } from '../ui'
 
 interface EvidenceTabProps {
-    initiativeId: string
-    onRefresh?: () => void
+ initiativeId: string
+ onRefresh?: () => void
 }
 
 export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProps) {
-    const { canEditEvidence, canDelete } = useTeam()
-    const [evidence, setEvidence] = useState<Evidence[]>([])
-    const [loading, setLoading] = useState(false)
-    const [locations, setLocations] = useState<Location[]>([])
-    const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
-    const [availableKPIs, setAvailableKPIs] = useState<any[]>([])
-    const [evidenceLocationMap, setEvidenceLocationMap] = useState<Record<string, string[]>>({})
-    const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null)
-    const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
-    const [editingEvidence, setEditingEvidence] = useState<Evidence | null>(null)
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false)
-    const [searchQuery, setSearchQuery] = useState('')
-    const [selectedDataPoint, setSelectedDataPoint] = useState<any>(null)
-    const [selectedDataPointKpi, setSelectedDataPointKpi] = useState<any>(null)
-    const [isDataPointPreviewOpen, setIsDataPointPreviewOpen] = useState(false)
-    const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
-    const [deleteEvidence, setDeleteEvidence] = useState<Evidence | null>(null)
-
-    // Master filter state
-    const [datePickerValue, setDatePickerValue] = useState<{
-        singleDate?: string
-        startDate?: string
-        endDate?: string
-    }>({})
-    const [selectedLocations, setSelectedLocations] = useState<string[]>([])
-    const [selectedBeneficiaryGroups, setSelectedBeneficiaryGroups] = useState<string[]>([])
-    const [selectedEvidenceTypes, setSelectedEvidenceTypes] = useState<string[]>([])
-    const [selectedTags, setSelectedTags] = useState<string[]>([])
-    const [allTags, setAllTags] = useState<MetricTag[]>([])
-    const [showLocationPicker, setShowLocationPicker] = useState(false)
-    const [showBeneficiaryPicker, setShowBeneficiaryPicker] = useState(false)
-    const [showEvidenceTypePicker, setShowEvidenceTypePicker] = useState(false)
-    const [showTagPicker, setShowTagPicker] = useState(false)
-    const locationButtonRef = useRef<HTMLButtonElement>(null)
-    const beneficiaryButtonRef = useRef<HTMLButtonElement>(null)
-    const evidenceTypeButtonRef = useRef<HTMLButtonElement>(null)
-    const tagButtonRef = useRef<HTMLButtonElement>(null)
-    const [locationDropdownPosition, setLocationDropdownPosition] = useState({ top: 0, left: 0 })
-    const [beneficiaryDropdownPosition, setBeneficiaryDropdownPosition] = useState({ top: 0, left: 0 })
-    const [evidenceTypeDropdownPosition, setEvidenceTypeDropdownPosition] = useState({ top: 0, left: 0 })
-    const [tagDropdownPosition, setTagDropdownPosition] = useState({ top: 0, left: 0 })
-
-    const evidenceTypes = [
-        { value: 'visual_proof', label: 'Visual Support', icon: Camera },
-        { value: 'documentation', label: 'Documentation', icon: FileText },
-        { value: 'testimony', label: 'Testimonies', icon: MessageSquare },
-        { value: 'financials', label: 'Financials', icon: DollarSign }
-    ] as const
-
-    // Load locations, beneficiary groups, and KPIs
-    useEffect(() => {
-        if (initiativeId) {
-            Promise.all([
-                apiService.getLocations(initiativeId),
-                apiService.getBeneficiaryGroups(initiativeId),
-                apiService.getKPIs(initiativeId),
-                apiService.getMetricTags()
-            ]).then(([locs, groups, kpis, tags]) => {
-                setLocations(locs || [])
-                setBeneficiaryGroups(groups || [])
-                setAvailableKPIs(kpis || [])
-                setAllTags(tags || [])
-            }).catch(() => {
-                setLocations([])
-                setBeneficiaryGroups([])
-                setAvailableKPIs([])
-                setAllTags([])
-            })
-        }
-    }, [initiativeId])
-
-    // Load evidence with filters
-    useEffect(() => {
-        loadEvidence()
-    }, [initiativeId, selectedLocations, selectedBeneficiaryGroups, selectedEvidenceTypes, selectedTags, datePickerValue, searchQuery])
-
-    const loadEvidence = async () => {
-        if (!initiativeId) return
-        try {
-            setLoading(true)
-            // Get all evidence for the initiative
-            const allEvidence = await apiService.getEvidence(initiativeId)
-
-            // Apply client-side filters since API doesn't support all filters
-            let filtered = allEvidence || []
-
-            // Filter by search query
-            if (searchQuery.trim()) {
-                const query = searchQuery.trim().toLowerCase()
-                filtered = filtered.filter(ev =>
-                    ev.title?.toLowerCase().includes(query) ||
-                    ev.description?.toLowerCase().includes(query)
-                )
-            }
-
-            // Filter by date range
-            if (datePickerValue.startDate || datePickerValue.endDate || datePickerValue.singleDate) {
-                const filterDate = datePickerValue.singleDate || datePickerValue.startDate
-                const endDate = datePickerValue.endDate || datePickerValue.singleDate
-
-                filtered = filtered.filter(ev => {
-                    const evDate = ev.date_represented || ev.date_range_start
-                    if (!evDate) return false
-
-                    if (filterDate && endDate) {
-                        return evDate >= filterDate && evDate <= endDate
-                    } else if (filterDate) {
-                        return evDate >= filterDate
-                    }
-                    return true
-                })
-            }
-
-            // Build location map. Modern evidence has inline location_ids;
-            // for legacy evidence without inline links we'd previously fan
-            // out one /data-points request per item (N+1) which dominated
-            // the tab's load time. Cap concurrency and only do the fallback
-            // when actually needed for filtering.
-            const locationMap: Record<string, string[]> = {}
-            const needsFallback: { id: string }[] = []
-
-            for (const ev of filtered) {
-                if (!ev.id) continue
-                const directLocationIds = ev.location_ids || (ev.location_id ? [ev.location_id] : [])
-                if (directLocationIds.length > 0) {
-                    locationMap[ev.id] = directLocationIds
-                } else {
-                    needsFallback.push({ id: ev.id })
-                }
-            }
-
-            // Only fetch data points for legacy items, and only when the user
-            // actually has a location filter active (otherwise we're computing
-            // a map nothing reads). Cap to 5 concurrent calls.
-            if (needsFallback.length > 0 && selectedLocations.length > 0) {
-                const CONCURRENCY = 5
-                for (let i = 0; i < needsFallback.length; i += CONCURRENCY) {
-                    const batch = needsFallback.slice(i, i + CONCURRENCY)
-                    await Promise.all(batch.map(async ({ id }) => {
-                        try {
-                            const dataPoints = await apiService.getDataPointsForEvidence(id)
-                            const dpLocationIds = dataPoints
-                                ?.filter((dp: any) => dp.location_id)
-                                .map((dp: any) => dp.location_id) || []
-                            if (dpLocationIds.length > 0) {
-                                locationMap[id] = [...new Set(dpLocationIds)]
-                            }
-                        } catch {
-                            // ignore; legacy item just won't filter by location
-                        }
-                    }))
-                }
-            }
-            setEvidenceLocationMap(locationMap)
-
-            // Filter by location using the resolved location map
-            if (selectedLocations.length > 0) {
-                filtered = filtered.filter(ev => {
-                    if (!ev.id) return false
-                    const evLocationIds = locationMap[ev.id] || []
-                    return evLocationIds.some(locId => selectedLocations.includes(locId))
-                })
-            }
-
-            // Filter by beneficiary groups (via direct evidence-beneficiary linkage)
-            if (selectedBeneficiaryGroups.length > 0) {
-                filtered = filtered.filter(ev => {
-                    const evBgIds = ev.beneficiary_group_ids || []
-                    return evBgIds.some(bgId => selectedBeneficiaryGroups.includes(bgId))
-                })
-            }
-
-            // Filter by tag
-            if (selectedTags.length > 0) {
-                filtered = filtered.filter(ev => {
-                    const evTagIds = ev.tag_ids || []
-                    return evTagIds.some(tid => selectedTags.includes(tid))
-                })
-            }
-
-            // Filter by evidence type
-            if (selectedEvidenceTypes.length > 0) {
-                filtered = filtered.filter(ev => selectedEvidenceTypes.includes(ev.type))
-            }
-
-            setEvidence(filtered)
-        } catch (error) {
-            console.error('Error loading evidence:', error)
-            toast.error('Failed to load evidence')
-            setEvidence([])
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    const handleViewEvidence = (ev: Evidence) => {
-        setSelectedEvidence(ev)
-        setIsPreviewModalOpen(true)
-    }
-
-    const handleEditEvidence = async (ev: Evidence) => {
-        setIsPreviewModalOpen(false)
-        setSelectedEvidence(null)
-        // Ensure we have the full evidence data before opening edit modal
-        try {
-            const fullEvidence = await apiService.getEvidenceItem(ev.id!)
-            setEditingEvidence(fullEvidence)
-            setIsAddModalOpen(true)
-        } catch (error) {
-            console.error('Error loading evidence for edit:', error)
-            toast.error('Failed to load evidence details')
-            // Fallback to using the evidence we have
-            setEditingEvidence(ev)
-            setIsAddModalOpen(true)
-        }
-    }
-
-    const handleDeleteEvidence = async (evidence: Evidence) => {
-        if (!evidence.id) return
-        try {
-            await apiService.deleteEvidence(evidence.id)
-            toast.success('Evidence deleted successfully')
-            setDeleteEvidence(null)
-            setIsPreviewModalOpen(false)
-            setSelectedEvidence(null)
-            loadEvidence()
-            onRefresh?.()
-        } catch (error) {
-            toast.error('Failed to delete evidence')
-        }
-    }
-
-    const handleSaveEvidence = async (evidenceData: any) => {
-        try {
-            if (editingEvidence?.id) {
-                // Update existing evidence
-                await apiService.updateEvidence(editingEvidence.id, evidenceData)
-                toast.success('Evidence updated successfully!')
-            } else {
-                // Create new evidence
-                await apiService.createEvidence(evidenceData)
-                toast.success('Evidence added successfully!')
-
-            }
-
-            apiService.clearCache('/evidence')
-            await loadEvidence()
-            onRefresh?.()
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to save evidence'
-            toast.error(message)
-            throw error
-        }
-    }
-
-    // Filter dropdown positioning
-    useEffect(() => {
-        if (showLocationPicker && locationButtonRef.current) {
-            const rect = locationButtonRef.current.getBoundingClientRect()
-            setLocationDropdownPosition({
-                top: rect.bottom + 4,
-                left: rect.left
-            })
-        }
-    }, [showLocationPicker])
-
-    useEffect(() => {
-        if (showBeneficiaryPicker && beneficiaryButtonRef.current) {
-            const rect = beneficiaryButtonRef.current.getBoundingClientRect()
-            setBeneficiaryDropdownPosition({
-                top: rect.bottom + 4,
-                left: rect.left
-            })
-        }
-    }, [showBeneficiaryPicker])
-
-    useEffect(() => {
-        if (showEvidenceTypePicker && evidenceTypeButtonRef.current) {
-            const rect = evidenceTypeButtonRef.current.getBoundingClientRect()
-            setEvidenceTypeDropdownPosition({
-                top: rect.bottom + 4,
-                left: rect.left
-            })
-        }
-    }, [showEvidenceTypePicker])
-
-    useEffect(() => {
-        if (showTagPicker && tagButtonRef.current) {
-            const rect = tagButtonRef.current.getBoundingClientRect()
-            setTagDropdownPosition({
-                top: rect.bottom + 4,
-                left: rect.left
-            })
-        }
-    }, [showTagPicker])
-
-    const hasActiveFilters = selectedLocations.length > 0 || selectedBeneficiaryGroups.length > 0 ||
-        selectedEvidenceTypes.length > 0 || selectedTags.length > 0 || datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate)
-
-    const clearFilters = () => {
-        setSelectedLocations([])
-        setSelectedBeneficiaryGroups([])
-        setSelectedEvidenceTypes([])
-        setSelectedTags([])
-        setDatePickerValue({})
-    }
-
-    // ---- Preview detection -------------------------------------------------
-    // We probe MIME type, original filename, AND URL extension because some
-    // storage backends (Supabase) return URLs without an extension when the
-    // object key is a UUID. URL-only sniffing was the source of "won't
-    // preview" reports for orgs with multi-file (`evidence_files`) uploads.
-    const stripQuery = (s: string) => s.split('?')[0]
-    const extOf = (s?: string | null) => {
-        if (!s) return ''
-        const path = stripQuery(s)
-        const dot = path.lastIndexOf('.')
-        return dot >= 0 ? path.slice(dot + 1).toLowerCase() : ''
-    }
-    const IMG_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif']
-    const VID_EXTS = ['mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v']
-
-    type FileLike = { file_url?: string; file_name?: string; file_type?: string }
-    const isImageFile = (f?: FileLike | null) => {
-        if (!f) return false
-        if ((f.file_type || '').toLowerCase().startsWith('image/')) return true
-        if (IMG_EXTS.includes(extOf(f.file_name))) return true
-        if (IMG_EXTS.includes(extOf(f.file_url))) return true
-        return false
-    }
-    const isVideoFile = (f?: FileLike | null) => {
-        if (!f) return false
-        if ((f.file_type || '').toLowerCase().startsWith('video/')) return true
-        if (VID_EXTS.includes(extOf(f.file_name))) return true
-        if (VID_EXTS.includes(extOf(f.file_url))) return true
-        return false
-    }
-
-    const isImage = (fileUrl?: string) => isImageFile({ file_url: fileUrl })
-    const isVideo = (fileUrl?: string) => isVideoFile({ file_url: fileUrl })
-
-    /** Pick the best preview URL across `file_url` + the gallery. Returns
-     *  `{ kind, url }` so the renderer can pick the right element. */
-    const getPreview = (
-        ev: Evidence,
-    ): { kind: 'image' | 'video' | 'youtube'; url: string } | null => {
-        const candidates: FileLike[] = [
-            { file_url: ev.file_url, file_type: ev.file_type },
-            ...((ev.files || []) as FileLike[]),
-        ].filter(c => !!c.file_url)
-        const img = candidates.find(isImageFile)
-        if (img?.file_url) return { kind: 'image', url: img.file_url }
-        const vid = candidates.find(isVideoFile)
-        if (vid?.file_url) return { kind: 'video', url: vid.file_url }
-        const yt = candidates.find(c => isYouTubeUrl(c.file_url))
-        if (yt?.file_url) return { kind: 'youtube', url: yt.file_url }
-        return null
-    }
-
-    const isYouTubeUrl = (url?: string) => {
-        if (!url) return false
-        return /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(url)
-    }
-
-    const getYouTubeVideoId = (url: string): string | null => {
-        const match = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
-        return match ? match[1] : null
-    }
-
-    return (
-        <div className="h-screen overflow-hidden flex flex-col mobile-content-padding">
-            {/* Header with Search and Add Button */}
-            <div className="p-4 sm:p-6 border-b border-gray-100 bg-white shadow-bubble-sm">
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Evidence</h2>
-                        <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">View and manage all evidence uploaded for this initiative</p>
-                    </div>
-                    {canEditEvidence && (
-                        <button
-                            onClick={() => {
-                                setEditingEvidence(null)
-                                setIsAddModalOpen(true)
-                            }}
-                            className="flex items-center space-x-2 px-4 sm:px-5 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25 active:scale-95"
-                        >
-                            <Plus className="w-4 sm:w-4 h-4 sm:h-4" />
-                            <span className="hidden sm:inline">Add Evidence</span>
-                            <span className="sm:hidden">Add</span>
-                        </button>
-                    )}
-                </div>
-
-                {/* Search Bar - hidden on mobile */}
-                <div className="relative mb-3 hidden md:block">
-                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="Search evidence by title or description..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-11 pr-4 py-2.5 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-evidence-400 focus:border-transparent bg-gray-50/50 text-sm"
-                    />
-                </div>
-
-                {/* Master Filters - hidden on mobile */}
-                <div className="flex-wrap items-center gap-2 hidden md:flex">
-                    {/* Date Filter */}
-                    <div className="relative">
-                        <DateRangePicker
-                            value={datePickerValue}
-                            onChange={setDatePickerValue}
-                            placeholder="Filter by date"
-                        />
-                    </div>
-
-                    {/* Location Filter */}
-                    <div className="relative">
-                        <button
-                            ref={locationButtonRef}
-                            onClick={() => setShowLocationPicker(!showLocationPicker)}
-                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${selectedLocations.length > 0
-                                ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
-                                : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
-                                }`}
-                        >
-                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedLocations.length > 0
-                                ? 'bg-primary-100 border-primary-500'
-                                : 'bg-gray-100 border-gray-200'
-                                }`}>
-                                <MapPin className={`w-5 h-5 ${selectedLocations.length > 0
-                                    ? 'text-primary-500'
-                                    : 'text-gray-600'
-                                    }`} />
-                            </div>
-                            <span className="ml-3">
-                                {selectedLocations.length === 0
-                                    ? 'Location'
-                                    : selectedLocations.length === 1
-                                        ? locations.find(l => l.id === selectedLocations[0])?.name || '1 location'
-                                        : `${selectedLocations.length} locations`}
-                            </span>
-                            {selectedLocations.length > 0 && (
-                                <span className="ml-1 bg-primary-500 text-white text-xs px-1 rounded-full">
-                                    {selectedLocations.length}
-                                </span>
-                            )}
-                            <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showLocationPicker ? 'rotate-180' : ''}`} />
-                        </button>
-
-                        {showLocationPicker && locationButtonRef.current && createPortal(
-                            <>
-                                <div
-                                    className="fixed inset-0 z-[9998]"
-                                    onClick={() => setShowLocationPicker(false)}
-                                />
-                                <div
-                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
-                                    style={{
-                                        top: `${locationDropdownPosition.top}px`,
-                                        left: `${locationDropdownPosition.left}px`
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    {locations.length === 0 ? (
-                                        <p className="text-xs text-gray-500">No locations available</p>
-                                    ) : (
-                                        <>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="text-xs font-semibold text-gray-700">Select Locations</span>
-                                                {selectedLocations.length > 0 && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            setSelectedLocations([])
-                                                        }}
-                                                        className="text-xs text-blue-600 hover:text-blue-800"
-                                                    >
-                                                        Clear
-                                                    </button>
-                                                )}
-                                            </div>
-                                            {locations.map((location) => (
-                                                <label
-                                                    key={location.id}
-                                                    className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedLocations.includes(location.id!)}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) {
-                                                                setSelectedLocations([...selectedLocations, location.id!])
-                                                            } else {
-                                                                setSelectedLocations(selectedLocations.filter(id => id !== location.id))
-                                                            }
-                                                        }}
-                                                        className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
-                                                    />
-                                                    <span className="text-xs text-gray-700 truncate flex-1">{location.name}</span>
-                                                </label>
-                                            ))}
-                                        </>
-                                    )}
-                                </div>
-                            </>,
-                            document.body
-                        )}
-                    </div>
-
-                    {/* Beneficiary Group Filter */}
-                    <div className="relative">
-                        <button
-                            ref={beneficiaryButtonRef}
-                            onClick={() => setShowBeneficiaryPicker(!showBeneficiaryPicker)}
-                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${selectedBeneficiaryGroups.length > 0
-                                ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
-                                : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
-                                }`}
-                        >
-                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedBeneficiaryGroups.length > 0
-                                ? 'bg-primary-100 border-primary-500'
-                                : 'bg-gray-100 border-gray-200'
-                                }`}>
-                                <Users className={`w-5 h-5 ${selectedBeneficiaryGroups.length > 0
-                                    ? 'text-primary-500'
-                                    : 'text-gray-600'
-                                    }`} />
-                            </div>
-                            <span className="ml-3">
-                                {selectedBeneficiaryGroups.length === 0
-                                    ? 'Beneficiary Group'
-                                    : selectedBeneficiaryGroups.length === 1
-                                        ? beneficiaryGroups.find(bg => bg.id === selectedBeneficiaryGroups[0])?.name || '1 group'
-                                        : `${selectedBeneficiaryGroups.length} groups`}
-                            </span>
-                            {selectedBeneficiaryGroups.length > 0 && (
-                                <span className="ml-1 bg-primary-500 text-white text-xs px-1 rounded-full">
-                                    {selectedBeneficiaryGroups.length}
-                                </span>
-                            )}
-                            <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showBeneficiaryPicker ? 'rotate-180' : ''}`} />
-                        </button>
-
-                        {showBeneficiaryPicker && beneficiaryButtonRef.current && createPortal(
-                            <>
-                                <div
-                                    className="fixed inset-0 z-[9998]"
-                                    onClick={() => setShowBeneficiaryPicker(false)}
-                                />
-                                <div
-                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
-                                    style={{
-                                        top: `${beneficiaryDropdownPosition.top}px`,
-                                        left: `${beneficiaryDropdownPosition.left}px`
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    {beneficiaryGroups.length === 0 ? (
-                                        <p className="text-xs text-gray-500">No beneficiary groups available</p>
-                                    ) : (
-                                        <>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="text-xs font-semibold text-gray-700">Select Beneficiary Groups</span>
-                                                {selectedBeneficiaryGroups.length > 0 && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            setSelectedBeneficiaryGroups([])
-                                                        }}
-                                                        className="text-xs text-blue-600 hover:text-blue-800"
-                                                    >
-                                                        Clear
-                                                    </button>
-                                                )}
-                                            </div>
-                                            {beneficiaryGroups.map((group) => (
-                                                <label
-                                                    key={group.id}
-                                                    className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedBeneficiaryGroups.includes(group.id!)}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) {
-                                                                setSelectedBeneficiaryGroups([...selectedBeneficiaryGroups, group.id!])
-                                                            } else {
-                                                                setSelectedBeneficiaryGroups(selectedBeneficiaryGroups.filter(id => id !== group.id))
-                                                            }
-                                                        }}
-                                                        className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
-                                                    />
-                                                    <span className="text-xs text-gray-700 truncate flex-1">{group.name}</span>
-                                                </label>
-                                            ))}
-                                        </>
-                                    )}
-                                </div>
-                            </>,
-                            document.body
-                        )}
-                    </div>
-
-                    {/* Tag Filter */}
-                    <div className="relative">
-                        <button
-                            ref={tagButtonRef}
-                            onClick={() => setShowTagPicker(!showTagPicker)}
-                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${selectedTags.length > 0
-                                ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
-                                : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
-                                }`}
-                        >
-                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedTags.length > 0
-                                ? 'bg-primary-100 border-primary-500'
-                                : 'bg-gray-100 border-gray-200'
-                                }`}>
-                                <TagIcon className={`w-5 h-5 ${selectedTags.length > 0
-                                    ? 'text-primary-500'
-                                    : 'text-gray-600'
-                                    }`} />
-                            </div>
-                            <span className="ml-3">
-                                {selectedTags.length === 0
-                                    ? 'Tag'
-                                    : selectedTags.length === 1
-                                        ? allTags.find(t => t.id === selectedTags[0])?.name || '1 tag'
-                                        : `${selectedTags.length} tags`}
-                            </span>
-                            {selectedTags.length > 0 && (
-                                <span className="ml-1 bg-primary-500 text-white text-xs px-1 rounded-full">
-                                    {selectedTags.length}
-                                </span>
-                            )}
-                            <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showTagPicker ? 'rotate-180' : ''}`} />
-                        </button>
-
-                        {showTagPicker && tagButtonRef.current && createPortal(
-                            <>
-                                <div
-                                    className="fixed inset-0 z-[9998]"
-                                    onClick={() => setShowTagPicker(false)}
-                                />
-                                <div
-                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
-                                    style={{
-                                        top: `${tagDropdownPosition.top}px`,
-                                        left: `${tagDropdownPosition.left}px`
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    {allTags.length === 0 ? (
-                                        <p className="text-xs text-gray-500">No tags available</p>
-                                    ) : (
-                                        <>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="text-xs font-semibold text-gray-700">Select Tags</span>
-                                                {selectedTags.length > 0 && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            setSelectedTags([])
-                                                        }}
-                                                        className="text-xs text-blue-600 hover:text-blue-800"
-                                                    >
-                                                        Clear
-                                                    </button>
-                                                )}
-                                            </div>
-                                            {allTags.map((tag) => (
-                                                <label
-                                                    key={tag.id}
-                                                    className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedTags.includes(tag.id)}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) {
-                                                                setSelectedTags([...selectedTags, tag.id])
-                                                            } else {
-                                                                setSelectedTags(selectedTags.filter(id => id !== tag.id))
-                                                            }
-                                                        }}
-                                                        className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
-                                                    />
-                                                    <span className="text-xs text-gray-700 truncate flex-1">{tag.name}</span>
-                                                </label>
-                                            ))}
-                                        </>
-                                    )}
-                                </div>
-                            </>,
-                            document.body
-                        )}
-                    </div>
-
-                    {/* Evidence Type Filter */}
-                    <div className="relative">
-                        <button
-                            ref={evidenceTypeButtonRef}
-                            onClick={() => setShowEvidenceTypePicker(!showEvidenceTypePicker)}
-                            className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 shadow-bubble-sm ${selectedEvidenceTypes.length > 0
-                                ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
-                                : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
-                                }`}
-                        >
-                            <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedEvidenceTypes.length > 0
-                                ? 'bg-primary-100 border-primary-500'
-                                : 'bg-gray-100 border-gray-200'
-                                }`}>
-                                <FileText className={`w-5 h-5 ${selectedEvidenceTypes.length > 0
-                                    ? 'text-primary-500'
-                                    : 'text-gray-600'
-                                    }`} />
-                            </div>
-                            <span className="ml-3">
-                                {selectedEvidenceTypes.length === 0
-                                    ? 'Evidence Type'
-                                    : selectedEvidenceTypes.length === 1
-                                        ? evidenceTypes.find(et => et.value === selectedEvidenceTypes[0])?.label || '1 type'
-                                        : `${selectedEvidenceTypes.length} types`}
-                            </span>
-                            {selectedEvidenceTypes.length > 0 && (
-                                <span className="ml-1 bg-primary-500 text-white text-xs px-1 rounded-full">
-                                    {selectedEvidenceTypes.length}
-                                </span>
-                            )}
-                            <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showEvidenceTypePicker ? 'rotate-180' : ''}`} />
-                        </button>
-
-                        {showEvidenceTypePicker && evidenceTypeButtonRef.current && createPortal(
-                            <>
-                                <div
-                                    className="fixed inset-0 z-[9998]"
-                                    onClick={() => setShowEvidenceTypePicker(false)}
-                                />
-                                <div
-                                    className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
-                                    style={{
-                                        top: `${evidenceTypeDropdownPosition.top}px`,
-                                        left: `${evidenceTypeDropdownPosition.left}px`
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-xs font-semibold text-gray-700">Select Evidence Types</span>
-                                        {selectedEvidenceTypes.length > 0 && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    setSelectedEvidenceTypes([])
-                                                }}
-                                                className="text-xs text-blue-600 hover:text-blue-800"
-                                            >
-                                                Clear
-                                            </button>
-                                        )}
-                                    </div>
-                                    {evidenceTypes.map((type) => {
-                                        const typeInfo = getEvidenceTypeInfo(type.value)
-                                        const bgColor = typeInfo.color.split(' ')[0]
-                                        return (
-                                            <label
-                                                key={type.value}
-                                                className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedEvidenceTypes.includes(type.value)}
-                                                    onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            setSelectedEvidenceTypes([...selectedEvidenceTypes, type.value])
-                                                        } else {
-                                                            setSelectedEvidenceTypes(selectedEvidenceTypes.filter(t => t !== type.value))
-                                                        }
-                                                    }}
-                                                    className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
-                                                />
-                                                <div className={`w-6 h-6 ${bgColor} rounded flex items-center justify-center`}>
-                                                    {React.createElement(type.icon, { className: 'w-4 h-4' })}
-                                                </div>
-                                                <span className="text-xs text-gray-700 truncate flex-1">{type.label}</span>
-                                            </label>
-                                        )
-                                    })}
-                                </div>
-                            </>,
-                            document.body
-                        )}
-                    </div>
-
-                    {/* Clear Filters */}
-                    {hasActiveFilters && (
-                        <button
-                            onClick={clearFilters}
-                            className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all duration-200"
-                        >
-                            <X className="w-4 h-4" />
-                            <span>Clear</span>
-                        </button>
-                    )}
-
-                    {/* View Toggle */}
-                    <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5 ml-2">
-                        <button
-                            onClick={() => setViewMode('list')}
-                            className={`p-1.5 rounded-md transition-all ${
-                                viewMode === 'list'
-                                    ? 'bg-white text-evidence-500 shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700'
-                            }`}
-                            title="List view"
-                        >
-                            <List className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                            onClick={() => setViewMode('grid')}
-                            className={`p-1.5 rounded-md transition-all ${
-                                viewMode === 'grid'
-                                    ? 'bg-white text-evidence-500 shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700'
-                            }`}
-                            title="Grid view"
-                        >
-                            <Grid className="w-3.5 h-3.5" />
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Evidence List */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-                {loading ? (
-                    <div className="flex items-center justify-center h-64">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-evidence-400"></div>
-                    </div>
-                ) : evidence.length === 0 ? (
-                    <div className="mobile-empty-state md:bg-white md:rounded-2xl md:shadow-bubble md:border md:border-gray-100 md:p-12">
-                        <div className="mobile-empty-icon md:icon-bubble md:mx-auto md:mb-4">
-                            <FileText className="w-6 h-6 text-gray-400" />
-                        </div>
-                        <h3 className="mobile-empty-title md:text-lg md:font-semibold md:text-gray-800 md:mb-2">No evidence found</h3>
-                        <p className="mobile-empty-text md:text-gray-500 md:text-sm md:mb-6">
-                            {hasActiveFilters || searchQuery
-                                ? 'Try adjusting your filters or search query'
-                                : 'Add your first evidence to support your impact claims'}
-                        </p>
-                        {!hasActiveFilters && !searchQuery && canEditEvidence && (
-                            <button
-                                onClick={() => {
-                                    setEditingEvidence(null)
-                                    setIsAddModalOpen(true)
-                                }}
-                                className="mt-6 px-5 py-3 bg-evidence-500 text-white rounded-2xl font-semibold text-sm shadow-lg active:scale-95 transition-transform"
-                            >
-                                Add Evidence
-                            </button>
-                        )}
-                    </div>
-                ) : viewMode === 'list' ? (
-                    <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 overflow-hidden">
-                        {/* Header Row */}
-                        <div className="px-6 py-3 bg-gray-50/50 border-b border-gray-100 grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wide">
-                            <div className="col-span-1"></div>
-                            <div className="col-span-3">Name</div>
-                            <div className="col-span-2">Type</div>
-                            <div className="col-span-2">Date</div>
-                            <div className="col-span-2">Location</div>
-                            <div className="col-span-2"></div>
-                        </div>
-
-                        {/* Evidence Items */}
-                        <div className="divide-y divide-gray-100">
-                            {evidence.map((ev) => {
-                                const typeInfo = getEvidenceTypeInfo(ev.type)
-                                // Extract background color from typeInfo.color (e.g., "bg-pink-100 text-pink-800" -> "bg-pink-100")
-                                const bgColor = typeInfo.color.split(' ')[0]
-                                const evidenceType = evidenceTypes.find(et => et.value === ev.type)
-                                const IconComponent = evidenceType?.icon || FileText
-
-                                return (
-                                    <div
-                                        key={ev.id}
-                                        className="px-6 py-4 hover:bg-gray-50/50 transition-all duration-200 cursor-pointer group grid grid-cols-12 gap-4 items-center"
-                                        onClick={() => handleViewEvidence(ev)}
-                                    >
-                                        {/* Icon */}
-                                        <div className="col-span-1 flex items-center justify-center">
-                                            <div className={`p-2 rounded-xl ${bgColor}`}>
-                                                <IconComponent className="w-4 h-4" />
-                                            </div>
-                                        </div>
-
-                                        {/* Name */}
-                                        <div className="col-span-3 min-w-0">
-                                            <div className="font-medium text-gray-800 truncate">
-                                                {ev.title || 'Untitled Evidence'}
-                                            </div>
-                                            {ev.description && (
-                                                <div className="text-sm text-gray-500 truncate mt-0.5">
-                                                    {ev.description}
-                                                </div>
-                                            )}
-                                            {Array.isArray(ev.tag_ids) && ev.tag_ids.length > 0 && (
-                                                <div className="mt-1.5">
-                                                    <EvidenceTagsList tagIds={ev.tag_ids} size="xs" visibleCap={4} />
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Type */}
-                                        <div className="col-span-2">
-                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${typeInfo.color}`}>
-                                                {typeInfo.label}
-                                            </span>
-                                        </div>
-
-                                        {/* Date */}
-                                        <div className="col-span-2 text-xs text-gray-500 whitespace-nowrap">
-                                            {ev.date_range_start && ev.date_range_end
-                                                ? `${formatDate(ev.date_range_start)} - ${formatDate(ev.date_range_end)}`
-                                                : formatDate(ev.date_represented)}
-                                        </div>
-
-                                        {/* Location */}
-                                        <div className="col-span-2 text-xs text-gray-500 truncate">
-                                            {(() => {
-                                                // Use the pre-fetched location map (includes both direct and impact claim locations)
-                                                const locationIds = ev.id ? evidenceLocationMap[ev.id] || [] : []
-                                                if (locationIds.length === 0) return '—'
-                                                const locationNames = locationIds
-                                                    .map(id => locations.find(l => l.id === id)?.name)
-                                                    .filter(Boolean)
-                                                return locationNames.length > 0 ? locationNames.join(', ') : '—'
-                                            })()}
-                                        </div>
-
-                                        {/* Actions */}
-                                        <div className="col-span-2 flex items-center justify-end space-x-1">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    handleViewEvidence(ev)
-                                                }}
-                                                className="p-1.5 text-gray-400 hover:text-evidence-400 rounded-lg hover:bg-evidence-50 transition-all duration-200 opacity-0 group-hover:opacity-100"
-                                                title="View"
-                                            >
-                                                <Eye className="w-4 h-4" />
-                                            </button>
-                                            {canEditEvidence && (
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        handleEditEvidence(ev)
-                                                    }}
-                                                    className="p-1.5 text-gray-400 hover:text-evidence-400 rounded-lg hover:bg-evidence-50 transition-all duration-200 opacity-0 group-hover:opacity-100"
-                                                    title="Edit"
-                                                >
-                                                    <Edit className="w-4 h-4" />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    </div>
-                ) : (
-                    /* Grid view - mobile shows simplified cards */
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                        {evidence.map((ev) => {
-                            const typeInfo = getEvidenceTypeInfo(ev.type)
-                            const bgColor = typeInfo.color.split(' ')[0]
-                            const evidenceType = evidenceTypes.find(et => et.value === ev.type)
-                            const IconComponent = evidenceType?.icon || FileText
-                            const preview = getPreview(ev)
-                            const hasImagePreview = preview?.kind === 'image'
-                            const hasVideoPreview = preview?.kind === 'video'
-                            const hasYouTubePreview = preview?.kind === 'youtube'
-                            const previewUrl = preview?.url
-                            const youTubeId = hasYouTubePreview && previewUrl ? getYouTubeVideoId(previewUrl) : null
-
-                            return (
-                                <div
-                                    key={ev.id}
-                                    className="bg-white rounded-xl md:rounded-xl shadow-sm md:shadow-bubble border border-gray-100 overflow-hidden md:hover:shadow-lg transition-all duration-200 cursor-pointer group active:scale-[0.98] md:active:scale-100"
-                                    onClick={() => handleViewEvidence(ev)}
-                                >
-                                    {/* Preview Image/Icon - smaller on mobile */}
-                                    <div className="relative w-full aspect-video md:aspect-square bg-gray-100 overflow-hidden">
-                                        {hasImagePreview && previewUrl ? (
-                                            <>
-                                                <img
-                                                    src={previewUrl}
-                                                    alt={ev.title || 'Evidence preview'}
-                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                                                    onError={(e) => {
-                                                        const target = e.target as HTMLImageElement
-                                                        target.style.display = 'none'
-                                                        const fallback = target.nextElementSibling as HTMLElement
-                                                        if (fallback) fallback.style.display = 'flex'
-                                                    }}
-                                                />
-                                                <div className={`w-full h-full hidden items-center justify-center ${bgColor}`}>
-                                                    <IconComponent className="w-12 h-12 text-gray-400" />
-                                                </div>
-                                            </>
-                                        ) : hasVideoPreview && previewUrl ? (
-                                            <>
-                                                <video
-                                                    src={previewUrl}
-                                                    className="w-full h-full object-cover"
-                                                    muted
-                                                    preload="metadata"
-                                                />
-                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                    <div className="w-12 h-12 bg-black/60 rounded-full flex items-center justify-center shadow-lg">
-                                                        <svg className="w-5 h-5 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor">
-                                                            <path d="M8 5v14l11-7z" />
-                                                        </svg>
-                                                    </div>
-                                                </div>
-                                            </>
-                                        ) : hasYouTubePreview && youTubeId ? (
-                                            <>
-                                                <img
-                                                    src={`https://img.youtube.com/vi/${youTubeId}/hqdefault.jpg`}
-                                                    alt={ev.title || 'YouTube preview'}
-                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                                                />
-                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                    <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
-                                                        <svg className="w-5 h-5 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor">
-                                                            <path d="M8 5v14l11-7z" />
-                                                        </svg>
-                                                    </div>
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <div className={`w-full h-full flex items-center justify-center ${bgColor}`}>
-                                                <IconComponent className="w-12 h-12 text-gray-400" />
-                                            </div>
-                                        )}
-                                        {/* Overlay on hover */}
-                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                            <Eye className="w-6 h-6 text-white" />
-                                        </div>
-                                    </div>
-
-                                    {/* Content - Mobile optimized */}
-                                    <div className="p-3 flex flex-col gap-1.5">
-                                        {/* Title */}
-                                        <h3 className="font-semibold text-gray-800 text-sm leading-snug line-clamp-2">
-                                            {ev.title || 'Untitled Evidence'}
-                                        </h3>
-                                        
-                                        {/* Type Badge */}
-                                        <div>
-                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${typeInfo.color}`}>
-                                                {typeInfo.label}
-                                            </span>
-                                        </div>
-                                        
-                                        {/* Date */}
-                                        <p className="text-xs text-gray-500">
-                                            {ev.date_range_start && ev.date_range_end
-                                                ? `${formatDate(ev.date_range_start)} - ${formatDate(ev.date_range_end)}`
-                                                : formatDate(ev.date_represented)}
-                                        </p>
-
-                                        {Array.isArray(ev.tag_ids) && ev.tag_ids.length > 0 && (
-                                            <EvidenceTagsList tagIds={ev.tag_ids} size="xs" visibleCap={3} />
-                                        )}
-                                    </div>
-                                </div>
-                            )
-                        })}
-                    </div>
-                )}
-            </div>
-
-            {/* Evidence Preview Modal */}
-            {isPreviewModalOpen && selectedEvidence && (
-                <EvidencePreviewModal
-                    isOpen={isPreviewModalOpen}
-                    onClose={() => {
-                        setIsPreviewModalOpen(false)
-                        setSelectedEvidence(null)
-                    }}
-                    evidence={selectedEvidence}
-                    onEdit={canEditEvidence ? handleEditEvidence : undefined}
-                    onDelete={canDelete ? setDeleteEvidence : undefined}
-                    onDataPointClick={(dataPoint, kpi) => {
-                        setSelectedDataPoint(dataPoint)
-                        setSelectedDataPointKpi(kpi)
-                        setIsPreviewModalOpen(false)
-                        setIsDataPointPreviewOpen(true)
-                    }}
-                />
-            )}
-
-            {/* Data Point Preview Modal - opens when clicking impact claim from evidence */}
-            {selectedDataPoint && (
-                <DataPointPreviewModal
-                    isOpen={isDataPointPreviewOpen}
-                    onClose={() => {
-                        setIsDataPointPreviewOpen(false)
-                        setSelectedDataPoint(null)
-                        setSelectedDataPointKpi(null)
-                    }}
-                    dataPoint={selectedDataPoint}
-                    kpi={selectedDataPointKpi || selectedDataPoint.kpi}
-                    onEvidenceClick={(ev) => {
-                        setSelectedEvidence(ev)
-                        setIsDataPointPreviewOpen(false)
-                        setIsPreviewModalOpen(true)
-                    }}
-                />
-            )}
-
-            {/* Edit Evidence Modal (legacy single-record form) */}
-            {isAddModalOpen && editingEvidence && (
-                <AddEvidenceModal
-                    isOpen={isAddModalOpen}
-                    onClose={() => {
-                        setIsAddModalOpen(false)
-                        setEditingEvidence(null)
-                    }}
-                    onSubmit={handleSaveEvidence}
-                    availableKPIs={availableKPIs}
-                    initiativeId={initiativeId}
-                    editData={editingEvidence}
-                />
-            )}
-
-            {/* Add Evidence Modal (kanban batch upload) */}
-            {isAddModalOpen && !editingEvidence && (
-                <EvidenceUploadModal
-                    isOpen={isAddModalOpen}
-                    onClose={() => setIsAddModalOpen(false)}
-                    onCreated={async () => {
-                        await loadEvidence()
-                        onRefresh?.()
-                    }}
-                    initiativeId={initiativeId}
-                />
-            )}
-
-            {deleteEvidence && (
-                <ConfirmDialog
-                    title="Delete Evidence"
-                    message={`Delete ${deleteEvidence.title || 'this evidence'}? This action cannot be undone.`}
-                    confirmLabel="Delete Evidence"
-                    tone="danger"
-                    onConfirm={() => handleDeleteEvidence(deleteEvidence)}
-                    onCancel={() => setDeleteEvidence(null)}
-                />
-            )}
-        </div>
-    )
+ const { canEditEvidence, canDelete } = useTeam()
+ const [evidence, setEvidence] = useState<Evidence[]>([])
+ const [loading, setLoading] = useState(false)
+ const [locations, setLocations] = useState<Location[]>([])
+ const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
+ const [availableKPIs, setAvailableKPIs] = useState<any[]>([])
+ const [evidenceLocationMap, setEvidenceLocationMap] = useState<Record<string, string[]>>({})
+ const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null)
+ const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
+ const [editingEvidence, setEditingEvidence] = useState<Evidence | null>(null)
+ const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+ const [searchQuery, setSearchQuery] = useState('')
+ const [selectedDataPoint, setSelectedDataPoint] = useState<any>(null)
+ const [selectedDataPointKpi, setSelectedDataPointKpi] = useState<any>(null)
+ const [isDataPointPreviewOpen, setIsDataPointPreviewOpen] = useState(false)
+ const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
+ const [deleteEvidence, setDeleteEvidence] = useState<Evidence | null>(null)
+
+ // Master filter state
+ const [datePickerValue, setDatePickerValue] = useState<{
+ singleDate?: string
+ startDate?: string
+ endDate?: string
+ }>({})
+ const [selectedLocations, setSelectedLocations] = useState<string[]>([])
+ const [selectedBeneficiaryGroups, setSelectedBeneficiaryGroups] = useState<string[]>([])
+ const [selectedEvidenceTypes, setSelectedEvidenceTypes] = useState<string[]>([])
+ const [selectedTags, setSelectedTags] = useState<string[]>([])
+ const [allTags, setAllTags] = useState<MetricTag[]>([])
+ const [showLocationPicker, setShowLocationPicker] = useState(false)
+ const [showBeneficiaryPicker, setShowBeneficiaryPicker] = useState(false)
+ const [showEvidenceTypePicker, setShowEvidenceTypePicker] = useState(false)
+ const [showTagPicker, setShowTagPicker] = useState(false)
+ const locationButtonRef = useRef<HTMLButtonElement>(null)
+ const beneficiaryButtonRef = useRef<HTMLButtonElement>(null)
+ const evidenceTypeButtonRef = useRef<HTMLButtonElement>(null)
+ const tagButtonRef = useRef<HTMLButtonElement>(null)
+ const [locationDropdownPosition, setLocationDropdownPosition] = useState({ top: 0, left: 0 })
+ const [beneficiaryDropdownPosition, setBeneficiaryDropdownPosition] = useState({ top: 0, left: 0 })
+ const [evidenceTypeDropdownPosition, setEvidenceTypeDropdownPosition] = useState({ top: 0, left: 0 })
+ const [tagDropdownPosition, setTagDropdownPosition] = useState({ top: 0, left: 0 })
+
+ const evidenceTypes = [
+ { value: 'visual_proof', label: 'Visual Support', icon: Camera },
+ { value: 'documentation', label: 'Documentation', icon: FileText },
+ { value: 'testimony', label: 'Testimonies', icon: MessageSquare },
+ { value: 'financials', label: 'Financials', icon: DollarSign }
+ ] as const
+
+ // Load locations, beneficiary groups, and KPIs
+ useEffect(() => {
+ if (initiativeId) {
+ Promise.all([
+ apiService.getLocations(initiativeId),
+ apiService.getBeneficiaryGroups(initiativeId),
+ apiService.getKPIs(initiativeId),
+ apiService.getMetricTags()
+ ]).then(([locs, groups, kpis, tags]) => {
+ setLocations(locs || [])
+ setBeneficiaryGroups(groups || [])
+ setAvailableKPIs(kpis || [])
+ setAllTags(tags || [])
+ }).catch(() => {
+ setLocations([])
+ setBeneficiaryGroups([])
+ setAvailableKPIs([])
+ setAllTags([])
+ })
+ }
+ }, [initiativeId])
+
+ // Load evidence with filters
+ useEffect(() => {
+ loadEvidence()
+ }, [initiativeId, selectedLocations, selectedBeneficiaryGroups, selectedEvidenceTypes, selectedTags, datePickerValue, searchQuery])
+
+ const loadEvidence = async () => {
+ if (!initiativeId) return
+ try {
+ setLoading(true)
+ // Get all evidence for the initiative
+ const allEvidence = await apiService.getEvidence(initiativeId)
+
+ // Apply client-side filters since API doesn't support all filters
+ let filtered = allEvidence || []
+
+ // Filter by search query
+ if (searchQuery.trim()) {
+ const query = searchQuery.trim().toLowerCase()
+ filtered = filtered.filter(ev =>
+ ev.title?.toLowerCase().includes(query) ||
+ ev.description?.toLowerCase().includes(query)
+ )
+ }
+
+ // Filter by date range
+ if (datePickerValue.startDate || datePickerValue.endDate || datePickerValue.singleDate) {
+ const filterDate = datePickerValue.singleDate || datePickerValue.startDate
+ const endDate = datePickerValue.endDate || datePickerValue.singleDate
+
+ filtered = filtered.filter(ev => {
+ const evDate = ev.date_represented || ev.date_range_start
+ if (!evDate) return false
+
+ if (filterDate && endDate) {
+ return evDate >= filterDate && evDate <= endDate
+ } else if (filterDate) {
+ return evDate >= filterDate
+ }
+ return true
+ })
+ }
+
+ // Build location map. Modern evidence has inline location_ids;
+ // for legacy evidence without inline links we'd previously fan
+ // out one /data-points request per item (N+1) which dominated
+ // the tab's load time. Cap concurrency and only do the fallback
+ // when actually needed for filtering.
+ const locationMap: Record<string, string[]> = {}
+ const needsFallback: { id: string }[] = []
+
+ for (const ev of filtered) {
+ if (!ev.id) continue
+ const directLocationIds = ev.location_ids || (ev.location_id ? [ev.location_id] : [])
+ if (directLocationIds.length > 0) {
+ locationMap[ev.id] = directLocationIds
+ } else {
+ needsFallback.push({ id: ev.id })
+ }
+ }
+
+ // Only fetch data points for legacy items, and only when the user
+ // actually has a location filter active (otherwise we're computing
+ // a map nothing reads). Cap to 5 concurrent calls.
+ if (needsFallback.length > 0 && selectedLocations.length > 0) {
+ const CONCURRENCY = 5
+ for (let i = 0; i < needsFallback.length; i += CONCURRENCY) {
+ const batch = needsFallback.slice(i, i + CONCURRENCY)
+ await Promise.all(batch.map(async ({ id }) => {
+ try {
+ const dataPoints = await apiService.getDataPointsForEvidence(id)
+ const dpLocationIds = dataPoints
+ ?.filter((dp: any) => dp.location_id)
+ .map((dp: any) => dp.location_id) || []
+ if (dpLocationIds.length > 0) {
+ locationMap[id] = [...new Set(dpLocationIds)]
+ }
+ } catch {
+ // ignore; legacy item just won't filter by location
+ }
+ }))
+ }
+ }
+ setEvidenceLocationMap(locationMap)
+
+ // Filter by location using the resolved location map
+ if (selectedLocations.length > 0) {
+ filtered = filtered.filter(ev => {
+ if (!ev.id) return false
+ const evLocationIds = locationMap[ev.id] || []
+ return evLocationIds.some(locId => selectedLocations.includes(locId))
+ })
+ }
+
+ // Filter by beneficiary groups (via direct evidence-beneficiary linkage)
+ if (selectedBeneficiaryGroups.length > 0) {
+ filtered = filtered.filter(ev => {
+ const evBgIds = ev.beneficiary_group_ids || []
+ return evBgIds.some(bgId => selectedBeneficiaryGroups.includes(bgId))
+ })
+ }
+
+ // Filter by tag
+ if (selectedTags.length > 0) {
+ filtered = filtered.filter(ev => {
+ const evTagIds = ev.tag_ids || []
+ return evTagIds.some(tid => selectedTags.includes(tid))
+ })
+ }
+
+ // Filter by evidence type
+ if (selectedEvidenceTypes.length > 0) {
+ filtered = filtered.filter(ev => selectedEvidenceTypes.includes(ev.type))
+ }
+
+ setEvidence(filtered)
+ } catch (error) {
+ console.error('Error loading evidence:', error)
+ notify.error('Failed to load evidence')
+ setEvidence([])
+ } finally {
+ setLoading(false)
+ }
+ }
+
+ const handleViewEvidence = (ev: Evidence) => {
+ setSelectedEvidence(ev)
+ setIsPreviewModalOpen(true)
+ }
+
+ const handleEditEvidence = async (ev: Evidence) => {
+ setIsPreviewModalOpen(false)
+ setSelectedEvidence(null)
+ // Ensure we have the full evidence data before opening edit modal
+ try {
+ const fullEvidence = await apiService.getEvidenceItem(ev.id!)
+ setEditingEvidence(fullEvidence)
+ setIsAddModalOpen(true)
+ } catch (error) {
+ console.error('Error loading evidence for edit:', error)
+ notify.error('Failed to load evidence details')
+ // Fallback to using the evidence we have
+ setEditingEvidence(ev)
+ setIsAddModalOpen(true)
+ }
+ }
+
+ const handleDeleteEvidence = async (evidence: Evidence) => {
+ if (!evidence.id) return
+ try {
+ await apiService.deleteEvidence(evidence.id)
+ notify.success('Evidence deleted successfully')
+ setDeleteEvidence(null)
+ setIsPreviewModalOpen(false)
+ setSelectedEvidence(null)
+ loadEvidence()
+ onRefresh?.()
+ } catch (error) {
+ notify.error('Failed to delete evidence')
+ }
+ }
+
+ const handleSaveEvidence = async (evidenceData: any) => {
+ try {
+ if (editingEvidence?.id) {
+ // Update existing evidence
+ await apiService.updateEvidence(editingEvidence.id, evidenceData)
+ notify.success('Evidence updated successfully!')
+ } else {
+ // Create new evidence
+ await apiService.createEvidence(evidenceData)
+ notify.success('Evidence added successfully!')
+
+ }
+
+ apiService.clearCache('/evidence')
+ await loadEvidence()
+ onRefresh?.()
+ } catch (error) {
+ const message = error instanceof Error ? error.message : 'Failed to save evidence'
+ notify.error(message)
+ throw error
+ }
+ }
+
+ // Filter dropdown positioning
+ useEffect(() => {
+ if (showLocationPicker && locationButtonRef.current) {
+ const rect = locationButtonRef.current.getBoundingClientRect()
+ setLocationDropdownPosition({
+ top: rect.bottom + 4,
+ left: rect.left
+ })
+ }
+ }, [showLocationPicker])
+
+ useEffect(() => {
+ if (showBeneficiaryPicker && beneficiaryButtonRef.current) {
+ const rect = beneficiaryButtonRef.current.getBoundingClientRect()
+ setBeneficiaryDropdownPosition({
+ top: rect.bottom + 4,
+ left: rect.left
+ })
+ }
+ }, [showBeneficiaryPicker])
+
+ useEffect(() => {
+ if (showEvidenceTypePicker && evidenceTypeButtonRef.current) {
+ const rect = evidenceTypeButtonRef.current.getBoundingClientRect()
+ setEvidenceTypeDropdownPosition({
+ top: rect.bottom + 4,
+ left: rect.left
+ })
+ }
+ }, [showEvidenceTypePicker])
+
+ useEffect(() => {
+ if (showTagPicker && tagButtonRef.current) {
+ const rect = tagButtonRef.current.getBoundingClientRect()
+ setTagDropdownPosition({
+ top: rect.bottom + 4,
+ left: rect.left
+ })
+ }
+ }, [showTagPicker])
+
+ const hasActiveFilters = selectedLocations.length > 0 || selectedBeneficiaryGroups.length > 0 ||
+ selectedEvidenceTypes.length > 0 || selectedTags.length > 0 || datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate)
+
+ const clearFilters = () => {
+ setSelectedLocations([])
+ setSelectedBeneficiaryGroups([])
+ setSelectedEvidenceTypes([])
+ setSelectedTags([])
+ setDatePickerValue({})
+ }
+
+ // ---- Preview detection -------------------------------------------------
+ // We probe MIME type, original filename, AND URL extension because some
+ // storage backends (Supabase) return URLs without an extension when the
+ // object key is a UUID. URL-only sniffing was the source of "won't
+ // preview" reports for orgs with multi-file (`evidence_files`) uploads.
+ const stripQuery = (s: string) => s.split('?')[0]
+ const extOf = (s?: string | null) => {
+ if (!s) return ''
+ const path = stripQuery(s)
+ const dot = path.lastIndexOf('.')
+ return dot >= 0 ? path.slice(dot + 1).toLowerCase() : ''
+ }
+ const IMG_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif']
+ const VID_EXTS = ['mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v']
+
+ type FileLike = { file_url?: string; file_name?: string; file_type?: string }
+ const isImageFile = (f?: FileLike | null) => {
+ if (!f) return false
+ if ((f.file_type || '').toLowerCase().startsWith('image/')) return true
+ if (IMG_EXTS.includes(extOf(f.file_name))) return true
+ if (IMG_EXTS.includes(extOf(f.file_url))) return true
+ return false
+ }
+ const isVideoFile = (f?: FileLike | null) => {
+ if (!f) return false
+ if ((f.file_type || '').toLowerCase().startsWith('video/')) return true
+ if (VID_EXTS.includes(extOf(f.file_name))) return true
+ if (VID_EXTS.includes(extOf(f.file_url))) return true
+ return false
+ }
+
+ const isImage = (fileUrl?: string) => isImageFile({ file_url: fileUrl })
+ const isVideo = (fileUrl?: string) => isVideoFile({ file_url: fileUrl })
+
+ /** Pick the best preview URL across `file_url` + the gallery. Returns
+ * `{ kind, url }` so the renderer can pick the right element. */
+ const getPreview = (
+ ev: Evidence,
+ ): { kind: 'image' | 'video' | 'youtube'; url: string } | null => {
+ const candidates: FileLike[] = [
+ { file_url: ev.file_url, file_type: ev.file_type },
+ ...((ev.files || []) as FileLike[]),
+ ].filter(c => !!c.file_url)
+ const img = candidates.find(isImageFile)
+ if (img?.file_url) return { kind: 'image', url: img.file_url }
+ const vid = candidates.find(isVideoFile)
+ if (vid?.file_url) return { kind: 'video', url: vid.file_url }
+ const yt = candidates.find(c => isYouTubeUrl(c.file_url))
+ if (yt?.file_url) return { kind: 'youtube', url: yt.file_url }
+ return null
+ }
+
+ const isYouTubeUrl = (url?: string) => {
+ if (!url) return false
+ return /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(url)
+ }
+
+ const getYouTubeVideoId = (url: string): string | null => {
+ const match = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+ return match ? match[1] : null
+ }
+
+ return (
+ <div className="h-screen overflow-hidden flex flex-col mobile-content-padding">
+ {/* Header with Search and Add Button */}
+ <div className="p-4 sm:p-6 border-b border-gray-100 bg-white">
+ <div className="flex items-center justify-between mb-4">
+ <div>
+ <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Evidence</h2>
+ <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">View and manage all evidence uploaded for this initiative</p>
+ </div>
+ {canEditEvidence && (
+ <button
+ onClick={() => {
+ setEditingEvidence(null)
+ setIsAddModalOpen(true)
+ }}
+ className="app-btn app-btn-evidence app-btn-sm"
+ >
+ <Plus className="w-4 sm:w-4 h-4 sm:h-4" />
+ <span className="hidden sm:inline">Add Evidence</span>
+ <span className="sm:hidden">Add</span>
+ </button>
+ )}
+ </div>
+
+ {/* Search Bar - hidden on mobile */}
+ <div className="relative mb-3 hidden md:block">
+ <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+ <input
+ type="text"
+ placeholder="Search evidence by title or description..."
+ value={searchQuery}
+ onChange={(e) => setSearchQuery(e.target.value)}
+ className="app-input pl-11"
+ />
+ </div>
+
+ {/* Master Filters - hidden on mobile */}
+ <div className="flex-wrap items-center gap-2 hidden md:flex">
+ {/* Date Filter */}
+ <div className="relative">
+ <DateRangePicker
+ value={datePickerValue}
+ onChange={setDatePickerValue}
+ placeholder="Filter by date"
+ />
+ </div>
+
+ {/* Location Filter */}
+ <div className="relative">
+ <button
+ ref={locationButtonRef}
+ onClick={() => setShowLocationPicker(!showLocationPicker)}
+ className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 ${selectedLocations.length > 0
+ ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
+ : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+ }`}
+ >
+ <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedLocations.length > 0
+ ? 'bg-primary-100 border-primary-500'
+ : 'bg-gray-100 border-gray-200'
+ }`}>
+ <MapPin className={`w-5 h-5 ${selectedLocations.length > 0
+ ? 'text-primary-500'
+ : 'text-gray-600'
+ }`} />
+ </div>
+ <span className="ml-3">
+ {selectedLocations.length === 0
+ ? 'Location'
+ : selectedLocations.length === 1
+ ? locations.find(l => l.id === selectedLocations[0])?.name || '1 location'
+ : `${selectedLocations.length} locations`}
+ </span>
+ {selectedLocations.length > 0 && (
+ <span className="ml-1 app-chip app-chip-accent text-xs px-1.5 py-0">
+ {selectedLocations.length}
+ </span>
+ )}
+ <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showLocationPicker ? 'rotate-180' : ''}`} />
+ </button>
+
+ {showLocationPicker && locationButtonRef.current && createPortal(
+ <>
+ <div
+ className="fixed inset-0 z-[9998]"
+ onClick={() => setShowLocationPicker(false)}
+ />
+ <div
+ className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
+ style={{
+ top: `${locationDropdownPosition.top}px`,
+ left: `${locationDropdownPosition.left}px`
+ }}
+ onClick={(e) => e.stopPropagation()}
+ >
+ {locations.length === 0 ? (
+ <p className="text-xs text-gray-500">No locations available</p>
+ ) : (
+ <>
+ <div className="flex items-center justify-between mb-2">
+ <span className="text-xs font-semibold text-gray-700">Select Locations</span>
+ {selectedLocations.length > 0 && (
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ setSelectedLocations([])
+ }}
+ className="text-xs text-primary-700 hover:text-primary-800"
+ >
+ Clear
+ </button>
+ )}
+ </div>
+ {locations.map((location) => (
+ <label
+ key={location.id}
+ className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
+ >
+ <input
+ type="checkbox"
+ checked={selectedLocations.includes(location.id!)}
+ onChange={(e) => {
+ if (e.target.checked) {
+ setSelectedLocations([...selectedLocations, location.id!])
+ } else {
+ setSelectedLocations(selectedLocations.filter(id => id !== location.id))
+ }
+ }}
+ className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
+ />
+ <span className="text-xs text-gray-700 truncate flex-1">{location.name}</span>
+ </label>
+ ))}
+ </>
+ )}
+ </div>
+ </>,
+ document.body
+ )}
+ </div>
+
+ {/* Beneficiary Group Filter */}
+ <div className="relative">
+ <button
+ ref={beneficiaryButtonRef}
+ onClick={() => setShowBeneficiaryPicker(!showBeneficiaryPicker)}
+ className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 ${selectedBeneficiaryGroups.length > 0
+ ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
+ : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+ }`}
+ >
+ <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedBeneficiaryGroups.length > 0
+ ? 'bg-primary-100 border-primary-500'
+ : 'bg-gray-100 border-gray-200'
+ }`}>
+ <Users className={`w-5 h-5 ${selectedBeneficiaryGroups.length > 0
+ ? 'text-primary-500'
+ : 'text-gray-600'
+ }`} />
+ </div>
+ <span className="ml-3">
+ {selectedBeneficiaryGroups.length === 0
+ ? 'Beneficiary Group'
+ : selectedBeneficiaryGroups.length === 1
+ ? beneficiaryGroups.find(bg => bg.id === selectedBeneficiaryGroups[0])?.name || '1 group'
+ : `${selectedBeneficiaryGroups.length} groups`}
+ </span>
+ {selectedBeneficiaryGroups.length > 0 && (
+ <span className="ml-1 app-chip app-chip-accent text-xs px-1.5 py-0">
+ {selectedBeneficiaryGroups.length}
+ </span>
+ )}
+ <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showBeneficiaryPicker ? 'rotate-180' : ''}`} />
+ </button>
+
+ {showBeneficiaryPicker && beneficiaryButtonRef.current && createPortal(
+ <>
+ <div
+ className="fixed inset-0 z-[9998]"
+ onClick={() => setShowBeneficiaryPicker(false)}
+ />
+ <div
+ className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
+ style={{
+ top: `${beneficiaryDropdownPosition.top}px`,
+ left: `${beneficiaryDropdownPosition.left}px`
+ }}
+ onClick={(e) => e.stopPropagation()}
+ >
+ {beneficiaryGroups.length === 0 ? (
+ <p className="text-xs text-gray-500">No beneficiary groups available</p>
+ ) : (
+ <>
+ <div className="flex items-center justify-between mb-2">
+ <span className="text-xs font-semibold text-gray-700">Select Beneficiary Groups</span>
+ {selectedBeneficiaryGroups.length > 0 && (
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ setSelectedBeneficiaryGroups([])
+ }}
+ className="text-xs text-primary-700 hover:text-primary-800"
+ >
+ Clear
+ </button>
+ )}
+ </div>
+ {beneficiaryGroups.map((group) => (
+ <label
+ key={group.id}
+ className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
+ >
+ <input
+ type="checkbox"
+ checked={selectedBeneficiaryGroups.includes(group.id!)}
+ onChange={(e) => {
+ if (e.target.checked) {
+ setSelectedBeneficiaryGroups([...selectedBeneficiaryGroups, group.id!])
+ } else {
+ setSelectedBeneficiaryGroups(selectedBeneficiaryGroups.filter(id => id !== group.id))
+ }
+ }}
+ className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
+ />
+ <span className="text-xs text-gray-700 truncate flex-1">{group.name}</span>
+ </label>
+ ))}
+ </>
+ )}
+ </div>
+ </>,
+ document.body
+ )}
+ </div>
+
+ {/* Tag Filter */}
+ <div className="relative">
+ <button
+ ref={tagButtonRef}
+ onClick={() => setShowTagPicker(!showTagPicker)}
+ className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 ${selectedTags.length > 0
+ ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
+ : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+ }`}
+ >
+ <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedTags.length > 0
+ ? 'bg-primary-100 border-primary-500'
+ : 'bg-gray-100 border-gray-200'
+ }`}>
+ <TagIcon className={`w-5 h-5 ${selectedTags.length > 0
+ ? 'text-primary-500'
+ : 'text-gray-600'
+ }`} />
+ </div>
+ <span className="ml-3">
+ {selectedTags.length === 0
+ ? 'Tag'
+ : selectedTags.length === 1
+ ? allTags.find(t => t.id === selectedTags[0])?.name || '1 tag'
+ : `${selectedTags.length} tags`}
+ </span>
+ {selectedTags.length > 0 && (
+ <span className="ml-1 app-chip app-chip-accent text-xs px-1.5 py-0">
+ {selectedTags.length}
+ </span>
+ )}
+ <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showTagPicker ? 'rotate-180' : ''}`} />
+ </button>
+
+ {showTagPicker && tagButtonRef.current && createPortal(
+ <>
+ <div
+ className="fixed inset-0 z-[9998]"
+ onClick={() => setShowTagPicker(false)}
+ />
+ <div
+ className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
+ style={{
+ top: `${tagDropdownPosition.top}px`,
+ left: `${tagDropdownPosition.left}px`
+ }}
+ onClick={(e) => e.stopPropagation()}
+ >
+ {allTags.length === 0 ? (
+ <p className="text-xs text-gray-500">No tags available</p>
+ ) : (
+ <>
+ <div className="flex items-center justify-between mb-2">
+ <span className="text-xs font-semibold text-gray-700">Select Tags</span>
+ {selectedTags.length > 0 && (
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ setSelectedTags([])
+ }}
+ className="text-xs text-primary-700 hover:text-primary-800"
+ >
+ Clear
+ </button>
+ )}
+ </div>
+ {allTags.map((tag) => (
+ <label
+ key={tag.id}
+ className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
+ >
+ <input
+ type="checkbox"
+ checked={selectedTags.includes(tag.id)}
+ onChange={(e) => {
+ if (e.target.checked) {
+ setSelectedTags([...selectedTags, tag.id])
+ } else {
+ setSelectedTags(selectedTags.filter(id => id !== tag.id))
+ }
+ }}
+ className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
+ />
+ <span className="text-xs text-gray-700 truncate flex-1">{tag.name}</span>
+ </label>
+ ))}
+ </>
+ )}
+ </div>
+ </>,
+ document.body
+ )}
+ </div>
+
+ {/* Evidence Type Filter */}
+ <div className="relative">
+ <button
+ ref={evidenceTypeButtonRef}
+ onClick={() => setShowEvidenceTypePicker(!showEvidenceTypePicker)}
+ className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 ${selectedEvidenceTypes.length > 0
+ ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
+ : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
+ }`}
+ >
+ <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${selectedEvidenceTypes.length > 0
+ ? 'bg-primary-100 border-primary-500'
+ : 'bg-gray-100 border-gray-200'
+ }`}>
+ <FileText className={`w-5 h-5 ${selectedEvidenceTypes.length > 0
+ ? 'text-primary-500'
+ : 'text-gray-600'
+ }`} />
+ </div>
+ <span className="ml-3">
+ {selectedEvidenceTypes.length === 0
+ ? 'Evidence Type'
+ : selectedEvidenceTypes.length === 1
+ ? evidenceTypes.find(et => et.value === selectedEvidenceTypes[0])?.label || '1 type'
+ : `${selectedEvidenceTypes.length} types`}
+ </span>
+ {selectedEvidenceTypes.length > 0 && (
+ <span className="ml-1 app-chip app-chip-accent text-xs px-1.5 py-0">
+ {selectedEvidenceTypes.length}
+ </span>
+ )}
+ <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showEvidenceTypePicker ? 'rotate-180' : ''}`} />
+ </button>
+
+ {showEvidenceTypePicker && evidenceTypeButtonRef.current && createPortal(
+ <>
+ <div
+ className="fixed inset-0 z-[9998]"
+ onClick={() => setShowEvidenceTypePicker(false)}
+ />
+ <div
+ className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
+ style={{
+ top: `${evidenceTypeDropdownPosition.top}px`,
+ left: `${evidenceTypeDropdownPosition.left}px`
+ }}
+ onClick={(e) => e.stopPropagation()}
+ >
+ <div className="flex items-center justify-between mb-2">
+ <span className="text-xs font-semibold text-gray-700">Select Evidence Types</span>
+ {selectedEvidenceTypes.length > 0 && (
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ setSelectedEvidenceTypes([])
+ }}
+ className="text-xs text-primary-700 hover:text-primary-800"
+ >
+ Clear
+ </button>
+ )}
+ </div>
+ {evidenceTypes.map((type) => {
+ const typeInfo = getEvidenceTypeInfo(type.value)
+ const bgColor = typeInfo.color.split(' ')[0]
+ return (
+ <label
+ key={type.value}
+ className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
+ >
+ <input
+ type="checkbox"
+ checked={selectedEvidenceTypes.includes(type.value)}
+ onChange={(e) => {
+ if (e.target.checked) {
+ setSelectedEvidenceTypes([...selectedEvidenceTypes, type.value])
+ } else {
+ setSelectedEvidenceTypes(selectedEvidenceTypes.filter(t => t !== type.value))
+ }
+ }}
+ className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
+ />
+ <div className={`w-6 h-6 ${bgColor} rounded flex items-center justify-center`}>
+ {React.createElement(type.icon, { className: 'w-4 h-4' })}
+ </div>
+ <span className="text-xs text-gray-700 truncate flex-1">{type.label}</span>
+ </label>
+ )
+ })}
+ </div>
+ </>,
+ document.body
+ )}
+ </div>
+
+ {/* Clear Filters */}
+ {hasActiveFilters && (
+ <button
+ onClick={clearFilters}
+ className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all duration-200"
+ >
+ <X className="w-4 h-4" />
+ <span>Clear</span>
+ </button>
+ )}
+
+ {/* View Toggle */}
+ <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5 ml-2">
+ <button
+ onClick={() => setViewMode('list')}
+ className={`p-1.5 rounded-md transition-all ${
+ viewMode === 'list'
+ ? 'bg-white text-evidence-500 shadow-sm'
+ : 'text-gray-500 hover:text-gray-700'
+ }`}
+ title="List view"
+ >
+ <List className="w-3.5 h-3.5" />
+ </button>
+ <button
+ onClick={() => setViewMode('grid')}
+ className={`p-1.5 rounded-md transition-all ${
+ viewMode === 'grid'
+ ? 'bg-white text-evidence-500 shadow-sm'
+ : 'text-gray-500 hover:text-gray-700'
+ }`}
+ title="Grid view"
+ >
+ <Grid className="w-3.5 h-3.5" />
+ </button>
+ </div>
+ </div>
+ </div>
+
+ {/* Evidence List */}
+ <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+ {loading ? (
+ <SectionLoader className="h-64" />
+ ) : evidence.length === 0 ? (
+ <div className="app-card md:p-8">
+ <EmptyState
+ icon={FileText}
+ title="No evidence found"
+ description={
+ hasActiveFilters || searchQuery
+ ? 'Try adjusting your filters or search query'
+ : 'Add your first evidence to support your impact claims'
+ }
+ action={
+ !hasActiveFilters && !searchQuery && canEditEvidence ? (
+ <button
+ type="button"
+ onClick={() => {
+ setEditingEvidence(null)
+ setIsAddModalOpen(true)
+ }}
+ className="app-btn app-btn-evidence app-btn-sm"
+ >
+ Add Evidence
+ </button>
+ ) : undefined
+ }
+ />
+ </div>
+ ) : viewMode === 'list' ? (
+ <div className="app-card overflow-hidden">
+ {/* Header Row */}
+ <div className="px-6 py-3 bg-gray-50/50 border-b border-gray-100 grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wide">
+ <div className="col-span-1"></div>
+ <div className="col-span-3">Name</div>
+ <div className="col-span-2">Type</div>
+ <div className="col-span-2">Date</div>
+ <div className="col-span-2">Location</div>
+ <div className="col-span-2"></div>
+ </div>
+
+ {/* Evidence Items */}
+ <div className="divide-y divide-gray-100">
+ {evidence.map((ev) => {
+ const typeInfo = getEvidenceTypeInfo(ev.type)
+ // Extract background color from typeInfo.color (e.g., "bg-pink-100 text-pink-800" -> "bg-pink-100")
+ const bgColor = typeInfo.color.split(' ')[0]
+ const evidenceType = evidenceTypes.find(et => et.value === ev.type)
+ const IconComponent = evidenceType?.icon || FileText
+
+ return (
+ <div
+ key={ev.id}
+ className="px-6 py-4 hover:bg-gray-50/50 transition-all duration-200 cursor-pointer group grid grid-cols-12 gap-4 items-center"
+ onClick={() => handleViewEvidence(ev)}
+ >
+ {/* Icon */}
+ <div className="col-span-1 flex items-center justify-center">
+ <div className={`p-2 rounded-xl ${bgColor}`}>
+ <IconComponent className="w-4 h-4" />
+ </div>
+ </div>
+
+ {/* Name */}
+ <div className="col-span-3 min-w-0">
+ <div className="font-medium text-gray-800 truncate">
+ {ev.title || 'Untitled Evidence'}
+ </div>
+ {ev.description && (
+ <div className="text-sm text-gray-500 truncate mt-0.5">
+ {ev.description}
+ </div>
+ )}
+ {Array.isArray(ev.tag_ids) && ev.tag_ids.length > 0 && (
+ <div className="mt-1.5">
+ <EvidenceTagsList tagIds={ev.tag_ids} size="xs" visibleCap={4} />
+ </div>
+ )}
+ </div>
+
+ {/* Type */}
+ <div className="col-span-2">
+ <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${typeInfo.color}`}>
+ {typeInfo.label}
+ </span>
+ </div>
+
+ {/* Date */}
+ <div className="col-span-2 text-xs text-gray-500 whitespace-nowrap">
+ {ev.date_range_start && ev.date_range_end
+ ? `${formatDate(ev.date_range_start)} - ${formatDate(ev.date_range_end)}`
+ : formatDate(ev.date_represented)}
+ </div>
+
+ {/* Location */}
+ <div className="col-span-2 text-xs text-gray-500 truncate">
+ {(() => {
+ // Use the pre-fetched location map (includes both direct and impact claim locations)
+ const locationIds = ev.id ? evidenceLocationMap[ev.id] || [] : []
+ if (locationIds.length === 0) return '—'
+ const locationNames = locationIds
+ .map(id => locations.find(l => l.id === id)?.name)
+ .filter(Boolean)
+ return locationNames.length > 0 ? locationNames.join(', ') : '—'
+ })()}
+ </div>
+
+ {/* Actions */}
+ <div className="col-span-2 flex items-center justify-end space-x-1">
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ handleViewEvidence(ev)
+ }}
+ className="p-1.5 text-gray-400 hover:text-evidence-400 rounded-lg hover:bg-evidence-50 transition-all duration-200 opacity-0 group-hover:opacity-100"
+ title="View"
+ >
+ <Eye className="w-4 h-4" />
+ </button>
+ {canEditEvidence && (
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ handleEditEvidence(ev)
+ }}
+ className="p-1.5 text-gray-400 hover:text-evidence-400 rounded-lg hover:bg-evidence-50 transition-all duration-200 opacity-0 group-hover:opacity-100"
+ title="Edit"
+ >
+ <Edit className="w-4 h-4" />
+ </button>
+ )}
+ </div>
+ </div>
+ )
+ })}
+ </div>
+ </div>
+ ) : (
+ /* Grid view - mobile shows simplified cards */
+ <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+ {evidence.map((ev) => {
+ const typeInfo = getEvidenceTypeInfo(ev.type)
+ const bgColor = typeInfo.color.split(' ')[0]
+ const evidenceType = evidenceTypes.find(et => et.value === ev.type)
+ const IconComponent = evidenceType?.icon || FileText
+ const preview = getPreview(ev)
+ const hasImagePreview = preview?.kind === 'image'
+ const hasVideoPreview = preview?.kind === 'video'
+ const hasYouTubePreview = preview?.kind === 'youtube'
+ const previewUrl = preview?.url
+ const youTubeId = hasYouTubePreview && previewUrl ? getYouTubeVideoId(previewUrl) : null
+
+ return (
+ <div
+ key={ev.id}
+ className="app-card-interactive overflow-hidden cursor-pointer group active:scale-[0.98] md:active:scale-100"
+ onClick={() => handleViewEvidence(ev)}
+ >
+ {/* Preview Image/Icon - smaller on mobile */}
+ <div className="relative w-full aspect-video md:aspect-square bg-gray-100 overflow-hidden">
+ {hasImagePreview && previewUrl ? (
+ <>
+ <img
+ src={previewUrl}
+ alt={ev.title || 'Evidence preview'}
+ className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+ onError={(e) => {
+ const target = e.target as HTMLImageElement
+ target.style.display = 'none'
+ const fallback = target.nextElementSibling as HTMLElement
+ if (fallback) fallback.style.display = 'flex'
+ }}
+ />
+ <div className={`w-full h-full hidden items-center justify-center ${bgColor}`}>
+ <IconComponent className="w-12 h-12 text-gray-400" />
+ </div>
+ </>
+ ) : hasVideoPreview && previewUrl ? (
+ <>
+ <video
+ src={previewUrl}
+ className="w-full h-full object-cover"
+ muted
+ preload="metadata"
+ />
+ <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+ <div className="w-12 h-12 bg-black/60 rounded-full flex items-center justify-center shadow-lg">
+ <svg className="w-5 h-5 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor">
+ <path d="M8 5v14l11-7z" />
+ </svg>
+ </div>
+ </div>
+ </>
+ ) : hasYouTubePreview && youTubeId ? (
+ <>
+ <img
+ src={`https://img.youtube.com/vi/${youTubeId}/hqdefault.jpg`}
+ alt={ev.title || 'YouTube preview'}
+ className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+ />
+ <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+ <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
+ <svg className="w-5 h-5 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor">
+ <path d="M8 5v14l11-7z" />
+ </svg>
+ </div>
+ </div>
+ </>
+ ) : (
+ <div className={`w-full h-full flex items-center justify-center ${bgColor}`}>
+ <IconComponent className="w-12 h-12 text-gray-400" />
+ </div>
+ )}
+ {/* Overlay on hover */}
+ <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
+ <Eye className="w-6 h-6 text-white" />
+ </div>
+ </div>
+
+ {/* Content - Mobile optimized */}
+ <div className="p-3 flex flex-col gap-1.5">
+ {/* Title */}
+ <h3 className="font-semibold text-gray-800 text-sm leading-snug line-clamp-2">
+ {ev.title || 'Untitled Evidence'}
+ </h3>
+ 
+ {/* Type Badge */}
+ <div>
+ <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${typeInfo.color}`}>
+ {typeInfo.label}
+ </span>
+ </div>
+ 
+ {/* Date */}
+ <p className="text-xs text-gray-500">
+ {ev.date_range_start && ev.date_range_end
+ ? `${formatDate(ev.date_range_start)} - ${formatDate(ev.date_range_end)}`
+ : formatDate(ev.date_represented)}
+ </p>
+
+ {Array.isArray(ev.tag_ids) && ev.tag_ids.length > 0 && (
+ <EvidenceTagsList tagIds={ev.tag_ids} size="xs" visibleCap={3} />
+ )}
+ </div>
+ </div>
+ )
+ })}
+ </div>
+ )}
+ </div>
+
+ {/* Evidence Preview Modal */}
+ {isPreviewModalOpen && selectedEvidence && (
+ <EvidencePreviewModal
+ isOpen={isPreviewModalOpen}
+ onClose={() => {
+ setIsPreviewModalOpen(false)
+ setSelectedEvidence(null)
+ }}
+ evidence={selectedEvidence}
+ onEdit={canEditEvidence ? handleEditEvidence : undefined}
+ onDelete={canDelete ? setDeleteEvidence : undefined}
+ onDataPointClick={(dataPoint, kpi) => {
+ setSelectedDataPoint(dataPoint)
+ setSelectedDataPointKpi(kpi)
+ setIsPreviewModalOpen(false)
+ setIsDataPointPreviewOpen(true)
+ }}
+ />
+ )}
+
+ {/* Data Point Preview Modal - opens when clicking impact claim from evidence */}
+ {selectedDataPoint && (
+ <DataPointPreviewModal
+ isOpen={isDataPointPreviewOpen}
+ onClose={() => {
+ setIsDataPointPreviewOpen(false)
+ setSelectedDataPoint(null)
+ setSelectedDataPointKpi(null)
+ }}
+ dataPoint={selectedDataPoint}
+ kpi={selectedDataPointKpi || selectedDataPoint.kpi}
+ onEvidenceClick={(ev) => {
+ setSelectedEvidence(ev)
+ setIsDataPointPreviewOpen(false)
+ setIsPreviewModalOpen(true)
+ }}
+ />
+ )}
+
+ {/* Edit Evidence Modal (legacy single-record form) */}
+ {isAddModalOpen && editingEvidence && (
+ <AddEvidenceModal
+ isOpen={isAddModalOpen}
+ onClose={() => {
+ setIsAddModalOpen(false)
+ setEditingEvidence(null)
+ }}
+ onSubmit={handleSaveEvidence}
+ availableKPIs={availableKPIs}
+ initiativeId={initiativeId}
+ editData={editingEvidence}
+ />
+ )}
+
+ {/* Add Evidence Modal (kanban batch upload) */}
+ {isAddModalOpen && !editingEvidence && (
+ <EvidenceUploadModal
+ isOpen={isAddModalOpen}
+ onClose={() => setIsAddModalOpen(false)}
+ onCreated={async () => {
+ await loadEvidence()
+ onRefresh?.()
+ }}
+ initiativeId={initiativeId}
+ />
+ )}
+
+ {deleteEvidence && (
+ <ConfirmDialog
+ title="Delete Evidence"
+ message={`Delete ${deleteEvidence.title || 'this evidence'}? This action cannot be undone.`}
+ confirmLabel="Delete Evidence"
+ tone="danger"
+ onConfirm={() => handleDeleteEvidence(deleteEvidence)}
+ onCancel={() => setDeleteEvidence(null)}
+ />
+ )}
+ </div>
+ )
 }
