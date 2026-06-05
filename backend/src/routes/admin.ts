@@ -248,10 +248,24 @@ router.post('/demos/:id/generate', async (req: AuthenticatedRequest, res) => {
             return;
         }
 
-        await supabase
+        // Atomically claim the generation slot: flip to 'generating' only if a
+        // run isn't already in flight. Two concurrent generates on the same shell
+        // would otherwise race in populateExistingDemo (one's clearGeneratedContent
+        // deletes the other's freshly-inserted kpis → kpi_updates FK violation).
+        const { data: claimed } = await supabase
             .from('organizations')
             .update({ demo_generation_status: 'generating' })
-            .eq('id', id);
+            .eq('id', id)
+            .neq('demo_generation_status', 'generating')
+            .select('id')
+            .maybeSingle();
+        if (!claimed) {
+            res.status(409).json({
+                error: 'A generation is already in progress for this demo.',
+                code: 'generation_in_progress',
+            });
+            return;
+        }
 
         try {
             await DemoGenerationService.generateFromWebsite(

@@ -48,24 +48,24 @@ export default function AdminDemosPage() {
     const [newName, setNewName] = useState('')
     const [websiteUrl, setWebsiteUrl] = useState('')
     const [websiteName, setWebsiteName] = useState('')
-    const [generationStage, setGenerationStage] = useState('')
     const [showCreate, setShowCreate] = useState(false)
     const [search, setSearch] = useState('')
     const [deleteConfirm, setDeleteConfirm] = useState<DemoOrg | null>(null)
     const [newFolder, setNewFolder] = useState('')
-    const [activeFolder, setActiveFolder] = useState<string | null>(null) // null = All; UNFILED = no folder
+    const [activeFolder, setActiveFolder] = useState<string | null>(null)
     const [folderMenuFor, setFolderMenuFor] = useState<string | null>(null)
-    const [showNewFolder, setShowNewFolder] = useState(false)
-    const [folderNameInput, setFolderNameInput] = useState('')
-    const [folderDemoName, setFolderDemoName] = useState('')
-    const [creatingFolder, setCreatingFolder] = useState(false)
-    // In-app modals (replace native prompt())
+    // Modals
     const [generateModal, setGenerateModal] = useState<DemoOrg | null>(null)
     const [generateUrl, setGenerateUrl] = useState('')
     const [folderModalDemo, setFolderModalDemo] = useState<DemoOrg | null>(null)
     const [rowFolderName, setRowFolderName] = useState('')
+    const [renameModal, setRenameModal] = useState<DemoOrg | null>(null)
+    const [renameValue, setRenameValue] = useState('')
+    const [cloneModal, setCloneModal] = useState<DemoOrg | null>(null)
+    const [cloneValue, setCloneValue] = useState('')
+    const [newFolderModal, setNewFolderModal] = useState(false)
+    const [newFolderName, setNewFolderName] = useState('')
 
-    // Distinct folder names across all demos (a folder exists only while a demo references it).
     const folders = Array.from(
         new Set(demos.map((d) => (d.demo_folder || '').trim()).filter(Boolean))
     ).sort((a, b) => a.localeCompare(b))
@@ -95,12 +95,22 @@ export default function AdminDemosPage() {
         refresh()
     }, [])
 
+    // Auto-poll while any demo is generating so the status badge updates live.
+    useEffect(() => {
+        const hasGenerating = demos.some((d) => d.demo_generation_status === 'generating')
+        if (!hasGenerating) return
+        const id = setInterval(async () => {
+            try {
+                const data = await AdminApi.listDemos()
+                setDemos(data)
+            } catch { /* silent — don't toast on background polls */ }
+        }, 4000)
+        return () => clearInterval(id)
+    }, [demos])
+
     const handleCreate = async () => {
         const name = newName.trim()
-        if (!name) {
-            toast.error('Name is required')
-            return
-        }
+        if (!name) { toast.error('Name is required'); return }
         setCreating(true)
         try {
             const demo = await AdminApi.createDemo({ name, demo_folder: newFolder.trim() || undefined })
@@ -118,16 +128,12 @@ export default function AdminDemosPage() {
 
     const handleGenerateFromWebsite = async () => {
         const url = websiteUrl.trim()
-        if (!url) {
-            toast.error('Website URL is required')
-            return
-        }
+        if (!url) { toast.error('Website URL is required'); return }
 
         const name = websiteName.trim() || deriveNameFromUrl(url)
         const folder = newFolder.trim() || undefined
 
         setGenerating(true)
-        // 1. Create the shell instantly so the demo (and its folder) appears right away.
         let shellId: string
         try {
             const shell = await AdminApi.createDemoShell({ name, demo_folder: folder, website_url: url })
@@ -145,7 +151,7 @@ export default function AdminDemosPage() {
             setGenerating(false)
         }
 
-        // 2. Generate content into the shell in the background; the card shows a spinner.
+        // Run generation in the background; polling useEffect keeps the status badge fresh.
         try {
             await AdminApi.generateInto(shellId, { website_url: url, name })
             toast.success(`Generated "${name}"`)
@@ -156,49 +162,17 @@ export default function AdminDemosPage() {
         }
     }
 
-    const handleCreateFolder = async () => {
-        const folder = folderNameInput.trim()
-        const demoName = folderDemoName.trim()
-        if (!folder) {
-            toast.error('Folder name is required')
-            return
-        }
-        if (!demoName) {
-            toast.error('Enter a name for the first demo charity in this folder')
-            return
-        }
-        setCreatingFolder(true)
-        try {
-            await AdminApi.createDemoShell({ name: demoName, demo_folder: folder })
-            toast.success(`Created folder "${folder}" with "${demoName}"`)
-            setShowNewFolder(false)
-            setFolderNameInput('')
-            setFolderDemoName('')
-            await refresh()
-            setActiveFolder(folder)
-        } catch (err) {
-            toast.error((err as Error).message)
-        } finally {
-            setCreatingFolder(false)
-        }
-    }
-
-    // Open the generate modal for an existing draft/failed demo.
     const openGenerateModal = (demo: DemoOrg) => {
         setFolderMenuFor(null)
         setGenerateModal(demo)
         setGenerateUrl(demo.website_url || '')
     }
 
-    // Generate (or retry) website content into the selected demo.
     const runGenerate = async () => {
         const demo = generateModal
         if (!demo) return
         const url = generateUrl.trim()
-        if (!url) {
-            toast.error('Website URL is required')
-            return
-        }
+        if (!url) { toast.error('Website URL is required'); return }
         setGenerateModal(null)
         setDemos((prev) =>
             prev.map((d) => (d.id === demo.id ? { ...d, demo_generation_status: 'generating' } : d))
@@ -235,12 +209,19 @@ export default function AdminDemosPage() {
         const demo = folderModalDemo
         if (!demo) return
         const folder = rowFolderName.trim()
-        if (!folder) {
-            toast.error('Folder name is required')
-            return
-        }
+        if (!folder) { toast.error('Folder name is required'); return }
         setFolderModalDemo(null)
         await handleMoveToFolder(demo, folder)
+    }
+
+    const confirmNewFolder = () => {
+        const name = newFolderName.trim()
+        if (!name) { toast.error('Folder name is required'); return }
+        setNewFolderModal(false)
+        setNewFolderName('')
+        setNewFolder(name)
+        setCreateMode('website')
+        setShowCreate(true)
     }
 
     const handleOpen = (demo: DemoOrg) => {
@@ -248,14 +229,38 @@ export default function AdminDemosPage() {
         window.location.href = '/dashboard'
     }
 
-    const handleClone = async (demo: DemoOrg) => {
-        const cloneName = window.prompt(
-            `Clone "${demo.name}"?\nEnter a name for the copy:`,
-            `${demo.name} (copy)`
-        )
-        if (cloneName === null) return
+    const handleRename = (demo: DemoOrg) => {
+        setRenameModal(demo)
+        setRenameValue(demo.name)
+    }
+
+    const runRename = async () => {
+        const demo = renameModal
+        if (!demo) return
+        const name = renameValue.trim()
+        setRenameModal(null)
+        if (!name || name === demo.name) return
         try {
-            const newDemo = await AdminApi.cloneDemo(demo.id, cloneName.trim() || undefined)
+            const updated = await AdminApi.patchDemo(demo.id, { name })
+            toast.success('Renamed')
+            setDemos((prev) => prev.map((d) => (d.id === demo.id ? { ...d, ...updated } : d)))
+        } catch (err) {
+            toast.error((err as Error).message)
+        }
+    }
+
+    const handleClone = (demo: DemoOrg) => {
+        setCloneModal(demo)
+        setCloneValue(`${demo.name} (copy)`)
+    }
+
+    const runClone = async () => {
+        const demo = cloneModal
+        if (!demo) return
+        const name = cloneValue.trim()
+        setCloneModal(null)
+        try {
+            const newDemo = await AdminApi.cloneDemo(demo.id, name || undefined)
             toast.success(`Cloned to "${newDemo.name}"`)
             await refresh()
         } catch (err) {
@@ -293,18 +298,6 @@ export default function AdminDemosPage() {
         )
     }
 
-    const handleRename = async (demo: DemoOrg) => {
-        const name = window.prompt('Rename demo:', demo.name)
-        if (!name || name.trim() === demo.name) return
-        try {
-            const updated = await AdminApi.patchDemo(demo.id, { name: name.trim() })
-            toast.success('Renamed')
-            setDemos((prev) => prev.map((d) => (d.id === demo.id ? { ...d, ...updated } : d)))
-        } catch (err) {
-            toast.error((err as Error).message)
-        }
-    }
-
     return (
         <div className="min-h-screen bg-gray-50 pt-24 pb-12 px-4">
             <div className="max-w-6xl mx-auto">
@@ -320,79 +313,21 @@ export default function AdminDemosPage() {
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => { setShowNewFolder((v) => !v); setShowCreate(false) }}
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-full hover:bg-gray-50 transition-colors text-sm font-medium"
-                        >
-                            <FolderPlus className="w-4 h-4" />
-                            New folder
-                        </button>
-                        <button
-                            onClick={() => { setShowCreate((v) => !v); setShowNewFolder(false) }}
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors text-sm font-medium"
-                        >
-                            <Plus className="w-4 h-4" />
-                            New demo
-                        </button>
-                    </div>
+                    <button
+                        onClick={() => { setNewFolderModal(true); setNewFolderName('') }}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-full hover:bg-gray-50 transition-colors text-sm font-medium"
+                    >
+                        <FolderPlus className="w-4 h-4" />
+                        New folder
+                    </button>
+                    <button
+                        onClick={() => setShowCreate((v) => !v)}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors text-sm font-medium"
+                    >
+                        <Plus className="w-4 h-4" />
+                        New demo
+                    </button>
                 </div>
-
-                {showNewFolder && (
-                    <div className="mb-6 p-4 bg-white border border-gray-200 rounded-2xl shadow-bubble-sm">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                                <FolderPlus className="w-4 h-4 text-gray-500" />
-                                <h2 className="text-sm font-semibold text-gray-900">New folder</h2>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => { setShowNewFolder(false); setFolderNameInput(''); setFolderDemoName('') }}
-                                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full"
-                                aria-label="Close new folder panel"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-                        <div className="space-y-3">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Folder name</label>
-                                <input
-                                    type="text"
-                                    value={folderNameInput}
-                                    onChange={(e) => setFolderNameInput(e.target.value)}
-                                    placeholder="e.g. Q3 Pitches"
-                                    className="w-full px-4 py-2.5 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                                    autoFocus
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">First demo charity name</label>
-                                <div className="flex flex-col sm:flex-row gap-2">
-                                    <input
-                                        type="text"
-                                        value={folderDemoName}
-                                        onChange={(e) => setFolderDemoName(e.target.value)}
-                                        placeholder="e.g. Acme Foundation (demo)"
-                                        className="flex-1 px-4 py-2.5 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                                        onKeyDown={(e) => { if (e.key === 'Enter' && !creatingFolder) handleCreateFolder() }}
-                                    />
-                                    <button
-                                        onClick={handleCreateFolder}
-                                        disabled={creatingFolder}
-                                        className="px-5 py-2.5 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50 inline-flex items-center justify-center gap-2"
-                                    >
-                                        {creatingFolder && <Loader2 className="w-4 h-4 animate-spin" />}
-                                        Create folder + demo
-                                    </button>
-                                </div>
-                                <p className="mt-2 text-xs text-gray-500">
-                                    Creates the folder with an empty draft demo inside. Generate its content from a website afterward with the Generate button.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                )}
 
                 {showCreate && (
                     <div className="mb-6 p-4 bg-white border border-gray-200 rounded-2xl shadow-bubble-sm">
@@ -428,6 +363,7 @@ export default function AdminDemosPage() {
                                     setNewName('')
                                     setWebsiteUrl('')
                                     setWebsiteName('')
+                                    setNewFolder('')
                                 }}
                                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full"
                                 aria-label="Close create panel"
@@ -461,7 +397,7 @@ export default function AdminDemosPage() {
                                         type="text"
                                         value={websiteName}
                                         onChange={(e) => setWebsiteName(e.target.value)}
-                                        placeholder="Optional"
+                                        placeholder="Optional — derived from URL if blank"
                                         className="w-full px-4 py-2.5 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter' && !generating) handleGenerateFromWebsite()
@@ -476,10 +412,10 @@ export default function AdminDemosPage() {
                                         className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50"
                                     >
                                         {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                                        {generating ? generationStage || 'Generating...' : 'Generate demo'}
+                                        {generating ? 'Creating…' : 'Generate demo'}
                                     </button>
                                     <p className="text-xs text-gray-500">
-                                        Creates a normal editable demo with profile, context, initiative, metrics, locations, beneficiaries, and stories.
+                                        Scrapes the site and generates profile, initiative, metrics, locations, beneficiaries, and stories. Takes ~30–60 s.
                                     </p>
                                 </div>
                             </div>
@@ -493,9 +429,7 @@ export default function AdminDemosPage() {
                                         onChange={(e) => setNewName(e.target.value)}
                                         placeholder="Acme Foundation (demo)"
                                         className="flex-1 px-4 py-2 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') handleCreate()
-                                        }}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') handleCreate() }}
                                     />
                                     <button
                                         onClick={handleCreate}
@@ -510,7 +444,7 @@ export default function AdminDemosPage() {
                                     <FolderField value={newFolder} onChange={setNewFolder} folders={folders} />
                                 </div>
                                 <p className="mt-2 text-xs text-gray-500">
-                                    Auto-seeds with 1 initiative, 4 KPIs, 1 beneficiary group, 1 location, and 1 story.
+                                    Auto-seeds with 1 initiative, 4 KPIs, 1 beneficiary group, 1 location, and 1 story. Ready to open immediately.
                                 </p>
                             </div>
                         )}
@@ -568,7 +502,7 @@ export default function AdminDemosPage() {
                             type="text"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search demos by name or slug..."
+                            placeholder="Search demos by name or slug…"
                             className="w-full pl-11 pr-10 py-2.5 bg-white border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                         />
                         {search && (
@@ -606,194 +540,208 @@ export default function AdminDemosPage() {
                     </div>
                 ) : (
                     <div className="grid gap-3">
-                        {filteredDemos.map((demo) => (
-                            <div
-                                key={demo.id}
-                                className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-2xl hover:border-gray-300 transition-colors"
-                            >
+                        {filteredDemos.map((demo) => {
+                            const isReady = !demo.demo_generation_status || demo.demo_generation_status === 'ready'
+                            const openTitle = demo.demo_generation_status === 'draft'
+                                ? 'Generate content first before opening'
+                                : demo.demo_generation_status === 'generating'
+                                    ? 'Generation in progress — please wait'
+                                    : 'Open dashboard'
+                            return (
                                 <div
-                                    className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
-                                    style={{ backgroundColor: demo.brand_color || '#f3f4f6' }}
+                                    key={demo.id}
+                                    className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-2xl hover:border-gray-300 transition-colors"
                                 >
-                                    {demo.logo_url ? (
-                                        <img src={demo.logo_url} alt="" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <Building2
-                                            className="w-5 h-5"
-                                            style={{ color: demo.brand_color ? '#fff' : '#9ca3af' }}
-                                        />
-                                    )}
-                                </div>
-
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="text-base font-semibold text-gray-900 truncate">{demo.name}</h3>
-                                        {demo.demo_generation_status === 'draft' && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold">
-                                                Draft
-                                            </span>
+                                    <div
+                                        className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
+                                        style={{ backgroundColor: demo.brand_color || '#f3f4f6' }}
+                                    >
+                                        {demo.logo_url ? (
+                                            <img src={demo.logo_url} alt="" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <Building2
+                                                className="w-5 h-5"
+                                                style={{ color: demo.brand_color ? '#fff' : '#9ca3af' }}
+                                            />
                                         )}
-                                        {demo.demo_generation_status === 'generating' && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
-                                                <Loader2 className="w-3 h-3 animate-spin" />
-                                                Generating
-                                            </span>
+                                    </div>
+
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="text-base font-semibold text-gray-900 truncate">{demo.name}</h3>
+                                            {demo.demo_generation_status === 'draft' && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold">
+                                                    Draft
+                                                </span>
+                                            )}
+                                            {demo.demo_generation_status === 'generating' && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+                                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                                    Generating…
+                                                </span>
+                                            )}
+                                            {demo.demo_generation_status === 'failed' && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
+                                                    <AlertTriangle className="w-3 h-3" />
+                                                    Failed
+                                                </span>
+                                            )}
+                                            {demo.demo_public_share && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-semibold uppercase tracking-wide">
+                                                    <Share2 className="w-3 h-3" />
+                                                    Shared
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2 text-xs text-gray-500 truncate">
+                                            <span className="truncate">/demo/{demo.slug}</span>
+                                            {demo.demo_folder && (
+                                                <span className="inline-flex items-center gap-1 text-gray-400">
+                                                    <Folder className="w-3 h-3" />
+                                                    {demo.demo_folder}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-1">
+                                        {demo.demo_generation_status === 'draft' && (
+                                            <button
+                                                onClick={() => openGenerateModal(demo)}
+                                                title="Generate content from a website"
+                                                className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white rounded-full hover:bg-purple-700 text-xs font-medium"
+                                            >
+                                                <Sparkles className="w-3.5 h-3.5" />
+                                                Generate
+                                            </button>
                                         )}
                                         {demo.demo_generation_status === 'failed' && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
-                                                <AlertTriangle className="w-3 h-3" />
-                                                Failed
-                                            </span>
+                                            <button
+                                                onClick={() => openGenerateModal(demo)}
+                                                title="Retry generation"
+                                                className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-full hover:bg-red-700 text-xs font-medium"
+                                            >
+                                                <RefreshCw className="w-3.5 h-3.5" />
+                                                Retry
+                                            </button>
                                         )}
-                                        {demo.demo_public_share && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-semibold uppercase tracking-wide">
-                                                <Share2 className="w-3 h-3" />
-                                                Shared
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-2 text-xs text-gray-500 truncate">
-                                        <span className="truncate">/demo/{demo.slug}</span>
-                                        {demo.demo_folder && (
-                                            <span className="inline-flex items-center gap-1 text-gray-400">
-                                                <Folder className="w-3 h-3" />
-                                                {demo.demo_folder}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-1">
-                                    {demo.demo_generation_status === 'draft' && (
                                         <button
-                                            onClick={() => openGenerateModal(demo)}
-                                            title="Generate content from a website"
-                                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white rounded-full hover:bg-purple-700 text-xs font-medium"
+                                            onClick={() => isReady && handleOpen(demo)}
+                                            disabled={!isReady}
+                                            title={openTitle}
+                                            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                                                isReady
+                                                    ? 'bg-gray-900 text-white hover:bg-gray-800'
+                                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            }`}
                                         >
-                                            <Sparkles className="w-3.5 h-3.5" />
-                                            Generate
+                                            Open
                                         </button>
-                                    )}
-                                    {demo.demo_generation_status === 'failed' && (
+                                        <div className="relative">
+                                            <button
+                                                onClick={() => setFolderMenuFor(folderMenuFor === demo.id ? null : demo.id)}
+                                                title="Move to folder"
+                                                className={`p-2 rounded-full ${demo.demo_folder
+                                                        ? 'text-gray-700 hover:bg-gray-100'
+                                                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                                                    }`}
+                                            >
+                                                <Folder className="w-4 h-4" />
+                                            </button>
+                                            {folderMenuFor === demo.id && (
+                                                <>
+                                                    <div className="fixed inset-0 z-40" onClick={() => setFolderMenuFor(null)} />
+                                                    <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1 max-h-72 overflow-y-auto">
+                                                        <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide">Move to folder</div>
+                                                        {folders.map((f) => (
+                                                            <button
+                                                                key={f}
+                                                                onClick={() => handleMoveToFolder(demo, f)}
+                                                                className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-gray-50 ${demo.demo_folder === f ? 'text-gray-900 font-medium' : 'text-gray-600'}`}
+                                                            >
+                                                                <Folder className="w-3.5 h-3.5 text-gray-400" />
+                                                                <span className="truncate flex-1">{f}</span>
+                                                                {demo.demo_folder === f && <span className="text-xs text-gray-400">current</span>}
+                                                            </button>
+                                                        ))}
+                                                        {demo.demo_folder && (
+                                                            <button
+                                                                onClick={() => handleMoveToFolder(demo, null)}
+                                                                className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 text-gray-600 hover:bg-gray-50 border-t border-gray-100"
+                                                            >
+                                                                <X className="w-3.5 h-3.5 text-gray-400" />
+                                                                Remove from folder
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={() => openNewFolderForDemo(demo)}
+                                                            className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 text-gray-700 hover:bg-gray-50 border-t border-gray-100"
+                                                        >
+                                                            <FolderPlus className="w-3.5 h-3.5 text-gray-400" />
+                                                            New folder…
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
                                         <button
-                                            onClick={() => openGenerateModal(demo)}
-                                            title="Retry generation"
-                                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-full hover:bg-red-700 text-xs font-medium"
+                                            onClick={() => handleRename(demo)}
+                                            title="Rename"
+                                            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full"
                                         >
-                                            <RefreshCw className="w-3.5 h-3.5" />
-                                            Retry
+                                            <Edit3 className="w-4 h-4" />
                                         </button>
-                                    )}
-                                    <button
-                                        onClick={() => handleOpen(demo)}
-                                        title="Open dashboard"
-                                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-900 text-white rounded-full hover:bg-gray-800 text-xs font-medium"
-                                    >
-                                        Open
-                                    </button>
-                                    <div className="relative">
                                         <button
-                                            onClick={() => setFolderMenuFor(folderMenuFor === demo.id ? null : demo.id)}
-                                            title="Move to folder"
-                                            className={`p-2 rounded-full ${demo.demo_folder
-                                                    ? 'text-gray-700 hover:bg-gray-100'
+                                            onClick={() => handleToggleShare(demo)}
+                                            title={demo.demo_public_share ? 'Disable share link' : 'Enable share link'}
+                                            className={`p-2 rounded-full ${demo.demo_public_share
+                                                    ? 'text-emerald-700 hover:bg-emerald-50'
                                                     : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
                                                 }`}
                                         >
-                                            <Folder className="w-4 h-4" />
+                                            <Share2 className="w-4 h-4" />
                                         </button>
-                                        {folderMenuFor === demo.id && (
+                                        {demo.demo_public_share && (
                                             <>
-                                                <div className="fixed inset-0 z-40" onClick={() => setFolderMenuFor(null)} />
-                                                <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1 max-h-72 overflow-y-auto">
-                                                    <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide">Move to folder</div>
-                                                    {folders.map((f) => (
-                                                        <button
-                                                            key={f}
-                                                            onClick={() => handleMoveToFolder(demo, f)}
-                                                            className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-gray-50 ${demo.demo_folder === f ? 'text-gray-900 font-medium' : 'text-gray-600'}`}
-                                                        >
-                                                            <Folder className="w-3.5 h-3.5 text-gray-400" />
-                                                            <span className="truncate flex-1">{f}</span>
-                                                            {demo.demo_folder === f && <span className="text-xs text-gray-400">current</span>}
-                                                        </button>
-                                                    ))}
-                                                    {demo.demo_folder && (
-                                                        <button
-                                                            onClick={() => handleMoveToFolder(demo, null)}
-                                                            className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 text-gray-600 hover:bg-gray-50 border-t border-gray-100"
-                                                        >
-                                                            <X className="w-3.5 h-3.5 text-gray-400" />
-                                                            Remove from folder
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        onClick={() => openNewFolderForDemo(demo)}
-                                                        className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 text-gray-700 hover:bg-gray-50 border-t border-gray-100"
-                                                    >
-                                                        <FolderPlus className="w-3.5 h-3.5 text-gray-400" />
-                                                        New folder…
-                                                    </button>
-                                                </div>
+                                                <button
+                                                    onClick={() => handleCopyShareLink(demo)}
+                                                    title="Copy share link"
+                                                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full"
+                                                >
+                                                    <Copy className="w-4 h-4" />
+                                                </button>
+                                                <Link
+                                                    to={`/demo/${demo.slug}`}
+                                                    target="_blank"
+                                                    title="Open public page"
+                                                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full"
+                                                >
+                                                    <ExternalLink className="w-4 h-4" />
+                                                </Link>
                                             </>
                                         )}
+                                        <button
+                                            onClick={() => handleClone(demo)}
+                                            title="Clone"
+                                            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full"
+                                        >
+                                            <Copy className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => setDeleteConfirm(demo)}
+                                            title="Delete"
+                                            className="p-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-full"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
                                     </div>
-                                    <button
-                                        onClick={() => handleRename(demo)}
-                                        title="Rename"
-                                        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full"
-                                    >
-                                        <Edit3 className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        onClick={() => handleToggleShare(demo)}
-                                        title={demo.demo_public_share ? 'Disable share link' : 'Enable share link'}
-                                        className={`p-2 rounded-full ${demo.demo_public_share
-                                                ? 'text-emerald-700 hover:bg-emerald-50'
-                                                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                                            }`}
-                                    >
-                                        <Share2 className="w-4 h-4" />
-                                    </button>
-                                    {demo.demo_public_share && (
-                                        <>
-                                            <button
-                                                onClick={() => handleCopyShareLink(demo)}
-                                                title="Copy share link"
-                                                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full"
-                                            >
-                                                <Copy className="w-4 h-4" />
-                                            </button>
-                                            <Link
-                                                to={`/demo/${demo.slug}`}
-                                                target="_blank"
-                                                title="Open public page"
-                                                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full"
-                                            >
-                                                <ExternalLink className="w-4 h-4" />
-                                            </Link>
-                                        </>
-                                    )}
-                                    <button
-                                        onClick={() => handleClone(demo)}
-                                        title="Clone"
-                                        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full"
-                                    >
-                                        <Copy className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        onClick={() => setDeleteConfirm(demo)}
-                                        title="Delete"
-                                        className="p-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-full"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
                                 </div>
-                            </div>
-                        ))}
+                            )
+                        })}
                     </div>
                 )}
             </div>
+
             {deleteConfirm && (
                 <ConfirmDialog
                     title="Delete demo"
@@ -814,7 +762,7 @@ export default function AdminDemosPage() {
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
                                 <Sparkles className="w-4 h-4 text-purple-600" />
-                                Generate “{generateModal.name}”
+                                Generate &ldquo;{generateModal.name}&rdquo;
                             </h3>
                             <button
                                 onClick={() => setGenerateModal(null)}
@@ -838,7 +786,7 @@ export default function AdminDemosPage() {
                             />
                         </div>
                         <p className="mt-2 text-xs text-gray-500">
-                            Pulls profile, context, initiative, metrics, locations, beneficiaries, and stories from this site into the draft.
+                            Pulls profile, context, initiative, metrics, locations, beneficiaries, and stories from this site. The card will show a &ldquo;Generating&hellip;&rdquo; badge and update automatically when done.
                         </p>
                         <div className="flex justify-end gap-2 mt-5">
                             <button
@@ -892,7 +840,7 @@ export default function AdminDemosPage() {
                             />
                         </div>
                         <p className="mt-2 text-xs text-gray-500">
-                            Moves “{folderModalDemo.name}” into this new folder.
+                            Moves &ldquo;{folderModalDemo.name}&rdquo; into this new folder.
                         </p>
                         <div className="flex justify-end gap-2 mt-5">
                             <button
@@ -907,6 +855,150 @@ export default function AdminDemosPage() {
                             >
                                 <FolderPlus className="w-4 h-4" />
                                 Create &amp; move
+                            </button>
+                        </div>
+                    </div>
+                </ModalFrame>
+            )}
+
+            {newFolderModal && (
+                <ModalFrame
+                    zIndexClass="z-[90]"
+                    panelClassName="bg-white rounded-2xl max-w-md w-full shadow-modal"
+                >
+                    <div className="p-5">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                                <FolderPlus className="w-4 h-4 text-gray-500" />
+                                New folder
+                            </h3>
+                            <button
+                                onClick={() => setNewFolderModal(false)}
+                                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full"
+                                aria-label="Close"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Folder name</label>
+                        <input
+                            type="text"
+                            value={newFolderName}
+                            onChange={(e) => setNewFolderName(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') confirmNewFolder() }}
+                            placeholder="e.g. Q3 Pitches"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                            autoFocus
+                        />
+                        <p className="mt-2 text-xs text-gray-500">
+                            Opens the new demo form with this folder pre-filled — create your first demo inside it to finish.
+                        </p>
+                        <div className="flex justify-end gap-2 mt-5">
+                            <button
+                                onClick={() => setNewFolderModal(false)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmNewFolder}
+                                className="px-4 py-2 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-full inline-flex items-center gap-2"
+                            >
+                                <FolderPlus className="w-4 h-4" />
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                </ModalFrame>
+            )}
+
+            {renameModal && (
+                <ModalFrame
+                    zIndexClass="z-[90]"
+                    panelClassName="bg-white rounded-2xl max-w-md w-full shadow-modal"
+                >
+                    <div className="p-5">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                                <Edit3 className="w-4 h-4 text-gray-500" />
+                                Rename demo
+                            </h3>
+                            <button
+                                onClick={() => setRenameModal(null)}
+                                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full"
+                                aria-label="Close"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                        <input
+                            type="text"
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') runRename() }}
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                            autoFocus
+                        />
+                        <div className="flex justify-end gap-2 mt-5">
+                            <button
+                                onClick={() => setRenameModal(null)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={runRename}
+                                className="px-4 py-2 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-full"
+                            >
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </ModalFrame>
+            )}
+
+            {cloneModal && (
+                <ModalFrame
+                    zIndexClass="z-[90]"
+                    panelClassName="bg-white rounded-2xl max-w-md w-full shadow-modal"
+                >
+                    <div className="p-5">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                                <Copy className="w-4 h-4 text-gray-500" />
+                                Clone &ldquo;{cloneModal.name}&rdquo;
+                            </h3>
+                            <button
+                                onClick={() => setCloneModal(null)}
+                                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full"
+                                aria-label="Close"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Name for the copy</label>
+                        <input
+                            type="text"
+                            value={cloneValue}
+                            onChange={(e) => setCloneValue(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') runClone() }}
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                            autoFocus
+                        />
+                        <div className="flex justify-end gap-2 mt-5">
+                            <button
+                                onClick={() => setCloneModal(null)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={runClone}
+                                className="px-4 py-2 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-full inline-flex items-center gap-2"
+                            >
+                                <Copy className="w-4 h-4" />
+                                Clone
                             </button>
                         </div>
                     </div>
@@ -986,7 +1078,7 @@ function FolderField({
                                     className="w-full px-4 py-2 text-left text-sm flex items-center gap-2 text-gray-700 hover:bg-gray-50 border-t border-gray-100"
                                 >
                                     <FolderPlus className="w-3.5 h-3.5 text-gray-400" />
-                                    Create “{trimmed}”
+                                    Create &ldquo;{trimmed}&rdquo;
                                 </button>
                             )}
                         </div>
