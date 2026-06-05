@@ -250,6 +250,12 @@ export class DemoPersistenceService {
             .eq('id', organizationId);
         if (updateErr) throw new Error(`Failed to update demo org profile: ${updateErr.message}`);
 
+        // Reused shells (initial generate that partially seeded, then a retry)
+        // already hold generated rows. Clear them first so re-seeding is
+        // idempotent — otherwise the org_context unique constraint trips and
+        // initiatives/locations/etc. get duplicated.
+        await this.clearGeneratedContent(organizationId);
+
         await this.seedGeneratedContent(organizationId, userId, draft);
 
         const { data: org, error } = await supabase
@@ -259,6 +265,33 @@ export class DemoPersistenceService {
             .single();
         if (error || !org) throw new Error(`Failed to reload populated demo org: ${error?.message}`);
         return org;
+    }
+
+    /**
+     * Remove previously-generated content for a demo org so a re-generation
+     * (or a retry after a partial failure) starts from a clean slate. Deleting
+     * the initiatives cascades to their kpis / kpi_updates / stories /
+     * beneficiary_groups and the join tables; locations are org-scoped (global)
+     * so they're cleared separately. The org row itself is preserved.
+     */
+    static async clearGeneratedContent(organizationId: string): Promise<void> {
+        const { error: ctxErr } = await supabase
+            .from('organization_context')
+            .delete()
+            .eq('organization_id', organizationId);
+        if (ctxErr) throw new Error(`Failed to clear existing context: ${ctxErr.message}`);
+
+        const { error: initErr } = await supabase
+            .from('initiatives')
+            .delete()
+            .eq('organization_id', organizationId);
+        if (initErr) throw new Error(`Failed to clear existing initiatives: ${initErr.message}`);
+
+        const { error: locErr } = await supabase
+            .from('locations')
+            .delete()
+            .eq('organization_id', organizationId);
+        if (locErr) throw new Error(`Failed to clear existing locations: ${locErr.message}`);
     }
 
     static async seedGeneratedContent(
