@@ -1,0 +1,30 @@
+---
+description: Use the authenticated-tier UI master (tokens, classes, primitives) for all app UI
+globs: frontend/src/**/*.tsx,frontend/src/**/*.css
+alwaysApply: true
+---
+
+# Authenticated-tier UI master
+
+For the **authenticated app** (everything except `public/`, `landing/`, and marketing/auth pages like `AuthPage`, `Offer*`, `Trial*`, `Subscription*`, `Terms*`, `Invite*`, `PWAAuthPage`), build UI from the master. Reference: `frontend/MASTER_STYLE_GUIDE.md`.
+
+## Always use the master, never raw equivalents
+
+- **Surfaces:** `.app-card` / `.app-card-interactive|elevated|flat|muted` or `<AppCard>` — NOT raw `bg-white rounded-xl border shadow-*`.
+- **Buttons:** `.app-btn` + `.app-btn-primary|secondary|ghost|danger` or `<Button>` — NOT raw `<button className="px-.. py.. bg-..">`.
+- **Inputs:** `.app-input` + `.app-label` + `.app-help` — NOT raw `border border-gray-300 rounded-lg focus:ring-*`.
+- **Modals/pop-ups:** `ModalFrame` with the **`size`** prop (`sm|md|lg|xl|2xl|full`) + `ModalHeader`/`ModalBody`(`rail` for forms)/`ModalFooter`/`ModalFieldGrid`. No glass (`bg-white/70 backdrop-blur`) panels; solid white + `shadow-app-modal`.
+- **Loaders/empties/alerts:** `<SectionLoader>`/`<PageLoader>`/`<Skeleton>`, `<EmptyState>`, `<InlineAlert>` — NOT ad-hoc `animate-spin` or hand-rolled banners.
+- **Headers:** `<PageHeader>` / `<SectionHeader>`. **Toasts:** `notify` from `src/lib/notify` (one `<AppToaster>` only).
+
+## Color = tokens only
+
+Use `primary` (brand green), `evidence` (teal = info), `impact` (success/active/done), `gray`, plus `amber/red` for warn/danger. **Never** `blue-/green-/emerald-/sky-/indigo-` (off-palette). `evidence` has shades 50–700 only.
+
+## Convert-on-touch
+
+When you edit a file that still hand-rolls a card/button/input with raw utilities, convert it to the master class/primitive in passing (keep diffs minimal otherwise). This grows master coverage instead of letting it drift.
+
+## Imports
+
+Relative paths only (no `@/` alias in Vite): `import { Button, PageHeader } from '../components/ui'`, `import ModalFrame, { ModalHeader } from '../ModalFrame'`.

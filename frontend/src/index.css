@@ -187,6 +187,218 @@
         @apply block text-sm font-medium text-gray-700 mb-1;
     }
 
+    /* =====================================================================
+       APP MASTER — modern SaaS design system (authenticated / private tier)
+       Single source of truth. Edit here → propagates everywhere wired up.
+       Do NOT use these inside `.landing-page` or public (PUBLIC_*) tiers.
+       Full reference + migration map: frontend/MASTER_STYLE_GUIDE.md
+       ===================================================================== */
+
+    /* --- Page canvas: opaque neutral that covers the global #root green
+       glow for a clean SaaS backdrop. Apply to authenticated page roots. --- */
+    .app-canvas {
+        @apply bg-[#F7F8FA];
+    }
+
+    /* --- Surfaces (cards / panels) --- */
+    .app-card {
+        @apply bg-white rounded-xl border border-gray-200/80 shadow-card;
+    }
+
+    .app-card-interactive {
+        @apply bg-white rounded-xl border border-gray-200/80 shadow-card transition-all duration-200 hover:shadow-card-hover hover:border-gray-300/80;
+    }
+
+    .app-card-elevated {
+        @apply bg-white rounded-xl border border-gray-200/70 shadow-card-lg;
+    }
+
+    .app-card-flat {
+        @apply bg-white rounded-xl border border-gray-200/80;
+    }
+
+    .app-card-muted {
+        @apply bg-gray-50/70 rounded-xl border border-gray-200/70;
+    }
+
+    /* Internal padding helpers (keep existing layout sizing — see guide) */
+    .app-pad {
+        @apply p-4 sm:p-5;
+    }
+
+    .app-pad-lg {
+        @apply p-5 sm:p-6;
+    }
+
+    /* Card header strip (title row + actions) */
+    .app-card-header {
+        @apply flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 border-b border-gray-100;
+    }
+
+    /* --- Modal sections (master chrome for ModalFrame contents) --- */
+    .app-modal-header {
+        @apply flex items-start justify-between gap-4 px-5 sm:px-6 py-4 border-b border-gray-100 flex-shrink-0;
+    }
+
+    .app-modal-body {
+        @apply flex-1 min-h-0 overflow-y-auto px-5 sm:px-6 py-5;
+    }
+
+    .app-modal-footer {
+        @apply flex items-center justify-end gap-3 px-5 sm:px-6 py-4 border-t border-gray-100 bg-gray-50/60 flex-shrink-0;
+    }
+
+    .app-modal-title {
+        @apply text-lg font-semibold tracking-tight text-secondary-900 leading-tight;
+    }
+
+    .app-modal-subtitle {
+        @apply text-sm text-secondary-500 mt-0.5;
+    }
+
+    /* Centered content rail INSIDE wide modals — wider than the old max-w-2xl
+       so forms breathe and use the panel width. */
+    .app-modal-rail {
+        @apply w-full max-w-3xl mx-auto;
+    }
+
+    /* --- Field grid: clean label/value info display for detail modals --- */
+    .app-field-grid {
+        @apply grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5;
+    }
+
+    .app-field-label {
+        @apply text-[11px] font-semibold uppercase tracking-wide text-secondary-400;
+    }
+
+    .app-field-value {
+        @apply text-sm text-secondary-900 mt-1 break-words;
+    }
+
+    /* --- Typography --- */
+    .app-page-title {
+        @apply text-2xl font-semibold tracking-tight text-secondary-900;
+    }
+
+    .app-page-subtitle {
+        @apply text-sm text-secondary-500 mt-1;
+    }
+
+    .app-section-title {
+        @apply text-[13px] font-semibold uppercase tracking-wide text-secondary-500;
+    }
+
+    .app-card-title {
+        @apply text-[15px] font-semibold text-secondary-900;
+    }
+
+    .app-muted {
+        @apply text-secondary-500;
+    }
+
+    .app-divider {
+        @apply border-t border-gray-100;
+    }
+
+    /* --- Icon tile (square, replaces round .icon-bubble for the SaaS look) --- */
+    .app-icon-tile {
+        @apply w-10 h-10 rounded-lg bg-gray-100 text-secondary-600 flex items-center justify-center flex-shrink-0;
+    }
+
+    .app-icon-tile-sm {
+        @apply w-8 h-8 rounded-lg bg-gray-100 text-secondary-600 flex items-center justify-center flex-shrink-0;
+    }
+
+    .app-icon-tile-accent {
+        @apply bg-primary-100 text-primary-800;
+    }
+
+    /* --- Buttons (CSS form — mirrors the React <Button> variants) --- */
+    .app-btn {
+        @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold text-sm h-10 px-4 transition-all duration-200 whitespace-nowrap disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2;
+    }
+
+    .app-btn-sm {
+        @apply h-8 px-3 text-[13px];
+    }
+
+    .app-btn-lg {
+        @apply h-11 px-5;
+    }
+
+    .app-btn-icon {
+        @apply h-10 w-10 px-0;
+    }
+
+    .app-btn-primary {
+        @apply bg-primary-500 text-white hover:bg-primary-600 shadow-lg shadow-primary-500/25;
+    }
+
+    .app-btn-evidence {
+        @apply bg-evidence-500 text-white hover:bg-evidence-600 shadow-lg shadow-evidence-500/25;
+    }
+
+    .app-btn-secondary {
+        @apply bg-white text-secondary-700 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm;
+    }
+
+    .app-btn-ghost {
+        @apply text-secondary-600 hover:bg-gray-100 hover:text-secondary-900;
+    }
+
+    .app-btn-danger {
+        @apply bg-red-500 text-white hover:bg-red-600 shadow-sm;
+    }
+
+    /* --- Inputs --- */
+    .app-input {
+        @apply block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-secondary-900 placeholder:text-secondary-400 shadow-sm transition-colors focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-none;
+    }
+
+    .app-label {
+        @apply block text-sm font-medium text-secondary-700 mb-1.5;
+    }
+
+    .app-help {
+        @apply text-xs text-secondary-500 mt-1;
+    }
+
+    /* --- Chips / badges --- */
+    .app-chip {
+        @apply inline-flex items-center gap-1 rounded-full bg-gray-100 text-secondary-600 px-2.5 py-1 text-xs font-medium;
+    }
+
+    .app-chip-accent {
+        @apply bg-primary-100 text-primary-800;
+    }
+
+    .app-chip-evidence {
+        @apply bg-evidence-50 text-evidence-600;
+    }
+
+    .app-chip-impact {
+        @apply bg-impact-50 text-impact-600;
+    }
+
+    /* --- Empty state --- */
+    .app-empty {
+        @apply flex flex-col items-center justify-center text-center py-12 px-6;
+    }
+
+    .app-empty-icon {
+        @apply w-12 h-12 rounded-xl bg-gray-100 text-secondary-400 flex items-center justify-center mb-3;
+    }
+
+    .app-empty-title {
+        @apply text-sm font-semibold text-secondary-900;
+    }
+
+    .app-empty-text {
+        @apply text-sm text-secondary-500 mt-1 max-w-sm;
+    }
+
+    /* === END APP MASTER === */
+
     .evidence-percentage-high {
         @apply text-evidence-400 bg-evidence-50 border-evidence-200;
     }

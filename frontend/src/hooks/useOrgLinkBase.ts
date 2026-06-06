@@ -9,6 +9,6 @@ import { useLocation } from 'react-router-dom'
  * whichever prefix the user entered through.
  */
 export function useOrgLinkBase(): '/org' | '/demo' {
-    const { pathname } = useLocation()
-    return pathname.startsWith('/demo/') || pathname === '/demo' ? '/demo' : '/org'
+ const { pathname } = useLocation()
+ return pathname.startsWith('/demo/') || pathname === '/demo' ? '/demo' : '/org'
 }

@@ -1,26 +1,26 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useUploadManager } from '../../context/UploadContext'
 import { 
-    Plus, 
-    FileText, 
-    Camera, 
-    MessageSquare, 
-    DollarSign,
-    Upload,
-    X,
-    Check,
-    ChevronRight,
-    ChevronLeft,
-    MapPin,
-    Calendar,
-    Eye,
-    Edit,
-    Trash2,
-    Download,
-    ExternalLink,
-    Filter,
-    ChevronDown,
-    Users
+ Plus, 
+ FileText, 
+ Camera, 
+ MessageSquare, 
+ DollarSign,
+ Upload,
+ X,
+ Check,
+ ChevronRight,
+ ChevronLeft,
+ MapPin,
+ Calendar,
+ Eye,
+ Edit,
+ Trash2,
+ Download,
+ ExternalLink,
+ Filter,
+ ChevronDown,
+ Users
 } from 'lucide-react'
 import { apiService } from '../../services/api'
 import { useTeam } from '../../context/TeamContext'
@@ -30,1710 +30,1701 @@ import { aggregateKpiUpdates } from '../../utils/kpiAggregation'
 import DateRangePicker from '../DateRangePicker'
 import TagPicker from '../MetricTags/TagPicker'
 import EvidenceTagsList from '../MetricTags/EvidenceTagsList'
-import toast from 'react-hot-toast'
+import { notify } from '../../lib/notify'
+import { EmptyState, SectionLoader, Spinner } from '../ui'
 
 interface MobileEvidenceTabProps {
-    initiativeId: string
-    onRefresh?: () => void
-    autoAdd?: boolean
+ initiativeId: string
+ onRefresh?: () => void
+ autoAdd?: boolean
 }
 
 export default function MobileEvidenceTab({ initiativeId, onRefresh, autoAdd }: MobileEvidenceTabProps) {
-    const { canEditEvidence, canDelete } = useTeam()
-    const [evidence, setEvidence] = useState<Evidence[]>([])
-    const [loading, setLoading] = useState(true)
-    const [showUploadFlow, setShowUploadFlow] = useState(!!autoAdd)
-    const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null)
-    const [showPreview, setShowPreview] = useState(false)
-    const [editingEvidence, setEditingEvidence] = useState<Evidence | null>(null)
-    
-    // Filter state
-    const [showFilters, setShowFilters] = useState(false)
-    const [locations, setLocations] = useState<Location[]>([])
-    const [filterType, setFilterType] = useState<string>('all')
-    const [filterLocation, setFilterLocation] = useState<string>('all')
-    const [datePickerValue, setDatePickerValue] = useState<{ singleDate?: string; startDate?: string; endDate?: string }>({})
+ const { canEditEvidence, canDelete } = useTeam()
+ const [evidence, setEvidence] = useState<Evidence[]>([])
+ const [loading, setLoading] = useState(true)
+ const [showUploadFlow, setShowUploadFlow] = useState(!!autoAdd)
+ const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null)
+ const [showPreview, setShowPreview] = useState(false)
+ const [editingEvidence, setEditingEvidence] = useState<Evidence | null>(null)
+ 
+ // Filter state
+ const [showFilters, setShowFilters] = useState(false)
+ const [locations, setLocations] = useState<Location[]>([])
+ const [filterType, setFilterType] = useState<string>('all')
+ const [filterLocation, setFilterLocation] = useState<string>('all')
+ const [datePickerValue, setDatePickerValue] = useState<{ singleDate?: string; startDate?: string; endDate?: string }>({})
 
-    useEffect(() => {
-        loadEvidence()
-        loadLocations()
-    }, [initiativeId])
-    
-    const loadLocations = async () => {
-        try {
-            const locs = await apiService.getLocations(initiativeId)
-            setLocations(locs || [])
-        } catch (error) {
-            console.error('Error loading locations:', error)
-        }
-    }
+ useEffect(() => {
+ loadEvidence()
+ loadLocations()
+ }, [initiativeId])
+ 
+ const loadLocations = async () => {
+ try {
+ const locs = await apiService.getLocations(initiativeId)
+ setLocations(locs || [])
+ } catch (error) {
+ console.error('Error loading locations:', error)
+ }
+ }
 
-    // Lock body scroll when preview is open
-    useEffect(() => {
-        if (showPreview) {
-            document.body.style.overflow = 'hidden'
-        } else {
-            document.body.style.overflow = ''
-        }
-        return () => {
-            document.body.style.overflow = ''
-        }
-    }, [showPreview])
+ // Lock body scroll when preview is open
+ useEffect(() => {
+ if (showPreview) {
+ document.body.style.overflow = 'hidden'
+ } else {
+ document.body.style.overflow = ''
+ }
+ return () => {
+ document.body.style.overflow = ''
+ }
+ }, [showPreview])
 
-    const loadEvidence = async () => {
-        try {
-            setLoading(true)
-            const data = await apiService.getEvidence(initiativeId)
-            setEvidence(data || [])
-        } catch (error) {
-            console.error('Error loading evidence:', error)
-            toast.error('Failed to load evidence')
-        } finally {
-            setLoading(false)
-        }
-    }
+ const loadEvidence = async () => {
+ try {
+ setLoading(true)
+ const data = await apiService.getEvidence(initiativeId)
+ setEvidence(data || [])
+ } catch (error) {
+ console.error('Error loading evidence:', error)
+ notify.error('Failed to load evidence')
+ } finally {
+ setLoading(false)
+ }
+ }
 
-    const handleViewEvidence = (ev: Evidence) => {
-        setSelectedEvidence(ev)
-        setShowPreview(true)
-    }
+ const handleViewEvidence = (ev: Evidence) => {
+ setSelectedEvidence(ev)
+ setShowPreview(true)
+ }
 
-    const handleEditEvidence = (ev: Evidence) => {
-        setShowPreview(false)
-        setEditingEvidence(ev)
-    }
+ const handleEditEvidence = (ev: Evidence) => {
+ setShowPreview(false)
+ setEditingEvidence(ev)
+ }
 
-    const handleDeleteEvidence = async (ev: Evidence) => {
-        if (!ev.id) return
-        try {
-            await apiService.deleteEvidence(ev.id)
-            toast.success('Evidence deleted')
-            setShowPreview(false)
-            setSelectedEvidence(null)
-            loadEvidence()
-        } catch (error) {
-            toast.error('Failed to delete')
-        }
-    }
+ const handleDeleteEvidence = async (ev: Evidence) => {
+ if (!ev.id) return
+ try {
+ await apiService.deleteEvidence(ev.id)
+ notify.success('Evidence deleted')
+ setShowPreview(false)
+ setSelectedEvidence(null)
+ loadEvidence()
+ } catch (error) {
+ notify.error('Failed to delete')
+ }
+ }
 
-    const evidenceTypes = [
-        { value: 'visual_proof', label: 'Visual', icon: Camera },
-        { value: 'documentation', label: 'Document', icon: FileText },
-        { value: 'testimony', label: 'Testimony', icon: MessageSquare },
-        { value: 'financials', label: 'Financial', icon: DollarSign }
-    ]
+ const evidenceTypes = [
+ { value: 'visual_proof', label: 'Visual', icon: Camera },
+ { value: 'documentation', label: 'Document', icon: FileText },
+ { value: 'testimony', label: 'Testimony', icon: MessageSquare },
+ { value: 'financials', label: 'Financial', icon: DollarSign }
+ ]
 
-    // Filter evidence - must be before conditional returns (hooks rule)
-    const filteredEvidence = useMemo(() => {
-        return evidence.filter(ev => {
-            // Type filter
-            if (filterType !== 'all' && ev.type !== filterType) return false
-            
-            // Location filter
-            if (filterLocation !== 'all') {
-                const evLocationIds = ev.location_ids || (ev.location_id ? [ev.location_id] : [])
-                if (!evLocationIds.includes(filterLocation)) return false
-            }
-            
-            // Date filter
-            if (datePickerValue.startDate || datePickerValue.endDate || datePickerValue.singleDate) {
-                const filterStart = datePickerValue.singleDate || datePickerValue.startDate
-                const filterEnd = datePickerValue.endDate || datePickerValue.singleDate
-                const evDate = ev.date_represented || ev.date_range_start
-                if (!evDate) return false
+ // Filter evidence - must be before conditional returns (hooks rule)
+ const filteredEvidence = useMemo(() => {
+ return evidence.filter(ev => {
+ // Type filter
+ if (filterType !== 'all' && ev.type !== filterType) return false
+ 
+ // Location filter
+ if (filterLocation !== 'all') {
+ const evLocationIds = ev.location_ids || (ev.location_id ? [ev.location_id] : [])
+ if (!evLocationIds.includes(filterLocation)) return false
+ }
+ 
+ // Date filter
+ if (datePickerValue.startDate || datePickerValue.endDate || datePickerValue.singleDate) {
+ const filterStart = datePickerValue.singleDate || datePickerValue.startDate
+ const filterEnd = datePickerValue.endDate || datePickerValue.singleDate
+ const evDate = ev.date_represented || ev.date_range_start
+ if (!evDate) return false
 
-                if (filterStart && filterEnd) {
-                    if (evDate < filterStart || evDate > filterEnd) return false
-                } else if (filterStart) {
-                    if (evDate < filterStart) return false
-                }
-            }
-            
-            return true
-        })
-    }, [evidence, filterType, filterLocation, datePickerValue])
+ if (filterStart && filterEnd) {
+ if (evDate < filterStart || evDate > filterEnd) return false
+ } else if (filterStart) {
+ if (evDate < filterStart) return false
+ }
+ }
+ 
+ return true
+ })
+ }, [evidence, filterType, filterLocation, datePickerValue])
 
-    const hasActiveFilters = filterType !== 'all' || filterLocation !== 'all' || datePickerValue.singleDate || datePickerValue.startDate || datePickerValue.endDate
-    
-    const clearFilters = () => {
-        setFilterType('all')
-        setFilterLocation('all')
-        setDatePickerValue({})
-    }
+ const hasActiveFilters = filterType !== 'all' || filterLocation !== 'all' || datePickerValue.singleDate || datePickerValue.startDate || datePickerValue.endDate
+ 
+ const clearFilters = () => {
+ setFilterType('all')
+ setFilterLocation('all')
+ setDatePickerValue({})
+ }
 
-    // Show upload flow for new evidence
-    if (showUploadFlow && canEditEvidence) {
-        return (
-            <MobileEvidenceUploadFlow
-                initiativeId={initiativeId}
-                onClose={() => setShowUploadFlow(false)}
-                onSuccess={() => {
-                    setShowUploadFlow(false)
-                    loadEvidence()
-                    onRefresh?.()
-                }}
-            />
-        )
-    }
+ // Show upload flow for new evidence
+ if (showUploadFlow && canEditEvidence) {
+ return (
+ <MobileEvidenceUploadFlow
+ initiativeId={initiativeId}
+ onClose={() => setShowUploadFlow(false)}
+ onSuccess={() => {
+ setShowUploadFlow(false)
+ loadEvidence()
+ onRefresh?.()
+ }}
+ />
+ )
+ }
 
-    // Show edit flow
-    if (editingEvidence) {
-        return (
-            <MobileEvidenceEditFlow
-                initiativeId={initiativeId}
-                evidence={editingEvidence}
-                onClose={() => setEditingEvidence(null)}
-                onSuccess={() => {
-                    setEditingEvidence(null)
-                    loadEvidence()
-                    onRefresh?.()
-                }}
-            />
-        )
-    }
+ // Show edit flow
+ if (editingEvidence) {
+ return (
+ <MobileEvidenceEditFlow
+ initiativeId={initiativeId}
+ evidence={editingEvidence}
+ onClose={() => setEditingEvidence(null)}
+ onSuccess={() => {
+ setEditingEvidence(null)
+ loadEvidence()
+ onRefresh?.()
+ }}
+ />
+ )
+ }
 
-    return (
-        <div className="p-4">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-                <div>
-                    <h1 className="text-xl font-bold text-gray-900">Evidence</h1>
-                    <p className="text-sm text-gray-500">
-                        {hasActiveFilters ? `${filteredEvidence.length} of ${evidence.length}` : `${evidence.length}`} items
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => setShowFilters(!showFilters)}
-                        className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                            hasActiveFilters 
-                                ? 'bg-evidence-100 text-evidence-700' 
-                                : 'bg-gray-100 text-gray-600'
-                        }`}
-                    >
-                        <Filter className="w-4 h-4" />
-                        {hasActiveFilters && <span className="w-1.5 h-1.5 rounded-full bg-evidence-500"></span>}
-                    </button>
-                    {canEditEvidence && (
-                        <button
-                            onClick={() => setShowUploadFlow(true)}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-evidence-500 text-white rounded-xl font-semibold text-sm shadow-lg shadow-evidence-500/25 active:scale-[0.98]"
-                        >
-                            <Plus className="w-4 h-4" />
-                            Add
-                        </button>
-                    )}
-                </div>
-            </div>
+ return (
+ <div className="p-4">
+ {/* Header */}
+ <div className="flex items-center justify-between mb-4">
+ <div>
+ <h1 className="text-xl font-bold text-gray-900">Evidence</h1>
+ <p className="text-sm text-gray-500">
+ {hasActiveFilters ? `${filteredEvidence.length} of ${evidence.length}` : `${evidence.length}`} items
+ </p>
+ </div>
+ <div className="flex items-center gap-2">
+ <button
+ onClick={() => setShowFilters(!showFilters)}
+ className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+ hasActiveFilters 
+ ? 'bg-evidence-100 text-evidence-700' 
+ : 'bg-gray-100 text-gray-600'
+ }`}
+ >
+ <Filter className="w-4 h-4" />
+ {hasActiveFilters && <span className="w-1.5 h-1.5 rounded-full bg-evidence-500"></span>}
+ </button>
+ {canEditEvidence && (
+ <button
+ onClick={() => setShowUploadFlow(true)}
+ className="app-btn bg-evidence-500 text-secondary-900 hover:bg-evidence-600 shadow-sm app-btn-sm active:scale-[0.98]"
+ >
+ <Plus className="w-4 h-4" />
+ Add
+ </button>
+ )}
+ </div>
+ </div>
 
-            {/* Filters Panel */}
-            {showFilters && (
-                <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-4 space-y-4">
-                    <div className="flex items-center justify-between">
-                        <span className="font-semibold text-gray-800">Filters</span>
-                        {hasActiveFilters && (
-                            <button 
-                                onClick={clearFilters}
-                                className="text-xs text-evidence-600 font-medium"
-                            >
-                                Clear all
-                            </button>
-                        )}
-                    </div>
+ {/* Filters Panel */}
+ {showFilters && (
+ <div className="app-card p-4 mb-4 space-y-4">
+ <div className="flex items-center justify-between">
+ <span className="font-semibold text-gray-800">Filters</span>
+ {hasActiveFilters && (
+ <button 
+ onClick={clearFilters}
+ className="text-xs text-evidence-600 font-medium"
+ >
+ Clear all
+ </button>
+ )}
+ </div>
 
-                    {/* Type Filter */}
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Type</label>
-                        <div className="flex flex-wrap gap-2">
-                            <button
-                                onClick={() => setFilterType('all')}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                                    filterType === 'all' 
-                                        ? 'bg-evidence-500 text-white' 
-                                        : 'bg-gray-100 text-gray-600'
-                                }`}
-                            >
-                                All
-                            </button>
-                            {evidenceTypes.map(type => (
-                                <button
-                                    key={type.value}
-                                    onClick={() => setFilterType(type.value)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                                        filterType === type.value 
-                                            ? 'bg-evidence-500 text-white' 
-                                            : 'bg-gray-100 text-gray-600'
-                                    }`}
-                                >
-                                    <type.icon className="w-3 h-3" />
-                                    {type.label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+ {/* Type Filter */}
+ <div>
+ <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Type</label>
+ <div className="flex flex-wrap gap-2">
+ <button
+ onClick={() => setFilterType('all')}
+ className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+ filterType === 'all' 
+ ? 'bg-evidence-500 text-secondary-900' 
+ : 'bg-gray-100 text-gray-600'
+ }`}
+ >
+ All
+ </button>
+ {evidenceTypes.map(type => (
+ <button
+ key={type.value}
+ onClick={() => setFilterType(type.value)}
+ className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+ filterType === type.value 
+ ? 'bg-evidence-500 text-secondary-900' 
+ : 'bg-gray-100 text-gray-600'
+ }`}
+ >
+ <type.icon className="w-3 h-3" />
+ {type.label}
+ </button>
+ ))}
+ </div>
+ </div>
 
-                    {/* Location Filter */}
-                    {locations.length > 0 && (
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Location</label>
-                            <div className="relative">
-                                <select
-                                    value={filterLocation}
-                                    onChange={(e) => setFilterLocation(e.target.value)}
-                                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm appearance-none pr-8"
-                                >
-                                    <option value="all">All locations</option>
-                                    {locations.map(loc => (
-                                        <option key={loc.id} value={loc.id}>{loc.name}</option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                            </div>
-                        </div>
-                    )}
+ {/* Location Filter */}
+ {locations.length > 0 && (
+ <div>
+ <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Location</label>
+ <div className="relative">
+ <select
+ value={filterLocation}
+ onChange={(e) => setFilterLocation(e.target.value)}
+ className="app-input bg-gray-50 appearance-none pr-8"
+ >
+ <option value="all">All locations</option>
+ {locations.map(loc => (
+ <option key={loc.id} value={loc.id}>{loc.name}</option>
+ ))}
+ </select>
+ <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+ </div>
+ </div>
+ )}
 
-                    {/* Date Filter */}
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Date Range</label>
-                        <DateRangePicker
-                            value={datePickerValue}
-                            onChange={setDatePickerValue}
-                            maxDate={getLocalDateString(new Date())}
-                            placeholder="Filter by date"
-                            className="w-full"
-                        />
-                    </div>
-                </div>
-            )}
+ {/* Date Filter */}
+ <div>
+ <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Date Range</label>
+ <DateRangePicker
+ value={datePickerValue}
+ onChange={setDatePickerValue}
+ maxDate={getLocalDateString(new Date())}
+ placeholder="Filter by date"
+ className="w-full"
+ />
+ </div>
+ </div>
+ )}
 
-            {/* Evidence List */}
-            {loading ? (
-                <div className="flex items-center justify-center h-64">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-evidence-500"></div>
-                </div>
-            ) : evidence.length === 0 ? (
-                <div className="text-center py-12 bg-white rounded-2xl border border-gray-100">
-                    <div className="w-16 h-16 bg-evidence-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <FileText className="w-8 h-8 text-evidence-400" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">No Evidence Yet</h3>
-                    <p className="text-gray-500 text-sm px-6 mb-6">
-                        Add photos, documents, or recordings to support your impact claims.
-                    </p>
-                    {canEditEvidence && (
-                        <button
-                            onClick={() => setShowUploadFlow(true)}
-                            className="px-6 py-3 bg-evidence-500 text-white rounded-xl font-medium text-sm"
-                        >
-                            Add Evidence
-                        </button>
-                    )}
-                </div>
-            ) : filteredEvidence.length === 0 ? (
-                <div className="text-center py-12 bg-white rounded-2xl border border-gray-100">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Filter className="w-8 h-8 text-gray-400" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">No Matches</h3>
-                    <p className="text-gray-500 text-sm px-6 mb-6">
-                        No evidence matches your current filters.
-                    </p>
-                    <button
-                        onClick={clearFilters}
-                        className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium text-sm"
-                    >
-                        Clear Filters
-                    </button>
-                </div>
-            ) : (
-                <div className="grid grid-cols-2 gap-3">
-                    {filteredEvidence.map((ev) => {
-                        const typeInfo = getEvidenceTypeInfo(ev.type)
-                        const bgColor = typeInfo.color.split(' ')[0]
-                        const TypeIcon = evidenceTypes.find(t => t.value === ev.type)?.icon || FileText
-                        const isImage = ev.file_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i)
-                        const isVideoThumb = ev.file_url?.match(/\.(mp4|webm|mov|avi|mkv)$/i)
+ {/* Evidence List */}
+ {loading ? (
+ <SectionLoader className="h-64" />
+ ) : evidence.length === 0 ? (
+ <EmptyState
+ className="app-card"
+ icon={FileText}
+ title="No Evidence Yet"
+ description="Add photos, documents, or recordings to support your impact claims."
+ action={
+ canEditEvidence ? (
+ <button type="button" onClick={() => setShowUploadFlow(true)} className="app-btn bg-evidence-500 text-secondary-900 hover:bg-evidence-600 shadow-sm">
+ Add Evidence
+ </button>
+ ) : undefined
+ }
+ />
+ ) : filteredEvidence.length === 0 ? (
+ <EmptyState
+ className="app-card"
+ icon={Filter}
+ title="No Matches"
+ description="No evidence matches your current filters."
+ action={
+ <button type="button" onClick={clearFilters} className="app-btn app-btn-secondary">
+ Clear Filters
+ </button>
+ }
+ />
+ ) : (
+ <div className="grid grid-cols-2 gap-3">
+ {filteredEvidence.map((ev) => {
+ const typeInfo = getEvidenceTypeInfo(ev.type)
+ const bgColor = typeInfo.color.split(' ')[0]
+ const TypeIcon = evidenceTypes.find(t => t.value === ev.type)?.icon || FileText
+ const isImage = ev.file_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+ const isVideoThumb = ev.file_url?.match(/\.(mp4|webm|mov|avi|mkv)$/i)
 
-                        return (
-                            <button
-                                key={ev.id}
-                                onClick={() => handleViewEvidence(ev)}
-                                className="bg-white rounded-xl border border-gray-100 overflow-hidden text-left active:scale-[0.98] transition-transform"
-                            >
-                                {/* Preview */}
-                                <div className={`aspect-square ${bgColor} flex items-center justify-center relative overflow-hidden`}>
-                                    {isImage && ev.file_url ? (
-                                        <img
-                                            src={ev.file_url}
-                                            alt={ev.title || ''}
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                                (e.target as HTMLImageElement).style.display = 'none'
-                                            }}
-                                        />
-                                    ) : isVideoThumb && ev.file_url ? (
-                                        <>
-                                            <video src={ev.file_url} className="w-full h-full object-cover" muted preload="metadata" />
-                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                <div className="w-10 h-10 bg-black/60 rounded-full flex items-center justify-center">
-                                                    <svg className="w-4 h-4 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-                                                </div>
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <TypeIcon className="w-10 h-10 text-gray-400" />
-                                    )}
-                                    <div className="absolute top-2 right-2">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${typeInfo.color}`}>
-                                            {typeInfo.label}
-                                        </span>
-                                    </div>
-                                </div>
-                                {/* Info */}
-                                <div className="p-3">
-                                    <h3 className="font-medium text-gray-800 text-sm truncate">
-                                        {ev.title || 'Untitled'}
-                                    </h3>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        {formatDate(ev.date_represented)}
-                                    </p>
-                                    {Array.isArray(ev.tag_ids) && ev.tag_ids.length > 0 && (
-                                        <div className="mt-1.5">
-                                            <EvidenceTagsList tagIds={ev.tag_ids} size="xs" visibleCap={3} clickable={false} />
-                                        </div>
-                                    )}
-                                </div>
-                            </button>
-                        )
-                    })}
-                </div>
-            )}
+ return (
+ <button
+ key={ev.id}
+ onClick={() => handleViewEvidence(ev)}
+ className="app-card-interactive overflow-hidden text-left active:scale-[0.98] transition-transform"
+ >
+ {/* Preview */}
+ <div className={`aspect-square ${bgColor} flex items-center justify-center relative overflow-hidden`}>
+ {isImage && ev.file_url ? (
+ <img
+ src={ev.file_url}
+ alt={ev.title || ''}
+ className="w-full h-full object-cover"
+ onError={(e) => {
+ (e.target as HTMLImageElement).style.display = 'none'
+ }}
+ />
+ ) : isVideoThumb && ev.file_url ? (
+ <>
+ <video src={ev.file_url} className="w-full h-full object-cover" muted preload="metadata" />
+ <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+ <div className="w-10 h-10 bg-black/60 rounded-full flex items-center justify-center">
+ <svg className="w-4 h-4 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+ </div>
+ </div>
+ </>
+ ) : (
+ <TypeIcon className="w-10 h-10 text-gray-400" />
+ )}
+ <div className="absolute top-2 right-2">
+ <span className={`px-2 py-1 rounded-full text-xs font-medium ${typeInfo.color}`}>
+ {typeInfo.label}
+ </span>
+ </div>
+ </div>
+ {/* Info */}
+ <div className="p-3">
+ <h3 className="font-medium text-gray-800 text-sm truncate">
+ {ev.title || 'Untitled'}
+ </h3>
+ <p className="text-xs text-gray-500 mt-1">
+ {formatDate(ev.date_represented)}
+ </p>
+ {Array.isArray(ev.tag_ids) && ev.tag_ids.length > 0 && (
+ <div className="mt-1.5">
+ <EvidenceTagsList tagIds={ev.tag_ids} size="xs" visibleCap={3} clickable={false} />
+ </div>
+ )}
+ </div>
+ </button>
+ )
+ })}
+ </div>
+ )}
 
-            {/* Mobile Evidence Preview */}
-            {showPreview && selectedEvidence && (
-                <MobileEvidencePreview
-                    evidence={selectedEvidence}
-                    onClose={() => {
-                        setShowPreview(false)
-                        setSelectedEvidence(null)
-                    }}
-                    onEdit={canEditEvidence ? () => handleEditEvidence(selectedEvidence) : undefined}
-                    onDelete={canDelete ? () => handleDeleteEvidence(selectedEvidence) : undefined}
-                />
-            )}
-        </div>
-    )
+ {/* Mobile Evidence Preview */}
+ {showPreview && selectedEvidence && (
+ <MobileEvidencePreview
+ evidence={selectedEvidence}
+ onClose={() => {
+ setShowPreview(false)
+ setSelectedEvidence(null)
+ }}
+ onEdit={canEditEvidence ? () => handleEditEvidence(selectedEvidence) : undefined}
+ onDelete={canDelete ? () => handleDeleteEvidence(selectedEvidence) : undefined}
+ />
+ )}
+ </div>
+ )
 }
 
 // Mobile Evidence Preview Component
 interface MobileEvidencePreviewProps {
-    evidence: Evidence
-    onClose: () => void
-    onEdit?: () => void
-    onDelete?: () => void
+ evidence: Evidence
+ onClose: () => void
+ onEdit?: () => void
+ onDelete?: () => void
 }
 
 function MobileEvidencePreview({ evidence, onClose, onEdit, onDelete }: MobileEvidencePreviewProps) {
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-    const [imageLoading, setImageLoading] = useState(true)
-    const [linkedDataPoints, setLinkedDataPoints] = useState<any[]>([])
-    const [loadingDataPoints, setLoadingDataPoints] = useState(true)
-    const [locations, setLocations] = useState<Location[]>([])
-    const [loadingLocations, setLoadingLocations] = useState(true)
-    const typeInfo = getEvidenceTypeInfo(evidence.type)
-    
-    const isImage = evidence.file_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i)
-    const isVideoPreview = evidence.file_url?.match(/\.(mp4|webm|mov|avi|mkv)$/i)
-    const isPDF = evidence.file_url?.match(/\.pdf$/i)
-    
-    const hasDateRange = evidence.date_range_start && evidence.date_range_end
-    const displayDate = hasDateRange
-        ? `${formatDate(evidence.date_range_start!)} - ${formatDate(evidence.date_range_end!)}`
-        : formatDate(evidence.date_represented)
+ const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+ const [imageLoading, setImageLoading] = useState(true)
+ const [linkedDataPoints, setLinkedDataPoints] = useState<any[]>([])
+ const [loadingDataPoints, setLoadingDataPoints] = useState(true)
+ const [locations, setLocations] = useState<Location[]>([])
+ const [loadingLocations, setLoadingLocations] = useState(true)
+ const typeInfo = getEvidenceTypeInfo(evidence.type)
+ 
+ const isImage = evidence.file_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+ const isVideoPreview = evidence.file_url?.match(/\.(mp4|webm|mov|avi|mkv)$/i)
+ const isPDF = evidence.file_url?.match(/\.pdf$/i)
+ 
+ const hasDateRange = evidence.date_range_start && evidence.date_range_end
+ const displayDate = hasDateRange
+ ? `${formatDate(evidence.date_range_start!)} - ${formatDate(evidence.date_range_end!)}`
+ : formatDate(evidence.date_represented)
 
-    // Load linked data points
-    useEffect(() => {
-        const loadData = async () => {
-            if (!evidence.id) return
-            try {
-                setLoadingDataPoints(true)
-                const dataPoints = await apiService.getDataPointsForEvidence(evidence.id)
-                setLinkedDataPoints(dataPoints || [])
-            } catch (error) {
-                console.error('Failed to load linked data points:', error)
-            } finally {
-                setLoadingDataPoints(false)
-            }
-        }
-        loadData()
-    }, [evidence.id])
+ // Load linked data points
+ useEffect(() => {
+ const loadData = async () => {
+ if (!evidence.id) return
+ try {
+ setLoadingDataPoints(true)
+ const dataPoints = await apiService.getDataPointsForEvidence(evidence.id)
+ setLinkedDataPoints(dataPoints || [])
+ } catch (error) {
+ console.error('Failed to load linked data points:', error)
+ } finally {
+ setLoadingDataPoints(false)
+ }
+ }
+ loadData()
+ }, [evidence.id])
 
-    // Load locations
-    useEffect(() => {
-        const loadLocs = async () => {
-            const locationIds = evidence.location_ids || (evidence.location_id ? [evidence.location_id] : [])
-            if (locationIds.length === 0) {
-                setLocations([])
-                setLoadingLocations(false)
-                return
-            }
-            try {
-                setLoadingLocations(true)
-                const locationPromises = locationIds.map((id: string) =>
-                    apiService.getLocation(id).catch(() => null)
-                )
-                const loadedLocations = await Promise.all(locationPromises)
-                setLocations(loadedLocations.filter(Boolean) as Location[])
-            } catch (error) {
-                console.error('Failed to load locations:', error)
-            } finally {
-                setLoadingLocations(false)
-            }
-        }
-        loadLocs()
-    }, [evidence.location_ids, evidence.location_id])
+ // Load locations
+ useEffect(() => {
+ const loadLocs = async () => {
+ const locationIds = evidence.location_ids || (evidence.location_id ? [evidence.location_id] : [])
+ if (locationIds.length === 0) {
+ setLocations([])
+ setLoadingLocations(false)
+ return
+ }
+ try {
+ setLoadingLocations(true)
+ const locationPromises = locationIds.map((id: string) =>
+ apiService.getLocation(id).catch(() => null)
+ )
+ const loadedLocations = await Promise.all(locationPromises)
+ setLocations(loadedLocations.filter(Boolean) as Location[])
+ } catch (error) {
+ console.error('Failed to load locations:', error)
+ } finally {
+ setLoadingLocations(false)
+ }
+ }
+ loadLocs()
+ }, [evidence.location_ids, evidence.location_id])
 
-    return (
-        <div className="fixed inset-0 bg-black/60 z-[100] flex flex-col">
-            {/* Header */}
-            <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-gray-100 safe-area-pt">
-                <button onClick={onClose} className="p-2 -ml-2">
-                    <X className="w-5 h-5 text-gray-500" />
-                </button>
-                <span className="font-semibold text-gray-800">Evidence</span>
-                <div className="w-9" /> {/* Spacer for alignment */}
-            </div>
+ return (
+ <div className="fixed inset-0 bg-black/60 z-[100] flex flex-col">
+ {/* Header */}
+ <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-gray-100 safe-area-pt">
+ <button onClick={onClose} className="p-2 -ml-2">
+ <X className="w-5 h-5 text-gray-500" />
+ </button>
+ <span className="font-semibold text-gray-800">Evidence</span>
+ <div className="w-9" /> {/* Spacer for alignment */}
+ </div>
 
-            {/* Content */}
-            <div className="flex-1 bg-white overflow-y-auto">
-                {/* Image/File Preview */}
-                <div className="bg-gray-100 aspect-square flex items-center justify-center relative">
-                    {isImage && evidence.file_url ? (
-                        <>
-                            {imageLoading && (
-                                <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
-                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-evidence-500"></div>
-                                </div>
-                            )}
-                            <img
-                                src={evidence.file_url}
-                                alt={evidence.title || ''}
-                                className="w-full h-full object-contain"
-                                onLoad={() => setImageLoading(false)}
-                                onError={() => setImageLoading(false)}
-                            />
-                        </>
-                    ) : isVideoPreview && evidence.file_url ? (
-                        <video
-                            src={evidence.file_url}
-                            controls
-                            className="w-full h-full object-contain rounded-xl"
-                            preload="metadata"
-                        />
-                    ) : isPDF ? (
-                        <div className="text-center p-6">
-                            <div className="w-20 h-20 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <FileText className="w-10 h-10 text-red-600" />
-                            </div>
-                            <p className="font-medium text-gray-800 mb-2">PDF Document</p>
-                            <a
-                                href={evidence.file_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-evidence-500 text-white rounded-xl text-sm font-medium"
-                            >
-                                <ExternalLink className="w-4 h-4" />
-                                Open PDF
-                            </a>
-                        </div>
-                    ) : evidence.file_url ? (
-                        <div className="text-center p-6">
-                            <div className="w-20 h-20 bg-gray-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <FileText className="w-10 h-10 text-gray-500" />
-                            </div>
-                            <p className="font-medium text-gray-800 mb-2">File Attached</p>
-                            <a
-                                href={evidence.file_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-xl text-sm font-medium"
-                            >
-                                <Download className="w-4 h-4" />
-                                Download
-                            </a>
-                        </div>
-                    ) : (
-                        <div className="text-center p-6">
-                            <div className={`w-20 h-20 ${typeInfo.color.split(' ')[0]} rounded-2xl flex items-center justify-center mx-auto mb-4`}>
-                                {evidence.type === 'visual_proof' ? <Camera className="w-10 h-10" /> :
-                                 evidence.type === 'testimony' ? <MessageSquare className="w-10 h-10" /> :
-                                 evidence.type === 'financials' ? <DollarSign className="w-10 h-10" /> :
-                                 <FileText className="w-10 h-10" />}
-                            </div>
-                            <p className="text-gray-500">No file preview</p>
-                        </div>
-                    )}
-                    
-                    {/* Type badge */}
-                    <div className="absolute top-3 right-3">
-                        <span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${typeInfo.color}`}>
-                            {typeInfo.label}
-                        </span>
-                    </div>
-                </div>
+ {/* Content */}
+ <div className="flex-1 bg-white overflow-y-auto">
+ {/* Image/File Preview */}
+ <div className="bg-gray-100 aspect-square flex items-center justify-center relative">
+ {isImage && evidence.file_url ? (
+ <>
+ {imageLoading && (
+ <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
+ <Spinner className="w-8 h-8" />
+ </div>
+ )}
+ <img
+ src={evidence.file_url}
+ alt={evidence.title || ''}
+ className="w-full h-full object-contain"
+ onLoad={() => setImageLoading(false)}
+ onError={() => setImageLoading(false)}
+ />
+ </>
+ ) : isVideoPreview && evidence.file_url ? (
+ <video
+ src={evidence.file_url}
+ controls
+ className="w-full h-full object-contain rounded-xl"
+ preload="metadata"
+ />
+ ) : isPDF ? (
+ <div className="text-center p-6">
+ <div className="w-20 h-20 bg-red-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+ <FileText className="w-10 h-10 text-red-600" />
+ </div>
+ <p className="font-medium text-gray-800 mb-2">PDF Document</p>
+ <a
+ href={evidence.file_url}
+ target="_blank"
+ rel="noopener noreferrer"
+ className="app-btn bg-evidence-500 text-secondary-900 hover:bg-evidence-600 shadow-sm app-btn-sm"
+ >
+ <ExternalLink className="w-4 h-4" />
+ Open PDF
+ </a>
+ </div>
+ ) : evidence.file_url ? (
+ <div className="text-center p-6">
+ <div className="w-20 h-20 bg-gray-200 rounded-xl flex items-center justify-center mx-auto mb-4">
+ <FileText className="w-10 h-10 text-gray-500" />
+ </div>
+ <p className="font-medium text-gray-800 mb-2">File Attached</p>
+ <a
+ href={evidence.file_url}
+ target="_blank"
+ rel="noopener noreferrer"
+ className="app-btn app-btn-secondary app-btn-sm"
+ >
+ <Download className="w-4 h-4" />
+ Download
+ </a>
+ </div>
+ ) : (
+ <div className="text-center p-6">
+ <div className={`w-20 h-20 ${typeInfo.color.split(' ')[0]} rounded-xl flex items-center justify-center mx-auto mb-4`}>
+ {evidence.type === 'visual_proof' ? <Camera className="w-10 h-10" /> :
+ evidence.type === 'testimony' ? <MessageSquare className="w-10 h-10" /> :
+ evidence.type === 'financials' ? <DollarSign className="w-10 h-10" /> :
+ <FileText className="w-10 h-10" />}
+ </div>
+ <p className="text-gray-500">No file preview</p>
+ </div>
+ )}
+ 
+ {/* Type badge */}
+ <div className="absolute top-3 right-3">
+ <span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${typeInfo.color}`}>
+ {typeInfo.label}
+ </span>
+ </div>
+ </div>
 
-                {/* Details */}
-                <div className="p-4 space-y-4">
-                    {/* Title */}
-                    <div>
-                        <h2 className="text-xl font-bold text-gray-900">{evidence.title || 'Untitled'}</h2>
-                    </div>
+ {/* Details */}
+ <div className="p-4 space-y-4">
+ {/* Title */}
+ <div>
+ <h2 className="text-xl font-bold text-gray-900">{evidence.title || 'Untitled'}</h2>
+ </div>
 
-                    {/* Date & Location Row */}
-                    <div className="flex flex-wrap gap-4">
-                        {/* Date */}
-                        <div className="flex items-center gap-2 text-sm">
-                            <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center">
-                                <Calendar className="w-4 h-4 text-primary-600" />
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-500 uppercase font-medium">Date</p>
-                                <span className="text-gray-800 font-medium">{displayDate}</span>
-                            </div>
-                        </div>
+ {/* Date & Location Row */}
+ <div className="flex flex-wrap gap-4">
+ {/* Date */}
+ <div className="flex items-center gap-2 text-sm">
+ <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center">
+ <Calendar className="w-4 h-4 text-primary-600" />
+ </div>
+ <div>
+ <p className="text-xs text-gray-500 uppercase font-medium">Date</p>
+ <span className="text-gray-800 font-medium">{displayDate}</span>
+ </div>
+ </div>
 
-                        {/* Locations */}
-                        {(locations.length > 0 || loadingLocations) && (
-                            <div className="flex items-center gap-2 text-sm">
-                                <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center">
-                                    <MapPin className="w-4 h-4 text-primary-600" />
-                                </div>
-                                <div>
-                                    <p className="text-xs text-gray-500 uppercase font-medium">
-                                        {locations.length > 1 ? 'Locations' : 'Location'}
-                                    </p>
-                                    {loadingLocations ? (
-                                        <div className="animate-pulse h-4 bg-gray-200 rounded w-16"></div>
-                                    ) : (
-                                        <span className="text-gray-800 font-medium">
-                                            {locations.map(loc => loc.name).join(', ')}
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
+ {/* Locations */}
+ {(locations.length > 0 || loadingLocations) && (
+ <div className="flex items-center gap-2 text-sm">
+ <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center">
+ <MapPin className="w-4 h-4 text-primary-600" />
+ </div>
+ <div>
+ <p className="text-xs text-gray-500 uppercase font-medium">
+ {locations.length > 1 ? 'Locations' : 'Location'}
+ </p>
+ {loadingLocations ? (
+ <div className="animate-pulse h-4 bg-gray-200 rounded w-16"></div>
+ ) : (
+ <span className="text-gray-800 font-medium">
+ {locations.map(loc => loc.name).join(', ')}
+ </span>
+ )}
+ </div>
+ </div>
+ )}
+ </div>
 
-                    {/* Tags */}
-                    {Array.isArray(evidence.tag_ids) && evidence.tag_ids.length > 0 && (
-                        <div className="bg-gray-50 rounded-xl p-4">
-                            <p className="text-xs text-gray-500 uppercase font-medium mb-2">Tags</p>
-                            <EvidenceTagsList tagIds={evidence.tag_ids} size="sm" />
-                        </div>
-                    )}
+ {/* Tags */}
+ {Array.isArray(evidence.tag_ids) && evidence.tag_ids.length > 0 && (
+ <div className="app-card-muted p-4">
+ <p className="text-xs text-gray-500 uppercase font-medium mb-2">Tags</p>
+ <EvidenceTagsList tagIds={evidence.tag_ids} size="sm" />
+ </div>
+ )}
 
-                    {/* Description */}
-                    {evidence.description && (
-                        <div className="bg-gray-50 rounded-xl p-4">
-                            <p className="text-xs text-gray-500 uppercase font-medium mb-2">Description</p>
-                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{evidence.description}</p>
-                        </div>
-                    )}
+ {/* Description */}
+ {evidence.description && (
+ <div className="app-card-muted p-4">
+ <p className="text-xs text-gray-500 uppercase font-medium mb-2">Description</p>
+ <p className="text-sm text-gray-700 whitespace-pre-wrap">{evidence.description}</p>
+ </div>
+ )}
 
-                    {/* Linked Impact Claims */}
-                    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-                        <div className="p-3 border-b border-gray-100 bg-gray-50/50">
-                            <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-md bg-primary-500 flex items-center justify-center">
-                                    <FileText className="w-3 h-3 text-white" />
-                                </div>
-                                <span className="text-sm font-semibold text-gray-700">Linked Impact Claims</span>
-                                <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">
-                                    {linkedDataPoints.length}
-                                </span>
-                            </div>
-                        </div>
-                        
-                        <div className="p-3">
-                            {loadingDataPoints ? (
-                                <div className="flex items-center justify-center py-6">
-                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500"></div>
-                                </div>
-                            ) : linkedDataPoints.length > 0 ? (
-                                (() => {
-                                    // Group by KPI
-                                    const groupedByKPI: Record<string, { kpi: any, dataPoints: any[] }> = {}
-                                    linkedDataPoints.forEach((dataPoint) => {
-                                        const kpiId = dataPoint.kpi?.id || 'unknown'
-                                        if (!groupedByKPI[kpiId]) {
-                                            groupedByKPI[kpiId] = { kpi: dataPoint.kpi, dataPoints: [] }
-                                        }
-                                        groupedByKPI[kpiId].dataPoints.push(dataPoint)
-                                    })
-                                    
-                                    return (
-                                        <div className="space-y-2">
-                                            {Object.values(groupedByKPI).map((group, groupIndex) => {
-                                                const total = aggregateKpiUpdates(group.dataPoints as any, group.kpi?.metric_type)
-                                                return (
-                                                    <div key={group.kpi?.id || groupIndex} className="bg-primary-50 rounded-xl p-3">
-                                                        <div className="flex items-center justify-between mb-2">
-                                                            <span className="text-sm font-semibold text-gray-800 truncate">
-                                                                {group.kpi?.title || 'Unknown Metric'}
-                                                            </span>
-                                                            <span className="text-sm font-bold text-primary-600">
-                                                                {total.toLocaleString()} {group.kpi?.unit_of_measurement || ''}
-                                                            </span>
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            {group.dataPoints.slice(0, 3).map((dp, idx) => (
-                                                                <div key={dp.id || idx} className="flex items-center justify-between text-xs text-gray-600">
-                                                                    <span className="flex items-center gap-1">
-                                                                        <div className="w-1.5 h-1.5 rounded-full bg-primary-400"></div>
-                                                                        {dp.value?.toLocaleString()} {group.kpi?.unit_of_measurement || ''}
-                                                                    </span>
-                                                                    <span className="text-gray-400">
-                                                                        {formatDate(dp.date_represented)}
-                                                                    </span>
-                                                                </div>
-                                                            ))}
-                                                            {group.dataPoints.length > 3 && (
-                                                                <p className="text-xs text-gray-400 text-center pt-1">
-                                                                    +{group.dataPoints.length - 3} more
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    )
-                                })()
-                            ) : (
-                                <div className="text-center py-6">
-                                    <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                                    <p className="text-sm text-gray-500">No linked impact claims</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </div>
+ {/* Linked Impact Claims */}
+ <div className="app-card overflow-hidden">
+ <div className="p-3 border-b border-gray-100 bg-gray-50/50">
+ <div className="flex items-center gap-2">
+ <div className="w-6 h-6 rounded-md bg-primary-500 flex items-center justify-center">
+ <FileText className="w-3 h-3 text-white" />
+ </div>
+ <span className="text-sm font-semibold text-gray-700">Linked Impact Claims</span>
+ <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">
+ {linkedDataPoints.length}
+ </span>
+ </div>
+ </div>
+ 
+ <div className="p-3">
+ {loadingDataPoints ? (
+ <div className="flex items-center justify-center py-6">
+ <Spinner className="w-6 h-6" />
+ </div>
+ ) : linkedDataPoints.length > 0 ? (
+ (() => {
+ // Group by KPI
+ const groupedByKPI: Record<string, { kpi: any, dataPoints: any[] }> = {}
+ linkedDataPoints.forEach((dataPoint) => {
+ const kpiId = dataPoint.kpi?.id || 'unknown'
+ if (!groupedByKPI[kpiId]) {
+ groupedByKPI[kpiId] = { kpi: dataPoint.kpi, dataPoints: [] }
+ }
+ groupedByKPI[kpiId].dataPoints.push(dataPoint)
+ })
+ 
+ return (
+ <div className="space-y-2">
+ {Object.values(groupedByKPI).map((group, groupIndex) => {
+ const total = aggregateKpiUpdates(group.dataPoints as any, group.kpi?.metric_type)
+ return (
+ <div key={group.kpi?.id || groupIndex} className="bg-primary-50 rounded-xl p-3">
+ <div className="flex items-center justify-between mb-2">
+ <span className="text-sm font-semibold text-gray-800 truncate">
+ {group.kpi?.title || 'Unknown Metric'}
+ </span>
+ <span className="text-sm font-bold text-primary-600">
+ {total.toLocaleString()} {group.kpi?.unit_of_measurement || ''}
+ </span>
+ </div>
+ <div className="space-y-1">
+ {group.dataPoints.slice(0, 3).map((dp, idx) => (
+ <div key={dp.id || idx} className="flex items-center justify-between text-xs text-gray-600">
+ <span className="flex items-center gap-1">
+ <div className="w-1.5 h-1.5 rounded-full bg-primary-400"></div>
+ {dp.value?.toLocaleString()} {group.kpi?.unit_of_measurement || ''}
+ </span>
+ <span className="text-gray-400">
+ {formatDate(dp.date_represented)}
+ </span>
+ </div>
+ ))}
+ {group.dataPoints.length > 3 && (
+ <p className="text-xs text-gray-400 text-center pt-1">
+ +{group.dataPoints.length - 3} more
+ </p>
+ )}
+ </div>
+ </div>
+ )
+ })}
+ </div>
+ )
+ })()
+ ) : (
+ <div className="text-center py-6">
+ <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+ <p className="text-sm text-gray-500">No linked impact claims</p>
+ </div>
+ )}
+ </div>
+ </div>
+ </div>
+ </div>
 
-            {/* Footer Actions */}
-            <div className="bg-white border-t border-gray-100 p-4 safe-area-pb">
-                <div className="flex gap-3">
-                    {onDelete && (
-                        <button
-                            onClick={() => setShowDeleteConfirm(true)}
-                            className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-50 text-red-600 rounded-xl font-medium text-sm"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                            Delete
-                        </button>
-                    )}
-                    {onEdit && (
-                        <button
-                            onClick={onEdit}
-                            className="flex-1 flex items-center justify-center gap-2 py-3 bg-evidence-500 text-white rounded-xl font-semibold text-sm"
-                        >
-                            <Edit className="w-4 h-4" />
-                            Edit
-                        </button>
-                    )}
-                </div>
-            </div>
+ {/* Footer Actions */}
+ <div className="bg-white border-t border-gray-100 p-4 safe-area-pb">
+ <div className="flex gap-3">
+ {onDelete && (
+ <button
+ onClick={() => setShowDeleteConfirm(true)}
+ className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-50 text-red-600 rounded-xl font-medium text-sm"
+ >
+ <Trash2 className="w-4 h-4" />
+ Delete
+ </button>
+ )}
+ {onEdit && (
+ <button
+ onClick={onEdit}
+ className="app-btn bg-evidence-500 text-secondary-900 hover:bg-evidence-600 shadow-sm flex-1 py-3"
+ >
+ <Edit className="w-4 h-4" />
+ Edit
+ </button>
+ )}
+ </div>
+ </div>
 
-            {/* Delete Confirmation */}
-            {showDeleteConfirm && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[110]">
-                    <div className="bg-white rounded-2xl max-w-sm w-full p-6">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                                <Trash2 className="w-5 h-5 text-red-600" />
-                            </div>
-                            <div>
-                                <h3 className="font-semibold text-gray-900">Delete Evidence</h3>
-                                <p className="text-xs text-gray-500">This cannot be undone</p>
-                            </div>
-                        </div>
-                        <p className="text-sm text-gray-600 mb-6">
-                            Delete "<strong>{evidence.title}</strong>"?
-                        </p>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowDeleteConfirm(false)}
-                                className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 rounded-xl font-medium text-sm"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setShowDeleteConfirm(false)
-                                    onDelete?.()
-                                }}
-                                className="flex-1 py-3 px-4 bg-red-500 text-white rounded-xl font-medium text-sm"
-                            >
-                                Delete
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    )
+ {/* Delete Confirmation */}
+ {showDeleteConfirm && (
+ <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[110]">
+ <div className="app-card max-w-sm w-full p-6">
+ <div className="flex items-center gap-3 mb-4">
+ <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+ <Trash2 className="w-5 h-5 text-red-600" />
+ </div>
+ <div>
+ <h3 className="font-semibold text-gray-900">Delete Evidence</h3>
+ <p className="text-xs text-gray-500">This cannot be undone</p>
+ </div>
+ </div>
+ <p className="text-sm text-gray-600 mb-6">
+ Delete "<strong>{evidence.title}</strong>"?
+ </p>
+ <div className="flex gap-3">
+ <button
+ onClick={() => setShowDeleteConfirm(false)}
+ className="app-btn app-btn-secondary flex-1 py-3"
+ >
+ Cancel
+ </button>
+ <button
+ onClick={() => {
+ setShowDeleteConfirm(false)
+ onDelete?.()
+ }}
+ className="app-btn app-btn-danger flex-1 py-3"
+ >
+ Delete
+ </button>
+ </div>
+ </div>
+ </div>
+ )}
+ </div>
+ )
 }
 
 // Mobile Evidence Upload Flow - Step by step wizard
 interface UploadFlowProps {
-    initiativeId: string
-    onClose: () => void
-    onSuccess: () => void
+ initiativeId: string
+ onClose: () => void
+ onSuccess: () => void
 }
 
 function MobileEvidenceUploadFlow({ initiativeId, onClose, onSuccess }: UploadFlowProps) {
-    const { canAccessLocation } = useTeam()
-    const [step, setStep] = useState(1)
-    const [loading, setLoading] = useState(false)
-    const [locations, setLocations] = useState<Location[]>([])
-    const [kpis, setKPIs] = useState<KPI[]>([])
-    const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
-    const fileInputRef = useRef<HTMLInputElement>(null)
-    const { queueUpload } = useUploadManager()
+ const { canAccessLocation } = useTeam()
+ const [step, setStep] = useState(1)
+ const [loading, setLoading] = useState(false)
+ const [locations, setLocations] = useState<Location[]>([])
+ const [kpis, setKPIs] = useState<KPI[]>([])
+ const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
+ const fileInputRef = useRef<HTMLInputElement>(null)
+ const { queueUpload } = useUploadManager()
 
-    // Form state
-    const [formData, setFormData] = useState({
-        type: 'visual_proof',
-        title: '',
-        description: '',
-        file: null as File | null,
-        fileUrl: '',
-        datePickerValue: {} as { singleDate?: string; startDate?: string; endDate?: string },
-        selectedLocationIds: [] as string[],
-        selectedKpiIds: [] as string[],
-        selectedBeneficiaryGroupIds: [] as string[],
-        selectedTagIds: [] as string[]
-    })
+ // Form state
+ const [formData, setFormData] = useState({
+ type: 'visual_proof',
+ title: '',
+ description: '',
+ file: null as File | null,
+ fileUrl: '',
+ datePickerValue: {} as { singleDate?: string; startDate?: string; endDate?: string },
+ selectedLocationIds: [] as string[],
+ selectedKpiIds: [] as string[],
+ selectedBeneficiaryGroupIds: [] as string[],
+ selectedTagIds: [] as string[]
+ })
 
-    const evidenceTypes = [
-        { value: 'visual_proof', label: 'Photo/Video', icon: Camera, description: 'Visual evidence' },
-        { value: 'documentation', label: 'Document', icon: FileText, description: 'Reports, forms' },
-        { value: 'testimony', label: 'Testimony', icon: MessageSquare, description: 'Quotes, feedback' },
-        { value: 'financials', label: 'Financial', icon: DollarSign, description: 'Receipts, invoices' }
-    ]
+ const evidenceTypes = [
+ { value: 'visual_proof', label: 'Photo/Video', icon: Camera, description: 'Visual evidence' },
+ { value: 'documentation', label: 'Document', icon: FileText, description: 'Reports, forms' },
+ { value: 'testimony', label: 'Testimony', icon: MessageSquare, description: 'Quotes, feedback' },
+ { value: 'financials', label: 'Financial', icon: DollarSign, description: 'Receipts, invoices' }
+ ]
 
-    useEffect(() => {
-        Promise.all([
-            apiService.getLocations(initiativeId),
-            apiService.getKPIs(initiativeId),
-            apiService.getBeneficiaryGroups(initiativeId)
-        ]).then(([locs, kpiData, bgs]) => {
-            setLocations((locs || []).filter(l => !l.id || canAccessLocation(l.id)))
-            setKPIs(kpiData || [])
-            setBeneficiaryGroups((bgs as BeneficiaryGroup[]) || [])
-        })
-    }, [initiativeId, canAccessLocation])
+ useEffect(() => {
+ Promise.all([
+ apiService.getLocations(initiativeId),
+ apiService.getKPIs(initiativeId),
+ apiService.getBeneficiaryGroups(initiativeId)
+ ]).then(([locs, kpiData, bgs]) => {
+ setLocations((locs || []).filter(l => !l.id || canAccessLocation(l.id)))
+ setKPIs(kpiData || [])
+ setBeneficiaryGroups((bgs as BeneficiaryGroup[]) || [])
+ })
+ }, [initiativeId, canAccessLocation])
 
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (file) {
-            setFormData(prev => ({
-                ...prev,
-                file,
-                title: prev.title || file.name.replace(/\.[^/.]+$/, '')
-            }))
-        }
-    }
+ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+ const file = e.target.files?.[0]
+ if (file) {
+ setFormData(prev => ({
+ ...prev,
+ file,
+ title: prev.title || file.name.replace(/\.[^/.]+$/, '')
+ }))
+ }
+ }
 
-    const handleSubmit = async () => {
-        if (formData.selectedLocationIds.length === 0) {
-            toast.error('Please select at least one location')
-            return
-        }
-        if (!formData.datePickerValue.singleDate && !(formData.datePickerValue.startDate && formData.datePickerValue.endDate)) {
-            toast.error('Please select a date')
-            return
-        }
-        if (formData.selectedKpiIds.length === 0) {
-            toast.error('Please select at least one metric')
-            return
-        }
-        if (!formData.title) {
-            toast.error('Please enter a title')
-            return
-        }
-        if (!formData.file && !formData.fileUrl) {
-            toast.error('Please select a file or enter a URL')
-            return
-        }
+ const handleSubmit = async () => {
+ if (formData.selectedLocationIds.length === 0) {
+ notify.error('Please select at least one location')
+ return
+ }
+ if (!formData.datePickerValue.singleDate && !(formData.datePickerValue.startDate && formData.datePickerValue.endDate)) {
+ notify.error('Please select a date')
+ return
+ }
+ if (formData.selectedKpiIds.length === 0) {
+ notify.error('Please select at least one metric')
+ return
+ }
+ if (!formData.title) {
+ notify.error('Please enter a title')
+ return
+ }
+ if (!formData.file && !formData.fileUrl) {
+ notify.error('Please select a file or enter a URL')
+ return
+ }
 
-        const submitData: any = {
-            title: formData.title,
-            description: formData.description,
-            type: formData.type,
-            initiative_id: initiativeId,
-            kpi_ids: formData.selectedKpiIds,
-            location_ids: formData.selectedLocationIds,
-            beneficiary_group_ids: formData.selectedBeneficiaryGroupIds,
-            tag_ids: formData.selectedTagIds
-        }
+ const submitData: any = {
+ title: formData.title,
+ description: formData.description,
+ type: formData.type,
+ initiative_id: initiativeId,
+ kpi_ids: formData.selectedKpiIds,
+ location_ids: formData.selectedLocationIds,
+ beneficiary_group_ids: formData.selectedBeneficiaryGroupIds,
+ tag_ids: formData.selectedTagIds
+ }
 
-        if (formData.datePickerValue.singleDate) {
-            submitData.date_represented = formData.datePickerValue.singleDate
-        } else if (formData.datePickerValue.startDate && formData.datePickerValue.endDate) {
-            submitData.date_range_start = formData.datePickerValue.startDate
-            submitData.date_range_end = formData.datePickerValue.endDate
-            submitData.date_represented = formData.datePickerValue.startDate
-        } else {
-            submitData.date_represented = getLocalDateString(new Date())
-        }
+ if (formData.datePickerValue.singleDate) {
+ submitData.date_represented = formData.datePickerValue.singleDate
+ } else if (formData.datePickerValue.startDate && formData.datePickerValue.endDate) {
+ submitData.date_range_start = formData.datePickerValue.startDate
+ submitData.date_range_end = formData.datePickerValue.endDate
+ submitData.date_represented = formData.datePickerValue.startDate
+ } else {
+ submitData.date_represented = getLocalDateString(new Date())
+ }
 
-        if (formData.file) {
-            const capturedFile = formData.file
-            const capturedSubmitData = { ...submitData }
-            const capturedOnSuccess = onSuccess
+ if (formData.file) {
+ const capturedFile = formData.file
+ const capturedSubmitData = { ...submitData }
+ const capturedOnSuccess = onSuccess
 
-            onClose()
+ onClose()
 
-            queueUpload({
-                file: capturedFile,
-                onComplete: async (result) => {
-                    try {
-                        await apiService.createEvidence({ ...capturedSubmitData, file_url: result.file_url })
-                        toast.success('Evidence added!')
-                        capturedOnSuccess()
-                    } catch (err) {
-                        toast.error(`Failed to create evidence: ${err instanceof Error ? err.message : 'Unknown error'}`)
-                    }
-                },
-                onError: (error) => {
-                    if (error.message !== 'Upload cancelled') {
-                        toast.error(`Upload failed for ${capturedFile.name}`)
-                    }
-                }
-            })
-            return
-        }
+ queueUpload({
+ file: capturedFile,
+ onComplete: async (result) => {
+ try {
+ await apiService.createEvidence({ ...capturedSubmitData, file_url: result.file_url })
+ notify.success('Evidence added!')
+ capturedOnSuccess()
+ } catch (err) {
+ notify.error(`Failed to create evidence: ${err instanceof Error ? err.message : 'Unknown error'}`)
+ }
+ },
+ onError: (error) => {
+ if (error.message !== 'Upload cancelled') {
+ notify.error(`Upload failed for ${capturedFile.name}`)
+ }
+ }
+ })
+ return
+ }
 
-        // No file — submit with URL directly
-        setLoading(true)
-        try {
-            submitData.file_url = formData.fileUrl
-            await apiService.createEvidence(submitData)
-            toast.success('Evidence added!')
-            onSuccess()
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to add evidence'
-            toast.error(message)
-        } finally {
-            setLoading(false)
-        }
-    }
+ // No file — submit with URL directly
+ setLoading(true)
+ try {
+ submitData.file_url = formData.fileUrl
+ await apiService.createEvidence(submitData)
+ notify.success('Evidence added!')
+ onSuccess()
+ } catch (error) {
+ const message = error instanceof Error ? error.message : 'Failed to add evidence'
+ notify.error(message)
+ } finally {
+ setLoading(false)
+ }
+ }
 
-    const canProceed = () => {
-        switch (step) {
-            case 1: return !!formData.type && formData.selectedLocationIds.length > 0 && (
-                !!formData.datePickerValue.singleDate ||
-                (!!formData.datePickerValue.startDate && !!formData.datePickerValue.endDate)
-            )
-            case 2: return formData.selectedKpiIds.length > 0
-            case 3: return true // tags optional
-            case 4: return true // beneficiaries optional
-            case 5: return !!formData.title && (formData.file !== null || formData.fileUrl !== '')
-            default: return false
-        }
-    }
+ const canProceed = () => {
+ switch (step) {
+ case 1: return !!formData.type && formData.selectedLocationIds.length > 0 && (
+ !!formData.datePickerValue.singleDate ||
+ (!!formData.datePickerValue.startDate && !!formData.datePickerValue.endDate)
+ )
+ case 2: return formData.selectedKpiIds.length > 0
+ case 3: return true // tags optional
+ case 4: return true // beneficiaries optional
+ case 5: return !!formData.title && (formData.file !== null || formData.fileUrl !== '')
+ default: return false
+ }
+ }
 
-    const totalSteps = 5
+ const totalSteps = 5
 
-    return (
-        <div className="fixed inset-0 bg-white z-[100] flex flex-col h-[100dvh] overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-100 flex-shrink-0">
-                <button onClick={onClose} className="p-2 -ml-2">
-                    <X className="w-5 h-5 text-gray-500" />
-                </button>
-                <span className="font-semibold text-gray-800">Add Evidence</span>
-                <span className="text-sm text-gray-500">{step}/{totalSteps}</span>
-            </div>
+ return (
+ <div className="fixed inset-0 bg-white z-[100] flex flex-col h-[100dvh] overflow-hidden">
+ {/* Header */}
+ <div className="flex items-center justify-between p-4 border-b border-gray-100 flex-shrink-0">
+ <button onClick={onClose} className="p-2 -ml-2">
+ <X className="w-5 h-5 text-gray-500" />
+ </button>
+ <span className="font-semibold text-gray-800">Add Evidence</span>
+ <span className="text-sm text-gray-500">{step}/{totalSteps}</span>
+ </div>
 
-            {/* Progress */}
-            <div className="px-4 pt-3 flex-shrink-0">
-                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div 
-                        className="h-full bg-evidence-500 transition-all duration-300"
-                        style={{ width: `${(step / totalSteps) * 100}%` }}
-                    />
-                </div>
-            </div>
+ {/* Progress */}
+ <div className="px-4 pt-3 flex-shrink-0">
+ <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+ <div 
+ className="h-full bg-evidence-500 transition-all duration-300"
+ style={{ width: `${(step / totalSteps) * 100}%` }}
+ />
+ </div>
+ </div>
 
-            {/* Content */}
-            <div className="flex-1 min-h-0 overflow-y-auto p-4">
-                {/* Step 1: Type + Date + Location */}
-                {step === 1 && (
-                    <div className="space-y-5">
-                        <div className="text-center mb-2">
-                            <h2 className="text-xl font-bold text-gray-900">Type, When & Where</h2>
-                            <p className="text-gray-500 text-sm mt-1">Type of evidence, date, and location</p>
-                        </div>
+ {/* Content */}
+ <div className="flex-1 min-h-0 overflow-y-auto p-4">
+ {/* Step 1: Type + Date + Location */}
+ {step === 1 && (
+ <div className="space-y-5">
+ <div className="text-center mb-2">
+ <h2 className="text-xl font-bold text-gray-900">Type, When & Where</h2>
+ <p className="text-gray-500 text-sm mt-1">Type of evidence, date, and location</p>
+ </div>
 
-                        <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">
-                                Type <span className="text-red-500">*</span>
-                            </label>
-                            <div className="grid grid-cols-2 gap-2">
-                                {evidenceTypes.map((type) => {
-                                    const Icon = type.icon
-                                    const isSelected = formData.type === type.value
-                                    return (
-                                        <button
-                                            key={type.value}
-                                            type="button"
-                                            onClick={() => setFormData(prev => ({ ...prev, type: type.value }))}
-                                            className={`flex items-center gap-2 p-2.5 rounded-xl border-2 transition-colors text-left ${
-                                                isSelected
-                                                    ? 'border-evidence-500 bg-evidence-50'
-                                                    : 'border-gray-200 bg-white'
-                                            }`}
-                                        >
-                                            <Icon className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
-                                            <div className="min-w-0">
-                                                <div className={`text-xs font-semibold truncate ${isSelected ? 'text-evidence-600' : 'text-gray-700'}`}>{type.label}</div>
-                                                <div className="text-xs text-gray-500 truncate">{type.description}</div>
-                                            </div>
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                        </div>
+ <div>
+ <label className="app-label text-xs uppercase tracking-wide">
+ Type <span className="text-red-500">*</span>
+ </label>
+ <div className="grid grid-cols-2 gap-2">
+ {evidenceTypes.map((type) => {
+ const Icon = type.icon
+ const isSelected = formData.type === type.value
+ return (
+ <button
+ key={type.value}
+ type="button"
+ onClick={() => setFormData(prev => ({ ...prev, type: type.value }))}
+ className={`flex items-center gap-2 p-2.5 rounded-xl border-2 transition-colors text-left ${
+ isSelected
+ ? 'border-evidence-500 bg-evidence-50'
+ : 'border-gray-200 bg-white'
+ }`}
+ >
+ <Icon className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
+ <div className="min-w-0">
+ <div className={`text-xs font-semibold truncate ${isSelected ? 'text-evidence-600' : 'text-gray-700'}`}>{type.label}</div>
+ <div className="text-xs text-gray-500 truncate">{type.description}</div>
+ </div>
+ </button>
+ )
+ })}
+ </div>
+ </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                <Calendar className="w-4 h-4 inline mr-1" />
-                                Date <span className="text-red-500">*</span>
-                            </label>
-                            <DateRangePicker
-                                value={formData.datePickerValue}
-                                onChange={(value) => setFormData(prev => ({ ...prev, datePickerValue: value }))}
-                                placeholder="Select date"
-                            />
-                        </div>
+ <div>
+ <label className="app-label">
+ <Calendar className="w-4 h-4 inline mr-1" />
+ Date <span className="text-red-500">*</span>
+ </label>
+ <DateRangePicker
+ value={formData.datePickerValue}
+ onChange={(value) => setFormData(prev => ({ ...prev, datePickerValue: value }))}
+ placeholder="Select date"
+ />
+ </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                <MapPin className="w-4 h-4 inline mr-1" />
-                                Location <span className="text-red-500">*</span>
-                            </label>
-                            {locations.length === 0 ? (
-                                <div className="text-center py-8 bg-gray-50 rounded-2xl">
-                                    <MapPin className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                                    <p className="text-gray-500 text-sm">No locations available</p>
-                                    <p className="text-gray-400 text-xs mt-1">Add locations in the Locations tab</p>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col gap-2">
-                                    {locations.map((location) => {
-                                        const isSelected = formData.selectedLocationIds.includes(location.id!)
-                                        return (
-                                            <button
-                                                key={location.id}
-                                                type="button"
-                                                onClick={() => {
-                                                    setFormData(prev => ({
-                                                        ...prev,
-                                                        selectedLocationIds: isSelected
-                                                            ? prev.selectedLocationIds.filter(id => id !== location.id)
-                                                            : [...prev.selectedLocationIds, location.id!]
-                                                    }))
-                                                }}
-                                                className={`block w-full appearance-none p-4 rounded-xl border-2 text-left transition-colors ${
-                                                    isSelected 
-                                                        ? 'border-evidence-500 bg-evidence-50' 
-                                                        : 'border-gray-200 bg-white'
-                                                }`}
-                                            >
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-3 min-w-0">
-                                                        <MapPin className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
-                                                        <div className="min-w-0">
-                                                            <div className="font-medium text-gray-800 truncate">{location.name}</div>
-                                                        </div>
-                                                    </div>
-                                                    {isSelected && (
-                                                        <Check className="w-5 h-5 text-evidence-500 flex-shrink-0 ml-2" />
-                                                    )}
-                                                </div>
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
+ <div>
+ <label className="app-label">
+ <MapPin className="w-4 h-4 inline mr-1" />
+ Location <span className="text-red-500">*</span>
+ </label>
+ {locations.length === 0 ? (
+ <div className="app-card-muted text-center py-8">
+ <MapPin className="w-10 h-10 text-gray-400 mx-auto mb-2" />
+ <p className="text-gray-500 text-sm">No locations available</p>
+ <p className="text-gray-400 text-xs mt-1">Add locations in the Locations tab</p>
+ </div>
+ ) : (
+ <div className="flex flex-col gap-2">
+ {locations.map((location) => {
+ const isSelected = formData.selectedLocationIds.includes(location.id!)
+ return (
+ <button
+ key={location.id}
+ type="button"
+ onClick={() => {
+ setFormData(prev => ({
+ ...prev,
+ selectedLocationIds: isSelected
+ ? prev.selectedLocationIds.filter(id => id !== location.id)
+ : [...prev.selectedLocationIds, location.id!]
+ }))
+ }}
+ className={`block w-full appearance-none p-4 rounded-xl border-2 text-left transition-colors ${
+ isSelected 
+ ? 'border-evidence-500 bg-evidence-50' 
+ : 'border-gray-200 bg-white'
+ }`}
+ >
+ <div className="flex items-center justify-between">
+ <div className="flex items-center gap-3 min-w-0">
+ <MapPin className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
+ <div className="min-w-0">
+ <div className="font-medium text-gray-800 truncate">{location.name}</div>
+ </div>
+ </div>
+ {isSelected && (
+ <Check className="w-5 h-5 text-evidence-500 flex-shrink-0 ml-2" />
+ )}
+ </div>
+ </button>
+ )
+ })}
+ </div>
+ )}
+ </div>
+ </div>
+ )}
 
-                {/* Step 2: Metrics */}
-                {step === 2 && (
-                    <div className="space-y-4">
-                        <div className="text-center mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Link to Metrics</h2>
-                            <p className="text-gray-500 text-sm mt-1">What does this support?</p>
-                        </div>
+ {/* Step 2: Metrics */}
+ {step === 2 && (
+ <div className="space-y-4">
+ <div className="text-center mb-6">
+ <h2 className="text-xl font-bold text-gray-900">Link to Metrics</h2>
+ <p className="text-gray-500 text-sm mt-1">What does this support?</p>
+ </div>
 
-                        {kpis.length === 0 ? (
-                            <div className="text-center py-8 bg-gray-50 rounded-2xl">
-                                <FileText className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                                <p className="text-gray-500 text-sm">No metrics available</p>
-                                <p className="text-gray-400 text-xs mt-1">Create metrics on desktop</p>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col gap-2">
-                                {kpis.map((kpi) => {
-                                    const isSelected = formData.selectedKpiIds.includes(kpi.id!)
-                                    return (
-                                        <button
-                                            key={kpi.id}
-                                            type="button"
-                                            onClick={() => {
-                                                setFormData(prev => ({
-                                                    ...prev,
-                                                    selectedKpiIds: isSelected
-                                                        ? prev.selectedKpiIds.filter(id => id !== kpi.id)
-                                                        : [...prev.selectedKpiIds, kpi.id!]
-                                                }))
-                                            }}
-                                            className={`block w-full appearance-none p-4 rounded-xl border-2 text-left transition-colors ${
-                                                isSelected 
-                                                    ? 'border-evidence-500 bg-evidence-50' 
-                                                    : 'border-gray-200 bg-white'
-                                            }`}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <div className="min-w-0">
-                                                    <div className="font-medium text-gray-800 truncate">{kpi.title}</div>
-                                                </div>
-                                                {isSelected && (
-                                                    <Check className="w-5 h-5 text-evidence-500 flex-shrink-0 ml-2" />
-                                                )}
-                                            </div>
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                        )}
-                    </div>
-                )}
+ {kpis.length === 0 ? (
+ <div className="app-card-muted text-center py-8">
+ <FileText className="w-10 h-10 text-gray-400 mx-auto mb-2" />
+ <p className="text-gray-500 text-sm">No metrics available</p>
+ <p className="text-gray-400 text-xs mt-1">Create metrics on desktop</p>
+ </div>
+ ) : (
+ <div className="flex flex-col gap-2">
+ {kpis.map((kpi) => {
+ const isSelected = formData.selectedKpiIds.includes(kpi.id!)
+ return (
+ <button
+ key={kpi.id}
+ type="button"
+ onClick={() => {
+ setFormData(prev => ({
+ ...prev,
+ selectedKpiIds: isSelected
+ ? prev.selectedKpiIds.filter(id => id !== kpi.id)
+ : [...prev.selectedKpiIds, kpi.id!]
+ }))
+ }}
+ className={`block w-full appearance-none p-4 rounded-xl border-2 text-left transition-colors ${
+ isSelected 
+ ? 'border-evidence-500 bg-evidence-50' 
+ : 'border-gray-200 bg-white'
+ }`}
+ >
+ <div className="flex items-center justify-between">
+ <div className="min-w-0">
+ <div className="font-medium text-gray-800 truncate">{kpi.title}</div>
+ </div>
+ {isSelected && (
+ <Check className="w-5 h-5 text-evidence-500 flex-shrink-0 ml-2" />
+ )}
+ </div>
+ </button>
+ )
+ })}
+ </div>
+ )}
+ </div>
+ )}
 
-                {/* Step 3: Tags (optional) */}
-                {step === 3 && (
-                    <div className="space-y-4">
-                        <div className="text-center mb-2">
-                            <h2 className="text-xl font-bold text-gray-900">Tags</h2>
-                            <p className="text-gray-500 text-sm mt-1">Optional — pull from selected metrics</p>
-                        </div>
+ {/* Step 3: Tags (optional) */}
+ {step === 3 && (
+ <div className="space-y-4">
+ <div className="text-center mb-2">
+ <h2 className="text-xl font-bold text-gray-900">Tags</h2>
+ <p className="text-gray-500 text-sm mt-1">Optional — pull from selected metrics</p>
+ </div>
 
-                        <TagPicker
-                            mode="multi-grouped"
-                            selectedIds={formData.selectedTagIds}
-                            onChange={(ids) => setFormData(prev => ({ ...prev, selectedTagIds: ids }))}
-                            groups={kpis
-                                .filter(k => formData.selectedKpiIds.includes(k.id!))
-                                .map(k => ({ metricId: k.id!, metricTitle: k.title, tagIds: ((k as any).tag_ids || []) as string[] }))}
-                            canCreate={false}
-                            helperText="Tags shown are pulled from the metrics you selected. You can skip this step."
-                        />
-                    </div>
-                )}
+ <TagPicker
+ mode="multi-grouped"
+ selectedIds={formData.selectedTagIds}
+ onChange={(ids) => setFormData(prev => ({ ...prev, selectedTagIds: ids }))}
+ groups={kpis
+ .filter(k => formData.selectedKpiIds.includes(k.id!))
+ .map(k => ({ metricId: k.id!, metricTitle: k.title, tagIds: ((k as any).tag_ids || []) as string[] }))}
+ canCreate={false}
+ helperText="Tags shown are pulled from the metrics you selected. You can skip this step."
+ />
+ </div>
+ )}
 
-                {/* Step 4: Beneficiaries (optional) */}
-                {step === 4 && (
-                    <div className="space-y-4">
-                        <div className="text-center mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Beneficiaries</h2>
-                            <p className="text-gray-500 text-sm mt-1">Optional — link to beneficiary groups</p>
-                        </div>
+ {/* Step 4: Beneficiaries (optional) */}
+ {step === 4 && (
+ <div className="space-y-4">
+ <div className="text-center mb-6">
+ <h2 className="text-xl font-bold text-gray-900">Beneficiaries</h2>
+ <p className="text-gray-500 text-sm mt-1">Optional — link to beneficiary groups</p>
+ </div>
 
-                        {beneficiaryGroups.length === 0 ? (
-                            <div className="text-center py-8 bg-gray-50 rounded-2xl">
-                                <Users className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                                <p className="text-gray-500 text-sm">No beneficiary groups</p>
-                                <p className="text-gray-400 text-xs mt-1">Add them in the Beneficiaries tab</p>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="flex items-center justify-between text-xs">
-                                    <span className="text-gray-600 font-medium">
-                                        {formData.selectedBeneficiaryGroupIds.length} of {beneficiaryGroups.length} selected
-                                    </span>
-                                    <div className="flex gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData(prev => ({ ...prev, selectedBeneficiaryGroupIds: beneficiaryGroups.map(g => g.id!) }))}
-                                            className="px-2.5 py-1 rounded-lg border border-evidence-300 text-evidence-700 font-medium"
-                                        >
-                                            Select All
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData(prev => ({ ...prev, selectedBeneficiaryGroupIds: [] }))}
-                                            className="px-2.5 py-1 rounded-lg border border-gray-300 text-gray-600 font-medium"
-                                        >
-                                            Clear
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    {beneficiaryGroups.map((group) => {
-                                        const isSelected = formData.selectedBeneficiaryGroupIds.includes(group.id!)
-                                        return (
-                                            <button
-                                                key={group.id}
-                                                type="button"
-                                                onClick={() => {
-                                                    setFormData(prev => ({
-                                                        ...prev,
-                                                        selectedBeneficiaryGroupIds: isSelected
-                                                            ? prev.selectedBeneficiaryGroupIds.filter(id => id !== group.id)
-                                                            : [...prev.selectedBeneficiaryGroupIds, group.id!]
-                                                    }))
-                                                }}
-                                                className={`block w-full appearance-none p-4 rounded-xl border-2 text-left transition-colors ${
-                                                    isSelected 
-                                                        ? 'border-evidence-500 bg-evidence-50' 
-                                                        : 'border-gray-200 bg-white'
-                                                }`}
-                                            >
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-3 min-w-0">
-                                                        <Users className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
-                                                        <div className="min-w-0">
-                                                            <div className="font-medium text-gray-800 truncate">{group.name}</div>
-                                                        </div>
-                                                    </div>
-                                                    {isSelected && (
-                                                        <Check className="w-5 h-5 text-evidence-500 flex-shrink-0 ml-2" />
-                                                    )}
-                                                </div>
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            </>
-                        )}
-                    </div>
-                )}
+ {beneficiaryGroups.length === 0 ? (
+ <div className="app-card-muted text-center py-8">
+ <Users className="w-10 h-10 text-gray-400 mx-auto mb-2" />
+ <p className="text-gray-500 text-sm">No beneficiary groups</p>
+ <p className="text-gray-400 text-xs mt-1">Add them in the Beneficiaries tab</p>
+ </div>
+ ) : (
+ <>
+ <div className="flex items-center justify-between text-xs">
+ <span className="text-gray-600 font-medium">
+ {formData.selectedBeneficiaryGroupIds.length} of {beneficiaryGroups.length} selected
+ </span>
+ <div className="flex gap-2">
+ <button
+ type="button"
+ onClick={() => setFormData(prev => ({ ...prev, selectedBeneficiaryGroupIds: beneficiaryGroups.map(g => g.id!) }))}
+ className="px-2.5 py-1 rounded-lg border border-evidence-300 text-evidence-700 font-medium"
+ >
+ Select All
+ </button>
+ <button
+ type="button"
+ onClick={() => setFormData(prev => ({ ...prev, selectedBeneficiaryGroupIds: [] }))}
+ className="px-2.5 py-1 rounded-lg border border-gray-300 text-gray-600 font-medium"
+ >
+ Clear
+ </button>
+ </div>
+ </div>
+ <div className="flex flex-col gap-2">
+ {beneficiaryGroups.map((group) => {
+ const isSelected = formData.selectedBeneficiaryGroupIds.includes(group.id!)
+ return (
+ <button
+ key={group.id}
+ type="button"
+ onClick={() => {
+ setFormData(prev => ({
+ ...prev,
+ selectedBeneficiaryGroupIds: isSelected
+ ? prev.selectedBeneficiaryGroupIds.filter(id => id !== group.id)
+ : [...prev.selectedBeneficiaryGroupIds, group.id!]
+ }))
+ }}
+ className={`block w-full appearance-none p-4 rounded-xl border-2 text-left transition-colors ${
+ isSelected 
+ ? 'border-evidence-500 bg-evidence-50' 
+ : 'border-gray-200 bg-white'
+ }`}
+ >
+ <div className="flex items-center justify-between">
+ <div className="flex items-center gap-3 min-w-0">
+ <Users className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
+ <div className="min-w-0">
+ <div className="font-medium text-gray-800 truncate">{group.name}</div>
+ </div>
+ </div>
+ {isSelected && (
+ <Check className="w-5 h-5 text-evidence-500 flex-shrink-0 ml-2" />
+ )}
+ </div>
+ </button>
+ )
+ })}
+ </div>
+ </>
+ )}
+ </div>
+ )}
 
-                {/* Step 5: Title, Description & Upload */}
-                {step === 5 && (
-                    <div className="space-y-4">
-                        <div className="text-center mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Details & File</h2>
-                            <p className="text-gray-500 text-sm mt-1">Title, description, and file</p>
-                        </div>
+ {/* Step 5: Title, Description & Upload */}
+ {step === 5 && (
+ <div className="space-y-4">
+ <div className="text-center mb-6">
+ <h2 className="text-xl font-bold text-gray-900">Details & File</h2>
+ <p className="text-gray-500 text-sm mt-1">Title, description, and file</p>
+ </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Title <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.title}
-                                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                                placeholder="e.g., Training photos"
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm"
-                            />
-                        </div>
+ <div>
+ <label className="app-label">
+ Title <span className="text-red-500">*</span>
+ </label>
+ <input
+ type="text"
+ value={formData.title}
+ onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+ placeholder="e.g., Training photos"
+ className="app-input"
+ />
+ </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Description (optional)
-                            </label>
-                            <textarea
-                                value={formData.description}
-                                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                                placeholder="What does this evidence show?"
-                                rows={3}
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm resize-none"
-                            />
-                        </div>
+ <div>
+ <label className="app-label">
+ Description (optional)
+ </label>
+ <textarea
+ value={formData.description}
+ onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+ placeholder="What does this evidence show?"
+ rows={3}
+ className="app-input resize-none"
+ />
+ </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                File <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                onChange={handleFileSelect}
-                                accept="image/*,video/*,.pdf,.doc,.docx"
-                                className="hidden"
-                            />
+ <div>
+ <label className="app-label">
+ File <span className="text-red-500">*</span>
+ </label>
+ <input
+ ref={fileInputRef}
+ type="file"
+ onChange={handleFileSelect}
+ accept="image/*,video/*,.pdf,.doc,.docx"
+ className="hidden"
+ />
 
-                            {formData.file ? (
-                                <div className="bg-evidence-50 border-2 border-evidence-300 rounded-2xl p-4 text-center">
-                                    <FileText className="w-12 h-12 text-evidence-500 mx-auto mb-2" />
-                                    <p className="font-medium text-gray-800 truncate">{formData.file.name}</p>
-                                    <p className="text-sm text-gray-500">
-                                        {(formData.file.size / 1024 / 1024).toFixed(2)} MB
-                                    </p>
-                                    <button
-                                        type="button"
-                                        onClick={() => setFormData(prev => ({ ...prev, file: null }))}
-                                        className="mt-3 text-sm text-red-600 font-medium"
-                                    >
-                                        Remove
-                                    </button>
-                                </div>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="w-full border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center hover:border-evidence-400 transition-colors"
-                                >
-                                    <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-                                    <p className="font-medium text-gray-700">Tap to select file</p>
-                                    <p className="text-sm text-gray-500 mt-1">Images, PDFs, documents</p>
-                                </button>
-                            )}
+ {formData.file ? (
+ <div className="bg-evidence-50 border-2 border-evidence-300 rounded-xl p-4 text-center">
+ <FileText className="w-12 h-12 text-evidence-500 mx-auto mb-2" />
+ <p className="font-medium text-gray-800 truncate">{formData.file.name}</p>
+ <p className="text-sm text-gray-500">
+ {(formData.file.size / 1024 / 1024).toFixed(2)} MB
+ </p>
+ <button
+ type="button"
+ onClick={() => setFormData(prev => ({ ...prev, file: null }))}
+ className="mt-3 text-sm text-red-600 font-medium"
+ >
+ Remove
+ </button>
+ </div>
+ ) : (
+ <button
+ type="button"
+ onClick={() => fileInputRef.current?.click()}
+ className="w-full border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-evidence-400 transition-colors"
+ >
+ <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+ <p className="font-medium text-gray-700">Tap to select file</p>
+ <p className="text-sm text-gray-500 mt-1">Images, PDFs, documents</p>
+ </button>
+ )}
 
-                            <div className="relative my-4">
-                                <div className="absolute inset-0 flex items-center">
-                                    <div className="w-full border-t border-gray-200" />
-                                </div>
-                                <div className="relative flex justify-center">
-                                    <span className="bg-white px-4 text-sm text-gray-500">or</span>
-                                </div>
-                            </div>
+ <div className="relative my-4">
+ <div className="absolute inset-0 flex items-center">
+ <div className="w-full border-t border-gray-200" />
+ </div>
+ <div className="relative flex justify-center">
+ <span className="bg-white px-4 text-sm text-gray-500">or</span>
+ </div>
+ </div>
 
-                            <input
-                                type="url"
-                                value={formData.fileUrl}
-                                onChange={(e) => setFormData(prev => ({ ...prev, fileUrl: e.target.value }))}
-                                placeholder="Paste a link (https://...)"
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm"
-                            />
-                        </div>
-                    </div>
-                )}
-            </div>
+ <input
+ type="url"
+ value={formData.fileUrl}
+ onChange={(e) => setFormData(prev => ({ ...prev, fileUrl: e.target.value }))}
+ placeholder="Paste a link (https://...)"
+ className="app-input"
+ />
+ </div>
+ </div>
+ )}
+ </div>
 
-            {/* Footer */}
-            <div className="p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] border-t border-gray-100 bg-white flex-shrink-0">
-                <div className="flex gap-3">
-                    {step > 1 && (
-                        <button
-                            type="button"
-                            onClick={() => setStep(s => s - 1)}
-                            className="px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium text-sm flex items-center gap-2"
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                            Back
-                        </button>
-                    )}
-                    <button
-                        type="button"
-                        onClick={() => {
-                            if (step < totalSteps) {
-                                setStep(s => s + 1)
-                            } else {
-                                handleSubmit()
-                            }
-                        }}
-                        disabled={!canProceed() || loading}
-                        className="flex-1 py-3 bg-evidence-500 text-white rounded-xl font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                        {loading ? (
-                            <>
-                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                Uploading...
-                            </>
-                        ) : step < totalSteps ? (
-                            <>
-                                Next
-                                <ChevronRight className="w-4 h-4" />
-                            </>
-                        ) : (
-                            <>
-                                <Check className="w-4 h-4" />
-                                Add Evidence
-                            </>
-                        )}
-                    </button>
-                </div>
-            </div>
-        </div>
-    )
+ {/* Footer */}
+ <div className="p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] border-t border-gray-100 bg-white flex-shrink-0">
+ <div className="flex gap-3">
+ {step > 1 && (
+ <button
+ type="button"
+ onClick={() => setStep(s => s - 1)}
+ className="app-btn app-btn-secondary px-4 py-3 flex items-center gap-2"
+ >
+ <ChevronLeft className="w-4 h-4" />
+ Back
+ </button>
+ )}
+ <button
+ type="button"
+ onClick={() => {
+ if (step < totalSteps) {
+ setStep(s => s + 1)
+ } else {
+ handleSubmit()
+ }
+ }}
+ disabled={!canProceed() || loading}
+ className="app-btn bg-evidence-500 text-secondary-900 hover:bg-evidence-600 shadow-sm flex-1 py-3"
+ >
+ {loading ? (
+ <>
+ <Spinner className="w-4 h-4" />
+ Uploading...
+ </>
+ ) : step < totalSteps ? (
+ <>
+ Next
+ <ChevronRight className="w-4 h-4" />
+ </>
+ ) : (
+ <>
+ <Check className="w-4 h-4" />
+ Add Evidence
+ </>
+ )}
+ </button>
+ </div>
+ </div>
+ </div>
+ )
 }
 
 // Mobile Evidence Edit Flow
 interface EditFlowProps {
-    initiativeId: string
-    evidence: Evidence
-    onClose: () => void
-    onSuccess: () => void
+ initiativeId: string
+ evidence: Evidence
+ onClose: () => void
+ onSuccess: () => void
 }
 
 type EvidenceType = 'visual_proof' | 'documentation' | 'testimony' | 'financials'
 
 function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: EditFlowProps) {
-    const { canAccessLocation } = useTeam()
-    const [loading, setLoading] = useState(false)
-    const [locations, setLocations] = useState<Location[]>([])
-    const [kpis, setKPIs] = useState<KPI[]>([])
-    const fileInputRef = useRef<HTMLInputElement>(null)
-    const { queueUpload } = useUploadManager()
+ const { canAccessLocation } = useTeam()
+ const [loading, setLoading] = useState(false)
+ const [locations, setLocations] = useState<Location[]>([])
+ const [kpis, setKPIs] = useState<KPI[]>([])
+ const fileInputRef = useRef<HTMLInputElement>(null)
+ const { queueUpload } = useUploadManager()
 
-    // Initialize form with existing evidence data
-    const [formData, setFormData] = useState({
-        type: (evidence.type || 'visual_proof') as EvidenceType,
-        title: evidence.title || '',
-        description: evidence.description || '',
-        file: null as File | null,
-        fileUrl: evidence.file_url || '',
-        datePickerValue: {
-            singleDate: evidence.date_represented,
-            startDate: evidence.date_range_start,
-            endDate: evidence.date_range_end
-        } as { singleDate?: string; startDate?: string; endDate?: string },
-        selectedLocationIds: evidence.location_ids || (evidence.location_id ? [evidence.location_id] : []),
-        selectedKpiIds: evidence.kpi_ids || [],
-        selectedTagIds: evidence.tag_ids || []
-    })
+ // Initialize form with existing evidence data
+ const [formData, setFormData] = useState({
+ type: (evidence.type || 'visual_proof') as EvidenceType,
+ title: evidence.title || '',
+ description: evidence.description || '',
+ file: null as File | null,
+ fileUrl: evidence.file_url || '',
+ datePickerValue: {
+ singleDate: evidence.date_represented,
+ startDate: evidence.date_range_start,
+ endDate: evidence.date_range_end
+ } as { singleDate?: string; startDate?: string; endDate?: string },
+ selectedLocationIds: evidence.location_ids || (evidence.location_id ? [evidence.location_id] : []),
+ selectedKpiIds: evidence.kpi_ids || [],
+ selectedTagIds: evidence.tag_ids || []
+ })
 
-    const evidenceTypes: { value: EvidenceType; label: string; icon: typeof Camera; description: string }[] = [
-        { value: 'visual_proof', label: 'Photo/Video', icon: Camera, description: 'Visual evidence' },
-        { value: 'documentation', label: 'Document', icon: FileText, description: 'Reports, forms' },
-        { value: 'testimony', label: 'Testimony', icon: MessageSquare, description: 'Quotes, feedback' },
-        { value: 'financials', label: 'Financial', icon: DollarSign, description: 'Receipts, invoices' }
-    ]
+ const evidenceTypes: { value: EvidenceType; label: string; icon: typeof Camera; description: string }[] = [
+ { value: 'visual_proof', label: 'Photo/Video', icon: Camera, description: 'Visual evidence' },
+ { value: 'documentation', label: 'Document', icon: FileText, description: 'Reports, forms' },
+ { value: 'testimony', label: 'Testimony', icon: MessageSquare, description: 'Quotes, feedback' },
+ { value: 'financials', label: 'Financial', icon: DollarSign, description: 'Receipts, invoices' }
+ ]
 
-    useEffect(() => {
-        // Load locations and KPIs
-        Promise.all([
-            apiService.getLocations(initiativeId),
-            apiService.getKPIs(initiativeId)
-        ]).then(([locs, kpiData]) => {
-            setLocations((locs || []).filter(l => !l.id || canAccessLocation(l.id)))
-            setKPIs(kpiData || [])
-        })
-    }, [initiativeId, canAccessLocation])
+ useEffect(() => {
+ // Load locations and KPIs
+ Promise.all([
+ apiService.getLocations(initiativeId),
+ apiService.getKPIs(initiativeId)
+ ]).then(([locs, kpiData]) => {
+ setLocations((locs || []).filter(l => !l.id || canAccessLocation(l.id)))
+ setKPIs(kpiData || [])
+ })
+ }, [initiativeId, canAccessLocation])
 
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (file) {
-            setFormData(prev => ({ ...prev, file }))
-        }
-    }
+ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+ const file = e.target.files?.[0]
+ if (file) {
+ setFormData(prev => ({ ...prev, file }))
+ }
+ }
 
-    const handleSubmit = async () => {
-        if (!formData.title) {
-            toast.error('Please enter a title')
-            return
-        }
+ const handleSubmit = async () => {
+ if (!formData.title) {
+ notify.error('Please enter a title')
+ return
+ }
 
-        const submitData: any = {
-            title: formData.title,
-            description: formData.description,
-            type: formData.type,
-            kpi_ids: formData.selectedKpiIds,
-            location_ids: formData.selectedLocationIds,
-            tag_ids: formData.selectedTagIds
-        }
+ const submitData: any = {
+ title: formData.title,
+ description: formData.description,
+ type: formData.type,
+ kpi_ids: formData.selectedKpiIds,
+ location_ids: formData.selectedLocationIds,
+ tag_ids: formData.selectedTagIds
+ }
 
-        if (formData.datePickerValue.singleDate) {
-            submitData.date_represented = formData.datePickerValue.singleDate
-        } else if (formData.datePickerValue.startDate && formData.datePickerValue.endDate) {
-            submitData.date_range_start = formData.datePickerValue.startDate
-            submitData.date_range_end = formData.datePickerValue.endDate
-            submitData.date_represented = formData.datePickerValue.startDate
-        }
+ if (formData.datePickerValue.singleDate) {
+ submitData.date_represented = formData.datePickerValue.singleDate
+ } else if (formData.datePickerValue.startDate && formData.datePickerValue.endDate) {
+ submitData.date_range_start = formData.datePickerValue.startDate
+ submitData.date_range_end = formData.datePickerValue.endDate
+ submitData.date_represented = formData.datePickerValue.startDate
+ }
 
-        if (formData.file) {
-            const capturedFile = formData.file
-            const capturedSubmitData = { ...submitData }
-            const capturedEvidenceId = evidence.id!
-            const capturedOnSuccess = onSuccess
+ if (formData.file) {
+ const capturedFile = formData.file
+ const capturedSubmitData = { ...submitData }
+ const capturedEvidenceId = evidence.id!
+ const capturedOnSuccess = onSuccess
 
-            onClose()
+ onClose()
 
-            queueUpload({
-                file: capturedFile,
-                onComplete: async (result) => {
-                    try {
-                        await apiService.updateEvidence(capturedEvidenceId, { ...capturedSubmitData, file_url: result.file_url })
-                        toast.success('Evidence updated!')
-                        capturedOnSuccess()
-                    } catch (err) {
-                        toast.error(`Failed to update evidence: ${err instanceof Error ? err.message : 'Unknown error'}`)
-                    }
-                },
-                onError: (error) => {
-                    if (error.message !== 'Upload cancelled') {
-                        toast.error(`Upload failed for ${capturedFile.name}`)
-                    }
-                }
-            })
-            return
-        }
+ queueUpload({
+ file: capturedFile,
+ onComplete: async (result) => {
+ try {
+ await apiService.updateEvidence(capturedEvidenceId, { ...capturedSubmitData, file_url: result.file_url })
+ notify.success('Evidence updated!')
+ capturedOnSuccess()
+ } catch (err) {
+ notify.error(`Failed to update evidence: ${err instanceof Error ? err.message : 'Unknown error'}`)
+ }
+ },
+ onError: (error) => {
+ if (error.message !== 'Upload cancelled') {
+ notify.error(`Upload failed for ${capturedFile.name}`)
+ }
+ }
+ })
+ return
+ }
 
-        setLoading(true)
-        try {
-            submitData.file_url = formData.fileUrl
-            await apiService.updateEvidence(evidence.id!, submitData)
-            toast.success('Evidence updated!')
-            onSuccess()
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to update evidence'
-            toast.error(message)
-        } finally {
-            setLoading(false)
-        }
-    }
+ setLoading(true)
+ try {
+ submitData.file_url = formData.fileUrl
+ await apiService.updateEvidence(evidence.id!, submitData)
+ notify.success('Evidence updated!')
+ onSuccess()
+ } catch (error) {
+ const message = error instanceof Error ? error.message : 'Failed to update evidence'
+ notify.error(message)
+ } finally {
+ setLoading(false)
+ }
+ }
 
-    return (
-        <div className="fixed inset-0 bg-white z-[100] flex flex-col h-[100dvh] overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-100 flex-shrink-0">
-                <button onClick={onClose} className="p-2 -ml-2">
-                    <X className="w-5 h-5 text-gray-500" />
-                </button>
-                <span className="font-semibold text-gray-800">Edit Evidence</span>
-                <div className="w-9" />
-            </div>
+ return (
+ <div className="fixed inset-0 bg-white z-[100] flex flex-col h-[100dvh] overflow-hidden">
+ {/* Header */}
+ <div className="flex items-center justify-between p-4 border-b border-gray-100 flex-shrink-0">
+ <button onClick={onClose} className="p-2 -ml-2">
+ <X className="w-5 h-5 text-gray-500" />
+ </button>
+ <span className="font-semibold text-gray-800">Edit Evidence</span>
+ <div className="w-9" />
+ </div>
 
-            {/* Content */}
-            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-6">
-                {/* Type Selection */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">Evidence Type</label>
-                    <div className="grid grid-cols-2 gap-2">
-                        {evidenceTypes.map((type) => {
-                            const Icon = type.icon
-                            const isSelected = formData.type === type.value
-                            return (
-                                <button
-                                    key={type.value}
-                                    type="button"
-                                    onClick={() => setFormData(prev => ({ ...prev, type: type.value }))}
-                                    className={`block w-full appearance-none p-3 rounded-xl border-2 transition-colors ${
-                                        isSelected 
-                                            ? 'border-evidence-500 bg-evidence-50' 
-                                            : 'border-gray-200 bg-white'
-                                    }`}
-                                >
-                                    <Icon className={`w-5 h-5 mx-auto mb-1 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
-                                    <div className={`text-xs font-medium ${isSelected ? 'text-evidence-600' : 'text-gray-600'}`}>
-                                        {type.label}
-                                    </div>
-                                </button>
-                            )
-                        })}
-                    </div>
-                </div>
+ {/* Content */}
+ <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-6">
+ {/* Type Selection */}
+ <div>
+ <label className="block text-sm font-medium text-gray-700 mb-3">Evidence Type</label>
+ <div className="grid grid-cols-2 gap-2">
+ {evidenceTypes.map((type) => {
+ const Icon = type.icon
+ const isSelected = formData.type === type.value
+ return (
+ <button
+ key={type.value}
+ type="button"
+ onClick={() => setFormData(prev => ({ ...prev, type: type.value }))}
+ className={`block w-full appearance-none p-3 rounded-xl border-2 transition-colors ${
+ isSelected 
+ ? 'border-evidence-500 bg-evidence-50' 
+ : 'border-gray-200 bg-white'
+ }`}
+ >
+ <Icon className={`w-5 h-5 mx-auto mb-1 ${isSelected ? 'text-evidence-500' : 'text-gray-400'}`} />
+ <div className={`text-xs font-medium ${isSelected ? 'text-evidence-600' : 'text-gray-600'}`}>
+ {type.label}
+ </div>
+ </button>
+ )
+ })}
+ </div>
+ </div>
 
-                {/* File */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">File</label>
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        onChange={handleFileSelect}
-                        accept="image/*,video/*,.pdf,.doc,.docx"
-                        className="hidden"
-                    />
-                    
-                    {formData.file ? (
-                        <div className="bg-evidence-50 border border-evidence-200 rounded-xl p-3 flex items-center justify-between">
-                            <div className="flex items-center gap-2 min-w-0">
-                                <FileText className="w-5 h-5 text-evidence-500 flex-shrink-0" />
-                                <span className="text-sm text-gray-700 truncate">{formData.file.name}</span>
-                            </div>
-                            <button onClick={() => setFormData(prev => ({ ...prev, file: null }))} className="text-red-500 text-xs font-medium">
-                                Remove
-                            </button>
-                        </div>
-                    ) : formData.fileUrl ? (
-                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex items-center justify-between">
-                            <div className="flex items-center gap-2 min-w-0">
-                                <FileText className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                                <span className="text-sm text-gray-600 truncate">Current file attached</span>
-                            </div>
-                            <button 
-                                onClick={() => fileInputRef.current?.click()} 
-                                className="text-evidence-500 text-xs font-medium"
-                            >
-                                Replace
-                            </button>
-                        </div>
-                    ) : (
-                        <button
-                            onClick={() => fileInputRef.current?.click()}
-                            className="w-full border border-dashed border-gray-300 rounded-xl p-4 text-center"
-                        >
-                            <Upload className="w-6 h-6 text-gray-400 mx-auto mb-1" />
-                            <p className="text-sm text-gray-600">Tap to select file</p>
-                        </button>
-                    )}
-                </div>
+ {/* File */}
+ <div>
+ <label className="app-label">File</label>
+ <input
+ ref={fileInputRef}
+ type="file"
+ onChange={handleFileSelect}
+ accept="image/*,video/*,.pdf,.doc,.docx"
+ className="hidden"
+ />
+ 
+ {formData.file ? (
+ <div className="bg-evidence-50 border border-evidence-200 rounded-xl p-3 flex items-center justify-between">
+ <div className="flex items-center gap-2 min-w-0">
+ <FileText className="w-5 h-5 text-evidence-500 flex-shrink-0" />
+ <span className="text-sm text-gray-700 truncate">{formData.file.name}</span>
+ </div>
+ <button onClick={() => setFormData(prev => ({ ...prev, file: null }))} className="text-red-500 text-xs font-medium">
+ Remove
+ </button>
+ </div>
+ ) : formData.fileUrl ? (
+ <div className="app-card-muted p-3 flex items-center justify-between">
+ <div className="flex items-center gap-2 min-w-0">
+ <FileText className="w-5 h-5 text-gray-400 flex-shrink-0" />
+ <span className="text-sm text-gray-600 truncate">Current file attached</span>
+ </div>
+ <button 
+ onClick={() => fileInputRef.current?.click()} 
+ className="text-evidence-500 text-xs font-medium"
+ >
+ Replace
+ </button>
+ </div>
+ ) : (
+ <button
+ onClick={() => fileInputRef.current?.click()}
+ className="w-full border border-dashed border-gray-300 rounded-xl p-4 text-center"
+ >
+ <Upload className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+ <p className="text-sm text-gray-600">Tap to select file</p>
+ </button>
+ )}
+ </div>
 
-                {/* Title */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Title <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                        type="text"
-                        value={formData.title}
-                        onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm"
-                    />
-                </div>
+ {/* Title */}
+ <div>
+ <label className="app-label">
+ Title <span className="text-red-500">*</span>
+ </label>
+ <input
+ type="text"
+ value={formData.title}
+ onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+ className="app-input"
+ />
+ </div>
 
-                {/* Description */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                    <textarea
-                        value={formData.description}
-                        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                        rows={3}
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm resize-none"
-                    />
-                </div>
+ {/* Description */}
+ <div>
+ <label className="app-label">Description</label>
+ <textarea
+ value={formData.description}
+ onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+ rows={3}
+ className="app-input resize-none"
+ />
+ </div>
 
-                {/* Date */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <Calendar className="w-4 h-4 inline mr-1" />
-                        Date
-                    </label>
-                    <DateRangePicker
-                        value={formData.datePickerValue}
-                        onChange={(value) => setFormData(prev => ({ ...prev, datePickerValue: value }))}
-                        placeholder="Select date"
-                    />
-                </div>
+ {/* Date */}
+ <div>
+ <label className="app-label">
+ <Calendar className="w-4 h-4 inline mr-1" />
+ Date
+ </label>
+ <DateRangePicker
+ value={formData.datePickerValue}
+ onChange={(value) => setFormData(prev => ({ ...prev, datePickerValue: value }))}
+ placeholder="Select date"
+ />
+ </div>
 
-                {/* Locations */}
-                {locations.length > 0 && (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            <MapPin className="w-4 h-4 inline mr-1" />
-                            Locations
-                        </label>
-                        <div className="flex flex-col gap-2 max-h-40 overflow-y-auto">
-                            {locations.map((location) => {
-                                const isSelected = formData.selectedLocationIds.includes(location.id!)
-                                return (
-                                    <button
-                                        key={location.id}
-                                        type="button"
-                                        onClick={() => {
-                                            setFormData(prev => ({
-                                                ...prev,
-                                                selectedLocationIds: isSelected
-                                                    ? prev.selectedLocationIds.filter(id => id !== location.id)
-                                                    : [...prev.selectedLocationIds, location.id!]
-                                            }))
-                                        }}
-                                        className={`block w-full appearance-none p-3 rounded-xl border text-left transition-colors ${
-                                            isSelected ? 'border-evidence-500 bg-evidence-50' : 'border-gray-200 bg-white'
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm font-medium text-gray-800">{location.name}</span>
-                                            {isSelected && <Check className="w-4 h-4 text-evidence-500" />}
-                                        </div>
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    </div>
-                )}
+ {/* Locations */}
+ {locations.length > 0 && (
+ <div>
+ <label className="app-label">
+ <MapPin className="w-4 h-4 inline mr-1" />
+ Locations
+ </label>
+ <div className="flex flex-col gap-2 max-h-40 overflow-y-auto">
+ {locations.map((location) => {
+ const isSelected = formData.selectedLocationIds.includes(location.id!)
+ return (
+ <button
+ key={location.id}
+ type="button"
+ onClick={() => {
+ setFormData(prev => ({
+ ...prev,
+ selectedLocationIds: isSelected
+ ? prev.selectedLocationIds.filter(id => id !== location.id)
+ : [...prev.selectedLocationIds, location.id!]
+ }))
+ }}
+ className={`block w-full appearance-none p-3 rounded-xl border text-left transition-colors ${
+ isSelected ? 'border-evidence-500 bg-evidence-50' : 'border-gray-200 bg-white'
+ }`}
+ >
+ <div className="flex items-center justify-between">
+ <span className="text-sm font-medium text-gray-800">{location.name}</span>
+ {isSelected && <Check className="w-4 h-4 text-evidence-500" />}
+ </div>
+ </button>
+ )
+ })}
+ </div>
+ </div>
+ )}
 
-                {/* KPIs */}
-                {kpis.length > 0 && (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            <FileText className="w-4 h-4 inline mr-1" />
-                            Linked Metrics
-                        </label>
-                        <div className="flex flex-col gap-2 max-h-40 overflow-y-auto">
-                            {kpis.map((kpi) => {
-                                const isSelected = formData.selectedKpiIds.includes(kpi.id!)
-                                return (
-                                    <button
-                                        key={kpi.id}
-                                        type="button"
-                                        onClick={() => {
-                                            setFormData(prev => ({
-                                                ...prev,
-                                                selectedKpiIds: isSelected
-                                                    ? prev.selectedKpiIds.filter(id => id !== kpi.id)
-                                                    : [...prev.selectedKpiIds, kpi.id!]
-                                            }))
-                                        }}
-                                        className={`block w-full appearance-none p-3 rounded-xl border text-left transition-colors ${
-                                            isSelected ? 'border-evidence-500 bg-evidence-50' : 'border-gray-200 bg-white'
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm font-medium text-gray-800">{kpi.title}</span>
-                                            {isSelected && <Check className="w-4 h-4 text-evidence-500" />}
-                                        </div>
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    </div>
-                )}
+ {/* KPIs */}
+ {kpis.length > 0 && (
+ <div>
+ <label className="app-label">
+ <FileText className="w-4 h-4 inline mr-1" />
+ Linked Metrics
+ </label>
+ <div className="flex flex-col gap-2 max-h-40 overflow-y-auto">
+ {kpis.map((kpi) => {
+ const isSelected = formData.selectedKpiIds.includes(kpi.id!)
+ return (
+ <button
+ key={kpi.id}
+ type="button"
+ onClick={() => {
+ setFormData(prev => ({
+ ...prev,
+ selectedKpiIds: isSelected
+ ? prev.selectedKpiIds.filter(id => id !== kpi.id)
+ : [...prev.selectedKpiIds, kpi.id!]
+ }))
+ }}
+ className={`block w-full appearance-none p-3 rounded-xl border text-left transition-colors ${
+ isSelected ? 'border-evidence-500 bg-evidence-50' : 'border-gray-200 bg-white'
+ }`}
+ >
+ <div className="flex items-center justify-between">
+ <span className="text-sm font-medium text-gray-800">{kpi.title}</span>
+ {isSelected && <Check className="w-4 h-4 text-evidence-500" />}
+ </div>
+ </button>
+ )
+ })}
+ </div>
+ </div>
+ )}
 
-                {/* Tags */}
-                <div>
-                    <TagPicker
-                        mode="multi-grouped"
-                        selectedIds={formData.selectedTagIds}
-                        onChange={(ids) => setFormData(prev => ({ ...prev, selectedTagIds: ids }))}
-                        groups={kpis
-                            .filter(k => formData.selectedKpiIds.includes(k.id!))
-                            .map(k => ({ metricId: k.id!, metricTitle: k.title, tagIds: ((k as any).tag_ids || []) as string[] }))}
-                        canCreate={false}
-                        label="Tags"
-                        helperText="Pulled from the linked metrics. Optional."
-                    />
-                </div>
-            </div>
+ {/* Tags */}
+ <div>
+ <TagPicker
+ mode="multi-grouped"
+ selectedIds={formData.selectedTagIds}
+ onChange={(ids) => setFormData(prev => ({ ...prev, selectedTagIds: ids }))}
+ groups={kpis
+ .filter(k => formData.selectedKpiIds.includes(k.id!))
+ .map(k => ({ metricId: k.id!, metricTitle: k.title, tagIds: ((k as any).tag_ids || []) as string[] }))}
+ canCreate={false}
+ label="Tags"
+ helperText="Pulled from the linked metrics. Optional."
+ />
+ </div>
+ </div>
 
-            {/* Footer */}
-            <div className="p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] border-t border-gray-100 bg-white flex-shrink-0">
-                <div className="flex gap-3">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium text-sm"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleSubmit}
-                        disabled={!formData.title || loading}
-                        className="flex-1 py-3 bg-evidence-500 text-white rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                        {loading ? (
-                            <>
-                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                Saving...
-                            </>
-                        ) : (
-                            <>
-                                <Check className="w-4 h-4" />
-                                Save Changes
-                            </>
-                        )}
-                    </button>
-                </div>
-            </div>
-        </div>
-    )
+ {/* Footer */}
+ <div className="p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] border-t border-gray-100 bg-white flex-shrink-0">
+ <div className="flex gap-3">
+ <button
+ type="button"
+ onClick={onClose}
+ className="app-btn app-btn-secondary px-4 py-3"
+ >
+ Cancel
+ </button>
+ <button
+ type="button"
+ onClick={handleSubmit}
+ disabled={!formData.title || loading}
+ className="app-btn bg-evidence-500 text-secondary-900 hover:bg-evidence-600 shadow-sm flex-1 py-3"
+ >
+ {loading ? (
+ <>
+ <Spinner className="w-4 h-4" />
+ Saving...
+ </>
+ ) : (
+ <>
+ <Check className="w-4 h-4" />
+ Save Changes
+ </>
+ )}
+ </button>
+ </div>
+ </div>
+ </div>
+ )
 }
 

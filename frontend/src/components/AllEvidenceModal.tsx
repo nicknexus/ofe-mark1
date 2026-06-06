@@ -7,213 +7,212 @@ import { apiService } from '../services/api'
 import ModalFrame from './ModalFrame'
 
 interface AllEvidenceModalProps {
-    isOpen: boolean
-    onClose: () => void
-    evidence: Evidence[]
-    kpi: any
-    onEvidenceClick?: (evidence: Evidence) => void
+ isOpen: boolean
+ onClose: () => void
+ evidence: Evidence[]
+ kpi: any
+ onEvidenceClick?: (evidence: Evidence) => void
 }
 
 export default function AllEvidenceModal({
-    isOpen,
-    onClose,
-    evidence,
-    kpi,
-    onEvidenceClick
+ isOpen,
+ onClose,
+ evidence,
+ kpi,
+ onEvidenceClick
 }: AllEvidenceModalProps) {
-    const [tagFilter, setTagFilter] = useState<string>('all')
-    const [allTags, setAllTags] = useState<MetricTag[]>([])
+ const [tagFilter, setTagFilter] = useState<string>('all')
+ const [allTags, setAllTags] = useState<MetricTag[]>([])
 
-    useEffect(() => {
-        if (!isOpen) return
-        apiService.getMetricTags().then(setAllTags).catch(() => setAllTags([]))
-    }, [isOpen])
+ useEffect(() => {
+ if (!isOpen) return
+ apiService.getMetricTags().then(setAllTags).catch(() => setAllTags([]))
+ }, [isOpen])
 
-    const tagsAvailableOnEvidence = useMemo(() => {
-        const ids = new Set<string>()
-        for (const ev of evidence) {
-            for (const tid of (ev.tag_ids || [])) ids.add(tid)
-        }
-        return allTags.filter(t => ids.has(t.id))
-    }, [allTags, evidence])
+ const tagsAvailableOnEvidence = useMemo(() => {
+ const ids = new Set<string>()
+ for (const ev of evidence) {
+ for (const tid of (ev.tag_ids || [])) ids.add(tid)
+ }
+ return allTags.filter(t => ids.has(t.id))
+ }, [allTags, evidence])
 
-    const filteredEvidence = useMemo(() => {
-        if (tagFilter === 'all') return evidence
-        return evidence.filter(ev => (ev.tag_ids || []).includes(tagFilter))
-    }, [evidence, tagFilter])
+ const filteredEvidence = useMemo(() => {
+ if (tagFilter === 'all') return evidence
+ return evidence.filter(ev => (ev.tag_ids || []).includes(tagFilter))
+ }, [evidence, tagFilter])
 
-    if (!isOpen) return null
+ if (!isOpen) return null
 
-    // Group evidence by type
-    const groupedByType: Record<string, Evidence[]> = {
-        visual_proof: [],
-        documentation: [],
-        testimony: [],
-        financials: []
-    }
+ // Group evidence by type
+ const groupedByType: Record<string, Evidence[]> = {
+ visual_proof: [],
+ documentation: [],
+ testimony: [],
+ financials: []
+ }
 
-    filteredEvidence.forEach((ev) => {
-        const type = ev.type || 'documentation'
-        if (groupedByType[type]) {
-            groupedByType[type].push(ev)
-        }
-    })
+ filteredEvidence.forEach((ev) => {
+ const type = ev.type || 'documentation'
+ if (groupedByType[type]) {
+ groupedByType[type].push(ev)
+ }
+ })
 
-    // Get icon component for evidence type
-    const getEvidenceIcon = (type: string) => {
-        switch (type) {
-            case 'visual_proof': return Camera
-            case 'documentation': return FileText
-            case 'testimony': return MessageSquare
-            case 'financials': return DollarSign
-            default: return FileText
-        }
-    }
+ // Get icon component for evidence type
+ const getEvidenceIcon = (type: string) => {
+ switch (type) {
+ case 'visual_proof': return Camera
+ case 'documentation': return FileText
+ case 'testimony': return MessageSquare
+ case 'financials': return DollarSign
+ default: return FileText
+ }
+ }
 
-    const typeOrder: Array<'visual_proof' | 'documentation' | 'testimony' | 'financials'> = [
-        'visual_proof',
-        'documentation',
-        'testimony',
-        'financials'
-    ]
+ const typeOrder: Array<'visual_proof' | 'documentation' | 'testimony' | 'financials'> = [
+ 'visual_proof',
+ 'documentation',
+ 'testimony',
+ 'financials'
+ ]
 
-    return (
-        <ModalFrame
-            zIndexClass="z-[70]"
-            backdropClassName="bg-black/40 backdrop-blur-sm"
-            panelClassName="bubble-card max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
-        >
-                {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-100">
-                    <div className="flex items-center gap-4">
-                        <div className="icon-bubble bg-primary-100">
-                            <FileText className="w-5 h-5 text-primary-600" />
-                        </div>
-                        <div>
-                            <h2 className="text-xl font-bold text-gray-900">All Evidence</h2>
-                            <p className="text-sm text-gray-500">{kpi?.title || 'Metric Evidence'}</p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
-                    >
-                        <X className="w-5 h-5 text-gray-400" />
-                    </button>
-                </div>
+ return (
+ <ModalFrame
+ zIndexClass="z-[70]"
+ panelClassName="app-card max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+ >
+ {/* Header */}
+ <div className="flex items-center justify-between p-6 border-b border-gray-100">
+ <div className="flex items-center gap-4">
+ <div className="app-icon-tile bg-primary-100">
+ <FileText className="w-5 h-5 text-primary-600" />
+ </div>
+ <div>
+ <h2 className="text-xl font-bold text-gray-900">All Evidence</h2>
+ <p className="text-sm text-gray-500">{kpi?.title || 'Metric Evidence'}</p>
+ </div>
+ </div>
+ <button
+ onClick={onClose}
+ className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
+ >
+ <X className="w-5 h-5 text-gray-400" />
+ </button>
+ </div>
 
-                {/* Tag filter */}
-                {tagsAvailableOnEvidence.length > 0 && (
-                    <div className="px-6 pt-4 pb-2 border-b border-gray-100 flex items-center gap-2">
-                        <TagIcon className="w-4 h-4 text-gray-500" />
-                        <span className="text-xs font-medium text-gray-600">Filter by tag:</span>
-                        <div className="relative">
-                            <select
-                                value={tagFilter}
-                                onChange={(e) => setTagFilter(e.target.value)}
-                                className="pl-3 pr-8 py-1.5 text-xs font-medium border border-gray-200 rounded-lg bg-white appearance-none focus:outline-none focus:ring-2 focus:ring-primary-300"
-                            >
-                                <option value="all">All tags</option>
-                                {tagsAvailableOnEvidence.map(t => (
-                                    <option key={t.id} value={t.id}>{t.name}</option>
-                                ))}
-                            </select>
-                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-                        </div>
-                        {tagFilter !== 'all' && (
-                            <button
-                                onClick={() => setTagFilter('all')}
-                                className="text-xs text-gray-500 hover:text-gray-700 ml-1"
-                            >
-                                Clear
-                            </button>
-                        )}
-                        <span className="ml-auto text-xs text-gray-500">{filteredEvidence.length} of {evidence.length}</span>
-                    </div>
-                )}
+ {/* Tag filter */}
+ {tagsAvailableOnEvidence.length > 0 && (
+ <div className="px-6 pt-4 pb-2 border-b border-gray-100 flex items-center gap-2">
+ <TagIcon className="w-4 h-4 text-gray-500" />
+ <span className="text-xs font-medium text-gray-600">Filter by tag:</span>
+ <div className="relative">
+ <select
+ value={tagFilter}
+ onChange={(e) => setTagFilter(e.target.value)}
+ className="pl-3 pr-8 py-1.5 text-xs font-medium border border-gray-200 rounded-lg bg-white appearance-none focus:outline-none focus:ring-2 focus:ring-primary-300"
+ >
+ <option value="all">All tags</option>
+ {tagsAvailableOnEvidence.map(t => (
+ <option key={t.id} value={t.id}>{t.name}</option>
+ ))}
+ </select>
+ <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+ </div>
+ {tagFilter !== 'all' && (
+ <button
+ onClick={() => setTagFilter('all')}
+ className="text-xs text-gray-500 hover:text-gray-700 ml-1"
+ >
+ Clear
+ </button>
+ )}
+ <span className="ml-auto text-xs text-gray-500">{filteredEvidence.length} of {evidence.length}</span>
+ </div>
+ )}
 
-                {/* Content */}
-                <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
-                    {filteredEvidence.length === 0 ? (
-                        <div className="text-center py-12">
-                            <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                            <p className="text-gray-500">No evidence available</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-6">
-                            {typeOrder.map((type) => {
-                                const typeEvidence = groupedByType[type]
-                                if (typeEvidence.length === 0) return null
+ {/* Content */}
+ <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+ {filteredEvidence.length === 0 ? (
+ <div className="text-center py-12">
+ <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+ <p className="text-gray-500">No evidence available</p>
+ </div>
+ ) : (
+ <div className="space-y-6">
+ {typeOrder.map((type) => {
+ const typeEvidence = groupedByType[type]
+ if (typeEvidence.length === 0) return null
 
-                                const typeInfo = getEvidenceTypeInfo(type)
-                                const IconComponent = getEvidenceIcon(type)
+ const typeInfo = getEvidenceTypeInfo(type)
+ const IconComponent = getEvidenceIcon(type)
 
-                                return (
-                                    <div key={type} className="space-y-3">
-                                        {/* Type Header */}
-                                        <div className="flex items-center gap-3 pb-2 border-b border-gray-100">
-                                            <div className={`p-2 rounded-lg ${typeInfo.color}`}>
-                                                <IconComponent className="w-4 h-4" />
-                                            </div>
-                                            <h3 className="text-sm font-semibold text-gray-700">
-                                                {typeInfo.label}
-                                            </h3>
-                                            <span className="text-xs text-gray-500">
-                                                ({typeEvidence.length} {typeEvidence.length === 1 ? 'item' : 'items'})
-                                            </span>
-                                        </div>
+ return (
+ <div key={type} className="space-y-3">
+ {/* Type Header */}
+ <div className="flex items-center gap-3 pb-2 border-b border-gray-100">
+ <div className={`p-2 rounded-lg ${typeInfo.color}`}>
+ <IconComponent className="w-4 h-4" />
+ </div>
+ <h3 className="text-sm font-semibold text-gray-700">
+ {typeInfo.label}
+ </h3>
+ <span className="text-xs text-gray-500">
+ ({typeEvidence.length} {typeEvidence.length === 1 ? 'item' : 'items'})
+ </span>
+ </div>
 
-                                        {/* Evidence List */}
-                                        <div className="space-y-2">
-                                            {typeEvidence.map((ev) => {
-                                                const hasDateRange = ev.date_range_start && ev.date_range_end
-                                                const displayDate = hasDateRange
-                                                    ? `${formatDate(ev.date_range_start!)} - ${formatDate(ev.date_range_end!)}`
-                                                    : formatDate(ev.date_represented)
+ {/* Evidence List */}
+ <div className="space-y-2">
+ {typeEvidence.map((ev) => {
+ const hasDateRange = ev.date_range_start && ev.date_range_end
+ const displayDate = hasDateRange
+ ? `${formatDate(ev.date_range_start!)} - ${formatDate(ev.date_range_end!)}`
+ : formatDate(ev.date_represented)
 
-                                                return (
-                                                    <div
-                                                        key={ev.id}
-                                                        onClick={() => onEvidenceClick?.(ev)}
-                                                        className="border border-gray-100/80 rounded-lg bg-white/60 hover:bg-primary-50/50 hover:border-primary-200 cursor-pointer transition-all duration-200 p-3"
-                                                    >
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="min-w-0 flex-1">
-                                                                <div className="flex items-center gap-2 mb-1">
-                                                                    <span className="text-sm font-semibold text-primary-600 truncate">
-                                                                        {ev.title}
-                                                                    </span>
-                                                                </div>
-                                                                {ev.description && (
-                                                                    <p className="text-xs text-gray-500 line-clamp-1 mb-1">
-                                                                        {ev.description}
-                                                                    </p>
-                                                                )}
-                                                                <div className="flex items-center space-x-2 text-xs text-gray-500">
-                                                                    <Calendar className="w-2.5 h-2.5" />
-                                                                    <span>{displayDate}</span>
-                                                                </div>
-                                                                {Array.isArray(ev.tag_ids) && ev.tag_ids.length > 0 && (
-                                                                    <div className="mt-1.5">
-                                                                        <EvidenceTagsList tagIds={ev.tag_ids} size="xs" visibleCap={4} />
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex items-center gap-1.5 ml-2">
-                                                                <Eye className="w-3 h-3 text-gray-400" />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    )}
-                </div>
-        </ModalFrame>
-    )
+ return (
+ <div
+ key={ev.id}
+ onClick={() => onEvidenceClick?.(ev)}
+ className="app-card-interactive cursor-pointer p-3 hover:border-primary-200"
+ >
+ <div className="flex items-center justify-between">
+ <div className="min-w-0 flex-1">
+ <div className="flex items-center gap-2 mb-1">
+ <span className="text-sm font-semibold text-primary-600 truncate">
+ {ev.title}
+ </span>
+ </div>
+ {ev.description && (
+ <p className="text-xs text-gray-500 line-clamp-1 mb-1">
+ {ev.description}
+ </p>
+ )}
+ <div className="flex items-center space-x-2 text-xs text-gray-500">
+ <Calendar className="w-2.5 h-2.5" />
+ <span>{displayDate}</span>
+ </div>
+ {Array.isArray(ev.tag_ids) && ev.tag_ids.length > 0 && (
+ <div className="mt-1.5">
+ <EvidenceTagsList tagIds={ev.tag_ids} size="xs" visibleCap={4} />
+ </div>
+ )}
+ </div>
+ <div className="flex items-center gap-1.5 ml-2">
+ <Eye className="w-3 h-3 text-gray-400" />
+ </div>
+ </div>
+ </div>
+ )
+ })}
+ </div>
+ </div>
+ )
+ })}
+ </div>
+ )}
+ </div>
+ </ModalFrame>
+ )
 }
 

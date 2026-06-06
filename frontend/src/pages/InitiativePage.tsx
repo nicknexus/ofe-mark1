@@ -1,23 +1,23 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-    ArrowLeft,
-    Plus,
-    Target,
-    BarChart3,
-    FileText,
-    Calendar,
-    MapPin,
-    Percent,
-    Hash,
-    TrendingUp,
-    Upload,
-    Eye,
-    Edit,
-    Trash2,
-    Camera,
-    MessageSquare,
-    DollarSign
+ ArrowLeft,
+ Plus,
+ Target,
+ BarChart3,
+ FileText,
+ Calendar,
+ MapPin,
+ Percent,
+ Hash,
+ TrendingUp,
+ Upload,
+ Eye,
+ Edit,
+ Trash2,
+ Camera,
+ MessageSquare,
+ DollarSign
 } from 'lucide-react'
 import { apiService } from '../services/api'
 import { InitiativeDashboard, LoadingState, CreateKPIForm, CreateKPIUpdateForm, CreateEvidenceForm, User, Organization } from '../types'
@@ -42,686 +42,678 @@ import StoriesTab from '../components/InitiativeTabs/StoriesTab'
 import ReportTab from '../components/InitiativeTabs/ReportTab'
 import MobileBottomNav from '../components/MobileBottomNav'
 import ModalFrame from '../components/ModalFrame'
-import toast from 'react-hot-toast'
-import { Button } from '../components/ui/button'
+import { notify } from '../lib/notify'
+import { Button, PageLoader, InlineAlert } from '../components/ui'
 import { useTeam } from '../context/TeamContext'
 
 export default function InitiativePage() {
-    const { canAddImpactClaims, canEditEvidence, canEditMetrics, canDelete } = useTeam()
-    const [user, setUser] = useState<User | null>(null)
-    const [organization, setOrganization] = useState<Organization | null>(null)
-    const { id, kpiId } = useParams<{ id: string; kpiId?: string }>()
-    const [searchParams] = useSearchParams()
-    const navigate = useNavigate()
-    const [dashboard, setDashboard] = useState<InitiativeDashboard | null>(null)
-    const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: true })
-    const [isLoadingDashboard, setIsLoadingDashboard] = useState(false)
-    const [kpiTotals, setKpiTotals] = useState<Record<string, number>>({})
-    const [categoryFilter, setCategoryFilter] = useState<'all' | 'input' | 'output' | 'impact'>('all')
-    const [expandedKPIs, setExpandedKPIs] = useState<Set<string>>(new Set())
-    const [allKPIUpdates, setAllKPIUpdates] = useState<any[]>([])
-    const [orderedKPIIds, setOrderedKPIIds] = useState<string[]>([])
-
-    // Sidebar navigation state
-    const [activeTab, setActiveTab] = useState('home')
-    const [previousTab, setPreviousTab] = useState<string | null>(null) // Track tab before viewing metric
-    const [initialStoryId, setInitialStoryId] = useState<string | undefined>(undefined)
-
-    // Modal states
-    const [isKPIModalOpen, setIsKPIModalOpen] = useState(false)
-    const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
-    const [isImpactClaimModalWithSelectionOpen, setIsImpactClaimModalWithSelectionOpen] = useState(false)
-    const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false)
-    const [isEditKPIModalOpen, setIsEditKPIModalOpen] = useState(false)
-    const [deleteConfirmKPI, setDeleteConfirmKPI] = useState<any>(null)
-    const [deleteConfirmText, setDeleteConfirmText] = useState('')
-
-    // Selected KPI for modals
-    const [selectedKPI, setSelectedKPI] = useState<any>(null)
-
-    // Handle URL query param for tab
-    useEffect(() => {
-        const tab = searchParams.get('tab')
-        if (tab && ['home', 'metrics', 'evidence', 'location', 'beneficiaries', 'stories', 'report'].includes(tab)) {
-            setActiveTab(tab)
-        }
-    }, [searchParams])
-
-    useEffect(() => {
-        // Load user and organization
-        const loadUserAndOrg = async () => {
-            try {
-                const currentUser = await AuthService.getCurrentUser()
-                setUser(currentUser)
-                
-                const orgs = await apiService.getOrganizations()
-                if (orgs && orgs.length > 0) {
-                    setOrganization(orgs[0])
-                }
-            } catch (error) {
-                console.error('Error loading user or organization:', error)
-            }
-        }
-        loadUserAndOrg()
-
-        if (id) {
-            loadDashboard()
-        }
-    }, [id])
-
-    const handleSignOut = async () => {
-        try {
-            await AuthService.signOut()
-            toast.success('Signed out successfully')
-        } catch (error) {
-            toast.error('Failed to sign out')
-        }
-    }
-
-    // Handle URL-based metric expansion
-    useEffect(() => {
-        if (kpiId && dashboard) {
-            // Save current tab before switching to metrics (only if not already on metrics)
-            if (activeTab !== 'metrics') {
-                setPreviousTab(activeTab)
-            }
-            setActiveTab('metrics')
-            setExpandedKPIs(new Set([kpiId]))
-        }
-    }, [kpiId, dashboard])
-
-    const loadKPITotals = async (kpis: any[]) => {
-        if (!id || kpis.length === 0) {
-            setKpiTotals({})
-            setAllKPIUpdates([])
-            return
-        }
-
-        const buildFromGrouped = (grouped: Record<string, any[]>) => {
-            const totals: Record<string, number> = {}
-            const allUpdates: any[] = []
-            for (const kpi of kpis) {
-                const updates = grouped[kpi.id] || []
-                totals[kpi.id] = aggregateKpiUpdates(updates as any, kpi.metric_type)
-                for (const update of updates) {
-                    allUpdates.push({
-                        ...update,
-                        kpi_title: kpi.title,
-                        kpi_unit: kpi.unit_of_measurement
-                    })
-                }
-            }
-            setKpiTotals(totals)
-            setAllKPIUpdates(allUpdates)
-        }
-
-        // Try the single-round-trip batch endpoint first.
-        try {
-            const grouped = await apiService.getKPIUpdatesForInitiative(id)
-            buildFromGrouped(grouped)
-            return
-        } catch (error) {
-            console.warn('Batch KPI updates failed, falling back to per-KPI loop:', error)
-        }
-
-        // Fallback: original per-KPI loop. Slower but guaranteed to work.
-        const grouped: Record<string, any[]> = {}
-        await Promise.all(kpis.map(async (kpi) => {
-            try {
-                grouped[kpi.id] = await apiService.getKPIUpdates(kpi.id)
-            } catch (err) {
-                console.warn(`Failed to load updates for KPI ${kpi.id}:`, err)
-                grouped[kpi.id] = []
-            }
-        }))
-        buildFromGrouped(grouped)
-    }
-
-    const loadDashboard = async () => {
-        if (!id || isLoadingDashboard) return
-
-        try {
-            setIsLoadingDashboard(true)
-            // Only show full-page loading on initial load (no dashboard yet)
-            if (!dashboard) {
-                setLoadingState({ isLoading: true })
-            }
-            const data = await apiService.getInitiativeDashboard(id)
-            setDashboard(data)
-
-            // Load KPI totals after dashboard loads
-            if (data?.kpis) {
-                await loadKPITotals(data.kpis)
-            }
-
-            setLoadingState({ isLoading: false })
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to load dashboard'
-            setLoadingState({ isLoading: false, error: message })
-            toast.error(message)
-        } finally {
-            setIsLoadingDashboard(false)
-        }
-    }
-
-    const handleCreateKPI = async (kpiData: CreateKPIForm) => {
-        try {
-            const newKPI = await apiService.createKPI(kpiData)
-            toast.success('Metric created successfully!')
-
-            // Explicitly clear the dashboard cache to ensure fresh data
-            apiService.clearCache(`/initiatives/${id}/dashboard`)
-
-            // Only reload if not currently loading
-            if (!isLoadingDashboard) {
-                await loadDashboard() // Refresh the dashboard
-            }
-
-            // Auto-open the metric popup after creation
-            if (newKPI?.id) {
-                // Switch to metrics tab if not already there
-                if (activeTab !== 'metrics') {
-                    setActiveTab('metrics')
-                }
-                // Expand the newly created metric
-                setExpandedKPIs(prev => {
-                    const newSet = new Set(prev)
-                    if (newKPI.id) {
-                        newSet.add(newKPI.id)
-                    }
-                    return newSet
-                })
-
-            }
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to create metric'
-            toast.error(message)
-            throw error // Re-throw to keep modal open on error
-        }
-    }
-
-    const handleEditKPI = async (kpiData: CreateKPIForm) => {
-        if (!selectedKPI) return
-        try {
-            await apiService.updateKPI(selectedKPI.id, kpiData)
-            toast.success('Metric updated successfully!')
-
-            // Explicitly clear the dashboard cache to ensure fresh data
-            apiService.clearCache(`/initiatives/${id}/dashboard`)
-
-            // Only reload if not currently loading
-            if (!isLoadingDashboard) {
-                loadDashboard() // Refresh the dashboard
-            }
-            setIsEditKPIModalOpen(false)
-            setSelectedKPI(null)
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to update metric'
-            toast.error(message)
-            throw error
-        }
-    }
-
-    const handleDeleteKPI = async (kpi: any) => {
-        if (deleteConfirmText !== 'DELETE MY METRIC') {
-            toast.error('Please type "DELETE MY METRIC" exactly to confirm')
-            return
-        }
-        try {
-            await apiService.deleteKPI(kpi.id)
-            toast.success('Metric deleted successfully!')
-
-            // Explicitly clear the dashboard cache to ensure fresh data
-            apiService.clearCache(`/initiatives/${id}/dashboard`)
-
-            // Only reload if not currently loading
-            if (!isLoadingDashboard) {
-                loadDashboard() // Refresh the dashboard
-            }
-            setDeleteConfirmKPI(null)
-            setDeleteConfirmText('')
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to delete metric'
-            toast.error(message)
-        }
-    }
-
-    const handleAddKPIUpdate = async (updateData: CreateKPIUpdateForm) => {
-        if (!selectedKPI) return
-
-        try {
-            const newUpdate = await apiService.createKPIUpdate(selectedKPI.id, updateData)
-            toast.success('Impact claim added successfully!')
-
-            // Explicitly clear the dashboard cache to ensure fresh data
-            apiService.clearCache(`/initiatives/${id}/dashboard`)
-
-            // Only reload if not currently loading
-            if (!isLoadingDashboard) {
-                loadDashboard() // Refresh the dashboard
-            }
-
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to add impact claim'
-            toast.error(message)
-            throw error
-        }
-    }
-
-    const handleAddKPIUpdateWithMetricSelection = async (updateData: CreateKPIUpdateForm, kpiId: string) => {
-        try {
-            const newUpdate = await apiService.createKPIUpdate(kpiId, updateData)
-            toast.success('Impact claim added successfully!')
-
-            // Explicitly clear the dashboard cache to ensure fresh data
-            apiService.clearCache(`/initiatives/${id}/dashboard`)
-
-            // Only reload if not currently loading
-            if (!isLoadingDashboard) {
-                loadDashboard() // Refresh the dashboard
-            }
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to add impact claim'
-            toast.error(message)
-            throw error
-        }
-    }
-
-    const handleAddEvidence = async (evidenceData: CreateEvidenceForm) => {
-        try {
-            await apiService.createEvidence(evidenceData)
-            toast.success('Evidence added successfully!')
-
-            // Explicitly clear the dashboard cache to ensure fresh data
-            apiService.clearCache(`/initiatives/${id}/dashboard`)
-
-            // Only reload if not currently loading
-            if (!isLoadingDashboard) {
-                loadDashboard() // Refresh the dashboard
-            }
-
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to add evidence'
-            toast.error(message)
-            throw error
-        }
-    }
-
-    const openUpdateModal = (kpi: any) => {
-        setSelectedKPI(kpi)
-        setIsUpdateModalOpen(true)
-    }
-
-    const openEvidenceModal = (kpi?: any) => {
-        if (kpi) {
-            setSelectedKPI(kpi)
-        }
-        setIsEvidenceModalOpen(true)
-    }
-
-    const openEditModal = (kpi: any) => {
-        setSelectedKPI(kpi)
-        setIsEditKPIModalOpen(true)
-    }
-
-    const openDeleteConfirm = (kpi: any) => {
-        setDeleteConfirmKPI(kpi)
-    }
-
-    const toggleKPIExpansion = (kpiIdToToggle: string) => {
-        const isExpanded = expandedKPIs.has(kpiIdToToggle)
-        if (isExpanded) {
-            // Closing the metric - navigate back to initiative
-            navigate(`/initiatives/${id}`)
-            setExpandedKPIs(new Set())
-            // Return to previous tab if we came from somewhere other than metrics
-            if (previousTab) {
-                setActiveTab(previousTab)
-                setPreviousTab(null)
-            }
-        } else {
-            // Opening a metric - navigate to metric URL
-            navigate(`/initiatives/${id}/metrics/${kpiIdToToggle}`)
-        }
-    }
-
-    const handleTabChange = (tab: string) => {
-        setActiveTab(tab)
-        // Clear expanded KPIs and navigate to base initiative URL when switching tabs
-        if (tab === 'metrics' && kpiId) {
-            navigate(`/initiatives/${id}`)
-            setExpandedKPIs(new Set())
-        } else if (expandedKPIs.size > 0) {
-            navigate(`/initiatives/${id}`)
-            setExpandedKPIs(new Set())
-        }
-    }
-
-    const handleMetricCardClick = (kpiIdToOpen: string) => {
-        // Navigate to the metric URL - this will trigger the useEffect to expand it
-        navigate(`/initiatives/${id}/metrics/${kpiIdToOpen}`)
-    }
-
-    const renderHomeContent = () => {
-        if (!dashboard) return null
-
-        const { initiative, kpis, stats } = dashboard
-
-        return (
-            <div className="h-full overflow-hidden">
-                {kpis.length === 0 ? (
-                    /* Empty State - Compact for Laptop */
-                    <div className="flex items-center justify-center h-full p-6">
-                        <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-10 text-center max-w-md mx-auto">
-                            <div className="icon-bubble mx-auto mb-6">
-                                <BarChart3 className="w-6 h-6 text-primary-500" />
-                            </div>
-                            <h3 className="text-xl font-semibold text-gray-800 mb-3">
-                                Create Your First Metric
-                            </h3>
-                            <p className="text-gray-500 text-sm mb-6 leading-relaxed">
-                                Metrics are the specific measurements you want to track, like "Students Trained" or "Wells Built"
-                            </p>
-                            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                                <button
-                                    onClick={() => setIsKPIModalOpen(true)}
-                                    className="inline-flex items-center justify-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl text-sm font-medium transition-all duration-200 shadow-bubble-sm"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    <span>Add First Metric</span>
-                                </button>
-                                <button
-                                    onClick={() => handleTabChange('metrics')}
-                                    className="inline-flex items-center justify-center space-x-2 px-5 py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-2xl text-sm font-medium transition-all duration-200"
-                                >
-                                    <BarChart3 className="w-4 h-4" />
-                                    <span>View Metrics</span>
-                                </button>
-                            </div>
-                            <div className="mt-6 p-3 bg-gray-50/50 rounded-xl border border-gray-100">
-                                <p className="text-xs text-gray-500">
-                                    💡 Example: "Number of people trained" or "Clean water access provided"
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    /* Analytics Dashboard - Flush to Top */
-                    <div className="h-full overflow-hidden">
-                        <MetricsDashboard
-                            kpis={kpis}
-                            kpiTotals={kpiTotals}
-                            stats={stats}
-                            kpiUpdates={allKPIUpdates}
-                            initiativeId={id}
-                            onNavigateToLocations={() => setActiveTab('location')}
-                            onMetricCardClick={handleMetricCardClick}
-                            onAddKPI={canEditMetrics ? () => setIsKPIModalOpen(true) : undefined}
-                            onStoryClick={(storyId) => {
-                                setInitialStoryId(storyId)
-                                setActiveTab('stories')
-                            }}
-                            user={user}
-                            organization={organization}
-                            onOrderChange={setOrderedKPIIds}
-                            onAddImpactClaim={canAddImpactClaims ? () => setIsImpactClaimModalWithSelectionOpen(true) : undefined}
-                            onAddEvidence={canEditEvidence ? () => {
-                                setSelectedKPI(null)
-                                setIsEvidenceModalOpen(true)
-                            } : undefined}
-                        />
-                    </div>
-                )}
-            </div>
-        )
-    }
-
-    const renderActiveTab = () => {
-        switch (activeTab) {
-            case 'home':
-                return (
-                    <HomeTab>
-                        {renderHomeContent()}
-                    </HomeTab>
-                )
-            case 'metrics':
-                return (
-                    <MetricsTab
-                        dashboard={dashboard}
-                        kpiTotals={kpiTotals}
-                        categoryFilter={categoryFilter}
-                        setCategoryFilter={setCategoryFilter}
-                        expandedKPIs={expandedKPIs}
-                        setExpandedKPIs={setExpandedKPIs}
-                        allKPIUpdates={allKPIUpdates}
-                        onAddKPI={canEditMetrics ? () => setIsKPIModalOpen(true) : undefined}
-                        onAddUpdate={openUpdateModal}
-                        onAddEvidence={canEditEvidence ? openEvidenceModal : undefined}
-                        onEditKPI={canEditMetrics ? openEditModal : undefined}
-                        onDeleteKPI={canDelete ? openDeleteConfirm : undefined}
-                        orderedKPIIds={orderedKPIIds}
-                        onToggleKPIExpansion={toggleKPIExpansion}
-                        initiativeId={id}
-                        onRefresh={loadDashboard}
-                    />
-                )
-            case 'evidence':
-                return <EvidenceTab initiativeId={id!} onRefresh={loadDashboard} />
-            case 'location':
-                return <LocationTab 
-                    onStoryClick={(storyId) => {
-                        setInitialStoryId(storyId)
-                        setActiveTab('stories')
-                    }}
-                    onMetricClick={handleMetricCardClick}
-                />
-            case 'beneficiaries':
-                return <BeneficiariesTab 
-                    initiativeId={id!} 
-                    onRefresh={loadDashboard}
-                    onStoryClick={(storyId) => {
-                        setInitialStoryId(storyId)
-                        setActiveTab('stories')
-                    }}
-                    onMetricClick={handleMetricCardClick}
-                />
-            case 'stories':
-                return <StoriesTab initiativeId={id!} onRefresh={loadDashboard} initialStoryId={initialStoryId} />
-            case 'report':
-                return <ReportTab initiativeId={id!} dashboard={dashboard} />
-            default:
-                return (
-                    <HomeTab>
-                        {renderHomeContent()}
-                    </HomeTab>
-                )
-        }
-    }
-
-    if (loadingState.isLoading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
-            </div>
-        )
-    }
-
-    if (loadingState.error || !dashboard) {
-        return (
-            <div className="text-center py-12">
-                <div className="text-red-600 mb-4">{loadingState.error || 'Initiative not found'}</div>
-                <div className="space-x-4">
-                    <Button asChild variant="secondary">
-                        <Link to="/">Back to Dashboard</Link>
-                    </Button>
-                    <Button onClick={loadDashboard} disabled={isLoadingDashboard}>
-                        {isLoadingDashboard ? 'Loading...' : 'Try Again'}
-                    </Button>
-                </div>
-            </div>
-        )
-    }
-
-    if (!user) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
-            </div>
-        )
-    }
-
-    return (
-        <div className="relative">
-            {/* Fixed Sidebar - hidden on mobile via CSS */}
-            <InitiativeSidebar
-                activeTab={activeTab}
-                onTabChange={handleTabChange}
-                initiativeTitle={dashboard.initiative.title}
-                initiativeId={id!}
-                initiativeSlug={dashboard.initiative.slug}
-                user={user}
-                onSignOut={handleSignOut}
-            />
-
-            {/* Mobile Header - visible only on mobile */}
-            <div className="mobile-only fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between shadow-sm">
-                <div className="flex items-center space-x-3 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                        <img src="/Nexuslogo.png" alt="Logo" className="w-5 h-5 object-contain" />
-                    </div>
-                    <div className="min-w-0">
-                        <h1 className="text-sm font-semibold text-gray-800 truncate">
-                            {dashboard.initiative.title}
-                        </h1>
-                        <p className="text-xs text-gray-400">Initiative</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Main Content with left margin for sidebar on desktop */}
-            <div className="ml-56 desktop-main-offset pt-14 md:pt-0">
-                {renderActiveTab()}
-            </div>
-
-            {/* Mobile Bottom Navigation - hidden on desktop */}
-            <MobileBottomNav
-                activeTab={activeTab}
-                onTabChange={handleTabChange}
-            />
-
-            {/* Modals */}
-            <CreateKPIModal
-                isOpen={isKPIModalOpen}
-                onClose={() => setIsKPIModalOpen(false)}
-                onSubmit={handleCreateKPI}
-                initiativeId={id!}
-            />
-
-            {selectedKPI && (
-                <AddKPIUpdateModal
-                    isOpen={isUpdateModalOpen}
-                    onClose={() => {
-                        setIsUpdateModalOpen(false)
-                        setSelectedKPI(null)
-                    }}
-                    onSubmit={handleAddKPIUpdate}
-                    kpiTitle={selectedKPI.title}
-                    kpiId={selectedKPI.id}
-                    metricType={selectedKPI.metric_type}
-                    unitOfMeasurement={selectedKPI.unit_of_measurement}
-                    initiativeId={id!}
-                    kpiTagIds={(selectedKPI as any).tag_ids || []}
-                />
-            )}
-
-            {dashboard && (
-                <AddKPIUpdateModalWithMetricSelection
-                    isOpen={isImpactClaimModalWithSelectionOpen}
-                    onClose={() => setIsImpactClaimModalWithSelectionOpen(false)}
-                    onSubmit={handleAddKPIUpdateWithMetricSelection}
-                    availableKPIs={dashboard.kpis}
-                    initiativeId={id!}
-                />
-            )}
-
-            <EvidenceUploadModal
-                isOpen={isEvidenceModalOpen}
-                onClose={() => {
-                    setIsEvidenceModalOpen(false)
-                    setSelectedKPI(null)
-                }}
-                onCreated={async () => {
-                    apiService.clearCache(`/initiatives/${id}/dashboard`)
-                    if (!isLoadingDashboard) loadDashboard()
-                }}
-                initiativeId={id!}
-                preSelectedKPIId={selectedKPI?.id}
-            />
-
-            {/* Edit KPI Modal */}
-            {selectedKPI && (
-                <CreateKPIModal
-                    isOpen={isEditKPIModalOpen}
-                    onClose={() => {
-                        setIsEditKPIModalOpen(false)
-                        setSelectedKPI(null)
-                    }}
-                    onSubmit={handleEditKPI}
-                    initiativeId={id!}
-                    editData={selectedKPI}
-                />
-            )}
-
-            {/* Modern Delete Confirmation Dialog */}
-            {deleteConfirmKPI && (
-                <ModalFrame zIndexClass="z-[60]" backdropClassName="bg-black/40 backdrop-blur-sm" panelClassName="bg-white rounded-2xl max-w-md w-full p-6 shadow-bubble-lg border border-gray-100">
-                        <div className="flex items-start space-x-4 mb-6">
-                            <div className="icon-bubble">
-                                <Trash2 className="w-5 h-5 text-red-500" />
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-gray-800 mb-1">Delete Metric</h3>
-                                <p className="text-sm text-gray-500">This action cannot be undone</p>
-                            </div>
-                        </div>
-
-                        <p className="text-gray-600 mb-2 text-sm">
-                            Are you sure you want to delete <strong className="text-gray-800">"{deleteConfirmKPI.title}"</strong>?
-                        </p>
-                        <p className="text-xs text-gray-500 mb-4">
-                            This will also delete all associated impact claims and evidence links.
-                        </p>
-
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Type <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">DELETE MY METRIC</span> to confirm:
-                            </label>
-                            <input
-                                type="text"
-                                value={deleteConfirmText}
-                                onChange={(e) => setDeleteConfirmText(e.target.value)}
-                                placeholder="DELETE MY METRIC"
-                                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                            />
-                        </div>
-
-                        <div className="flex space-x-3">
-                            <button
-                                onClick={() => { setDeleteConfirmKPI(null); setDeleteConfirmText('') }}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-all duration-200"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => handleDeleteKPI(deleteConfirmKPI)}
-                                disabled={deleteConfirmText !== 'DELETE MY METRIC'}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-2xl transition-all duration-200 shadow-bubble-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                Delete Metric
-                            </button>
-                        </div>
-                </ModalFrame>
-            )}
-        </div>
-    )
+ const { canAddImpactClaims, canEditEvidence, canEditMetrics, canDelete } = useTeam()
+ const [user, setUser] = useState<User | null>(null)
+ const [organization, setOrganization] = useState<Organization | null>(null)
+ const { id, kpiId } = useParams<{ id: string; kpiId?: string }>()
+ const [searchParams] = useSearchParams()
+ const navigate = useNavigate()
+ const [dashboard, setDashboard] = useState<InitiativeDashboard | null>(null)
+ const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: true })
+ const [isLoadingDashboard, setIsLoadingDashboard] = useState(false)
+ const [kpiTotals, setKpiTotals] = useState<Record<string, number>>({})
+ const [categoryFilter, setCategoryFilter] = useState<'all' | 'input' | 'output' | 'impact'>('all')
+ const [expandedKPIs, setExpandedKPIs] = useState<Set<string>>(new Set())
+ const [allKPIUpdates, setAllKPIUpdates] = useState<any[]>([])
+ const [orderedKPIIds, setOrderedKPIIds] = useState<string[]>([])
+
+ // Sidebar navigation state
+ const [activeTab, setActiveTab] = useState('home')
+ const [previousTab, setPreviousTab] = useState<string | null>(null) // Track tab before viewing metric
+ const [initialStoryId, setInitialStoryId] = useState<string | undefined>(undefined)
+
+ // Modal states
+ const [isKPIModalOpen, setIsKPIModalOpen] = useState(false)
+ const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
+ const [isImpactClaimModalWithSelectionOpen, setIsImpactClaimModalWithSelectionOpen] = useState(false)
+ const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false)
+ const [isEditKPIModalOpen, setIsEditKPIModalOpen] = useState(false)
+ const [deleteConfirmKPI, setDeleteConfirmKPI] = useState<any>(null)
+ const [deleteConfirmText, setDeleteConfirmText] = useState('')
+
+ // Selected KPI for modals
+ const [selectedKPI, setSelectedKPI] = useState<any>(null)
+
+ // Handle URL query param for tab
+ useEffect(() => {
+ const tab = searchParams.get('tab')
+ if (tab && ['home', 'metrics', 'evidence', 'location', 'beneficiaries', 'stories', 'report'].includes(tab)) {
+ setActiveTab(tab)
+ }
+ }, [searchParams])
+
+ useEffect(() => {
+ // Load user and organization
+ const loadUserAndOrg = async () => {
+ try {
+ const currentUser = await AuthService.getCurrentUser()
+ setUser(currentUser)
+ 
+ const orgs = await apiService.getOrganizations()
+ if (orgs && orgs.length > 0) {
+ setOrganization(orgs[0])
+ }
+ } catch (error) {
+ console.error('Error loading user or organization:', error)
+ }
+ }
+ loadUserAndOrg()
+
+ if (id) {
+ loadDashboard()
+ }
+ }, [id])
+
+ const handleSignOut = async () => {
+ try {
+ await AuthService.signOut()
+ notify.success('Signed out successfully')
+ } catch (error) {
+ notify.error('Failed to sign out')
+ }
+ }
+
+ // Handle URL-based metric expansion
+ useEffect(() => {
+ if (kpiId && dashboard) {
+ // Save current tab before switching to metrics (only if not already on metrics)
+ if (activeTab !== 'metrics') {
+ setPreviousTab(activeTab)
+ }
+ setActiveTab('metrics')
+ setExpandedKPIs(new Set([kpiId]))
+ }
+ }, [kpiId, dashboard])
+
+ const loadKPITotals = async (kpis: any[]) => {
+ if (!id || kpis.length === 0) {
+ setKpiTotals({})
+ setAllKPIUpdates([])
+ return
+ }
+
+ const buildFromGrouped = (grouped: Record<string, any[]>) => {
+ const totals: Record<string, number> = {}
+ const allUpdates: any[] = []
+ for (const kpi of kpis) {
+ const updates = grouped[kpi.id] || []
+ totals[kpi.id] = aggregateKpiUpdates(updates as any, kpi.metric_type)
+ for (const update of updates) {
+ allUpdates.push({
+ ...update,
+ kpi_title: kpi.title,
+ kpi_unit: kpi.unit_of_measurement
+ })
+ }
+ }
+ setKpiTotals(totals)
+ setAllKPIUpdates(allUpdates)
+ }
+
+ // Try the single-round-trip batch endpoint first.
+ try {
+ const grouped = await apiService.getKPIUpdatesForInitiative(id)
+ buildFromGrouped(grouped)
+ return
+ } catch (error) {
+ console.warn('Batch KPI updates failed, falling back to per-KPI loop:', error)
+ }
+
+ // Fallback: original per-KPI loop. Slower but guaranteed to work.
+ const grouped: Record<string, any[]> = {}
+ await Promise.all(kpis.map(async (kpi) => {
+ try {
+ grouped[kpi.id] = await apiService.getKPIUpdates(kpi.id)
+ } catch (err) {
+ console.warn(`Failed to load updates for KPI ${kpi.id}:`, err)
+ grouped[kpi.id] = []
+ }
+ }))
+ buildFromGrouped(grouped)
+ }
+
+ const loadDashboard = async () => {
+ if (!id || isLoadingDashboard) return
+
+ try {
+ setIsLoadingDashboard(true)
+ // Only show full-page loading on initial load (no dashboard yet)
+ if (!dashboard) {
+ setLoadingState({ isLoading: true })
+ }
+ const data = await apiService.getInitiativeDashboard(id)
+ setDashboard(data)
+
+ // Load KPI totals after dashboard loads
+ if (data?.kpis) {
+ await loadKPITotals(data.kpis)
+ }
+
+ setLoadingState({ isLoading: false })
+ } catch (error) {
+ const message = error instanceof Error ? error.message : 'Failed to load dashboard'
+ setLoadingState({ isLoading: false, error: message })
+ notify.error(message)
+ } finally {
+ setIsLoadingDashboard(false)
+ }
+ }
+
+ const handleCreateKPI = async (kpiData: CreateKPIForm) => {
+ try {
+ const newKPI = await apiService.createKPI(kpiData)
+ notify.success('Metric created successfully!')
+
+ // Explicitly clear the dashboard cache to ensure fresh data
+ apiService.clearCache(`/initiatives/${id}/dashboard`)
+
+ // Only reload if not currently loading
+ if (!isLoadingDashboard) {
+ await loadDashboard() // Refresh the dashboard
+ }
+
+ // Auto-open the metric popup after creation
+ if (newKPI?.id) {
+ // Switch to metrics tab if not already there
+ if (activeTab !== 'metrics') {
+ setActiveTab('metrics')
+ }
+ // Expand the newly created metric
+ setExpandedKPIs(prev => {
+ const newSet = new Set(prev)
+ if (newKPI.id) {
+ newSet.add(newKPI.id)
+ }
+ return newSet
+ })
+
+ }
+ } catch (error) {
+ const message = error instanceof Error ? error.message : 'Failed to create metric'
+ notify.error(message)
+ throw error // Re-throw to keep modal open on error
+ }
+ }
+
+ const handleEditKPI = async (kpiData: CreateKPIForm) => {
+ if (!selectedKPI) return
+ try {
+ await apiService.updateKPI(selectedKPI.id, kpiData)
+ notify.success('Metric updated successfully!')
+
+ // Explicitly clear the dashboard cache to ensure fresh data
+ apiService.clearCache(`/initiatives/${id}/dashboard`)
+
+ // Only reload if not currently loading
+ if (!isLoadingDashboard) {
+ loadDashboard() // Refresh the dashboard
+ }
+ setIsEditKPIModalOpen(false)
+ setSelectedKPI(null)
+ } catch (error) {
+ const message = error instanceof Error ? error.message : 'Failed to update metric'
+ notify.error(message)
+ throw error
+ }
+ }
+
+ const handleDeleteKPI = async (kpi: any) => {
+ if (deleteConfirmText !== 'DELETE MY METRIC') {
+ notify.error('Please type "DELETE MY METRIC" exactly to confirm')
+ return
+ }
+ try {
+ await apiService.deleteKPI(kpi.id)
+ notify.success('Metric deleted successfully!')
+
+ // Explicitly clear the dashboard cache to ensure fresh data
+ apiService.clearCache(`/initiatives/${id}/dashboard`)
+
+ // Only reload if not currently loading
+ if (!isLoadingDashboard) {
+ loadDashboard() // Refresh the dashboard
+ }
+ setDeleteConfirmKPI(null)
+ setDeleteConfirmText('')
+ } catch (error) {
+ const message = error instanceof Error ? error.message : 'Failed to delete metric'
+ notify.error(message)
+ }
+ }
+
+ const handleAddKPIUpdate = async (updateData: CreateKPIUpdateForm) => {
+ if (!selectedKPI) return
+
+ try {
+ const newUpdate = await apiService.createKPIUpdate(selectedKPI.id, updateData)
+ notify.success('Impact claim added successfully!')
+
+ // Explicitly clear the dashboard cache to ensure fresh data
+ apiService.clearCache(`/initiatives/${id}/dashboard`)
+
+ // Only reload if not currently loading
+ if (!isLoadingDashboard) {
+ loadDashboard() // Refresh the dashboard
+ }
+
+ } catch (error) {
+ const message = error instanceof Error ? error.message : 'Failed to add impact claim'
+ notify.error(message)
+ throw error
+ }
+ }
+
+ const handleAddKPIUpdateWithMetricSelection = async (updateData: CreateKPIUpdateForm, kpiId: string) => {
+ try {
+ const newUpdate = await apiService.createKPIUpdate(kpiId, updateData)
+ notify.success('Impact claim added successfully!')
+
+ // Explicitly clear the dashboard cache to ensure fresh data
+ apiService.clearCache(`/initiatives/${id}/dashboard`)
+
+ // Only reload if not currently loading
+ if (!isLoadingDashboard) {
+ loadDashboard() // Refresh the dashboard
+ }
+ } catch (error) {
+ const message = error instanceof Error ? error.message : 'Failed to add impact claim'
+ notify.error(message)
+ throw error
+ }
+ }
+
+ const handleAddEvidence = async (evidenceData: CreateEvidenceForm) => {
+ try {
+ await apiService.createEvidence(evidenceData)
+ notify.success('Evidence added successfully!')
+
+ // Explicitly clear the dashboard cache to ensure fresh data
+ apiService.clearCache(`/initiatives/${id}/dashboard`)
+
+ // Only reload if not currently loading
+ if (!isLoadingDashboard) {
+ loadDashboard() // Refresh the dashboard
+ }
+
+ } catch (error) {
+ const message = error instanceof Error ? error.message : 'Failed to add evidence'
+ notify.error(message)
+ throw error
+ }
+ }
+
+ const openUpdateModal = (kpi: any) => {
+ setSelectedKPI(kpi)
+ setIsUpdateModalOpen(true)
+ }
+
+ const openEvidenceModal = (kpi?: any) => {
+ if (kpi) {
+ setSelectedKPI(kpi)
+ }
+ setIsEvidenceModalOpen(true)
+ }
+
+ const openEditModal = (kpi: any) => {
+ setSelectedKPI(kpi)
+ setIsEditKPIModalOpen(true)
+ }
+
+ const openDeleteConfirm = (kpi: any) => {
+ setDeleteConfirmKPI(kpi)
+ }
+
+ const toggleKPIExpansion = (kpiIdToToggle: string) => {
+ const isExpanded = expandedKPIs.has(kpiIdToToggle)
+ if (isExpanded) {
+ // Closing the metric - navigate back to initiative
+ navigate(`/initiatives/${id}`)
+ setExpandedKPIs(new Set())
+ // Return to previous tab if we came from somewhere other than metrics
+ if (previousTab) {
+ setActiveTab(previousTab)
+ setPreviousTab(null)
+ }
+ } else {
+ // Opening a metric - navigate to metric URL
+ navigate(`/initiatives/${id}/metrics/${kpiIdToToggle}`)
+ }
+ }
+
+ const handleTabChange = (tab: string) => {
+ setActiveTab(tab)
+ // Clear expanded KPIs and navigate to base initiative URL when switching tabs
+ if (tab === 'metrics' && kpiId) {
+ navigate(`/initiatives/${id}`)
+ setExpandedKPIs(new Set())
+ } else if (expandedKPIs.size > 0) {
+ navigate(`/initiatives/${id}`)
+ setExpandedKPIs(new Set())
+ }
+ }
+
+ const handleMetricCardClick = (kpiIdToOpen: string) => {
+ // Navigate to the metric URL - this will trigger the useEffect to expand it
+ navigate(`/initiatives/${id}/metrics/${kpiIdToOpen}`)
+ }
+
+ const renderHomeContent = () => {
+ if (!dashboard) return null
+
+ const { initiative, kpis, stats } = dashboard
+
+ return (
+ <div className="h-full overflow-hidden">
+ {kpis.length === 0 ? (
+ /* Empty State - Compact for Laptop */
+ <div className="flex items-center justify-center h-full p-6">
+ <div className="app-card p-10 text-center max-w-md mx-auto">
+ <div className="app-icon-tile mx-auto mb-6">
+ <BarChart3 className="w-6 h-6 text-primary-500" />
+ </div>
+ <h3 className="text-xl font-semibold text-gray-800 mb-3">
+ Create Your First Metric
+ </h3>
+ <p className="text-gray-500 text-sm mb-6 leading-relaxed">
+ Metrics are the specific measurements you want to track, like "Students Trained" or "Wells Built"
+ </p>
+ <div className="flex flex-col sm:flex-row gap-3 justify-center">
+ <button
+ onClick={() => setIsKPIModalOpen(true)}
+            className="app-btn app-btn-primary inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm"
+ >
+ <Plus className="w-4 h-4" />
+ <span>Add First Metric</span>
+ </button>
+ <button
+ onClick={() => handleTabChange('metrics')}
+            className="app-btn app-btn-secondary inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm"
+ >
+ <BarChart3 className="w-4 h-4" />
+ <span>View Metrics</span>
+ </button>
+ </div>
+ <div className="mt-6 p-3 bg-gray-50/50 rounded-xl border border-gray-100">
+ <p className="text-xs text-gray-500">
+ 💡 Example: "Number of people trained" or "Clean water access provided"
+ </p>
+ </div>
+ </div>
+ </div>
+ ) : (
+ /* Analytics Dashboard - Flush to Top */
+ <div className="h-full overflow-hidden">
+ <MetricsDashboard
+ kpis={kpis}
+ kpiTotals={kpiTotals}
+ stats={stats}
+ kpiUpdates={allKPIUpdates}
+ initiativeId={id}
+ onNavigateToLocations={() => setActiveTab('location')}
+ onMetricCardClick={handleMetricCardClick}
+ onAddKPI={canEditMetrics ? () => setIsKPIModalOpen(true) : undefined}
+ onStoryClick={(storyId) => {
+ setInitialStoryId(storyId)
+ setActiveTab('stories')
+ }}
+ user={user}
+ organization={organization}
+ onOrderChange={setOrderedKPIIds}
+ onAddImpactClaim={canAddImpactClaims ? () => setIsImpactClaimModalWithSelectionOpen(true) : undefined}
+ onAddEvidence={canEditEvidence ? () => {
+ setSelectedKPI(null)
+ setIsEvidenceModalOpen(true)
+ } : undefined}
+ />
+ </div>
+ )}
+ </div>
+ )
+ }
+
+ const renderActiveTab = () => {
+ switch (activeTab) {
+ case 'home':
+ return (
+ <HomeTab>
+ {renderHomeContent()}
+ </HomeTab>
+ )
+ case 'metrics':
+ return (
+ <MetricsTab
+ dashboard={dashboard}
+ kpiTotals={kpiTotals}
+ categoryFilter={categoryFilter}
+ setCategoryFilter={setCategoryFilter}
+ expandedKPIs={expandedKPIs}
+ setExpandedKPIs={setExpandedKPIs}
+ allKPIUpdates={allKPIUpdates}
+ onAddKPI={canEditMetrics ? () => setIsKPIModalOpen(true) : undefined}
+ onAddUpdate={openUpdateModal}
+ onAddEvidence={canEditEvidence ? openEvidenceModal : undefined}
+ onEditKPI={canEditMetrics ? openEditModal : undefined}
+ onDeleteKPI={canDelete ? openDeleteConfirm : undefined}
+ orderedKPIIds={orderedKPIIds}
+ onToggleKPIExpansion={toggleKPIExpansion}
+ initiativeId={id}
+ onRefresh={loadDashboard}
+ />
+ )
+ case 'evidence':
+ return <EvidenceTab initiativeId={id!} onRefresh={loadDashboard} />
+ case 'location':
+ return <LocationTab 
+ onStoryClick={(storyId) => {
+ setInitialStoryId(storyId)
+ setActiveTab('stories')
+ }}
+ onMetricClick={handleMetricCardClick}
+ />
+ case 'beneficiaries':
+ return <BeneficiariesTab 
+ initiativeId={id!} 
+ onRefresh={loadDashboard}
+ onStoryClick={(storyId) => {
+ setInitialStoryId(storyId)
+ setActiveTab('stories')
+ }}
+ onMetricClick={handleMetricCardClick}
+ />
+ case 'stories':
+ return <StoriesTab initiativeId={id!} onRefresh={loadDashboard} initialStoryId={initialStoryId} />
+ case 'report':
+ return <ReportTab initiativeId={id!} dashboard={dashboard} />
+ default:
+ return (
+ <HomeTab>
+ {renderHomeContent()}
+ </HomeTab>
+ )
+ }
+ }
+
+ if (loadingState.isLoading) {
+ return <PageLoader />
+ }
+
+ if (loadingState.error || !dashboard) {
+ return (
+ <div className="text-center py-12 px-4 app-canvas min-h-screen">
+ <InlineAlert tone="error" className="mb-4 max-w-md mx-auto text-left">{loadingState.error || 'Initiative not found'}</InlineAlert>
+ <div className="space-x-4">
+ <Button asChild variant="secondary">
+ <Link to="/">Back to Dashboard</Link>
+ </Button>
+ <Button onClick={loadDashboard} disabled={isLoadingDashboard}>
+ {isLoadingDashboard ? 'Loading...' : 'Try Again'}
+ </Button>
+ </div>
+ </div>
+ )
+ }
+
+ if (!user) {
+ return <PageLoader />
+ }
+
+ return (
+ <div className="relative app-canvas min-h-screen">
+ {/* Fixed Sidebar - hidden on mobile via CSS */}
+ <InitiativeSidebar
+ activeTab={activeTab}
+ onTabChange={handleTabChange}
+ initiativeTitle={dashboard.initiative.title}
+ initiativeId={id!}
+ initiativeSlug={dashboard.initiative.slug}
+ user={user}
+ onSignOut={handleSignOut}
+ />
+
+ {/* Mobile Header - visible only on mobile */}
+ <div className="mobile-only fixed top-0 left-0 right-0 z-40 app-card rounded-none border-x-0 border-t-0 px-4 py-3 flex items-center justify-between">
+ <div className="flex items-center space-x-3 min-w-0">
+ <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+ <img src="/Nexuslogo.png" alt="Logo" className="w-5 h-5 object-contain" />
+ </div>
+ <div className="min-w-0">
+ <h1 className="text-sm font-semibold text-gray-800 truncate">
+ {dashboard.initiative.title}
+ </h1>
+ <p className="text-xs text-gray-400">Initiative</p>
+ </div>
+ </div>
+ </div>
+
+ {/* Main Content with left margin for sidebar on desktop */}
+ <div className="ml-56 desktop-main-offset pt-14 md:pt-0">
+ {renderActiveTab()}
+ </div>
+
+ {/* Mobile Bottom Navigation - hidden on desktop */}
+ <MobileBottomNav
+ activeTab={activeTab}
+ onTabChange={handleTabChange}
+ />
+
+ {/* Modals */}
+ <CreateKPIModal
+ isOpen={isKPIModalOpen}
+ onClose={() => setIsKPIModalOpen(false)}
+ onSubmit={handleCreateKPI}
+ initiativeId={id!}
+ />
+
+ {selectedKPI && (
+ <AddKPIUpdateModal
+ isOpen={isUpdateModalOpen}
+ onClose={() => {
+ setIsUpdateModalOpen(false)
+ setSelectedKPI(null)
+ }}
+ onSubmit={handleAddKPIUpdate}
+ kpiTitle={selectedKPI.title}
+ kpiId={selectedKPI.id}
+ metricType={selectedKPI.metric_type}
+ unitOfMeasurement={selectedKPI.unit_of_measurement}
+ initiativeId={id!}
+ kpiTagIds={(selectedKPI as any).tag_ids || []}
+ />
+ )}
+
+ {dashboard && (
+ <AddKPIUpdateModalWithMetricSelection
+ isOpen={isImpactClaimModalWithSelectionOpen}
+ onClose={() => setIsImpactClaimModalWithSelectionOpen(false)}
+ onSubmit={handleAddKPIUpdateWithMetricSelection}
+ availableKPIs={dashboard.kpis}
+ initiativeId={id!}
+ />
+ )}
+
+ <EvidenceUploadModal
+ isOpen={isEvidenceModalOpen}
+ onClose={() => {
+ setIsEvidenceModalOpen(false)
+ setSelectedKPI(null)
+ }}
+ onCreated={async () => {
+ apiService.clearCache(`/initiatives/${id}/dashboard`)
+ if (!isLoadingDashboard) loadDashboard()
+ }}
+ initiativeId={id!}
+ preSelectedKPIId={selectedKPI?.id}
+ />
+
+ {/* Edit KPI Modal */}
+ {selectedKPI && (
+ <CreateKPIModal
+ isOpen={isEditKPIModalOpen}
+ onClose={() => {
+ setIsEditKPIModalOpen(false)
+ setSelectedKPI(null)
+ }}
+ onSubmit={handleEditKPI}
+ initiativeId={id!}
+ editData={selectedKPI}
+ />
+ )}
+
+ {/* Modern Delete Confirmation Dialog */}
+ {deleteConfirmKPI && (
+ <ModalFrame zIndexClass="z-[60]" backdropClassName="bg-black/40 backdrop-blur-sm" panelClassName="bg-white rounded-xl max-w-md w-full p-6 shadow-card-lg border border-gray-100">
+ <div className="flex items-start space-x-4 mb-6">
+ <div className="app-icon-tile">
+ <Trash2 className="w-5 h-5 text-red-500" />
+ </div>
+ <div className="flex-1">
+ <h3 className="text-lg font-semibold text-gray-800 mb-1">Delete Metric</h3>
+ <p className="text-sm text-gray-500">This action cannot be undone</p>
+ </div>
+ </div>
+
+ <p className="text-gray-600 mb-2 text-sm">
+ Are you sure you want to delete <strong className="text-gray-800">"{deleteConfirmKPI.title}"</strong>?
+ </p>
+ <p className="text-xs text-gray-500 mb-4">
+ This will also delete all associated impact claims and evidence links.
+ </p>
+
+ <div className="mb-6">
+ <label className="block text-sm font-medium text-gray-700 mb-2">
+ Type <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">DELETE MY METRIC</span> to confirm:
+ </label>
+ <input
+ type="text"
+ value={deleteConfirmText}
+ onChange={(e) => setDeleteConfirmText(e.target.value)}
+ placeholder="DELETE MY METRIC"
+ className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500"
+ />
+ </div>
+
+ <div className="flex space-x-3">
+ <button
+ onClick={() => { setDeleteConfirmKPI(null); setDeleteConfirmText('') }}
+ className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-xl transition-all duration-200"
+ >
+ Cancel
+ </button>
+ <button
+ onClick={() => handleDeleteKPI(deleteConfirmKPI)}
+ disabled={deleteConfirmText !== 'DELETE MY METRIC'}
+ className="app-btn app-btn-danger flex-1"
+ >
+ Delete Metric
+ </button>
+ </div>
+ </ModalFrame>
+ )}
+ </div>
+ )
 }

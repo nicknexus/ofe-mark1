@@ -2,26 +2,26 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useTeam } from '../context/TeamContext'
 import {
-    ChevronDown,
-    ChevronUp,
-    Plus,
-    Upload,
-    Edit,
-    Trash2,
-    BarChart3,
-    FileText,
-    TrendingUp,
-    Calendar,
-    Target,
-    X,
-    Eye,
-    MapPin,
-    Camera,
-    MessageSquare,
-    DollarSign,
-    Heart,
-    Check,
-    Info
+ ChevronDown,
+ ChevronUp,
+ Plus,
+ Upload,
+ Edit,
+ Trash2,
+ BarChart3,
+ FileText,
+ TrendingUp,
+ Calendar,
+ Target,
+ X,
+ Eye,
+ MapPin,
+ Camera,
+ MessageSquare,
+ DollarSign,
+ Heart,
+ Check,
+ Info
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, ReferenceLine } from 'recharts'
 import { getCategoryColor, formatDate, getEvidenceTypeInfo, compareClaimsByEffectiveDateDesc } from '../utils'
@@ -40,1927 +40,1927 @@ import KPIFilterBar from './KPIFilterBar'
 import { Link } from 'react-router-dom'
 import { MetricTag, Location, BeneficiaryGroup } from '../types'
 import { apiService } from '../services/api'
-import toast from 'react-hot-toast'
+import { notify } from '../lib/notify'
 import ConfirmDialog from './ConfirmDialog'
 import {
-    getClaimSupportPercentage as computeClaimSupportPercentage,
-    getClaimEvidenceCount as computeClaimEvidenceCount,
+ getClaimSupportPercentage as computeClaimSupportPercentage,
+ getClaimEvidenceCount as computeClaimEvidenceCount,
 } from './expandableKpiCard/claimEvidenceSupport'
 import { generateKpiChartData } from './expandableKpiCard/generateKpiChartData'
 import { calculateEvidenceTypePercentages } from './expandableKpiCard/evidenceTypeCoverage'
 import {
-    getXAxisInterval,
-    formatXAxisTick,
-    calculateMaxWithHeadroom,
-    computeActualMaxCumulative,
-    generateYTicks,
-    computePercentageYAxis,
+ getXAxisInterval,
+ formatXAxisTick,
+ calculateMaxWithHeadroom,
+ computeActualMaxCumulative,
+ generateYTicks,
+ computePercentageYAxis,
 } from './expandableKpiCard/kpiChartAxisHelpers'
 import { ExpandableKPICardPercentageTooltip } from './expandableKpiCard/ExpandableKPICardPercentageTooltip'
 
 interface ExpandableKPICardProps {
-    kpi: any
-    kpiTotal: number
-    isExpanded: boolean
-    renderAsPage?: boolean // When true, renders as full page instead of portal overlay
-    onToggleExpand: () => void
-    onAddUpdate: () => void
-    onAddEvidence?: () => void
-    onEdit?: () => void
-    onDelete?: () => void
-    kpiUpdates?: any[] // Add KPI updates data for this specific KPI
-    initiativeId?: string // Initiative ID for fetching evidence
-    onRefresh?: () => void // Optional callback to refresh data after updates
-    metricColor?: string // Color for the metric's chart line (matches home tab color)
+ kpi: any
+ kpiTotal: number
+ isExpanded: boolean
+ renderAsPage?: boolean // When true, renders as full page instead of portal overlay
+ onToggleExpand: () => void
+ onAddUpdate: () => void
+ onAddEvidence?: () => void
+ onEdit?: () => void
+ onDelete?: () => void
+ kpiUpdates?: any[] // Add KPI updates data for this specific KPI
+ initiativeId?: string // Initiative ID for fetching evidence
+ onRefresh?: () => void // Optional callback to refresh data after updates
+ metricColor?: string // Color for the metric's chart line (matches home tab color)
 }
 
 const DEFAULT_METRIC_COLOR = '#c0dfa1' // site green (primary-500)
 
 export default function ExpandableKPICard({
-    kpi,
-    kpiTotal,
-    isExpanded,
-    renderAsPage = false,
-    onToggleExpand,
-    onAddUpdate,
-    onAddEvidence,
-    onEdit,
-    onDelete,
-    kpiUpdates = [],
-    initiativeId,
-    onRefresh,
-    metricColor
+ kpi,
+ kpiTotal,
+ isExpanded,
+ renderAsPage = false,
+ onToggleExpand,
+ onAddUpdate,
+ onAddEvidence,
+ onEdit,
+ onDelete,
+ kpiUpdates = [],
+ initiativeId,
+ onRefresh,
+ metricColor
 }: ExpandableKPICardProps) {
 
-    // Use provided color or default to site green
-    const chartColor = metricColor || DEFAULT_METRIC_COLOR
-
-    // Team permissions
-    const { canAddImpactClaims, canEditEvidence, canEditMetrics, canDelete } = useTeam()
-
-    // Lock body scroll when expanded (only for portal mode, not page mode)
-    useEffect(() => {
-        if (isExpanded && !renderAsPage) {
-            document.body.style.overflow = 'hidden'
-        } else {
-            document.body.style.overflow = 'unset'
-        }
-
-        // Cleanup on unmount
-        return () => {
-            document.body.style.overflow = 'unset'
-        }
-    }, [isExpanded, renderAsPage])
-
-    // Time frame filter state
-    const [timeFrame, setTimeFrame] = useState<'all' | '1month' | '6months' | '1year' | '5years'>('all')
-    const [isCumulative, setIsCumulative] = useState(false)
-    const [datePickerValue, setDatePickerValue] = useState<{
-        singleDate?: string
-        startDate?: string
-        endDate?: string
-    }>({})
-    const [expandedDataPoints, setExpandedDataPoints] = useState<string[]>([])
-    const [expandedEvidence, setExpandedEvidence] = useState<string[]>([])
-    const [selectedEvidence, setSelectedEvidence] = useState<any>(null)
-    const [selectedDataPoint, setSelectedDataPoint] = useState<any>(null)
-    const [isEvidencePreviewOpen, setIsEvidencePreviewOpen] = useState(false)
-    const [isDataPointPreviewOpen, setIsDataPointPreviewOpen] = useState(false)
-    const [isEditDataPointModalOpen, setIsEditDataPointModalOpen] = useState(false)
-    const [isEditEvidenceModalOpen, setIsEditEvidenceModalOpen] = useState(false)
-    const [deleteConfirmDataPoint, setDeleteConfirmDataPoint] = useState<any>(null)
-    const [deleteConfirmEvidence, setDeleteConfirmEvidence] = useState<any>(null)
-    const [editingDataPoint, setEditingDataPoint] = useState<any>(null)
-    const [evidence, setEvidence] = useState<any[]>([])
-    const [allTags, setAllTags] = useState<MetricTag[]>([])
-    const [showDescription, setShowDescription] = useState(false)
-    const [loadingEvidence, setLoadingEvidence] = useState(false)
-    const [updateLocations, setUpdateLocations] = useState<Record<string, any>>({})
-    const [isCreditingModalOpen, setIsCreditingModalOpen] = useState(false)
-    const [selectedClaimForEvidence, setSelectedClaimForEvidence] = useState<any>(null)
-    const [isEasyEvidenceModalOpen, setIsEasyEvidenceModalOpen] = useState(false)
-    const [isAllEvidenceModalOpen, setIsAllEvidenceModalOpen] = useState(false)
-
-    // Filter bar state for the expanded view (date is shared with timeFrame logic above).
-    const [filterLocations, setFilterLocations] = useState<string[]>([])
-    const [filterTags, setFilterTags] = useState<string[]>([])
-    const [filterBeneficiaryGroups, setFilterBeneficiaryGroups] = useState<string[]>([])
-    const [filterAllLocations, setFilterAllLocations] = useState<Location[]>([])
-    const [filterAllBeneficiaryGroups, setFilterAllBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
-
-    useEffect(() => {
-        if (!isExpanded || !initiativeId) return
-        let active = true
-        Promise.all([
-            apiService.getLocations(initiativeId),
-            apiService.getBeneficiaryGroups(initiativeId),
-        ]).then(([locs, groups]) => {
-            if (!active) return
-            setFilterAllLocations(locs || [])
-            setFilterAllBeneficiaryGroups((groups || []) as BeneficiaryGroup[])
-        }).catch(() => {
-            if (!active) return
-            setFilterAllLocations([])
-            setFilterAllBeneficiaryGroups([])
-        })
-        return () => { active = false }
-    }, [isExpanded, initiativeId])
-
-    // Tags available on this metric only.
-    const filterAvailableTags = useMemo(() => {
-        const ids = new Set((kpi.tag_ids || []) as string[])
-        return allTags.filter(t => ids.has(t.id))
-    }, [allTags, kpi.tag_ids])
-
-    const filteredKpiUpdates = useMemo(() => {
-        if (!Array.isArray(kpiUpdates)) return []
-        return kpiUpdates.filter((u: any) => {
-            if (filterLocations.length > 0 && !filterLocations.includes(u.location_id || '')) return false
-            if (filterTags.length > 0 && !filterTags.includes(u.tag_id || '')) return false
-            if (filterBeneficiaryGroups.length > 0) {
-                const ids: string[] = u.beneficiary_group_ids || []
-                if (!ids.some(id => filterBeneficiaryGroups.includes(id))) return false
-            }
-            return true
-        })
-    }, [kpiUpdates, filterLocations, filterTags, filterBeneficiaryGroups])
-
-    const clearAllFilters = () => {
-        setFilterLocations([])
-        setFilterTags([])
-        setFilterBeneficiaryGroups([])
-        setDatePickerValue({})
-    }
-
-
-    const handleDataPointClick = (update: any) => {
-        setSelectedDataPoint(update)
-        setIsDataPointPreviewOpen(true)
-    }
-
-    const toggleEvidenceExpanded = (evidenceId: string) => {
-        setExpandedEvidence(prev =>
-            prev.includes(evidenceId)
-                ? prev.filter(id => id !== evidenceId)
-                : [...prev, evidenceId]
-        )
-    }
-
-    // Load evidence for all cards (needed for evidence type percentages in collapsed view)
-    // Also reload when kpiUpdates changes (e.g., new impact claim created that may have auto-linked evidence)
-    useEffect(() => {
-        if (kpi.id && initiativeId) {
-            loadEvidence()
-        }
-    }, [kpi.id, initiativeId, kpiUpdates.length])
-
-    useEffect(() => {
-        apiService.getMetricTags().then(setAllTags).catch(() => setAllTags([]))
-    }, [])
-
-    // Load update locations when expanded
-    useEffect(() => {
-        if (isExpanded && kpiUpdates && kpiUpdates.length > 0) {
-            loadUpdateLocations()
-        }
-    }, [isExpanded, kpiUpdates])
-
-    const loadEvidence = async () => {
-        if (!kpi.id || !initiativeId) return
-        try {
-            setLoadingEvidence(true)
-            const data = await apiService.getEvidence(initiativeId, kpi.id)
-            setEvidence(data || [])
-        } catch (error) {
-            console.error('Error loading evidence:', error)
-            setEvidence([])
-        } finally {
-            setLoadingEvidence(false)
-        }
-    }
-
-    const loadUpdateLocations = async () => {
-        if (!kpiUpdates || kpiUpdates.length === 0) return
-
-        // Get unique location IDs from updates
-        const locationIds = [...new Set(kpiUpdates
-            .filter((update: any) => update.location_id)
-            .map((update: any) => update.location_id)
-        )]
-
-        if (locationIds.length === 0) {
-            setUpdateLocations({})
-            return
-        }
-
-        try {
-            const locationPromises = locationIds.map((id: string) =>
-                apiService.getLocation(id).catch(() => null)
-            )
-            const locations = await Promise.all(locationPromises)
-            const locationMap: Record<string, any> = {}
-            locationIds.forEach((id: string, index: number) => {
-                if (locations[index]) {
-                    locationMap[id] = locations[index]
-                }
-            })
-            setUpdateLocations(locationMap)
-        } catch (error) {
-            console.error('Error loading update locations:', error)
-            setUpdateLocations({})
-        }
-    }
-
-    const handleEvidenceClick = (evidenceItem: any) => {
-        setSelectedEvidence(evidenceItem)
-        setIsEvidencePreviewOpen(true)
-    }
-
-    // Data Point handlers
-    const handleEditDataPoint = (dataPoint: any) => {
-        setEditingDataPoint(dataPoint)
-        setIsEditDataPointModalOpen(true)
-    }
-
-    const handleDeleteDataPoint = async (dataPoint: any) => {
-        if (!dataPoint.id) return
-        try {
-            await apiService.deleteKPIUpdate(dataPoint.id)
-            toast.success('Impact claim deleted successfully!')
-
-            // Clear cache and refresh data
-            if (initiativeId) {
-                apiService.clearCache(`/initiatives/${initiativeId}/dashboard`)
-            }
-            apiService.clearCache(`/kpis/${kpi.id}/updates`)
-            onRefresh?.()
-
-            // Reload evidence if expanded
-            if (isExpanded && kpi.id && initiativeId) {
-                loadEvidence()
-            }
-
-            setDeleteConfirmDataPoint(null)
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to delete impact claim'
-            toast.error(message)
-        }
-    }
-
-    const handleUpdateDataPoint = async (updateData: any) => {
-        if (!editingDataPoint?.id) return
-        try {
-            await apiService.updateKPIUpdate(editingDataPoint.id, updateData)
-            toast.success('Impact claim updated successfully!')
-
-            // Clear cache and refresh data
-            if (initiativeId) {
-                apiService.clearCache(`/initiatives/${initiativeId}/dashboard`)
-            }
-            apiService.clearCache(`/kpis/${kpi.id}/updates`)
-            onRefresh?.()
-
-            // Reload evidence if expanded
-            if (isExpanded && kpi.id && initiativeId) {
-                loadEvidence()
-            }
-
-            setIsEditDataPointModalOpen(false)
-            setEditingDataPoint(null)
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to update impact claim'
-            toast.error(message)
-            throw error
-        }
-    }
-
-    // Evidence handlers
-    const handleEditEvidence = (evidence: any) => {
-        setSelectedEvidence(evidence)
-        setIsEditEvidenceModalOpen(true)
-    }
-
-    const handleDeleteEvidence = async (evidence: any) => {
-        if (!evidence.id) return
-        try {
-            await apiService.deleteEvidence(evidence.id)
-            toast.success('Evidence deleted successfully!')
-
-            // Clear cache and refresh data
-            if (initiativeId) {
-                apiService.clearCache(`/initiatives/${initiativeId}/dashboard`)
-            }
-            onRefresh?.()
-
-            // Reload evidence if expanded
-            if (isExpanded && kpi.id && initiativeId) {
-                loadEvidence()
-            }
-
-            setDeleteConfirmEvidence(null)
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to delete evidence'
-            toast.error(message)
-        }
-    }
-
-    const handleUpdateEvidence = async (evidenceData: any) => {
-        if (!selectedEvidence?.id) return
-        try {
-            await apiService.updateEvidence(selectedEvidence.id, evidenceData)
-            toast.success('Evidence updated successfully!')
-
-            // Clear cache and refresh data
-            if (initiativeId) {
-                apiService.clearCache(`/initiatives/${initiativeId}/dashboard`)
-            }
-            onRefresh?.()
-
-            // Reload evidence if expanded
-            if (isExpanded && kpi.id && initiativeId) {
-                loadEvidence()
-            }
-
-            setIsEditEvidenceModalOpen(false)
-            setSelectedEvidence(null)
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to update evidence'
-            toast.error(message)
-            throw error
-        }
-    }
-
-    // Handler for easy evidence upload (single claim) - legacy, kept for compatibility
-    const handleEasyEvidenceSubmit = async (evidenceData: any) => {
-        await apiService.createEvidence(evidenceData)
-    }
-
-    // Handler called once after all evidence is batch-created
-    const handleEasyEvidenceBatchComplete = async () => {
-        // Clear cache and refresh data
-        if (initiativeId) {
-            apiService.clearCache(`/initiatives/${initiativeId}/dashboard`)
-        }
-        apiService.clearCache(`/evidence?initiative_id=${initiativeId}&kpi_id=${kpi.id}`)
-        onRefresh?.()
-
-        // Reload evidence immediately to update UI
-        if (kpi.id && initiativeId) {
-            await loadEvidence()
-        }
-
-        setIsEasyEvidenceModalOpen(false)
-        setSelectedClaimForEvidence(null)
-
-    }
-
-    // Open easy evidence modal for a specific claim
-    const handleAddEvidenceForClaim = (claim: any, e: React.MouseEvent) => {
-        e.stopPropagation()
-        e.preventDefault()
-        if (!canEditEvidence) return
-        setSelectedClaimForEvidence(claim)
-        setIsEasyEvidenceModalOpen(true)
-    }
-
-    const getClaimSupportPercentage = (claim: any) => computeClaimSupportPercentage(claim, evidence)
-    const getClaimEvidenceCount = (claim: any) => computeClaimEvidenceCount(claim, evidence)
-
-    const isPercentageMetric = kpi.metric_type === 'percentage'
-    const effectiveIsCumulative = isCumulative && !isPercentageMetric
-
-    const chartData = generateKpiChartData({
-        filteredKpiUpdates,
-        datePickerValue,
-        timeFrame,
-        isCumulative,
-        isPercentageMetric,
-    })
-
-    const totalMetricValue = aggregateKpiUpdates(kpiUpdates as any, kpi.metric_type)
-
-    if (isPercentageMetric) {
-        for (const d of chartData) {
-            (d as any).average = totalMetricValue
-        }
-    }
-
-    const xAxisInterval = getXAxisInterval({ timeFrame, chartData, effectiveIsCumulative })
-
-    const formatXAxisTickBound = (dateStr: string) => formatXAxisTick(chartData, dateStr)
-
-    const maxDomainValue = calculateMaxWithHeadroom(chartData)
-    const actualMaxValue = computeActualMaxCumulative(chartData)
-
-    const { percentageYMax, percentageYTicks } = computePercentageYAxis(chartData, isPercentageMetric)
-
-    const yTicks = generateYTicks(maxDomainValue, actualMaxValue)
-
-    const evidenceTypePercentages = calculateEvidenceTypePercentages({
-        kpiId: kpi.id,
-        kpiUpdates,
-        evidence,
-    })
-
-
-    // Get evidence type icon component
-    const getEvidenceIcon = (type: 'visual_proof' | 'documentation' | 'testimony' | 'financials') => {
-        switch (type) {
-            case 'visual_proof': return Camera
-            case 'documentation': return FileText
-            case 'testimony': return MessageSquare
-            case 'financials': return DollarSign
-            default: return FileText
-        }
-    }
-
-    // When renderAsPage is true, skip the card wrapper and collapsed view entirely
-    if (renderAsPage && isExpanded) {
-        return (
-            <>
-                {/* Full Page View - No card wrapper */}
-                <div className="h-screen flex flex-col overflow-hidden">
-                    {/* Header - Prominent */}
-                    <div className="flex-shrink-0 bg-white/80 backdrop-blur-xl border-b border-gray-100/60 px-6 py-3.5 shadow-soft-float">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                                <button onClick={(e) => { e.stopPropagation(); onToggleExpand() }} className="p-2.5 hover:bg-red-50 rounded-xl transition-all duration-200 border border-gray-200">
-                                    <X className="w-5 h-5 text-red-500" />
-                                </button>
-                                <div className="flex items-center gap-2 min-w-0">
-                                    <div className="flex items-center gap-1.5 min-w-0">
-                                        <h2 className="text-base lg:text-xl font-bold text-gray-900 truncate">{kpi.title}</h2>
-                                        {kpi.description && (
-                                            <button
-                                                type="button"
-                                                onClick={(e) => { e.stopPropagation(); setShowDescription(s => !s) }}
-                                                className="flex-shrink-0 w-5 h-5 inline-flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors"
-                                                title={showDescription ? 'Hide description' : 'Show description'}
-                                            >
-                                                <Info className="w-3 h-3" />
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="flex flex-col items-end flex-shrink-0">
-                                        <div className="flex items-baseline gap-0.5 px-2.5 lg:px-3 py-1 lg:py-1.5 bg-primary-50 rounded-lg border border-primary-100">
-                                            <span className="text-lg lg:text-2xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}{isPercentageMetric ? '%' : ''}</span>
-                                            {!isPercentageMetric && kpi.unit_of_measurement && <span className="text-xs text-primary-500 ml-1">{kpi.unit_of_measurement}</span>}
-                                        </div>
-                                        {isPercentageMetric && <span className="text-xs uppercase tracking-wide text-gray-400 mt-0.5">Average</span>}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-1.5 lg:gap-2 flex-shrink-0">
-                                {canAddImpactClaims && (
-                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center gap-1.5 px-2.5 lg:px-4 py-1.5 lg:py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg lg:rounded-xl font-semibold text-xs lg:text-sm transition-all duration-200 shadow-lg shadow-primary-500/25 whitespace-nowrap">
-                                        <Plus className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
-                                        <span className="hidden sm:inline">Add Impact Claim</span>
-                                        <span className="sm:hidden">Claim</span>
-                                    </button>
-                                )}
-                                {canEditEvidence && (
-                                    <button onClick={(e) => { e.stopPropagation(); onAddEvidence?.() }} className="flex items-center gap-1.5 px-2.5 lg:px-4 py-1.5 lg:py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-lg lg:rounded-xl font-semibold text-xs lg:text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25 whitespace-nowrap">
-                                        <Upload className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
-                                        <span className="hidden sm:inline">Add Evidence</span>
-                                        <span className="sm:hidden">Evidence</span>
-                                    </button>
-                                )}
-                                {canEditMetrics && (
-                                    <button onClick={(e) => { e.stopPropagation(); onEdit?.() }} className="p-1.5 lg:p-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/60 text-gray-600 rounded-lg lg:rounded-xl transition-all duration-200">
-                                        <Edit className="w-4 h-4 lg:w-5 lg:h-5" />
-                                    </button>
-                                )}
-                                {canDelete && (
-                                    <button onClick={(e) => { e.stopPropagation(); onDelete?.() }} className="p-1.5 lg:p-2.5 bg-red-50/80 hover:bg-red-100 text-red-500 rounded-lg lg:rounded-xl transition-all duration-200">
-                                        <Trash2 className="w-4 h-4 lg:w-5 lg:h-5" />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Content - Fit to screen */}
-                    <div className="flex-1 p-3 flex flex-col gap-2 max-w-[1800px] mx-auto overflow-hidden w-full min-h-0">
-                                {showDescription && kpi.description && (
-                                    <div className="flex-shrink-0 bg-white/80 backdrop-blur-xl border border-gray-100/60 rounded-xl px-3 py-2 shadow-soft-float flex items-start gap-2" onClick={(e) => e.stopPropagation()}>
-                                        <Info className="w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5" />
-                                        <p className="text-xs text-gray-600 flex-1">{kpi.description}</p>
-                                        <button type="button" onClick={() => setShowDescription(false)} className="flex-shrink-0 text-gray-400 hover:text-gray-600">
-                                            <X className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
-                                )}
-                                <div className="flex-shrink-0">
-                                    <KPIFilterBar
-                                        locations={filterAllLocations}
-                                        beneficiaryGroups={filterAllBeneficiaryGroups}
-                                        tags={filterAvailableTags}
-                                        selectedLocations={filterLocations}
-                                        onLocationsChange={setFilterLocations}
-                                        selectedBeneficiaryGroups={filterBeneficiaryGroups}
-                                        onBeneficiaryGroupsChange={setFilterBeneficiaryGroups}
-                                        selectedTags={filterTags}
-                                        onTagsChange={setFilterTags}
-                                        datePickerValue={datePickerValue}
-                                        onDatePickerChange={setDatePickerValue}
-                                        onClearAll={clearAllFilters}
-                                    />
-                                </div>
-                                <TagBreakdownStrip kpi={kpi} kpiUpdates={filteredKpiUpdates} allTags={allTags} compact />
-                                <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 flex-1 min-h-0 overflow-hidden">
-                                    <div className="lg:col-span-3 bg-white/80 backdrop-blur-xl border border-gray-100/60 rounded-xl p-3 flex flex-col shadow-soft-float min-h-0 overflow-hidden">
-                                        <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
-                                            <div className="flex-shrink-0 min-w-0">
-                                                <h5 className="text-sm lg:text-base font-semibold text-gray-900 truncate">{isPercentageMetric ? 'Percentage Over Time' : (isCumulative ? 'Cumulative Progress' : 'Monthly Progress')}</h5>
-                                                {!isPercentageMetric && <p className="text-xs text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals'}</p>}
-                                            </div>
-                                            <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
-                                                {!isPercentageMetric && timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
-                                                    <div className="flex items-center bg-gray-100 rounded-md lg:rounded-lg p-0.5">
-                                                        <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
-                                                        <button onClick={() => setIsCumulative(true)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
-                                                    </div>
-                                                )}
-                                                <div className="flex bg-gray-100 rounded-md lg:rounded-lg p-0.5">
-                                                    {['all', '1month', '6months', '1year', '5years'].map((tf) => (
-                                                        <button key={tf} onClick={() => { setTimeFrame(tf as any); setDatePickerValue({}); setIsCumulative(true) }} className={`px-1.5 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${timeFrame === tf && !datePickerValue.singleDate && !datePickerValue.startDate ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
-                                                            {tf === 'all' ? 'All' : tf === '1month' ? '1M' : tf === '6months' ? '6M' : tf === '1year' ? '1Y' : '5Y'}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="flex-1 min-h-[100px] flex items-center justify-center">
-                                            {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                                                        <CartesianGrid vertical={false} stroke="#f1f5f9" strokeDasharray="3 3" />
-                                                        <XAxis dataKey="date" stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} angle={-45} textAnchor="end" height={50} interval={xAxisInterval} tickMargin={6} tickFormatter={effectiveIsCumulative ? formatXAxisTickBound : undefined} />
-                                                        <YAxis stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} domain={isPercentageMetric ? [0, percentageYMax] : (maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax'])} ticks={isPercentageMetric ? percentageYTicks : (yTicks.length > 0 ? yTicks : undefined)} tickFormatter={isPercentageMetric ? ((value: any) => `${Math.round(value)}%`) : ((value) => { if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`; if (value >= 1000) return `${(value / 1000).toFixed(1)}K`; return value.toString() })} />
-                                                        {isPercentageMetric ? (
-                                                            <Tooltip content={(tooltipProps) => <ExpandableKPICardPercentageTooltip {...tooltipProps} chartData={chartData} chartColor={chartColor} totalMetricValue={totalMetricValue} />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
-                                                        ) : (
-                                                            <Tooltip contentStyle={{ backgroundColor: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(8px)', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '8px 12px', fontSize: '12px', boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }} formatter={(value: any) => [typeof value === 'number' ? value.toLocaleString() + (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '') : value, 'Cumulative Total']} labelFormatter={(label) => { const dp = chartData.find(d => d.date === label); return dp?.fullDate ? formatDate(dp.fullDate) : `Date: ${label}` }} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
-                                                        )}
-                                                        {isPercentageMetric && totalMetricValue > 0 && (
-                                                            <ReferenceLine y={totalMetricValue} stroke={chartColor} strokeOpacity={0.5} strokeWidth={1.25} strokeDasharray="5 4" ifOverflow="extendDomain" />
-                                                        )}
-                                                        {isPercentageMetric && (
-                                                            <Line type="monotone" dataKey="average" stroke="transparent" dot={false} activeDot={false} isAnimationActive={false} legendType="none" />
-                                                        )}
-                                                        <Line type="monotone" dataKey="cumulative" stroke={chartColor} strokeWidth={2.25} dot={isPercentageMetric ? { r: 2.5, fill: chartColor, strokeWidth: 0 } : false} activeDot={{ r: 4, fill: chartColor, stroke: 'white', strokeWidth: 1.5 }} strokeLinecap="round" connectNulls={isPercentageMetric} />
-                                                    </LineChart>
-                                                </ResponsiveContainer>
-                                            ) : (
-                                                <div className="h-full flex flex-col items-center justify-center text-gray-500">
-                                                    <BarChart3 className="w-10 h-10 mb-3 opacity-50" />
-                                                    <h4 className="text-base font-semibold text-gray-700 mb-1">No Data Yet</h4>
-                                                    <p className="text-xs text-center max-w-xs">{kpiUpdates && kpiUpdates.length > 0 ? 'No data matches the active filters' : 'Add data to see your activity over time'}</p>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Stats grid - constrained to chart width */}
-                                        <div className="grid grid-cols-3 gap-2 mt-2 flex-shrink-0">
-                                            <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-2 shadow-soft-float">
-                                                <div className="flex items-center space-x-2">
-                                                    <div className="p-1.5 bg-primary-100/80 rounded-lg"><BarChart3 className="w-3.5 h-3.5 text-primary-500" /></div>
-                                                    <div className="min-w-0"><p className="text-xs text-gray-500 truncate">Impact Claims</p><p className="text-base font-bold text-primary-500">{kpi.total_updates}</p></div>
-                                                </div>
-                                            </div>
-                                            <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-xl p-2 shadow-soft-float">
-                                                <div className="flex items-center space-x-2">
-                                                    <div className="p-1.5 bg-evidence-100/80 rounded-lg"><FileText className="w-3.5 h-3.5 text-evidence-500" /></div>
-                                                    <div className="min-w-0"><p className="text-xs text-gray-500 truncate">Evidence Items</p><p className="text-base font-bold text-evidence-500">{kpi.evidence_count}</p></div>
-                                                </div>
-                                            </div>
-                                            <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-2 shadow-soft-float">
-                                                <div className="flex items-center space-x-2">
-                                                    <div className="p-1.5 bg-primary-100/80 rounded-lg"><Target className="w-3.5 h-3.5 text-primary-500" /></div>
-                                                    <div className="min-w-0"><p className="text-xs text-gray-500 truncate">Coverage</p><p className="text-base font-bold text-primary-500">{kpi.evidence_percentage}%</p></div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Evidence type bar - constrained to chart width */}
-                                        <div className="flex items-center justify-between gap-2 h-10 bg-white/60 backdrop-blur-sm border border-gray-100/60 rounded-lg px-3 mt-2 flex-shrink-0">
-                                            {(['visual_proof', 'documentation', 'testimony', 'financials'] as const).map((type) => {
-                                                const IconComponent = getEvidenceIcon(type)
-                                                const typeInfo = getEvidenceTypeInfo(type)
-                                                const percentage = evidenceTypePercentages[type].percentage
-                                                const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' : typeInfo.color.includes('blue') ? 'text-evidence-600' : typeInfo.color.includes('orange') ? 'text-orange-600' : typeInfo.color.includes('green') ? 'text-primary-500' : 'text-gray-600'
-                                                return (
-                                                    <div key={type} className="flex items-center gap-1.5 flex-1 min-w-0">
-                                                        <IconComponent className={`w-3.5 h-3.5 ${colorClasses} flex-shrink-0`} />
-                                                        <div className="flex flex-col items-start min-w-0 flex-1 overflow-hidden">
-                                                            <span className="text-xs font-medium text-gray-700 truncate w-full leading-tight">{typeInfo.label}</span>
-                                                            <span className="text-[8px] font-bold text-gray-600 leading-tight whitespace-nowrap">{percentage}%</span>
-                                                        </div>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
-
-                                    {/* Impact Claims - Full Height */}
-                                    <div className="lg:col-span-2 flex flex-col min-h-0 overflow-hidden">
-                                        {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
-                                            <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-xl p-3 shadow-soft-float flex flex-col flex-1 min-h-0">
-                                                <div className="flex items-center justify-between mb-2 flex-shrink-0">
-                                                    <h5 className="text-sm font-semibold text-gray-800">Impact Claims ({filteredKpiUpdates.length})</h5>
-                                                    {canAddImpactClaims && <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25"><Plus className="w-4 h-4" /><span>Add Impact Claim</span></button>}
-                                                </div>
-                                                <div className="flex-1 overflow-y-auto space-y-1 pr-1 min-h-0">
-                                                    {[...filteredKpiUpdates].sort(compareClaimsByEffectiveDateDesc).map((update, index) => (
-                                                        <div key={update.id || index} className="border border-gray-100/80 rounded-lg bg-white/60 hover:bg-primary-50/50 hover:border-primary-200 cursor-pointer transition-all duration-200 p-2" onClick={() => handleDataPointClick(update)}>
-                                                            <div className="flex items-center justify-between">
-                                                                <div className="min-w-0 flex-1">
-                                                                    <span className="text-xs font-semibold text-primary-600">{update.value?.toLocaleString()}{isPercentageMetric ? '%' : (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '')}</span>
-                                                                    <div className="flex items-center space-x-1.5 mt-0.5"><Calendar className="w-2.5 h-2.5 text-gray-400" /><span className="text-xs text-gray-500">{update.date_range_start && update.date_range_end ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}` : formatDate(update.date_represented)}</span></div>
-                                                                </div>
-                                                                <div className="flex items-center gap-1.5">
-                                                                    {update.tag_id && allTags.length > 0 && (() => {
-                                                                        const t = allTags.find(t => t.id === update.tag_id)
-                                                                        return t ? <div onClick={(e) => e.stopPropagation()}><Link to={`/tags/${t.id}`} className="contents"><TagChip name={t.name} size="xs" /></Link></div> : null
-                                                                    })()}
-                                                                    {(() => {
-                                                                        const supportPercentage = getClaimSupportPercentage(update)
-                                                                        const evidenceCount = getClaimEvidenceCount(update)
-                                                                        return (
-                                                                            <>
-                                                                                {supportPercentage > 0 && (
-                                                                                    <div className={`flex items-center justify-center px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap ${supportPercentage === 100
-                                                                                        ? 'bg-primary-100 text-primary-700'
-                                                                                        : 'bg-yellow-100 text-yellow-700'
-                                                                                        }`}>
-                                                                                        <span>{evidenceCount} | {supportPercentage}% Coverage</span>
-                                                                                    </div>
-                                                                                )}
-                                                                                {supportPercentage === 0 && !loadingEvidence && (
-                                                                                    <div className="flex items-center justify-center px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap bg-red-100 text-red-700">
-                                                                                        <span>0 | 0% Coverage</span>
-                                                                                    </div>
-                                                                                )}
-                                                                                {canEditEvidence && (
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={(e) => handleAddEvidenceForClaim(update, e)}
-                                                                                        className="flex items-center gap-1 px-2 py-1 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-xs font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
-                                                                                        title="Add supporting evidence for this claim"
-                                                                                    >
-                                                                                        <Upload className="w-2.5 h-2.5" />
-                                                                                        <span>Add Evidence</span>
-                                                                                    </button>
-                                                                                )}
-                                                                            </>
-                                                                        )
-                                                                    })()}
-                                                                    <Eye className="w-3 h-3 text-gray-400" />
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                                {/* View All Evidence Button */}
-                                                <div className="pt-2 mt-2 border-t border-gray-100 flex-shrink-0">
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); setIsAllEvidenceModalOpen(true) }}
-                                                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-xs transition-all duration-200 shadow-lg shadow-evidence-500/25"
-                                                    >
-                                                        <FileText className="w-3.5 h-3.5" />
-                                                        <span>View All Evidence ({evidence.length})</span>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-primary-400 rounded-xl p-4 shadow-lg shadow-primary-200/50 flex-1 ring-2 ring-primary-200 ring-offset-2">
-                                                <div className="text-center">
-                                                    <div className="w-10 h-10 mx-auto mb-2 bg-primary-100/80 rounded-lg flex items-center justify-center"><BarChart3 className="w-5 h-5 text-primary-500" /></div>
-                                                    <h5 className="text-sm font-semibold text-gray-800 mb-1">Impact Claims</h5>
-                                                    <p className="text-xs text-gray-500 mb-3">{canAddImpactClaims ? 'Start tracking your impact' : 'No impact claims yet'}</p>
-                                                    {canAddImpactClaims && <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25 animate-pulse"><Plus className="w-4 h-4" /><span>Add Impact Claim</span></button>}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                    </div>
-                </div>
-
-                {/* Modals for page mode */}
-                {selectedDataPoint && createPortal(
-                    <DataPointPreviewModal
-                        dataPoint={selectedDataPoint}
-                        kpi={selectedDataPoint.kpi || kpi}
-                        isOpen={isDataPointPreviewOpen}
-                        onClose={() => { setIsDataPointPreviewOpen(false); setSelectedDataPoint(null) }}
-                        onEdit={canEditMetrics ? (dp) => { setEditingDataPoint(dp); setIsDataPointPreviewOpen(false); setSelectedDataPoint(null); setIsEditDataPointModalOpen(true) } : undefined}
-                        onDelete={canDelete ? (dp) => { setDeleteConfirmDataPoint(dp); setIsDataPointPreviewOpen(false); setSelectedDataPoint(null) } : undefined}
-                        onEvidenceClick={(ev) => { setSelectedEvidence(ev); setIsDataPointPreviewOpen(false); setIsEvidencePreviewOpen(true) }}
-                        onAddEvidence={canEditEvidence ? (dp) => { setIsDataPointPreviewOpen(false); setSelectedDataPoint(null); setSelectedClaimForEvidence(dp); setIsEasyEvidenceModalOpen(true) } : undefined}
-                    />,
-                    document.body
-                )}
-
-                {selectedEvidence && createPortal(
-                    <EvidencePreviewModal
-                        evidence={selectedEvidence}
-                        isOpen={isEvidencePreviewOpen}
-                        onClose={() => setIsEvidencePreviewOpen(false)}
-                        onEdit={canEditEvidence ? (ev) => { setSelectedEvidence(ev); setIsEvidencePreviewOpen(false); setIsEditEvidenceModalOpen(true) } : undefined}
-                        onDelete={canDelete ? (ev) => { setDeleteConfirmEvidence(ev); setIsEvidencePreviewOpen(false) } : undefined}
-                        onDataPointClick={(dp) => { setSelectedDataPoint(dp); setIsEvidencePreviewOpen(false); setIsDataPointPreviewOpen(true) }}
-                    />,
-                    document.body
-                )}
-
-                {editingDataPoint && createPortal(
-                    <AddKPIUpdateModal
-                        isOpen={isEditDataPointModalOpen}
-                        onClose={() => { setIsEditDataPointModalOpen(false); setEditingDataPoint(null) }}
-                        onSubmit={handleUpdateDataPoint}
-                        kpiTitle={kpi.title}
-                        kpiId={kpi.id}
-                        metricType={kpi.metric_type || 'number'}
-                        unitOfMeasurement={kpi.unit_of_measurement || ''}
-                        initiativeId={initiativeId}
-                        kpiTagIds={(kpi as any).tag_ids || []}
-                        editData={editingDataPoint}
-                    />,
-                    document.body
-                )}
-
-                {selectedEvidence && createPortal(
-                    <AddEvidenceModal
-                        isOpen={isEditEvidenceModalOpen}
-                        onClose={() => { setIsEditEvidenceModalOpen(false); setSelectedEvidence(null) }}
-                        onSubmit={handleUpdateEvidence}
-                        availableKPIs={[kpi]}
-                        initiativeId={kpi.initiative_id}
-                        preSelectedKPIId={kpi.id}
-                        editData={selectedEvidence}
-                    />,
-                    document.body
-                )}
-
-                {deleteConfirmDataPoint && createPortal(
-                    <ConfirmDialog
-                        tone="danger"
-                        title="Delete Impact Claim"
-                        message={
-                            'This action cannot be undone.\n\nAre you sure you want to delete this impact claim and its associated information?'
-                        }
-                        confirmLabel="Delete"
-                        onCancel={() => setDeleteConfirmDataPoint(null)}
-                        onConfirm={() => handleDeleteDataPoint(deleteConfirmDataPoint)}
-                    />,
-                    document.body
-                )}
-
-                {deleteConfirmEvidence && createPortal(
-                    <ConfirmDialog
-                        tone="danger"
-                        title="Delete Evidence"
-                        message={
-                            'This action cannot be undone.\n\nAre you sure you want to delete this evidence and its associated information?'
-                        }
-                        confirmLabel="Delete"
-                        onCancel={() => setDeleteConfirmEvidence(null)}
-                        onConfirm={() => handleDeleteEvidence(deleteConfirmEvidence)}
-                    />,
-                    document.body
-                )}
-
-                {isCreditingModalOpen && initiativeId && (
-                    <MetricCreditingModal
-                        isOpen={isCreditingModalOpen}
-                        onClose={() => setIsCreditingModalOpen(false)}
-                        onSave={async () => { onRefresh?.() }}
-                        kpi={kpi}
-                        kpiUpdates={kpiUpdates}
-                        initiativeId={initiativeId}
-                    />
-                )}
-
-                {/* Easy Evidence Modal - For single claim evidence upload */}
-                {selectedClaimForEvidence && createPortal(
-                    <EasyEvidenceModal
-                        isOpen={isEasyEvidenceModalOpen}
-                        onClose={() => {
-                            setIsEasyEvidenceModalOpen(false)
-                            setSelectedClaimForEvidence(null)
-                        }}
-                        onSubmit={handleEasyEvidenceSubmit}
-                        onBatchComplete={handleEasyEvidenceBatchComplete}
-                        impactClaim={selectedClaimForEvidence}
-                        kpi={kpi}
-                        initiativeId={initiativeId || kpi.initiative_id || ''}
-                    />,
-                    document.body
-                )}
-
-                {/* All Evidence Modal - View all evidence grouped by type */}
-                {createPortal(
-                    <AllEvidenceModal
-                        isOpen={isAllEvidenceModalOpen}
-                        onClose={() => setIsAllEvidenceModalOpen(false)}
-                        evidence={evidence}
-                        kpi={kpi}
-                        onEvidenceClick={(ev) => {
-                            setSelectedEvidence(ev)
-                            setIsAllEvidenceModalOpen(false)
-                            setIsEvidencePreviewOpen(true)
-                        }}
-                    />,
-                    document.body
-                )}
-            </>
-        )
-    }
-
-    return (
-        <div className={`bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] border transition-all duration-300 overflow-hidden ${(kpi.evidence_percentage || 0) >= 80
-            ? 'border-primary-200/60 hover:border-primary-300/60'
-            : (kpi.evidence_percentage || 0) >= 30
-                ? 'border-yellow-200/60 hover:border-yellow-300/60'
-                : 'border-red-200/60 hover:border-red-300/60'
-            }`}>
-            {/* Collapsed View - New Layout */}
-            <div
-                className="cursor-pointer h-full flex flex-col"
-                onClick={onToggleExpand}
-            >
-                {/* Main Content Section */}
-                <div className="flex flex-1 min-h-0">
-                    {/* Left Section - ~70% width */}
-                    <div className="w-[70%] p-3 flex flex-col">
-                        {/* Category Badge */}
-                        <div className="mb-2">
-                            <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${getCategoryColor(kpi.category)}`}>
-                                {kpi.category}
-                            </span>
-                        </div>
-
-                        {/* Title */}
-                        <h3 className="text-xl font-bold text-gray-900 mb-3 line-clamp-2 leading-tight">{kpi.title}</h3>
-
-                        {/* Metric Number */}
-                        {kpiTotal !== undefined ? (
-                            <div className="flex-1 flex flex-col justify-center">
-                                <span className="text-5xl font-extrabold text-gray-900 tracking-tight leading-none">
-                                    {kpiTotal.toLocaleString()}
-                                </span>
-                                <span className="text-sm font-medium text-gray-600 mt-1">
-                                    {kpi.metric_type === 'percentage' ? '%' : kpi.unit_of_measurement}
-                                </span>
-                            </div>
-                        ) : (
-                            <div className="flex-1 flex items-center">
-                                <div className="text-sm text-gray-400 font-medium">No data yet</div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Right Section - ~30% width */}
-                    <div className="w-[30%] p-3 flex flex-col border-l border-gray-100">
-                        {/* Impact Claims */}
-                        <div className="mb-2">
-                            <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-0.5">
-                                Impact Claims
-                            </div>
-                            <div className="text-2xl font-extrabold text-primary-500">
-                                {kpi.total_updates || 0}
-                            </div>
-                        </div>
-
-                        {/* Evidence Items */}
-                        <div className="mb-3">
-                            <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-0.5">
-                                Evidence Items
-                            </div>
-                            <div className="text-2xl font-extrabold text-evidence-500">
-                                {kpi.evidence_count || 0}
-                            </div>
-                        </div>
-
-                        {/* Evidence Type Grid - 2x2 */}
-                        <div className="grid grid-cols-2 gap-1.5 mt-auto">
-                            {(['visual_proof', 'documentation', 'testimony', 'financials'] as const).map((type) => {
-                                const IconComponent = getEvidenceIcon(type)
-                                const typeInfo = getEvidenceTypeInfo(type)
-                                const percentage = evidenceTypePercentages[type].percentage
-
-                                // Extract color classes from typeInfo
-                                const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' :
-                                    typeInfo.color.includes('blue') ? 'text-evidence-600' :
-                                        typeInfo.color.includes('orange') ? 'text-orange-600' :
-                                            typeInfo.color.includes('green') ? 'text-primary-500' :
-                                                'text-gray-600'
-
-                                return (
-                                    <div
-                                        key={type}
-                                        className={`p-1.5 rounded bg-white/60 border border-gray-200/50 flex flex-col items-center justify-center ${percentage > 0 ? 'hover:bg-white/80' : 'opacity-50'}`}
-                                    >
-                                        <IconComponent className={`w-3 h-3 ${colorClasses}`} />
-                                        <div className="text-[8px] font-bold text-gray-700 mt-0.5">
-                                            {percentage}%
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Progress Bar Section - Full width at bottom */}
-                <div className="px-3 py-2.5 border-t border-gray-100">
-                    <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="font-semibold text-gray-600">Evidence Coverage</span>
-                        <span className={`font-bold ${(kpi.evidence_percentage || 0) >= 80
-                            ? 'text-primary-500'
-                            : (kpi.evidence_percentage || 0) >= 30
-                                ? 'text-yellow-600'
-                                : 'text-red-600'
-                            }`}>
-                            {kpi.evidence_percentage || 0}%
-                        </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                        <div
-                            className={`h-full rounded-full transition-all duration-500 ${(kpi.evidence_percentage || 0) >= 80
-                                ? 'bg-gradient-to-r from-primary-500 to-primary-600'
-                                : (kpi.evidence_percentage || 0) >= 30
-                                    ? 'bg-gradient-to-r from-yellow-500 to-yellow-600'
-                                    : 'bg-gradient-to-r from-red-500 to-red-600'
-                                }`}
-                            style={{
-                                width: `${Math.min(kpi.evidence_percentage || 0, 100)}%`
-                            }}
-                        ></div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Expanded View - Full Screen (as page or portal) */}
-            {isExpanded && (renderAsPage ? (
-                // Render as inline page content (not portal)
-                <div className="h-screen overflow-y-auto">
-                    {/* Header */}
-                    <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-100/60 p-4 shadow-soft-float">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        onToggleExpand()
-                                    }}
-                                    className="p-2.5 hover:bg-red-50 rounded-xl transition-all duration-200 border border-gray-100"
-                                >
-                                    <X className="w-5 h-5 text-red-500" />
-                                </button>
-                                <div className="flex items-center gap-3">
-                                    <div>
-                                        <h2 className="text-xl font-bold text-gray-800">{kpi.title}</h2>
-                                        <p className="text-sm text-gray-500">{kpi.description}</p>
-                                    </div>
-                                    <div className="flex flex-col items-end">
-                                        <div className="flex items-baseline gap-0.5 px-3 py-1.5 bg-primary-50 rounded-xl border border-primary-100">
-                                            <span className="text-2xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}{isPercentageMetric ? '%' : ''}</span>
-                                            {!isPercentageMetric && kpi.unit_of_measurement && <span className="text-xs text-primary-500 ml-1">{kpi.unit_of_measurement}</span>}
-                                        </div>
-                                        {isPercentageMetric && <span className="text-xs uppercase tracking-wide text-gray-400 mt-0.5">Average</span>}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                {canAddImpactClaims && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            onAddUpdate()
-                                        }}
-                                        className="flex items-center space-x-2 px-4 py-2.5 bg-primary-100/80 hover:bg-primary-200/80 text-evidence-700 rounded-xl text-sm font-medium transition-all duration-200"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                        <span>Add Impact Claim</span>
-                                    </button>
-                                )}
-                                {canEditEvidence && kpi.total_updates > 0 && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            onAddEvidence?.()
-                                        }}
-                                        className="flex items-center space-x-2 px-4 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
-                                    >
-                                        <Upload className="w-4 h-4" />
-                                        <span>Add Evidence</span>
-                                    </button>
-                                )}
-                                {kpi.metric_type !== 'percentage' && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            setIsCreditingModalOpen(true)
-                                        }}
-                                        className="flex items-center space-x-2 px-4 py-2.5 bg-purple-100/80 hover:bg-purple-200/80 text-purple-700 rounded-xl text-sm font-medium transition-all duration-200"
-                                    >
-                                        <Heart className="w-4 h-4" />
-                                        <span>Credit to Donor</span>
-                                    </button>
-                                )}
-                                {canEditMetrics && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            onEdit?.()
-                                        }}
-                                        className="flex items-center space-x-2 px-4 py-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/60 text-gray-600 rounded-xl text-sm font-medium transition-all duration-200"
-                                    >
-                                        <Edit className="w-4 h-4" />
-                                        <span>Edit</span>
-                                    </button>
-                                )}
-                                {canDelete && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            onDelete?.()
-                                        }}
-                                        className="p-2.5 bg-red-50/80 hover:bg-red-100 text-red-500 rounded-xl transition-all duration-200"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Content - Reuse the same content structure */}
-                    <div className="p-4 space-y-4 max-w-[1600px] mx-auto">
-                                {/* Stats Grid */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                    <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-2xl p-4 shadow-soft-float">
-                                        <div className="flex items-center space-x-3">
-                                            <div className="p-2.5 bg-primary-100/80 rounded-xl">
-                                                <BarChart3 className="w-5 h-5 text-primary-500" />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm text-gray-500">Impact Claims</p>
-                                                <p className="text-xl font-bold text-primary-500">{kpi.total_updates}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-2xl p-4 shadow-soft-float">
-                                        <div className="flex items-center space-x-3">
-                                            <div className="p-2.5 bg-evidence-100/80 rounded-xl">
-                                                <FileText className="w-5 h-5 text-evidence-500" />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm text-gray-500">Evidence Items</p>
-                                                <p className="text-xl font-bold text-evidence-500">{kpi.evidence_count}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-2xl p-4 shadow-soft-float">
-                                        <div className="flex items-center space-x-3">
-                                            <div className="p-2.5 bg-primary-100/80 rounded-xl">
-                                                <Target className="w-5 h-5 text-primary-500" />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm text-gray-500">Evidence Coverage</p>
-                                                <p className="text-xl font-bold text-primary-500">{kpi.evidence_percentage}%</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Evidence Type Icons Row */}
-                                <div className="flex items-center justify-between gap-2 h-10 bg-white/60 backdrop-blur-sm border border-gray-100/60 rounded-xl px-4 py-1">
-                                    {(['visual_proof', 'documentation', 'testimony', 'financials'] as const).map((type) => {
-                                        const IconComponent = getEvidenceIcon(type)
-                                        const typeInfo = getEvidenceTypeInfo(type)
-                                        const percentage = evidenceTypePercentages[type].percentage
-
-                                        const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' :
-                                            typeInfo.color.includes('blue') ? 'text-evidence-600' :
-                                                typeInfo.color.includes('orange') ? 'text-orange-600' :
-                                                    typeInfo.color.includes('green') ? 'text-primary-500' :
-                                                        'text-gray-600'
-
-                                        return (
-                                            <div key={type} className="flex items-center gap-1.5 flex-1 min-w-0">
-                                                <IconComponent className={`w-3.5 h-3.5 ${colorClasses} flex-shrink-0`} />
-                                                <div className="flex flex-col items-start min-w-0 flex-1 overflow-hidden">
-                                                    <span className="text-xs font-medium text-gray-700 truncate w-full leading-tight">
-                                                        {typeInfo.label}
-                                                    </span>
-                                                    <span className="text-[8px] font-bold text-gray-600 leading-tight whitespace-nowrap">
-                                                        {percentage}%
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-
-                                <KPIFilterBar
-                                    locations={filterAllLocations}
-                                    beneficiaryGroups={filterAllBeneficiaryGroups}
-                                    tags={filterAvailableTags}
-                                    selectedLocations={filterLocations}
-                                    onLocationsChange={setFilterLocations}
-                                    selectedBeneficiaryGroups={filterBeneficiaryGroups}
-                                    onBeneficiaryGroupsChange={setFilterBeneficiaryGroups}
-                                    selectedTags={filterTags}
-                                    onTagsChange={setFilterTags}
-                                    datePickerValue={datePickerValue}
-                                    onDatePickerChange={setDatePickerValue}
-                                    onClearAll={clearAllFilters}
-                                />
-
-                                <TagBreakdownStrip kpi={kpi} kpiUpdates={filteredKpiUpdates} allTags={allTags} />
-
-                                {/* Chart and Data Sections */}
-                                <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-                                    {/* Chart Section */}
-                                    <div className="lg:col-span-3 bg-white/80 backdrop-blur-xl border border-gray-100/60 rounded-2xl p-4 flex flex-col shadow-soft-float">
-                                        <div className="flex items-center justify-between mb-4 gap-2">
-                                            <div className="flex-shrink-0 min-w-0">
-                                                <h5 className="text-base lg:text-lg font-semibold text-gray-900 truncate">{isPercentageMetric ? 'Percentage Over Time' : (isCumulative ? 'Cumulative Progress' : 'Monthly Progress')}</h5>
-                                                {!isPercentageMetric && <p className="text-xs lg:text-sm text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals over time'}</p>}
-                                            </div>
-                                            <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
-                                                {!isPercentageMetric && timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
-                                                    <div className="flex items-center bg-gray-100 rounded-md lg:rounded-lg p-0.5">
-                                                        <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
-                                                        <button onClick={() => setIsCumulative(true)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
-                                                    </div>
-                                                )}
-                                                <div className="flex bg-gray-100 rounded-md lg:rounded-lg p-0.5">
-                                                    {['all', '1month', '6months', '1year', '5years'].map((tf) => (
-                                                        <button key={tf} onClick={() => { setTimeFrame(tf as any); setDatePickerValue({}); setIsCumulative(true) }} className={`px-1.5 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${timeFrame === tf && !datePickerValue.singleDate && !datePickerValue.startDate ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
-                                                            {tf === 'all' ? 'All' : tf === '1month' ? '1M' : tf === '6months' ? '6M' : tf === '1year' ? '1Y' : '5Y'}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex-1 h-64 flex items-center justify-center">
-                                            {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <LineChart data={chartData} margin={{ top: 12, right: 20, left: 0, bottom: 0 }}>
-                                                        <CartesianGrid vertical={false} stroke="#f1f5f9" strokeDasharray="3 3" />
-                                                        <XAxis dataKey="date" stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} angle={-45} textAnchor="end" height={60} interval={xAxisInterval} tickMargin={8} tickFormatter={effectiveIsCumulative ? formatXAxisTickBound : undefined} />
-                                                        <YAxis stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} domain={isPercentageMetric ? [0, percentageYMax] : (maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax'])} ticks={isPercentageMetric ? percentageYTicks : (yTicks.length > 0 ? yTicks : undefined)} tickFormatter={isPercentageMetric ? ((value: any) => `${Math.round(value)}%`) : ((value) => { if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`; if (value >= 1000) return `${(value / 1000).toFixed(1)}K`; return value.toString() })} />
-                                                        {isPercentageMetric ? (
-                                                            <Tooltip content={(tooltipProps) => <ExpandableKPICardPercentageTooltip {...tooltipProps} chartData={chartData} chartColor={chartColor} totalMetricValue={totalMetricValue} />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
-                                                        ) : (
-                                                            <Tooltip contentStyle={{ backgroundColor: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(8px)', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '10px 12px', fontSize: '12px', boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }} formatter={(value: any) => { const unit = kpi.unit_of_measurement || ''; const formattedValue = typeof value === 'number' ? value.toLocaleString() + (unit ? ` ${unit}` : '') : value; return [formattedValue, 'Cumulative Total'] }} labelFormatter={(label) => { const dataPoint = chartData.find(d => d.date === label); if (dataPoint?.fullDate) { return formatDate(dataPoint.fullDate) } return `Date: ${label}` }} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
-                                                        )}
-                                                        {isPercentageMetric && totalMetricValue > 0 && (
-                                                            <ReferenceLine y={totalMetricValue} stroke={chartColor} strokeOpacity={0.5} strokeWidth={1.25} strokeDasharray="5 4" ifOverflow="extendDomain" />
-                                                        )}
-                                                        {isPercentageMetric && (
-                                                            <Line type="monotone" dataKey="average" stroke="transparent" dot={false} activeDot={false} isAnimationActive={false} legendType="none" />
-                                                        )}
-                                                        <Line type="monotone" dataKey="cumulative" stroke={chartColor} strokeWidth={2.25} dot={isPercentageMetric ? { r: 2.5, fill: chartColor, strokeWidth: 0 } : false} activeDot={{ r: 4, fill: chartColor, stroke: 'white', strokeWidth: 1.5 }} strokeLinecap="round" connectNulls={isPercentageMetric} />
-                                                    </LineChart>
-                                                </ResponsiveContainer>
-                                            ) : (
-                                                <div className="h-full flex flex-col items-center justify-center text-gray-500">
-                                                    <BarChart3 className="w-12 h-12 mb-4 opacity-50" />
-                                                    <h4 className="text-lg font-semibold text-gray-700 mb-2">No Data Yet</h4>
-                                                    <p className="text-sm text-center max-w-xs">{kpiUpdates && kpiUpdates.length > 0 ? 'No data matches the active filters' : 'Come back when you add data to see your activity over time'}</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Impact Claims - Full Height */}
-                                    <div className="lg:col-span-2 flex flex-col">
-                                        {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
-                                            <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-2xl p-4 shadow-soft-float flex flex-col flex-1 max-h-[calc(100vh-400px)]">
-                                                <div className="flex items-center justify-between mb-3 flex-shrink-0">
-                                                    <h5 className="text-base font-semibold text-gray-800">Impact Claims ({filteredKpiUpdates.length})</h5>
-                                                    <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25">
-                                                        <Plus className="w-4 h-4" /><span>Add</span>
-                                                    </button>
-                                                </div>
-                                                <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
-                                                    {[...filteredKpiUpdates].sort(compareClaimsByEffectiveDateDesc).map((update, index) => (
-                                                        <div key={update.id || index} className="border border-gray-100/80 rounded-xl bg-white/60 hover:bg-primary-50/50 hover:border-primary-200 cursor-pointer transition-all duration-200 p-2.5" onClick={() => handleDataPointClick(update)}>
-                                                            <div className="flex items-center justify-between">
-                                                                <div className="min-w-0 flex-1">
-                                                                    <span className="text-sm font-semibold text-primary-600">{update.value?.toLocaleString()}{isPercentageMetric ? '%' : (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '')}</span>
-                                                                    <div className="flex items-center space-x-2 mt-0.5">
-                                                                        <Calendar className="w-3 h-3 text-gray-400" />
-                                                                        <span className="text-xs text-gray-500">{update.date_range_start && update.date_range_end ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}` : formatDate(update.date_represented)}</span>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    {update.tag_id && allTags.length > 0 && (() => {
-                                                                        const t = allTags.find(t => t.id === update.tag_id)
-                                                                        return t ? <div onClick={(e) => e.stopPropagation()}><Link to={`/tags/${t.id}`} className="contents"><TagChip name={t.name} size="xs" /></Link></div> : null
-                                                                    })()}
-                                                                    {(() => {
-                                                                        const supportPercentage = getClaimSupportPercentage(update)
-                                                                        const evidenceCount = getClaimEvidenceCount(update)
-                                                                        return (
-                                                                            <>
-                                                                                {supportPercentage > 0 && (
-                                                                                    <div className={`flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${supportPercentage === 100
-                                                                                        ? 'bg-primary-100 text-primary-700'
-                                                                                        : 'bg-yellow-100 text-yellow-700'
-                                                                                        }`}>
-                                                                                        <span>{evidenceCount} | {supportPercentage}% Coverage</span>
-                                                                                    </div>
-                                                                                )}
-                                                                                {supportPercentage === 0 && !loadingEvidence && (
-                                                                                    <div className="flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-red-100 text-red-700">
-                                                                                        <span>0 | 0% Coverage</span>
-                                                                                    </div>
-                                                                                )}
-                                                                                {canEditEvidence && (
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={(e) => handleAddEvidenceForClaim(update, e)}
-                                                                                        className="flex items-center gap-1 px-2.5 py-1.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-xs font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
-                                                                                        title="Add supporting evidence for this claim"
-                                                                                    >
-                                                                                        <Upload className="w-3 h-3" />
-                                                                                        <span>Add Evidence</span>
-                                                                                    </button>
-                                                                                )}
-                                                                            </>
-                                                                        )
-                                                                    })()}
-                                                                    <Eye className="w-3.5 h-3.5 text-gray-400" />
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                                {/* View All Evidence Button */}
-                                                <div className="pt-3 mt-3 border-t border-gray-100 flex-shrink-0">
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); setIsAllEvidenceModalOpen(true) }}
-                                                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25"
-                                                    >
-                                                        <FileText className="w-4 h-4" />
-                                                        <span>View All Evidence ({evidence.length})</span>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-primary-400 rounded-2xl p-6 shadow-lg shadow-primary-200/50 flex-1 ring-2 ring-primary-200 ring-offset-2">
-                                                <div className="text-center">
-                                                    <div className="w-14 h-14 mx-auto mb-3 bg-primary-100/80 rounded-xl flex items-center justify-center"><BarChart3 className="w-7 h-7 text-primary-500" /></div>
-                                                    <h5 className="text-base font-semibold text-gray-800 mb-1">Impact Claims</h5>
-                                                    <p className="text-sm text-gray-500 mb-3">{canAddImpactClaims ? 'Start tracking your impact' : 'No impact claims yet'}</p>
-                                                    {canAddImpactClaims && (
-                                                        <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="inline-flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25 animate-pulse">
-                                                            <Plus className="w-5 h-5" /><span>Add Impact Claim</span>
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                    </div>
-                </div>
-            ) : createPortal(
-                <div className="fixed top-0 right-0 bottom-0 z-50 overflow-y-auto bg-gray-50" style={{ position: 'fixed', top: 0, left: '224px', right: 0, bottom: 0, width: 'calc(100vw - 224px)', height: '100vh' }}>
-                    {/* Header */}
-                    <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-100/60 p-4 shadow-soft-float">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        onToggleExpand()
-                                    }}
-                                    className="p-2.5 hover:bg-red-50 rounded-xl transition-all duration-200 border border-gray-100"
-                                >
-                                    <X className="w-5 h-5 text-red-500" />
-                                </button>
-                                <div className="flex items-center gap-3">
-                                    <div>
-                                        <h2 className="text-xl font-bold text-gray-800">{kpi.title}</h2>
-                                        <p className="text-sm text-gray-500">{kpi.description}</p>
-                                    </div>
-                                    <div className="flex flex-col items-end">
-                                        <div className="flex items-baseline gap-0.5 px-3 py-1.5 bg-primary-50 rounded-xl border border-primary-100">
-                                            <span className="text-2xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}{isPercentageMetric ? '%' : ''}</span>
-                                            {!isPercentageMetric && kpi.unit_of_measurement && <span className="text-xs text-primary-500 ml-1">{kpi.unit_of_measurement}</span>}
-                                        </div>
-                                        {isPercentageMetric && <span className="text-xs uppercase tracking-wide text-gray-400 mt-0.5">Average</span>}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                {canAddImpactClaims && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            onAddUpdate()
-                                        }}
-                                        className="flex items-center space-x-2 px-4 py-2.5 bg-primary-100/80 hover:bg-primary-200/80 text-evidence-700 rounded-xl text-sm font-medium transition-all duration-200"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                        <span>Add Impact Claim</span>
-                                    </button>
-                                )}
-                                {canEditEvidence && kpi.total_updates > 0 && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            onAddEvidence?.()
-                                        }}
-                                        className="flex items-center space-x-2 px-4 py-2.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
-                                    >
-                                        <Upload className="w-4 h-4" />
-                                        <span>Add Evidence</span>
-                                    </button>
-                                )}
-                                {kpi.metric_type !== 'percentage' && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            setIsCreditingModalOpen(true)
-                                        }}
-                                        className="flex items-center space-x-2 px-4 py-2.5 bg-purple-100/80 hover:bg-purple-200/80 text-purple-700 rounded-xl text-sm font-medium transition-all duration-200"
-                                    >
-                                        <Heart className="w-4 h-4" />
-                                        <span>Credit to Donor</span>
-                                    </button>
-                                )}
-                                {canEditMetrics && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            onEdit?.()
-                                        }}
-                                        className="flex items-center space-x-2 px-4 py-2.5 bg-white/60 hover:bg-white/80 border border-gray-200/60 text-gray-600 rounded-xl text-sm font-medium transition-all duration-200"
-                                    >
-                                        <Edit className="w-4 h-4" />
-                                        <span>Edit</span>
-                                    </button>
-                                )}
-                                {canDelete && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            onDelete?.()
-                                        }}
-                                        className="p-2.5 bg-red-50/80 hover:bg-red-100 text-red-500 rounded-xl transition-all duration-200"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Content */}
-                    <div className="p-4 space-y-4 max-w-[1600px] mx-auto">
-                                {/* Stats Grid */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                    <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-2xl p-4 shadow-soft-float">
-                                        <div className="flex items-center space-x-3">
-                                            <div className="p-2.5 bg-primary-100/80 rounded-xl">
-                                                <BarChart3 className="w-5 h-5 text-primary-500" />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm text-gray-500">Impact Claims</p>
-                                                <p className="text-xl font-bold text-primary-500">{kpi.total_updates}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white/80 backdrop-blur-xl border border-evidence-100/60 rounded-2xl p-4 shadow-soft-float">
-                                        <div className="flex items-center space-x-3">
-                                            <div className="p-2.5 bg-evidence-100/80 rounded-xl">
-                                                <FileText className="w-5 h-5 text-evidence-500" />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm text-gray-500">Evidence Items</p>
-                                                <p className="text-xl font-bold text-evidence-500">{kpi.evidence_count}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-2xl p-4 shadow-soft-float">
-                                        <div className="flex items-center space-x-3">
-                                            <div className="p-2.5 bg-primary-100/80 rounded-xl">
-                                                <Target className="w-5 h-5 text-primary-500" />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm text-gray-500">Evidence Coverage</p>
-                                                <p className="text-xl font-bold text-primary-500">{kpi.evidence_percentage}%</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Evidence Type Icons Row - Below Stats Cards */}
-                                <div className="flex items-center justify-between gap-2 h-10 bg-white/60 backdrop-blur-sm border border-gray-100/60 rounded-xl px-4 py-1">
-                                    {(['visual_proof', 'documentation', 'testimony', 'financials'] as const).map((type) => {
-                                        const IconComponent = getEvidenceIcon(type)
-                                        const typeInfo = getEvidenceTypeInfo(type)
-                                        const percentage = evidenceTypePercentages[type].percentage
-
-                                        // Extract color classes from typeInfo
-                                        const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' :
-                                            typeInfo.color.includes('blue') ? 'text-evidence-600' :
-                                                typeInfo.color.includes('orange') ? 'text-orange-600' :
-                                                    typeInfo.color.includes('green') ? 'text-primary-500' :
-                                                        'text-gray-600'
-
-                                        return (
-                                            <div
-                                                key={type}
-                                                className="flex items-center gap-1.5 flex-1 min-w-0"
-                                            >
-                                                <IconComponent className={`w-3.5 h-3.5 ${colorClasses} flex-shrink-0`} />
-                                                <div className="flex flex-col items-start min-w-0 flex-1 overflow-hidden">
-                                                    <span className="text-xs font-medium text-gray-700 truncate w-full leading-tight">
-                                                        {typeInfo.label}
-                                                    </span>
-                                                    <span className="text-[8px] font-bold text-gray-600 leading-tight whitespace-nowrap">
-                                                        {percentage}%
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-
-                                <KPIFilterBar
-                                    locations={filterAllLocations}
-                                    beneficiaryGroups={filterAllBeneficiaryGroups}
-                                    tags={filterAvailableTags}
-                                    selectedLocations={filterLocations}
-                                    onLocationsChange={setFilterLocations}
-                                    selectedBeneficiaryGroups={filterBeneficiaryGroups}
-                                    onBeneficiaryGroupsChange={setFilterBeneficiaryGroups}
-                                    selectedTags={filterTags}
-                                    onTagsChange={setFilterTags}
-                                    datePickerValue={datePickerValue}
-                                    onDatePickerChange={setDatePickerValue}
-                                    onClearAll={clearAllFilters}
-                                />
-
-                                <TagBreakdownStrip kpi={kpi} kpiUpdates={filteredKpiUpdates} allTags={allTags} />
-
-                                {/* Chart and Data Sections - 3/5 chart + 2/5 data/evidence */}
-                                <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-                                    {/* Chart Section - 3/5 width */}
-                                    <div className="lg:col-span-3 bg-white/80 backdrop-blur-xl border border-gray-100/60 rounded-2xl p-4 flex flex-col shadow-soft-float">
-                                        <div className="flex items-center justify-between mb-4 gap-2">
-                                            <div className="flex-shrink-0 min-w-0">
-                                                <h5 className="text-base lg:text-lg font-semibold text-gray-900 truncate">{isPercentageMetric ? 'Percentage Over Time' : (isCumulative ? 'Cumulative Progress' : 'Monthly Progress')}</h5>
-                                                {!isPercentageMetric && <p className="text-xs lg:text-sm text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals over time'}</p>}
-                                            </div>
-                                            <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
-                                                {!isPercentageMetric && timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
-                                                    <div className="flex items-center bg-gray-100 rounded-md lg:rounded-lg p-0.5">
-                                                        <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
-                                                        <button onClick={() => setIsCumulative(true)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${isCumulative ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
-                                                    </div>
-                                                )}
-                                                <div className="flex bg-gray-100 rounded-md lg:rounded-lg p-0.5">
-                                                    {['all', '1month', '6months', '1year', '5years'].map((tf) => (
-                                                        <button key={tf} onClick={() => { setTimeFrame(tf as any); setDatePickerValue({}); setIsCumulative(true) }} className={`px-1.5 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${timeFrame === tf && !datePickerValue.singleDate && !datePickerValue.startDate ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
-                                                            {tf === 'all' ? 'All' : tf === '1month' ? '1M' : tf === '6months' ? '6M' : tf === '1year' ? '1Y' : '5Y'}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex-1 h-64 flex items-center justify-center">
-                                            {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <LineChart data={chartData} margin={{ top: 12, right: 20, left: 0, bottom: 0 }}>
-                                                        <CartesianGrid vertical={false} stroke="#f1f5f9" strokeDasharray="3 3" />
-                                                        <XAxis
-                                                            dataKey="date"
-                                                            stroke="#cbd5e1"
-                                                            fontSize={11}
-                                                            tickLine={false}
-                                                            axisLine={false}
-                                                            tick={{ fill: '#94a3b8' }}
-                                                            angle={-45}
-                                                            textAnchor="end"
-                                                            height={60}
-                                                            interval={xAxisInterval}
-                                                            tickMargin={8}
-                                                            tickFormatter={effectiveIsCumulative ? formatXAxisTickBound : undefined}
-                                                        />
-                                                        <YAxis
-                                                            stroke="#cbd5e1"
-                                                            fontSize={11}
-                                                            tickLine={false}
-                                                            axisLine={false}
-                                                            tick={{ fill: '#94a3b8' }}
-                                                            domain={isPercentageMetric ? [0, percentageYMax] : (maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax'])}
-                                                            ticks={isPercentageMetric ? percentageYTicks : (yTicks.length > 0 ? yTicks : undefined)}
-                                                            tickFormatter={isPercentageMetric ? ((value: any) => `${Math.round(value)}%`) : ((value) => {
-                                                                if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
-                                                                if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
-                                                                return value.toString()
-                                                            })}
-                                                        />
-                                                        {isPercentageMetric ? (
-                                                            <Tooltip content={(tooltipProps) => <ExpandableKPICardPercentageTooltip {...tooltipProps} chartData={chartData} chartColor={chartColor} totalMetricValue={totalMetricValue} />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
-                                                        ) : (
-                                                            <Tooltip
-                                                                contentStyle={{
-                                                                    backgroundColor: 'rgba(255,255,255,0.98)',
-                                                                    backdropFilter: 'blur(8px)',
-                                                                    border: '1px solid #f1f5f9',
-                                                                    borderRadius: '12px',
-                                                                    padding: '10px 12px',
-                                                                    fontSize: '12px',
-                                                                    boxShadow: '0 8px 24px rgba(15,23,42,0.08)'
-                                                                }}
-                                                                formatter={(value: any) => {
-                                                                    const unit = kpi.unit_of_measurement || ''
-                                                                    const formattedValue = typeof value === 'number'
-                                                                        ? value.toLocaleString() + (unit ? ` ${unit}` : '')
-                                                                        : value
-                                                                    return [formattedValue, 'Cumulative Total']
-                                                                }}
-                                                                labelFormatter={(label) => {
-                                                                    const dataPoint = chartData.find(d => d.date === label)
-                                                                    if (dataPoint?.fullDate) {
-                                                                        return formatDate(dataPoint.fullDate)
-                                                                    }
-                                                                    return `Date: ${label}`
-                                                                }}
-                                                                cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }}
-                                                            />
-                                                        )}
-                                                        {isPercentageMetric && totalMetricValue > 0 && (
-                                                            <ReferenceLine
-                                                                y={totalMetricValue}
-                                                                stroke={chartColor}
-                                                                strokeOpacity={0.5}
-                                                                strokeWidth={1.25}
-                                                                strokeDasharray="5 4"
-                                                                ifOverflow="extendDomain"
-                                                            />
-                                                        )}
-                                                        {isPercentageMetric && (
-                                                            <Line
-                                                                type="monotone"
-                                                                dataKey="average"
-                                                                stroke="transparent"
-                                                                dot={false}
-                                                                activeDot={false}
-                                                                isAnimationActive={false}
-                                                                legendType="none"
-                                                            />
-                                                        )}
-                                                        <Line
-                                                            type="monotone"
-                                                            dataKey="cumulative"
-                                                            stroke={chartColor}
-                                                            strokeWidth={2.25}
-                                                            dot={isPercentageMetric ? { r: 2.5, fill: chartColor, strokeWidth: 0 } : false}
-                                                            activeDot={{ r: 4, fill: chartColor, stroke: 'white', strokeWidth: 1.5 }}
-                                                            strokeLinecap="round"
-                                                            connectNulls={isPercentageMetric}
-                                                        />
-                                                    </LineChart>
-                                                </ResponsiveContainer>
-                                            ) : (
-                                                <div className="h-full flex flex-col items-center justify-center text-gray-500">
-                                                    <BarChart3 className="w-12 h-12 mb-4 opacity-50" />
-                                                    <h4 className="text-lg font-semibold text-gray-700 mb-2">No Data Yet</h4>
-                                                    <p className="text-sm text-center max-w-xs">
-                                                        {kpiUpdates && kpiUpdates.length > 0 ? 'No data matches the active filters' : 'Come back when you add data to see your activity over time'}
-                                                    </p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Impact Claims - Full Height */}
-                                    <div className="lg:col-span-2 flex flex-col">
-                                        {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
-                                            <div className="bg-white/80 backdrop-blur-xl border border-primary-100/60 rounded-2xl p-4 shadow-soft-float flex flex-col flex-1 max-h-[calc(100vh-400px)]">
-                                                <div className="flex items-center justify-between mb-3 flex-shrink-0">
-                                                    <h5 className="text-base font-semibold text-gray-800">Impact Claims ({filteredKpiUpdates.length})</h5>
-                                                    <div className="flex items-center space-x-3">
-                                                        <div className="flex items-center space-x-2 text-sm text-gray-500">
-                                                            <BarChart3 className="w-4 h-4" />
-                                                            <span>{kpi.total_updates || 0} total</span>
-                                                        </div>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation()
-                                                                onAddUpdate()
-                                                            }}
-                                                            className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-primary-500/25"
-                                                        >
-                                                            <Plus className="w-4 h-4" />
-                                                            <span>Add</span>
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
-                                                    {[...filteredKpiUpdates].sort(compareClaimsByEffectiveDateDesc).map((update, index) => {
-                                                        const hasDateRange = update.date_range_start && update.date_range_end
-                                                        const displayDate = hasDateRange
-                                                            ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}`
-                                                            : formatDate(update.date_represented)
-
-                                                        const updateLocation = update.location_id ? updateLocations[update.location_id] : null
-
-                                                        return (
-                                                            <div
-                                                                key={update.id || index}
-                                                                className="border border-gray-100/80 rounded-xl bg-white/60 hover:bg-primary-50/50 hover:border-primary-200 cursor-pointer transition-all duration-200 p-2.5"
-                                                                onClick={() => handleDataPointClick(update)}
-                                                            >
-                                                                <div className="flex items-center justify-between">
-                                                                    <div className="min-w-0 flex-1">
-                                                                        <div className="flex items-center space-x-2">
-                                                                            <span className="text-sm font-semibold text-primary-600">
-                                                                                {update.value?.toLocaleString()}{isPercentageMetric ? '%' : (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '')}
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className="flex items-center space-x-2 mt-0.5">
-                                                                            <Calendar className="w-3 h-3 text-gray-400" />
-                                                                            <span className="text-xs text-gray-500">{displayDate}</span>
-                                                                        </div>
-                                                                        {updateLocation && (
-                                                                            <div className="flex items-center space-x-1 mt-0.5">
-                                                                                <MapPin className="w-3 h-3 text-gray-400" />
-                                                                                <span className="text-xs text-gray-500">{updateLocation.name}</span>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2">
-                                                                        {(() => {
-                                                                            const supportPercentage = getClaimSupportPercentage(update)
-                                                                            const evidenceCount = getClaimEvidenceCount(update)
-                                                                            return (
-                                                                                <>
-                                                                                    {supportPercentage > 0 && (
-                                                                                        <div className={`flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${supportPercentage === 100
-                                                                                            ? 'bg-primary-100 text-primary-700'
-                                                                                            : 'bg-yellow-100 text-yellow-700'
-                                                                                            }`}>
-                                                                                            <span>{evidenceCount} | {supportPercentage}% Coverage</span>
-                                                                                        </div>
-                                                                                    )}
-                                                                                    {supportPercentage === 0 && !loadingEvidence && (
-                                                                                        <div className="flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-red-100 text-red-700">
-                                                                                            <span>0 | 0% Coverage</span>
-                                                                                        </div>
-                                                                                    )}
-                                                                                    {canEditEvidence && (
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={(e) => handleAddEvidenceForClaim(update, e)}
-                                                                                            className="flex items-center gap-1 px-2.5 py-1.5 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-xs font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"
-                                                                                            title="Add supporting evidence for this claim"
-                                                                                        >
-                                                                                            <Upload className="w-3 h-3" />
-                                                                                            <span>Add Evidence</span>
-                                                                                        </button>
-                                                                                    )}
-                                                                                </>
-                                                                            )
-                                                                        })()}
-                                                                        <Eye className="w-3.5 h-3.5 text-gray-400" />
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                                {/* View All Evidence Button */}
-                                                <div className="pt-3 mt-3 border-t border-gray-100 flex-shrink-0">
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); setIsAllEvidenceModalOpen(true) }}
-                                                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-evidence-500/25"
-                                                    >
-                                                        <FileText className="w-4 h-4" />
-                                                        <span>View All Evidence ({evidence.length})</span>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="bg-white/80 backdrop-blur-xl border-2 border-primary-400 rounded-2xl p-6 shadow-lg shadow-primary-200/50 flex-1 ring-2 ring-primary-200 ring-offset-2">
-                                                <div className="text-center">
-                                                    <div className="w-14 h-14 mx-auto mb-3 bg-primary-100/80 rounded-xl flex items-center justify-center">
-                                                        <BarChart3 className="w-7 h-7 text-primary-500" />
-                                                    </div>
-                                                    <h5 className="text-base font-semibold text-gray-800 mb-1">Impact Claims</h5>
-                                                    <p className="text-sm text-gray-500 mb-3">{canAddImpactClaims ? 'Start tracking your impact' : 'No impact claims yet'}</p>
-                                                    {canAddImpactClaims && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation()
-                                                                onAddUpdate()
-                                                            }}
-                                                            className="inline-flex items-center space-x-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-primary-500/25 animate-pulse"
-                                                        >
-                                                            <Plus className="w-5 h-5" />
-                                                            <span>Add Impact Claim</span>
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                    </div>
-                </div>,
-                document.body
-            ))}
-
-            {/* Data Point Preview Modal */}
-            {selectedDataPoint && createPortal(
-                <DataPointPreviewModal
-                    dataPoint={selectedDataPoint}
-                    kpi={selectedDataPoint.kpi || kpi}
-                    isOpen={isDataPointPreviewOpen}
-                    onClose={() => {
-                        setIsDataPointPreviewOpen(false)
-                        setSelectedDataPoint(null)
-                    }}
-                    onEdit={canEditMetrics ? (dataPoint) => {
-                        setEditingDataPoint(dataPoint)
-                        setIsDataPointPreviewOpen(false)
-                        setSelectedDataPoint(null)
-                        setIsEditDataPointModalOpen(true)
-                    } : undefined}
-                    onDelete={canDelete ? (dataPoint) => {
-                        setDeleteConfirmDataPoint(dataPoint)
-                        setIsDataPointPreviewOpen(false)
-                        setSelectedDataPoint(null)
-                    } : undefined}
-                    onEvidenceClick={(evidence) => {
-                        setSelectedEvidence(evidence)
-                        setIsDataPointPreviewOpen(false)
-                        setIsEvidencePreviewOpen(true)
-                    }}
-                    onAddEvidence={canEditEvidence ? (dp) => {
-                        setIsDataPointPreviewOpen(false)
-                        setSelectedDataPoint(null)
-                        setSelectedClaimForEvidence(dp)
-                        setIsEasyEvidenceModalOpen(true)
-                    } : undefined}
-                />,
-                document.body
-            )}
-
-            {/* Evidence Preview Modal - Rendered outside portal */}
-            {selectedEvidence && createPortal(
-                <EvidencePreviewModal
-                    evidence={selectedEvidence}
-                    isOpen={isEvidencePreviewOpen}
-                    onClose={() => setIsEvidencePreviewOpen(false)}
-                    onEdit={canEditEvidence ? (evidence) => {
-                        setSelectedEvidence(evidence)
-                        setIsEvidencePreviewOpen(false)
-                        setIsEditEvidenceModalOpen(true)
-                    } : undefined}
-                    onDelete={canDelete ? (evidence) => {
-                        setDeleteConfirmEvidence(evidence)
-                        setIsEvidencePreviewOpen(false)
-                    } : undefined}
-                    onDataPointClick={(dataPoint, kpiData) => {
-                        setSelectedDataPoint(dataPoint)
-                        setIsEvidencePreviewOpen(false)
-                        setIsDataPointPreviewOpen(true)
-                    }}
-                />,
-                document.body
-            )}
-
-            {/* Edit Data Point Modal */}
-            {editingDataPoint && createPortal(
-                <AddKPIUpdateModal
-                    isOpen={isEditDataPointModalOpen}
-                    onClose={() => {
-                        setIsEditDataPointModalOpen(false)
-                        setEditingDataPoint(null)
-                    }}
-                    onSubmit={handleUpdateDataPoint}
-                    kpiTitle={kpi.title}
-                    kpiId={kpi.id}
-                    metricType={kpi.metric_type || 'number'}
-                    unitOfMeasurement={kpi.unit_of_measurement || ''}
-                    initiativeId={initiativeId}
-                    kpiTagIds={(kpi as any).tag_ids || []}
-                    editData={editingDataPoint}
-                />,
-                document.body
-            )}
-
-            {/* Edit Evidence Modal */}
-            {selectedEvidence && createPortal(
-                <AddEvidenceModal
-                    isOpen={isEditEvidenceModalOpen}
-                    onClose={() => {
-                        setIsEditEvidenceModalOpen(false)
-                        setSelectedEvidence(null)
-                    }}
-                    onSubmit={handleUpdateEvidence}
-                    availableKPIs={[kpi]}
-                    initiativeId={kpi.initiative_id}
-                    preSelectedKPIId={kpi.id}
-                    editData={selectedEvidence}
-                />,
-                document.body
-            )}
-
-            {deleteConfirmDataPoint && createPortal(
-                <ConfirmDialog
-                    tone="danger"
-                    title="Delete Impact Claim"
-                    message={
-                        'This action cannot be undone.\n\nAre you sure you want to delete this impact claim and its associated information?'
-                    }
-                    confirmLabel="Delete"
-                    onCancel={() => setDeleteConfirmDataPoint(null)}
-                    onConfirm={() => handleDeleteDataPoint(deleteConfirmDataPoint)}
-                />,
-                document.body
-            )}
-
-            {deleteConfirmEvidence && createPortal(
-                <ConfirmDialog
-                    tone="danger"
-                    title="Delete Evidence"
-                    message={
-                        'This action cannot be undone.\n\nAre you sure you want to delete this evidence and its associated information?'
-                    }
-                    confirmLabel="Delete"
-                    onCancel={() => setDeleteConfirmEvidence(null)}
-                    onConfirm={() => handleDeleteEvidence(deleteConfirmEvidence)}
-                />,
-                document.body
-            )}
-
-            {/* Credit to Donor Modal */}
-            {isCreditingModalOpen && initiativeId && (
-                <MetricCreditingModal
-                    isOpen={isCreditingModalOpen}
-                    onClose={() => setIsCreditingModalOpen(false)}
-                    onSave={async () => {
-                        onRefresh?.()
-                    }}
-                    kpi={kpi}
-                    kpiUpdates={kpiUpdates}
-                    initiativeId={initiativeId}
-                />
-            )}
-
-            {/* Easy Evidence Modal - For single claim evidence upload */}
-            {selectedClaimForEvidence && createPortal(
-                <EasyEvidenceModal
-                    isOpen={isEasyEvidenceModalOpen}
-                    onClose={() => {
-                        setIsEasyEvidenceModalOpen(false)
-                        setSelectedClaimForEvidence(null)
-                    }}
-                    onSubmit={handleEasyEvidenceSubmit}
-                    onBatchComplete={handleEasyEvidenceBatchComplete}
-                    impactClaim={selectedClaimForEvidence}
-                    kpi={kpi}
-                    initiativeId={initiativeId || kpi.initiative_id || ''}
-                />,
-                document.body
-            )}
-
-            {/* All Evidence Modal - View all evidence grouped by type */}
-            {createPortal(
-                <AllEvidenceModal
-                    isOpen={isAllEvidenceModalOpen}
-                    onClose={() => setIsAllEvidenceModalOpen(false)}
-                    evidence={evidence}
-                    kpi={kpi}
-                    onEvidenceClick={(ev) => {
-                        setSelectedEvidence(ev)
-                        setIsAllEvidenceModalOpen(false)
-                        setIsEvidencePreviewOpen(true)
-                    }}
-                />,
-                document.body
-            )}
-        </div>
-    )
+ // Use provided color or default to site green
+ const chartColor = metricColor || DEFAULT_METRIC_COLOR
+
+ // Team permissions
+ const { canAddImpactClaims, canEditEvidence, canEditMetrics, canDelete } = useTeam()
+
+ // Lock body scroll when expanded (only for portal mode, not page mode)
+ useEffect(() => {
+ if (isExpanded && !renderAsPage) {
+ document.body.style.overflow = 'hidden'
+ } else {
+ document.body.style.overflow = 'unset'
+ }
+
+ // Cleanup on unmount
+ return () => {
+ document.body.style.overflow = 'unset'
+ }
+ }, [isExpanded, renderAsPage])
+
+ // Time frame filter state
+ const [timeFrame, setTimeFrame] = useState<'all' | '1month' | '6months' | '1year' | '5years'>('all')
+ const [isCumulative, setIsCumulative] = useState(false)
+ const [datePickerValue, setDatePickerValue] = useState<{
+ singleDate?: string
+ startDate?: string
+ endDate?: string
+ }>({})
+ const [expandedDataPoints, setExpandedDataPoints] = useState<string[]>([])
+ const [expandedEvidence, setExpandedEvidence] = useState<string[]>([])
+ const [selectedEvidence, setSelectedEvidence] = useState<any>(null)
+ const [selectedDataPoint, setSelectedDataPoint] = useState<any>(null)
+ const [isEvidencePreviewOpen, setIsEvidencePreviewOpen] = useState(false)
+ const [isDataPointPreviewOpen, setIsDataPointPreviewOpen] = useState(false)
+ const [isEditDataPointModalOpen, setIsEditDataPointModalOpen] = useState(false)
+ const [isEditEvidenceModalOpen, setIsEditEvidenceModalOpen] = useState(false)
+ const [deleteConfirmDataPoint, setDeleteConfirmDataPoint] = useState<any>(null)
+ const [deleteConfirmEvidence, setDeleteConfirmEvidence] = useState<any>(null)
+ const [editingDataPoint, setEditingDataPoint] = useState<any>(null)
+ const [evidence, setEvidence] = useState<any[]>([])
+ const [allTags, setAllTags] = useState<MetricTag[]>([])
+ const [showDescription, setShowDescription] = useState(false)
+ const [loadingEvidence, setLoadingEvidence] = useState(false)
+ const [updateLocations, setUpdateLocations] = useState<Record<string, any>>({})
+ const [isCreditingModalOpen, setIsCreditingModalOpen] = useState(false)
+ const [selectedClaimForEvidence, setSelectedClaimForEvidence] = useState<any>(null)
+ const [isEasyEvidenceModalOpen, setIsEasyEvidenceModalOpen] = useState(false)
+ const [isAllEvidenceModalOpen, setIsAllEvidenceModalOpen] = useState(false)
+
+ // Filter bar state for the expanded view (date is shared with timeFrame logic above).
+ const [filterLocations, setFilterLocations] = useState<string[]>([])
+ const [filterTags, setFilterTags] = useState<string[]>([])
+ const [filterBeneficiaryGroups, setFilterBeneficiaryGroups] = useState<string[]>([])
+ const [filterAllLocations, setFilterAllLocations] = useState<Location[]>([])
+ const [filterAllBeneficiaryGroups, setFilterAllBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
+
+ useEffect(() => {
+ if (!isExpanded || !initiativeId) return
+ let active = true
+ Promise.all([
+ apiService.getLocations(initiativeId),
+ apiService.getBeneficiaryGroups(initiativeId),
+ ]).then(([locs, groups]) => {
+ if (!active) return
+ setFilterAllLocations(locs || [])
+ setFilterAllBeneficiaryGroups((groups || []) as BeneficiaryGroup[])
+ }).catch(() => {
+ if (!active) return
+ setFilterAllLocations([])
+ setFilterAllBeneficiaryGroups([])
+ })
+ return () => { active = false }
+ }, [isExpanded, initiativeId])
+
+ // Tags available on this metric only.
+ const filterAvailableTags = useMemo(() => {
+ const ids = new Set((kpi.tag_ids || []) as string[])
+ return allTags.filter(t => ids.has(t.id))
+ }, [allTags, kpi.tag_ids])
+
+ const filteredKpiUpdates = useMemo(() => {
+ if (!Array.isArray(kpiUpdates)) return []
+ return kpiUpdates.filter((u: any) => {
+ if (filterLocations.length > 0 && !filterLocations.includes(u.location_id || '')) return false
+ if (filterTags.length > 0 && !filterTags.includes(u.tag_id || '')) return false
+ if (filterBeneficiaryGroups.length > 0) {
+ const ids: string[] = u.beneficiary_group_ids || []
+ if (!ids.some(id => filterBeneficiaryGroups.includes(id))) return false
+ }
+ return true
+ })
+ }, [kpiUpdates, filterLocations, filterTags, filterBeneficiaryGroups])
+
+ const clearAllFilters = () => {
+ setFilterLocations([])
+ setFilterTags([])
+ setFilterBeneficiaryGroups([])
+ setDatePickerValue({})
+ }
+
+
+ const handleDataPointClick = (update: any) => {
+ setSelectedDataPoint(update)
+ setIsDataPointPreviewOpen(true)
+ }
+
+ const toggleEvidenceExpanded = (evidenceId: string) => {
+ setExpandedEvidence(prev =>
+ prev.includes(evidenceId)
+ ? prev.filter(id => id !== evidenceId)
+ : [...prev, evidenceId]
+ )
+ }
+
+ // Load evidence for all cards (needed for evidence type percentages in collapsed view)
+ // Also reload when kpiUpdates changes (e.g., new impact claim created that may have auto-linked evidence)
+ useEffect(() => {
+ if (kpi.id && initiativeId) {
+ loadEvidence()
+ }
+ }, [kpi.id, initiativeId, kpiUpdates.length])
+
+ useEffect(() => {
+ apiService.getMetricTags().then(setAllTags).catch(() => setAllTags([]))
+ }, [])
+
+ // Load update locations when expanded
+ useEffect(() => {
+ if (isExpanded && kpiUpdates && kpiUpdates.length > 0) {
+ loadUpdateLocations()
+ }
+ }, [isExpanded, kpiUpdates])
+
+ const loadEvidence = async () => {
+ if (!kpi.id || !initiativeId) return
+ try {
+ setLoadingEvidence(true)
+ const data = await apiService.getEvidence(initiativeId, kpi.id)
+ setEvidence(data || [])
+ } catch (error) {
+ console.error('Error loading evidence:', error)
+ setEvidence([])
+ } finally {
+ setLoadingEvidence(false)
+ }
+ }
+
+ const loadUpdateLocations = async () => {
+ if (!kpiUpdates || kpiUpdates.length === 0) return
+
+ // Get unique location IDs from updates
+ const locationIds = [...new Set(kpiUpdates
+ .filter((update: any) => update.location_id)
+ .map((update: any) => update.location_id)
+ )]
+
+ if (locationIds.length === 0) {
+ setUpdateLocations({})
+ return
+ }
+
+ try {
+ const locationPromises = locationIds.map((id: string) =>
+ apiService.getLocation(id).catch(() => null)
+ )
+ const locations = await Promise.all(locationPromises)
+ const locationMap: Record<string, any> = {}
+ locationIds.forEach((id: string, index: number) => {
+ if (locations[index]) {
+ locationMap[id] = locations[index]
+ }
+ })
+ setUpdateLocations(locationMap)
+ } catch (error) {
+ console.error('Error loading update locations:', error)
+ setUpdateLocations({})
+ }
+ }
+
+ const handleEvidenceClick = (evidenceItem: any) => {
+ setSelectedEvidence(evidenceItem)
+ setIsEvidencePreviewOpen(true)
+ }
+
+ // Data Point handlers
+ const handleEditDataPoint = (dataPoint: any) => {
+ setEditingDataPoint(dataPoint)
+ setIsEditDataPointModalOpen(true)
+ }
+
+ const handleDeleteDataPoint = async (dataPoint: any) => {
+ if (!dataPoint.id) return
+ try {
+ await apiService.deleteKPIUpdate(dataPoint.id)
+ notify.success('Impact claim deleted successfully!')
+
+ // Clear cache and refresh data
+ if (initiativeId) {
+ apiService.clearCache(`/initiatives/${initiativeId}/dashboard`)
+ }
+ apiService.clearCache(`/kpis/${kpi.id}/updates`)
+ onRefresh?.()
+
+ // Reload evidence if expanded
+ if (isExpanded && kpi.id && initiativeId) {
+ loadEvidence()
+ }
+
+ setDeleteConfirmDataPoint(null)
+ } catch (error) {
+ const message = error instanceof Error ? error.message : 'Failed to delete impact claim'
+ notify.error(message)
+ }
+ }
+
+ const handleUpdateDataPoint = async (updateData: any) => {
+ if (!editingDataPoint?.id) return
+ try {
+ await apiService.updateKPIUpdate(editingDataPoint.id, updateData)
+ notify.success('Impact claim updated successfully!')
+
+ // Clear cache and refresh data
+ if (initiativeId) {
+ apiService.clearCache(`/initiatives/${initiativeId}/dashboard`)
+ }
+ apiService.clearCache(`/kpis/${kpi.id}/updates`)
+ onRefresh?.()
+
+ // Reload evidence if expanded
+ if (isExpanded && kpi.id && initiativeId) {
+ loadEvidence()
+ }
+
+ setIsEditDataPointModalOpen(false)
+ setEditingDataPoint(null)
+ } catch (error) {
+ const message = error instanceof Error ? error.message : 'Failed to update impact claim'
+ notify.error(message)
+ throw error
+ }
+ }
+
+ // Evidence handlers
+ const handleEditEvidence = (evidence: any) => {
+ setSelectedEvidence(evidence)
+ setIsEditEvidenceModalOpen(true)
+ }
+
+ const handleDeleteEvidence = async (evidence: any) => {
+ if (!evidence.id) return
+ try {
+ await apiService.deleteEvidence(evidence.id)
+ notify.success('Evidence deleted successfully!')
+
+ // Clear cache and refresh data
+ if (initiativeId) {
+ apiService.clearCache(`/initiatives/${initiativeId}/dashboard`)
+ }
+ onRefresh?.()
+
+ // Reload evidence if expanded
+ if (isExpanded && kpi.id && initiativeId) {
+ loadEvidence()
+ }
+
+ setDeleteConfirmEvidence(null)
+ } catch (error) {
+ const message = error instanceof Error ? error.message : 'Failed to delete evidence'
+ notify.error(message)
+ }
+ }
+
+ const handleUpdateEvidence = async (evidenceData: any) => {
+ if (!selectedEvidence?.id) return
+ try {
+ await apiService.updateEvidence(selectedEvidence.id, evidenceData)
+ notify.success('Evidence updated successfully!')
+
+ // Clear cache and refresh data
+ if (initiativeId) {
+ apiService.clearCache(`/initiatives/${initiativeId}/dashboard`)
+ }
+ onRefresh?.()
+
+ // Reload evidence if expanded
+ if (isExpanded && kpi.id && initiativeId) {
+ loadEvidence()
+ }
+
+ setIsEditEvidenceModalOpen(false)
+ setSelectedEvidence(null)
+ } catch (error) {
+ const message = error instanceof Error ? error.message : 'Failed to update evidence'
+ notify.error(message)
+ throw error
+ }
+ }
+
+ // Handler for easy evidence upload (single claim) - legacy, kept for compatibility
+ const handleEasyEvidenceSubmit = async (evidenceData: any) => {
+ await apiService.createEvidence(evidenceData)
+ }
+
+ // Handler called once after all evidence is batch-created
+ const handleEasyEvidenceBatchComplete = async () => {
+ // Clear cache and refresh data
+ if (initiativeId) {
+ apiService.clearCache(`/initiatives/${initiativeId}/dashboard`)
+ }
+ apiService.clearCache(`/evidence?initiative_id=${initiativeId}&kpi_id=${kpi.id}`)
+ onRefresh?.()
+
+ // Reload evidence immediately to update UI
+ if (kpi.id && initiativeId) {
+ await loadEvidence()
+ }
+
+ setIsEasyEvidenceModalOpen(false)
+ setSelectedClaimForEvidence(null)
+
+ }
+
+ // Open easy evidence modal for a specific claim
+ const handleAddEvidenceForClaim = (claim: any, e: React.MouseEvent) => {
+ e.stopPropagation()
+ e.preventDefault()
+ if (!canEditEvidence) return
+ setSelectedClaimForEvidence(claim)
+ setIsEasyEvidenceModalOpen(true)
+ }
+
+ const getClaimSupportPercentage = (claim: any) => computeClaimSupportPercentage(claim, evidence)
+ const getClaimEvidenceCount = (claim: any) => computeClaimEvidenceCount(claim, evidence)
+
+ const isPercentageMetric = kpi.metric_type === 'percentage'
+ const effectiveIsCumulative = isCumulative && !isPercentageMetric
+
+ const chartData = generateKpiChartData({
+ filteredKpiUpdates,
+ datePickerValue,
+ timeFrame,
+ isCumulative,
+ isPercentageMetric,
+ })
+
+ const totalMetricValue = aggregateKpiUpdates(kpiUpdates as any, kpi.metric_type)
+
+ if (isPercentageMetric) {
+ for (const d of chartData) {
+ (d as any).average = totalMetricValue
+ }
+ }
+
+ const xAxisInterval = getXAxisInterval({ timeFrame, chartData, effectiveIsCumulative })
+
+ const formatXAxisTickBound = (dateStr: string) => formatXAxisTick(chartData, dateStr)
+
+ const maxDomainValue = calculateMaxWithHeadroom(chartData)
+ const actualMaxValue = computeActualMaxCumulative(chartData)
+
+ const { percentageYMax, percentageYTicks } = computePercentageYAxis(chartData, isPercentageMetric)
+
+ const yTicks = generateYTicks(maxDomainValue, actualMaxValue)
+
+ const evidenceTypePercentages = calculateEvidenceTypePercentages({
+ kpiId: kpi.id,
+ kpiUpdates,
+ evidence,
+ })
+
+
+ // Get evidence type icon component
+ const getEvidenceIcon = (type: 'visual_proof' | 'documentation' | 'testimony' | 'financials') => {
+ switch (type) {
+ case 'visual_proof': return Camera
+ case 'documentation': return FileText
+ case 'testimony': return MessageSquare
+ case 'financials': return DollarSign
+ default: return FileText
+ }
+ }
+
+ // When renderAsPage is true, skip the app-card wrapper and collapsed view entirely
+ if (renderAsPage && isExpanded) {
+ return (
+ <>
+ {/* Full Page View - No app-card wrapper */}
+ <div className="h-screen flex flex-col overflow-hidden">
+ {/* Header - Prominent */}
+ <div className="flex-shrink-0 bg-white border-b border-gray-200/80 px-6 py-3.5">
+ <div className="flex items-center justify-between">
+ <div className="flex items-center space-x-4">
+ <button onClick={(e) => { e.stopPropagation(); onToggleExpand() }} className="app-btn app-btn-icon app-btn-ghost text-red-500 hover:bg-red-50 border border-gray-200">
+ <X className="w-5 h-5 text-red-500" />
+ </button>
+ <div className="flex items-center gap-2 min-w-0">
+ <div className="flex items-center gap-1.5 min-w-0">
+ <h2 className="text-base lg:text-xl font-bold text-gray-900 truncate">{kpi.title}</h2>
+ {kpi.description && (
+ <button
+ type="button"
+ onClick={(e) => { e.stopPropagation(); setShowDescription(s => !s) }}
+ className="flex-shrink-0 w-5 h-5 inline-flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors"
+ title={showDescription ? 'Hide description' : 'Show description'}
+ >
+ <Info className="w-3 h-3" />
+ </button>
+ )}
+ </div>
+ <div className="flex flex-col items-end flex-shrink-0">
+ <div className="flex items-baseline gap-0.5 px-2.5 lg:px-3 py-1 lg:py-1.5 bg-primary-50 rounded-lg border border-primary-100">
+ <span className="text-lg lg:text-2xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}{isPercentageMetric ? '%' : ''}</span>
+ {!isPercentageMetric && kpi.unit_of_measurement && <span className="text-xs text-primary-500 ml-1">{kpi.unit_of_measurement}</span>}
+ </div>
+ {isPercentageMetric && <span className="text-xs uppercase tracking-wide text-gray-400 mt-0.5">Average</span>}
+ </div>
+ </div>
+ </div>
+ <div className="flex items-center gap-1.5 lg:gap-2 flex-shrink-0">
+ {canAddImpactClaims && (
+ <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="app-btn app-btn-primary app-btn-sm whitespace-nowrap">
+ <Plus className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+ <span className="hidden sm:inline">Add Impact Claim</span>
+ <span className="sm:hidden">Claim</span>
+ </button>
+ )}
+ {canEditEvidence && (
+ <button onClick={(e) => { e.stopPropagation(); onAddEvidence?.() }} className="app-btn app-btn-evidence app-btn-sm whitespace-nowrap">
+ <Upload className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+ <span className="hidden sm:inline">Add Evidence</span>
+ <span className="sm:hidden">Evidence</span>
+ </button>
+ )}
+ {canEditMetrics && (
+ <button onClick={(e) => { e.stopPropagation(); onEdit?.() }} className="app-btn app-btn-icon app-btn-secondary app-btn-sm">
+ <Edit className="w-4 h-4 lg:w-5 lg:h-5" />
+ </button>
+ )}
+ {canDelete && (
+ <button onClick={(e) => { e.stopPropagation(); onDelete?.() }} className="app-btn app-btn-icon app-btn-ghost text-red-500 hover:bg-red-50">
+ <Trash2 className="w-4 h-4 lg:w-5 lg:h-5" />
+ </button>
+ )}
+ </div>
+ </div>
+ </div>
+
+ {/* Content - Fit to screen */}
+ <div className="flex-1 p-3 flex flex-col gap-2 max-w-[1800px] mx-auto overflow-hidden w-full min-h-0">
+ {showDescription && kpi.description && (
+ <div className="flex-shrink-0 app-card px-3 py-2 flex items-start gap-2" onClick={(e) => e.stopPropagation()}>
+ <Info className="w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5" />
+ <p className="text-xs text-gray-600 flex-1">{kpi.description}</p>
+ <button type="button" onClick={() => setShowDescription(false)} className="flex-shrink-0 text-gray-400 hover:text-gray-600">
+ <X className="w-3.5 h-3.5" />
+ </button>
+ </div>
+ )}
+ <div className="flex-shrink-0">
+ <KPIFilterBar
+ locations={filterAllLocations}
+ beneficiaryGroups={filterAllBeneficiaryGroups}
+ tags={filterAvailableTags}
+ selectedLocations={filterLocations}
+ onLocationsChange={setFilterLocations}
+ selectedBeneficiaryGroups={filterBeneficiaryGroups}
+ onBeneficiaryGroupsChange={setFilterBeneficiaryGroups}
+ selectedTags={filterTags}
+ onTagsChange={setFilterTags}
+ datePickerValue={datePickerValue}
+ onDatePickerChange={setDatePickerValue}
+ onClearAll={clearAllFilters}
+ />
+ </div>
+ <TagBreakdownStrip kpi={kpi} kpiUpdates={filteredKpiUpdates} allTags={allTags} compact />
+ <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 flex-1 min-h-0 overflow-hidden">
+ <div className="lg:col-span-3 app-card p-3 flex flex-col min-h-0 overflow-hidden">
+ <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
+ <div className="flex-shrink-0 min-w-0">
+ <h5 className="text-sm lg:text-base font-semibold text-gray-900 truncate">{isPercentageMetric ? 'Percentage Over Time' : (isCumulative ? 'Cumulative Progress' : 'Monthly Progress')}</h5>
+ {!isPercentageMetric && <p className="text-xs text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals'}</p>}
+ </div>
+ <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
+ {!isPercentageMetric && timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
+ <div className="flex items-center bg-gray-100 rounded-md lg:rounded-lg p-0.5">
+ <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-primary-500 text-secondary-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
+ <button onClick={() => setIsCumulative(true)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${isCumulative ? 'bg-primary-500 text-secondary-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
+ </div>
+ )}
+ <div className="flex bg-gray-100 rounded-md lg:rounded-lg p-0.5">
+ {['all', '1month', '6months', '1year', '5years'].map((tf) => (
+ <button key={tf} onClick={() => { setTimeFrame(tf as any); setDatePickerValue({}); setIsCumulative(true) }} className={`px-1.5 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${timeFrame === tf && !datePickerValue.singleDate && !datePickerValue.startDate ? 'bg-primary-500 text-secondary-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+ {tf === 'all' ? 'All' : tf === '1month' ? '1M' : tf === '6months' ? '6M' : tf === '1year' ? '1Y' : '5Y'}
+ </button>
+ ))}
+ </div>
+ </div>
+ </div>
+ <div className="flex-1 min-h-[100px] flex items-center justify-center">
+ {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
+ <ResponsiveContainer width="100%" height="100%">
+ <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+ <CartesianGrid vertical={false} stroke="#f1f5f9" strokeDasharray="3 3" />
+ <XAxis dataKey="date" stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} angle={-45} textAnchor="end" height={50} interval={xAxisInterval} tickMargin={6} tickFormatter={effectiveIsCumulative ? formatXAxisTickBound : undefined} />
+ <YAxis stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} domain={isPercentageMetric ? [0, percentageYMax] : (maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax'])} ticks={isPercentageMetric ? percentageYTicks : (yTicks.length > 0 ? yTicks : undefined)} tickFormatter={isPercentageMetric ? ((value: any) => `${Math.round(value)}%`) : ((value) => { if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`; if (value >= 1000) return `${(value / 1000).toFixed(1)}K`; return value.toString() })} />
+ {isPercentageMetric ? (
+ <Tooltip content={(tooltipProps) => <ExpandableKPICardPercentageTooltip {...tooltipProps} chartData={chartData} chartColor={chartColor} totalMetricValue={totalMetricValue} />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+ ) : (
+ <Tooltip contentStyle={{ backgroundColor: 'rgba(255,255,255,0.98)', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '8px 12px', fontSize: '12px', boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }} formatter={(value: any) => [typeof value === 'number' ? value.toLocaleString() + (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '') : value, 'Cumulative Total']} labelFormatter={(label) => { const dp = chartData.find(d => d.date === label); return dp?.fullDate ? formatDate(dp.fullDate) : `Date: ${label}` }} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+ )}
+ {isPercentageMetric && totalMetricValue > 0 && (
+ <ReferenceLine y={totalMetricValue} stroke={chartColor} strokeOpacity={0.5} strokeWidth={1.25} strokeDasharray="5 4" ifOverflow="extendDomain" />
+ )}
+ {isPercentageMetric && (
+ <Line type="monotone" dataKey="average" stroke="transparent" dot={false} activeDot={false} isAnimationActive={false} legendType="none" />
+ )}
+ <Line type="monotone" dataKey="cumulative" stroke={chartColor} strokeWidth={2.25} dot={isPercentageMetric ? { r: 2.5, fill: chartColor, strokeWidth: 0 } : false} activeDot={{ r: 4, fill: chartColor, stroke: 'white', strokeWidth: 1.5 }} strokeLinecap="round" connectNulls={isPercentageMetric} />
+ </LineChart>
+ </ResponsiveContainer>
+ ) : (
+ <div className="h-full flex flex-col items-center justify-center text-gray-500">
+ <BarChart3 className="w-10 h-10 mb-3 opacity-50" />
+ <h4 className="text-base font-semibold text-gray-700 mb-1">No Data Yet</h4>
+ <p className="text-xs text-center max-w-xs">{kpiUpdates && kpiUpdates.length > 0 ? 'No data matches the active filters' : 'Add data to see your activity over time'}</p>
+ </div>
+ )}
+ </div>
+
+ {/* Stats grid - constrained to chart width */}
+ <div className="grid grid-cols-3 gap-2 mt-2 flex-shrink-0">
+ <div className="app-card border-primary-100 p-2">
+ <div className="flex items-center space-x-2">
+ <div className="p-1.5 bg-primary-100/80 rounded-lg"><BarChart3 className="w-3.5 h-3.5 text-primary-500" /></div>
+ <div className="min-w-0"><p className="text-xs text-gray-500 truncate">Impact Claims</p><p className="text-base font-bold text-primary-500">{kpi.total_updates}</p></div>
+ </div>
+ </div>
+ <div className="app-card border-evidence-100 p-2">
+ <div className="flex items-center space-x-2">
+ <div className="p-1.5 bg-evidence-100/80 rounded-lg"><FileText className="w-3.5 h-3.5 text-evidence-500" /></div>
+ <div className="min-w-0"><p className="text-xs text-gray-500 truncate">Evidence Items</p><p className="text-base font-bold text-evidence-500">{kpi.evidence_count}</p></div>
+ </div>
+ </div>
+ <div className="app-card border-primary-100 p-2">
+ <div className="flex items-center space-x-2">
+ <div className="p-1.5 bg-primary-100/80 rounded-lg"><Target className="w-3.5 h-3.5 text-primary-500" /></div>
+ <div className="min-w-0"><p className="text-xs text-gray-500 truncate">Coverage</p><p className="text-base font-bold text-primary-500">{kpi.evidence_percentage}%</p></div>
+ </div>
+ </div>
+ </div>
+
+ {/* Evidence type bar - constrained to chart width */}
+ <div className="flex items-center justify-between gap-2 h-10 app-card-muted rounded-lg px-3 mt-2 flex-shrink-0">
+ {(['visual_proof', 'documentation', 'testimony', 'financials'] as const).map((type) => {
+ const IconComponent = getEvidenceIcon(type)
+ const typeInfo = getEvidenceTypeInfo(type)
+ const percentage = evidenceTypePercentages[type].percentage
+ const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' : typeInfo.color.includes('blue') ? 'text-evidence-600' : typeInfo.color.includes('orange') ? 'text-orange-600' : typeInfo.color.includes('green') ? 'text-primary-500' : 'text-gray-600'
+ return (
+ <div key={type} className="flex items-center gap-1.5 flex-1 min-w-0">
+ <IconComponent className={`w-3.5 h-3.5 ${colorClasses} flex-shrink-0`} />
+ <div className="flex flex-col items-start min-w-0 flex-1 overflow-hidden">
+ <span className="text-xs font-medium text-gray-700 truncate w-full leading-tight">{typeInfo.label}</span>
+ <span className="text-[8px] font-bold text-gray-600 leading-tight whitespace-nowrap">{percentage}%</span>
+ </div>
+ </div>
+ )
+ })}
+ </div>
+ </div>
+
+ {/* Impact Claims - Full Height */}
+ <div className="lg:col-span-2 flex flex-col min-h-0 overflow-hidden">
+ {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
+ <div className="app-card border-primary-100 p-3 flex flex-col flex-1 min-h-0">
+ <div className="flex items-center justify-between mb-2 flex-shrink-0">
+ <h5 className="text-sm font-semibold text-gray-800">Impact Claims ({filteredKpiUpdates.length})</h5>
+ {canAddImpactClaims && <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="app-btn app-btn-primary app-btn-sm"><Plus className="w-4 h-4" /><span>Add Impact Claim</span></button>}
+ </div>
+ <div className="flex-1 overflow-y-auto space-y-1 pr-1 min-h-0">
+ {[...filteredKpiUpdates].sort(compareClaimsByEffectiveDateDesc).map((update, index) => (
+ <div key={update.id || index} className="app-card-interactive cursor-pointer p-2" onClick={() => handleDataPointClick(update)}>
+ <div className="flex items-center justify-between">
+ <div className="min-w-0 flex-1">
+ <span className="text-xs font-semibold text-primary-600">{update.value?.toLocaleString()}{isPercentageMetric ? '%' : (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '')}</span>
+ <div className="flex items-center space-x-1.5 mt-0.5"><Calendar className="w-2.5 h-2.5 text-gray-400" /><span className="text-xs text-gray-500">{update.date_range_start && update.date_range_end ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}` : formatDate(update.date_represented)}</span></div>
+ </div>
+ <div className="flex items-center gap-1.5">
+ {update.tag_id && allTags.length > 0 && (() => {
+ const t = allTags.find(t => t.id === update.tag_id)
+ return t ? <div onClick={(e) => e.stopPropagation()}><Link to={`/tags/${t.id}`} className="contents"><TagChip name={t.name} size="xs" /></Link></div> : null
+ })()}
+ {(() => {
+ const supportPercentage = getClaimSupportPercentage(update)
+ const evidenceCount = getClaimEvidenceCount(update)
+ return (
+ <>
+ {supportPercentage > 0 && (
+ <div className={`flex items-center justify-center px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap ${supportPercentage === 100
+ ? 'bg-primary-100 text-primary-700'
+ : 'bg-yellow-100 text-yellow-700'
+ }`}>
+ <span>{evidenceCount} | {supportPercentage}% Coverage</span>
+ </div>
+ )}
+ {supportPercentage === 0 && !loadingEvidence && (
+ <div className="flex items-center justify-center px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap bg-red-100 text-red-700">
+ <span>0 | 0% Coverage</span>
+ </div>
+ )}
+ {canEditEvidence && (
+ <button
+ type="button"
+ onClick={(e) => handleAddEvidenceForClaim(update, e)}
+ className="app-btn app-btn-evidence app-btn-sm"
+ title="Add supporting evidence for this claim"
+ >
+ <Upload className="w-2.5 h-2.5" />
+ <span>Add Evidence</span>
+ </button>
+ )}
+ </>
+ )
+ })()}
+ <Eye className="w-3 h-3 text-gray-400" />
+ </div>
+ </div>
+ </div>
+ ))}
+ </div>
+ {/* View All Evidence Button */}
+ <div className="pt-2 mt-2 border-t border-gray-100 flex-shrink-0">
+ <button
+ onClick={(e) => { e.stopPropagation(); setIsAllEvidenceModalOpen(true) }}
+ className="app-btn app-btn-evidence app-btn-sm w-full"
+ >
+ <FileText className="w-3.5 h-3.5" />
+ <span>View All Evidence ({evidence.length})</span>
+ </button>
+ </div>
+ </div>
+ ) : (
+ <div className="app-card-elevated border-2 border-primary-400 p-4 flex-1 ring-2 ring-primary-200 ring-offset-2">
+ <div className="text-center">
+ <div className="w-10 h-10 mx-auto mb-2 bg-primary-100/80 rounded-lg flex items-center justify-center"><BarChart3 className="w-5 h-5 text-primary-500" /></div>
+ <h5 className="text-sm font-semibold text-gray-800 mb-1">Impact Claims</h5>
+ <p className="text-xs text-gray-500 mb-3">{canAddImpactClaims ? 'Start tracking your impact' : 'No impact claims yet'}</p>
+ {canAddImpactClaims && <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="app-btn app-btn-primary app-btn-sm animate-pulse"><Plus className="w-4 h-4" /><span>Add Impact Claim</span></button>}
+ </div>
+ </div>
+ )}
+ </div>
+ </div>
+
+ </div>
+ </div>
+
+ {/* Modals for page mode */}
+ {selectedDataPoint && createPortal(
+ <DataPointPreviewModal
+ dataPoint={selectedDataPoint}
+ kpi={selectedDataPoint.kpi || kpi}
+ isOpen={isDataPointPreviewOpen}
+ onClose={() => { setIsDataPointPreviewOpen(false); setSelectedDataPoint(null) }}
+ onEdit={canEditMetrics ? (dp) => { setEditingDataPoint(dp); setIsDataPointPreviewOpen(false); setSelectedDataPoint(null); setIsEditDataPointModalOpen(true) } : undefined}
+ onDelete={canDelete ? (dp) => { setDeleteConfirmDataPoint(dp); setIsDataPointPreviewOpen(false); setSelectedDataPoint(null) } : undefined}
+ onEvidenceClick={(ev) => { setSelectedEvidence(ev); setIsDataPointPreviewOpen(false); setIsEvidencePreviewOpen(true) }}
+ onAddEvidence={canEditEvidence ? (dp) => { setIsDataPointPreviewOpen(false); setSelectedDataPoint(null); setSelectedClaimForEvidence(dp); setIsEasyEvidenceModalOpen(true) } : undefined}
+ />,
+ document.body
+ )}
+
+ {selectedEvidence && createPortal(
+ <EvidencePreviewModal
+ evidence={selectedEvidence}
+ isOpen={isEvidencePreviewOpen}
+ onClose={() => setIsEvidencePreviewOpen(false)}
+ onEdit={canEditEvidence ? (ev) => { setSelectedEvidence(ev); setIsEvidencePreviewOpen(false); setIsEditEvidenceModalOpen(true) } : undefined}
+ onDelete={canDelete ? (ev) => { setDeleteConfirmEvidence(ev); setIsEvidencePreviewOpen(false) } : undefined}
+ onDataPointClick={(dp) => { setSelectedDataPoint(dp); setIsEvidencePreviewOpen(false); setIsDataPointPreviewOpen(true) }}
+ />,
+ document.body
+ )}
+
+ {editingDataPoint && createPortal(
+ <AddKPIUpdateModal
+ isOpen={isEditDataPointModalOpen}
+ onClose={() => { setIsEditDataPointModalOpen(false); setEditingDataPoint(null) }}
+ onSubmit={handleUpdateDataPoint}
+ kpiTitle={kpi.title}
+ kpiId={kpi.id}
+ metricType={kpi.metric_type || 'number'}
+ unitOfMeasurement={kpi.unit_of_measurement || ''}
+ initiativeId={initiativeId}
+ kpiTagIds={(kpi as any).tag_ids || []}
+ editData={editingDataPoint}
+ />,
+ document.body
+ )}
+
+ {selectedEvidence && createPortal(
+ <AddEvidenceModal
+ isOpen={isEditEvidenceModalOpen}
+ onClose={() => { setIsEditEvidenceModalOpen(false); setSelectedEvidence(null) }}
+ onSubmit={handleUpdateEvidence}
+ availableKPIs={[kpi]}
+ initiativeId={kpi.initiative_id}
+ preSelectedKPIId={kpi.id}
+ editData={selectedEvidence}
+ />,
+ document.body
+ )}
+
+ {deleteConfirmDataPoint && createPortal(
+ <ConfirmDialog
+ tone="danger"
+ title="Delete Impact Claim"
+ message={
+ 'This action cannot be undone.\n\nAre you sure you want to delete this impact claim and its associated information?'
+ }
+ confirmLabel="Delete"
+ onCancel={() => setDeleteConfirmDataPoint(null)}
+ onConfirm={() => handleDeleteDataPoint(deleteConfirmDataPoint)}
+ />,
+ document.body
+ )}
+
+ {deleteConfirmEvidence && createPortal(
+ <ConfirmDialog
+ tone="danger"
+ title="Delete Evidence"
+ message={
+ 'This action cannot be undone.\n\nAre you sure you want to delete this evidence and its associated information?'
+ }
+ confirmLabel="Delete"
+ onCancel={() => setDeleteConfirmEvidence(null)}
+ onConfirm={() => handleDeleteEvidence(deleteConfirmEvidence)}
+ />,
+ document.body
+ )}
+
+ {isCreditingModalOpen && initiativeId && (
+ <MetricCreditingModal
+ isOpen={isCreditingModalOpen}
+ onClose={() => setIsCreditingModalOpen(false)}
+ onSave={async () => { onRefresh?.() }}
+ kpi={kpi}
+ kpiUpdates={kpiUpdates}
+ initiativeId={initiativeId}
+ />
+ )}
+
+ {/* Easy Evidence Modal - For single claim evidence upload */}
+ {selectedClaimForEvidence && createPortal(
+ <EasyEvidenceModal
+ isOpen={isEasyEvidenceModalOpen}
+ onClose={() => {
+ setIsEasyEvidenceModalOpen(false)
+ setSelectedClaimForEvidence(null)
+ }}
+ onSubmit={handleEasyEvidenceSubmit}
+ onBatchComplete={handleEasyEvidenceBatchComplete}
+ impactClaim={selectedClaimForEvidence}
+ kpi={kpi}
+ initiativeId={initiativeId || kpi.initiative_id || ''}
+ />,
+ document.body
+ )}
+
+ {/* All Evidence Modal - View all evidence grouped by type */}
+ {createPortal(
+ <AllEvidenceModal
+ isOpen={isAllEvidenceModalOpen}
+ onClose={() => setIsAllEvidenceModalOpen(false)}
+ evidence={evidence}
+ kpi={kpi}
+ onEvidenceClick={(ev) => {
+ setSelectedEvidence(ev)
+ setIsAllEvidenceModalOpen(false)
+ setIsEvidencePreviewOpen(true)
+ }}
+ />,
+ document.body
+ )}
+ </>
+ )
+ }
+
+ return (
+ <div className={`app-card-interactive transition-all duration-300 overflow-hidden ${(kpi.evidence_percentage || 0) >= 80
+ ? 'border-primary-200/60 hover:border-primary-300/60'
+ : (kpi.evidence_percentage || 0) >= 30
+ ? 'border-yellow-200/60 hover:border-yellow-300/60'
+ : 'border-red-200/60 hover:border-red-300/60'
+ }`}>
+ {/* Collapsed View - New Layout */}
+ <div
+ className="cursor-pointer h-full flex flex-col"
+ onClick={onToggleExpand}
+ >
+ {/* Main Content Section */}
+ <div className="flex flex-1 min-h-0">
+ {/* Left Section - ~70% width */}
+ <div className="w-[70%] p-3 flex flex-col">
+ {/* Category Badge */}
+ <div className="mb-2">
+ <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${getCategoryColor(kpi.category)}`}>
+ {kpi.category}
+ </span>
+ </div>
+
+ {/* Title */}
+ <h3 className="text-xl font-bold text-gray-900 mb-3 line-clamp-2 leading-tight">{kpi.title}</h3>
+
+ {/* Metric Number */}
+ {kpiTotal !== undefined ? (
+ <div className="flex-1 flex flex-col justify-center">
+ <span className="text-5xl font-extrabold text-gray-900 tracking-tight leading-none">
+ {kpiTotal.toLocaleString()}
+ </span>
+ <span className="text-sm font-medium text-gray-600 mt-1">
+ {kpi.metric_type === 'percentage' ? '%' : kpi.unit_of_measurement}
+ </span>
+ </div>
+ ) : (
+ <div className="flex-1 flex items-center">
+ <div className="text-sm text-gray-400 font-medium">No data yet</div>
+ </div>
+ )}
+ </div>
+
+ {/* Right Section - ~30% width */}
+ <div className="w-[30%] p-3 flex flex-col border-l border-gray-100">
+ {/* Impact Claims */}
+ <div className="mb-2">
+ <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-0.5">
+ Impact Claims
+ </div>
+ <div className="text-2xl font-extrabold text-primary-500">
+ {kpi.total_updates || 0}
+ </div>
+ </div>
+
+ {/* Evidence Items */}
+ <div className="mb-3">
+ <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-0.5">
+ Evidence Items
+ </div>
+ <div className="text-2xl font-extrabold text-evidence-500">
+ {kpi.evidence_count || 0}
+ </div>
+ </div>
+
+ {/* Evidence Type Grid - 2x2 */}
+ <div className="grid grid-cols-2 gap-1.5 mt-auto">
+ {(['visual_proof', 'documentation', 'testimony', 'financials'] as const).map((type) => {
+ const IconComponent = getEvidenceIcon(type)
+ const typeInfo = getEvidenceTypeInfo(type)
+ const percentage = evidenceTypePercentages[type].percentage
+
+ // Extract color classes from typeInfo
+ const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' :
+ typeInfo.color.includes('blue') ? 'text-evidence-600' :
+ typeInfo.color.includes('orange') ? 'text-orange-600' :
+ typeInfo.color.includes('green') ? 'text-primary-500' :
+ 'text-gray-600'
+
+ return (
+ <div
+ key={type}
+ className={`app-card-muted p-1.5 flex flex-col items-center justify-center ${percentage > 0 ? 'hover:bg-gray-100' : 'opacity-50'}`}
+ >
+ <IconComponent className={`w-3 h-3 ${colorClasses}`} />
+ <div className="text-[8px] font-bold text-gray-700 mt-0.5">
+ {percentage}%
+ </div>
+ </div>
+ )
+ })}
+ </div>
+ </div>
+ </div>
+
+ {/* Progress Bar Section - Full width at bottom */}
+ <div className="px-3 py-2.5 border-t border-gray-100">
+ <div className="flex items-center justify-between text-xs mb-1">
+ <span className="font-semibold text-gray-600">Evidence Coverage</span>
+ <span className={`font-bold ${(kpi.evidence_percentage || 0) >= 80
+ ? 'text-primary-500'
+ : (kpi.evidence_percentage || 0) >= 30
+ ? 'text-yellow-600'
+ : 'text-red-600'
+ }`}>
+ {kpi.evidence_percentage || 0}%
+ </span>
+ </div>
+ <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+ <div
+ className={`h-full rounded-full transition-all duration-500 ${(kpi.evidence_percentage || 0) >= 80
+ ? 'bg-gradient-to-r from-primary-500 to-primary-600'
+ : (kpi.evidence_percentage || 0) >= 30
+ ? 'bg-gradient-to-r from-yellow-500 to-yellow-600'
+ : 'bg-gradient-to-r from-red-500 to-red-600'
+ }`}
+ style={{
+ width: `${Math.min(kpi.evidence_percentage || 0, 100)}%`
+ }}
+ ></div>
+ </div>
+ </div>
+ </div>
+
+ {/* Expanded View - Full Screen (as page or portal) */}
+ {isExpanded && (renderAsPage ? (
+ // Render as inline page content (not portal)
+ <div className="h-screen overflow-y-auto app-canvas">
+ {/* Header */}
+ <div className="sticky top-0 z-10 bg-white border-b border-gray-200/80 p-4">
+ <div className="flex items-center justify-between">
+ <div className="flex items-center space-x-4">
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ onToggleExpand()
+ }}
+ className="app-btn app-btn-icon app-btn-ghost text-red-500 hover:bg-red-50 border border-gray-200"
+ >
+ <X className="w-5 h-5 text-red-500" />
+ </button>
+ <div className="flex items-center gap-3">
+ <div>
+ <h2 className="text-xl font-bold text-gray-800">{kpi.title}</h2>
+ <p className="text-sm text-gray-500">{kpi.description}</p>
+ </div>
+ <div className="flex flex-col items-end">
+ <div className="flex items-baseline gap-0.5 px-3 py-1.5 bg-primary-50 rounded-xl border border-primary-100">
+ <span className="text-2xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}{isPercentageMetric ? '%' : ''}</span>
+ {!isPercentageMetric && kpi.unit_of_measurement && <span className="text-xs text-primary-500 ml-1">{kpi.unit_of_measurement}</span>}
+ </div>
+ {isPercentageMetric && <span className="text-xs uppercase tracking-wide text-gray-400 mt-0.5">Average</span>}
+ </div>
+ </div>
+ </div>
+ <div className="flex items-center space-x-2">
+ {canAddImpactClaims && (
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ onAddUpdate()
+ }}
+ className="app-btn app-btn-secondary app-btn-sm"
+ >
+ <Plus className="w-4 h-4" />
+ <span>Add Impact Claim</span>
+ </button>
+ )}
+ {canEditEvidence && kpi.total_updates > 0 && (
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ onAddEvidence?.()
+ }}
+ className="app-btn app-btn-evidence app-btn-sm"
+ >
+ <Upload className="w-4 h-4" />
+ <span>Add Evidence</span>
+ </button>
+ )}
+ {kpi.metric_type !== 'percentage' && (
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ setIsCreditingModalOpen(true)
+ }}
+ className="app-btn app-btn-secondary app-btn-sm bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+ >
+ <Heart className="w-4 h-4" />
+ <span>Credit to Donor</span>
+ </button>
+ )}
+ {canEditMetrics && (
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ onEdit?.()
+ }}
+ className="app-btn app-btn-secondary app-btn-sm"
+ >
+ <Edit className="w-4 h-4" />
+ <span>Edit</span>
+ </button>
+ )}
+ {canDelete && (
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ onDelete?.()
+ }}
+ className="app-btn app-btn-icon app-btn-ghost text-red-500 hover:bg-red-50"
+ >
+ <Trash2 className="w-4 h-4" />
+ </button>
+ )}
+ </div>
+ </div>
+ </div>
+
+ {/* Content - Reuse the same content structure */}
+ <div className="p-4 space-y-4 max-w-[1600px] mx-auto">
+ {/* Stats Grid */}
+ <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+ <div className="app-card border-primary-100 p-4">
+ <div className="flex items-center space-x-3">
+ <div className="p-2.5 bg-primary-100/80 rounded-xl">
+ <BarChart3 className="w-5 h-5 text-primary-500" />
+ </div>
+ <div>
+ <p className="text-sm text-gray-500">Impact Claims</p>
+ <p className="text-xl font-bold text-primary-500">{kpi.total_updates}</p>
+ </div>
+ </div>
+ </div>
+
+ <div className="app-card border-evidence-100 p-4">
+ <div className="flex items-center space-x-3">
+ <div className="p-2.5 bg-evidence-100/80 rounded-xl">
+ <FileText className="w-5 h-5 text-evidence-500" />
+ </div>
+ <div>
+ <p className="text-sm text-gray-500">Evidence Items</p>
+ <p className="text-xl font-bold text-evidence-500">{kpi.evidence_count}</p>
+ </div>
+ </div>
+ </div>
+
+ <div className="app-card border-primary-100 p-4">
+ <div className="flex items-center space-x-3">
+ <div className="p-2.5 bg-primary-100/80 rounded-xl">
+ <Target className="w-5 h-5 text-primary-500" />
+ </div>
+ <div>
+ <p className="text-sm text-gray-500">Evidence Coverage</p>
+ <p className="text-xl font-bold text-primary-500">{kpi.evidence_percentage}%</p>
+ </div>
+ </div>
+ </div>
+ </div>
+
+ {/* Evidence Type Icons Row */}
+ <div className="flex items-center justify-between gap-2 h-10 app-card-muted rounded-xl px-4 py-1">
+ {(['visual_proof', 'documentation', 'testimony', 'financials'] as const).map((type) => {
+ const IconComponent = getEvidenceIcon(type)
+ const typeInfo = getEvidenceTypeInfo(type)
+ const percentage = evidenceTypePercentages[type].percentage
+
+ const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' :
+ typeInfo.color.includes('blue') ? 'text-evidence-600' :
+ typeInfo.color.includes('orange') ? 'text-orange-600' :
+ typeInfo.color.includes('green') ? 'text-primary-500' :
+ 'text-gray-600'
+
+ return (
+ <div key={type} className="flex items-center gap-1.5 flex-1 min-w-0">
+ <IconComponent className={`w-3.5 h-3.5 ${colorClasses} flex-shrink-0`} />
+ <div className="flex flex-col items-start min-w-0 flex-1 overflow-hidden">
+ <span className="text-xs font-medium text-gray-700 truncate w-full leading-tight">
+ {typeInfo.label}
+ </span>
+ <span className="text-[8px] font-bold text-gray-600 leading-tight whitespace-nowrap">
+ {percentage}%
+ </span>
+ </div>
+ </div>
+ )
+ })}
+ </div>
+
+ <KPIFilterBar
+ locations={filterAllLocations}
+ beneficiaryGroups={filterAllBeneficiaryGroups}
+ tags={filterAvailableTags}
+ selectedLocations={filterLocations}
+ onLocationsChange={setFilterLocations}
+ selectedBeneficiaryGroups={filterBeneficiaryGroups}
+ onBeneficiaryGroupsChange={setFilterBeneficiaryGroups}
+ selectedTags={filterTags}
+ onTagsChange={setFilterTags}
+ datePickerValue={datePickerValue}
+ onDatePickerChange={setDatePickerValue}
+ onClearAll={clearAllFilters}
+ />
+
+ <TagBreakdownStrip kpi={kpi} kpiUpdates={filteredKpiUpdates} allTags={allTags} />
+
+ {/* Chart and Data Sections */}
+ <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+ {/* Chart Section */}
+ <div className="lg:col-span-3 app-card p-4 flex flex-col">
+ <div className="flex items-center justify-between mb-4 gap-2">
+ <div className="flex-shrink-0 min-w-0">
+ <h5 className="text-base lg:text-lg font-semibold text-gray-900 truncate">{isPercentageMetric ? 'Percentage Over Time' : (isCumulative ? 'Cumulative Progress' : 'Monthly Progress')}</h5>
+ {!isPercentageMetric && <p className="text-xs lg:text-sm text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals over time'}</p>}
+ </div>
+ <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
+ {!isPercentageMetric && timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
+ <div className="flex items-center bg-gray-100 rounded-md lg:rounded-lg p-0.5">
+ <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-primary-500 text-secondary-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
+ <button onClick={() => setIsCumulative(true)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${isCumulative ? 'bg-primary-500 text-secondary-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
+ </div>
+ )}
+ <div className="flex bg-gray-100 rounded-md lg:rounded-lg p-0.5">
+ {['all', '1month', '6months', '1year', '5years'].map((tf) => (
+ <button key={tf} onClick={() => { setTimeFrame(tf as any); setDatePickerValue({}); setIsCumulative(true) }} className={`px-1.5 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${timeFrame === tf && !datePickerValue.singleDate && !datePickerValue.startDate ? 'bg-primary-500 text-secondary-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+ {tf === 'all' ? 'All' : tf === '1month' ? '1M' : tf === '6months' ? '6M' : tf === '1year' ? '1Y' : '5Y'}
+ </button>
+ ))}
+ </div>
+ </div>
+ </div>
+
+ <div className="flex-1 h-64 flex items-center justify-center">
+ {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
+ <ResponsiveContainer width="100%" height="100%">
+ <LineChart data={chartData} margin={{ top: 12, right: 20, left: 0, bottom: 0 }}>
+ <CartesianGrid vertical={false} stroke="#f1f5f9" strokeDasharray="3 3" />
+ <XAxis dataKey="date" stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} angle={-45} textAnchor="end" height={60} interval={xAxisInterval} tickMargin={8} tickFormatter={effectiveIsCumulative ? formatXAxisTickBound : undefined} />
+ <YAxis stroke="#cbd5e1" fontSize={11} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8' }} domain={isPercentageMetric ? [0, percentageYMax] : (maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax'])} ticks={isPercentageMetric ? percentageYTicks : (yTicks.length > 0 ? yTicks : undefined)} tickFormatter={isPercentageMetric ? ((value: any) => `${Math.round(value)}%`) : ((value) => { if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`; if (value >= 1000) return `${(value / 1000).toFixed(1)}K`; return value.toString() })} />
+ {isPercentageMetric ? (
+ <Tooltip content={(tooltipProps) => <ExpandableKPICardPercentageTooltip {...tooltipProps} chartData={chartData} chartColor={chartColor} totalMetricValue={totalMetricValue} />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+ ) : (
+ <Tooltip contentStyle={{ backgroundColor: 'rgba(255,255,255,0.98)', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '10px 12px', fontSize: '12px', boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }} formatter={(value: any) => { const unit = kpi.unit_of_measurement || ''; const formattedValue = typeof value === 'number' ? value.toLocaleString() + (unit ? ` ${unit}` : '') : value; return [formattedValue, 'Cumulative Total'] }} labelFormatter={(label) => { const dataPoint = chartData.find(d => d.date === label); if (dataPoint?.fullDate) { return formatDate(dataPoint.fullDate) } return `Date: ${label}` }} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+ )}
+ {isPercentageMetric && totalMetricValue > 0 && (
+ <ReferenceLine y={totalMetricValue} stroke={chartColor} strokeOpacity={0.5} strokeWidth={1.25} strokeDasharray="5 4" ifOverflow="extendDomain" />
+ )}
+ {isPercentageMetric && (
+ <Line type="monotone" dataKey="average" stroke="transparent" dot={false} activeDot={false} isAnimationActive={false} legendType="none" />
+ )}
+ <Line type="monotone" dataKey="cumulative" stroke={chartColor} strokeWidth={2.25} dot={isPercentageMetric ? { r: 2.5, fill: chartColor, strokeWidth: 0 } : false} activeDot={{ r: 4, fill: chartColor, stroke: 'white', strokeWidth: 1.5 }} strokeLinecap="round" connectNulls={isPercentageMetric} />
+ </LineChart>
+ </ResponsiveContainer>
+ ) : (
+ <div className="h-full flex flex-col items-center justify-center text-gray-500">
+ <BarChart3 className="w-12 h-12 mb-4 opacity-50" />
+ <h4 className="text-lg font-semibold text-gray-700 mb-2">No Data Yet</h4>
+ <p className="text-sm text-center max-w-xs">{kpiUpdates && kpiUpdates.length > 0 ? 'No data matches the active filters' : 'Come back when you add data to see your activity over time'}</p>
+ </div>
+ )}
+ </div>
+ </div>
+
+ {/* Impact Claims - Full Height */}
+ <div className="lg:col-span-2 flex flex-col">
+ {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
+ <div className="app-card border-primary-100 p-4 flex flex-col flex-1 max-h-[calc(100vh-400px)]">
+ <div className="flex items-center justify-between mb-3 flex-shrink-0">
+ <h5 className="text-base font-semibold text-gray-800">Impact Claims ({filteredKpiUpdates.length})</h5>
+ <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="app-btn app-btn-primary app-btn-sm">
+ <Plus className="w-4 h-4" /><span>Add</span>
+ </button>
+ </div>
+ <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+ {[...filteredKpiUpdates].sort(compareClaimsByEffectiveDateDesc).map((update, index) => (
+ <div key={update.id || index} className="app-card-interactive cursor-pointer p-2.5" onClick={() => handleDataPointClick(update)}>
+ <div className="flex items-center justify-between">
+ <div className="min-w-0 flex-1">
+ <span className="text-sm font-semibold text-primary-600">{update.value?.toLocaleString()}{isPercentageMetric ? '%' : (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '')}</span>
+ <div className="flex items-center space-x-2 mt-0.5">
+ <Calendar className="w-3 h-3 text-gray-400" />
+ <span className="text-xs text-gray-500">{update.date_range_start && update.date_range_end ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}` : formatDate(update.date_represented)}</span>
+ </div>
+ </div>
+ <div className="flex items-center gap-2">
+ {update.tag_id && allTags.length > 0 && (() => {
+ const t = allTags.find(t => t.id === update.tag_id)
+ return t ? <div onClick={(e) => e.stopPropagation()}><Link to={`/tags/${t.id}`} className="contents"><TagChip name={t.name} size="xs" /></Link></div> : null
+ })()}
+ {(() => {
+ const supportPercentage = getClaimSupportPercentage(update)
+ const evidenceCount = getClaimEvidenceCount(update)
+ return (
+ <>
+ {supportPercentage > 0 && (
+ <div className={`flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${supportPercentage === 100
+ ? 'bg-primary-100 text-primary-700'
+ : 'bg-yellow-100 text-yellow-700'
+ }`}>
+ <span>{evidenceCount} | {supportPercentage}% Coverage</span>
+ </div>
+ )}
+ {supportPercentage === 0 && !loadingEvidence && (
+ <div className="flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-red-100 text-red-700">
+ <span>0 | 0% Coverage</span>
+ </div>
+ )}
+ {canEditEvidence && (
+ <button
+ type="button"
+ onClick={(e) => handleAddEvidenceForClaim(update, e)}
+ className="app-btn app-btn-evidence app-btn-sm"
+ title="Add supporting evidence for this claim"
+ >
+ <Upload className="w-3 h-3" />
+ <span>Add Evidence</span>
+ </button>
+ )}
+ </>
+ )
+ })()}
+ <Eye className="w-3.5 h-3.5 text-gray-400" />
+ </div>
+ </div>
+ </div>
+ ))}
+ </div>
+ {/* View All Evidence Button */}
+ <div className="pt-3 mt-3 border-t border-gray-100 flex-shrink-0">
+ <button
+ onClick={(e) => { e.stopPropagation(); setIsAllEvidenceModalOpen(true) }}
+ className="app-btn app-btn-evidence app-btn-sm w-full"
+ >
+ <FileText className="w-4 h-4" />
+ <span>View All Evidence ({evidence.length})</span>
+ </button>
+ </div>
+ </div>
+ ) : (
+ <div className="app-card-elevated border-2 border-primary-400 p-6 flex-1 ring-2 ring-primary-200 ring-offset-2">
+ <div className="text-center">
+ <div className="w-14 h-14 mx-auto mb-3 bg-primary-100/80 rounded-xl flex items-center justify-center"><BarChart3 className="w-7 h-7 text-primary-500" /></div>
+ <h5 className="text-base font-semibold text-gray-800 mb-1">Impact Claims</h5>
+ <p className="text-sm text-gray-500 mb-3">{canAddImpactClaims ? 'Start tracking your impact' : 'No impact claims yet'}</p>
+ {canAddImpactClaims && (
+ <button onClick={(e) => { e.stopPropagation(); onAddUpdate() }} className="app-btn app-btn-primary app-btn-sm animate-pulse">
+ <Plus className="w-5 h-5" /><span>Add Impact Claim</span>
+ </button>
+ )}
+ </div>
+ </div>
+ )}
+ </div>
+ </div>
+ </div>
+ </div>
+ ) : createPortal(
+ <div className="fixed top-0 right-0 bottom-0 z-50 overflow-y-auto app-canvas" style={{ position: 'fixed', top: 0, left: '224px', right: 0, bottom: 0, width: 'calc(100vw - 224px)', height: '100vh' }}>
+ {/* Header */}
+ <div className="sticky top-0 z-10 bg-white border-b border-gray-200/80 p-4">
+ <div className="flex items-center justify-between">
+ <div className="flex items-center space-x-4">
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ onToggleExpand()
+ }}
+ className="app-btn app-btn-icon app-btn-ghost text-red-500 hover:bg-red-50 border border-gray-200"
+ >
+ <X className="w-5 h-5 text-red-500" />
+ </button>
+ <div className="flex items-center gap-3">
+ <div>
+ <h2 className="text-xl font-bold text-gray-800">{kpi.title}</h2>
+ <p className="text-sm text-gray-500">{kpi.description}</p>
+ </div>
+ <div className="flex flex-col items-end">
+ <div className="flex items-baseline gap-0.5 px-3 py-1.5 bg-primary-50 rounded-xl border border-primary-100">
+ <span className="text-2xl font-bold text-primary-600">{totalMetricValue.toLocaleString()}{isPercentageMetric ? '%' : ''}</span>
+ {!isPercentageMetric && kpi.unit_of_measurement && <span className="text-xs text-primary-500 ml-1">{kpi.unit_of_measurement}</span>}
+ </div>
+ {isPercentageMetric && <span className="text-xs uppercase tracking-wide text-gray-400 mt-0.5">Average</span>}
+ </div>
+ </div>
+ </div>
+ <div className="flex items-center space-x-2">
+ {canAddImpactClaims && (
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ onAddUpdate()
+ }}
+ className="app-btn app-btn-secondary app-btn-sm"
+ >
+ <Plus className="w-4 h-4" />
+ <span>Add Impact Claim</span>
+ </button>
+ )}
+ {canEditEvidence && kpi.total_updates > 0 && (
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ onAddEvidence?.()
+ }}
+ className="app-btn app-btn-evidence app-btn-sm"
+ >
+ <Upload className="w-4 h-4" />
+ <span>Add Evidence</span>
+ </button>
+ )}
+ {kpi.metric_type !== 'percentage' && (
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ setIsCreditingModalOpen(true)
+ }}
+ className="app-btn app-btn-secondary app-btn-sm bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+ >
+ <Heart className="w-4 h-4" />
+ <span>Credit to Donor</span>
+ </button>
+ )}
+ {canEditMetrics && (
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ onEdit?.()
+ }}
+ className="app-btn app-btn-secondary app-btn-sm"
+ >
+ <Edit className="w-4 h-4" />
+ <span>Edit</span>
+ </button>
+ )}
+ {canDelete && (
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ onDelete?.()
+ }}
+ className="app-btn app-btn-icon app-btn-ghost text-red-500 hover:bg-red-50"
+ >
+ <Trash2 className="w-4 h-4" />
+ </button>
+ )}
+ </div>
+ </div>
+ </div>
+
+ {/* Content */}
+ <div className="p-4 space-y-4 max-w-[1600px] mx-auto">
+ {/* Stats Grid */}
+ <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+ <div className="app-card border-primary-100 p-4">
+ <div className="flex items-center space-x-3">
+ <div className="p-2.5 bg-primary-100/80 rounded-xl">
+ <BarChart3 className="w-5 h-5 text-primary-500" />
+ </div>
+ <div>
+ <p className="text-sm text-gray-500">Impact Claims</p>
+ <p className="text-xl font-bold text-primary-500">{kpi.total_updates}</p>
+ </div>
+ </div>
+ </div>
+
+ <div className="app-card border-evidence-100 p-4">
+ <div className="flex items-center space-x-3">
+ <div className="p-2.5 bg-evidence-100/80 rounded-xl">
+ <FileText className="w-5 h-5 text-evidence-500" />
+ </div>
+ <div>
+ <p className="text-sm text-gray-500">Evidence Items</p>
+ <p className="text-xl font-bold text-evidence-500">{kpi.evidence_count}</p>
+ </div>
+ </div>
+ </div>
+
+ <div className="app-card border-primary-100 p-4">
+ <div className="flex items-center space-x-3">
+ <div className="p-2.5 bg-primary-100/80 rounded-xl">
+ <Target className="w-5 h-5 text-primary-500" />
+ </div>
+ <div>
+ <p className="text-sm text-gray-500">Evidence Coverage</p>
+ <p className="text-xl font-bold text-primary-500">{kpi.evidence_percentage}%</p>
+ </div>
+ </div>
+ </div>
+ </div>
+
+ {/* Evidence Type Icons Row - Below Stats Cards */}
+ <div className="flex items-center justify-between gap-2 h-10 app-card-muted rounded-xl px-4 py-1">
+ {(['visual_proof', 'documentation', 'testimony', 'financials'] as const).map((type) => {
+ const IconComponent = getEvidenceIcon(type)
+ const typeInfo = getEvidenceTypeInfo(type)
+ const percentage = evidenceTypePercentages[type].percentage
+
+ // Extract color classes from typeInfo
+ const colorClasses = typeInfo.color.includes('pink') ? 'text-pink-600' :
+ typeInfo.color.includes('blue') ? 'text-evidence-600' :
+ typeInfo.color.includes('orange') ? 'text-orange-600' :
+ typeInfo.color.includes('green') ? 'text-primary-500' :
+ 'text-gray-600'
+
+ return (
+ <div
+ key={type}
+ className="flex items-center gap-1.5 flex-1 min-w-0"
+ >
+ <IconComponent className={`w-3.5 h-3.5 ${colorClasses} flex-shrink-0`} />
+ <div className="flex flex-col items-start min-w-0 flex-1 overflow-hidden">
+ <span className="text-xs font-medium text-gray-700 truncate w-full leading-tight">
+ {typeInfo.label}
+ </span>
+ <span className="text-[8px] font-bold text-gray-600 leading-tight whitespace-nowrap">
+ {percentage}%
+ </span>
+ </div>
+ </div>
+ )
+ })}
+ </div>
+
+ <KPIFilterBar
+ locations={filterAllLocations}
+ beneficiaryGroups={filterAllBeneficiaryGroups}
+ tags={filterAvailableTags}
+ selectedLocations={filterLocations}
+ onLocationsChange={setFilterLocations}
+ selectedBeneficiaryGroups={filterBeneficiaryGroups}
+ onBeneficiaryGroupsChange={setFilterBeneficiaryGroups}
+ selectedTags={filterTags}
+ onTagsChange={setFilterTags}
+ datePickerValue={datePickerValue}
+ onDatePickerChange={setDatePickerValue}
+ onClearAll={clearAllFilters}
+ />
+
+ <TagBreakdownStrip kpi={kpi} kpiUpdates={filteredKpiUpdates} allTags={allTags} />
+
+ {/* Chart and Data Sections - 3/5 chart + 2/5 data/evidence */}
+ <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+ {/* Chart Section - 3/5 width */}
+ <div className="lg:col-span-3 app-card p-4 flex flex-col">
+ <div className="flex items-center justify-between mb-4 gap-2">
+ <div className="flex-shrink-0 min-w-0">
+ <h5 className="text-base lg:text-lg font-semibold text-gray-900 truncate">{isPercentageMetric ? 'Percentage Over Time' : (isCumulative ? 'Cumulative Progress' : 'Monthly Progress')}</h5>
+ {!isPercentageMetric && <p className="text-xs lg:text-sm text-gray-500 hidden sm:block">{isCumulative ? 'Running total over time' : 'Monthly totals over time'}</p>}
+ </div>
+ <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
+ {!isPercentageMetric && timeFrame === 'all' && !datePickerValue.singleDate && !datePickerValue.startDate && (
+ <div className="flex items-center bg-gray-100 rounded-md lg:rounded-lg p-0.5">
+ <button onClick={() => setIsCumulative(false)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${!isCumulative ? 'bg-primary-500 text-secondary-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Monthly</button>
+ <button onClick={() => setIsCumulative(true)} className={`px-2 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${isCumulative ? 'bg-primary-500 text-secondary-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>Cumulative</button>
+ </div>
+ )}
+ <div className="flex bg-gray-100 rounded-md lg:rounded-lg p-0.5">
+ {['all', '1month', '6months', '1year', '5years'].map((tf) => (
+ <button key={tf} onClick={() => { setTimeFrame(tf as any); setDatePickerValue({}); setIsCumulative(true) }} className={`px-1.5 lg:px-2.5 py-0.5 lg:py-1 text-xs rounded-sm lg:rounded-md font-medium transition-colors ${timeFrame === tf && !datePickerValue.singleDate && !datePickerValue.startDate ? 'bg-primary-500 text-secondary-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+ {tf === 'all' ? 'All' : tf === '1month' ? '1M' : tf === '6months' ? '6M' : tf === '1year' ? '1Y' : '5Y'}
+ </button>
+ ))}
+ </div>
+ </div>
+ </div>
+
+ <div className="flex-1 h-64 flex items-center justify-center">
+ {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
+ <ResponsiveContainer width="100%" height="100%">
+ <LineChart data={chartData} margin={{ top: 12, right: 20, left: 0, bottom: 0 }}>
+ <CartesianGrid vertical={false} stroke="#f1f5f9" strokeDasharray="3 3" />
+ <XAxis
+ dataKey="date"
+ stroke="#cbd5e1"
+ fontSize={11}
+ tickLine={false}
+ axisLine={false}
+ tick={{ fill: '#94a3b8' }}
+ angle={-45}
+ textAnchor="end"
+ height={60}
+ interval={xAxisInterval}
+ tickMargin={8}
+ tickFormatter={effectiveIsCumulative ? formatXAxisTickBound : undefined}
+ />
+ <YAxis
+ stroke="#cbd5e1"
+ fontSize={11}
+ tickLine={false}
+ axisLine={false}
+ tick={{ fill: '#94a3b8' }}
+ domain={isPercentageMetric ? [0, percentageYMax] : (maxDomainValue > 0 ? [0, maxDomainValue] : [0, 'dataMax'])}
+ ticks={isPercentageMetric ? percentageYTicks : (yTicks.length > 0 ? yTicks : undefined)}
+ tickFormatter={isPercentageMetric ? ((value: any) => `${Math.round(value)}%`) : ((value) => {
+ if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
+ if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
+ return value.toString()
+ })}
+ />
+ {isPercentageMetric ? (
+ <Tooltip content={(tooltipProps) => <ExpandableKPICardPercentageTooltip {...tooltipProps} chartData={chartData} chartColor={chartColor} totalMetricValue={totalMetricValue} />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+ ) : (
+ <Tooltip
+ contentStyle={{
+ backgroundColor: 'rgba(255,255,255,0.98)',
+ backdropFilter: 'blur(8px)',
+ border: '1px solid #f1f5f9',
+ borderRadius: '12px',
+ padding: '10px 12px',
+ fontSize: '12px',
+ boxShadow: '0 8px 24px rgba(15,23,42,0.08)'
+ }}
+ formatter={(value: any) => {
+ const unit = kpi.unit_of_measurement || ''
+ const formattedValue = typeof value === 'number'
+ ? value.toLocaleString() + (unit ? ` ${unit}` : '')
+ : value
+ return [formattedValue, 'Cumulative Total']
+ }}
+ labelFormatter={(label) => {
+ const dataPoint = chartData.find(d => d.date === label)
+ if (dataPoint?.fullDate) {
+ return formatDate(dataPoint.fullDate)
+ }
+ return `Date: ${label}`
+ }}
+ cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }}
+ />
+ )}
+ {isPercentageMetric && totalMetricValue > 0 && (
+ <ReferenceLine
+ y={totalMetricValue}
+ stroke={chartColor}
+ strokeOpacity={0.5}
+ strokeWidth={1.25}
+ strokeDasharray="5 4"
+ ifOverflow="extendDomain"
+ />
+ )}
+ {isPercentageMetric && (
+ <Line
+ type="monotone"
+ dataKey="average"
+ stroke="transparent"
+ dot={false}
+ activeDot={false}
+ isAnimationActive={false}
+ legendType="none"
+ />
+ )}
+ <Line
+ type="monotone"
+ dataKey="cumulative"
+ stroke={chartColor}
+ strokeWidth={2.25}
+ dot={isPercentageMetric ? { r: 2.5, fill: chartColor, strokeWidth: 0 } : false}
+ activeDot={{ r: 4, fill: chartColor, stroke: 'white', strokeWidth: 1.5 }}
+ strokeLinecap="round"
+ connectNulls={isPercentageMetric}
+ />
+ </LineChart>
+ </ResponsiveContainer>
+ ) : (
+ <div className="h-full flex flex-col items-center justify-center text-gray-500">
+ <BarChart3 className="w-12 h-12 mb-4 opacity-50" />
+ <h4 className="text-lg font-semibold text-gray-700 mb-2">No Data Yet</h4>
+ <p className="text-sm text-center max-w-xs">
+ {kpiUpdates && kpiUpdates.length > 0 ? 'No data matches the active filters' : 'Come back when you add data to see your activity over time'}
+ </p>
+ </div>
+ )}
+ </div>
+ </div>
+
+ {/* Impact Claims - Full Height */}
+ <div className="lg:col-span-2 flex flex-col">
+ {filteredKpiUpdates && filteredKpiUpdates.length > 0 ? (
+ <div className="app-card border-primary-100 p-4 flex flex-col flex-1 max-h-[calc(100vh-400px)]">
+ <div className="flex items-center justify-between mb-3 flex-shrink-0">
+ <h5 className="text-base font-semibold text-gray-800">Impact Claims ({filteredKpiUpdates.length})</h5>
+ <div className="flex items-center space-x-3">
+ <div className="flex items-center space-x-2 text-sm text-gray-500">
+ <BarChart3 className="w-4 h-4" />
+ <span>{kpi.total_updates || 0} total</span>
+ </div>
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ onAddUpdate()
+ }}
+ className="app-btn app-btn-primary app-btn-sm"
+ >
+ <Plus className="w-4 h-4" />
+ <span>Add</span>
+ </button>
+ </div>
+ </div>
+ <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+ {[...filteredKpiUpdates].sort(compareClaimsByEffectiveDateDesc).map((update, index) => {
+ const hasDateRange = update.date_range_start && update.date_range_end
+ const displayDate = hasDateRange
+ ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}`
+ : formatDate(update.date_represented)
+
+ const updateLocation = update.location_id ? updateLocations[update.location_id] : null
+
+ return (
+ <div
+ key={update.id || index}
+ className="app-card-interactive cursor-pointer p-2.5"
+ onClick={() => handleDataPointClick(update)}
+ >
+ <div className="flex items-center justify-between">
+ <div className="min-w-0 flex-1">
+ <div className="flex items-center space-x-2">
+ <span className="text-sm font-semibold text-primary-600">
+ {update.value?.toLocaleString()}{isPercentageMetric ? '%' : (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '')}
+ </span>
+ </div>
+ <div className="flex items-center space-x-2 mt-0.5">
+ <Calendar className="w-3 h-3 text-gray-400" />
+ <span className="text-xs text-gray-500">{displayDate}</span>
+ </div>
+ {updateLocation && (
+ <div className="flex items-center space-x-1 mt-0.5">
+ <MapPin className="w-3 h-3 text-gray-400" />
+ <span className="text-xs text-gray-500">{updateLocation.name}</span>
+ </div>
+ )}
+ </div>
+ <div className="flex items-center gap-2">
+ {(() => {
+ const supportPercentage = getClaimSupportPercentage(update)
+ const evidenceCount = getClaimEvidenceCount(update)
+ return (
+ <>
+ {supportPercentage > 0 && (
+ <div className={`flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${supportPercentage === 100
+ ? 'bg-primary-100 text-primary-700'
+ : 'bg-yellow-100 text-yellow-700'
+ }`}>
+ <span>{evidenceCount} | {supportPercentage}% Coverage</span>
+ </div>
+ )}
+ {supportPercentage === 0 && !loadingEvidence && (
+ <div className="flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-red-100 text-red-700">
+ <span>0 | 0% Coverage</span>
+ </div>
+ )}
+ {canEditEvidence && (
+ <button
+ type="button"
+ onClick={(e) => handleAddEvidenceForClaim(update, e)}
+ className="app-btn app-btn-evidence app-btn-sm"
+ title="Add supporting evidence for this claim"
+ >
+ <Upload className="w-3 h-3" />
+ <span>Add Evidence</span>
+ </button>
+ )}
+ </>
+ )
+ })()}
+ <Eye className="w-3.5 h-3.5 text-gray-400" />
+ </div>
+ </div>
+ </div>
+ )
+ })}
+ </div>
+ {/* View All Evidence Button */}
+ <div className="pt-3 mt-3 border-t border-gray-100 flex-shrink-0">
+ <button
+ onClick={(e) => { e.stopPropagation(); setIsAllEvidenceModalOpen(true) }}
+ className="app-btn app-btn-evidence app-btn-sm w-full"
+ >
+ <FileText className="w-4 h-4" />
+ <span>View All Evidence ({evidence.length})</span>
+ </button>
+ </div>
+ </div>
+ ) : (
+ <div className="app-card-elevated border-2 border-primary-400 p-6 flex-1 ring-2 ring-primary-200 ring-offset-2">
+ <div className="text-center">
+ <div className="w-14 h-14 mx-auto mb-3 bg-primary-100/80 rounded-xl flex items-center justify-center">
+ <BarChart3 className="w-7 h-7 text-primary-500" />
+ </div>
+ <h5 className="text-base font-semibold text-gray-800 mb-1">Impact Claims</h5>
+ <p className="text-sm text-gray-500 mb-3">{canAddImpactClaims ? 'Start tracking your impact' : 'No impact claims yet'}</p>
+ {canAddImpactClaims && (
+ <button
+ onClick={(e) => {
+ e.stopPropagation()
+ onAddUpdate()
+ }}
+ className="app-btn app-btn-primary app-btn-sm animate-pulse"
+ >
+ <Plus className="w-5 h-5" />
+ <span>Add Impact Claim</span>
+ </button>
+ )}
+ </div>
+ </div>
+ )}
+ </div>
+ </div>
+ </div>
+ </div>,
+ document.body
+ ))}
+
+ {/* Data Point Preview Modal */}
+ {selectedDataPoint && createPortal(
+ <DataPointPreviewModal
+ dataPoint={selectedDataPoint}
+ kpi={selectedDataPoint.kpi || kpi}
+ isOpen={isDataPointPreviewOpen}
+ onClose={() => {
+ setIsDataPointPreviewOpen(false)
+ setSelectedDataPoint(null)
+ }}
+ onEdit={canEditMetrics ? (dataPoint) => {
+ setEditingDataPoint(dataPoint)
+ setIsDataPointPreviewOpen(false)
+ setSelectedDataPoint(null)
+ setIsEditDataPointModalOpen(true)
+ } : undefined}
+ onDelete={canDelete ? (dataPoint) => {
+ setDeleteConfirmDataPoint(dataPoint)
+ setIsDataPointPreviewOpen(false)
+ setSelectedDataPoint(null)
+ } : undefined}
+ onEvidenceClick={(evidence) => {
+ setSelectedEvidence(evidence)
+ setIsDataPointPreviewOpen(false)
+ setIsEvidencePreviewOpen(true)
+ }}
+ onAddEvidence={canEditEvidence ? (dp) => {
+ setIsDataPointPreviewOpen(false)
+ setSelectedDataPoint(null)
+ setSelectedClaimForEvidence(dp)
+ setIsEasyEvidenceModalOpen(true)
+ } : undefined}
+ />,
+ document.body
+ )}
+
+ {/* Evidence Preview Modal - Rendered outside portal */}
+ {selectedEvidence && createPortal(
+ <EvidencePreviewModal
+ evidence={selectedEvidence}
+ isOpen={isEvidencePreviewOpen}
+ onClose={() => setIsEvidencePreviewOpen(false)}
+ onEdit={canEditEvidence ? (evidence) => {
+ setSelectedEvidence(evidence)
+ setIsEvidencePreviewOpen(false)
+ setIsEditEvidenceModalOpen(true)
+ } : undefined}
+ onDelete={canDelete ? (evidence) => {
+ setDeleteConfirmEvidence(evidence)
+ setIsEvidencePreviewOpen(false)
+ } : undefined}
+ onDataPointClick={(dataPoint, kpiData) => {
+ setSelectedDataPoint(dataPoint)
+ setIsEvidencePreviewOpen(false)
+ setIsDataPointPreviewOpen(true)
+ }}
+ />,
+ document.body
+ )}
+
+ {/* Edit Data Point Modal */}
+ {editingDataPoint && createPortal(
+ <AddKPIUpdateModal
+ isOpen={isEditDataPointModalOpen}
+ onClose={() => {
+ setIsEditDataPointModalOpen(false)
+ setEditingDataPoint(null)
+ }}
+ onSubmit={handleUpdateDataPoint}
+ kpiTitle={kpi.title}
+ kpiId={kpi.id}
+ metricType={kpi.metric_type || 'number'}
+ unitOfMeasurement={kpi.unit_of_measurement || ''}
+ initiativeId={initiativeId}
+ kpiTagIds={(kpi as any).tag_ids || []}
+ editData={editingDataPoint}
+ />,
+ document.body
+ )}
+
+ {/* Edit Evidence Modal */}
+ {selectedEvidence && createPortal(
+ <AddEvidenceModal
+ isOpen={isEditEvidenceModalOpen}
+ onClose={() => {
+ setIsEditEvidenceModalOpen(false)
+ setSelectedEvidence(null)
+ }}
+ onSubmit={handleUpdateEvidence}
+ availableKPIs={[kpi]}
+ initiativeId={kpi.initiative_id}
+ preSelectedKPIId={kpi.id}
+ editData={selectedEvidence}
+ />,
+ document.body
+ )}
+
+ {deleteConfirmDataPoint && createPortal(
+ <ConfirmDialog
+ tone="danger"
+ title="Delete Impact Claim"
+ message={
+ 'This action cannot be undone.\n\nAre you sure you want to delete this impact claim and its associated information?'
+ }
+ confirmLabel="Delete"
+ onCancel={() => setDeleteConfirmDataPoint(null)}
+ onConfirm={() => handleDeleteDataPoint(deleteConfirmDataPoint)}
+ />,
+ document.body
+ )}
+
+ {deleteConfirmEvidence && createPortal(
+ <ConfirmDialog
+ tone="danger"
+ title="Delete Evidence"
+ message={
+ 'This action cannot be undone.\n\nAre you sure you want to delete this evidence and its associated information?'
+ }
+ confirmLabel="Delete"
+ onCancel={() => setDeleteConfirmEvidence(null)}
+ onConfirm={() => handleDeleteEvidence(deleteConfirmEvidence)}
+ />,
+ document.body
+ )}
+
+ {/* Credit to Donor Modal */}
+ {isCreditingModalOpen && initiativeId && (
+ <MetricCreditingModal
+ isOpen={isCreditingModalOpen}
+ onClose={() => setIsCreditingModalOpen(false)}
+ onSave={async () => {
+ onRefresh?.()
+ }}
+ kpi={kpi}
+ kpiUpdates={kpiUpdates}
+ initiativeId={initiativeId}
+ />
+ )}
+
+ {/* Easy Evidence Modal - For single claim evidence upload */}
+ {selectedClaimForEvidence && createPortal(
+ <EasyEvidenceModal
+ isOpen={isEasyEvidenceModalOpen}
+ onClose={() => {
+ setIsEasyEvidenceModalOpen(false)
+ setSelectedClaimForEvidence(null)
+ }}
+ onSubmit={handleEasyEvidenceSubmit}
+ onBatchComplete={handleEasyEvidenceBatchComplete}
+ impactClaim={selectedClaimForEvidence}
+ kpi={kpi}
+ initiativeId={initiativeId || kpi.initiative_id || ''}
+ />,
+ document.body
+ )}
+
+ {/* All Evidence Modal - View all evidence grouped by type */}
+ {createPortal(
+ <AllEvidenceModal
+ isOpen={isAllEvidenceModalOpen}
+ onClose={() => setIsAllEvidenceModalOpen(false)}
+ evidence={evidence}
+ kpi={kpi}
+ onEvidenceClick={(ev) => {
+ setSelectedEvidence(ev)
+ setIsAllEvidenceModalOpen(false)
+ setIsEvidencePreviewOpen(true)
+ }}
+ />,
+ document.body
+ )}
+ </div>
+ )
 }

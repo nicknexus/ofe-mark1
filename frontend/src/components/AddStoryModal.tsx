@@ -8,593 +8,593 @@ import DateRangePicker from './DateRangePicker'
 import LocationModal from './LocationModal'
 import TagPicker from './MetricTags/TagPicker'
 import ModalFrame from './ModalFrame'
-import toast from 'react-hot-toast'
+import { notify } from '../lib/notify'
 
 interface AddStoryModalProps {
-    isOpen: boolean
-    onClose: () => void
-    onSubmit: () => Promise<void>
-    initiativeId: string
-    editData?: Story | null
+ isOpen: boolean
+ onClose: () => void
+ onSubmit: () => Promise<void>
+ initiativeId: string
+ editData?: Story | null
 }
 
 export default function AddStoryModal({
-    isOpen,
-    onClose,
-    onSubmit,
-    initiativeId,
-    editData
+ isOpen,
+ onClose,
+ onSubmit,
+ initiativeId,
+ editData
 }: AddStoryModalProps) {
-    const [formData, setFormData] = useState<CreateStoryForm>({
-        title: '',
-        description: '',
-        media_url: '',
-        media_type: 'photo',
-        date_represented: getLocalDateString(new Date()),
-        location_ids: [],
-        beneficiary_group_ids: [],
-        tag_ids: [],
-        initiative_id: initiativeId
-    })
-    const [datePickerValue, setDatePickerValue] = useState<{
-        singleDate?: string
-        startDate?: string
-        endDate?: string
-    }>({})
-    const [loading, setLoading] = useState(false)
-    const [selectedFile, setSelectedFile] = useState<File | null>(null)
-    const [isDragOver, setIsDragOver] = useState(false)
-    const [uploadProgress, setUploadProgress] = useState('')
-    const fileInputRef = useRef<HTMLInputElement>(null)
-    const [locations, setLocations] = useState<Location[]>([])
-    const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
-    const [selectedBeneficiaryGroupIds, setSelectedBeneficiaryGroupIds] = useState<string[]>([])
-    const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
-    const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
-    const { queueUpload } = useUploadManager()
+ const [formData, setFormData] = useState<CreateStoryForm>({
+ title: '',
+ description: '',
+ media_url: '',
+ media_type: 'photo',
+ date_represented: getLocalDateString(new Date()),
+ location_ids: [],
+ beneficiary_group_ids: [],
+ tag_ids: [],
+ initiative_id: initiativeId
+ })
+ const [datePickerValue, setDatePickerValue] = useState<{
+ singleDate?: string
+ startDate?: string
+ endDate?: string
+ }>({})
+ const [loading, setLoading] = useState(false)
+ const [selectedFile, setSelectedFile] = useState<File | null>(null)
+ const [isDragOver, setIsDragOver] = useState(false)
+ const [uploadProgress, setUploadProgress] = useState('')
+ const fileInputRef = useRef<HTMLInputElement>(null)
+ const [locations, setLocations] = useState<Location[]>([])
+ const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
+ const [selectedBeneficiaryGroupIds, setSelectedBeneficiaryGroupIds] = useState<string[]>([])
+ const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+ const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
+ const { queueUpload } = useUploadManager()
 
-    const mediaTypes = [
-        { value: 'photo', label: 'Photo', icon: Camera },
-        { value: 'video', label: 'Video', icon: Video },
-        { value: 'recording', label: 'Recording', icon: Mic },
-        { value: 'text', label: 'Text', icon: FileText }
-    ] as const
+ const mediaTypes = [
+ { value: 'photo', label: 'Photo', icon: Camera },
+ { value: 'video', label: 'Video', icon: Video },
+ { value: 'recording', label: 'Recording', icon: Mic },
+ { value: 'text', label: 'Text', icon: FileText }
+ ] as const
 
-    // Load locations and beneficiary groups
-    useEffect(() => {
-        if (initiativeId) {
-            Promise.all([
-                apiService.getLocations(initiativeId),
-                apiService.getBeneficiaryGroups(initiativeId)
-            ]).then(([locs, groups]) => {
-                setLocations(locs || [])
-                setBeneficiaryGroups(groups || [])
-            })
-        }
-    }, [initiativeId])
+ // Load locations and beneficiary groups
+ useEffect(() => {
+ if (initiativeId) {
+ Promise.all([
+ apiService.getLocations(initiativeId),
+ apiService.getBeneficiaryGroups(initiativeId)
+ ]).then(([locs, groups]) => {
+ setLocations(locs || [])
+ setBeneficiaryGroups(groups || [])
+ })
+ }
+ }, [initiativeId])
 
-    // Initialize form data when editing
-    useEffect(() => {
-        if (editData) {
-            setFormData({
-                title: editData.title || '',
-                description: editData.description || '',
-                media_url: editData.media_url || '',
-                media_type: editData.media_type || 'photo',
-                date_represented: editData.date_represented || getLocalDateString(new Date()),
-                location_ids: editData.location_ids || (editData.location_id ? [editData.location_id] : []),
-                beneficiary_group_ids: editData.beneficiary_group_ids || [],
-                tag_ids: editData.tag_ids || [],
-                initiative_id: initiativeId
-            })
-            setDatePickerValue({ singleDate: editData.date_represented })
-            setSelectedBeneficiaryGroupIds(editData.beneficiary_group_ids || [])
-            setSelectedTagIds(editData.tag_ids || [])
-        } else {
-            // Reset for new story
-            setFormData({
-                title: '',
-                description: '',
-                media_url: '',
-                media_type: 'photo',
-                date_represented: getLocalDateString(new Date()),
-                location_ids: [],
-                beneficiary_group_ids: [],
-                tag_ids: [],
-                initiative_id: initiativeId
-            })
-            setDatePickerValue({})
-            setSelectedBeneficiaryGroupIds([])
-            setSelectedTagIds([])
-            setSelectedFile(null)
-            setUploadProgress('')
-        }
-    }, [editData, initiativeId, isOpen])
+ // Initialize form data when editing
+ useEffect(() => {
+ if (editData) {
+ setFormData({
+ title: editData.title || '',
+ description: editData.description || '',
+ media_url: editData.media_url || '',
+ media_type: editData.media_type || 'photo',
+ date_represented: editData.date_represented || getLocalDateString(new Date()),
+ location_ids: editData.location_ids || (editData.location_id ? [editData.location_id] : []),
+ beneficiary_group_ids: editData.beneficiary_group_ids || [],
+ tag_ids: editData.tag_ids || [],
+ initiative_id: initiativeId
+ })
+ setDatePickerValue({ singleDate: editData.date_represented })
+ setSelectedBeneficiaryGroupIds(editData.beneficiary_group_ids || [])
+ setSelectedTagIds(editData.tag_ids || [])
+ } else {
+ // Reset for new story
+ setFormData({
+ title: '',
+ description: '',
+ media_url: '',
+ media_type: 'photo',
+ date_represented: getLocalDateString(new Date()),
+ location_ids: [],
+ beneficiary_group_ids: [],
+ tag_ids: [],
+ initiative_id: initiativeId
+ })
+ setDatePickerValue({})
+ setSelectedBeneficiaryGroupIds([])
+ setSelectedTagIds([])
+ setSelectedFile(null)
+ setUploadProgress('')
+ }
+ }, [editData, initiativeId, isOpen])
 
-    // Update date_represented when datePickerValue changes
-    useEffect(() => {
-        if (datePickerValue.singleDate) {
-            setFormData(prev => ({ ...prev, date_represented: datePickerValue.singleDate! }))
-        } else if (datePickerValue.startDate) {
-            setFormData(prev => ({ ...prev, date_represented: datePickerValue.startDate! }))
-        }
-    }, [datePickerValue])
+ // Update date_represented when datePickerValue changes
+ useEffect(() => {
+ if (datePickerValue.singleDate) {
+ setFormData(prev => ({ ...prev, date_represented: datePickerValue.singleDate! }))
+ } else if (datePickerValue.startDate) {
+ setFormData(prev => ({ ...prev, date_represented: datePickerValue.startDate! }))
+ }
+ }, [datePickerValue])
 
-    const handleFileSelect = async (file: File) => {
-        setSelectedFile(file)
-        setUploadProgress('File selected — will upload on save')
-    }
+ const handleFileSelect = async (file: File) => {
+ setSelectedFile(file)
+ setUploadProgress('File selected — will upload on save')
+ }
 
-    const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault()
-        setIsDragOver(true)
-    }
+ const handleDragOver = (e: React.DragEvent) => {
+ e.preventDefault()
+ setIsDragOver(true)
+ }
 
-    const handleDragLeave = () => {
-        setIsDragOver(false)
-    }
+ const handleDragLeave = () => {
+ setIsDragOver(false)
+ }
 
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault()
-        setIsDragOver(false)
-        const file = e.dataTransfer.files[0]
-        if (file) {
-            handleFileSelect(file)
-        }
-    }
+ const handleDrop = (e: React.DragEvent) => {
+ e.preventDefault()
+ setIsDragOver(false)
+ const file = e.dataTransfer.files[0]
+ if (file) {
+ handleFileSelect(file)
+ }
+ }
 
-    const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (file) {
-            handleFileSelect(file)
-        }
-    }
+ const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+ const file = e.target.files?.[0]
+ if (file) {
+ handleFileSelect(file)
+ }
+ }
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!formData.title.trim()) {
-            toast.error('Please enter a title')
-            return
-        }
-        if (!formData.date_represented) {
-            toast.error('Please select a date')
-            return
-        }
-        if (!formData.location_ids || formData.location_ids.length === 0) {
-            toast.error('Please select at least one location')
-            return
-        }
+ const handleSubmit = async (e: React.FormEvent) => {
+ e.preventDefault()
+ if (!formData.title.trim()) {
+ notify.error('Please enter a title')
+ return
+ }
+ if (!formData.date_represented) {
+ notify.error('Please select a date')
+ return
+ }
+ if (!formData.location_ids || formData.location_ids.length === 0) {
+ notify.error('Please select at least one location')
+ return
+ }
 
-        // If there's a file to upload, queue it in background and close modal immediately
-        if (selectedFile && !formData.media_url) {
-            const capturedFormData = { ...formData }
-            const capturedBenGroups = [...selectedBeneficiaryGroupIds]
-            const capturedTagIds = [...selectedTagIds]
-            const capturedEditId = editData?.id
-            const capturedOnSubmit = onSubmit
+ // If there's a file to upload, queue it in background and close modal immediately
+ if (selectedFile && !formData.media_url) {
+ const capturedFormData = { ...formData }
+ const capturedBenGroups = [...selectedBeneficiaryGroupIds]
+ const capturedTagIds = [...selectedTagIds]
+ const capturedEditId = editData?.id
+ const capturedOnSubmit = onSubmit
 
-            onClose()
+ onClose()
 
-            queueUpload({
-                file: selectedFile,
-                onComplete: async (result) => {
-                    try {
-                        const submitData = {
-                            ...capturedFormData,
-                            media_url: result.file_url,
-                            beneficiary_group_ids: capturedBenGroups,
-                            tag_ids: capturedTagIds
-                        }
-                        if (capturedEditId) {
-                            await apiService.updateStory(capturedEditId, submitData)
-                            toast.success('Story updated successfully!')
-                        } else {
-                            await apiService.createStory(submitData)
-                            toast.success('Story created successfully!')
-                        }
-                        await capturedOnSubmit()
-                    } catch (err) {
-                        toast.error(`Failed to save story: ${err instanceof Error ? err.message : 'Unknown error'}`)
-                    }
-                },
-                onError: (error) => {
-                    if (error.message !== 'Upload cancelled') {
-                        toast.error(`Upload failed for ${selectedFile.name}`)
-                    }
-                }
-            })
+ queueUpload({
+ file: selectedFile,
+ onComplete: async (result) => {
+ try {
+ const submitData = {
+ ...capturedFormData,
+ media_url: result.file_url,
+ beneficiary_group_ids: capturedBenGroups,
+ tag_ids: capturedTagIds
+ }
+ if (capturedEditId) {
+ await apiService.updateStory(capturedEditId, submitData)
+ notify.success('Story updated successfully!')
+ } else {
+ await apiService.createStory(submitData)
+ notify.success('Story created successfully!')
+ }
+ await capturedOnSubmit()
+ } catch (err) {
+ notify.error(`Failed to save story: ${err instanceof Error ? err.message : 'Unknown error'}`)
+ }
+ },
+ onError: (error) => {
+ if (error.message !== 'Upload cancelled') {
+ notify.error(`Upload failed for ${selectedFile.name}`)
+ }
+ }
+ })
 
-            return
-        }
+ return
+ }
 
-        // No file to upload — submit directly
-        setLoading(true)
-        try {
-            const submitData = {
-                ...formData,
-                media_url: formData.media_url?.trim() || undefined,
-                beneficiary_group_ids: selectedBeneficiaryGroupIds,
-                tag_ids: selectedTagIds
-            }
+ // No file to upload — submit directly
+ setLoading(true)
+ try {
+ const submitData = {
+ ...formData,
+ media_url: formData.media_url?.trim() || undefined,
+ beneficiary_group_ids: selectedBeneficiaryGroupIds,
+ tag_ids: selectedTagIds
+ }
 
-            if (editData?.id) {
-                await apiService.updateStory(editData.id, submitData)
-                toast.success('Story updated successfully!')
-            } else {
-                await apiService.createStory(submitData)
-                toast.success('Story created successfully!')
-            }
-            await onSubmit()
-            onClose()
-        } catch (error: any) {
-            const message = error instanceof Error ? error.message : 'Failed to save story'
-            toast.error(message)
-        } finally {
-            setLoading(false)
-        }
-    }
+ if (editData?.id) {
+ await apiService.updateStory(editData.id, submitData)
+ notify.success('Story updated successfully!')
+ } else {
+ await apiService.createStory(submitData)
+ notify.success('Story created successfully!')
+ }
+ await onSubmit()
+ onClose()
+ } catch (error: any) {
+ const message = error instanceof Error ? error.message : 'Failed to save story'
+ notify.error(message)
+ } finally {
+ setLoading(false)
+ }
+ }
 
-    if (!isOpen) return null
+ if (!isOpen) return null
 
-    return (
-        <ModalFrame panelClassName="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-modal flex flex-col">
-                {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                    <h2 className="text-xl font-semibold text-gray-900">
-                        {editData ? 'Edit Story' : 'Add Story'}
-                    </h2>
-                    <button
-                        onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 p-1"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
+ return (
+ <ModalFrame panelClassName="bg-white rounded-xl border border-gray-200 max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-app-modal flex flex-col">
+ {/* Header */}
+ <div className="flex items-center justify-between p-6 border-b border-gray-200">
+ <h2 className="text-xl font-semibold text-gray-900">
+ {editData ? 'Edit Story' : 'Add Story'}
+ </h2>
+ <button
+ onClick={onClose}
+ className="text-gray-400 hover:text-gray-600 p-1"
+ >
+ <X className="w-5 h-5" />
+ </button>
+ </div>
 
-                {/* Form */}
-                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
-                    {/* Title */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Title *
-                        </label>
-                        <input
-                            type="text"
-                            value={formData.title}
-                            onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Enter story title"
-                            required
-                        />
-                    </div>
+ {/* Form */}
+ <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+ {/* Title */}
+ <div>
+ <label className="block text-sm font-medium text-gray-700 mb-2">
+ Title *
+ </label>
+ <input
+ type="text"
+ value={formData.title}
+ onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+ className="app-input"
+ placeholder="Enter story title"
+ required
+ />
+ </div>
 
-                    {/* Description */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Description
-                        </label>
-                        <textarea
-                            value={formData.description}
-                            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            rows={4}
-                            placeholder="Tell the story of this impact..."
-                        />
-                    </div>
+ {/* Description */}
+ <div>
+ <label className="block text-sm font-medium text-gray-700 mb-2">
+ Description
+ </label>
+ <textarea
+ value={formData.description}
+ onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+ className="app-input"
+ rows={4}
+ placeholder="Tell the story of this impact..."
+ />
+ </div>
 
-                    {/* Media Type */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Media Type *
-                        </label>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            {mediaTypes.map((type) => {
-                                const Icon = type.icon
-                                const isSelected = formData.media_type === type.value
-                                return (
-                                    <button
-                                        key={type.value}
-                                        type="button"
-                                        onClick={() => {
-                                            setFormData(prev => ({ ...prev, media_type: type.value }))
-                                            // Clear media_url when switching to text type
-                                            if (type.value === 'text') {
-                                                setFormData(prev => ({ ...prev, media_url: '' }))
-                                                setSelectedFile(null)
-                                            }
-                                        }}
-                                        className={`p-4 border-2 rounded-lg transition-colors ${
-                                            isSelected
-                                                ? 'border-blue-500 bg-blue-50'
-                                                : 'border-gray-200 hover:border-gray-300'
-                                        }`}
-                                    >
-                                        <Icon className={`w-6 h-6 mx-auto mb-2 ${isSelected ? 'text-blue-600' : 'text-gray-400'}`} />
-                                        <div className={`text-sm font-medium ${isSelected ? 'text-blue-700' : 'text-gray-600'}`}>
-                                            {type.label}
-                                        </div>
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    </div>
+ {/* Media Type */}
+ <div>
+ <label className="block text-sm font-medium text-gray-700 mb-2">
+ Media Type *
+ </label>
+ <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+ {mediaTypes.map((type) => {
+ const Icon = type.icon
+ const isSelected = formData.media_type === type.value
+ return (
+ <button
+ key={type.value}
+ type="button"
+ onClick={() => {
+ setFormData(prev => ({ ...prev, media_type: type.value }))
+ // Clear media_url when switching to text type
+ if (type.value === 'text') {
+ setFormData(prev => ({ ...prev, media_url: '' }))
+ setSelectedFile(null)
+ }
+ }}
+ className={`p-4 border-2 rounded-lg transition-colors ${
+ isSelected
+ ? 'border-primary-500 bg-primary-50'
+ : 'border-gray-200 hover:border-gray-300'
+ }`}
+ >
+ <Icon className={`w-6 h-6 mx-auto mb-2 ${isSelected ? 'text-primary-700' : 'text-gray-400'}`} />
+ <div className={`text-sm font-medium ${isSelected ? 'text-primary-700' : 'text-gray-600'}`}>
+ {type.label}
+ </div>
+ </button>
+ )
+ })}
+ </div>
+ </div>
 
-                    {/* File Upload - Only show if not text type */}
-                    {formData.media_type !== 'text' && (
-                        <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                Upload {formData.media_type === 'photo' ? 'Photo' : formData.media_type === 'video' ? 'Video' : 'Recording'} <span className="text-gray-400 font-normal">(optional)</span>
-                            </label>
-                            {(formData.media_url || selectedFile) ? (
-                                <div className="space-y-3">
-                                    {formData.media_url && /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(formData.media_url) ? (
-                                        <div className="relative w-full max-w-md mx-auto" style={{ paddingBottom: '56.25%' }}>
-                                            <iframe
-                                                src={`https://www.youtube.com/embed/${(formData.media_url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) || [])[1]}`}
-                                                title="YouTube video"
-                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                                allowFullScreen
-                                                className="absolute inset-0 w-full h-full rounded-lg shadow-lg border-2 border-gray-200"
-                                            />
-                                        </div>
-                                    ) : selectedFile && !formData.media_url ? (
-                                        <div className="w-full max-w-md mx-auto bg-gray-50 rounded-lg flex items-center justify-center p-8 border-2 border-gray-200" style={{ minHeight: '120px' }}>
-                                            <div className="text-center">
-                                                <Upload className="w-10 h-10 text-blue-500 mx-auto mb-2" />
-                                                <p className="text-sm font-medium text-gray-700">{selectedFile.name}</p>
-                                                <p className="text-xs text-gray-500 mt-1">{(selectedFile.size / 1024 / 1024).toFixed(1)} MB — will upload on save</p>
-                                            </div>
-                                        </div>
-                                    ) : formData.media_type === 'photo' ? (
-                                        <div className="relative w-full max-w-md mx-auto">
-                                            <img 
-                                                src={formData.media_url} 
-                                                alt="Preview" 
-                                                className="w-full h-auto rounded-lg object-cover shadow-lg border-2 border-gray-200" 
-                                                style={{ maxHeight: '400px' }}
-                                            />
-                                        </div>
-                                    ) : formData.media_type === 'video' ? (
-                                        <video 
-                                            src={formData.media_url} 
-                                            className="w-full max-w-md mx-auto rounded-lg object-cover shadow-lg border-2 border-gray-200" 
-                                            controls 
-                                            style={{ maxHeight: '400px' }}
-                                        />
-                                    ) : (
-                                        <div className="w-full max-w-md mx-auto bg-gray-100 rounded-lg flex items-center justify-center p-8" style={{ minHeight: '200px' }}>
-                                            <div className="text-center">
-                                                <Mic className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                                                <p className="text-sm text-gray-600">Audio Recording</p>
-                                            </div>
-                                        </div>
-                                    )}
-                                    <div className="text-center">
-                                        <p className="text-xs text-gray-600 mb-2">{uploadProgress || 'File uploaded'}</p>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setFormData(prev => ({ ...prev, media_url: '' }))
-                                                setSelectedFile(null)
-                                                setUploadProgress('')
-                                            }}
-                                            className="text-xs text-red-600 hover:text-red-700 font-medium"
-                                        >
-                                            Remove
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div
-                                    className={`border-2 border-dashed rounded-xl p-6 text-center transition-all duration-200 cursor-pointer ${
-                                        isDragOver
-                                            ? 'border-primary-500 bg-primary-50/50'
-                                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50/50'
-                                    }`}
-                                    onDrop={handleDrop}
-                                    onDragOver={handleDragOver}
-                                    onDragLeave={handleDragLeave}
-                                    onClick={() => fileInputRef.current?.click()}
-                                >
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        onChange={handleFileInputChange}
-                                        accept={formData.media_type === 'photo' ? 'image/*' : formData.media_type === 'video' ? 'video/*' : 'audio/*'}
-                                        className="hidden"
-                                    />
-                                    <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
-                                    <p className="text-sm text-gray-600">
-                                        Drag & drop files here, or <span className="text-primary-600 font-medium">browse</span>
-                                    </p>
-                                    <p className="text-xs text-gray-400 mt-1">
-                                        {formData.media_type === 'photo' ? 'Images supported' : formData.media_type === 'video' ? 'Videos supported' : 'Audio files supported'}
-                                    </p>
-                                </div>
-                            )}
+ {/* File Upload - Only show if not text type */}
+ {formData.media_type !== 'text' && (
+ <div>
+ <label className="block text-sm font-semibold text-gray-700 mb-2">
+ Upload {formData.media_type === 'photo' ? 'Photo' : formData.media_type === 'video' ? 'Video' : 'Recording'} <span className="text-gray-400 font-normal">(optional)</span>
+ </label>
+ {(formData.media_url || selectedFile) ? (
+ <div className="space-y-3">
+ {formData.media_url && /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(formData.media_url) ? (
+ <div className="relative w-full max-w-md mx-auto" style={{ paddingBottom: '56.25%' }}>
+ <iframe
+ src={`https://www.youtube.com/embed/${(formData.media_url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) || [])[1]}`}
+ title="YouTube video"
+ allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+ allowFullScreen
+ className="absolute inset-0 w-full h-full rounded-lg shadow-lg border-2 border-gray-200"
+ />
+ </div>
+ ) : selectedFile && !formData.media_url ? (
+ <div className="w-full max-w-md mx-auto bg-gray-50 rounded-lg flex items-center justify-center p-8 border-2 border-gray-200" style={{ minHeight: '120px' }}>
+ <div className="text-center">
+ <Upload className="w-10 h-10 text-primary-600 mx-auto mb-2" />
+ <p className="text-sm font-medium text-gray-700">{selectedFile.name}</p>
+ <p className="text-xs text-gray-500 mt-1">{(selectedFile.size / 1024 / 1024).toFixed(1)} MB — will upload on save</p>
+ </div>
+ </div>
+ ) : formData.media_type === 'photo' ? (
+ <div className="relative w-full max-w-md mx-auto">
+ <img 
+ src={formData.media_url} 
+ alt="Preview" 
+ className="w-full h-auto rounded-lg object-cover shadow-lg border-2 border-gray-200" 
+ style={{ maxHeight: '400px' }}
+ />
+ </div>
+ ) : formData.media_type === 'video' ? (
+ <video 
+ src={formData.media_url} 
+ className="w-full max-w-md mx-auto rounded-lg object-cover shadow-lg border-2 border-gray-200" 
+ controls 
+ style={{ maxHeight: '400px' }}
+ />
+ ) : (
+ <div className="w-full max-w-md mx-auto bg-gray-100 rounded-lg flex items-center justify-center p-8" style={{ minHeight: '200px' }}>
+ <div className="text-center">
+ <Mic className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+ <p className="text-sm text-gray-600">Audio Recording</p>
+ </div>
+ </div>
+ )}
+ <div className="text-center">
+ <p className="text-xs text-gray-600 mb-2">{uploadProgress || 'File uploaded'}</p>
+ <button
+ type="button"
+ onClick={() => {
+ setFormData(prev => ({ ...prev, media_url: '' }))
+ setSelectedFile(null)
+ setUploadProgress('')
+ }}
+ className="text-xs text-red-600 hover:text-red-700 font-medium"
+ >
+ Remove
+ </button>
+ </div>
+ </div>
+ ) : (
+ <div
+ className={`border-2 border-dashed rounded-xl p-6 text-center transition-all duration-200 cursor-pointer ${
+ isDragOver
+ ? 'border-primary-500 bg-primary-50/50'
+ : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50/50'
+ }`}
+ onDrop={handleDrop}
+ onDragOver={handleDragOver}
+ onDragLeave={handleDragLeave}
+ onClick={() => fileInputRef.current?.click()}
+ >
+ <input
+ ref={fileInputRef}
+ type="file"
+ onChange={handleFileInputChange}
+ accept={formData.media_type === 'photo' ? 'image/*' : formData.media_type === 'video' ? 'video/*' : 'audio/*'}
+ className="hidden"
+ />
+ <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+ <p className="text-sm text-gray-600">
+ Drag & drop files here, or <span className="text-primary-600 font-medium">browse</span>
+ </p>
+ <p className="text-xs text-gray-400 mt-1">
+ {formData.media_type === 'photo' ? 'Images supported' : formData.media_type === 'video' ? 'Videos supported' : 'Audio files supported'}
+ </p>
+ </div>
+ )}
 
-                            {/* Link inputs */}
-                            {!formData.media_url && !selectedFile && (
-                                <div className="mt-4 space-y-3">
-                                    <div className="flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200/60 rounded-xl">
-                                        <div className="w-9 h-9 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                                            <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                                            </svg>
-                                        </div>
-                                        <input
-                                            type="url"
-                                            value={formData.media_url || ''}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, media_url: e.target.value }))}
-                                            className="flex-1 bg-transparent border-none outline-none text-sm text-gray-800 placeholder-red-400/70 focus:ring-0 p-0"
-                                            placeholder="Paste a YouTube link here"
-                                        />
-                                    </div>
-                                    <div className="relative flex items-center">
-                                        <div className="flex-1 border-t border-gray-200"></div>
-                                        <span className="px-3 text-xs text-gray-400 font-medium">or paste any link</span>
-                                        <div className="flex-1 border-t border-gray-200"></div>
-                                    </div>
-                                    <input
-                                        type="url"
-                                        value={formData.media_url || ''}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, media_url: e.target.value }))}
-                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                                        placeholder="Paste a link to media (https://...)"
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    )}
+ {/* Link inputs */}
+ {!formData.media_url && !selectedFile && (
+ <div className="mt-4 space-y-3">
+ <div className="flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200/60 rounded-xl">
+ <div className="app-icon-tile bg-red-50 text-red-600 flex-shrink-0">
+ <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+ <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+ </svg>
+ </div>
+ <input
+ type="url"
+ value={formData.media_url || ''}
+ onChange={(e) => setFormData(prev => ({ ...prev, media_url: e.target.value }))}
+ className="flex-1 bg-transparent border-none outline-none text-sm text-gray-800 placeholder-red-400/70 focus:ring-0 p-0"
+ placeholder="Paste a YouTube link here"
+ />
+ </div>
+ <div className="relative flex items-center">
+ <div className="flex-1 border-t border-gray-200"></div>
+ <span className="px-3 text-xs text-gray-400 font-medium">or paste any link</span>
+ <div className="flex-1 border-t border-gray-200"></div>
+ </div>
+ <input
+ type="url"
+ value={formData.media_url || ''}
+ onChange={(e) => setFormData(prev => ({ ...prev, media_url: e.target.value }))}
+ className="app-input"
+ placeholder="Paste a link to media (https://...)"
+ />
+ </div>
+ )}
+ </div>
+ )}
 
-                    {/* Date */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Date *
-                        </label>
-                        <DateRangePicker
-                            value={datePickerValue}
-                            onChange={setDatePickerValue}
-                            placeholder="Select date"
-                        />
-                    </div>
+ {/* Date */}
+ <div>
+ <label className="block text-sm font-medium text-gray-700 mb-2">
+ Date *
+ </label>
+ <DateRangePicker
+ value={datePickerValue}
+ onChange={setDatePickerValue}
+ placeholder="Select date"
+ />
+ </div>
 
-                    {/* Locations */}
-                    <div>
-                        <div className="flex items-center justify-between mb-2">
-                            <label className="block text-sm font-medium text-gray-700">
-                                Locations <span className="text-red-500">*</span>
-                            </label>
-                            <button
-                                type="button"
-                                onClick={() => setIsLocationModalOpen(true)}
-                                className="px-2 py-1 border border-gray-300 rounded-lg hover:bg-gray-50 text-xs font-medium text-gray-700 flex items-center gap-1"
-                                title="Add new location"
-                            >
-                                <Plus className="w-3 h-3" /> New
-                            </button>
-                        </div>
-                        {locations.length === 0 ? (
-                            <p className="text-xs text-gray-500">No locations yet. Click the + button to create one.</p>
-                        ) : (
-                            <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto">
-                                <div className="space-y-2">
-                                    {locations.map((location) => {
-                                        const isSelected = (formData.location_ids || []).includes(location.id!)
-                                        return (
-                                            <label
-                                                key={location.id}
-                                                className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isSelected}
-                                                    onChange={() => {
-                                                        setFormData(prev => ({
-                                                            ...prev,
-                                                            location_ids: isSelected
-                                                                ? (prev.location_ids || []).filter(id => id !== location.id)
-                                                                : [...(prev.location_ids || []), location.id!]
-                                                        }))
-                                                    }}
-                                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                />
-                                                <span className="text-sm text-gray-700 flex items-center gap-1">
-                                                    <MapPin className="w-3 h-3 text-gray-400" />
-                                                    {location.name}
-                                                </span>
-                                            </label>
-                                        )
-                                    })}
-                                </div>
-                            </div>
-                        )}
-                    </div>
+ {/* Locations */}
+ <div>
+ <div className="flex items-center justify-between mb-2">
+ <label className="block text-sm font-medium text-gray-700">
+ Locations <span className="text-red-500">*</span>
+ </label>
+ <button
+ type="button"
+ onClick={() => setIsLocationModalOpen(true)}
+ className="app-btn app-btn-secondary app-btn-sm flex items-center gap-1"
+ title="Add new location"
+ >
+ <Plus className="w-3 h-3" /> New
+ </button>
+ </div>
+ {locations.length === 0 ? (
+ <p className="text-xs text-gray-500">No locations yet. Click the + button to create one.</p>
+ ) : (
+ <div className="app-card-flat p-3 max-h-48 overflow-y-auto">
+ <div className="space-y-2">
+ {locations.map((location) => {
+ const isSelected = (formData.location_ids || []).includes(location.id!)
+ return (
+ <label
+ key={location.id}
+ className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
+ >
+ <input
+ type="checkbox"
+ checked={isSelected}
+ onChange={() => {
+ setFormData(prev => ({
+ ...prev,
+ location_ids: isSelected
+ ? (prev.location_ids || []).filter(id => id !== location.id)
+ : [...(prev.location_ids || []), location.id!]
+ }))
+ }}
+ className="rounded border-gray-300 text-primary-700 focus:ring-primary-500"
+ />
+ <span className="text-sm text-gray-700 flex items-center gap-1">
+ <MapPin className="w-3 h-3 text-gray-400" />
+ {location.name}
+ </span>
+ </label>
+ )
+ })}
+ </div>
+ </div>
+ )}
+ </div>
 
-                    {/* Beneficiary Groups */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Beneficiary Groups (Optional)
-                        </label>
-                        <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto">
-                            {beneficiaryGroups.length === 0 ? (
-                                <p className="text-sm text-gray-500">No beneficiary groups available</p>
-                            ) : (
-                                <div className="space-y-2">
-                                    {beneficiaryGroups.map((group) => (
-                                        <label
-                                            key={group.id}
-                                            className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedBeneficiaryGroupIds.includes(group.id!)}
-                                                onChange={(e) => {
-                                                    if (e.target.checked) {
-                                                        setSelectedBeneficiaryGroupIds([...selectedBeneficiaryGroupIds, group.id!])
-                                                    } else {
-                                                        setSelectedBeneficiaryGroupIds(selectedBeneficiaryGroupIds.filter(id => id !== group.id))
-                                                    }
-                                                }}
-                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                            />
-                                            <span className="text-sm text-gray-700">{group.name}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
+ {/* Beneficiary Groups */}
+ <div>
+ <label className="block text-sm font-medium text-gray-700 mb-2">
+ Beneficiary Groups (Optional)
+ </label>
+ <div className="app-card-flat p-3 max-h-48 overflow-y-auto">
+ {beneficiaryGroups.length === 0 ? (
+ <p className="text-sm text-gray-500">No beneficiary groups available</p>
+ ) : (
+ <div className="space-y-2">
+ {beneficiaryGroups.map((group) => (
+ <label
+ key={group.id}
+ className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
+ >
+ <input
+ type="checkbox"
+ checked={selectedBeneficiaryGroupIds.includes(group.id!)}
+ onChange={(e) => {
+ if (e.target.checked) {
+ setSelectedBeneficiaryGroupIds([...selectedBeneficiaryGroupIds, group.id!])
+ } else {
+ setSelectedBeneficiaryGroupIds(selectedBeneficiaryGroupIds.filter(id => id !== group.id))
+ }
+ }}
+ className="rounded border-gray-300 text-primary-700 focus:ring-primary-500"
+ />
+ <span className="text-sm text-gray-700">{group.name}</span>
+ </label>
+ ))}
+ </div>
+ )}
+ </div>
+ </div>
 
-                    {/* Tags */}
-                    <div>
-                        <TagPicker
-                            mode="multi"
-                            selectedIds={selectedTagIds}
-                            onChange={setSelectedTagIds}
-                            label="Tags (Optional)"
-                            helperText="Tag this story so it shows up when filtering by tag."
-                        />
-                    </div>
+ {/* Tags */}
+ <div>
+ <TagPicker
+ mode="multi"
+ selectedIds={selectedTagIds}
+ onChange={setSelectedTagIds}
+ label="Tags (Optional)"
+ helperText="Tag this story so it shows up when filtering by tag."
+ />
+ </div>
 
-                    {/* Actions */}
-                    <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {loading ? 'Saving...' : editData ? 'Update Story' : 'Create Story'}
-                        </button>
-                    </div>
-                </form>
+ {/* Actions */}
+ <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200">
+ <button
+ type="button"
+ onClick={onClose}
+ className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
+ >
+ Cancel
+ </button>
+ <button
+ type="submit"
+ disabled={loading}
+ className="app-btn app-btn-primary"
+ >
+ {loading ? 'Saving...' : editData ? 'Update Story' : 'Create Story'}
+ </button>
+ </div>
+ </form>
 
-                {/* Location Creation Modal */}
-                <LocationModal
-                    isOpen={isLocationModalOpen}
-                    onClose={() => setIsLocationModalOpen(false)}
-                    onSubmit={async (locationData) => {
-                        try {
-                            const newLocation = await apiService.createLocation(locationData)
-                            setLocations([...locations, newLocation])
-                            setFormData(prev => ({ ...prev, location_ids: [...(prev.location_ids || []), newLocation.id!] }))
-                            setIsLocationModalOpen(false)
-                            toast.success('Location created successfully!')
-                        } catch (error) {
-                            const message = error instanceof Error ? error.message : 'Failed to create location'
-                            toast.error(message)
-                            throw error
-                        }
-                    }}
-                    initiativeId={initiativeId}
-                />
-        </ModalFrame>
-    )
+ {/* Location Creation Modal */}
+ <LocationModal
+ isOpen={isLocationModalOpen}
+ onClose={() => setIsLocationModalOpen(false)}
+ onSubmit={async (locationData) => {
+ try {
+ const newLocation = await apiService.createLocation(locationData)
+ setLocations([...locations, newLocation])
+ setFormData(prev => ({ ...prev, location_ids: [...(prev.location_ids || []), newLocation.id!] }))
+ setIsLocationModalOpen(false)
+ notify.success('Location created successfully!')
+ } catch (error) {
+ const message = error instanceof Error ? error.message : 'Failed to create location'
+ notify.error(message)
+ throw error
+ }
+ }}
+ initiativeId={initiativeId}
+ />
+ </ModalFrame>
+ )
 }

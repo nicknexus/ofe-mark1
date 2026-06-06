@@ -1,59 +1,59 @@
 export interface Organization {
-    id?: string;
-    name: string;
-    slug?: string;
-    description?: string;
-    statement?: string; // Brief mission statement (max 150 characters)
-    website_url?: string; // Organization website URL
-    donation_url?: string; // URL where people can donate
-    logo_url?: string; // URL to organization logo image
-    brand_color?: string; // Hex color for public page branding
-    is_public?: boolean;
-    is_demo?: boolean; // Sandbox / mock-charity org created from admin dashboard. Hidden from /explore + search.
-    demo_public_share?: boolean; // When true, demo orgs public page is reachable via direct link.
-    owner_id?: string; // Single owner user (cascades delete when user is deleted)
-    created_at?: string;
-    updated_at?: string;
-    role?: 'owner' | 'admin' | 'member'; // User's role in organization
+ id?: string;
+ name: string;
+ slug?: string;
+ description?: string;
+ statement?: string; // Brief mission statement (max 150 characters)
+ website_url?: string; // Organization website URL
+ donation_url?: string; // URL where people can donate
+ logo_url?: string; // URL to organization logo image
+ brand_color?: string; // Hex color for public page branding
+ is_public?: boolean;
+ is_demo?: boolean; // Sandbox / mock-charity org created from admin dashboard. Hidden from /explore + search.
+ demo_public_share?: boolean; // When true, demo orgs public page is reachable via direct link.
+ owner_id?: string; // Single owner user (cascades delete when user is deleted)
+ created_at?: string;
+ updated_at?: string;
+ role?: 'owner' | 'admin' | 'member'; // User's role in organization
 }
 
 export type StatCardType = 'stat' | 'statement';
 
 export interface StatCard {
-    id: string;
-    type: StatCardType;
-    value?: string;
-    title: string;
-    description: string;
-    source?: string;
-    source_url?: string;
-    created_at: string;
+ id: string;
+ type: StatCardType;
+ value?: string;
+ title: string;
+ description: string;
+ source?: string;
+ source_url?: string;
+ created_at: string;
 }
 
 export interface TheoryStage {
-    id: string;
-    title: string;
-    description: string;
+ id: string;
+ title: string;
+ description: string;
 }
 
 export interface Strategy {
-    id: string;
-    title: string;
-    description: string;
+ id: string;
+ title: string;
+ description: string;
 }
 
 export interface OrganizationContext {
-    id?: string;
-    organization_id: string;
-    featured_video_url?: string;
-    problem_statement?: string;
-    stats_and_statements?: StatCard[] | null;
-    theory_of_change?: string;
-    theory_of_change_stages?: TheoryStage[] | null;
-    strategies?: Strategy[] | null;
-    additional_info?: string;
-    created_at?: string;
-    updated_at?: string;
+ id?: string;
+ organization_id: string;
+ featured_video_url?: string;
+ problem_statement?: string;
+ stats_and_statements?: StatCard[] | null;
+ theory_of_change?: string;
+ theory_of_change_stages?: TheoryStage[] | null;
+ strategies?: Strategy[] | null;
+ additional_info?: string;
+ created_at?: string;
+ updated_at?: string;
 }
 
 export const MAX_STAT_CARDS = 12;
@@ -61,369 +61,369 @@ export const MAX_THEORY_STAGES = 12;
 export const MAX_STRATEGIES = 12;
 
 export interface Initiative {
-    id?: string;
-    title: string;
-    description: string;
-    region?: string;
-    location?: string;
-    slug?: string;
-    coordinates?: {
-        lat: number;
-        lng: number;
-    }[];
-    created_at?: string;
-    updated_at?: string;
-    user_id?: string;
-    display_order?: number;
+ id?: string;
+ title: string;
+ description: string;
+ region?: string;
+ location?: string;
+ slug?: string;
+ coordinates?: {
+ lat: number;
+ lng: number;
+ }[];
+ created_at?: string;
+ updated_at?: string;
+ user_id?: string;
+ display_order?: number;
 }
 
 export interface UmbrellaKPI {
-    id?: string;
-    title: string;
-    description?: string;
-    initiative_id?: string;
-    created_at?: string;
-    updated_at?: string;
-    user_id?: string;
+ id?: string;
+ title: string;
+ description?: string;
+ initiative_id?: string;
+ created_at?: string;
+ updated_at?: string;
+ user_id?: string;
 }
 
 export interface KPI {
-    id?: string;
-    title: string;
-    description: string;
-    metric_type: 'number' | 'percentage';
-    unit_of_measurement: string;
-    category: 'input' | 'output' | 'impact';
-    initiative_id?: string;
-    umbrella_kpi_id?: string;
-    display_order?: number;
-    tag_ids?: string[];
-    created_at?: string;
-    updated_at?: string;
-    user_id?: string;
+ id?: string;
+ title: string;
+ description: string;
+ metric_type: 'number' | 'percentage';
+ unit_of_measurement: string;
+ category: 'input' | 'output' | 'impact';
+ initiative_id?: string;
+ umbrella_kpi_id?: string;
+ display_order?: number;
+ tag_ids?: string[];
+ created_at?: string;
+ updated_at?: string;
+ user_id?: string;
 }
 
 export interface MetricTag {
-    id: string;
-    organization_id: string;
-    name: string;
-    color?: string | null;
-    parent_id?: string | null;
-    is_public?: boolean;
-    created_by?: string | null;
-    created_at?: string;
-    updated_at?: string;
-    metric_count?: number;
-    claim_count?: number;
+ id: string;
+ organization_id: string;
+ name: string;
+ color?: string | null;
+ parent_id?: string | null;
+ is_public?: boolean;
+ created_by?: string | null;
+ created_at?: string;
+ updated_at?: string;
+ metric_count?: number;
+ claim_count?: number;
 }
 
 export interface Location {
-    id?: string;
-    organization_id?: string;
-    initiative_id?: string | null;
-    initiative_ids?: string[];
-    name: string;
-    description?: string;
-    latitude: number;
-    longitude: number;
-    country?: string;
-    display_order?: number;
-    created_at?: string;
-    updated_at?: string;
-    user_id?: string;
+ id?: string;
+ organization_id?: string;
+ initiative_id?: string | null;
+ initiative_ids?: string[];
+ name: string;
+ description?: string;
+ latitude: number;
+ longitude: number;
+ country?: string;
+ display_order?: number;
+ created_at?: string;
+ updated_at?: string;
+ user_id?: string;
 }
 
 export interface KPIUpdate {
-    id?: string;
-    kpi_id: string;
-    value: number;
-    date_represented: string;
-    date_range_start?: string;
-    date_range_end?: string;
-    note?: string;
-    label?: string;
-    location_id?: string;
-    coordinates?: {
-        lat: number;
-        lng: number;
-    }[];
-    beneficiary_group_ids?: string[];
-    tag_id?: string | null;
-    created_at?: string;
-    updated_at?: string;
-    user_id?: string;
+ id?: string;
+ kpi_id: string;
+ value: number;
+ date_represented: string;
+ date_range_start?: string;
+ date_range_end?: string;
+ note?: string;
+ label?: string;
+ location_id?: string;
+ coordinates?: {
+ lat: number;
+ lng: number;
+ }[];
+ beneficiary_group_ids?: string[];
+ tag_id?: string | null;
+ created_at?: string;
+ updated_at?: string;
+ user_id?: string;
 }
 
 export interface BeneficiaryGroup {
-    id?: string;
-    initiative_id: string;
-    name: string;
-    description?: string;
-    criteria?: Record<string, any> | null;
-    location_id?: string; // Legacy - locations now derived from linked claims/evidence
-    age_range_start?: number | null; // Optional minimum age
-    age_range_end?: number | null; // Optional maximum age
-    total_number?: number | null; // Total number of beneficiaries in the group
-    display_order?: number;
-    created_at?: string;
-    updated_at?: string;
-    user_id?: string;
+ id?: string;
+ initiative_id: string;
+ name: string;
+ description?: string;
+ criteria?: Record<string, any> | null;
+ location_id?: string; // Legacy - locations now derived from linked claims/evidence
+ age_range_start?: number | null; // Optional minimum age
+ age_range_end?: number | null; // Optional maximum age
+ total_number?: number | null; // Total number of beneficiaries in the group
+ display_order?: number;
+ created_at?: string;
+ updated_at?: string;
+ user_id?: string;
 }
 
 export interface Evidence {
-    id?: string;
-    title: string;
-    description?: string;
-    type: 'visual_proof' | 'documentation' | 'testimony' | 'financials';
-    file_url?: string;
-    file_type?: string;
-    /** Gallery files when an evidence item has more than one. The legacy
-     * `file_url` is kept populated only for single-file uploads; multi-file
-     * rows hydrate this array instead. */
-    files?: {
-        id: string;
-        file_url: string;
-        file_name?: string;
-        file_type?: string;
-        display_order?: number;
-    }[];
-    date_represented: string;
-    date_range_start?: string;
-    date_range_end?: string;
-    location_id?: string; // Legacy single location (kept for backward compatibility)
-    location_ids?: string[]; // New: multiple locations support
-    coordinates?: {
-        lat: number;
-        lng: number;
-    }[];
-    // Legacy linkage (kept for backward compatibility in UI/API)
-    kpi_ids?: string[];
-    // New precise linkage to specific KPI updates (data points)
-    kpi_update_ids?: string[];
-    beneficiary_group_ids?: string[];
-    tag_ids?: string[];
-    initiative_id?: string;
-    created_at?: string;
-    updated_at?: string;
-    user_id?: string;
+ id?: string;
+ title: string;
+ description?: string;
+ type: 'visual_proof' | 'documentation' | 'testimony' | 'financials';
+ file_url?: string;
+ file_type?: string;
+ /** Gallery files when an evidence item has more than one. The legacy
+ * `file_url` is kept populated only for single-file uploads; multi-file
+ * rows hydrate this array instead. */
+ files?: {
+ id: string;
+ file_url: string;
+ file_name?: string;
+ file_type?: string;
+ display_order?: number;
+ }[];
+ date_represented: string;
+ date_range_start?: string;
+ date_range_end?: string;
+ location_id?: string; // Legacy single location (kept for backward compatibility)
+ location_ids?: string[]; // New: multiple locations support
+ coordinates?: {
+ lat: number;
+ lng: number;
+ }[];
+ // Legacy linkage (kept for backward compatibility in UI/API)
+ kpi_ids?: string[];
+ // New precise linkage to specific KPI updates (data points)
+ kpi_update_ids?: string[];
+ beneficiary_group_ids?: string[];
+ tag_ids?: string[];
+ initiative_id?: string;
+ created_at?: string;
+ updated_at?: string;
+ user_id?: string;
 }
 
 export interface Story {
-    id?: string;
-    initiative_id: string;
-    title: string;
-    description?: string;
-    media_url?: string; // Optional - can be null/empty
-    media_type: 'photo' | 'video' | 'recording' | 'text';
-    date_represented: string; // Mandatory date
-    location_id?: string; // Legacy single location
-    location_ids?: string[]; // Multiple locations via story_locations junction table
-    location?: Location; // Legacy populated single location
-    locations?: Location[]; // Populated when fetching multiple locations
-    beneficiary_group_ids?: string[]; // Array of linked beneficiary group IDs
-    beneficiary_groups?: BeneficiaryGroup[]; // Populated when fetching
-    tag_ids?: string[]; // Metric tags attached to this story (multi-tag, additive)
-    created_at?: string;
-    updated_at?: string;
-    user_id?: string;
+ id?: string;
+ initiative_id: string;
+ title: string;
+ description?: string;
+ media_url?: string; // Optional - can be null/empty
+ media_type: 'photo' | 'video' | 'recording' | 'text';
+ date_represented: string; // Mandatory date
+ location_id?: string; // Legacy single location
+ location_ids?: string[]; // Multiple locations via story_locations junction table
+ location?: Location; // Legacy populated single location
+ locations?: Location[]; // Populated when fetching multiple locations
+ beneficiary_group_ids?: string[]; // Array of linked beneficiary group IDs
+ beneficiary_groups?: BeneficiaryGroup[]; // Populated when fetching
+ tag_ids?: string[]; // Metric tags attached to this story (multi-tag, additive)
+ created_at?: string;
+ updated_at?: string;
+ user_id?: string;
 }
 
 export interface DashboardStats {
-    total_kpis: number;
-    evidence_coverage_percentage: number;
-    most_active_initiative?: string;
-    recent_updates: number;
-    evidence_types?: EvidenceTypeStats;
+ total_kpis: number;
+ evidence_coverage_percentage: number;
+ most_active_initiative?: string;
+ recent_updates: number;
+ evidence_types?: EvidenceTypeStats;
 }
 
 export interface KPIWithEvidence extends KPI {
-    evidence_count: number;
-    evidence_percentage: number;
-    latest_update?: KPIUpdate;
-    total_updates: number;
-    total_value: number;
-    evidence_types: Array<{
-        type: string;
-        count: number;
-        percentage: number;
-        label: string;
-    }>;
+ evidence_count: number;
+ evidence_percentage: number;
+ latest_update?: KPIUpdate;
+ total_updates: number;
+ total_value: number;
+ evidence_types: Array<{
+ type: string;
+ count: number;
+ percentage: number;
+ label: string;
+ }>;
 }
 
 export interface EvidenceTypeStats {
-    visual_proof: number;
-    documentation: number;
-    testimony: number;
-    financials: number;
+ visual_proof: number;
+ documentation: number;
+ testimony: number;
+ financials: number;
 }
 
 export interface User {
-    id: string;
-    email: string;
-    name?: string;
-    organization?: string;
-    has_completed_tutorial?: boolean;
-    accepted_terms_of_service?: boolean;
-    accepted_terms_of_service_at?: string;
-    is_admin?: boolean; // Platform admin — unlocks /admin/demos + /api/admin/*
+ id: string;
+ email: string;
+ name?: string;
+ organization?: string;
+ has_completed_tutorial?: boolean;
+ accepted_terms_of_service?: boolean;
+ accepted_terms_of_service_at?: string;
+ is_admin?: boolean; // Platform admin — unlocks /admin/demos + /api/admin/*
 }
 
 export interface Subscription {
-    id: string;
-    user_id: string;
-    organization_id?: string;
-    status: 'none' | 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
-    plan_tier?: 'starter' | 'professional' | 'enterprise' | null;
-    billing_interval?: 'monthly' | 'yearly' | 'lifetime' | null;
-    trial_started_at?: string;
-    trial_ends_at?: string;
-    stripe_customer_id?: string;
-    stripe_subscription_id?: string;
-    current_period_start?: string;
-    current_period_end?: string;
-    cancel_at_period_end?: boolean;
-    created_at: string;
-    updated_at: string;
+ id: string;
+ user_id: string;
+ organization_id?: string;
+ status: 'none' | 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
+ plan_tier?: 'starter' | 'professional' | 'enterprise' | null;
+ billing_interval?: 'monthly' | 'yearly' | 'lifetime' | null;
+ trial_started_at?: string;
+ trial_ends_at?: string;
+ stripe_customer_id?: string;
+ stripe_subscription_id?: string;
+ current_period_start?: string;
+ current_period_end?: string;
+ cancel_at_period_end?: boolean;
+ created_at: string;
+ updated_at: string;
 }
 
 export interface SubscriptionStatus {
-    hasAccess: boolean;
-    reason: string;
-    subscription: Subscription;
-    remainingTrialDays: number | null;
-    isInherited?: boolean;
-    inheritedFromOrgId?: string;
+ hasAccess: boolean;
+ reason: string;
+ subscription: Subscription;
+ remainingTrialDays: number | null;
+ isInherited?: boolean;
+ inheritedFromOrgId?: string;
 }
 
 export interface InitiativeDashboard {
-    initiative: Initiative;
-    kpis: KPIWithEvidence[];
-    stats: {
-        total_kpis: number;
-        evidence_coverage_percentage: number;
-        evidence_types: EvidenceTypeStats;
-        recent_updates: number;
-    };
+ initiative: Initiative;
+ kpis: KPIWithEvidence[];
+ stats: {
+ total_kpis: number;
+ evidence_coverage_percentage: number;
+ evidence_types: EvidenceTypeStats;
+ recent_updates: number;
+ };
 }
 
 // Form types
 export interface CreateInitiativeForm {
-    title: string;
-    description: string;
-    region?: string;
-    location?: string;
+ title: string;
+ description: string;
+ region?: string;
+ location?: string;
 }
 
 export interface CreateKPIForm {
-    title: string;
-    description: string;
-    metric_type: 'number' | 'percentage';
-    unit_of_measurement: string;
-    category: 'input' | 'output' | 'impact';
-    initiative_id?: string;
-    umbrella_kpi_id?: string;
-    tag_ids?: string[];
+ title: string;
+ description: string;
+ metric_type: 'number' | 'percentage';
+ unit_of_measurement: string;
+ category: 'input' | 'output' | 'impact';
+ initiative_id?: string;
+ umbrella_kpi_id?: string;
+ tag_ids?: string[];
 }
 
 export interface CreateKPIUpdateForm {
-    value: number;
-    date_represented: string;
-    date_range_start?: string;
-    date_range_end?: string;
-    note?: string;
-    label?: string;
-    location_id?: string;
-    // New: link data point to beneficiary groups at creation time
-    beneficiary_group_ids?: string[];
-    tag_id?: string | null;
+ value: number;
+ date_represented: string;
+ date_range_start?: string;
+ date_range_end?: string;
+ note?: string;
+ label?: string;
+ location_id?: string;
+ // New: link data point to beneficiary groups at creation time
+ beneficiary_group_ids?: string[];
+ tag_id?: string | null;
 }
 
 export interface CreateEvidenceForm {
-    title: string;
-    description?: string;
-    type: 'visual_proof' | 'documentation' | 'testimony' | 'financials';
-    file_url?: string;
-    file_urls?: string[]; // Array of file URLs for multiple files support
-    file_sizes?: number[]; // File sizes in bytes (parallel to file_urls) for storage tracking
-    date_represented: string;
-    date_range_start?: string;
-    date_range_end?: string;
-    location_id?: string; // Legacy single location (kept for backward compatibility)
-    location_ids?: string[]; // New: multiple locations support
-    // Legacy: link evidence to KPIs (kept for backward compatibility)
-    kpi_ids?: string[];
-    // New: link evidence to specific KPI updates (data points)
-    kpi_update_ids?: string[];
-    beneficiary_group_ids?: string[];
-    tag_ids?: string[];
-    initiative_id?: string;
+ title: string;
+ description?: string;
+ type: 'visual_proof' | 'documentation' | 'testimony' | 'financials';
+ file_url?: string;
+ file_urls?: string[]; // Array of file URLs for multiple files support
+ file_sizes?: number[]; // File sizes in bytes (parallel to file_urls) for storage tracking
+ date_represented: string;
+ date_range_start?: string;
+ date_range_end?: string;
+ location_id?: string; // Legacy single location (kept for backward compatibility)
+ location_ids?: string[]; // New: multiple locations support
+ // Legacy: link evidence to KPIs (kept for backward compatibility)
+ kpi_ids?: string[];
+ // New: link evidence to specific KPI updates (data points)
+ kpi_update_ids?: string[];
+ beneficiary_group_ids?: string[];
+ tag_ids?: string[];
+ initiative_id?: string;
 }
 
 export interface CreateStoryForm {
-    title: string;
-    description?: string;
-    media_url?: string; // Optional
-    media_type: 'photo' | 'video' | 'recording' | 'text';
-    date_represented: string; // Mandatory date
-    location_id?: string; // Legacy single location
-    location_ids?: string[]; // Multiple locations
-    beneficiary_group_ids?: string[]; // Optional array of beneficiary group IDs
-    tag_ids?: string[]; // Metric tags attached to this story (multi-tag, additive)
-    initiative_id: string;
+ title: string;
+ description?: string;
+ media_url?: string; // Optional
+ media_type: 'photo' | 'video' | 'recording' | 'text';
+ date_represented: string; // Mandatory date
+ location_id?: string; // Legacy single location
+ location_ids?: string[]; // Multiple locations
+ beneficiary_group_ids?: string[]; // Optional array of beneficiary group IDs
+ tag_ids?: string[]; // Metric tags attached to this story (multi-tag, additive)
+ initiative_id: string;
 }
 
 // UI State types
 export interface LoadingState {
-    isLoading: boolean;
-    error?: string;
+ isLoading: boolean;
+ error?: string;
 }
 
 export interface Donor {
-    id?: string;
-    initiative_id: string;
-    name: string;
-    email: string;
-    organization?: string;
-    notes?: string;
-    created_at?: string;
-    updated_at?: string;
-    user_id?: string;
+ id?: string;
+ initiative_id: string;
+ name: string;
+ email: string;
+ organization?: string;
+ notes?: string;
+ created_at?: string;
+ updated_at?: string;
+ user_id?: string;
 }
 
 export interface DonorCredit {
-    id?: string;
-    donor_id: string;
-    kpi_id: string;
-    kpi_update_id?: string;
-    credited_value: number;
-    credited_percentage?: number;
-    date_range_start?: string;
-    date_range_end?: string;
-    notes?: string;
-    created_at?: string;
-    updated_at?: string;
-    user_id?: string;
-    // Populated when fetching
-    donor?: Donor;
-    kpi?: KPI;
-    kpi_update?: KPIUpdate;
+ id?: string;
+ donor_id: string;
+ kpi_id: string;
+ kpi_update_id?: string;
+ credited_value: number;
+ credited_percentage?: number;
+ date_range_start?: string;
+ date_range_end?: string;
+ notes?: string;
+ created_at?: string;
+ updated_at?: string;
+ user_id?: string;
+ // Populated when fetching
+ donor?: Donor;
+ kpi?: KPI;
+ kpi_update?: KPIUpdate;
 }
 
 export interface EvidenceByDate {
-    date: string;
-    dateRange?: {
-        start: string;
-        end: string;
-    };
-    totalMetricImpact: number;
-    dataPoints: KPIUpdate[];
-    evidenceItems: Evidence[];
-    completionPercentage: number;
-    isFullyProven: boolean;
+ date: string;
+ dateRange?: {
+ start: string;
+ end: string;
+ };
+ totalMetricImpact: number;
+ dataPoints: KPIUpdate[];
+ evidenceItems: Evidence[];
+ completionPercentage: number;
+ isFullyProven: boolean;
 }
 
 export interface ModalState {
-    isOpen: boolean;
-    type?: 'create' | 'edit' | 'view';
-    data?: any;
+ isOpen: boolean;
+ type?: 'create' | 'edit' | 'view';
+ data?: any;
 } 

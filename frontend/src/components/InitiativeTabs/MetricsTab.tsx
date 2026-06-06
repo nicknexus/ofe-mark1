@@ -1,5 +1,6 @@
 import React from 'react'
-import { BarChart3, Plus, Target, Upload } from 'lucide-react'
+import { BarChart3, Plus, Target } from 'lucide-react'
+import { EmptyState } from '../ui'
 import { InitiativeDashboard } from '../../types'
 import ExpandableKPICard from '../ExpandableKPICard'
 import MobileMetricDetail from '../MobileMetricDetail'
@@ -7,341 +8,331 @@ import DataPointPreviewModal from '../DataPointPreviewModal'
 
 // Color palette matching MetricsDashboard - for metrics past 12, default to site green
 const METRIC_COLOR_PALETTE = [
-    '#3b82f6', // blue
-    '#10b981', // green
-    '#8b5cf6', // purple
-    '#f59e0b', // amber
-    '#ef4444', // red
-    '#06b6d4', // cyan
-    '#ec4899', // pink
-    '#84cc16', // lime
-    '#f97316', // orange
-    '#6366f1', // indigo
-    '#14b8a6', // teal
-    '#a855f7', // violet
+ '#3b82f6', // blue
+ '#10b981', // green
+ '#8b5cf6', // purple
+ '#f59e0b', // amber
+ '#ef4444', // red
+ '#06b6d4', // cyan
+ '#ec4899', // pink
+ '#84cc16', // lime
+ '#f97316', // orange
+ '#6366f1', // indigo
+ '#14b8a6', // teal
+ '#a855f7', // violet
 ]
 const DEFAULT_METRIC_COLOR = '#c0dfa1' // site green (primary-500)
 
 const getMetricColor = (index: number): string => {
-    if (index >= METRIC_COLOR_PALETTE.length) return DEFAULT_METRIC_COLOR
-    return METRIC_COLOR_PALETTE[index]
+ if (index >= METRIC_COLOR_PALETTE.length) return DEFAULT_METRIC_COLOR
+ return METRIC_COLOR_PALETTE[index]
 }
 
 interface MetricsTabProps {
-    dashboard: InitiativeDashboard | null
-    kpiTotals: Record<string, number>
-    categoryFilter: 'all' | 'input' | 'output' | 'impact'
-    setCategoryFilter: (filter: 'all' | 'input' | 'output' | 'impact') => void
-    expandedKPIs: Set<string>
-    setExpandedKPIs: React.Dispatch<React.SetStateAction<Set<string>>>
-    allKPIUpdates: any[]
-    onAddKPI?: () => void
-    onAddUpdate: (kpi: any) => void
-    onAddEvidence?: (kpi?: any) => void
-    onEditKPI?: (kpi: any) => void
-    onDeleteKPI?: (kpi: any) => void
-    onToggleKPIExpansion: (kpiId: string) => void
-    initiativeId?: string
-    onRefresh?: () => void
-    orderedKPIIds?: string[] // KPI IDs in display order (from home tab drag/drop)
+ dashboard: InitiativeDashboard | null
+ kpiTotals: Record<string, number>
+ categoryFilter: 'all' | 'input' | 'output' | 'impact'
+ setCategoryFilter: (filter: 'all' | 'input' | 'output' | 'impact') => void
+ expandedKPIs: Set<string>
+ setExpandedKPIs: React.Dispatch<React.SetStateAction<Set<string>>>
+ allKPIUpdates: any[]
+ onAddKPI?: () => void
+ onAddUpdate: (kpi: any) => void
+ onAddEvidence?: (kpi?: any) => void
+ onEditKPI?: (kpi: any) => void
+ onDeleteKPI?: (kpi: any) => void
+ onToggleKPIExpansion: (kpiId: string) => void
+ initiativeId?: string
+ onRefresh?: () => void
+ orderedKPIIds?: string[] // KPI IDs in display order (from home tab drag/drop)
 }
 
 export default function MetricsTab({
-    dashboard,
-    kpiTotals,
-    categoryFilter,
-    setCategoryFilter,
-    expandedKPIs,
-    setExpandedKPIs,
-    allKPIUpdates,
-    onAddKPI,
-    onAddUpdate,
-    onAddEvidence,
-    onEditKPI,
-    onDeleteKPI,
-    onToggleKPIExpansion,
-    initiativeId,
-    onRefresh,
-    orderedKPIIds = []
+ dashboard,
+ kpiTotals,
+ categoryFilter,
+ setCategoryFilter,
+ expandedKPIs,
+ setExpandedKPIs,
+ allKPIUpdates,
+ onAddKPI,
+ onAddUpdate,
+ onAddEvidence,
+ onEditKPI,
+ onDeleteKPI,
+ onToggleKPIExpansion,
+ initiativeId,
+ onRefresh,
+ orderedKPIIds = []
 }: MetricsTabProps) {
-    const [selectedDataPoint, setSelectedDataPoint] = React.useState<any>(null)
-    const [isDataPointPreviewOpen, setIsDataPointPreviewOpen] = React.useState(false)
+ const [selectedDataPoint, setSelectedDataPoint] = React.useState<any>(null)
+ const [isDataPointPreviewOpen, setIsDataPointPreviewOpen] = React.useState(false)
 
-    if (!dashboard) return null
+ if (!dashboard) return null
 
-    const { initiative, kpis, stats } = dashboard
+ const { initiative, kpis, stats } = dashboard
 
-    // Filter KPIs based on category
-    const filteredKpis = categoryFilter === 'all'
-        ? kpis
-        : kpis.filter(kpi => kpi.category === categoryFilter)
+ // Filter KPIs based on category
+ const filteredKpis = categoryFilter === 'all'
+ ? kpis
+ : kpis.filter(kpi => kpi.category === categoryFilter)
 
-    // Check if a metric is expanded via URL - render it as full page instead of overlay
-    const expandedKpiId = expandedKPIs.size > 0 ? Array.from(expandedKPIs)[0] : null
-    const expandedKpi = expandedKpiId ? kpis.find(k => k.id === expandedKpiId) : null
+ // Check if a metric is expanded via URL - render it as full page instead of overlay
+ const expandedKpiId = expandedKPIs.size > 0 ? Array.from(expandedKPIs)[0] : null
+ const expandedKpi = expandedKpiId ? kpis.find(k => k.id === expandedKpiId) : null
 
-    // Get color index based on ordered IDs (from home tab) or fallback to kpis array order
-    const getOrderedIndex = (kpiId: string): number => {
-        if (orderedKPIIds.length > 0) {
-            const orderedIndex = orderedKPIIds.indexOf(kpiId)
-            if (orderedIndex !== -1) return orderedIndex
-        }
-        // Fallback to original kpis array order
-        return kpis.findIndex(k => k.id === kpiId)
-    }
+ // Get color index based on ordered IDs (from home tab) or fallback to kpis array order
+ const getOrderedIndex = (kpiId: string): number => {
+ if (orderedKPIIds.length > 0) {
+ const orderedIndex = orderedKPIIds.indexOf(kpiId)
+ if (orderedIndex !== -1) return orderedIndex
+ }
+ // Fallback to original kpis array order
+ return kpis.findIndex(k => k.id === kpiId)
+ }
 
-    // If a metric is expanded, render detail view
-    if (expandedKpi) {
-        const expandedKpiIndex = getOrderedIndex(expandedKpi.id!)
-        const kpiUpdatesForMetric = allKPIUpdates.filter(update => update.kpi_id === expandedKpi.id)
+ // If a metric is expanded, render detail view
+ if (expandedKpi) {
+ const expandedKpiIndex = getOrderedIndex(expandedKpi.id!)
+ const kpiUpdatesForMetric = allKPIUpdates.filter(update => update.kpi_id === expandedKpi.id)
 
-        return (
-            <>
-                {/* Mobile: Simple Detail View */}
-                <div className="md:hidden">
-                    <MobileMetricDetail
-                        kpi={expandedKpi}
-                        kpiTotal={kpiTotals[expandedKpi.id!] || 0}
-                        kpiUpdates={kpiUpdatesForMetric}
-                        onBack={() => expandedKpi.id && onToggleKPIExpansion(expandedKpi.id)}
-                        onAddUpdate={() => onAddUpdate(expandedKpi)}
-                        onDataPointClick={(update) => {
-                            setSelectedDataPoint(update)
-                            setIsDataPointPreviewOpen(true)
-                        }}
-                        initiativeId={initiativeId || initiative.id || ''}
-                    />
-                </div>
+ return (
+ <>
+ {/* Mobile: Simple Detail View */}
+ <div className="md:hidden">
+ <MobileMetricDetail
+ kpi={expandedKpi}
+ kpiTotal={kpiTotals[expandedKpi.id!] || 0}
+ kpiUpdates={kpiUpdatesForMetric}
+ onBack={() => expandedKpi.id && onToggleKPIExpansion(expandedKpi.id)}
+ onAddUpdate={() => onAddUpdate(expandedKpi)}
+ onDataPointClick={(update) => {
+ setSelectedDataPoint(update)
+ setIsDataPointPreviewOpen(true)
+ }}
+ initiativeId={initiativeId || initiative.id || ''}
+ />
+ </div>
 
-                {/* Desktop: Full Complex View */}
-                <div className="hidden md:block">
-                    <ExpandableKPICard
-                        key={expandedKpi.id}
-                        kpi={expandedKpi}
-                        kpiTotal={kpiTotals[expandedKpi.id!] || 0}
-                        isExpanded={true}
-                        renderAsPage={true}
-                        onToggleExpand={() => expandedKpi.id && onToggleKPIExpansion(expandedKpi.id)}
-                        onAddUpdate={() => onAddUpdate(expandedKpi)}
-                        onAddEvidence={onAddEvidence ? () => onAddEvidence(expandedKpi) : undefined}
-                        onEdit={onEditKPI ? () => onEditKPI(expandedKpi) : undefined}
-                        onDelete={onDeleteKPI ? () => onDeleteKPI(expandedKpi) : undefined}
-                        kpiUpdates={kpiUpdatesForMetric}
-                        initiativeId={initiativeId || initiative.id || ''}
-                        onRefresh={onRefresh}
-                        metricColor={getMetricColor(expandedKpiIndex)}
-                    />
-                </div>
+ {/* Desktop: Full Complex View */}
+ <div className="hidden md:block">
+ <ExpandableKPICard
+ key={expandedKpi.id}
+ kpi={expandedKpi}
+ kpiTotal={kpiTotals[expandedKpi.id!] || 0}
+ isExpanded={true}
+ renderAsPage={true}
+ onToggleExpand={() => expandedKpi.id && onToggleKPIExpansion(expandedKpi.id)}
+ onAddUpdate={() => onAddUpdate(expandedKpi)}
+ onAddEvidence={onAddEvidence ? () => onAddEvidence(expandedKpi) : undefined}
+ onEdit={onEditKPI ? () => onEditKPI(expandedKpi) : undefined}
+ onDelete={onDeleteKPI ? () => onDeleteKPI(expandedKpi) : undefined}
+ kpiUpdates={kpiUpdatesForMetric}
+ initiativeId={initiativeId || initiative.id || ''}
+ onRefresh={onRefresh}
+ metricColor={getMetricColor(expandedKpiIndex)}
+ />
+ </div>
 
-                {/* Data Point Preview Modal */}
-                {selectedDataPoint && (
-                    <DataPointPreviewModal
-                        isOpen={isDataPointPreviewOpen}
-                        onClose={() => {
-                            setIsDataPointPreviewOpen(false)
-                            setSelectedDataPoint(null)
-                        }}
-                        dataPoint={selectedDataPoint}
-                        kpi={expandedKpi}
-                        onEvidenceClick={() => { }}
-                    />
-                )}
-            </>
-        )
-    }
+ {/* Data Point Preview Modal */}
+ {selectedDataPoint && (
+ <DataPointPreviewModal
+ isOpen={isDataPointPreviewOpen}
+ onClose={() => {
+ setIsDataPointPreviewOpen(false)
+ setSelectedDataPoint(null)
+ }}
+ dataPoint={selectedDataPoint}
+ kpi={expandedKpi}
+ onEvidenceClick={() => { }}
+ />
+ )}
+ </>
+ )
+ }
 
-    return (
-        <div className="h-screen overflow-hidden">
-            {/* Mobile: Simple List View */}
-            <div className="md:hidden h-full w-full px-4 py-4 overflow-y-auto mobile-content-padding">
-                {kpis.length === 0 ? (
-                    /* Empty State */
-                    <div className="mobile-empty-state">
-                        <div className="mobile-empty-icon">
-                            <BarChart3 className="w-6 h-6 text-gray-400" />
-                        </div>
-                        <h3 className="mobile-empty-title">No Metrics Yet</h3>
-                        <p className="mobile-empty-text">Add your first metric to track impact</p>
-                        {onAddKPI && (
-                            <button
-                                onClick={onAddKPI}
-                                className="mt-6 inline-flex items-center space-x-2 px-5 py-3 bg-primary-500 text-white rounded-2xl text-sm font-semibold shadow-lg active:scale-95 transition-transform"
-                            >
-                                <Plus className="w-5 h-5" />
-                                <span>Add Metric</span>
-                            </button>
-                        )}
-                    </div>
-                ) : (
-                    /* Mobile Metrics List */
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between mb-3">
-                            <h2 className="mobile-section-title mb-0">Your Metrics</h2>
-                            {onAddKPI && (
-                                <button
-                                    onClick={onAddKPI}
-                                    className="p-2.5 bg-primary-500 text-white rounded-xl shadow-lg active:scale-95 transition-transform"
-                                >
-                                    <Plus className="w-5 h-5" />
-                                </button>
-                            )}
-                        </div>
+ return (
+ <div className="h-screen overflow-hidden">
+ {/* Mobile: Simple List View */}
+ <div className="md:hidden h-full w-full px-4 py-4 overflow-y-auto mobile-content-padding">
+ {kpis.length === 0 ? (
+ <EmptyState
+ icon={BarChart3}
+ title="No Metrics Yet"
+ description="Add your first metric to track impact"
+ action={onAddKPI ? (
+ <button type="button" onClick={onAddKPI} className="app-btn app-btn-primary">
+ <Plus className="w-5 h-5" />
+ <span>Add Metric</span>
+ </button>
+ ) : undefined}
+ />
+ ) : (
+ /* Mobile Metrics List */
+ <div className="space-y-3">
+ <div className="flex items-center justify-between mb-3">
+ <h2 className="mobile-section-title mb-0">Your Metrics</h2>
+ {onAddKPI && (
+ <button
+ type="button"
+ onClick={onAddKPI}
+ className="app-btn app-btn-primary app-btn-icon"
+ >
+ <Plus className="w-5 h-5" />
+ </button>
+ )}
+ </div>
 
-                        {filteredKpis.map((kpi) => {
-                            const total = kpiTotals[kpi.id!] || 0
-                            return kpi.id && (
-                                <div
-                                    key={kpi.id}
-                                    onClick={() => kpi.id && onToggleKPIExpansion(kpi.id)}
-                                    className="mobile-metric-card-clean"
-                                >
-                                    <div className="flex items-start justify-between mb-2">
-                                        <h3 className="mobile-metric-title flex-1">{kpi.title}</h3>
-                                        <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full ml-2">
-                                            {kpi.category}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-baseline gap-1 mb-1">
-                                        <span className="mobile-metric-number">{total.toLocaleString()}</span>
-                                        <span className="text-sm text-gray-500 font-medium">{kpi.unit_of_measurement}</span>
-                                    </div>
-                                </div>
-                            )
-                        })}
-                    </div>
-                )}
-            </div>
+ {filteredKpis.map((kpi) => {
+ const total = kpiTotals[kpi.id!] || 0
+ return kpi.id && (
+ <div
+ key={kpi.id}
+ onClick={() => kpi.id && onToggleKPIExpansion(kpi.id)}
+ className="mobile-metric-card-clean"
+ >
+ <div className="flex items-start justify-between mb-2">
+ <h3 className="mobile-metric-title flex-1">{kpi.title}</h3>
+ <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full ml-2">
+ {kpi.category}
+ </span>
+ </div>
+ <div className="flex items-baseline gap-1 mb-1">
+ <span className="mobile-metric-number">{total.toLocaleString()}</span>
+ <span className="text-sm text-gray-500 font-medium">{kpi.unit_of_measurement}</span>
+ </div>
+ </div>
+ )
+ })}
+ </div>
+ )}
+ </div>
 
-            {/* Desktop: Original Complex View */}
-            <div className="hidden md:block h-full w-full px-4 sm:px-6 py-6 space-y-6 overflow-y-auto mobile-content-padding">
-                {kpis.length === 0 ? (
-                    /* Empty State - Only show Add Metric button */
-                    <div className="flex items-center justify-center min-h-[60vh]">
-                        <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-12 text-center max-w-lg mx-auto">
-                            <div className="icon-bubble mx-auto mb-4">
-                                <BarChart3 className="w-6 h-6 text-primary-500" />
-                            </div>
-                            <h3 className="text-lg font-semibold text-gray-800 mb-2">No Metrics Yet</h3>
-                            <p className="text-gray-500 mb-6">Create your first metric to start tracking your initiative's impact</p>
-                            {onAddKPI && (
-                                <button
-                                    onClick={onAddKPI}
-                                    className="inline-flex items-center space-x-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl text-sm font-medium transition-all duration-200 shadow-bubble-sm"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    <span>Add Metric</span>
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                ) : (
-                    /* Metrics Section */
-                    <div className="space-y-6">
-                        {/* Metrics Section */}
-                        <div className="bg-white rounded-2xl shadow-bubble border border-gray-100 p-6">
-                            <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between mb-6 space-y-3 xl:space-y-0">
-                                <div className="space-y-1">
-                                    <h2 className="text-xl font-semibold text-gray-800">
-                                        Performance Metrics
-                                    </h2>
-                                    <p className="text-gray-500 text-sm">Track and measure your initiative's impact across all metrics</p>
-                                </div>
+ {/* Desktop: Original Complex View */}
+ <div className="hidden md:block h-full w-full px-4 sm:px-6 py-6 space-y-6 overflow-y-auto mobile-content-padding">
+ {kpis.length === 0 ? (
+ /* Empty State - Only show Add Metric button */
+ <div className="flex items-center justify-center min-h-[60vh]">
+ <div className="app-card p-12 max-w-lg mx-auto w-full">
+ <EmptyState
+ icon={BarChart3}
+ title="No Metrics Yet"
+ description="Create your first metric to start tracking your initiative's impact"
+ action={onAddKPI ? (
+ <button type="button" onClick={onAddKPI} className="app-btn app-btn-primary">
+ <Plus className="w-4 h-4" />
+ <span>Add Metric</span>
+ </button>
+ ) : undefined}
+ />
+ </div>
+ </div>
+ ) : (
+ /* Metrics Section */
+ <div className="space-y-6">
+ {/* Metrics Section */}
+ <div className="app-card p-6">
+ <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between mb-6 space-y-3 xl:space-y-0">
+ <div className="space-y-1">
+ <h2 className="text-xl font-semibold text-gray-800">
+ Performance Metrics
+ </h2>
+ <p className="text-gray-500 text-sm">Track and measure your initiative's impact across all metrics</p>
+ </div>
 
-                                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-                                    {/* Category Filter */}
-                                    <div className="flex bg-gray-50 rounded-2xl p-1 border border-gray-100">
-                                        <button
-                                            onClick={() => setCategoryFilter('all')}
-                                            className={`px-4 py-2 text-xs rounded-xl font-medium transition-all duration-200 ${categoryFilter === 'all'
-                                                ? 'bg-white text-gray-800 shadow-bubble-sm'
-                                                : 'text-gray-500 hover:text-gray-700'
-                                                }`}
-                                        >
-                                            All
-                                        </button>
-                                        <button
-                                            onClick={() => setCategoryFilter('input')}
-                                            className={`px-4 py-2 text-xs rounded-xl font-medium transition-all duration-200 ${categoryFilter === 'input'
-                                                ? 'bg-white text-gray-800 shadow-bubble-sm'
-                                                : 'text-gray-500 hover:text-gray-700'
-                                                }`}
-                                        >
-                                            Inputs
-                                        </button>
-                                        <button
-                                            onClick={() => setCategoryFilter('output')}
-                                            className={`px-4 py-2 text-xs rounded-xl font-medium transition-all duration-200 ${categoryFilter === 'output'
-                                                ? 'bg-white text-gray-800 shadow-bubble-sm'
-                                                : 'text-gray-500 hover:text-gray-700'
-                                                }`}
-                                        >
-                                            Outputs
-                                        </button>
-                                        <button
-                                            onClick={() => setCategoryFilter('impact')}
-                                            className={`px-4 py-2 text-xs rounded-xl font-medium transition-all duration-200 ${categoryFilter === 'impact'
-                                                ? 'bg-white text-gray-800 shadow-bubble-sm'
-                                                : 'text-gray-500 hover:text-gray-700'
-                                                }`}
-                                        >
-                                            Impacts
-                                        </button>
-                                    </div>
+ <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
+ {/* Category Filter */}
+ <div className="flex bg-gray-50 rounded-xl p-1 border border-gray-100">
+ <button
+ onClick={() => setCategoryFilter('all')}
+ className={`px-4 py-2 text-xs rounded-xl font-medium transition-all duration-200 ${categoryFilter === 'all'
+ ? 'bg-white text-gray-800 '
+ : 'text-gray-500 hover:text-gray-700'
+ }`}
+ >
+ All
+ </button>
+ <button
+ onClick={() => setCategoryFilter('input')}
+ className={`px-4 py-2 text-xs rounded-xl font-medium transition-all duration-200 ${categoryFilter === 'input'
+ ? 'bg-white text-gray-800 '
+ : 'text-gray-500 hover:text-gray-700'
+ }`}
+ >
+ Inputs
+ </button>
+ <button
+ onClick={() => setCategoryFilter('output')}
+ className={`px-4 py-2 text-xs rounded-xl font-medium transition-all duration-200 ${categoryFilter === 'output'
+ ? 'bg-white text-gray-800 '
+ : 'text-gray-500 hover:text-gray-700'
+ }`}
+ >
+ Outputs
+ </button>
+ <button
+ onClick={() => setCategoryFilter('impact')}
+ className={`px-4 py-2 text-xs rounded-xl font-medium transition-all duration-200 ${categoryFilter === 'impact'
+ ? 'bg-white text-gray-800 '
+ : 'text-gray-500 hover:text-gray-700'
+ }`}
+ >
+ Impacts
+ </button>
+ </div>
 
-                                    {onAddKPI && (
-                                        <button
-                                            onClick={onAddKPI}
-                                            className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl text-sm font-medium transition-all duration-200 shadow-bubble-sm"
-                                        >
-                                            <Plus className="w-4 h-4" />
-                                            <span>Add Metric</span>
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
+ {onAddKPI && (
+ <button
+ type="button"
+ onClick={onAddKPI}
+ className="app-btn app-btn-primary app-btn-sm"
+ >
+ <Plus className="w-4 h-4" />
+ <span>Add Metric</span>
+ </button>
+ )}
+ </div>
+ </div>
 
-                            {/* Metrics Cards */}
-                            {filteredKpis.length === 0 ? (
-                                <div className="text-center py-12">
-                                    <div className="icon-bubble mx-auto mb-4">
-                                        <Target className="w-6 h-6 text-gray-400" />
-                                    </div>
-                                    <h3 className="text-lg font-semibold text-gray-800 mb-2">No Metrics Found</h3>
-                                    <p className="text-gray-500 text-sm max-w-md mx-auto">
-                                        {categoryFilter === 'all'
-                                            ? 'Create your first metric to start tracking your initiative\'s performance and impact.'
-                                            : `No ${categoryFilter} metrics found. Try a different filter or create a new metric.`
-                                        }
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    {filteredKpis.map((kpi) => {
-                                        const kpiIndex = getOrderedIndex(kpi.id!)
-                                        return kpi.id && (
-                                            <ExpandableKPICard
-                                                key={kpi.id}
-                                                kpi={kpi}
-                                                kpiTotal={kpiTotals[kpi.id] || 0}
-                                                isExpanded={expandedKPIs.has(kpi.id)}
-                                                onToggleExpand={() => kpi.id && onToggleKPIExpansion(kpi.id)}
-                                                onAddUpdate={() => onAddUpdate(kpi)}
-                                                onAddEvidence={onAddEvidence ? () => onAddEvidence(kpi) : undefined}
-                                                onEdit={onEditKPI ? () => onEditKPI(kpi) : undefined}
-                                                onDelete={onDeleteKPI ? () => onDeleteKPI(kpi) : undefined}
-                                                kpiUpdates={allKPIUpdates.filter(update => update.kpi_id === kpi.id)}
-                                                initiativeId={initiativeId || initiative.id || ''}
-                                                onRefresh={onRefresh}
-                                                metricColor={getMetricColor(kpiIndex)}
-                                            />
-                                        )
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>
-    )
+ {/* Metrics Cards */}
+ {filteredKpis.length === 0 ? (
+ <EmptyState
+ icon={Target}
+ title="No Metrics Found"
+ description={
+ categoryFilter === 'all'
+ ? "Create your first metric to start tracking your initiative's performance and impact."
+ : `No ${categoryFilter} metrics found. Try a different filter or create a new metric.`
+ }
+ />
+ ) : (
+ <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+ {filteredKpis.map((kpi) => {
+ const kpiIndex = getOrderedIndex(kpi.id!)
+ return kpi.id && (
+ <ExpandableKPICard
+ key={kpi.id}
+ kpi={kpi}
+ kpiTotal={kpiTotals[kpi.id] || 0}
+ isExpanded={expandedKPIs.has(kpi.id)}
+ onToggleExpand={() => kpi.id && onToggleKPIExpansion(kpi.id)}
+ onAddUpdate={() => onAddUpdate(kpi)}
+ onAddEvidence={onAddEvidence ? () => onAddEvidence(kpi) : undefined}
+ onEdit={onEditKPI ? () => onEditKPI(kpi) : undefined}
+ onDelete={onDeleteKPI ? () => onDeleteKPI(kpi) : undefined}
+ kpiUpdates={allKPIUpdates.filter(update => update.kpi_id === kpi.id)}
+ initiativeId={initiativeId || initiative.id || ''}
+ onRefresh={onRefresh}
+ metricColor={getMetricColor(kpiIndex)}
+ />
+ )
+ })}
+ </div>
+ )}
+ </div>
+ </div>
+ )}
+ </div>
+ </div>
+ )
 }
