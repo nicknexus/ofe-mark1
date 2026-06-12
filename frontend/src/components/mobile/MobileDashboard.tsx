@@ -135,7 +135,7 @@ export default function MobileDashboard({
  {initiatives.length === 0 ? (
  <EmptyState
  className="app-card"
- title={isSharedMember ? 'No Initiatives Yet' : 'Welcome to Nexus'}
+ title={isSharedMember ? 'No Initiatives Yet' : 'Welcome to Nexus Impacts AI'}
  description={
  isSharedMember
  ? `Your organization doesn't have any initiatives yet. Tap "New Initiative" above to add one.`

@@ -94,7 +94,9 @@ export default function PublicImpactClaimPage() {
 
     const hasDateRange = claim.date_range_start && claim.date_range_end
     const displayDate = hasDateRange
-        ? `${formatDate(claim.date_range_start!, { month: 'short', day: 'numeric' })} - ${formatDate(claim.date_range_end!)}`
+        ? claim.date_range_start === claim.date_range_end
+            ? formatDate(claim.date_range_start!, { month: 'long', day: 'numeric', year: 'numeric' })
+            : `${formatDate(claim.date_range_start!, { month: 'short', day: 'numeric', year: 'numeric' })} - ${formatDate(claim.date_range_end!)}`
         : formatDate(claim.date_represented, { month: 'long', day: 'numeric', year: 'numeric' })
 
     const locationIcon = L.divIcon({

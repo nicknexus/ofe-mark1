@@ -33,11 +33,11 @@ import AllLocationsModal from './AllLocationsModal'
 import DateRangePicker from './DateRangePicker'
 import { apiService } from '../services/api'
 import { Location, BeneficiaryGroup, User, Organization } from '../types'
-import { AuthService } from '../services/auth'
 import { getCategoryColor, getLocalDateString, formatDate } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import { notify } from '../lib/notify'
 import { SortableMetricCard } from './metricsDashboard/SortableMetricCard'
+import { UserProfileMenu } from './ui/UserProfileMenu'
 import { getKPIColor } from './metricsDashboard/metricColorPalette'
 import { filterDashboardKpiUpdates, computeFilteredTotals } from './metricsDashboard/filterDashboardKpiUpdates'
 import { generateMetricsDashboardChartData } from './metricsDashboard/generateMetricsDashboardChartData'
@@ -191,32 +191,6 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
  const [beneficiaryDropdownPosition, setBeneficiaryDropdownPosition] = useState({ top: 0, left: 0 })
  const [tagDropdownPosition, setTagDropdownPosition] = useState({ top: 0, left: 0 })
  const [metricsDropdownPosition, setMetricsDropdownPosition] = useState({ top: 0, left: 0 })
- const [userMenuOpen, setUserMenuOpen] = useState(false)
- const userMenuRef = useRef<HTMLDivElement>(null)
-
- // Close user menu when clicking outside
- useEffect(() => {
- const handleClickOutside = (event: MouseEvent) => {
- if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
- setUserMenuOpen(false)
- }
- }
- if (userMenuOpen) {
- document.addEventListener('mousedown', handleClickOutside)
- }
- return () => {
- document.removeEventListener('mousedown', handleClickOutside)
- }
- }, [userMenuOpen])
-
- const handleSignOut = async () => {
- try {
- await AuthService.signOut()
- notify.success('Signed out successfully')
- } catch (error) {
- notify.error('Failed to sign out')
- }
- }
 
  // Load locations
  useEffect(() => {
@@ -776,39 +750,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
  )}
  {/* User Profile with Organization and Dropdown */}
  {user && (
- <div className="hidden md:block relative" ref={userMenuRef}>
- <button
- onClick={() => setUserMenuOpen(!userMenuOpen)}
- className="flex items-center gap-2 px-3 h-10 app-card-flat hover:bg-gray-50 rounded-full transition-all duration-200 min-w-[180px]"
- >
- <div className="flex flex-col items-start flex-1 min-w-0 justify-center">
- <span className="text-xs font-medium text-gray-900 truncate w-full leading-tight">
- {user.name || user.email}
- </span>
- {organization && (
- <span className="text-xs text-gray-500 truncate w-full leading-tight">
- {organization.name}
- </span>
- )}
- </div>
- <ChevronDown className={`w-3 h-3 text-gray-500 flex-shrink-0 transition-transform duration-200 ${userMenuOpen ? 'rotate-180' : ''}`} />
- </button>
-
- {/* Dropdown Menu */}
- {userMenuOpen && (
- <div className="absolute right-0 mt-2 w-48 app-card-lg border border-gray-200 overflow-hidden z-50">
- <button
- onClick={() => {
- handleSignOut()
- setUserMenuOpen(false)
- }}
- className="w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
- >
- Sign Out
- </button>
- </div>
- )}
- </div>
+ <UserProfileMenu user={user} organizationName={organization?.name} />
  )}
  </div>
  </div>

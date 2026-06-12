@@ -26,6 +26,7 @@ import { generateMetricSlug } from './metricColors'
 import { EmptyState, LoadingState } from './PublicInitiativeTabStates'
 import {
     PUBLIC_PANEL_STATIC_CLASS,
+    PUBLIC_PRIMARY_BUTTON_CLASS,
     PUBLIC_SECTION_CHIP_STYLE,
     brandIconStyle,
     DEFAULT_PUBLIC_BRAND,
@@ -441,10 +442,11 @@ export function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', ta
 
             {/* Load More */}
             {hasMore && (
-                <div className="text-center mt-6">
+                <div className="text-center mt-8 pb-2">
                     <button
+                        type="button"
                         onClick={() => setDisplayCount(prev => prev + 8)}
-                        className="inline-flex items-center gap-2 px-6 py-3 bg-accent/10 text-accent rounded-xl hover:bg-accent/20 transition-colors font-medium border border-accent/20 hover:border-accent"
+                        className={PUBLIC_PRIMARY_BUTTON_CLASS}
                     >
                         <ChevronDown className="w-4 h-4" />
                         Load More ({filteredEvidence.length - displayCount} remaining)

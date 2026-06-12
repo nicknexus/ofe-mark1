@@ -1,9 +1,9 @@
 import React from 'react'
 import { cn } from '../../lib/utils'
 
-/** Brand spinner. Size via className (e.g. w-7 h-7). */
+/** Simple circle spinner. Size via className (e.g. w-7 h-7). Style: index.css `.app-spinner`. */
 export function Spinner({ className }: { className?: string }) {
- return <div className={cn('animate-spin rounded-full border-2 border-gray-200 border-t-primary-500', className)} />
+ return <div className={cn('app-spinner', className)} role="status" aria-label="Loading" />
 }
 
 /**

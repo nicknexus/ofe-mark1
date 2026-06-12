@@ -19,6 +19,7 @@ import { apiService } from '../services/api'
 import { useTeam } from '../context/TeamContext'
 import { User, Organization } from '../types'
 import { notify } from '../lib/notify'
+import { UserProfileMenu } from './ui/UserProfileMenu'
 
 interface LayoutProps {
  user: User
@@ -29,10 +30,8 @@ export default function Layout({ user, children }: LayoutProps) {
  const location = useLocation()
  const navigate = useNavigate()
  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
- const [userMenuOpen, setUserMenuOpen] = useState(false)
  const [orgMenuOpen, setOrgMenuOpen] = useState(false)
  const [organization, setOrganization] = useState<Organization | null>(null)
- const userMenuRef = useRef<HTMLDivElement>(null)
  const orgMenuRef = useRef<HTMLDivElement>(null)
 
  const {
@@ -75,21 +74,6 @@ export default function Layout({ user, children }: LayoutProps) {
  document.removeEventListener('mousedown', handleClickOutside)
  }
  }, [orgMenuOpen])
-
- // Close user menu when clicking outside
- useEffect(() => {
- const handleClickOutside = (event: MouseEvent) => {
- if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
- setUserMenuOpen(false)
- }
- }
- if (userMenuOpen) {
- document.addEventListener('mousedown', handleClickOutside)
- }
- return () => {
- document.removeEventListener('mousedown', handleClickOutside)
- }
- }, [userMenuOpen])
 
  const handleSignOut = async () => {
  try {
@@ -327,46 +311,10 @@ export default function Layout({ user, children }: LayoutProps) {
  </Link>
 
  {/* User Profile with Organization and Dropdown */}
- <div className="hidden md:block relative" ref={userMenuRef}>
- <button
- onClick={() => setUserMenuOpen(!userMenuOpen)}
- className="flex items-center gap-2 px-3 h-10 app-btn app-btn-secondary rounded-full min-w-[180px]"
- >
- <div className="flex flex-col items-start flex-1 min-w-0 justify-center">
- <span className="text-xs font-medium text-secondary-900 truncate w-full leading-tight">
- {user.name || user.email}
- </span>
- {(activeOrganization || organization) && (
- <span className="text-xs text-gray-500 truncate w-full leading-tight">
- {activeOrganization?.name || organization?.name}
- </span>
- )}
- </div>
- <ChevronDown className={`w-3 h-3 text-gray-500 flex-shrink-0 transition-transform duration-200 ${userMenuOpen ? 'rotate-180' : ''}`} />
- </button>
-
- {/* Dropdown Menu */}
- {userMenuOpen && (
- <div className="absolute right-0 mt-2 w-48 app-card overflow-hidden z-50">
- <Link
- to="/account"
- onClick={() => setUserMenuOpen(false)}
- className="block w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left border-b border-gray-100"
- >
- Account Settings
- </Link>
- <button
- onClick={() => {
- handleSignOut()
- setUserMenuOpen(false)
- }}
- className="w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
- >
- Sign Out
- </button>
- </div>
- )}
- </div>
+ <UserProfileMenu
+ user={user}
+ organizationName={activeOrganization?.name || organization?.name}
+ />
 
  {/* Mobile menu button */}
  <div className="lg:hidden">

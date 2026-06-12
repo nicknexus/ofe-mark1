@@ -100,6 +100,18 @@ export const PUBLIC_NEUTRAL_CHIP_CLASS =
 export const PUBLIC_COUNT_PILL_CLASS =
     'inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold'
 
+/**
+ * High-contrast primary action button for public pages.
+ * Use for load-more CTAs, gallery actions, and other prominent taps — not
+ * `bg-accent/10 text-accent`, which is low-contrast outside `.landing-page`.
+ */
+export const PUBLIC_PRIMARY_BUTTON_CLASS =
+    'inline-flex items-center justify-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-xl hover:bg-gray-700 transition-colors font-semibold shadow-public hover:shadow-public-hover'
+
+/** Compact primary button for toolbars and inline actions. */
+export const PUBLIC_PRIMARY_BUTTON_SM_CLASS =
+    'inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors text-xs font-medium flex-shrink-0'
+
 /** Brand-tinted count / status badge sitting next to a section title. */
 export function publicCountBadgeStyle(brandColor: string): React.CSSProperties {
     return {

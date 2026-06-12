@@ -756,9 +756,9 @@ export default function Dashboard() {
  <div className={`col-span-1 ${showOwnerWidgets ? 'lg:col-span-2' : 'lg:col-span-2'} app-card-interactive overflow-hidden flex flex-col min-h-0`}>
  {/* Team Member Banner */}
  {isSharedMember && organizationName && (
-<div className="px-6 py-3 bg-primary-50 border-b border-primary-100 flex items-center gap-2">
-<Users className="w-4 h-4 text-primary-600" />
-<span className="text-sm text-primary-800">
+<div className="px-6 py-3 bg-purple-50 border-b border-purple-100 flex items-center gap-2">
+<Users className="w-4 h-4 text-purple-600" />
+<span className="text-sm text-purple-800">
  You're viewing <strong>{organizationName}</strong>'s initiatives as a team member
  </span>
  </div>
@@ -801,7 +801,7 @@ export default function Dashboard() {
  <img src="/Nexuslogo.png" alt="Nexus Logo" className="w-6 h-6 object-contain" />
  </div>
  <h3 className="text-lg font-semibold text-gray-800 mb-2">
- {isSharedMember ? 'No Initiatives Yet' : 'Welcome to OFE'}
+ {isSharedMember ? 'No Initiatives Yet' : 'Welcome to Nexus Impacts AI'}
  </h3>
  <p className="text-gray-500 mb-6 max-w-md mx-auto text-sm">
  {isSharedMember

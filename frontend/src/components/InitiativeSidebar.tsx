@@ -125,7 +125,7 @@ export default function InitiativeSidebar({
  <div className="relative" ref={settingsRef}>
  <button
  onClick={() => setSettingsOpen(!settingsOpen)}
- className="relative w-9 h-9 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition-colors"
+ className="relative app-btn app-btn-icon app-btn-secondary rounded-lg"
  title={hasOwnOrganization && !ownedOrganization?.is_public ? "Settings - Organization not public" : "Settings"}
  >
  <Settings className="w-4 h-4 text-gray-500" />
@@ -136,13 +136,13 @@ export default function InitiativeSidebar({
 
  {/* Dropdown Menu */}
  {settingsOpen && (
- <div className="absolute bottom-full right-0 mb-2 w-40 app-card-elevated overflow-hidden">
+ <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-44 app-card overflow-hidden z-50 p-1.5">
  <button
  onClick={() => {
  navigate('/account')
  setSettingsOpen(false)
  }}
- className="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+ className="app-btn app-btn-ghost w-full justify-start app-btn-sm h-auto py-2.5"
  >
  <UserIcon className="w-4 h-4" />
  <span>Account</span>
@@ -152,7 +152,7 @@ export default function InitiativeSidebar({
  onSignOut()
  setSettingsOpen(false)
  }}
- className="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-t border-gray-100"
+ className="app-btn app-btn-secondary w-full app-btn-sm mt-1"
  >
  <LogOut className="w-4 h-4" />
  <span>Sign Out</span>
