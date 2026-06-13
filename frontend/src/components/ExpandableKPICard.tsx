@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useTeam } from '../context/TeamContext'
 import {
@@ -133,6 +133,7 @@ export default function ExpandableKPICard({
  const [editingDataPoint, setEditingDataPoint] = useState<any>(null)
  const [evidence, setEvidence] = useState<any[]>([])
  const [allTags, setAllTags] = useState<MetricTag[]>([])
+ const [loadingTags, setLoadingTags] = useState(true)
  const [showDescription, setShowDescription] = useState(false)
  const [loadingEvidence, setLoadingEvidence] = useState(false)
  const [updateLocations, setUpdateLocations] = useState<Record<string, any>>({})
@@ -147,6 +148,25 @@ export default function ExpandableKPICard({
  const [filterBeneficiaryGroups, setFilterBeneficiaryGroups] = useState<string[]>([])
  const [filterAllLocations, setFilterAllLocations] = useState<Location[]>([])
  const [filterAllBeneficiaryGroups, setFilterAllBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
+
+ // Track newly-added claim IDs so we can animate them in
+ const prevUpdateIdsRef = useRef<Set<string>>(new Set())
+ const [newClaimIds, setNewClaimIds] = useState<Set<string>>(new Set())
+
+ useEffect(() => {
+ const currentIds = new Set(kpiUpdates.map((u: any) => u.id as string))
+ if (prevUpdateIdsRef.current.size === 0) {
+ prevUpdateIdsRef.current = currentIds
+ return
+ }
+ const added = [...currentIds].filter(id => !prevUpdateIdsRef.current.has(id))
+ prevUpdateIdsRef.current = currentIds
+ if (added.length === 0) return
+ const fresh = new Set(added)
+ setNewClaimIds(fresh)
+ const t = setTimeout(() => setNewClaimIds(new Set()), 800)
+ return () => clearTimeout(t)
+ }, [kpiUpdates])
 
  useEffect(() => {
  if (!isExpanded || !initiativeId) return
@@ -215,7 +235,9 @@ export default function ExpandableKPICard({
  }, [kpi.id, initiativeId, kpiUpdates.length])
 
  useEffect(() => {
- apiService.getMetricTags().then(setAllTags).catch(() => setAllTags([]))
+ apiService.getMetricTags()
+ .then((tags) => { setAllTags(tags); setLoadingTags(false) })
+ .catch(() => { setAllTags([]); setLoadingTags(false) })
  }, [])
 
  // Load update locations when expanded
@@ -672,34 +694,41 @@ export default function ExpandableKPICard({
  </div>
  <div className="flex-1 overflow-y-auto space-y-1 pr-1 min-h-0">
  {[...filteredKpiUpdates].sort(compareClaimsByEffectiveDateDesc).map((update, index) => (
- <div key={update.id || index} className="app-card-interactive cursor-pointer p-2" onClick={() => handleDataPointClick(update)}>
+ <div key={update.id || index} className={`app-card-interactive cursor-pointer p-2${newClaimIds.has(update.id) ? ' animate-claim-pop' : ''}`} onClick={() => handleDataPointClick(update)}>
  <div className="flex items-center justify-between">
  <div className="min-w-0 flex-1">
  <span className="text-xs font-semibold text-primary-600">{update.value?.toLocaleString()}{isPercentageMetric ? '%' : (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '')}</span>
  <div className="flex items-center space-x-1.5 mt-0.5"><Calendar className="w-2.5 h-2.5 text-gray-400" /><span className="text-xs text-gray-500">{update.date_range_start && update.date_range_end ? `${formatDate(update.date_range_start)} - ${formatDate(update.date_range_end)}` : formatDate(update.date_represented)}</span></div>
  </div>
  <div className="flex items-center gap-1.5">
- {update.tag_id && allTags.length > 0 && (() => {
+ {update.tag_id && (
+ loadingTags
+ ? <span className="shimmer inline-block w-14 h-5 rounded-full flex-shrink-0" />
+ : (() => {
  const t = allTags.find(t => t.id === update.tag_id)
  return t ? <div onClick={(e) => e.stopPropagation()}><Link to={`/tags/${t.id}`} className="contents"><TagChip name={t.name} size="xs" /></Link></div> : null
- })()}
+ })()
+ )}
  {(() => {
  const supportPercentage = getClaimSupportPercentage(update)
  const evidenceCount = getClaimEvidenceCount(update)
  return (
  <>
+ {loadingEvidence ? (
+ <span className="shimmer inline-block w-20 h-5 rounded-md flex-shrink-0" />
+ ) : (
+ <>
  {supportPercentage > 0 && (
- <div className={`flex items-center justify-center px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap ${supportPercentage === 100
- ? 'bg-primary-100 text-primary-700'
- : 'bg-yellow-100 text-yellow-700'
- }`}>
+ <div className={`animate-coverage-reveal flex items-center justify-center px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap ${supportPercentage === 100 ? 'bg-primary-100 text-primary-700' : 'bg-yellow-100 text-yellow-700'}`}>
  <span>{evidenceCount} | {supportPercentage}% Coverage</span>
  </div>
  )}
- {supportPercentage === 0 && !loadingEvidence && (
- <div className="flex items-center justify-center px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap bg-red-100 text-red-700">
+ {supportPercentage === 0 && (
+ <div className="animate-coverage-reveal flex items-center justify-center px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap bg-red-100 text-red-700">
  <span>0 | 0% Coverage</span>
  </div>
+ )}
+ </>
  )}
  {canEditEvidence && (
  <button
@@ -1254,7 +1283,7 @@ export default function ExpandableKPICard({
  </div>
  <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
  {[...filteredKpiUpdates].sort(compareClaimsByEffectiveDateDesc).map((update, index) => (
- <div key={update.id || index} className="app-card-interactive cursor-pointer p-2.5" onClick={() => handleDataPointClick(update)}>
+ <div key={update.id || index} className={`app-card-interactive cursor-pointer p-2.5${newClaimIds.has(update.id) ? ' animate-claim-pop' : ''}`} onClick={() => handleDataPointClick(update)}>
  <div className="flex items-center justify-between">
  <div className="min-w-0 flex-1">
  <span className="text-sm font-semibold text-primary-600">{update.value?.toLocaleString()}{isPercentageMetric ? '%' : (kpi.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : '')}</span>
@@ -1264,27 +1293,34 @@ export default function ExpandableKPICard({
  </div>
  </div>
  <div className="flex items-center gap-2">
- {update.tag_id && allTags.length > 0 && (() => {
+ {update.tag_id && (
+ loadingTags
+ ? <span className="shimmer inline-block w-14 h-5 rounded-full flex-shrink-0" />
+ : (() => {
  const t = allTags.find(t => t.id === update.tag_id)
  return t ? <div onClick={(e) => e.stopPropagation()}><Link to={`/tags/${t.id}`} className="contents"><TagChip name={t.name} size="xs" /></Link></div> : null
- })()}
+ })()
+ )}
  {(() => {
  const supportPercentage = getClaimSupportPercentage(update)
  const evidenceCount = getClaimEvidenceCount(update)
  return (
  <>
+ {loadingEvidence ? (
+ <span className="shimmer inline-block w-24 h-[22px] rounded-lg flex-shrink-0" />
+ ) : (
+ <>
  {supportPercentage > 0 && (
- <div className={`flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${supportPercentage === 100
- ? 'bg-primary-100 text-primary-700'
- : 'bg-yellow-100 text-yellow-700'
- }`}>
+ <div className={`animate-coverage-reveal flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${supportPercentage === 100 ? 'bg-primary-100 text-primary-700' : 'bg-yellow-100 text-yellow-700'}`}>
  <span>{evidenceCount} | {supportPercentage}% Coverage</span>
  </div>
  )}
- {supportPercentage === 0 && !loadingEvidence && (
- <div className="flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-red-100 text-red-700">
+ {supportPercentage === 0 && (
+ <div className="animate-coverage-reveal flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-red-100 text-red-700">
  <span>0 | 0% Coverage</span>
  </div>
+ )}
+ </>
  )}
  {canEditEvidence && (
  <button
@@ -1688,7 +1724,7 @@ export default function ExpandableKPICard({
  return (
  <div
  key={update.id || index}
- className="app-card-interactive cursor-pointer p-2.5"
+ className={`app-card-interactive cursor-pointer p-2.5${newClaimIds.has(update.id) ? ' animate-claim-pop' : ''}`}
  onClick={() => handleDataPointClick(update)}
  >
  <div className="flex items-center justify-between">
@@ -1715,18 +1751,21 @@ export default function ExpandableKPICard({
  const evidenceCount = getClaimEvidenceCount(update)
  return (
  <>
+ {loadingEvidence ? (
+ <span className="shimmer inline-block w-24 h-[22px] rounded-lg flex-shrink-0" />
+ ) : (
+ <>
  {supportPercentage > 0 && (
- <div className={`flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${supportPercentage === 100
- ? 'bg-primary-100 text-primary-700'
- : 'bg-yellow-100 text-yellow-700'
- }`}>
+ <div className={`animate-coverage-reveal flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${supportPercentage === 100 ? 'bg-primary-100 text-primary-700' : 'bg-yellow-100 text-yellow-700'}`}>
  <span>{evidenceCount} | {supportPercentage}% Coverage</span>
  </div>
  )}
- {supportPercentage === 0 && !loadingEvidence && (
- <div className="flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-red-100 text-red-700">
+ {supportPercentage === 0 && (
+ <div className="animate-coverage-reveal flex items-center justify-center px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-red-100 text-red-700">
  <span>0 | 0% Coverage</span>
  </div>
+ )}
+ </>
  )}
  {canEditEvidence && (
  <button

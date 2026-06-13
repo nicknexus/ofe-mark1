@@ -17,3 +17,14 @@ export function isNewEvidenceUploadEnabled(): boolean {
  return true
  }
 }
+
+const ADVANCED_IMPACT_CLAIM_KILL_KEY = 'nexus-advanced-impact-claim-disabled'
+
+export function isAdvancedImpactClaimEnabled(): boolean {
+ if (typeof window === 'undefined') return true
+ try {
+ return window.localStorage.getItem(ADVANCED_IMPACT_CLAIM_KILL_KEY) !== '1'
+ } catch {
+ return true
+ }
+}

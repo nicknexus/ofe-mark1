@@ -27,6 +27,7 @@ import { AuthService } from '../services/auth'
 import CreateKPIModal from '../components/CreateKPIModal'
 import AddKPIUpdateModal from '../components/AddKPIUpdateModal'
 import AddKPIUpdateModalWithMetricSelection from '../components/AddKPIUpdateModalWithMetricSelection'
+import ImpactClaimUploadModal from '../components/impactClaims/ImpactClaimUploadModal'
 import EvidenceUploadModal from '../components/evidence/EvidenceUploadModal'
 import InitiativeCharts from '../components/InitiativeCharts'
 import BeneficiaryManager from '../components/BeneficiaryManager'
@@ -130,10 +131,10 @@ export default function InitiativePage() {
  }
  }, [kpiId, dashboard])
 
- const loadKPITotals = async (kpis: any[]) => {
+ const loadKPITotals = async (kpis: any[], clearFirst = true) => {
  if (!id || kpis.length === 0) {
  setKpiTotals({})
- setAllKPIUpdates([])
+ if (clearFirst) setAllKPIUpdates([])
  return
  }
 
@@ -202,6 +203,16 @@ export default function InitiativePage() {
  } finally {
  setIsLoadingDashboard(false)
  }
+ }
+
+ // Fast refresh after a claim submit: reload KPI updates immediately (no dashboard round-trip),
+ // then trigger a background dashboard reload for evidence % / totals.
+ const refreshAfterClaim = () => {
+ if (dashboard?.kpis) {
+ loadKPITotals(dashboard.kpis, false)
+ }
+ apiService.clearCache(`/initiatives/${id}/dashboard`)
+ if (!isLoadingDashboard) loadDashboard()
  }
 
  const handleCreateKPI = async (kpiData: CreateKPIForm) => {
@@ -292,15 +303,13 @@ export default function InitiativePage() {
  try {
  const newUpdate = await apiService.createKPIUpdate(selectedKPI.id, updateData)
  notify.success('Impact claim added successfully!')
-
- // Explicitly clear the dashboard cache to ensure fresh data
- apiService.clearCache(`/initiatives/${id}/dashboard`)
-
- // Only reload if not currently loading
- if (!isLoadingDashboard) {
- loadDashboard() // Refresh the dashboard
- }
-
+ // Inject immediately so the card shows the new claim without waiting for refresh
+ setAllKPIUpdates(prev => [...prev, {
+ ...newUpdate,
+ kpi_title: selectedKPI.title,
+ kpi_unit: selectedKPI.unit_of_measurement,
+ }])
+ refreshAfterClaim()
  } catch (error) {
  const message = error instanceof Error ? error.message : 'Failed to add impact claim'
  notify.error(message)
@@ -312,14 +321,13 @@ export default function InitiativePage() {
  try {
  const newUpdate = await apiService.createKPIUpdate(kpiId, updateData)
  notify.success('Impact claim added successfully!')
-
- // Explicitly clear the dashboard cache to ensure fresh data
- apiService.clearCache(`/initiatives/${id}/dashboard`)
-
- // Only reload if not currently loading
- if (!isLoadingDashboard) {
- loadDashboard() // Refresh the dashboard
- }
+ const kpi = dashboard?.kpis?.find((k: any) => k.id === kpiId)
+ setAllKPIUpdates(prev => [...prev, {
+ ...newUpdate,
+ kpi_title: kpi?.title,
+ kpi_unit: kpi?.unit_of_measurement,
+ }])
+ refreshAfterClaim()
  } catch (error) {
  const message = error instanceof Error ? error.message : 'Failed to add impact claim'
  notify.error(message)
@@ -609,32 +617,24 @@ export default function InitiativePage() {
  initiativeId={id!}
  />
 
- {selectedKPI && (
- <AddKPIUpdateModal
- isOpen={isUpdateModalOpen}
+ {/* Unified impact claim modal — covers both single-KPI and multi-KPI flows */}
+ <ImpactClaimUploadModal
+ isOpen={isUpdateModalOpen || isImpactClaimModalWithSelectionOpen}
  onClose={() => {
  setIsUpdateModalOpen(false)
+ setIsImpactClaimModalWithSelectionOpen(false)
  setSelectedKPI(null)
  }}
- onSubmit={handleAddKPIUpdate}
- kpiTitle={selectedKPI.title}
- kpiId={selectedKPI.id}
- metricType={selectedKPI.metric_type}
- unitOfMeasurement={selectedKPI.unit_of_measurement}
+ onCreated={(newUpdates) => {
+ if (newUpdates?.length) setAllKPIUpdates(prev => [...prev, ...newUpdates])
+ refreshAfterClaim()
+ }}
  initiativeId={id!}
- kpiTagIds={(selectedKPI as any).tag_ids || []}
+ preSelectedKPI={selectedKPI ?? undefined}
+ availableKPIs={dashboard?.kpis}
+ onSimpleSubmit={handleAddKPIUpdateWithMetricSelection}
+ onSimpleSubmitSingle={handleAddKPIUpdate}
  />
- )}
-
- {dashboard && (
- <AddKPIUpdateModalWithMetricSelection
- isOpen={isImpactClaimModalWithSelectionOpen}
- onClose={() => setIsImpactClaimModalWithSelectionOpen(false)}
- onSubmit={handleAddKPIUpdateWithMetricSelection}
- availableKPIs={dashboard.kpis}
- initiativeId={id!}
- />
- )}
 
  <EvidenceUploadModal
  isOpen={isEvidenceModalOpen}
