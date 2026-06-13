@@ -110,50 +110,37 @@ export default function ClaimBoard({
     setSubmitting(true)
     const total = allClaims.length
     setProgress({ done: 0, total })
-    const errors: string[] = []
-    const created: any[] = []
 
-    const CONCURRENCY = 5
-    for (let i = 0; i < allClaims.length; i += CONCURRENCY) {
-      const chunk = allClaims.slice(i, i + CONCURRENCY)
-      await Promise.all(
-        chunk.map(async (claim) => {
-          const col = state.columns.find((c) => c.id === claim.columnId)
-          try {
-            const result = await apiService.createKPIUpdate(claim.columnId, {
-              value: Number(claim.value),
-              date_represented: claim.date_represented,
-              date_range_start: claim.date_range_start,
-              date_range_end: claim.date_range_end,
-              label: claim.label,
-              note: claim.note || undefined,
-              location_id: claim.location_id || undefined,
-              beneficiary_group_ids: claim.beneficiary_group_ids,
-              tag_id: claim.tag_id,
-            })
-            created.push({
-              ...result,
-              kpi_title: col?.kpi.title,
-              kpi_unit: col?.kpi.unit_of_measurement,
-            })
-          } catch {
-            errors.push(claim.label || claim.id)
-          }
-          setProgress((p) => ({ ...p, done: p.done + 1 }))
-        })
-      )
-    }
+    // One batched request for the whole board. The backend authorizes once per
+    // KPI and bulk-inserts, so there's no per-claim HTTP round trip and no
+    // parallel burst of writes (which used to drop claims via ENOTFOUND).
+    const payload = allClaims.map((claim) => ({
+      kpi_id: claim.columnId,
+      value: Number(claim.value),
+      date_represented: claim.date_represented,
+      date_range_start: claim.date_range_start,
+      date_range_end: claim.date_range_end,
+      label: claim.label,
+      note: claim.note || undefined,
+      location_id: claim.location_id || undefined,
+      beneficiary_group_ids: claim.beneficiary_group_ids,
+      tag_id: claim.tag_id,
+    }))
 
-    setSubmitting(false)
-    const succeeded = total - errors.length
-    if (errors.length === 0) {
+    try {
+      const results = await apiService.createKPIUpdatesBatch(payload as any)
+      const created = results.map((r) => {
+        const col = state.columns.find((c) => c.id === r.kpi_id)
+        return { ...r, kpi_title: col?.kpi.title, kpi_unit: col?.kpi.unit_of_measurement }
+      })
+      setProgress({ done: total, total })
+      setSubmitting(false)
       notify.success(`${total} impact claim${total !== 1 ? 's' : ''} added!`)
       onCreated?.(created)
       onClose()
-    } else if (succeeded > 0) {
-      notify.error(`${succeeded} submitted, ${errors.length} failed. Retry the failed claims.`)
-    } else {
-      notify.error('All submissions failed. Please try again.')
+    } catch (err) {
+      setSubmitting(false)
+      notify.error((err as Error)?.message || 'Failed to add impact claims. Please try again.')
     }
   }
 
@@ -215,19 +202,16 @@ export default function ClaimBoard({
 
         {/* Submit bar */}
         <div className="flex-shrink-0 border-t border-gray-200 bg-white">
-          {/* Progress bar — only visible while submitting */}
-          <div className="h-1 bg-gray-100 overflow-hidden">
-            <div
-              className="h-full bg-primary-500 transition-all duration-300 ease-out"
-              style={{ width: submitting && progress.total > 0 ? `${(progress.done / progress.total) * 100}%` : '0%' }}
-            />
+          {/* Indeterminate progress bar — visible only while submitting */}
+          <div className="relative h-1 bg-gray-100 overflow-hidden">
+            {submitting && <div className="animate-indeterminate-bar bg-primary-500" />}
           </div>
           <div className="px-4 py-3 flex items-center justify-between gap-3">
             <div className="text-xs text-gray-500">
               {allClaims.length === 0 ? (
                 'Add a metric column to get started'
               ) : submitting ? (
-                `Submitting ${progress.done} of ${progress.total}…`
+                `Submitting ${progress.total} claim${progress.total !== 1 ? 's' : ''}…`
               ) : !allValid ? (
                 <span className="text-amber-600">
                   {invalidCount} claim{invalidCount !== 1 ? 's' : ''} still need info

@@ -103,6 +103,20 @@ router.post('/:id/updates', authenticateUser, async (req: AuthenticatedRequest, 
     }
 });
 
+// Batch-create many KPI updates in one request. Each item must carry its own
+// kpi_id. Authorizes once per KPI and bulk-inserts — far faster and more
+// reliable than firing one request per claim.
+router.post('/updates/batch', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const updates = Array.isArray(req.body?.updates) ? req.body.updates : req.body;
+        const created = await KPIService.addUpdatesBatch(updates, req.user!.id, requestedOrgId);
+        res.status(201).json(created);
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
 // Update a KPI update
 router.put('/updates/:updateId', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {

@@ -371,6 +371,149 @@ export class KPIService {
         return { ...data, tag_id: tag_id ?? null };
     }
 
+    /**
+     * Bulk-create many KPI updates in a single call.
+     *
+     * Why this exists: addUpdate() fans out to ~12-15 Supabase round trips per
+     * claim (auth, permission, org/location checks, insert, ben-group links,
+     * tag link, evidence auto-link). Submitting claims one-at-a-time from the
+     * client made that the dominant cost; firing them in parallel from the
+     * client caused a DNS/connection burst that intermittently dropped writes.
+     *
+     * This batches the expensive parts: auth + permission + org access run ONCE
+     * per distinct KPI, locations are validated once each, and rows / ben-group
+     * links / tag links are bulk-inserted in one query apiece. Evidence
+     * auto-linking reuses the proven per-row helper (cheap when the KPI has no
+     * evidence yet — the typical bulk-entry case).
+     *
+     * Note: not a single DB transaction. Validation happens before any insert,
+     * so a mid-batch failure is unlikely; on failure the caller surfaces an
+     * error and the user can retry.
+     */
+    static async addUpdatesBatch(
+        updates: KPIUpdate[],
+        userId: string,
+        requestedOrgId?: string
+    ): Promise<KPIUpdate[]> {
+        if (!Array.isArray(updates) || updates.length === 0) return [];
+
+        // Validate location is present on every claim up front.
+        for (const u of updates) {
+            if (!u.location_id || !String(u.location_id).trim()) {
+                throw new Error('Location is required for impact claims');
+            }
+            if (!u.kpi_id) {
+                throw new Error('kpi_id is required for every claim');
+            }
+        }
+
+        // Group claims by their parent KPI so auth/permission/org checks run once.
+        const byKpi = new Map<string, KPIUpdate[]>();
+        for (const u of updates) {
+            const arr = byKpi.get(u.kpi_id!) ?? [];
+            arr.push(u);
+            byKpi.set(u.kpi_id!, arr);
+        }
+
+        const results: KPIUpdate[] = [];
+
+        for (const [kpiId, group] of byKpi) {
+            // Authorize once per KPI.
+            const kpi = await this.getById(kpiId, userId, requestedOrgId);
+            if (!kpi) throw new Error('KPI not found or access denied');
+
+            await PermissionService.assert(userId, requestedOrgId, 'impact_claims', 'create', {
+                resourceId: kpiId,
+                initiativeId: kpi.initiative_id,
+            });
+
+            const { organizationId } = await OrgAccessService.assertInitiativeAccess(
+                kpi.initiative_id!,
+                userId,
+                requestedOrgId
+            );
+
+            // Validate each distinct location once (not per claim).
+            const uniqueLocationIds = [...new Set(group.map((g) => g.location_id!))];
+            for (const locId of uniqueLocationIds) {
+                await OrgAccessService.assertLocationInOrg(locId, organizationId, userId, requestedOrgId);
+            }
+
+            // Validate any tag_ids belong to this KPI (one query for the whole group).
+            const wantedTagIds = [...new Set(
+                group.map((g) => (g as any).tag_id).filter(Boolean)
+            )] as string[];
+            if (wantedTagIds.length > 0) {
+                const { data: kpiTags } = await supabase
+                    .from('kpi_metric_tags')
+                    .select('tag_id')
+                    .eq('kpi_id', kpiId);
+                const allowed = new Set((kpiTags || []).map((r: any) => r.tag_id));
+                for (const t of wantedTagIds) {
+                    if (!allowed.has(t)) throw new Error('Tag is not attached to the parent metric');
+                }
+            }
+
+            // Bulk insert all rows for this KPI. PostgREST returns RETURNING rows
+            // in input order for a multi-row insert, so index alignment is safe.
+            const insertRows = group.map((g) => {
+                const { beneficiary_group_ids, tag_id, ...rest } = (g as any);
+                return { ...rest, kpi_id: kpiId, user_id: userId };
+            });
+            const { data: inserted, error } = await supabase
+                .from('kpi_updates')
+                .insert(insertRows)
+                .select();
+            if (error) throw new Error(`Failed to add KPI updates: ${error.message}`);
+            const insertedRows = inserted || [];
+
+            // Bulk insert beneficiary-group links across the whole group.
+            const benLinks: any[] = [];
+            insertedRows.forEach((row: any, i: number) => {
+                const groups = (group[i] as any).beneficiary_group_ids;
+                if (Array.isArray(groups)) {
+                    for (const gid of groups) {
+                        benLinks.push({ kpi_update_id: row.id, beneficiary_group_id: gid, user_id: userId });
+                    }
+                }
+            });
+            if (benLinks.length > 0) {
+                const { error: benErr } = await supabase
+                    .from('kpi_update_beneficiary_groups')
+                    .insert(benLinks);
+                if (benErr) throw new Error(`Failed to link beneficiary groups: ${benErr.message}`);
+            }
+
+            // Bulk insert tag links (single tag per claim).
+            const tagLinks: any[] = [];
+            insertedRows.forEach((row: any, i: number) => {
+                const tagId = (group[i] as any).tag_id;
+                if (tagId) tagLinks.push({ kpi_update_id: row.id, tag_id: tagId });
+            });
+            if (tagLinks.length > 0) {
+                const { error: tagErr } = await supabase
+                    .from('kpi_update_metric_tags')
+                    .insert(tagLinks);
+                if (tagErr) throw new Error(`Failed to attach tags: ${tagErr.message}`);
+            }
+
+            // Auto-link evidence per row (ben-group + tag links already exist, so
+            // the matching gates inside see correct values). Cheap when the KPI
+            // has no evidence yet.
+            for (let i = 0; i < insertedRows.length; i++) {
+                const row: any = insertedRows[i];
+                await this.autoLinkEvidenceToUpdate(row, userId);
+                results.push({
+                    ...row,
+                    beneficiary_group_ids: (group[i] as any).beneficiary_group_ids || [],
+                    tag_id: (group[i] as any).tag_id ?? null,
+                });
+            }
+        }
+
+        return results;
+    }
+
     // Helper: Check if two date ranges overlap
     private static datesOverlap(
         date1Start: string,

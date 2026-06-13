@@ -41,6 +41,19 @@
   animation: claimPop 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Indeterminate progress bar — a segment sweeps across while work is in flight. */
+@keyframes indeterminateBar {
+  0%   { left: -40%; width: 40%; }
+  50%  { left: 30%;  width: 50%; }
+  100% { left: 100%; width: 40%; }
+}
+.animate-indeterminate-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  animation: indeterminateBar 1.1s ease-in-out infinite;
+}
+
 :root {
     --brand-primary: #c0dfa1;
     --brand-primary-dark: #90b171;

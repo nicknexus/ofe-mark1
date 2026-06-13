@@ -458,6 +458,17 @@ class ApiService {
  })
  }
 
+ // Bulk-create many claims in one request. Each item must include its kpi_id.
+ async createKPIUpdatesBatch(
+ updates: Array<CreateKPIUpdateForm & { kpi_id: string }>
+ ): Promise<KPIUpdate[]> {
+ const result = await this.request<KPIUpdate[]>(`/kpis/updates/batch`, {
+ method: 'POST',
+ body: JSON.stringify({ updates })
+ })
+ return result || []
+ }
+
  async updateKPIUpdate(updateId: string, data: Partial<CreateKPIUpdateForm>): Promise<KPIUpdate> {
  return this.request<KPIUpdate>(`/kpis/updates/${updateId}`, {
  method: 'PUT',
