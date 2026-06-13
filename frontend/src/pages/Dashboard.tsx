@@ -783,6 +783,15 @@ export default function Dashboard() {
  <span className="hidden sm:inline">Tutorial</span>
  </button>
  {canCreateInitiatives && (
+ <>
+ <button
+ onClick={() => navigate('/setup')}
+ className="app-btn app-btn-secondary app-btn-sm"
+ title="Guided setup"
+ >
+ <Sparkles className="w-4 h-4" />
+ <span className="hidden sm:inline">Guided setup</span>
+ </button>
  <button
  onClick={() => setShowCreateModal(true)}
  className="app-btn app-btn-primary app-btn-sm"
@@ -790,6 +799,7 @@ export default function Dashboard() {
  <Plus className="w-4 h-4" />
  {initiatives.length === 0 ? 'Get Started' : 'New Initiative'}
  </button>
+ </>
  )}
  </div>
  </div>
@@ -809,12 +819,21 @@ export default function Dashboard() {
  : 'Create your first initiative to start tracking impact.'}
  </p>
  {canCreateInitiatives && (
+ <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+ <button
+ onClick={() => navigate('/setup')}
+ className="app-btn app-btn-primary"
+ >
+ <Sparkles className="w-4 h-4" />
+ Start guided setup
+ </button>
  <button
  onClick={() => setShowCreateModal(true)}
- className="app-btn app-btn-primary"
+ className="app-btn app-btn-secondary"
  >
  Create Your First Initiative
  </button>
+ </div>
  )}
  </div>
  ) : (

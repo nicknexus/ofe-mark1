@@ -32,6 +32,7 @@ import AccountPage from './pages/AccountPage'
 import PublicOrganizationPage from './pages/PublicOrganizationPage'
 import PublicOrgContextPage from './pages/PublicOrgContextPage'
 import OrgContextPage from './pages/OrgContextPage'
+import SetupPage from './pages/SetupPage'
 import PublicInitiativePage from './pages/PublicInitiativePage'
 import PublicMetricPage from './pages/PublicMetricPage'
 import PublicStoryPage from './pages/PublicStoryPage'
@@ -687,6 +688,7 @@ function App() {
  <Layout user={user}>
  <Routes>
  <Route index element={<Dashboard />} />
+ <Route path="setup" element={<SetupPage />} />
  <Route path="initiatives/:id" element={<InitiativePage />} />
  <Route path="initiatives/:id/metrics/:kpiId" element={<InitiativePage />} />
  <Route path="tags" element={<AllTagsPage />} />
