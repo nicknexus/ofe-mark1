@@ -37,13 +37,9 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
  const completed = user.user_metadata?.has_completed_tutorial === true
  setHasCompletedTutorial(completed)
 
- if (!completed) {
- const timer = setTimeout(() => {
- setIsActive(true)
- setCurrentSlide(0)
- }, 1500)
- return () => clearTimeout(timer)
- }
+ // Auto-launch is intentionally disabled — the OnboardingWizard is now the
+ // first-run experience. This slide tour stays available as a manual
+ // "Replay concepts" via startTutorial() (dashboard Tutorial button).
  }
  } catch (error) {
  console.error('Error checking tutorial status:', error)

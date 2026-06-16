@@ -7,10 +7,12 @@ import { SubscriptionService } from './services/subscription'
 import { TeamService, PendingInviteCheck } from './services/team'
 import { User, SubscriptionStatus } from './types'
 import { TutorialProvider } from './context/TutorialContext'
+import { OnboardingProvider } from './context/OnboardingContext'
 import { StorageProvider } from './context/StorageContext'
 import { TeamProvider } from './context/TeamContext'
 import { UploadProvider } from './context/UploadContext'
 import InteractiveTutorial from './components/InteractiveTutorial'
+import OnboardingWizard from './components/onboarding/OnboardingWizard'
 import FloatingUploadPanel from './components/FloatingUploadPanel'
 import TrialBanner from './components/TrialBanner'
 import MobileApp from './components/MobileApp'
@@ -670,6 +672,7 @@ function App() {
  <StorageProvider>
  <TeamProvider>
  <TutorialProvider>
+ <OnboardingProvider>
  {showTrialBanner && (
  <TrialBanner
  remainingDays={subscriptionStatus.remainingTrialDays}
@@ -703,7 +706,9 @@ function App() {
  } />
  </Routes>
  <InteractiveTutorial />
+ <OnboardingWizard />
  {updateAvailable && <UpdateBanner onRefresh={refreshApp} onDismiss={dismissUpdate} />}
+ </OnboardingProvider>
  </TutorialProvider>
  </TeamProvider>
  </StorageProvider>

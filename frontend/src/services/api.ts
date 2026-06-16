@@ -20,6 +20,7 @@ import {
  DonorCredit,
  MetricTag
 } from '../types'
+import { OnboardingChatResponse, ChatStage, ChatContext } from '../components/onboarding/planTypes'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -1164,6 +1165,18 @@ class ApiService {
  return this.request<{ reportText: string }>('/reports/generate-report', {
  method: 'POST',
  body: JSON.stringify(data)
+ })
+ }
+
+ // Onboarding — WorldSee AI guided chat (one stage at a time)
+ async onboardingChat(
+ messages: { role: 'user' | 'assistant'; content: string }[],
+ stage: ChatStage,
+ context?: ChatContext
+ ): Promise<OnboardingChatResponse> {
+ return this.request<OnboardingChatResponse>('/onboarding/chat', {
+ method: 'POST',
+ body: JSON.stringify({ messages, stage, context })
  })
  }
 

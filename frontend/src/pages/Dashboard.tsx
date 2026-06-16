@@ -47,6 +47,7 @@ import ModalFrame from '../components/ModalFrame'
 import TagsWidget from '../components/MetricTags/TagsWidget'
 import { ExternalLink } from 'lucide-react'
 import { useTutorial } from '../context/TutorialContext'
+import { useOnboarding } from '../context/OnboardingContext'
 import { useTeam } from '../context/TeamContext'
 import { Button, PageLoader, InlineAlert, EmptyState } from '../components/ui'
 
@@ -354,6 +355,7 @@ function NextStepsCard({
 export default function Dashboard() {
  const navigate = useNavigate()
  const { startTutorial } = useTutorial()
+ const { startOnboarding } = useOnboarding()
  const {
  isOwner,
  isSharedMember,
@@ -464,6 +466,23 @@ export default function Dashboard() {
  return () => {
  window.removeEventListener('show-tutorial', handleShowTutorial)
  }
+ }, [])
+
+ // Refresh dashboard data when the onboarding wizard closes — entities it
+ // created (initiatives, locations, metrics) should appear without a manual
+ // reload. Mutations already busted the apiService cache, so this just
+ // re-pulls into component state.
+ useEffect(() => {
+ const handleOnboardingUpdated = () => {
+ apiService.clearCache()
+ loadingPromise.current = null
+ loadingPromise.current = loadAllData()
+ }
+ window.addEventListener('onboarding-updated', handleOnboardingUpdated)
+ return () => {
+ window.removeEventListener('onboarding-updated', handleOnboardingUpdated)
+ }
+ // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [])
 
  const loadAllData = async (): Promise<void> => {
@@ -774,6 +793,19 @@ export default function Dashboard() {
  </h2>
  </div>
  <div className="flex items-center gap-2">
+ <div className="relative">
+ <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide rounded-full bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] text-white leading-none whitespace-nowrap z-10 shadow-sm">
+ Beta
+ </span>
+ <button
+ onClick={startOnboarding}
+ className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200 flex items-center gap-1.5"
+ title="Guided setup"
+ >
+ <Sparkles className="w-4 h-4" />
+ <span className="hidden sm:inline">Setup</span>
+ </button>
+ </div>
  <button
  onClick={startTutorial}
  className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200 flex items-center gap-1.5"
