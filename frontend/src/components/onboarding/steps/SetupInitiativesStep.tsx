@@ -33,12 +33,12 @@ export default function SetupInitiativesStep({ draftApi }: Props) {
       <div>
         <StepHeader
           icon={BarChart3}
-          title="Set up your initiatives"
-          subtitle="Metrics, tags & groups"
+          headline="Metrics"
+          title="What are you tracking?"
+          description="Head back one step and create an initiative first — then you can add metrics here."
         />
         <div className="onboarding-empty max-w-2xl">
           <span className="onboarding-empty-icon"><BarChart3 className="w-5 h-5" /></span>
-          <p className="onboarding-empty-text">Head back one step and create an initiative first — then you can add metrics here.</p>
         </div>
       </div>
     )
@@ -50,8 +50,8 @@ export default function SetupInitiativesStep({ draftApi }: Props) {
     <div>
       <StepHeader
         icon={BarChart3}
-        title="Set up your initiatives"
-        subtitle="Metrics, tags & beneficiary groups"
+        headline="Metrics"
+        title="What are you tracking?"
         description="Choose the metrics you want to track in each initiative, add tags to break them into sub-metrics, and optionally define who benefits. You'll add your actual numbers and evidence once setup is done."
       />
 

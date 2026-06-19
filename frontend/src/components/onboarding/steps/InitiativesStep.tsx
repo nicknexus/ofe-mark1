@@ -53,8 +53,7 @@ export default function InitiativesStep({ draftApi }: Props) {
     <div>
       <StepHeader
         icon={Target}
-        title="Create your initiatives"
-        subtitle="Your projects & programs"
+        headline="Create Initiatives"
         description="Initiatives are how you organize your work — each one holds its own metrics, evidence, and reports. Create your first one here, then you'll add metrics in the next step. Create as many as you need."
       />
 

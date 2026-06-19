@@ -146,6 +146,20 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
  loadPermissionsForActiveOrg()
  }, [activeOrgId, loading, loadPermissionsForActiveOrg])
 
+ // Onboarding writes org fields (logo, brand color, website/donation URLs)
+ // straight to the DB. The accessible-orgs list is cached, so refresh it when
+ // onboarding signals a change — otherwise Account settings reads a stale
+ // snapshot and the new values appear missing.
+ useEffect(() => {
+ const onOnboardingUpdated = () => {
+ apiService.clearCache('/team/organizations')
+ apiService.clearCache('/organizations')
+ fetchData()
+ }
+ window.addEventListener('onboarding-updated', onOnboardingUpdated)
+ return () => window.removeEventListener('onboarding-updated', onOnboardingUpdated)
+ }, [fetchData])
+
  const switchOrganization = useCallback((orgId: string) => {
  const org = accessibleOrganizations.find(o => o.id === orgId)
  if (!org) return

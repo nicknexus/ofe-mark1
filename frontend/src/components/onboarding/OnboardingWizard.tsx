@@ -7,24 +7,39 @@ import { useTeam } from '../../context/TeamContext'
 import { useOnboardingDraft } from './useOnboardingDraft'
 import ModeChooserStep from './steps/ModeChooserStep'
 import ChatStep from './steps/ChatStep'
+import WelcomeStep from './steps/WelcomeStep'
 import CharityDescriptionStep from './steps/CharityDescriptionStep'
-import TheoryOfChangeStep from './steps/TheoryOfChangeStep'
+import BrandingStep from './steps/BrandingStep'
+import LinksStep from './steps/LinksStep'
+import InitiativeIntroStep from './steps/InitiativeIntroStep'
 import LocationsStep from './steps/LocationsStep'
 import InitiativesStep from './steps/InitiativesStep'
 import SetupInitiativesStep from './steps/SetupInitiativesStep'
 import ReviewStep from './steps/ReviewStep'
 import './onboarding.css'
 
-type Mode = 'choose' | 'manual' | 'chat'
+type Mode = 'choose' | 'welcome' | 'manual' | 'chat'
 
-const MANUAL_STEPS = [
-  { railLabel: 'About you' },
-  { railLabel: 'Theory of change' },
-  { railLabel: 'Locations' },
-  { railLabel: 'Initiatives' },
-  { railLabel: 'Metrics & groups' },
-  { railLabel: 'Review' },
+// Wordsee AI chat is built but hidden for now — launch straight into the manual
+// setup (welcome → steps). Flip to `true` to re-enable the mode chooser + chat
+// flow (all code for it is intact: ModeChooserStep, ChatStep, backend route).
+const CHAT_ENABLED = false
+const INITIAL_MODE: Mode = CHAT_ENABLED ? 'choose' : 'welcome'
+
+// Manual setup is split into two parts shown as sections in the rail.
+// `hideInRail` steps are interstitials (e.g. the Initiative setup intro) that
+// still participate in the step machine but aren't listed in the rail.
+const MANUAL_STEPS: { railLabel: string; section: string; hideInRail?: boolean }[] = [
+  { railLabel: 'About you', section: 'Account setup' },
+  { railLabel: 'Branding', section: 'Account setup' },
+  { railLabel: 'Links', section: 'Account setup' },
+  { railLabel: 'Overview', section: 'Initiative setup', hideInRail: true },
+  { railLabel: 'Locations', section: 'Initiative setup' },
+  { railLabel: 'Initiatives', section: 'Initiative setup' },
+  { railLabel: 'Metrics & groups', section: 'Initiative setup' },
+  { railLabel: 'Review', section: 'Initiative setup' },
 ]
+const SECTIONS = ['Account setup', 'Initiative setup']
 const LAST = MANUAL_STEPS.length - 1
 
 export default function OnboardingWizard() {
@@ -35,7 +50,7 @@ export default function OnboardingWizard() {
   const orgName = org?.name
   const draftApi = useOnboardingDraft()
 
-  const [mode, setMode] = useState<Mode>('choose')
+  const [mode, setMode] = useState<Mode>(INITIAL_MODE)
   const [step, setStep] = useState(0)
   const [dir, setDir] = useState(1)
 
@@ -57,13 +72,14 @@ export default function OnboardingWizard() {
   const back = () => { setDir(-1); setStep(s => Math.max(s - 1, 0)) }
   const goStep = (i: number) => { setDir(i > step ? 1 : -1); setStep(i) }
 
-  const goManual = () => { setDir(1); setMode('manual'); setStep(0) }
+  const goManual = () => { setDir(1); setMode('welcome'); setStep(0) }
+  const startSteps = () => { setDir(1); setMode('manual'); setStep(0) }
   const goChat = () => setMode('chat')
   const goChoose = () => { setDir(-1); setMode('choose') }
 
   const handleFinish = async () => {
     await completeOnboarding()
-    setMode('choose'); setStep(0)
+    setMode(INITIAL_MODE); setStep(0)
   }
 
   const handlePlanApplied = () => { setMode('manual'); setStep(LAST) }
@@ -74,11 +90,13 @@ export default function OnboardingWizard() {
   const renderManualStep = (i: number) => {
     switch (i) {
       case 0: return <CharityDescriptionStep orgId={orgId} draftApi={draftApi} />
-      case 1: return <TheoryOfChangeStep />
-      case 2: return <LocationsStep draftApi={draftApi} />
-      case 3: return <InitiativesStep draftApi={draftApi} />
-      case 4: return <SetupInitiativesStep draftApi={draftApi} />
-      case 5: return <ReviewStep draftApi={draftApi} onNavigate={pauseOnboarding} />
+      case 1: return <BrandingStep orgId={orgId} orgName={orgName} />
+      case 2: return <LinksStep orgId={orgId} />
+      case 3: return <InitiativeIntroStep />
+      case 4: return <LocationsStep draftApi={draftApi} />
+      case 5: return <InitiativesStep draftApi={draftApi} />
+      case 6: return <SetupInitiativesStep draftApi={draftApi} />
+      case 7: return <ReviewStep draftApi={draftApi} onNavigate={pauseOnboarding} />
       default: return null
     }
   }
@@ -110,33 +128,41 @@ export default function OnboardingWizard() {
               <img src="/Nexuslogo.png" alt="" className="w-5 h-5 object-contain" />
               <span className="onboarding-rail-brand-mark">Setup</span>
             </div>
-            <p className="onboarding-rail-title">Your progress</p>
-            <nav className="space-y-0.5 flex-1">
-              {MANUAL_STEPS.map((s, index) => {
-                const done = index < step
-                const current = index === step
-                return (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => goStep(index)}
-                    className={`onboarding-rail-item ${
-                      current ? 'onboarding-rail-item--current'
-                      : done ? 'onboarding-rail-item--done'
-                      : 'onboarding-rail-item--upcoming'
-                    }`}
-                  >
-                    <span className={`onboarding-rail-dot ${
-                      current ? 'onboarding-rail-dot--current'
-                      : done ? 'onboarding-rail-dot--done'
-                      : 'onboarding-rail-dot--upcoming'
-                    }`}>
-                      {done ? <Check className="w-3 h-3" /> : index + 1}
-                    </span>
-                    <span className="truncate">{s.railLabel}</span>
-                  </button>
-                )
-              })}
+            <nav className="space-y-4 flex-1">
+              {SECTIONS.map((section, si) => (
+                <div key={section}>
+                  <p className="onboarding-rail-title">
+                    <span className="onboarding-rail-section-num">{si + 1}</span>
+                    {section}
+                  </p>
+                  <div className="space-y-0.5">
+                    {MANUAL_STEPS.map((s, index) => {
+                      if (s.section !== section || s.hideInRail) return null
+                      const done = index < step
+                      const current = index === step
+                      return (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={() => goStep(index)}
+                          className={`onboarding-rail-item ${current ? 'onboarding-rail-item--current'
+                              : done ? 'onboarding-rail-item--done'
+                                : 'onboarding-rail-item--upcoming'
+                            }`}
+                        >
+                          <span className={`onboarding-rail-dot ${current ? 'onboarding-rail-dot--current'
+                              : done ? 'onboarding-rail-dot--done'
+                                : 'onboarding-rail-dot--upcoming'
+                            }`}>
+                            {done ? <Check className="w-3 h-3" /> : index + 1}
+                          </span>
+                          <span className="truncate">{s.railLabel}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
             </nav>
           </aside>
         )}
@@ -151,6 +177,8 @@ export default function OnboardingWizard() {
               onBackToOptions={goChoose}
               onSkip={completeOnboarding}
             />
+          ) : mode === 'welcome' ? (
+            <WelcomeStep orgName={orgName} onGetStarted={startSteps} onSkip={completeOnboarding} />
           ) : (
             <div className="onboarding-step-inner">
               <div className="onboarding-step-body">
@@ -179,9 +207,11 @@ export default function OnboardingWizard() {
         <nav className="onboarding-nav" aria-label="Setup navigation">
           <div>
             {step === 0 ? (
-              <button type="button" onClick={goChoose} className="app-btn app-btn-secondary app-btn-sm">
-                <ChevronLeft className="w-4 h-4" /> Options
-              </button>
+              CHAT_ENABLED ? (
+                <button type="button" onClick={goChoose} className="app-btn app-btn-secondary app-btn-sm">
+                  <ChevronLeft className="w-4 h-4" /> Options
+                </button>
+              ) : <div />
             ) : (
               <button type="button" onClick={back} className="app-btn app-btn-secondary app-btn-sm">
                 <ChevronLeft className="w-4 h-4" /> Back
