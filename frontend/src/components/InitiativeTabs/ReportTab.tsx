@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { FileText, Calendar, BarChart3, MapPin, Users, Sparkles, Download, X, ChevronLeft, ChevronRight, Check, BookOpen, Plus, Pencil, Save } from 'lucide-react'
+import { FileText, Calendar, BarChart3, MapPin, Users, Sparkles, Download, X, ChevronLeft, ChevronRight, Check, BookOpen, Plus, Pencil, Save, Tag } from 'lucide-react'
 import { SectionLoader, EmptyState, Spinner } from '../ui'
 import { apiService } from '../../services/api'
-import { KPI, Location, BeneficiaryGroup, Story, InitiativeDashboard } from '../../types'
+import { KPI, Location, BeneficiaryGroup, Story, InitiativeDashboard, MetricTag } from '../../types'
 import DateRangePicker from '../DateRangePicker'
 import { notify } from '../../lib/notify'
 import L from 'leaflet'
@@ -35,6 +35,12 @@ interface ReportData {
  unit_of_measurement: string
  total_value: number
  count: number
+ tag_ids?: string[]
+ }>
+ tags?: Array<{
+ id: string
+ name: string
+ color?: string | null
  }>
  locations: Array<{
  id: string
@@ -62,7 +68,7 @@ interface ReportData {
 }
 
 export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
- const { canExportReports } = useTeam()
+ const { canExportReports, activeOrganization } = useTeam()
  // Filter state
  const [dateRange, setDateRange] = useState<{
  singleDate?: string
@@ -72,11 +78,13 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  const [selectedKPIIds, setSelectedKPIIds] = useState<string[]>([])
  const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([])
  const [selectedBeneficiaryGroupIds, setSelectedBeneficiaryGroupIds] = useState<string[]>([])
+ const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
 
  // Data state
  const [kpis, setKPIs] = useState<KPI[]>([])
  const [locations, setLocations] = useState<Location[]>([])
  const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
+ const [metricTags, setMetricTags] = useState<MetricTag[]>([])
  const [reportData, setReportData] = useState<ReportData | null>(null)
  const [selectedStory, setSelectedStory] = useState<ReportData['stories'][0] | null>(null)
  const [reportText, setReportText] = useState<string | null>(null)
@@ -97,6 +105,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  const [showKPIPicker, setShowKPIPicker] = useState(false)
  const [showLocationPicker, setShowLocationPicker] = useState(false)
  const [showBeneficiaryPicker, setShowBeneficiaryPicker] = useState(false)
+ const [showTagPicker, setShowTagPicker] = useState(false)
  const [showDashboard, setShowDashboard] = useState(true)
  const [isEditingReport, setIsEditingReport] = useState(false)
  
@@ -116,6 +125,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  const kpiPickerRef = useRef<HTMLDivElement>(null)
  const locationPickerRef = useRef<HTMLDivElement>(null)
  const beneficiaryPickerRef = useRef<HTMLDivElement>(null)
+ const tagPickerRef = useRef<HTMLDivElement>(null)
 
  // Storage key for this initiative's report
  const storageKey = `report-${initiativeId}`
@@ -205,11 +215,13 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  Promise.all([
  apiService.getKPIs(initiativeId),
  apiService.getLocations(initiativeId),
- apiService.getBeneficiaryGroups(initiativeId)
- ]).then(([kpisData, locationsData, groupsData]) => {
+ apiService.getBeneficiaryGroups(initiativeId),
+ apiService.getMetricTags().catch(() => [])
+ ]).then(([kpisData, locationsData, groupsData, tagsData]) => {
  setKPIs(kpisData || [])
  setLocations(locationsData || [])
  setBeneficiaryGroups(groupsData || [])
+ setMetricTags(tagsData || [])
  }).catch(() => {
  notify.error('Failed to load filter options')
  })
@@ -227,6 +239,9 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  }
  if (beneficiaryPickerRef.current && !beneficiaryPickerRef.current.contains(event.target as Node)) {
  setShowBeneficiaryPicker(false)
+ }
+ if (tagPickerRef.current && !tagPickerRef.current.contains(event.target as Node)) {
+ setShowTagPicker(false)
  }
  }
 
@@ -257,7 +272,8 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  dateEnd,
  kpiIds: selectedKPIIds.length > 0 ? selectedKPIIds : undefined,
  locationIds: selectedLocationIds.length > 0 ? selectedLocationIds : undefined,
- beneficiaryGroupIds: selectedBeneficiaryGroupIds.length > 0 ? selectedBeneficiaryGroupIds : undefined
+ beneficiaryGroupIds: selectedBeneficiaryGroupIds.length > 0 ? selectedBeneficiaryGroupIds : undefined,
+ tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined
  })
 
  setReportData(data)
@@ -314,6 +330,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  rawMetrics: reportData.metrics,
  selectedStory: selectedStory || undefined,
  locations: reportData.locations,
+ tags: reportData.tags,
  beneficiaryGroups: beneficiaryGroups.filter(bg =>
  selectedBeneficiaryGroupIds.length === 0 || selectedBeneficiaryGroupIds.includes(bg.id!)
  )
@@ -650,6 +667,14 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  )
  }
 
+ const toggleTag = (tagId: string) => {
+ setSelectedTagIds(prev =>
+ prev.includes(tagId)
+ ? prev.filter(id => id !== tagId)
+ : [...prev, tagId]
+ )
+ }
+
  const canProceedToNextStep = () => {
  switch (currentStep) {
  case 1:
@@ -694,6 +719,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  setSelectedKPIIds([])
  setSelectedLocationIds([])
  setSelectedBeneficiaryGroupIds([])
+ setSelectedTagIds([])
  setCurrentStep(1)
  setShowDashboard(true)
  setIsEditingReport(false)
@@ -834,6 +860,8 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  {dashboard && (
  <ReportDashboard
  dashboard={dashboard}
+ organization={activeOrganization}
+ tags={reportData.tags}
  overviewSummary={editableOverview || reportDashboardData.overviewSummary}
  totals={reportData.totals}
  beneficiaryText={editableBeneficiaryText || reportDashboardData.beneficiaryText}
@@ -1053,6 +1081,51 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  className="mr-3 w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
  />
  <span className="text-sm font-medium">{group.name}</span>
+ </label>
+ ))
+ )}
+ </div>
+ )}
+ </div>
+
+ {/* Tag Multi-Select */}
+ <div className="relative" ref={tagPickerRef}>
+ <label className="app-label mb-2 block">
+ <Tag className="w-4 h-4 inline mr-1.5 text-primary-600" />
+ Tags ({selectedTagIds.length} selected)
+ </label>
+ <button
+ type="button"
+ onClick={() => setShowTagPicker(!showTagPicker)}
+ className="app-input w-full text-left cursor-pointer"
+ >
+ {selectedTagIds.length === 0
+ ? 'All tags (default)'
+ : `${selectedTagIds.length} tag${selectedTagIds.length > 1 ? 's' : ''} selected`
+ }
+ </button>
+ {showTagPicker && (
+ <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-200 rounded-xl shadow-card max-h-60 overflow-y-auto">
+ {metricTags.length === 0 ? (
+ <div className="p-4 text-sm text-gray-500">No tags available</div>
+ ) : (
+ metricTags.map(tag => (
+ <label
+ key={tag.id}
+ className={`flex items-center px-4 py-3 cursor-pointer transition-all ${selectedTagIds.includes(tag.id) ? 'bg-primary-50' : 'hover:bg-gray-50'
+ }`}
+ >
+ <input
+ type="checkbox"
+ checked={selectedTagIds.includes(tag.id)}
+ onChange={() => toggleTag(tag.id)}
+ className="mr-3 w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+ />
+ <span
+ className="inline-block w-2.5 h-2.5 rounded-full mr-2 flex-shrink-0"
+ style={{ background: tag.color || '#608341' }}
+ />
+ <span className="text-sm font-medium">{tag.name}</span>
  </label>
  ))
  )}

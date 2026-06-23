@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default function InitiativesStep({ draftApi }: Props) {
-  const { draft, addInitiative, removeInitiative } = draftApi
+  const { draft, addInitiative, removeInitiative, isLocked } = draftApi
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [region, setRegion] = useState('')
@@ -94,14 +94,18 @@ export default function InitiativesStep({ draftApi }: Props) {
                       <p className="text-sm font-semibold text-secondary-900 truncate">{init.title}</p>
                       <p className="text-xs text-secondary-500 line-clamp-2 mt-0.5">{init.description}</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => init.id && handleRemove(init.id)}
-                      className="app-btn app-btn-icon app-btn-ghost opacity-0 group-hover:opacity-100 text-secondary-400 hover:text-red-600"
-                      title="Remove"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {isLocked(init.id) ? (
+                      <span className="onboarding-locked-pill" title="Created earlier — can't be edited here">Added</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => init.id && handleRemove(init.id)}
+                        className="app-btn app-btn-icon app-btn-ghost opacity-0 group-hover:opacity-100 text-secondary-400 hover:text-red-600"
+                        title="Remove"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

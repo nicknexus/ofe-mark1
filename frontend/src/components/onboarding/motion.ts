@@ -35,9 +35,9 @@ export const staggerFast: Variants = {
 
 /** Directional step transition for the wizard body. */
 export const stepVariants = {
-  enter: (dir: number) => ({ opacity: 0, x: dir > 0 ? 36 : -36 }),
-  center: { opacity: 1, x: 0, transition: { duration: 0.42, ease: easeOut } },
-  exit: (dir: number) => ({ opacity: 0, x: dir > 0 ? -36 : 36, transition: { duration: 0.28, ease: easeOut } }),
+  enter: (dir: number) => ({ opacity: 0, x: dir > 0 ? 14 : -14 }),
+  center: { opacity: 1, x: 0, transition: { duration: 0.34, ease: easeOut } },
+  exit: (dir: number) => ({ opacity: 0, x: dir > 0 ? -10 : 10, transition: { duration: 0.2, ease: easeOut } }),
 }
 
 /** Chat bubble entrance — user bubbles drift from the right, AI from the left. */

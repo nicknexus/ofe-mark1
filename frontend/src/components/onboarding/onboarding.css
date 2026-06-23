@@ -1886,3 +1886,74 @@
   color: var(--ob-soft);
   margin-top: 2rem;
 }
+
+/* ─── Setup hub (Account / Initiative selection) ───────────────────────────── */
+.onboarding-hub-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  width: 100%;
+}
+.onboarding-hub-check {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  color: #fff;
+  background: var(--brand-primary-dark);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--brand-primary) 40%, transparent);
+}
+.onboarding-mode-card--done {
+  border-color: color-mix(in srgb, var(--brand-primary) 35%, #e8eaed);
+  background: color-mix(in srgb, var(--brand-primary) 5%, white);
+}
+.onboarding-hub-finish {
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.onboarding-hub-finish:hover { color: var(--brand-primary-dark); }
+
+/* Rail back-to-menu button */
+.onboarding-rail-back {
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+}
+.onboarding-rail-back:hover .onboarding-rail-brand-mark { color: var(--brand-primary-dark); }
+
+/* "Added" pill on locked (pre-existing) items — create-only on re-entry */
+.onboarding-locked-pill {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #6b7886;
+  background: #eef1f4;
+  border: 1px solid #e2e6ea;
+}
+
+
+/* Smooth the rail + bottom nav appearing when entering a track, so they don't
+   snap in while the step content slides (matches the step transition timing). */
+@keyframes ob-rail-in {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes ob-nav-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.onboarding-rail {
+  animation: ob-rail-in 0.34s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.onboarding-nav {
+  animation: ob-nav-in 0.34s cubic-bezier(0.16, 1, 0.3, 1);
+}

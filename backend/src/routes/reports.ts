@@ -10,7 +10,7 @@ const router = Router();
 // Get filtered report data for preview
 router.post('/report-data', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const { initiativeId, dateStart, dateEnd, kpiIds, locationIds, beneficiaryGroupIds, donorId } = req.body;
+        const { initiativeId, dateStart, dateEnd, kpiIds, locationIds, beneficiaryGroupIds, tagIds, donorId } = req.body;
 
         if (!initiativeId) {
             res.status(400).json({ error: 'initiativeId is required' });
@@ -27,6 +27,7 @@ router.post('/report-data', authenticateUser, async (req: AuthenticatedRequest, 
             kpiIds: Array.isArray(kpiIds) ? kpiIds : undefined,
             locationIds: Array.isArray(locationIds) ? locationIds : undefined,
             beneficiaryGroupIds: Array.isArray(beneficiaryGroupIds) ? beneficiaryGroupIds : undefined,
+            tagIds: Array.isArray(tagIds) ? tagIds : undefined,
             donorId: donorId || undefined
         });
 
@@ -53,6 +54,7 @@ router.post('/generate-report', authenticateUser, async (req: AuthenticatedReque
             selectedStory,
             locations,
             beneficiaryGroups,
+            tags,
             donor,
             deepLink
         } = req.body;
@@ -118,6 +120,20 @@ Make the report engaging but factual.`;
                 `- ${l.name}${l.description ? `: ${l.description}` : ''}`
             ).join('\n')
             : 'No locations specified';
+
+        // Tag/theme context: which themes the metrics fall under, plus the metrics
+        // grouped by theme so the narrative can speak to each area of impact.
+        const tagsText = tags && tags.length > 0
+            ? (tags as any[]).map((t: any) => {
+                const metricsForTag = (totals || []).filter((tot: any) =>
+                    Array.isArray(tot.tag_ids) && tot.tag_ids.includes(t.id)
+                );
+                const metricList = metricsForTag.length > 0
+                    ? metricsForTag.map((m: any) => `${m.kpi_title} (${m.total_value} ${m.unit_of_measurement})`).join(', ')
+                    : 'no metrics';
+                return `- ${t.name}: ${metricList}`;
+            }).join('\n')
+            : 'No themes/tags specified';
 
         // Enrich beneficiary groups with location names
         let enrichedBeneficiaryGroups = beneficiaryGroups || [];
@@ -216,6 +232,9 @@ ${metricsText}
 **Locations Involved:**
 ${locationsText}
 
+**Themes / Tags (metrics grouped by theme):**
+${tagsText}
+
 **Beneficiary Groups:**
 ${beneficiaryGroupsText}
 
@@ -237,6 +256,7 @@ ${selectedStory ? '- DO NOT include a Story Section - the actual story will be i
 - Use EXACTLY the section headers shown above (e.g., "## Visual Metrics Description", "## Location Information")
 - Sections 4, 5, 6, and 7 must be EXACTLY ONE SENTENCE each
 - The Overview Summary must be exactly ONE paragraph (4-5 sentences)
+- When themes/tags are provided, reference them naturally in the Total Metrics section to frame the areas of impact (do not add a separate themes section)
 - Make the report professional, engaging, and data-driven
 - Use specific numbers throughout`;
 

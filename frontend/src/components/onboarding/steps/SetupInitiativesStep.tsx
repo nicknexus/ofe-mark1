@@ -18,7 +18,7 @@ const CATEGORIES: { value: CreateKPIForm['category']; label: string; desc: strin
 ]
 
 export default function SetupInitiativesStep({ draftApi }: Props) {
-  const { draft, addMetric, removeMetric, addGroup, removeGroup } = draftApi
+  const { draft, addMetric, removeMetric, addGroup, removeGroup, isLocked } = draftApi
   const [activeId, setActiveId] = useState<string | null>(draft.initiatives[0]?.id ?? null)
 
   // Keep the active tab valid as initiatives change.
@@ -83,6 +83,7 @@ export default function SetupInitiativesStep({ draftApi }: Props) {
           metrics={draft.metricsByInitiative[active.id!] || []}
           onAdded={(kpi) => addMetric(active.id!, kpi)}
           onRemoved={(id) => removeMetric(active.id!, id)}
+          isLocked={isLocked}
         />
 
         <GroupsSection
@@ -91,6 +92,7 @@ export default function SetupInitiativesStep({ draftApi }: Props) {
           groups={draft.groupsByInitiative[active.id!] || []}
           onAdded={(g) => addGroup(active.id!, g)}
           onRemoved={(id) => removeGroup(active.id!, id)}
+          isLocked={isLocked}
         />
       </div>
     </div>
@@ -99,11 +101,12 @@ export default function SetupInitiativesStep({ draftApi }: Props) {
 
 // ─── Metrics ────────────────────────────────────────────────────────────────
 
-function MetricsSection({ initiativeId, metrics, onAdded, onRemoved }: {
+function MetricsSection({ initiativeId, metrics, onAdded, onRemoved, isLocked }: {
   initiativeId: string
   metrics: any[]
   onAdded: (kpi: any) => void
   onRemoved: (id: string) => void
+  isLocked: (id?: string) => boolean
 }) {
   const [form, setForm] = useState<CreateKPIForm>({
     title: '', description: '', metric_type: 'number', unit_of_measurement: '', category: 'output', initiative_id: initiativeId, tag_ids: [],
@@ -208,9 +211,13 @@ function MetricsSection({ initiativeId, metrics, onAdded, onRemoved }: {
                   <p className="text-sm font-semibold text-secondary-900 truncate">{m.title}</p>
                   <p className="text-xs text-secondary-500 truncate capitalize">{m.category} · {m.unit_of_measurement}</p>
                 </div>
-                <button type="button" onClick={() => m.id && handleRemove(m.id)} className="app-btn app-btn-icon app-btn-ghost opacity-0 group-hover:opacity-100 text-secondary-400 hover:text-red-600" title="Remove">
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {isLocked(m.id) ? (
+                  <span className="onboarding-locked-pill" title="Created earlier — can't be edited here">Added</span>
+                ) : (
+                  <button type="button" onClick={() => m.id && handleRemove(m.id)} className="app-btn app-btn-icon app-btn-ghost opacity-0 group-hover:opacity-100 text-secondary-400 hover:text-red-600" title="Remove">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -222,11 +229,12 @@ function MetricsSection({ initiativeId, metrics, onAdded, onRemoved }: {
 
 // ─── Beneficiary groups (optional, collapsible) ──────────────────────────────
 
-function GroupsSection({ initiativeId, groups, onAdded, onRemoved }: {
+function GroupsSection({ initiativeId, groups, onAdded, onRemoved, isLocked }: {
   initiativeId: string
   groups: any[]
   onAdded: (g: any) => void
   onRemoved: (id: string) => void
+  isLocked: (id?: string) => boolean
 }) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
@@ -330,9 +338,13 @@ function GroupsSection({ initiativeId, groups, onAdded, onRemoved }: {
                         {[g.total_number != null ? `${g.total_number} people` : null, g.age_range_start != null ? `age ${g.age_range_start}${g.age_range_end != null ? `–${g.age_range_end}` : '+'}` : null].filter(Boolean).join(' · ') || 'No details'}
                       </p>
                     </div>
-                    <button type="button" onClick={() => g.id && handleRemove(g.id)} className="app-btn app-btn-icon app-btn-ghost opacity-0 group-hover:opacity-100 text-secondary-400 hover:text-red-600" title="Remove">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {isLocked(g.id) ? (
+                      <span className="onboarding-locked-pill" title="Created earlier — can't be edited here">Added</span>
+                    ) : (
+                      <button type="button" onClick={() => g.id && handleRemove(g.id)} className="app-btn app-btn-icon app-btn-ghost opacity-0 group-hover:opacity-100 text-secondary-400 hover:text-red-600" title="Remove">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

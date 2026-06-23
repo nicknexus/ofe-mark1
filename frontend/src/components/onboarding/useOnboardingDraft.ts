@@ -14,6 +14,12 @@ export interface OnboardingDraft {
   initiatives: Initiative[]
   metricsByInitiative: Record<string, KPI[]>
   groupsByInitiative: Record<string, BeneficiaryGroup[]>
+  /**
+   * Ids of entities that existed BEFORE this setup session (hydrated from the
+   * backend on open). These are shown read-only — create-only, not editable or
+   * removable. Items created during the session are not in this set.
+   */
+  lockedIds: Set<string>
 }
 
 const EMPTY: OnboardingDraft = {
@@ -23,10 +29,44 @@ const EMPTY: OnboardingDraft = {
   initiatives: [],
   metricsByInitiative: {},
   groupsByInitiative: {},
+  lockedIds: new Set(),
+}
+
+/** Shape used to hydrate the draft from existing org data on wizard open. */
+export interface HydratePayload {
+  description?: string
+  statement?: string
+  locations?: Location[]
+  initiatives?: Initiative[]
+  metricsByInitiative?: Record<string, KPI[]>
+  groupsByInitiative?: Record<string, BeneficiaryGroup[]>
 }
 
 export function useOnboardingDraft() {
   const [draft, setDraft] = useState<OnboardingDraft>(EMPTY)
+
+  /**
+   * Load existing org data into the draft and mark every loaded entity locked
+   * (create-only on re-entry). Replaces draft state wholesale.
+   */
+  const hydrate = useCallback((payload: HydratePayload) => {
+    const locked = new Set<string>()
+    payload.locations?.forEach(l => l.id && locked.add(l.id))
+    payload.initiatives?.forEach(i => i.id && locked.add(i.id))
+    Object.values(payload.metricsByInitiative || {}).forEach(arr => arr.forEach(k => k.id && locked.add(k.id)))
+    Object.values(payload.groupsByInitiative || {}).forEach(arr => arr.forEach(g => g.id && locked.add(g.id)))
+    setDraft({
+      description: payload.description || '',
+      statement: payload.statement || '',
+      locations: payload.locations || [],
+      initiatives: payload.initiatives || [],
+      metricsByInitiative: payload.metricsByInitiative || {},
+      groupsByInitiative: payload.groupsByInitiative || {},
+      lockedIds: locked,
+    })
+  }, [])
+
+  const isLocked = useCallback((id?: string) => !!id && draft.lockedIds.has(id), [draft.lockedIds])
 
   const setOrgText = useCallback((patch: Partial<Pick<OnboardingDraft, 'description' | 'statement'>>) => {
     setDraft(d => ({ ...d, ...patch }))
@@ -106,6 +146,8 @@ export function useOnboardingDraft() {
 
   return {
     draft,
+    hydrate,
+    isLocked,
     setOrgText,
     addLocation,
     removeLocation,

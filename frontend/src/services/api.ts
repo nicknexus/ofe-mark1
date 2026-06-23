@@ -1101,6 +1101,7 @@ class ApiService {
  kpiIds?: string[]
  locationIds?: string[]
  beneficiaryGroupIds?: string[]
+ tagIds?: string[]
  donorId?: string
  }): Promise<{
  metrics: Array<{
@@ -1121,6 +1122,12 @@ class ApiService {
  unit_of_measurement: string
  total_value: number
  count: number
+ tag_ids: string[]
+ }>
+ tags: Array<{
+ id: string
+ name: string
+ color?: string | null
  }>
  locations: Array<{
  id: string
@@ -1159,6 +1166,7 @@ class ApiService {
  selectedStory: any
  locations: any[]
  beneficiaryGroups: any[]
+ tags?: any[]
  donor?: Donor
  deepLink?: string
  }): Promise<{ reportText: string }> {

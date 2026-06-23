@@ -12,7 +12,7 @@ interface Props {
 }
 
 export default function LocationsStep({ draftApi }: Props) {
-  const { draft, addLocation, removeLocation } = draftApi
+  const { draft, addLocation, removeLocation, isLocked } = draftApi
   const { results, isSearching, search, clearResults, reverseGeocodeCountry } = useNominatimSearch()
 
   const [query, setQuery] = useState('')
@@ -194,14 +194,18 @@ export default function LocationsStep({ draftApi }: Props) {
                       {loc.country || `${loc.latitude.toFixed(3)}, ${loc.longitude.toFixed(3)}`}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => loc.id && handleRemove(loc.id)}
-                    className="app-btn app-btn-icon app-btn-ghost opacity-0 group-hover:opacity-100 text-secondary-400 hover:text-red-600"
-                    title="Remove"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {isLocked(loc.id) ? (
+                    <span className="onboarding-locked-pill" title="Added earlier — can't be edited here">Added</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => loc.id && handleRemove(loc.id)}
+                      className="app-btn app-btn-icon app-btn-ghost opacity-0 group-hover:opacity-100 text-secondary-400 hover:text-red-600"
+                      title="Remove"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

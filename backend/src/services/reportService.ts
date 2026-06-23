@@ -1,6 +1,7 @@
 import { supabase } from '../utils/supabase';
 import { InitiativeService } from './initiativeService';
 import { aggregateKpiUpdates } from '../utils/kpiAggregation';
+import { MetricTagService } from './metricTagService';
 
 export interface ReportDataFilters {
     initiativeId: string;
@@ -11,6 +12,7 @@ export interface ReportDataFilters {
     kpiIds?: string[];
     locationIds?: string[];
     beneficiaryGroupIds?: string[];
+    tagIds?: string[];
     donorId?: string;
 }
 
@@ -34,6 +36,13 @@ export interface ReportDataResponse {
         metric_type: 'number' | 'percentage' | string;
         total_value: number;
         count: number;
+        tag_ids: string[];
+    }>;
+    // Org metric tags referenced by the report's KPIs (lookup for chips + grouping).
+    tags: Array<{
+        id: string;
+        name: string;
+        color?: string | null;
     }>;
     locations: Array<{
         id: string;
@@ -62,7 +71,7 @@ export interface ReportDataResponse {
 
 export class ReportService {
     static async getReportData(filters: ReportDataFilters): Promise<ReportDataResponse> {
-        const { initiativeId, userId, requestedOrgId, dateStart, dateEnd, kpiIds, locationIds, beneficiaryGroupIds, donorId } = filters;
+        const { initiativeId, userId, requestedOrgId, dateStart, dateEnd, kpiIds, locationIds, beneficiaryGroupIds, tagIds, donorId } = filters;
 
         // Authorize via initiative org context (org-scoped, not user-scoped).
         const initiative = await InitiativeService.getById(initiativeId, userId, requestedOrgId);
@@ -163,6 +172,19 @@ export class ReportService {
             }
         }
 
+        // Resolve which org metric tags each KPI carries so the report can show
+        // tag chips, group by tag, and (optionally) filter to selected tags.
+        const kpiIdsInPlay = Array.from(new Set(metrics.map((m: any) => m.kpi_id).filter(Boolean)));
+        const kpiToTags = await MetricTagService.getTagIdsForKpis(kpiIdsInPlay as string[]);
+
+        // Apply tag filter: keep only metrics whose KPI carries a selected tag.
+        if (tagIds && tagIds.length > 0) {
+            const wanted = new Set(tagIds);
+            metrics = metrics.filter((m: any) =>
+                (kpiToTags[m.kpi_id] || []).some((t: string) => wanted.has(t))
+            );
+        }
+
         // Calculate totals grouped by KPI. We collect raw values per KPI then
         // run the aggregation helper so percentage metrics get averaged instead
         // of summed. NOTE: report metrics are deduped by location/ben-group join
@@ -206,8 +228,18 @@ export class ReportService {
             unit_of_measurement: b.unit_of_measurement,
             metric_type: b.metric_type,
             total_value: aggregateKpiUpdates(Array.from(b.updates.values()), b.metric_type),
-            count: b.updates.size
+            count: b.updates.size,
+            tag_ids: kpiToTags[b.kpi_id] || []
         }));
+
+        // Build the tag lookup, limited to tags actually referenced by the report's
+        // KPIs (after the tag filter). Names/colours come from the org tag list.
+        const referencedTagIds = new Set<string>();
+        totals.forEach(t => t.tag_ids.forEach((id: string) => referencedTagIds.add(id)));
+        const orgTags = await MetricTagService.getAll(userId, requestedOrgId);
+        const tags = orgTags
+            .filter(t => t.id && referencedTagIds.has(t.id))
+            .map(t => ({ id: t.id as string, name: t.name, color: t.color ?? null }));
 
         // Get distinct locations from filtered metrics
         const locationMap = new Map<string, { id: string; name: string; description?: string; latitude: number; longitude: number }>();
@@ -321,6 +353,7 @@ export class ReportService {
                 location_name: m.location_name || undefined
             })),
             totals,
+            tags,
             locations,
             stories,
             mapPoints
