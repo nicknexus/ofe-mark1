@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { supabase } from '../utils/supabase';
+import { supabase, supabaseClient } from '../utils/supabase';
 import { OrganizationService } from '../services/organizationService';
 import { SubscriptionService } from '../services/subscriptionService';
 import { PlatformAdminService } from '../services/platformAdminService';
@@ -39,8 +39,13 @@ router.post('/signup', async (req, res) => {
             return;
         }
 
-        // Create user in Supabase Auth (email confirmation is disabled in settings)
-        const { data: authData, error: authError } = await supabase.auth.signUp({
+        // Create user in Supabase Auth (email confirmation is disabled in settings).
+        // IMPORTANT: use the anon client for sign-up/sign-in. Calling these on the
+        // shared service-role `supabase` client sets an in-memory user session on it,
+        // which silently downgrades every subsequent `supabase.from(...)` in this
+        // process from service_role to that authenticated user — breaking privileged
+        // writes like accepting a team invite (RLS then rejects the insert).
+        const { data: authData, error: authError } = await supabaseClient.auth.signUp({
             email,
             password,
             options: {
@@ -93,8 +98,9 @@ router.post('/signup', async (req, res) => {
         }
         // Note: Users without an organization will get access through team_members when they accept invite
 
-        // Sign the user in immediately (email confirmation is disabled, so this should work)
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        // Sign the user in immediately (email confirmation is disabled, so this should work).
+        // Anon client (see note above) — never the service-role client.
+        const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
             email,
             password
         });

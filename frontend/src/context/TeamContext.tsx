@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { TeamService, UserPermissions, AccessibleOrganization } from '../services/team'
 import type { TeamMemberScope } from '../types/teamPermissions'
 import { apiService } from '../services/api'
+import PendingInviteModal from '../components/PendingInviteModal'
 
 interface TeamContextType {
  permissions: UserPermissions | null
@@ -249,6 +250,7 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
  return (
  <TeamContext.Provider value={value}>
  {children}
+ <PendingInviteModal />
  </TeamContext.Provider>
  )
 }

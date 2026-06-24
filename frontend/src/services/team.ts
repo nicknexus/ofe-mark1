@@ -103,6 +103,7 @@ export interface TeamInvitation {
 
 export interface InviteDetails {
  id: string
+ email: string
  organization_name: string
  inviter_name?: string
  inviter_email: string
@@ -232,7 +233,7 @@ export class TeamService {
 
  const { data, error } = await supabase
  .from('team_invitations')
- .select('id, status, expires_at, can_add_impact_claims, invited_by, organization_id, organizations(name)')
+ .select('id, email, status, expires_at, can_add_impact_claims, invited_by, organization_id, organizations(name)')
  .eq('token', token)
  .maybeSingle()
 
@@ -243,7 +244,7 @@ export class TeamService {
  console.log(`[TeamService] Join query failed (${error?.message}), trying without join...`)
  const { data: inviteOnly, error: err2 } = await supabase
  .from('team_invitations')
- .select('id, status, expires_at, can_add_impact_claims, invited_by, organization_id')
+ .select('id, email, status, expires_at, can_add_impact_claims, invited_by, organization_id')
  .eq('token', token)
  .maybeSingle()
 
@@ -259,6 +260,7 @@ export class TeamService {
 
  return {
  id: invite.id,
+ email: invite.email,
  organization_name: orgName,
  inviter_name: undefined,
  inviter_email: '',
@@ -291,6 +293,21 @@ export class TeamService {
  }
 
  return response.json()
+ }
+
+ /**
+ * Decline an invitation (public — invitee may be logged out)
+ */
+ static async declineInvite(token: string): Promise<void> {
+ const response = await fetch(`${API_BASE_URL}/api/team/invite/${token}/decline`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ })
+
+ if (!response.ok) {
+ const error = await response.json()
+ throw new Error(error.error || 'Failed to decline invitation')
+ }
  }
 
  /**

@@ -28,7 +28,7 @@ export interface TeamInvitation {
     invited_by: string;
     member_type?: 'admin' | 'team_member' | null;
     token: string;
-    status: 'pending' | 'accepted' | 'expired' | 'revoked';
+    status: 'pending' | 'accepted' | 'expired' | 'revoked' | 'declined';
     expires_at: string;
     can_add_impact_claims: boolean;
     email_sent_at?: string;
@@ -54,6 +54,8 @@ export interface TeamMember {
 
 export interface InviteDetails {
     id: string;
+    /** Email the invitation was sent to — drives the locked email on the accept page. */
+    email: string;
     organization_name: string;
     inviter_name?: string;
     inviter_email: string;
@@ -760,6 +762,7 @@ export class TeamService {
             .from('team_invitations')
             .select(`
                 id,
+                email,
                 status,
                 expires_at,
                 can_add_impact_claims,
@@ -818,6 +821,7 @@ export class TeamService {
 
         return {
             id: invite.id,
+            email: invite.email,
             organization_name: org?.name || 'Unknown Organization',
             inviter_name: inviter?.raw_user_meta_data?.name,
             inviter_email: inviter?.email || '',
@@ -948,6 +952,22 @@ export class TeamService {
         }
 
         console.log(`[acceptInvitation] Successfully created team member: ${member.id}`);
+
+        // New team members join an existing org, so the account-setup onboarding
+        // wizard (and legacy tutorial) shouldn't auto-launch for them. Mark both
+        // done now — preserving any other metadata.
+        try {
+            const { data: u } = await supabase.auth.admin.getUserById(userId);
+            await supabase.auth.admin.updateUserById(userId, {
+                user_metadata: {
+                    ...(u?.user?.user_metadata || {}),
+                    has_completed_onboarding: true,
+                    has_completed_tutorial: true,
+                },
+            });
+        } catch (e) {
+            console.warn('[acceptInvitation] could not mark onboarding complete:', (e as Error).message);
+        }
 
         // Mark invitation as accepted
         await supabase
@@ -1183,6 +1203,35 @@ export class TeamService {
 
         if (error) {
             throw new Error(`Failed to revoke invitation: ${error.message}`);
+        }
+    }
+
+    /**
+     * Decline an invitation by token (invitee-side, no auth required — they may
+     * be clicking from the email while logged out). Idempotent on a pending invite.
+     */
+    static async declineInvitation(token: string): Promise<void> {
+        const { data: invite, error } = await supabase
+            .from('team_invitations')
+            .select('id, status')
+            .eq('token', token)
+            .maybeSingle();
+
+        if (error || !invite) {
+            throw new Error('Invalid or expired invitation');
+        }
+        if (invite.status !== 'pending') {
+            // Already accepted/declined/revoked — nothing to do.
+            return;
+        }
+
+        const { error: updateError } = await supabase
+            .from('team_invitations')
+            .update({ status: 'declined' })
+            .eq('id', invite.id);
+
+        if (updateError) {
+            throw new Error(`Failed to decline invitation: ${updateError.message}`);
         }
     }
 

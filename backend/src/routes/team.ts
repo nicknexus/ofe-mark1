@@ -194,6 +194,20 @@ router.post('/invite/:token/accept', authenticateUser, async (req: Authenticated
 });
 
 /**
+ * POST /api/team/invite/:token/decline
+ * Decline an invitation (public - invitee may be logged out)
+ */
+router.post('/invite/:token/decline', async (req, res) => {
+    try {
+        await TeamService.declineInvitation(req.params.token);
+        res.json({ success: true, message: 'Invitation declined' });
+    } catch (error) {
+        console.error('Error declining invitation:', error);
+        res.status(400).json({ error: (error as Error).message });
+    }
+});
+
+/**
  * POST /api/team/invite/:id/resend
  * Resend an invitation email (owner only)
  */
