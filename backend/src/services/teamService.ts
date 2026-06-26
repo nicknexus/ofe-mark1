@@ -493,6 +493,49 @@ export class TeamService {
     }
 
     /**
+     * Build an accessible-org entry for a platform admin entering an org in
+     * support mode. Role is 'owner' so TeamContext treats it as the single
+     * owned/active/editable org (settings/branding target the customer org, not
+     * the admin's). Destructive/payment surfaces are hidden in the frontend via
+     * the support-mode flag instead.
+     */
+    static async getSupportOrgSummary(orgId: string): Promise<{
+        id: string;
+        name: string;
+        slug?: string;
+        role: 'owner' | 'member';
+        canAddImpactClaims?: boolean;
+        canEditEvidence?: boolean;
+        logo_url?: string;
+        brand_color?: string;
+        is_public?: boolean;
+        statement?: string;
+        website_url?: string;
+        donation_url?: string;
+    } | null> {
+        const { data, error } = await supabase
+            .from('organizations')
+            .select('id, name, slug, logo_url, brand_color, is_public, statement, website_url, donation_url')
+            .eq('id', orgId)
+            .maybeSingle();
+        if (error || !data) return null;
+        return {
+            id: data.id,
+            name: data.name,
+            slug: data.slug,
+            role: 'owner',
+            canAddImpactClaims: true,
+            canEditEvidence: true,
+            logo_url: data.logo_url,
+            brand_color: data.brand_color,
+            is_public: data.is_public,
+            statement: data.statement,
+            website_url: data.website_url,
+            donation_url: data.donation_url,
+        };
+    }
+
+    /**
      * Get organization owner's user ID
      */
     static async getOrganizationOwnerId(organizationId: string): Promise<string | null> {
@@ -548,6 +591,23 @@ export class TeamService {
 
         const membership = await this.getUserTeamMembership(userId, ctx.organizationId);
         if (!membership) {
+            // Platform admin in support mode (access granted by resolveOrgContext
+            // without a member row): present as the owner so the experience is the
+            // customer's full account, not a limited team-member view. Payment +
+            // delete surfaces are hidden in the frontend via the support-mode flag.
+            if (await PlatformAdminService.canAccessOrg(userId, ctx.organizationId)) {
+                return {
+                    isOwner: true,
+                    isSharedMember: false,
+                    canAddImpactClaims: true,
+                    canEditEvidence: true,
+                    canDelete: true,
+                    capabilities: fullCapabilities(),
+                    scope: { ...FULL_SCOPE },
+                    organizationId: ctx.organizationId,
+                    organizationName: org?.name,
+                };
+            }
             return {
                 isOwner: false,
                 isSharedMember: false,

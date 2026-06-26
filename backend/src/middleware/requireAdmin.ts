@@ -29,3 +29,29 @@ export const requireAdmin = async (
         res.status(500).json({ error: 'Internal server error' });
     }
 };
+
+/**
+ * Allows the request through only if the user is a SUPER platform admin.
+ * Used to gate support-agent management (only super admins manage sub-accounts).
+ * MUST be used AFTER `authenticateUser`.
+ */
+export const requireSuperAdmin = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+): Promise<void> => {
+    try {
+        if (!req.user?.id) {
+            res.status(401).json({ error: 'Not authenticated' });
+            return;
+        }
+        if (!(await PlatformAdminService.isSuperAdmin(req.user.id))) {
+            res.status(403).json({ error: 'Super admin access required' });
+            return;
+        }
+        next();
+    } catch (error) {
+        console.error('[requireSuperAdmin] error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};

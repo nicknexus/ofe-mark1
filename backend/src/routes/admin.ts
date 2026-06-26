@@ -1,10 +1,29 @@
 import { Router } from 'express';
 import { supabase } from '../utils/supabase';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
-import { requireAdmin } from '../middleware/requireAdmin';
+import { requireAdmin, requireSuperAdmin } from '../middleware/requireAdmin';
+import { PlatformAdminService } from '../services/platformAdminService';
 import { OrganizationService } from '../services/organizationService';
 import { DemoSeedService } from '../services/demoSeedService';
 import { DemoGenerationError, DemoGenerationService } from '../services/demoGenerationService';
+import { sendEmail } from '../utils/email';
+import { recordAdminAction } from '../utils/auditLog';
+
+const APP_URL = process.env.APP_URL || 'http://localhost:5173';
+
+/** Find an auth user by email via the admin API (paginated; schema-independent). */
+async function findAuthUserByEmail(email: string): Promise<{ id: string; email: string } | null> {
+    const target = email.toLowerCase();
+    for (let page = 1; page <= 50; page++) {
+        const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 200 });
+        if (error) return null;
+        const users = data?.users ?? [];
+        const match = users.find((u) => (u.email ?? '').toLowerCase() === target);
+        if (match) return { id: match.id, email: match.email ?? '' };
+        if (users.length < 200) break;
+    }
+    return null;
+}
 
 const router = Router();
 
@@ -774,6 +793,505 @@ router.post('/demos/:id/clone', async (req: AuthenticatedRequest, res) => {
         res.status(201).json(newOrg);
     } catch (error) {
         console.error('[admin] clone demo error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * GET /api/admin/orgs
+ * List all real (non-demo) organizations with owner, plan, and usage.
+ * Optional ?search= filters by org name or slug (case-insensitive).
+ */
+router.get('/orgs', async (req: AuthenticatedRequest, res) => {
+    try {
+        const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+
+        let query = supabase
+            .from('organizations')
+            .select('id, name, slug, is_public, owner_id, created_at')
+            .eq('is_demo', false)
+            .order('created_at', { ascending: false })
+            .limit(500);
+
+        if (search) {
+            query = query.or(`name.ilike.%${search}%,slug.ilike.%${search}%`);
+        }
+
+        // Support agents only see the orgs assigned to them; super admins see all.
+        const role = await PlatformAdminService.getRole(req.user!.id);
+        if (role === 'support') {
+            const assigned = await PlatformAdminService.getAssignedOrgIds(req.user!.id);
+            if (assigned.length === 0) {
+                res.json([]);
+                return;
+            }
+            query = query.in('id', assigned);
+        }
+
+        const { data: orgs, error } = await query;
+        if (error) throw error;
+
+        const rows = await Promise.all(
+            (orgs || []).map(async (org) => {
+                // Owner identity
+                let owner: { id: string; email?: string; name?: string } = { id: org.owner_id };
+                if (org.owner_id) {
+                    const { data: u } = await supabase.auth.admin.getUserById(org.owner_id);
+                    owner = {
+                        id: org.owner_id,
+                        email: u?.user?.email,
+                        name: u?.user?.user_metadata?.name,
+                    };
+                }
+
+                // Owner's subscription (limits live here)
+                const { data: sub } = await supabase
+                    .from('subscriptions')
+                    .select('status, plan_tier, team_members_limit, initiatives_limit, trial_ends_at')
+                    .eq('user_id', org.owner_id)
+                    .maybeSingle();
+
+                // Usage counts
+                const [{ count: memberCount }, { count: initiativeCount }] = await Promise.all([
+                    supabase
+                        .from('team_members')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('organization_id', org.id),
+                    supabase
+                        .from('initiatives')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('organization_id', org.id),
+                ]);
+
+                return {
+                    id: org.id,
+                    name: org.name,
+                    slug: org.slug,
+                    is_public: org.is_public,
+                    created_at: org.created_at,
+                    owner,
+                    subscription: sub || null,
+                    usage: {
+                        team_members: memberCount || 0,
+                        initiatives: initiativeCount || 0,
+                    },
+                };
+            })
+        );
+
+        res.json(rows);
+    } catch (error) {
+        console.error('[admin] list orgs error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * GET /api/admin/orgs/:id
+ * Single org detail (owner + plan + usage). Used by the support-mode account
+ * view so an agent sees the customer owner's details, not their own.
+ */
+router.get('/orgs/:id', async (req: AuthenticatedRequest, res) => {
+    try {
+        const { id } = req.params;
+        const { data: org, error } = await supabase
+            .from('organizations')
+            .select('id, name, slug, is_public, owner_id, created_at')
+            .eq('id', id)
+            .maybeSingle();
+        if (error) throw error;
+        if (!org) {
+            res.status(404).json({ error: 'Organization not found' });
+            return;
+        }
+
+        let owner: { id: string; email?: string; name?: string } = { id: org.owner_id };
+        if (org.owner_id) {
+            const { data: u } = await supabase.auth.admin.getUserById(org.owner_id);
+            owner = { id: org.owner_id, email: u?.user?.email, name: u?.user?.user_metadata?.name };
+        }
+
+        const { data: sub } = await supabase
+            .from('subscriptions')
+            .select('status, plan_tier, team_members_limit, initiatives_limit, trial_ends_at')
+            .eq('user_id', org.owner_id)
+            .maybeSingle();
+
+        const [{ count: memberCount }, { count: initiativeCount }] = await Promise.all([
+            supabase.from('team_members').select('*', { count: 'exact', head: true }).eq('organization_id', org.id),
+            supabase.from('initiatives').select('*', { count: 'exact', head: true }).eq('organization_id', org.id),
+        ]);
+
+        res.json({
+            id: org.id,
+            name: org.name,
+            slug: org.slug,
+            is_public: org.is_public,
+            created_at: org.created_at,
+            owner,
+            subscription: sub || null,
+            usage: { team_members: memberCount || 0, initiatives: initiativeCount || 0 },
+        });
+    } catch (error) {
+        console.error('[admin] get org error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * PATCH /api/admin/orgs/:id/limits
+ * Adjust an org's quota/date columns on the OWNER's subscription row.
+ * Body (all optional): { team_members_limit, initiatives_limit, trial_ends_at }
+ * Never touches Stripe / payment data.
+ */
+router.patch('/orgs/:id/limits', async (req: AuthenticatedRequest, res) => {
+    try {
+        const { id } = req.params;
+        const { team_members_limit, initiatives_limit, trial_ends_at } = req.body || {};
+
+        const { data: org, error: orgErr } = await supabase
+            .from('organizations')
+            .select('id, owner_id, is_demo')
+            .eq('id', id)
+            .maybeSingle();
+        if (orgErr) throw orgErr;
+        if (!org || org.is_demo) {
+            res.status(404).json({ error: 'Organization not found' });
+            return;
+        }
+        if (!org.owner_id) {
+            res.status(400).json({ error: 'Organization has no owner subscription to adjust' });
+            return;
+        }
+
+        const updates: Record<string, unknown> = {};
+        if (team_members_limit !== undefined) {
+            if (team_members_limit !== null && (typeof team_members_limit !== 'number' || team_members_limit < 0)) {
+                res.status(400).json({ error: 'team_members_limit must be a non-negative number or null' });
+                return;
+            }
+            updates.team_members_limit = team_members_limit;
+        }
+        if (initiatives_limit !== undefined) {
+            if (initiatives_limit !== null && (typeof initiatives_limit !== 'number' || initiatives_limit < 0)) {
+                res.status(400).json({ error: 'initiatives_limit must be a non-negative number or null' });
+                return;
+            }
+            updates.initiatives_limit = initiatives_limit;
+        }
+        if (trial_ends_at !== undefined) {
+            updates.trial_ends_at = trial_ends_at; // ISO string or null
+        }
+
+        if (Object.keys(updates).length === 0) {
+            res.status(400).json({ error: 'No valid fields to update' });
+            return;
+        }
+
+        const { data, error } = await supabase
+            .from('subscriptions')
+            .update(updates)
+            .eq('user_id', org.owner_id)
+            .select('status, plan_tier, team_members_limit, initiatives_limit, trial_ends_at')
+            .maybeSingle();
+        if (error) throw error;
+
+        console.log(`[admin] ${req.user!.email} adjusted limits for org ${id}:`, updates);
+        await recordAdminAction({
+            adminUserId: req.user!.id,
+            adminEmail: req.user!.email,
+            organizationId: id,
+            action: 'limits.update',
+            detail: updates,
+        });
+        res.json(data);
+    } catch (error) {
+        console.error('[admin] patch org limits error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * GET /api/admin/me
+ * The calling admin's role, so the console can gate super-only sections.
+ */
+router.get('/me', async (req: AuthenticatedRequest, res) => {
+    try {
+        const role = await PlatformAdminService.getRole(req.user!.id);
+        res.json({ id: req.user!.id, email: req.user!.email, role });
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// ─── Support agents (super admins only) ──────────────────────────────────────
+
+/**
+ * GET /api/admin/agents
+ * List support agents with their assigned orgs.
+ */
+router.get('/agents', requireSuperAdmin, async (_req: AuthenticatedRequest, res) => {
+    try {
+        const { data: admins, error } = await supabase
+            .from('platform_admins')
+            .select('user_id, role')
+            .eq('role', 'support');
+        if (error) throw error;
+
+        const agents = await Promise.all(
+            (admins || []).map(async (a) => {
+                const { data: u } = await supabase.auth.admin.getUserById(a.user_id);
+                const { data: assigns } = await supabase
+                    .from('support_org_assignments')
+                    .select('organization_id, organizations(id, name)')
+                    .eq('admin_user_id', a.user_id);
+                return {
+                    user_id: a.user_id,
+                    email: u?.user?.email,
+                    name: u?.user?.user_metadata?.name,
+                    last_sign_in_at: (u?.user as any)?.last_sign_in_at ?? null,
+                    orgs: (assigns || []).map((r: any) => ({
+                        id: r.organization_id,
+                        name: r.organizations?.name ?? '(unknown)',
+                    })),
+                };
+            })
+        );
+        res.json(agents);
+    } catch (error) {
+        console.error('[admin] list agents error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * POST /api/admin/agents
+ * Body: { email, mode: 'create' | 'promote' }
+ *  - create: provision a new account + email a set-password link.
+ *  - promote: turn an existing account into a support agent.
+ */
+router.post('/agents', requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+        const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+        const mode = req.body?.mode === 'promote' ? 'promote' : 'create';
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            res.status(400).json({ error: 'Please provide a valid email address' });
+            return;
+        }
+
+        let userId: string;
+        let setupLink: string | undefined;
+
+        const existing = await findAuthUserByEmail(email);
+        if (mode === 'promote') {
+            if (!existing) {
+                res.status(404).json({ error: 'No account found with that email to promote' });
+                return;
+            }
+            userId = existing.id;
+        } else {
+            if (existing) {
+                res.status(409).json({ error: 'An account with that email already exists. Use “promote” instead.' });
+                return;
+            }
+            const crypto = await import('crypto');
+            const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+                email,
+                password: crypto.randomBytes(24).toString('hex'),
+                email_confirm: true,
+                user_metadata: { must_change_password: true },
+            });
+            if (createErr || !created?.user) {
+                throw new Error(`Failed to create account: ${createErr?.message ?? 'unknown error'}`);
+            }
+            userId = created.user.id;
+            const { data: link } = await supabase.auth.admin.generateLink({
+                type: 'recovery',
+                email,
+                options: { redirectTo: `${APP_URL.replace(/\/+$/, '')}/reset-password` },
+            });
+            setupLink = (link?.properties as any)?.action_link ?? undefined;
+        }
+
+        const { error: upsertErr } = await supabase
+            .from('platform_admins')
+            .upsert({ user_id: userId, role: 'support' }, { onConflict: 'user_id' });
+        if (upsertErr) throw upsertErr;
+
+        await recordAdminAction({
+            adminUserId: req.user!.id,
+            adminEmail: req.user!.email,
+            action: mode === 'promote' ? 'agent.promote' : 'agent.create',
+            detail: { email },
+        });
+
+        let emailSent = false;
+        if (setupLink) {
+            const result = await sendEmail({
+                to: email,
+                subject: 'You have been added as a support agent on Nexus',
+                html: `<p>You've been added as a support agent.</p><p>Set your password to get started: <a href="${setupLink}">Set your password</a></p><p>Then sign in at <a href="${APP_URL.replace(/\/+$/, '')}/admin">${APP_URL.replace(/\/+$/, '')}/admin</a>.</p>`,
+                text: `You've been added as a support agent. Set your password: ${setupLink}\nThen sign in at ${APP_URL.replace(/\/+$/, '')}/admin`,
+            });
+            emailSent = result.success;
+            console.log(`[admin] support agent set-password link for ${email}: ${setupLink}`);
+        }
+
+        res.status(201).json({ user_id: userId, email, mode, emailSent, setupLink: emailSent ? undefined : setupLink });
+    } catch (error) {
+        console.error('[admin] create agent error:', error);
+        res.status(400).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * DELETE /api/admin/agents/:userId
+ * Revoke a support agent (removes their admin row + all assignments).
+ * Refuses to touch a super admin via this route.
+ */
+router.delete('/agents/:userId', requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+        const { userId } = req.params;
+        const { data: row } = await supabase
+            .from('platform_admins')
+            .select('role')
+            .eq('user_id', userId)
+            .maybeSingle();
+        if (!row) {
+            res.status(404).json({ error: 'Agent not found' });
+            return;
+        }
+        if ((row as any).role !== 'support') {
+            res.status(400).json({ error: 'This route only revokes support agents' });
+            return;
+        }
+        await supabase.from('support_org_assignments').delete().eq('admin_user_id', userId);
+        await supabase.from('platform_admins').delete().eq('user_id', userId);
+        await recordAdminAction({
+            adminUserId: req.user!.id,
+            adminEmail: req.user!.email,
+            action: 'agent.revoke',
+            detail: { revoked_user_id: userId },
+        });
+        res.status(204).send();
+    } catch (error) {
+        console.error('[admin] revoke agent error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * POST /api/admin/agents/:userId/orgs   Body: { organization_id }
+ * Assign an org to a support agent.
+ */
+router.post('/agents/:userId/orgs', requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+        const { userId } = req.params;
+        const organization_id = req.body?.organization_id;
+        if (!organization_id) {
+            res.status(400).json({ error: 'organization_id is required' });
+            return;
+        }
+        const { error } = await supabase
+            .from('support_org_assignments')
+            .upsert(
+                { admin_user_id: userId, organization_id, granted_by: req.user!.id },
+                { onConflict: 'admin_user_id,organization_id', ignoreDuplicates: true }
+            );
+        if (error) throw error;
+        res.status(201).json({ success: true });
+    } catch (error) {
+        console.error('[admin] assign org error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * DELETE /api/admin/agents/:userId/orgs/:orgId
+ * Unassign an org from a support agent.
+ */
+router.delete('/agents/:userId/orgs/:orgId', requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+        const { userId, orgId } = req.params;
+        const { error } = await supabase
+            .from('support_org_assignments')
+            .delete()
+            .eq('admin_user_id', userId)
+            .eq('organization_id', orgId);
+        if (error) throw error;
+        res.status(204).send();
+    } catch (error) {
+        console.error('[admin] unassign org error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// ─── Audit log ───────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/admin/audit/support-session   Body: { organization_id }
+ * Records that an admin entered support mode for an org. Called by the console
+ * when "Open" is clicked. Requires the caller to be allowed to access the org.
+ */
+router.post('/audit/support-session', async (req: AuthenticatedRequest, res) => {
+    try {
+        const organization_id = req.body?.organization_id;
+        if (!organization_id) {
+            res.status(400).json({ error: 'organization_id is required' });
+            return;
+        }
+        if (!(await PlatformAdminService.canAccessOrg(req.user!.id, organization_id))) {
+            res.status(403).json({ error: 'Not allowed to support this organization' });
+            return;
+        }
+        await recordAdminAction({
+            adminUserId: req.user!.id,
+            adminEmail: req.user!.email,
+            organizationId: organization_id,
+            action: 'support.enter',
+        });
+        res.status(201).json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * GET /api/admin/audit
+ * Recent admin actions. Super admins see everything; support agents see only
+ * their own actions.
+ */
+router.get('/audit', async (req: AuthenticatedRequest, res) => {
+    try {
+        let query = supabase
+            .from('admin_audit_log')
+            .select('id, admin_user_id, admin_email, organization_id, action, detail, created_at')
+            .order('created_at', { ascending: false })
+            .limit(200);
+
+        if (!(await PlatformAdminService.isSuperAdmin(req.user!.id))) {
+            query = query.eq('admin_user_id', req.user!.id);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        // Decorate with org names for readability.
+        const orgIds = Array.from(new Set((data || []).map((r) => r.organization_id).filter(Boolean))) as string[];
+        const orgNames = new Map<string, string>();
+        if (orgIds.length > 0) {
+            const { data: orgs } = await supabase.from('organizations').select('id, name').in('id', orgIds);
+            for (const o of orgs || []) orgNames.set(o.id, o.name);
+        }
+
+        res.json(
+            (data || []).map((r) => ({
+                ...r,
+                organization_name: r.organization_id ? orgNames.get(r.organization_id) ?? null : null,
+            }))
+        );
+    } catch (error) {
+        console.error('[admin] list audit error:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });

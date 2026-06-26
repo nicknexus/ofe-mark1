@@ -34,6 +34,26 @@ router.get('/permissions', authenticateUser, async (req: AuthenticatedRequest, r
 router.get('/organizations', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const organizations = await TeamService.getUserAccessibleOrganizations(req.user!.id);
+
+        // Support mode: a platform admin operating inside an org they don't
+        // otherwise belong to. Surface that single org so the app accepts it as
+        // the active org. This block is skipped entirely for normal users and
+        // normal admin flows, because the requested org is already in the list.
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        if (requestedOrgId && !organizations.some((o) => o.id === requestedOrgId)) {
+            const { PlatformAdminService } = await import('../services/platformAdminService');
+            if (await PlatformAdminService.canAccessOrg(req.user!.id, requestedOrgId)) {
+                const supportOrg = await TeamService.getSupportOrgSummary(requestedOrgId);
+                if (supportOrg) {
+                    // Support mode: return ONLY the supported org so the app locks
+                    // to it (no switching back to the admin's own orgs) and treats
+                    // it as the single owned/active/editable org.
+                    res.json([supportOrg]);
+                    return;
+                }
+            }
+        }
+
         res.json(organizations);
     } catch (error) {
         console.error('Error getting organizations:', error);

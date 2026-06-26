@@ -107,14 +107,18 @@ export class OrgAccessService {
                 return { organizationId: requestedOrgId, isOwner: false };
             }
 
-            const isAdmin = await PlatformAdminService.isAdmin(userId);
-            if (isAdmin) {
+            // Platform admins (support mode): may open an org they're allowed to
+            // support — super = any org, support agent = only assigned orgs.
+            // Gated + requires an explicit requestedOrgId, so normal users and
+            // normal admin flows (own org / demos) are unaffected. isOwner stays
+            // false so owner-only surfaces (billing) are never granted here.
+            if (await PlatformAdminService.canAccessOrg(userId, requestedOrgId)) {
                 const { data: org } = await supabase
                     .from('organizations')
-                    .select('id, is_demo')
+                    .select('id')
                     .eq('id', requestedOrgId)
                     .maybeSingle();
-                if (org?.is_demo) {
+                if (org) {
                     return { organizationId: requestedOrgId, isOwner: false };
                 }
             }
@@ -170,6 +174,12 @@ export class OrgAccessService {
         }
         const membership = await TeamService.getUserTeamMembership(userId, ctx.organizationId);
         if (!membership) {
+            // Platform admin in support mode: resolveOrgContext granted access
+            // without an owner/member row → unrestricted edit (billing blocked at
+            // the route layer). Non-admins never reach here with a context.
+            if (await PlatformAdminService.canAccessOrg(userId, ctx.organizationId)) {
+                return { unrestricted: true, organizationId: ctx.organizationId, scope: { ...FULL_SCOPE } };
+            }
             return { unrestricted: false, organizationId: ctx.organizationId, scope: { ...EMPTY_SCOPE } };
         }
         if (resolveMemberType(membership.member_type) === 'admin') {

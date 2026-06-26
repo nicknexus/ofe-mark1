@@ -277,17 +277,6 @@ export default function Layout({ user, children }: LayoutProps) {
  <span>Explore</span>
  </Link>
 
- {/* Admin: Demo Charities (only for platform admins) */}
- {user.is_admin && (
- <Link
- to="/admin/demos"
- className="hidden lg:flex items-center gap-2 px-4 py-2 bg-purple-50 hover:bg-purple-100 border border-purple-200 hover:border-purple-300 rounded-full transition-all duration-200 "
- title="Admin — Demo charities"
- >
- <FlaskConical className="w-4 h-4 text-purple-700" />
- <span className="text-sm font-medium text-purple-700">Demos</span>
- </Link>
- )}
 
  {/* Tutorial Button - Circle Icon */}
  <button

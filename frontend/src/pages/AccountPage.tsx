@@ -36,6 +36,8 @@ import { BillingTab } from '../components/account/BillingTab'
 import { BrandingTab } from '../components/account/BrandingTab'
 import { DangerTab } from '../components/account/DangerTab'
 import { OrganizationTab } from '../components/account/OrganizationTab'
+import { getSupportContext } from '../admin/support'
+import SupportAccountView from '../components/account/SupportAccountView'
 import { StorageTab } from '../components/account/StorageTab'
 import { TeamsTab } from '../components/account/TeamsTab'
 import { WidgetTab } from '../components/account/WidgetTab'
@@ -406,6 +408,7 @@ export default function AccountPage({ subscriptionStatus }: AccountPageOuterProp
  return <PageLoader />
  }
 
+ const isSupportMode = !!getSupportContext()
  const tabs = [
  { id: 'account' as TabType, label: 'Account', icon: UserIcon },
  { id: 'organization' as TabType, label: 'Organization', icon: Building2, requiresOrg: true },
@@ -429,6 +432,7 @@ export default function AccountPage({ subscriptionStatus }: AccountPageOuterProp
  <nav className="space-y-1">
  {tabs.map((tab) => {
  if (tab.id === 'teams' && !canManageTeam) return null
+ if (isSupportMode && (tab.id === 'billing' || tab.id === 'danger')) return null
  if (tab.requiresOrg && !hasOwnOrganization) return null
  const showNotPublicIndicator = tab.id === 'account' && hasOwnOrganization && !ownedOrganization?.is_public
  return (
@@ -454,7 +458,11 @@ export default function AccountPage({ subscriptionStatus }: AccountPageOuterProp
 
  {/* Content */}
  <div className="flex-1 min-w-0">
- {activeTab === 'account' && (
+ {activeTab === 'account' && isSupportMode && activeOrganization && (
+ <SupportAccountView orgId={activeOrganization.id} />
+ )}
+
+ {activeTab === 'account' && !isSupportMode && (
  <AccountTab
  subscriptionStatus={subscriptionStatus}
  user={user}
