@@ -1,14 +1,24 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { writeFileSync } from 'fs'
+import { mkdirSync, writeFileSync } from 'fs'
 import { resolve } from 'path'
 
 function stampVersion() {
+    let root = __dirname
+    let outDir = 'dist'
     return {
         name: 'stamp-version',
-        buildStart() {
-            const file = resolve(__dirname, 'public/version.json')
-            writeFileSync(file, JSON.stringify({ version: String(Date.now()) }) + '\n')
+        configResolved(config) {
+            root = config.root
+            outDir = config.build.outDir
+        },
+        closeBundle() {
+            const dir = resolve(root, outDir)
+            mkdirSync(dir, { recursive: true })
+            writeFileSync(
+                resolve(dir, 'version.json'),
+                JSON.stringify({ version: String(Date.now()) }) + '\n',
+            )
         },
     }
 }

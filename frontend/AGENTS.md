@@ -70,8 +70,8 @@ When adding a new modal, check sibling features for the same flow and match beha
 
 ## Vite & `version.json`
 
-- **`vite.config.ts`** stamps `public/version.json` **only on `vite build`**, not on dev server—so local dev does not constantly rewrite it.
-- Do not commit arbitrary timestamp-only changes unless releasing.
+- **`vite.config.ts`** writes `dist/version.json` at the end of **`vite build`** (build artifact only—not in `public/`, not tracked in git).
+- Dev server does not stamp a version; `useVersionCheck` no-ops until a production build exists.
 
 ## File placement
 

@@ -118,6 +118,7 @@ Thumbs.db
 dist/
 build/
 out/
+frontend/public/version.json
 
 # Database
 *.sqlite
