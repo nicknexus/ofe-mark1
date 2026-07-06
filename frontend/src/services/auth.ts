@@ -161,6 +161,9 @@ export class AuthService {
  if (event === 'SIGNED_OUT') {
  cachedAdminFor = null
  cachedIsAdmin = false
+ // Drop the saved active-org selection so the next login (possibly a
+ // different account) can't inherit the previous user's org context.
+ localStorage.removeItem('nexus-active-org-id')
  }
 
  if (session?.user) {

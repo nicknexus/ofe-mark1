@@ -384,7 +384,7 @@ function App() {
  <div className="min-h-screen" style={{ backgroundColor: '#F9FAFB' }}>
  <UploadProvider>
  <StorageProvider>
- <TeamProvider>
+ <TeamProvider key={user.id}>
  {showTrialBanner && (
  <TrialBanner remainingDays={subscriptionStatus.remainingTrialDays} />
  )}
@@ -654,7 +654,7 @@ function App() {
  <div className="min-h-screen" style={{ backgroundColor: '#F9FAFB' }}>
  <UploadProvider>
  <StorageProvider>
- <TeamProvider>
+ <TeamProvider key={user.id}>
  {showTrialBanner && (
  <TrialBanner
  remainingDays={subscriptionStatus.remainingTrialDays}
@@ -698,7 +698,7 @@ function App() {
  <Router>
  <UploadProvider>
  <StorageProvider>
- <TeamProvider>
+ <TeamProvider key={user.id}>
  <TutorialProvider>
  <OnboardingProvider>
  {showTrialBanner && (
