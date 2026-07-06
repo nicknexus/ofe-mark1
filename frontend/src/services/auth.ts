@@ -146,8 +146,15 @@ export class AuthService {
  // ERR_INTERNET_DISCONNECTED errors on every fetch in the page.
  let cachedAdminFor: string | null = null
  let cachedIsAdmin = false
+ // Monotonic sequence to drop stale async handlers. The /me fetch below
+ // awaits mid-callback; when the user switches accounts quickly, an older
+ // event's handler can resolve AFTER a newer login and clobber it with the
+ // previous user (login succeeds, then the app "switches back"). Any
+ // handler that finishes after a newer auth event has fired is discarded.
+ let seq = 0
 
  return supabase.auth.onAuthStateChange(async (event, session) => {
+ const mySeq = ++seq
  if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
  apiService.clearCache()
  }
@@ -183,6 +190,10 @@ export class AuthService {
  }
  }
 
+ // A newer auth event fired while we were awaiting /me — this
+ // handler is stale; delivering it would switch to the wrong user.
+ if (mySeq !== seq) return
+
  const user: User = {
  id: session.user.id,
  email: session.user.email || '',
@@ -195,6 +206,7 @@ export class AuthService {
  }
  callback(user)
  } else {
+ if (mySeq !== seq) return
  callback(null)
  }
  })
