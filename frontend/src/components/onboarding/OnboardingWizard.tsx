@@ -92,7 +92,11 @@ export default function OnboardingWizard() {
         })
 
         // Reflect what's already there as completed on the hub.
-        const accountDone = !!(organization?.description || organization?.statement || organization?.logo_url || organization?.brand_color || organization?.website_url || organization?.donation_url)
+        // NOTE: brand_color has a DB default ('#c0dfa1'), so every org has one from
+        // creation — only count it as "done" if it's been changed from the default,
+        // otherwise the hub shows Account setup as complete before the user does anything.
+        const brandColorSet = !!organization?.brand_color && organization.brand_color !== '#c0dfa1'
+        const accountDone = !!(organization?.description || organization?.statement || organization?.logo_url || brandColorSet || organization?.website_url || organization?.donation_url)
         setCompleted({ account: accountDone, initiative: initiatives.length > 0 })
       } catch { /* non-fatal — start empty */ }
     })()

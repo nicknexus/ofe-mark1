@@ -1,6 +1,7 @@
 import { supabase } from '../utils/supabase'
 import { MetricTag } from '../types'
 import { InitiativeService } from './initiativeService'
+import { EntitlementService } from './entitlementService'
 // Lazy-import EvidenceService inside reconcile call sites to avoid the
 // circular import that would otherwise form between the two services.
 type ReconcileFns = {
@@ -206,9 +207,26 @@ export class MetricTagService {
      * Cascades to claims: any kpi_update_metric_tags row for this KPI's
      * updates pointing to a tag no longer in `tagIds` is deleted.
      */
+    /**
+     * Plan gate for tag LINK writes (attaching tags to metrics/claims/evidence/
+     * stories). On plans without tags the link is silently skipped so the parent
+     * write (e.g. creating a metric) still succeeds — the UI is locked anyway;
+     * this is the server backstop. Existing links are never removed.
+     */
+    private static async tagLinksLocked(orgId: string | null): Promise<boolean> {
+        if (!orgId) return false // fail open
+        const ent = await EntitlementService.getForOrg(orgId)
+        if (!ent.features.tags) {
+            console.log(`[metricTags] tag link skipped — tags not in org ${orgId}'s plan`)
+            return true
+        }
+        return false
+    }
+
     static async replaceTagsForKpi(kpiId: string, tagIds: string[], userId: string, requestedOrgId?: string): Promise<void> {
         const orgId = await this.getOrgId(userId, requestedOrgId)
         if (!orgId) throw new Error('No organization context')
+        if (tagIds.length > 0 && await this.tagLinksLocked(orgId)) return
 
         // Validate every tag belongs to the caller's org.
         if (tagIds.length > 0) {
@@ -371,6 +389,11 @@ export class MetricTagService {
         if (tagId === null || tagId === undefined || tagId === '') {
             await supabase.from('kpi_update_metric_tags').delete().eq('kpi_update_id', updateId)
         } else {
+            // Plan gate: skip attaching (removal above stays allowed).
+            if (userId) {
+                const orgId = await this.getOrgId(userId)
+                if (await this.tagLinksLocked(orgId)) return
+            }
             // Validate the tag is on the parent KPI.
             const { data: link } = await supabase
                 .from('kpi_metric_tags')
@@ -422,6 +445,7 @@ export class MetricTagService {
     static async setTagsForEvidence(evidenceId: string, tagIds: string[], userId: string, requestedOrgId?: string): Promise<void> {
         const orgId = await this.getOrgId(userId, requestedOrgId)
         if (!orgId) throw new Error('No organization context')
+        if (tagIds.length > 0 && await this.tagLinksLocked(orgId)) return
 
         if (tagIds.length > 0) {
             const { data: validTags } = await supabase
@@ -488,6 +512,7 @@ export class MetricTagService {
     static async setTagsForStory(storyId: string, tagIds: string[], userId: string, requestedOrgId?: string): Promise<void> {
         const orgId = await this.getOrgId(userId, requestedOrgId)
         if (!orgId) throw new Error('No organization context')
+        if (tagIds.length > 0 && await this.tagLinksLocked(orgId)) return
 
         if (tagIds.length > 0) {
             const { data: validTags } = await supabase

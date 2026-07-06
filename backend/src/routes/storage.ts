@@ -1,10 +1,13 @@
 import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { StorageService, PLACEHOLDER_MAX_STORAGE_BYTES } from '../services/storageService';
+import { SubscriptionService } from '../services/subscriptionService';
 import { OrgAccessService } from '../services/orgAccessService';
 import { getCompressionStatus } from '../utils/imageCompression';
 
 const router = Router();
+
+const GB = 1024 ** 3;
 
 /**
  * STORAGE ROUTES - Phase 1: Tracking Only
@@ -53,16 +56,23 @@ router.get('/usage', authenticateUser, async (req: AuthenticatedRequest, res: Re
             return;
         }
 
+        // Real plan storage limit (falls back to the tier default if the column
+        // isn't set yet). Unlimited → show the used amount as the "limit" so the
+        // bar never exceeds 100%.
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const { effectiveLimitBytes } = await SubscriptionService.getStorageLimit(req.user.id, requestedOrgId);
+        const limitBytes = effectiveLimitBytes ?? Math.max(usage.storage_used_bytes, GB);
+        const usedPercentage = limitBytes > 0 ? (usage.storage_used_bytes / limitBytes) * 100 : 0;
+
         res.json({
             ...usage,
-            // Phase 1: Include placeholder values for UI
-            placeholder_max_bytes: PLACEHOLDER_MAX_STORAGE_BYTES,
-            placeholder_max_gb: PLACEHOLDER_MAX_STORAGE_BYTES / (1024 * 1024 * 1024),
-            // TODO Phase 2: Replace these with actual plan values
-            // storage_limit_bytes: planLimit,
-            // limit_gb: planLimit / (1024 * 1024 * 1024),
-            // plan_tier: 'free',
-            // limits_enforced: false, // Phase 1
+            used_percentage: Math.round(usedPercentage * 100) / 100,
+            storage_limit_bytes: effectiveLimitBytes,
+            limit_gb: effectiveLimitBytes === null ? null : Math.round((effectiveLimitBytes / GB) * 100) / 100,
+            unlimited: effectiveLimitBytes === null,
+            // Same field names the account UI already reads, now with the real limit:
+            placeholder_max_bytes: limitBytes,
+            placeholder_max_gb: Math.round((limitBytes / GB) * 100) / 100,
         });
     } catch (error) {
         console.error('Storage usage error:', error);

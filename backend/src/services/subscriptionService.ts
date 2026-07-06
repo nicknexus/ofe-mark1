@@ -1,14 +1,20 @@
 import { supabase } from '../utils/supabase';
 import { TeamService } from './teamService';
-import { PLAN_LIMITS, stripe } from '../utils/stripe';
+import { stripe } from '../utils/stripe';
+import { EntitlementService } from './entitlementService';
+import { PLAN_CATALOG, PlanTier, getPlan, normaliseTier, planLimitColumns } from '../config/planCatalog';
 
 export interface Subscription {
     id: string;
     user_id: string;
     organization_id?: string;
-    status: 'none' | 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
-    plan_tier?: 'starter' | 'professional' | 'enterprise' | null;
-    billing_interval?: 'monthly' | 'yearly' | 'lifetime' | null;
+    // 'free' = on the always-free plan (no Stripe sub, permanent access).
+    status: 'none' | 'free' | 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
+    // Current tiers are free/growth/pro. Legacy values (starter/professional/
+    // enterprise) may still exist until the rename migration runs; normaliseTier()
+    // maps them. Kept as string to avoid churn during migration.
+    plan_tier?: string | null;
+    billing_interval?: 'monthly' | 'annual' | 'yearly' | 'lifetime' | null;
     trial_started_at?: string;
     trial_ends_at?: string;
     stripe_customer_id?: string;
@@ -19,6 +25,10 @@ export interface Subscription {
     cancel_at_period_end?: boolean;
     cancelled_at?: string;
     initiatives_limit?: number | null;
+    team_members_limit?: number | null;
+    locations_limit?: number | null;
+    storage_limit_bytes?: number | null;
+    ai_reports_per_day?: number | null;
     created_at: string;
     updated_at: string;
 }
@@ -102,29 +112,74 @@ export class SubscriptionService {
     }
 
     /**
-     * Start free trial - sets status to 'trial' and calculates end date
+     * Activate the always-free plan for a user. Sets status 'free', plan_tier
+     * 'free', and applies all Free limits. Replaces the old free trial — no card,
+     * no expiry. Idempotent-ish: only meaningful from status 'none'.
      */
-    static async startTrial(userId: string): Promise<Subscription> {
-        const now = new Date();
-        const trialEnd = new Date(now.getTime() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000);
-
+    static async activateFree(userId: string): Promise<Subscription> {
         const { data, error } = await supabase
             .from('subscriptions')
             .update({
-                status: 'trial',
-                trial_started_at: now.toISOString(),
-                trial_ends_at: trialEnd.toISOString(),
-                initiatives_limit: PLAN_LIMITS.trial.initiatives_limit
+                status: 'free',
+                ...planLimitColumns('free'),
             })
             .eq('user_id', userId)
             .select()
             .single();
 
         if (error) {
-            throw new Error(`Failed to start trial: ${error.message}`);
+            throw new Error(`Failed to activate free plan: ${error.message}`);
         }
 
         return data;
+    }
+
+    /** @deprecated Trial removed — kept so old callers activate the free plan. */
+    static async startTrial(userId: string): Promise<Subscription> {
+        return this.activateFree(userId);
+    }
+
+    /**
+     * Apply a paid (or free) tier's full limit set + plan_tier to a subscription.
+     * Single writer for plan limits so the DB never drifts from the catalog.
+     */
+    static async applyPlan(userId: string, tier: PlanTier): Promise<Subscription> {
+        const { data, error } = await supabase
+            .from('subscriptions')
+            .update(planLimitColumns(tier))
+            .eq('user_id', userId)
+            .select()
+            .single();
+
+        if (error) {
+            throw new Error(`Failed to apply plan ${tier}: ${error.message}`);
+        }
+        // Plan changed → drop cached entitlements so public/private visibility
+        // reflects the new tier immediately.
+        EntitlementService.bustAll();
+        return data;
+    }
+
+    /**
+     * Downgrade a user to the free plan (e.g. paid subscription lapsed/cancelled).
+     * Applies Free limits and sets status 'free'. Nothing else is touched:
+     * over-limit initiatives, tags, and beneficiary groups are hidden/locked at
+     * read time by EntitlementService, so the user's data (and their is_public
+     * choices) are preserved exactly and reappear instantly on re-upgrade.
+     */
+    static async downgradeToFree(userId: string): Promise<Subscription> {
+        const sub = await supabase
+            .from('subscriptions')
+            .update({ status: 'free', ...planLimitColumns('free'), cancelled_at: new Date().toISOString() })
+            .eq('user_id', userId)
+            .select()
+            .single();
+
+        if (sub.error) {
+            throw new Error(`Failed to downgrade to free: ${sub.error.message}`);
+        }
+        EntitlementService.bustAll();
+        return sub.data;
     }
 
     /**
@@ -154,6 +209,10 @@ export class SubscriptionService {
 
         // First check user's own subscription
         switch (subscription.status) {
+            case 'free':
+                // Always-free plan: permanent access at Free limits.
+                return { hasAccess: true, reason: 'free_plan', subscription };
+
             case 'trial':
                 if (subscription.trial_ends_at && new Date(subscription.trial_ends_at) > new Date()) {
                     return { hasAccess: true, reason: 'trial_active', subscription };
@@ -183,8 +242,11 @@ export class SubscriptionService {
                 break;
 
             case 'past_due':
-                // Could implement grace period here - but check inherited access first
-                break;
+                // Payment failed but Stripe is still retrying (dunning). Keep access
+                // during the grace window — Stripe will either recover the payment
+                // (→ active) or eventually cancel (→ subscription.deleted →
+                // downgradeToFree). We never hard-lock the user out.
+                return { hasAccess: true, reason: 'payment_past_due_grace', subscription };
 
             case 'cancelled':
                 // Check if still in paid period (user cancelled but period hasn't ended)
@@ -250,6 +312,10 @@ export class SubscriptionService {
             if (!ownerSubscription) continue;
 
             switch (ownerSubscription.status) {
+                case 'free':
+                    // Team member of a free-plan owner inherits access (Free allows team members).
+                    return { hasAccess: true, organizationId: membership.organization_id };
+
                 case 'trial':
                     if (ownerSubscription.trial_ends_at && new Date(ownerSubscription.trial_ends_at) > new Date()) {
                         return { hasAccess: true, organizationId: membership.organization_id };
@@ -260,6 +326,10 @@ export class SubscriptionService {
                     if (ownerSubscription.current_period_end && new Date(ownerSubscription.current_period_end) > new Date()) {
                         return { hasAccess: true, organizationId: membership.organization_id };
                     }
+                    return { hasAccess: true, organizationId: membership.organization_id };
+
+                case 'past_due':
+                    // Owner is in the payment-retry grace window — team keeps access.
                     return { hasAccess: true, organizationId: membership.organization_id };
 
                 case 'cancelled':
@@ -358,7 +428,8 @@ export class SubscriptionService {
                 status: 'trial',
                 trial_started_at: now.toISOString(),
                 trial_ends_at: trialEnd.toISOString(),
-                initiatives_limit: PLAN_LIMITS.trial.initiatives_limit
+                // Comped access codes grant Growth-level limits for the window.
+                ...planLimitColumns('growth'),
             })
             .eq('user_id', userId)
             .select()
@@ -391,16 +462,15 @@ export class SubscriptionService {
     }
 
     /**
-     * Get initiatives usage (current count vs limit) for the user's *active* org.
-     * For team members creating in a team org, the org owner's subscription is
-     * the source of truth and the count is org-scoped.
+     * Resolve which org a user is acting in and whose subscription governs it.
+     * The org owner's subscription is always the source of truth for limits.
+     * Shared by every per-org limit/feature check.
      */
-    static async getInitiativesUsage(userId: string, requestedOrgId?: string): Promise<{
-        current: number;
-        limit: number | null;
-        canCreate: boolean;
+    static async resolveActiveOrg(userId: string, requestedOrgId?: string): Promise<{
+        activeOrgId: string | null;
+        ownerId: string;
+        subscription: Subscription;
     }> {
-        // Resolve which org the user is acting in.
         let activeOrgId: string | null = null;
         if (requestedOrgId) {
             const ownsRequested = await TeamService.isUserOwnerOfOrganization(userId, requestedOrgId);
@@ -425,6 +495,136 @@ export class SubscriptionService {
             : userId;
 
         const subscription = await this.getOrCreate(ownerId);
+        return { activeOrgId, ownerId, subscription };
+    }
+
+    /**
+     * Feature access for the user's active org, derived from the owner's plan tier.
+     * Currently only Free restricts tags + beneficiary groups.
+     */
+    static async getFeatureAccess(userId: string, requestedOrgId?: string): Promise<{
+        tier: PlanTier;
+        tags: boolean;
+        beneficiaryGroups: boolean;
+    }> {
+        const { subscription } = await this.resolveActiveOrg(userId, requestedOrgId);
+        const plan = getPlan(subscription.plan_tier);
+        return { tier: plan.tier, tags: plan.features.tags, beneficiaryGroups: plan.features.beneficiaryGroups };
+    }
+
+    /** Locations usage (org-scoped count vs the owner plan's limit). */
+    static async getLocationsUsage(userId: string, requestedOrgId?: string): Promise<{
+        current: number;
+        limit: number | null;
+        canCreate: boolean;
+    }> {
+        const { activeOrgId, subscription } = await this.resolveActiveOrg(userId, requestedOrgId);
+        let countQuery = supabase
+            .from('locations')
+            .select('*', { count: 'exact', head: true });
+        countQuery = activeOrgId
+            ? countQuery.eq('organization_id', activeOrgId)
+            : countQuery.eq('user_id', userId);
+        const { count, error } = await countQuery;
+        if (error) throw new Error(`Failed to count locations: ${error.message}`);
+
+        const current = count || 0;
+        const limit = subscription.locations_limit ?? null;
+        return { current, limit, canCreate: limit === null || current < limit };
+    }
+
+    /**
+     * Storage usage (org bytes used vs the owner plan's byte limit).
+     * `limitBytes` is the raw column (null = unlimited, used for enforcement).
+     * `effectiveLimitBytes` falls back to the plan-tier default when the column
+     * isn't set yet (used for display so the UI never shows a stale number).
+     */
+    static async getStorageLimit(userId: string, requestedOrgId?: string): Promise<{
+        usedBytes: number;
+        limitBytes: number | null;
+        effectiveLimitBytes: number | null;
+        organizationId: string | null;
+    }> {
+        const { activeOrgId, subscription } = await this.resolveActiveOrg(userId, requestedOrgId);
+        let usedBytes = 0;
+        if (activeOrgId) {
+            const { data } = await supabase
+                .from('organizations')
+                .select('storage_used_bytes')
+                .eq('id', activeOrgId)
+                .maybeSingle();
+            usedBytes = data?.storage_used_bytes || 0;
+        }
+        const limitBytes = subscription.storage_limit_bytes ?? null;
+        const effectiveLimitBytes = limitBytes ?? getPlan(subscription.plan_tier).storage_limit_bytes;
+        return { usedBytes, limitBytes, effectiveLimitBytes, organizationId: activeOrgId };
+    }
+
+    /**
+     * Whether an upload of `additionalBytes` would fit within the org's storage
+     * limit. Returns allowed=true when unlimited or under the cap.
+     */
+    static async checkStorageAllowed(userId: string, requestedOrgId: string | undefined, additionalBytes: number): Promise<{
+        allowed: boolean;
+        usedBytes: number;
+        limitBytes: number | null;
+    }> {
+        const { usedBytes, limitBytes } = await this.getStorageLimit(userId, requestedOrgId);
+        if (limitBytes === null) return { allowed: true, usedBytes, limitBytes };
+        return { allowed: usedBytes + Math.max(0, additionalBytes) <= limitBytes, usedBytes, limitBytes };
+    }
+
+    /**
+     * Whether the org may generate another AI report today, given its plan's
+     * daily limit. Counts rows logged in ai_report_log for the current UTC day.
+     */
+    static async checkAiReportQuota(userId: string, requestedOrgId?: string): Promise<{
+        canGenerate: boolean;
+        used: number;
+        limit: number | null;
+        organizationId: string | null;
+    }> {
+        const { activeOrgId, subscription } = await this.resolveActiveOrg(userId, requestedOrgId);
+        const limit = subscription.ai_reports_per_day ?? null;
+        if (limit === null) return { canGenerate: true, used: 0, limit: null, organizationId: activeOrgId };
+        if (!activeOrgId) return { canGenerate: true, used: 0, limit, organizationId: null };
+
+        const startOfDay = new Date();
+        startOfDay.setUTCHours(0, 0, 0, 0);
+        const { count, error } = await supabase
+            .from('ai_report_log')
+            .select('*', { count: 'exact', head: true })
+            .eq('organization_id', activeOrgId)
+            .gte('created_at', startOfDay.toISOString());
+
+        if (error) {
+            // Fail open — never block report generation on a logging-table error.
+            console.error('[checkAiReportQuota] count failed, allowing:', error.message);
+            return { canGenerate: true, used: 0, limit, organizationId: activeOrgId };
+        }
+        const used = count || 0;
+        return { canGenerate: used < limit, used, limit, organizationId: activeOrgId };
+    }
+
+    /** Record an AI report generation for daily-quota accounting. Best-effort. */
+    static async logAiReport(organizationId: string, userId: string): Promise<void> {
+        const { error } = await supabase
+            .from('ai_report_log')
+            .insert([{ organization_id: organizationId, user_id: userId }]);
+        if (error) console.error('[logAiReport] insert failed:', error.message);
+    }
+
+    /**
+     * Get initiatives usage (current count vs limit) for the user's *active* org.
+     * For team members creating in a team org, the org owner's subscription is
+     * the source of truth and the count is org-scoped.
+     */
+    static async getInitiativesUsage(userId: string, requestedOrgId?: string): Promise<{
+        current: number;
+        limit: number | null;
+        canCreate: boolean;
+    }> {
+        const { activeOrgId, subscription } = await this.resolveActiveOrg(userId, requestedOrgId);
 
         let countQuery = supabase
             .from('initiatives')

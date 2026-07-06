@@ -38,17 +38,17 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
         window.location.reload()
     }
 
-    const handleSubscribe = async () => {
+    const handleManageBilling = async () => {
         setSubscribing(true)
         try {
-            const { url } = await SubscriptionService.createCheckoutSession()
+            const { url } = await SubscriptionService.createPortalSession()
             if (url) {
                 window.location.href = url
             } else {
-                toast.error('Failed to create checkout session')
+                toast.error('Failed to open billing portal')
             }
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Failed to start checkout')
+            toast.error(error instanceof Error ? error.message : 'Failed to open billing portal')
         } finally {
             setSubscribing(false)
         }
@@ -83,35 +83,17 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
         }
 
         switch (reason) {
-            case 'trial_expired':
-                return {
-                    title: 'Your Free Trial Has Ended',
-                    subtitle: 'Subscribe to continue tracking your impact',
-                    icon: Clock
-                }
-            case 'subscription_cancelled':
-                return {
-                    title: 'Subscription Cancelled',
-                    subtitle: 'Your subscription has been cancelled',
-                    icon: AlertCircle
-                }
             case 'payment_past_due':
                 return {
-                    title: 'Payment Required',
-                    subtitle: 'Please update your payment method to continue',
+                    title: 'Payment Issue',
+                    subtitle: 'Update your payment method to keep your paid plan',
                     icon: CreditCard
-                }
-            case 'expired':
-                return {
-                    title: 'Subscription Expired',
-                    subtitle: 'Subscribe to regain access to your data',
-                    icon: AlertCircle
                 }
             default:
                 return {
-                    title: 'Subscription Required',
-                    subtitle: 'Subscribe to access all features',
-                    icon: AlertCircle
+                    title: 'Billing Needs Attention',
+                    subtitle: 'Update your billing to restore your paid plan, or continue on the free plan',
+                    icon: CreditCard
                 }
         }
     }
@@ -186,30 +168,16 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
                         ) : (
                             <>
                                 <div className="bg-white/40 backdrop-blur rounded-xl border border-white/60 p-5 mb-6 text-left">
-                                    <h3 className="font-medium text-foreground mb-3">Starter Plan - $2/day (billed $56 every 4 weeks)</h3>
-                                    <ul className="space-y-2 text-sm text-muted-foreground">
-                                        <li className="flex items-center gap-2">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
-                                            2 initiatives included
-                                        </li>
-                                        <li className="flex items-center gap-2">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
-                                            Full KPI tracking & analytics
-                                        </li>
-                                        <li className="flex items-center gap-2">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
-                                            Evidence management
-                                        </li>
-                                        <li className="flex items-center gap-2">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
-                                            Public impact reports
-                                        </li>
-                                    </ul>
+                                    <p className="text-sm text-muted-foreground">
+                                        There's a problem with your subscription's billing. Update your payment
+                                        method to restore your paid plan. Your data is safe, and you can always
+                                        continue on the free plan.
+                                    </p>
                                 </div>
 
                                 <div className="space-y-3">
                                     <button
-                                        onClick={handleSubscribe}
+                                        onClick={handleManageBilling}
                                         disabled={subscribing}
                                         className="w-full bg-primary-500 text-gray-800 py-3.5 px-6 rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium flex items-center justify-center gap-2"
                                     >
@@ -221,7 +189,7 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
                                         ) : (
                                             <>
                                                 <CreditCard className="w-5 h-5" />
-                                                Subscribe Now - $2/day
+                                                Update payment method
                                                 <ArrowRight className="w-5 h-5" />
                                             </>
                                         )}

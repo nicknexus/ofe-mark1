@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { LocationService } from '../services/locationService';
+import { SubscriptionService } from '../services/subscriptionService';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { supabase } from '../utils/supabase';
 
@@ -21,6 +22,18 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
 router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+
+        // Enforce plan locations limit (org-scoped, owner's subscription).
+        const usage = await SubscriptionService.getLocationsUsage(req.user!.id, requestedOrgId);
+        if (!usage.canCreate) {
+            res.status(403).json({
+                error: `Location limit reached (${usage.current}/${usage.limit}). Upgrade your plan to add more locations.`,
+                code: 'LOCATION_LIMIT_REACHED',
+                usage,
+            });
+            return;
+        }
+
         const location = await LocationService.create(req.body, req.user!.id, requestedOrgId);
         res.status(201).json(location);
     } catch (error) {

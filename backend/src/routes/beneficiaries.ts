@@ -1,10 +1,30 @@
-import { Router } from 'express'
+import { Router, Response } from 'express'
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth'
 import { BeneficiaryService } from '../services/beneficiaryService'
 import { OrgAccessService } from '../services/orgAccessService'
+import { SubscriptionService } from '../services/subscriptionService'
 import { supabase } from '../utils/supabase'
 
 const router = Router()
+
+/**
+ * Plan gate for all beneficiary-group WRITES. Reads stay open so the UI can
+ * show existing groups locked (read-only) on the Free plan — data is never
+ * deleted on downgrade, just frozen until they upgrade.
+ */
+async function assertGroupsWritable(req: AuthenticatedRequest, res: Response): Promise<boolean> {
+    const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+    const features = await SubscriptionService.getFeatureAccess(req.user!.id, requestedOrgId)
+    if (!features.beneficiaryGroups) {
+        res.status(403).json({
+            error: 'Beneficiary groups are not available on the Free plan. Upgrade to Growth or Pro to use them.',
+            code: 'FEATURE_NOT_IN_PLAN',
+            feature: 'beneficiaryGroups',
+        })
+        return false
+    }
+    return true
+}
 
 // List groups (optionally by initiative)
 router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
@@ -21,6 +41,7 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
 // Create
 router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
+        if (!(await assertGroupsWritable(req, res))) return
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined
         const group = await BeneficiaryService.create(req.body, req.user!.id, requestedOrgId)
         res.status(201).json(group)
@@ -32,6 +53,7 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
 // Update
 router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
+        if (!(await assertGroupsWritable(req, res))) return
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined
         const group = await BeneficiaryService.update(req.params.id, req.body, req.user!.id, requestedOrgId)
         res.json(group)
@@ -44,6 +66,7 @@ router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
 // Phase 1 (full-access baseline): any team member of the org can delete.
 router.delete('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
+        if (!(await assertGroupsWritable(req, res))) return
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined
         await BeneficiaryService.delete(req.params.id, req.user!.id, requestedOrgId)
         res.status(204).send()
@@ -55,6 +78,7 @@ router.delete('/:id', authenticateUser, async (req: AuthenticatedRequest, res) =
 // Link/unlink data point to groups (post-hoc)
 router.post('/link-kpi-update', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
+        if (!(await assertGroupsWritable(req, res))) return
         const { kpi_update_id, beneficiary_group_ids } = req.body
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined
         const result = await BeneficiaryService.replaceLinksForUpdate(

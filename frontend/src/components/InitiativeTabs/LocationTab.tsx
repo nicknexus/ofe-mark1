@@ -10,6 +10,7 @@ import AddLocationPickerModal from '../AddLocationPickerModal'
 import { useTeam } from '../../context/TeamContext'
 import { notify } from '../../lib/notify'
 import ConfirmDialog from '../ConfirmDialog'
+import UpgradeModal from '../UpgradeModal'
 import { PageLoader } from '../ui'
 import {
  DndContext,
@@ -160,6 +161,7 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  const [orderedLocations, setOrderedLocations] = useState<Location[]>([])
  const [loading, setLoading] = useState(true)
  const [isModalOpen, setIsModalOpen] = useState(false)
+ const [showUpgrade, setShowUpgrade] = useState(false)
  const [isPickerOpen, setIsPickerOpen] = useState(false)
  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null)
@@ -261,7 +263,13 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  setSelectedLocation(null)
  setMapClickCoordinates(null)
 
- } catch (error) {
+ } catch (error: any) {
+ // Free/plan location limit reached → show upgrade options.
+ if (error?.code === 'LOCATION_LIMIT_REACHED') {
+ setIsModalOpen(false)
+ setShowUpgrade(true)
+ return
+ }
  throw error
  }
  }
@@ -513,6 +521,13 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  onLinked={() => {
  loadLocations()
  }}
+ />
+
+ <UpgradeModal
+ isOpen={showUpgrade}
+ onClose={() => setShowUpgrade(false)}
+ title="You've hit your location limit"
+ subtitle="Upgrade to Growth or Pro to add more locations."
  />
 
  {unlinkConfirmId && (

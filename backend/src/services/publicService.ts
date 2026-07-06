@@ -2,6 +2,7 @@ import { supabase } from '../utils/supabase';
 import { Organization, Initiative, KPI, Evidence, Story, Location, BeneficiaryGroup } from '../types';
 import { BeneficiaryService } from './beneficiaryService';
 import { MetricTagService } from './metricTagService';
+import { EntitlementService } from './entitlementService';
 import { aggregateKpiUpdates } from '../utils/kpiAggregation';
 
 // Types for public responses (stripped of sensitive fields)
@@ -164,7 +165,14 @@ export class PublicService {
             created_at: o.created_at
         }));
 
-        const initiatives = (inits || []).map((i: any) => ({
+        // Plan gate: drop initiative hits that are hidden by the org's plan.
+        const initRows: any[] = [];
+        for (const i of (inits || []) as any[]) {
+            if (await EntitlementService.isInitiativeAllowed(i.organization_id, i.id)) {
+                initRows.push(i);
+            }
+        }
+        const initiatives = initRows.map((i: any) => ({
             id: i.id,
             title: i.title,
             description: i.description,
@@ -188,6 +196,8 @@ export class PublicService {
                 const i = link?.initiatives;
                 const o = i?.organizations;
                 if (!i || !o || !o.is_public || o.is_demo) continue;
+                // Plan gate: skip matches pointing at plan-hidden initiatives.
+                if (!(await EntitlementService.isInitiativeAllowed(i.organization_id, i.id))) continue;
                 locationMatches.push({
                     location: {
                         id: l.id,
@@ -264,24 +274,34 @@ export class PublicService {
 
         if (error || !org) return null;
 
-        // Get stats - if org is public, all its initiatives count
+        // Get stats — scoped to what the org's current plan allows, so numbers
+        // from plan-hidden initiatives/locations never leak into public counts.
+        const ent = await EntitlementService.getForOrg(org.id);
         const { data: initiatives } = await supabase
             .from('initiatives')
             .select('id')
             .eq('organization_id', org.id);
 
-        const initiativeIds = (initiatives || []).map(i => i.id);
+        let initiativeIds = (initiatives || []).map(i => i.id);
+        if (ent.allowedInitiativeIds !== null) {
+            const allowed = new Set(ent.allowedInitiativeIds);
+            initiativeIds = initiativeIds.filter(id => allowed.has(id));
+        }
         let locationCount = 0;
         let storyCount = 0;
         let kpiCount = 0;
 
         if (initiativeIds.length > 0) {
             // Locations are org-global now; count by organization_id directly.
-            const { count: locCount } = await supabase
-                .from('locations')
-                .select('id', { count: 'exact', head: true })
-                .eq('organization_id', org.id);
-            locationCount = locCount || 0;
+            if (ent.allowedLocationIds !== null) {
+                locationCount = ent.allowedLocationIds.length;
+            } else {
+                const { count: locCount } = await supabase
+                    .from('locations')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('organization_id', org.id);
+                locationCount = locCount || 0;
+            }
 
             const { count: storCount } = await supabase
                 .from('stories')
@@ -322,7 +342,17 @@ export class PublicService {
 
         if (error) throw new Error(`Failed to fetch initiatives: ${error.message}`);
 
-        return (data || []).map((i: any) => ({
+        // Plan gate: hide initiatives beyond the org's current allowance.
+        let rows = data || [];
+        if (rows.length > 0) {
+            const ent = await EntitlementService.getForOrg(rows[0].organization_id);
+            if (ent.allowedInitiativeIds !== null) {
+                const allowed = new Set(ent.allowedInitiativeIds);
+                rows = rows.filter((i: any) => allowed.has(i.id));
+            }
+        }
+
+        return rows.map((i: any) => ({
             id: i.id,
             title: i.title,
             description: i.description,
@@ -360,7 +390,17 @@ export class PublicService {
 
         if (error) throw new Error(`Failed to fetch metrics: ${error.message}`);
 
-        const rows = data || [];
+        // Plan gate: exclude KPIs (and their totals) from plan-hidden initiatives
+        // so aggregate numbers only reflect what's publicly visible.
+        let rows = data || [];
+        const metricsOrgId = (rows[0] as any)?.initiatives?.organization_id;
+        if (metricsOrgId) {
+            const ent = await EntitlementService.getForOrg(metricsOrgId);
+            if (ent.allowedInitiativeIds !== null) {
+                const allowed = new Set(ent.allowedInitiativeIds);
+                rows = rows.filter((k: any) => allowed.has(k.initiative_id));
+            }
+        }
         const kpiIds = rows.map((k: any) => k.id);
         const allUpdateIds = rows.flatMap((k: any) => (k.kpi_updates || []).map((u: any) => u.id));
 
@@ -425,7 +465,13 @@ export class PublicService {
 
         if (error) throw new Error(`Failed to fetch stories: ${error.message}`);
 
-        const rows = data || [];
+        // Plan gate: drop stories from plan-hidden initiatives.
+        let rows = data || [];
+        const storyEnt = await EntitlementService.getForOrgSlug(orgSlug);
+        if (storyEnt.allowedInitiativeIds !== null) {
+            const allowed = new Set(storyEnt.allowedInitiativeIds);
+            rows = rows.filter((s: any) => allowed.has(s.initiative_id));
+        }
         const tagsByStory = await MetricTagService.getTagIdsForStories(rows.map((s: any) => s.id));
 
         return rows.map((s: any) => {
@@ -473,8 +519,21 @@ export class PublicService {
 
         if (error) throw new Error(`Failed to fetch locations: ${error.message}`);
 
-        return (data || []).map((l: any) => {
-            const links: any[] = l.initiative_locations || [];
+        // Plan gate: hide over-limit locations and links to plan-hidden initiatives.
+        const locEnt = await EntitlementService.getForOrg(org.id);
+        let locRows = data || [];
+        if (locEnt.allowedLocationIds !== null) {
+            const allowedLocs = new Set(locEnt.allowedLocationIds);
+            locRows = locRows.filter((l: any) => allowedLocs.has(l.id));
+        }
+        const allowedInits = locEnt.allowedInitiativeIds !== null
+            ? new Set(locEnt.allowedInitiativeIds)
+            : null;
+
+        return locRows.map((l: any) => {
+            const links: any[] = (l.initiative_locations || []).filter(
+                (link: any) => !allowedInits || (link?.initiatives && allowedInits.has(link.initiatives.id))
+            );
             const initiatives = links.map(link => link?.initiatives).filter(Boolean);
             const initiativeIds = initiatives.map((i: any) => i.id);
             // Keep legacy fields populated with the first linked initiative for
@@ -545,13 +604,22 @@ export class PublicService {
         // Stitch: visual_proof first, then everything else, deduping by id
         // (defensive — should never collide given the disjoint type filters).
         const seen = new Set<string>();
-        const stitched: any[] = [];
+        let stitched: any[] = [];
         for (const r of [...(visualRes.data || []), ...(restRes.data || [])]) {
             if (!seen.has(r.id)) {
                 seen.add(r.id);
                 stitched.push(r);
             }
         }
+
+        // Plan gate: drop evidence from plan-hidden initiatives (before the cap
+        // slice so visible orgs still fill their result window).
+        const evEnt = await EntitlementService.getForOrgSlug(orgSlug);
+        if (evEnt.allowedInitiativeIds !== null) {
+            const allowed = new Set(evEnt.allowedInitiativeIds);
+            stitched = stitched.filter((e: any) => allowed.has(e.initiative_id));
+        }
+
         const rows = cap ? stitched.slice(0, cap) : stitched;
         const evidenceIds = rows.map((e: any) => e.id);
         const allClaimIds = rows.flatMap((e: any) =>
@@ -602,6 +670,13 @@ export class PublicService {
             .single();
 
         if (error || !data) return null;
+
+        // Plan gate: initiatives beyond the org's current plan allowance are
+        // cosmetically hidden — every per-initiative public method resolves
+        // through here, so this one check 404s the whole initiative surface.
+        if (!(await EntitlementService.isInitiativeAllowed(data.organization_id, data.id))) {
+            return null;
+        }
 
         return {
             id: data.id,
@@ -863,6 +938,10 @@ export class PublicService {
         const initiative = await this.getInitiativeBySlug(orgSlug, initiativeSlug);
         if (!initiative) return [];
 
+        // Plan gate: beneficiary groups are hidden entirely on plans without the feature.
+        const ent = await EntitlementService.getForOrg(initiative.organization_id!);
+        if (!ent.features.beneficiaryGroups) return [];
+
         const { data, error } = await supabase
             .from('beneficiary_groups')
             .select(`
@@ -883,6 +962,10 @@ export class PublicService {
     static async getBeneficiaryGroupDetail(orgSlug: string, initiativeSlug: string, groupId: string): Promise<any | null> {
         const initiative = await this.getInitiativeBySlug(orgSlug, initiativeSlug);
         if (!initiative) return null;
+
+        // Plan gate: beneficiary group pages 404 on plans without the feature.
+        const ent = await EntitlementService.getForOrg(initiative.organization_id!);
+        if (!ent.features.beneficiaryGroups) return null;
 
         // Fetch the beneficiary group
         const { data: group, error: groupError } = await supabase
@@ -1719,6 +1802,10 @@ export class PublicService {
             .eq('is_public', true)
             .single();
         if (!org) return [];
+
+        // Plan gate: tags are hidden entirely on plans without the feature.
+        const ent = await EntitlementService.getForOrg(org.id);
+        if (!ent.features.tags) return [];
 
         const { data, error } = await supabase
             .from('metric_tags')

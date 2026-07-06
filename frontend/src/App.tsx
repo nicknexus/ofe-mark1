@@ -90,9 +90,24 @@ function App() {
  checkUser()
 
  // Listen for auth changes
- const { data: authListener } = AuthService.onAuthStateChange((user) => {
- setUser(user)
- if (!user) {
+ const { data: authListener } = AuthService.onAuthStateChange((nextUser) => {
+ // Supabase fires INITIAL_SESSION + SIGNED_IN (and token refreshes), and
+ // checkUser() also runs on mount — each hands us a *new* user object.
+ // Skip the state update when nothing meaningful changed so we don't
+ // re-render (and visibly re-mount) the ToS/onboarding pages repeatedly.
+ setUser(prev => {
+ if (prev && nextUser
+ && prev.id === nextUser.id
+ && prev.accepted_terms_of_service === nextUser.accepted_terms_of_service
+ && prev.has_completed_tutorial === nextUser.has_completed_tutorial
+ && prev.is_admin === nextUser.is_admin
+ && prev.name === nextUser.name
+ && prev.organization === nextUser.organization) {
+ return prev
+ }
+ return nextUser
+ })
+ if (!nextUser) {
  // User logged out - clear subscription status
  setSubscriptionStatus(null)
  }
@@ -120,7 +135,20 @@ function App() {
  const checkUser = async () => {
  try {
  const currentUser = await AuthService.getCurrentUser()
- setUser(currentUser)
+ // Guard against a redundant re-render if the auth listener already set
+ // an equivalent user (both run on mount).
+ setUser(prev => {
+ if (prev && currentUser
+ && prev.id === currentUser.id
+ && prev.accepted_terms_of_service === currentUser.accepted_terms_of_service
+ && prev.has_completed_tutorial === currentUser.has_completed_tutorial
+ && prev.is_admin === currentUser.is_admin
+ && prev.name === currentUser.name
+ && prev.organization === currentUser.organization) {
+ return prev
+ }
+ return currentUser
+ })
  } catch (error) {
  console.error('Error checking user:', error)
  } finally {

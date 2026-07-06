@@ -272,9 +272,9 @@ export interface Subscription {
  id: string;
  user_id: string;
  organization_id?: string;
- status: 'none' | 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
- plan_tier?: 'starter' | 'professional' | 'enterprise' | null;
- billing_interval?: 'monthly' | 'yearly' | 'lifetime' | null;
+ status: 'none' | 'free' | 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
+ plan_tier?: 'free' | 'growth' | 'pro' | 'starter' | 'professional' | 'enterprise' | null;
+ billing_interval?: 'monthly' | 'annual' | 'yearly' | 'lifetime' | null;
  trial_started_at?: string;
  trial_ends_at?: string;
  stripe_customer_id?: string;
@@ -282,6 +282,11 @@ export interface Subscription {
  current_period_start?: string;
  current_period_end?: string;
  cancel_at_period_end?: boolean;
+ initiatives_limit?: number | null;
+ team_members_limit?: number | null;
+ locations_limit?: number | null;
+ storage_limit_bytes?: number | null;
+ ai_reports_per_day?: number | null;
  created_at: string;
  updated_at: string;
 }

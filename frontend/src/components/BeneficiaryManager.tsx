@@ -4,6 +4,8 @@ import { apiService } from '../services/api'
 import { BeneficiaryGroup, Location } from '../types'
 import { notify } from '../lib/notify'
 import BeneficiaryGroupDetailsModal from './BeneficiaryGroupDetailsModal'
+import UpgradeModal from './UpgradeModal'
+import { SubscriptionService } from '../services/subscription'
 import {
  DndContext,
  closestCenter,
@@ -329,6 +331,15 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
  const [derivedLocationIds, setDerivedLocationIds] = useState<Record<string, string[]>>({})
  const [locations, setLocations] = useState<Location[]>([])
  const [locationsMap, setLocationsMap] = useState<Record<string, Location>>({})
+ const [showUpgrade, setShowUpgrade] = useState(false)
+ // Free plan: existing groups stay visible but read-only (locked) until upgrade.
+ const [groupsLocked, setGroupsLocked] = useState(false)
+
+ useEffect(() => {
+ SubscriptionService.getFeatures()
+ .then(f => setGroupsLocked(!f.beneficiaryGroups))
+ .catch(() => { /* fail open */ })
+ }, [])
 
  // Initialize ordered groups from state, sorted by display_order
  useEffect(() => {
@@ -441,7 +452,13 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
  notify.success('Beneficiary group created successfully!')
  loadGroups()
  onRefresh?.()
- } catch (error) {
+ } catch (error: any) {
+ // Free plan can't use beneficiary groups → show upgrade options.
+ if (error?.code === 'FEATURE_NOT_IN_PLAN') {
+ setIsCreateModalOpen(false)
+ setShowUpgrade(true)
+ return
+ }
  const message = error instanceof Error ? error.message : 'Failed to create group'
  notify.error(message)
  throw error
@@ -456,7 +473,12 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
  loadGroups()
  onRefresh?.()
  setEditingGroup(null)
- } catch (error) {
+ } catch (error: any) {
+ if (error?.code === 'FEATURE_NOT_IN_PLAN') {
+ setEditingGroup(null)
+ setShowUpgrade(true)
+ return
+ }
  const message = error instanceof Error ? error.message : 'Failed to update group'
  notify.error(message)
  throw error
@@ -471,7 +493,12 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
  loadGroups()
  onRefresh?.()
  setDeleteConfirmGroup(null)
- } catch (error) {
+ } catch (error: any) {
+ if (error?.code === 'FEATURE_NOT_IN_PLAN') {
+ setDeleteConfirmGroup(null)
+ setShowUpgrade(true)
+ return
+ }
  const message = error instanceof Error ? error.message : 'Failed to delete group'
  notify.error(message)
  }
@@ -502,7 +529,7 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
  </h3>
  {canEditBeneficiaries && (
  <button
- onClick={() => setIsCreateModalOpen(true)}
+ onClick={() => groupsLocked ? setShowUpgrade(true) : setIsCreateModalOpen(true)}
  className="app-btn app-btn-secondary w-full sm:w-auto justify-center sm:justify-start"
  >
  <Plus className="w-4 h-4 flex-shrink-0" />
@@ -510,6 +537,18 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
  </button>
  )}
  </div>
+
+ {/* Free-plan lock banner: groups are preserved but read-only until upgrade */}
+ {groupsLocked && groups.length > 0 && (
+ <button
+ type="button"
+ onClick={() => setShowUpgrade(true)}
+ className="flex items-center gap-2 w-full px-3 py-2 mb-1 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-xl hover:bg-amber-100 transition-colors flex-shrink-0"
+ >
+ <Users className="w-4 h-4 flex-shrink-0" />
+ Beneficiary groups are locked on the Free plan — your data is saved and will unlock when you upgrade.
+ </button>
+ )}
 
  {groups.length === 0 ? (
  <div className="flex-1 flex items-center justify-center">
@@ -520,7 +559,7 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
  </p>
  {canEditBeneficiaries && (
  <Button
- onClick={() => setIsCreateModalOpen(true)}
+ onClick={() => groupsLocked ? setShowUpgrade(true) : setIsCreateModalOpen(true)}
  size="sm"
  >
  Create First Group
@@ -582,6 +621,13 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
  onClose={() => setIsCreateModalOpen(false)}
  onSubmit={handleCreateGroup}
  initiativeId={initiativeId}
+ />
+
+ <UpgradeModal
+ isOpen={showUpgrade}
+ onClose={() => setShowUpgrade(false)}
+ title="Beneficiary groups are a paid feature"
+ subtitle="Upgrade to Growth or Pro to track beneficiary groups."
  />
 
  {/* Edit Modal */}

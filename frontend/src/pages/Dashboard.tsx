@@ -44,8 +44,10 @@ import CreateInitiativeModal from '../components/CreateInitiativeModal'
 import LocationMap from '../components/LocationMap'
 import AllLocationsModal from '../components/AllLocationsModal'
 import ModalFrame from '../components/ModalFrame'
+import UpgradeModal from '../components/UpgradeModal'
+import { SubscriptionService } from '../services/subscription'
 import TagsWidget from '../components/MetricTags/TagsWidget'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Lock } from 'lucide-react'
 import { useTutorial } from '../context/TutorialContext'
 import { useOnboarding } from '../context/OnboardingContext'
 import { useTeam } from '../context/TeamContext'
@@ -60,12 +62,16 @@ function SortableInitiativeCard({
  canDeleteInitiatives,
  openEditModal,
  openDeleteConfirm,
+ locked = false,
+ onLockedClick,
 }: {
  initiative: Initiative
  canEditInitiatives: boolean
  canDeleteInitiatives: boolean
  openEditModal: (i: Initiative) => void
  openDeleteConfirm: (i: Initiative) => void
+ locked?: boolean
+ onLockedClick?: () => void
 }) {
  const {
  attributes,
@@ -87,28 +93,41 @@ function SortableInitiativeCard({
  <div
  ref={setNodeRef}
  style={style}
- className="group bg-gradient-to-br from-white to-gray-50/40 hover:from-primary-50/40 hover:to-primary-50/10 border border-gray-100 hover:border-primary-200/70 rounded-xl p-3.5 transition-all duration-200 relative"
+ className={`group bg-gradient-to-br from-white to-gray-50/40 border rounded-xl p-3.5 transition-all duration-200 relative ${locked ? 'border-gray-200 hover:border-amber-200' : 'hover:from-primary-50/40 hover:to-primary-50/10 border-gray-100 hover:border-primary-200/70'}`}
  >
- <Link to={`/initiatives/${initiative.id}`} className="block">
+ {(() => {
+ const inner = (
  <div className="flex items-start justify-between">
  <div className="flex items-center space-x-3 flex-1 min-w-0">
- <div className="w-10 h-10 rounded-xl bg-white ring-1 ring-gray-200/70 shadow-sm flex items-center justify-center flex-shrink-0 group-hover:ring-primary-200/70 transition-colors">
- <img src="/Nexuslogo.png" alt="Nexus Logo" className="w-5 h-5 object-contain" />
+ <div className={`w-10 h-10 rounded-xl bg-white ring-1 shadow-sm flex items-center justify-center flex-shrink-0 transition-colors ${locked ? 'ring-gray-200/70' : 'ring-gray-200/70 group-hover:ring-primary-200/70'}`}>
+ {locked
+ ? <Lock className="w-4 h-4 text-amber-500" />
+ : <img src="/Nexuslogo.png" alt="Nexus Logo" className="w-5 h-5 object-contain" />}
  </div>
  <div className="flex-1 min-w-0">
- <h3 className="text-sm font-semibold text-gray-800 group-hover:text-primary-600 transition-colors truncate">
+ <h3 className={`text-sm font-semibold truncate transition-colors ${locked ? 'text-gray-500' : 'text-gray-800 group-hover:text-primary-600'}`}>
  {initiative.title}
  </h3>
  <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
- {truncateText(initiative.description, 60)}
+ {locked ? 'Locked — upgrade to unlock this initiative' : truncateText(initiative.description, 60)}
  </p>
  </div>
  </div>
- <span className="text-primary-500 text-sm font-medium group-hover:translate-x-0.5 transition-transform flex-shrink-0 ml-2">
- →
+ <span className={`text-sm font-medium flex-shrink-0 ml-2 transition-transform ${locked ? 'text-amber-500' : 'text-primary-500 group-hover:translate-x-0.5'}`}>
+ {locked ? <Lock className="w-3.5 h-3.5" /> : '→'}
  </span>
  </div>
+ )
+ return locked ? (
+ <button type="button" onClick={onLockedClick} className="block w-full text-left">
+ {inner}
+ </button>
+ ) : (
+ <Link to={`/initiatives/${initiative.id}`} className="block">
+ {inner}
  </Link>
+ )
+ })()}
 
  {/* Edit/Delete buttons - top right, gated per granular permission. */}
  {(canEditInitiatives || canDeleteInitiatives) && (
@@ -391,6 +410,8 @@ export default function Dashboard() {
  const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null)
  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
  const [upgradeUsage, setUpgradeUsage] = useState<{ current: number; limit: number } | null>(null)
+ // Plan initiative limit — used to lock over-limit initiatives after a downgrade.
+ const [initiativesLimit, setInitiativesLimit] = useState<number | null>(null)
 
  // Add loading cache to prevent duplicate requests
  const [isLoadingData, setIsLoadingData] = useState(false)
@@ -513,6 +534,11 @@ export default function Dashboard() {
  const initiatives = await apiService.loadInitiativesOnly()
  setInitiatives(initiatives)
  setLoadingState({ isLoading: false }) // Show initiatives immediately
+
+ // Fetch the plan's initiative limit so we can lock over-limit initiatives.
+ SubscriptionService.getInitiativesUsage()
+ .then(u => setInitiativesLimit(u.limit))
+ .catch(() => { /* non-fatal */ })
 
  // Load KPIs, evidence, and locations in background
  const [{ kpis, evidence }, locations] = await Promise.all([
@@ -665,12 +691,26 @@ export default function Dashboard() {
 
  // ============ Completeness + Next Steps (owner only) ============
  // IMPORTANT: these hooks MUST run before any early return to preserve hook order.
+ // Over-limit initiatives are locked: keep the oldest `limit`, lock the rest.
+ // Matches the backend's downgrade rule (enforcePlanLimits keeps the oldest).
+ const lockedInitiativeIds = useMemo(() => {
+ const set = new Set<string>()
+ if (initiativesLimit === null || initiatives.length <= initiativesLimit) return set
+ const byAge = [...initiatives].sort((a, b) => {
+ const ta = a.created_at ? new Date(a.created_at).getTime() : 0
+ const tb = b.created_at ? new Date(b.created_at).getTime() : 0
+ return ta - tb
+ })
+ byAge.slice(initiativesLimit).forEach(i => { if (i.id) set.add(i.id) })
+ return set
+ }, [initiatives, initiativesLimit])
+
  const publicChecks = useMemo(() => {
  const o = ownedOrganization
  const firstInit = initiatives[0]?.id
  return [
  { id: 'logo', label: 'Upload organization logo', done: !!o?.logo_url, to: '/account?tab=organization' },
- { id: 'brand', label: 'Set brand color', done: !!o?.brand_color, to: '/account?tab=branding' },
+ { id: 'brand', label: 'Set brand color', done: !!o?.brand_color && o.brand_color !== '#c0dfa1', to: '/account?tab=branding' },
  { id: 'statement', label: 'Write mission statement', done: !!(o?.statement && o.statement.trim().length > 0), to: '/account?tab=organization' },
  { id: 'public', label: 'Make organization public', done: !!o?.is_public, to: '/account?tab=organization' },
  { id: 'initiative', label: 'Create an initiative', done: initiatives.length > 0, to: '/' },
@@ -868,6 +908,8 @@ export default function Dashboard() {
  canDeleteInitiatives={canDelete}
  openEditModal={openEditModal}
  openDeleteConfirm={openDeleteConfirm}
+ locked={!!initiative.id && lockedInitiativeIds.has(initiative.id)}
+ onLockedClick={() => setShowUpgradeModal(true)}
  />
  ))}
  </div>
@@ -1024,70 +1066,12 @@ export default function Dashboard() {
  )}
 
  {/* Upgrade Modal - Initiative Limit Reached */}
- {showUpgradeModal && (
- <ModalFrame zIndexClass="z-[60]" panelClassName="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-app-modal transform transition-all duration-200 ease-out">
- {/* Header */}
- <div className="relative bg-gradient-to-br from-amber-50 to-orange-50 p-6 text-center border-b border-amber-100">
- <button
- onClick={() => setShowUpgradeModal(false)}
- className="absolute top-4 right-4 app-btn app-btn-icon app-btn-ghost"
- >
- <X className="w-5 h-5" />
- </button>
- <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-amber-200 rounded-full flex items-center justify-center mx-auto mb-4">
- <Zap className="w-8 h-8 text-amber-600" />
- </div>
- <h2 className="text-xl font-bold text-gray-900 mb-1">Initiative Limit Reached</h2>
- <p className="text-gray-600 text-sm">
- You're using {upgradeUsage?.current || initiatives.length} of {upgradeUsage?.limit || 2} initiatives
- </p>
- </div>
-
- {/* Body */}
- <div className="p-6">
- <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-5 mb-6 border border-amber-100">
- <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
- <span className="text-amber-600">⚡</span>
- Initiative Limit Reached
- </h3>
- <div className="space-y-2 text-sm text-gray-700">
- <p className="flex items-start gap-2">
- <span className="text-amber-500 mt-0.5">•</span>
- <span>You've used all {upgradeUsage?.limit || 2} initiatives in your plan</span>
- </p>
- <p className="flex items-start gap-2">
- <span className="text-amber-500 mt-0.5">•</span>
- <span><strong>+$1/day</strong> per additional initiative (coming soon)</span>
- </p>
- <p className="flex items-start gap-2">
- <span className="text-amber-500 mt-0.5">•</span>
- <span>Delete an existing initiative to create a new one</span>
- </p>
- </div>
- </div>
-
- {/* Actions */}
- <div className="flex flex-col gap-3">
- <button
- onClick={() => {
- setShowUpgradeModal(false)
- navigate('/account')
- }}
- className="app-btn app-btn-primary w-full py-3 px-6 justify-center gap-2"
- >
- Manage Subscription
- <ArrowRight className="w-5 h-5" />
- </button>
- <button
- onClick={() => setShowUpgradeModal(false)}
- className="w-full py-2.5 px-4 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-all"
- >
- Maybe Later
- </button>
- </div>
- </div>
- </ModalFrame>
- )}
+ <UpgradeModal
+ isOpen={showUpgradeModal}
+ onClose={() => setShowUpgradeModal(false)}
+ title="You've hit your initiative limit"
+ subtitle={`You're using ${upgradeUsage?.current ?? initiatives.length} of ${upgradeUsage?.limit ?? 1} initiatives. Upgrade for more.`}
+ />
 
  </>
  )

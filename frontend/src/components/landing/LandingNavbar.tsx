@@ -6,11 +6,12 @@ import { Organization } from "../../types";
 
 interface LandingNavbarProps {
   onGetStarted: () => void;
+  onSignIn: () => void;
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-const LandingNavbar = ({ onGetStarted }: LandingNavbarProps) => {
+const LandingNavbar = ({ onGetStarted, onSignIn }: LandingNavbarProps) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Close mobile menu on resize to desktop
@@ -66,7 +67,7 @@ const LandingNavbar = ({ onGetStarted }: LandingNavbarProps) => {
             
             {/* Desktop buttons */}
             <div className="hidden lg:flex items-center gap-3">
-              <Button variant="ghost" onClick={onGetStarted}>Sign In</Button>
+              <Button variant="ghost" onClick={onSignIn}>Sign In</Button>
               <Button variant="sage" onClick={onGetStarted}>Get Started</Button>
             </div>
 
@@ -129,7 +130,7 @@ const LandingNavbar = ({ onGetStarted }: LandingNavbarProps) => {
             <div className="p-4 pt-2 border-t border-gray-100 space-y-2">
               <button 
                 className="w-full px-4 py-3 text-foreground font-medium rounded-xl hover:bg-black/5 transition-colors text-center"
-                onClick={() => { setMobileMenuOpen(false); onGetStarted(); }}
+                onClick={() => { setMobileMenuOpen(false); onSignIn(); }}
               >
                 Sign In
               </button>

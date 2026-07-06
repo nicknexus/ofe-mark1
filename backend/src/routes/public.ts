@@ -1,8 +1,19 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import { PublicService } from '../services/publicService';
 import { OrganizationContextService } from '../services/organizationContextService';
+import { EntitlementService, stripGatedFields } from '../services/entitlementService';
 
 const router = Router();
+
+/**
+ * Send a public payload with plan-gated fields (tags, beneficiary groups)
+ * cosmetically stripped when the org's current plan doesn't include them.
+ * No-op for plans with all features — underlying data is never touched.
+ */
+async function sendPublic(res: Response, orgSlug: string, payload: any): Promise<void> {
+    const ent = await EntitlementService.getForOrgSlug(orgSlug);
+    res.json(stripGatedFields(payload, ent.features));
+}
 
 // ============================================
 // SEARCH
@@ -65,7 +76,7 @@ router.get('/organizations/:slug/initiatives', async (req, res) => {
 router.get('/organizations/:slug/metrics', async (req, res) => {
     try {
         const metrics = await PublicService.getOrganizationMetrics(req.params.slug);
-        res.json(metrics);
+        await sendPublic(res, req.params.slug, metrics);
     } catch (error) {
         console.error('Get org metrics error:', error);
         res.status(500).json({ error: (error as Error).message });
@@ -77,7 +88,7 @@ router.get('/organizations/:slug/stories', async (req, res) => {
     try {
         const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
         const stories = await PublicService.getOrganizationStories(req.params.slug, limit);
-        res.json(stories);
+        await sendPublic(res, req.params.slug, stories);
     } catch (error) {
         console.error('Get org stories error:', error);
         res.status(500).json({ error: (error as Error).message });
@@ -122,7 +133,7 @@ router.get('/organizations/:slug/evidence', async (req, res) => {
     try {
         const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
         const evidence = await PublicService.getOrganizationEvidence(req.params.slug, limit);
-        res.json(evidence);
+        await sendPublic(res, req.params.slug, evidence);
     } catch (error) {
         console.error('Get org evidence error:', error);
         res.status(500).json({ error: (error as Error).message });
@@ -156,7 +167,7 @@ router.get('/initiatives/:orgSlug/:slug/dashboard', async (req, res) => {
             res.status(404).json({ error: 'Initiative not found' });
             return;
         }
-        res.json(dashboard);
+        await sendPublic(res, req.params.orgSlug, dashboard);
     } catch (error) {
         console.error('Get initiative dashboard error:', error);
         res.status(500).json({ error: (error as Error).message });
@@ -167,7 +178,7 @@ router.get('/initiatives/:orgSlug/:slug/dashboard', async (req, res) => {
 router.get('/initiatives/:orgSlug/:slug/kpis', async (req, res) => {
     try {
         const kpis = await PublicService.getInitiativeKPIs(req.params.orgSlug, req.params.slug);
-        res.json(kpis);
+        await sendPublic(res, req.params.orgSlug, kpis);
     } catch (error) {
         console.error('Get initiative KPIs error:', error);
         res.status(500).json({ error: (error as Error).message });
@@ -178,7 +189,7 @@ router.get('/initiatives/:orgSlug/:slug/kpis', async (req, res) => {
 router.get('/initiatives/:orgSlug/:slug/stories', async (req, res) => {
     try {
         const stories = await PublicService.getInitiativeStories(req.params.orgSlug, req.params.slug);
-        res.json(stories);
+        await sendPublic(res, req.params.orgSlug, stories);
     } catch (error) {
         console.error('Get initiative stories error:', error);
         res.status(500).json({ error: (error as Error).message });
@@ -204,7 +215,7 @@ router.get('/initiatives/:orgSlug/:slug/location/:locationId', async (req, res) 
             res.status(404).json({ error: 'Location not found' });
             return;
         }
-        res.json(detail);
+        await sendPublic(res, req.params.orgSlug, detail);
     } catch (error) {
         console.error('Get location detail error:', error);
         res.status(500).json({ error: (error as Error).message });
@@ -215,7 +226,7 @@ router.get('/initiatives/:orgSlug/:slug/location/:locationId', async (req, res) 
 router.get('/initiatives/:orgSlug/:slug/evidence', async (req, res) => {
     try {
         const evidence = await PublicService.getInitiativeEvidence(req.params.orgSlug, req.params.slug);
-        res.json(evidence);
+        await sendPublic(res, req.params.orgSlug, evidence);
     } catch (error) {
         console.error('Get initiative evidence error:', error);
         res.status(500).json({ error: (error as Error).message });
@@ -264,7 +275,7 @@ router.get('/initiatives/:orgSlug/:initiativeSlug/metric/:metricSlug', async (re
             res.status(404).json({ error: 'Metric not found' });
             return;
         }
-        res.json(metric);
+        await sendPublic(res, req.params.orgSlug, metric);
     } catch (error) {
         console.error('Get metric detail error:', error);
         res.status(500).json({ error: (error as Error).message });
@@ -283,7 +294,7 @@ router.get('/initiatives/:orgSlug/:initiativeSlug/claim/:claimId', async (req, r
             res.status(404).json({ error: 'Impact claim not found' });
             return;
         }
-        res.json(claim);
+        await sendPublic(res, req.params.orgSlug, claim);
     } catch (error) {
         console.error('Get impact claim detail error:', error);
         res.status(500).json({ error: (error as Error).message });
@@ -302,7 +313,7 @@ router.get('/initiatives/:orgSlug/:initiativeSlug/story/:storyId', async (req, r
             res.status(404).json({ error: 'Story not found' });
             return;
         }
-        res.json(story);
+        await sendPublic(res, req.params.orgSlug, story);
     } catch (error) {
         console.error('Get story detail error:', error);
         res.status(500).json({ error: (error as Error).message });
@@ -321,7 +332,7 @@ router.get('/initiatives/:orgSlug/:initiativeSlug/evidence/:evidenceId', async (
             res.status(404).json({ error: 'Evidence not found' });
             return;
         }
-        res.json(evidence);
+        await sendPublic(res, req.params.orgSlug, evidence);
     } catch (error) {
         console.error('Get evidence detail error:', error);
         res.status(500).json({ error: (error as Error).message });

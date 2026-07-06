@@ -6,6 +6,7 @@ import { MetricTagService } from './metricTagService';
 import { aggregateKpiUpdates } from '../utils/kpiAggregation';
 import { PermissionService } from './permissionService';
 import { OrgAccessService } from './orgAccessService';
+import { EntitlementService } from './entitlementService';
 
 export class KPIService {
     static async create(kpi: KPI, userId: string, requestedOrgId?: string): Promise<KPI> {
@@ -308,6 +309,9 @@ export class KPIService {
             throw new Error('Location is required for impact claims')
         }
 
+        // Captured for the plan gate on beneficiary-group links below.
+        let planOrgId: string | null = null
+
         // Authorize via the parent KPI's org context.
         if (update.kpi_id) {
             const kpi = await this.getById(update.kpi_id, userId, requestedOrgId)
@@ -326,6 +330,7 @@ export class KPIService {
                 userId,
                 requestedOrgId
             )
+            planOrgId = organizationId
             await OrgAccessService.assertLocationInOrg(
                 update.location_id!,
                 organizationId,
@@ -345,8 +350,11 @@ export class KPIService {
 
         if (error) throw new Error(`Failed to add KPI update: ${error.message}`);
 
-        // Link to beneficiary groups if provided
-        if (Array.isArray(beneficiary_group_ids) && beneficiary_group_ids.length > 0) {
+        // Link to beneficiary groups if provided. Plan gate: silently skipped on
+        // plans without the feature (UI is locked; this is the server backstop).
+        const benGroupsAllowed = !planOrgId
+            || (await EntitlementService.getForOrg(planOrgId)).features.beneficiaryGroups
+        if (benGroupsAllowed && Array.isArray(beneficiary_group_ids) && beneficiary_group_ids.length > 0) {
             const links = beneficiary_group_ids.map((groupId: string) => ({
                 kpi_update_id: data.id,
                 beneficiary_group_id: groupId,
@@ -433,6 +441,10 @@ export class KPIService {
                 requestedOrgId
             );
 
+            // Plan gate: on plans without tags / beneficiary groups the link
+            // writes below are silently skipped (UI is locked; server backstop).
+            const planFeatures = (await EntitlementService.getForOrg(organizationId)).features;
+
             // Validate each distinct location once (not per claim).
             const uniqueLocationIds = [...new Set(group.map((g) => g.location_id!))];
             for (const locId of uniqueLocationIds) {
@@ -469,14 +481,16 @@ export class KPIService {
 
             // Bulk insert beneficiary-group links across the whole group.
             const benLinks: any[] = [];
-            insertedRows.forEach((row: any, i: number) => {
-                const groups = (group[i] as any).beneficiary_group_ids;
-                if (Array.isArray(groups)) {
-                    for (const gid of groups) {
-                        benLinks.push({ kpi_update_id: row.id, beneficiary_group_id: gid, user_id: userId });
+            if (planFeatures.beneficiaryGroups) {
+                insertedRows.forEach((row: any, i: number) => {
+                    const groups = (group[i] as any).beneficiary_group_ids;
+                    if (Array.isArray(groups)) {
+                        for (const gid of groups) {
+                            benLinks.push({ kpi_update_id: row.id, beneficiary_group_id: gid, user_id: userId });
+                        }
                     }
-                }
-            });
+                });
+            }
             if (benLinks.length > 0) {
                 const { error: benErr } = await supabase
                     .from('kpi_update_beneficiary_groups')
@@ -486,10 +500,12 @@ export class KPIService {
 
             // Bulk insert tag links (single tag per claim).
             const tagLinks: any[] = [];
-            insertedRows.forEach((row: any, i: number) => {
-                const tagId = (group[i] as any).tag_id;
-                if (tagId) tagLinks.push({ kpi_update_id: row.id, tag_id: tagId });
-            });
+            if (planFeatures.tags) {
+                insertedRows.forEach((row: any, i: number) => {
+                    const tagId = (group[i] as any).tag_id;
+                    if (tagId) tagLinks.push({ kpi_update_id: row.id, tag_id: tagId });
+                });
+            }
             if (tagLinks.length > 0) {
                 const { error: tagErr } = await supabase
                     .from('kpi_update_metric_tags')
@@ -803,14 +819,27 @@ export class KPIService {
 
         if (error) throw new Error(`Failed to update KPI update: ${error.message}`);
 
-        // Replace beneficiary links if provided
+        // Replace beneficiary links if provided. Plan gate: re-adding links is
+        // skipped on plans without the feature (removal stays allowed).
         if (beneficiary_group_ids !== undefined) {
             await supabase
                 .from('kpi_update_beneficiary_groups')
                 .delete()
                 .eq('kpi_update_id', id)
 
-            if (Array.isArray(beneficiary_group_ids) && beneficiary_group_ids.length > 0) {
+            let benAllowed = true
+            if (Array.isArray(beneficiary_group_ids) && beneficiary_group_ids.length > 0 && kpi.initiative_id) {
+                const { data: init } = await supabase
+                    .from('initiatives')
+                    .select('organization_id')
+                    .eq('id', kpi.initiative_id)
+                    .maybeSingle()
+                if (init?.organization_id) {
+                    benAllowed = (await EntitlementService.getForOrg(init.organization_id)).features.beneficiaryGroups
+                }
+            }
+
+            if (benAllowed && Array.isArray(beneficiary_group_ids) && beneficiary_group_ids.length > 0) {
                 const links = beneficiary_group_ids.map((groupId: string) => ({
                     kpi_update_id: id,
                     beneficiary_group_id: groupId,

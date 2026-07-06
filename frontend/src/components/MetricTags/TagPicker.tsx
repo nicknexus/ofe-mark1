@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Plus, Tag as TagIcon } from 'lucide-react'
+import { Plus, Tag as TagIcon, Lock } from 'lucide-react'
 import { MetricTag } from '../../types'
 import { apiService } from '../../services/api'
+import { SubscriptionService } from '../../services/subscription'
 import TagChip from './TagChip'
 import { useTeam } from '../../context/TeamContext'
 import { notify } from '../../lib/notify'
@@ -58,6 +59,15 @@ export default function TagPicker({
  const [newName, setNewName] = useState('')
  const [showCreateInput, setShowCreateInput] = useState(false)
  const { canEditTags } = useTeam()
+ // Free plan: tag picking is locked everywhere this picker is embedded
+ // (metric create/edit, claims, evidence, stories) — one check covers all.
+ const [tagsLocked, setTagsLocked] = useState(false)
+
+ useEffect(() => {
+ SubscriptionService.getFeatures()
+ .then(f => setTagsLocked(!f.tags))
+ .catch(() => { /* fail open */ })
+ }, [])
 
  const allowCreate = (canCreate ?? (mode === 'multi')) && canEditTags
 
@@ -109,8 +119,12 @@ export default function TagPicker({
  }
  setNewName('')
  setShowCreateInput(false)
- } catch (e) {
+ } catch (e: any) {
+ if (e?.code === 'FEATURE_NOT_IN_PLAN') {
+ notify.error('Tags are a paid feature. Upgrade to Growth or Pro in Settings → Billing.')
+ } else {
  notify.error((e as Error).message || 'Failed to create tag')
+ }
  } finally {
  setCreating(false)
  }
@@ -130,6 +144,14 @@ export default function TagPicker({
  <div className="flex items-center gap-2 text-sm text-gray-500">
  <Spinner className="w-4 h-4" />
  Loading tags...
+ </div>
+ ) : tagsLocked ? (
+ <div className="bg-amber-50 rounded-lg border border-amber-200 p-3 flex items-start gap-2">
+ <Lock className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+ <p className="text-sm text-amber-700">
+ Tags are locked on the Free plan. Upgrade to Growth or Pro in{' '}
+ <span className="font-medium">Settings → Billing</span> to organize with tags.
+ </p>
  </div>
  ) : mode === 'multi-grouped' ? (
  (() => {

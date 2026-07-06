@@ -1,10 +1,25 @@
 import { Router, Request, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { SubscriptionService } from '../services/subscriptionService';
-import { stripe, STRIPE_CONFIG, PLAN_LIMITS } from '../utils/stripe';
+import { stripe, STRIPE_CONFIG, priceIdForTier, tierFromPriceId, BillingInterval } from '../utils/stripe';
+import { normaliseTier, getPlan, PlanTier } from '../config/planCatalog';
+import { EntitlementService } from '../services/entitlementService';
 import { supabase } from '../utils/supabase';
 
 const router = Router();
+
+/**
+ * Resolve the plan tier a Stripe subscription represents, always re-deriving
+ * from the price id first (self-healing across upgrades/downgrades/portal
+ * changes), then falling back to metadata, then Growth as a safe default for a
+ * paid subscription.
+ */
+function resolvePaidTier(priceId: string | undefined, metadataPlanTier: string | undefined): PlanTier {
+    const fromPrice = tierFromPriceId(priceId);
+    if (fromPrice) return fromPrice.tier;
+    if (metadataPlanTier) return normaliseTier(metadataPlanTier);
+    return 'growth';
+}
 
 /**
  * GET /api/subscription/status
@@ -32,46 +47,41 @@ router.get('/status', authenticateUser, async (req: AuthenticatedRequest, res) =
 });
 
 /**
- * POST /api/subscription/start-trial
- * Activate the 30-day free trial
+ * POST /api/subscription/activate-free
+ * (alias: POST /api/subscription/start-trial — kept for the existing frontend)
+ * Activate the always-free plan. No card, no expiry. Only valid from status
+ * 'none'; if already on any plan we just return the current subscription.
  */
-router.post('/start-trial', authenticateUser, async (req: AuthenticatedRequest, res) => {
+const activateFreeHandler = async (req: AuthenticatedRequest, res: Response) => {
     try {
-        // Get current subscription
         const existing = await SubscriptionService.getOrCreate(req.user!.id);
 
-        // Prevent restarting trial or starting if already subscribed
+        // Already on a plan (free/active/etc.) — idempotent no-op.
         if (existing.status !== 'none') {
-            const errorMessages: Record<string, string> = {
-                'trial': 'Trial is already active',
-                'active': 'You already have an active subscription',
-                'past_due': 'Please update your payment method',
-                'cancelled': 'Trial has already been used',
-                'expired': 'Trial has already been used'
-            };
-
-            res.status(400).json({
-                error: errorMessages[existing.status] || 'Cannot start trial',
-                currentStatus: existing.status
+            res.json({
+                success: true,
+                subscription: existing,
+                remainingTrialDays: null,
+                message: 'Your plan is already active.'
             });
             return;
         }
 
-        // Start the trial
-        const subscription = await SubscriptionService.startTrial(req.user!.id);
-        const remainingTrialDays = SubscriptionService.getRemainingTrialDays(subscription);
-
+        const subscription = await SubscriptionService.activateFree(req.user!.id);
         res.json({
             success: true,
             subscription,
-            remainingTrialDays,
-            message: `Your 30-day free trial has started! You have full access until ${new Date(subscription.trial_ends_at!).toLocaleDateString()}.`
+            remainingTrialDays: null,
+            message: 'Your free plan is active. Welcome aboard!'
         });
     } catch (error) {
-        console.error('Error starting trial:', error);
+        console.error('Error activating free plan:', error);
         res.status(500).json({ error: (error as Error).message });
     }
-});
+};
+
+router.post('/activate-free', authenticateUser, activateFreeHandler);
+router.post('/start-trial', authenticateUser, activateFreeHandler);
 
 /**
  * POST /api/subscription/redeem-code
@@ -169,64 +179,25 @@ router.get('/details', authenticateUser, async (req: AuthenticatedRequest, res) 
 });
 
 /**
- * Helper: Get features available for a plan tier
- * This will be useful when you implement different pricing tiers
+ * Helper: Get features available for a plan tier, derived from the catalog.
+ * Limits shown as human-readable lines; Free omits tags + beneficiary groups.
  */
 function getFeaturesByPlan(
     planTier: string | null | undefined,
-    status: string
+    _status: string
 ): { name: string; included: boolean }[] {
-    // During trial, all features are available
-    if (status === 'trial') {
-        return [
-            { name: 'Unlimited initiatives', included: true },
-            { name: 'Full KPI tracking', included: true },
-            { name: 'Evidence management', included: true },
-            { name: 'Public reports', included: true },
-            { name: 'All integrations', included: true },
-            { name: 'Priority support', included: true }
-        ];
-    }
-
-    // Future: Different features per plan tier
-    switch (planTier) {
-        case 'starter':
-            return [
-                { name: 'Up to 3 initiatives', included: true },
-                { name: 'Basic KPI tracking', included: true },
-                { name: 'Evidence management', included: true },
-                { name: 'Public reports', included: false },
-                { name: 'All integrations', included: false },
-                { name: 'Priority support', included: false }
-            ];
-        case 'professional':
-            return [
-                { name: 'Unlimited initiatives', included: true },
-                { name: 'Full KPI tracking', included: true },
-                { name: 'Evidence management', included: true },
-                { name: 'Public reports', included: true },
-                { name: 'All integrations', included: true },
-                { name: 'Priority support', included: false }
-            ];
-        case 'enterprise':
-            return [
-                { name: 'Unlimited initiatives', included: true },
-                { name: 'Full KPI tracking', included: true },
-                { name: 'Evidence management', included: true },
-                { name: 'Public reports', included: true },
-                { name: 'All integrations', included: true },
-                { name: 'Priority support', included: true }
-            ];
-        default:
-            return [
-                { name: 'Unlimited initiatives', included: false },
-                { name: 'Full KPI tracking', included: false },
-                { name: 'Evidence management', included: false },
-                { name: 'Public reports', included: false },
-                { name: 'All integrations', included: false },
-                { name: 'Priority support', included: false }
-            ];
-    }
+    const plan = getPlan(planTier);
+    const fmtLimit = (n: number | null, unit: string) => (n === null ? `Unlimited ${unit}` : `Up to ${n} ${unit}`);
+    const gb = (bytes: number | null) => (bytes === null ? 'Unlimited storage' : `${Math.round(bytes / (1024 ** 3))} GB storage`);
+    return [
+        { name: fmtLimit(plan.initiatives_limit, 'initiatives'), included: true },
+        { name: fmtLimit(plan.team_members_limit, 'team members'), included: true },
+        { name: fmtLimit(plan.locations_limit, 'locations'), included: true },
+        { name: gb(plan.storage_limit_bytes), included: true },
+        { name: plan.ai_reports_per_day === null ? 'Unlimited AI reports' : `${plan.ai_reports_per_day} AI report/day`, included: true },
+        { name: 'Metric tags / themes', included: plan.features.tags },
+        { name: 'Beneficiary groups', included: plan.features.beneficiaryGroups },
+    ];
 }
 
 /**
@@ -243,8 +214,25 @@ router.post('/create-checkout-session', authenticateUser, async (req: Authentica
 
         const userId = req.user!.id;
         const userEmail = req.user!.email;
-        const { priceId } = req.body || {};
-        const finalPriceId = priceId || STRIPE_CONFIG.STARTER_PRICE_ID;
+        // Self-serve: pass { tier: 'growth'|'pro', interval: 'monthly'|'annual' }.
+        // Legacy/offer links may still pass an explicit { priceId }.
+        const { priceId, tier, interval } = req.body || {};
+
+        let finalPriceId: string;
+        let planTier: PlanTier;
+        if (tier === 'growth' || tier === 'pro') {
+            const billingInterval: BillingInterval = interval === 'annual' ? 'annual' : 'monthly';
+            finalPriceId = priceIdForTier(tier, billingInterval);
+            planTier = tier;
+            if (!finalPriceId) {
+                res.status(400).json({ error: `No Stripe price configured for ${tier} (${billingInterval})` });
+                return;
+            }
+        } else {
+            finalPriceId = priceId || STRIPE_CONFIG.STARTER_PRICE_ID;
+            // Derive the tier from the price where possible (grandfathered/offer prices fall back to growth).
+            planTier = resolvePaidTier(finalPriceId, undefined);
+        }
 
         // Get or create subscription to get/create stripe customer
         let subscription = await SubscriptionService.getOrCreate(userId);
@@ -279,8 +267,8 @@ router.post('/create-checkout-session', authenticateUser, async (req: Authentica
                 mode: 'subscription',
                 success_url: `${STRIPE_CONFIG.SUCCESS_URL}?checkout=success`,
                 cancel_url: `${STRIPE_CONFIG.CANCEL_URL}?checkout=cancelled`,
-                metadata: { user_id: userId, plan_tier: 'starter' },
-                subscription_data: { metadata: { user_id: userId, plan_tier: 'starter' } },
+                metadata: { user_id: userId, plan_tier: planTier },
+                subscription_data: { metadata: { user_id: userId, plan_tier: planTier } },
             });
 
         let session;
@@ -363,25 +351,22 @@ router.post('/webhook', async (req: Request, res: Response) => {
                         : new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString();
 
                     const actualPriceId = stripeSubscription.items?.data?.[0]?.price?.id || STRIPE_CONFIG.STARTER_PRICE_ID;
-                    const planTier = (session.metadata?.plan_tier || 'starter') as 'starter' | 'professional' | 'enterprise';
+                    const planTier = resolvePaidTier(actualPriceId, session.metadata?.plan_tier);
+                    const billingInterval = tierFromPriceId(actualPriceId)?.interval || 'monthly';
 
                     await SubscriptionService.updateFromStripe(userId, {
                         stripe_subscription_id: stripeSubscription.id,
                         stripe_price_id: actualPriceId,
                         status: 'active',
-                        plan_tier: planTier,
-                        billing_interval: 'monthly',
+                        billing_interval: billingInterval,
                         current_period_start: periodStart,
                         current_period_end: periodEnd,
                     });
 
-                    // Set initiative limit for starter plan
-                    await supabase
-                        .from('subscriptions')
-                        .update({ initiatives_limit: PLAN_LIMITS.starter.initiatives_limit })
-                        .eq('user_id', userId);
+                    // Apply the full limit set + plan_tier from the catalog.
+                    await SubscriptionService.applyPlan(userId, planTier);
 
-                    console.log(`✅ Subscription activated for user ${userId}`);
+                    console.log(`✅ Subscription activated for user ${userId} (${planTier}, ${billingInterval})`);
                 }
                 break;
             }
@@ -424,16 +409,32 @@ router.post('/webhook', async (req: Request, res: Response) => {
                         subscription.cancel_at_period_end === true ||
                         (!!subscription.cancel_at && subscription.status === 'active');
 
+                    const updatedPriceId = item?.price?.id as string | undefined;
+
                     await SubscriptionService.updateFromStripe(userId, {
                         status,
+                        ...(updatedPriceId && { stripe_price_id: updatedPriceId }),
                         ...(periodStart && { current_period_start: periodStart }),
                         ...(periodEnd && { current_period_end: periodEnd }),
+                        ...(status === 'active' && { billing_interval: tierFromPriceId(updatedPriceId)?.interval || undefined }),
                         cancel_at_period_end: cancelAtPeriodEnd,
                         ...(status === 'cancelled' && { cancelled_at: new Date().toISOString() }),
                         ...(status === 'active' && { cancelled_at: null }),
                     });
 
-                    console.log(`✅ Subscription updated for user ${userId}: ${status}, cancel_at_period_end=${cancelAtPeriodEnd}, periodEnd=${periodEnd}`);
+                    // Re-apply limits from the (possibly changed) price so plan
+                    // switches via the Stripe portal self-heal. On cancellation,
+                    // drop to Free and hide overflow public initiatives.
+                    if (status === 'active') {
+                        const tier = resolvePaidTier(updatedPriceId, subscription.metadata?.plan_tier);
+                        await SubscriptionService.applyPlan(userId, tier);
+                        console.log(`✅ Subscription updated for user ${userId}: active (${tier}), periodEnd=${periodEnd}`);
+                    } else if (status === 'cancelled') {
+                        await SubscriptionService.downgradeToFree(userId);
+                        console.log(`✅ Subscription cancelled for user ${userId} → downgraded to Free`);
+                    } else {
+                        console.log(`✅ Subscription updated for user ${userId}: ${status}, cancel_at_period_end=${cancelAtPeriodEnd}`);
+                    }
                 }
                 break;
             }
@@ -445,11 +446,10 @@ router.post('/webhook', async (req: Request, res: Response) => {
                     userId = await SubscriptionService.getUserIdByStripeSubscriptionId(subscription.id) ?? undefined;
                 }
                 if (userId) {
-                    await SubscriptionService.updateFromStripe(userId, {
-                        status: 'cancelled',
-                        cancelled_at: new Date().toISOString(),
-                    });
-                    console.log(`✅ Subscription cancelled for user ${userId}`);
+                    // Paid subscription ended → downgrade to Free (keep access) and
+                    // hide overflow public initiatives instead of locking the user out.
+                    await SubscriptionService.downgradeToFree(userId);
+                    console.log(`✅ Subscription deleted for user ${userId} → downgraded to Free`);
                 } else {
                     console.warn('[webhook] customer.subscription.deleted: no user_id (metadata or stripe_subscription_id lookup)', subscription.id);
                 }
@@ -493,10 +493,42 @@ router.post('/webhook', async (req: Request, res: Response) => {
 router.get('/initiatives-usage', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
         const userId = req.user!.id;
-        const usage = await SubscriptionService.getInitiativesUsage(userId);
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const usage = await SubscriptionService.getInitiativesUsage(userId, requestedOrgId);
         res.json(usage);
     } catch (error) {
         console.error('Error getting initiatives usage:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * GET /api/subscription/locations-usage
+ * Get current locations count vs limit
+ */
+router.get('/locations-usage', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const usage = await SubscriptionService.getLocationsUsage(req.user!.id, requestedOrgId);
+        res.json(usage);
+    } catch (error) {
+        console.error('Error getting locations usage:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * GET /api/subscription/features
+ * Feature access for the active org (tier + which features are unlocked).
+ * Frontend uses this to lock the tags / beneficiary-group UI on Free.
+ */
+router.get('/features', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const features = await SubscriptionService.getFeatureAccess(req.user!.id, requestedOrgId);
+        res.json(features);
+    } catch (error) {
+        console.error('Error getting feature access:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });

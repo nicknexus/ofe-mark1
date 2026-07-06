@@ -5,8 +5,28 @@ import { SubscriptionService } from '../../services/subscription'
 import type { BillingTabProps } from './accountTypes'
 import { Spinner } from '../ui'
 
+// Self-serve upgrade tiers. Annual = 2 months free (10x monthly).
+const UPGRADE_TIERS = [
+ {
+ tier: 'growth' as const,
+ name: 'Growth',
+ monthly: '$75/mo',
+ annual: '$750/yr',
+ blurb: '10 initiatives · 10 team · 15 locations · 300 GB · unlimited AI · tags & beneficiary groups',
+ },
+ {
+ tier: 'pro' as const,
+ name: 'Pro',
+ monthly: '$240/mo',
+ annual: '$2,400/yr',
+ blurb: '25 initiatives · 20 team · 30 locations · 1 TB · unlimited AI · advanced widgets',
+ },
+]
+
 export function BillingTab({ subscriptionStatus }: BillingTabProps) {
  const [loading, setLoading] = useState(false)
+ const [interval, setInterval] = useState<'monthly' | 'annual'>('monthly')
+ const [upgrading, setUpgrading] = useState<string | null>(null)
 
  const handleOpenPortal = async () => {
  setLoading(true)
@@ -20,8 +40,23 @@ export function BillingTab({ subscriptionStatus }: BillingTabProps) {
  }
  }
 
+ const handleUpgrade = async (tier: 'growth' | 'pro') => {
+ setUpgrading(tier)
+ try {
+ const { url } = await SubscriptionService.createCheckoutSession({ tier, interval })
+ if (url) window.location.href = url
+ else notify.error('Failed to start checkout')
+ } catch (error) {
+ notify.error(error instanceof Error ? error.message : 'Failed to start checkout')
+ } finally {
+ setUpgrading(null)
+ }
+ }
+
  const plan = (subscriptionStatus?.subscription?.plan_tier as string) || 'free'
  const status = (subscriptionStatus?.subscription?.status as string) || 'none'
+ // Paid users manage their plan via the portal; free users see upgrade options.
+ const isPaid = status === 'active' || status === 'past_due'
 
  return (
  <div className="app-card p-6">
@@ -54,8 +89,50 @@ export function BillingTab({ subscriptionStatus }: BillingTabProps) {
  </div>
  </div>
 
+ {/* Upgrade options for free users */}
+ {!isPaid && (
+ <div className="mb-6">
+ <div className="flex items-center justify-between mb-3">
+ <h3 className="text-sm font-semibold text-gray-900">Upgrade your plan</h3>
+ <div className="inline-flex rounded-lg bg-gray-100 p-0.5 text-xs font-medium">
+ <button
+ onClick={() => setInterval('monthly')}
+ className={`px-3 py-1 rounded-md transition-colors ${interval === 'monthly' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}
+ >
+ Monthly
+ </button>
+ <button
+ onClick={() => setInterval('annual')}
+ className={`px-3 py-1 rounded-md transition-colors ${interval === 'annual' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}
+ >
+ Annual <span className="text-impact-600">·2 months free</span>
+ </button>
+ </div>
+ </div>
+ <div className="grid sm:grid-cols-2 gap-3">
+ {UPGRADE_TIERS.map(t => (
+ <div key={t.tier} className="border border-gray-200 rounded-xl p-4 flex flex-col">
+ <div className="flex items-baseline justify-between mb-1">
+ <p className="text-base font-bold text-gray-900">{t.name}</p>
+ <p className="text-sm font-semibold text-gray-900">{interval === 'annual' ? t.annual : t.monthly}</p>
+ </div>
+ <p className="text-xs text-gray-500 flex-1 mb-3">{t.blurb}</p>
+ <button
+ onClick={() => handleUpgrade(t.tier)}
+ disabled={upgrading !== null}
+ className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
+ >
+ {upgrading === t.tier ? <Spinner className="w-4 h-4" /> : null}
+ {upgrading === t.tier ? 'Opening...' : `Upgrade to ${t.name}`}
+ </button>
+ </div>
+ ))}
+ </div>
+ </div>
+ )}
+
  <p className="text-sm text-gray-600 mb-4">
- Open the Stripe billing portal to manage your subscription, update payment methods, view past invoices, or cancel your plan.
+ Open the Stripe billing portal to manage your subscription, update payment methods, view past invoices, or {isPaid ? 'change or cancel your plan' : 'redeem details'}.
  </p>
 
  <button

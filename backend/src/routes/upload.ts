@@ -2,9 +2,12 @@ import { Router, Response } from 'express'
 import { upload, uploadToSupabase } from '../utils/fileUpload'
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth'
 import { StorageService } from '../services/storageService'
+import { SubscriptionService } from '../services/subscriptionService'
 import { compressImage, isCompressibleImage } from '../utils/imageCompression'
 import { supabase } from '../utils/supabase'
 import path from 'path'
+
+const formatGb = (bytes: number) => `${Math.round((bytes / (1024 ** 3)) * 10) / 10} GB`
 
 const router = Router()
 
@@ -16,9 +19,26 @@ router.post('/signed-url', authenticateUser, async (req: AuthenticatedRequest, r
             return
         }
 
-        const { filename, contentType } = req.body
+        const { filename, contentType, fileSize } = req.body
         if (!filename || !contentType) {
             res.status(400).json({ error: 'filename and contentType are required' })
+            return
+        }
+
+        // Enforce plan storage limit before issuing an upload URL.
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const check = await SubscriptionService.checkStorageAllowed(
+            req.user.id,
+            requestedOrgId,
+            typeof fileSize === 'number' ? fileSize : 0
+        )
+        if (!check.allowed) {
+            res.status(413).json({
+                error: `Storage limit reached (${formatGb(check.usedBytes)} of ${formatGb(check.limitBytes!)} used). Upgrade your plan or free up space.`,
+                code: 'STORAGE_LIMIT_REACHED',
+                usedBytes: check.usedBytes,
+                limitBytes: check.limitBytes,
+            })
             return
         }
 
@@ -100,13 +120,19 @@ router.post('/file', authenticateUser, upload.single('file'), async (req: Authen
             return
         }
 
-        // Phase 1: No limit checks - just upload
-        // TODO Phase 2: Check storage limit before upload
-        // const canUpload = await StorageService.checkStorageLimit(req.user.id, req.file.size)
-        // if (!canUpload) {
-        //     res.status(413).json({ error: 'Storage limit exceeded', code: 'STORAGE_LIMIT_EXCEEDED' })
-        //     return
-        // }
+        // Enforce plan storage limit before upload (uses the uncompressed size as
+        // an upper bound; compression only frees up more headroom).
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined
+        const storageCheck = await SubscriptionService.checkStorageAllowed(req.user.id, requestedOrgId, req.file.size)
+        if (!storageCheck.allowed) {
+            res.status(413).json({
+                error: `Storage limit reached (${formatGb(storageCheck.usedBytes)} of ${formatGb(storageCheck.limitBytes!)} used). Upgrade your plan or free up space.`,
+                code: 'STORAGE_LIMIT_REACHED',
+                usedBytes: storageCheck.usedBytes,
+                limitBytes: storageCheck.limitBytes,
+            })
+            return
+        }
 
         // Compress images before upload (invisible to user)
         // Only affects image/* MIME types, PDFs/videos/docs pass through unchanged

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { ReportService } from '../services/reportService';
 import { OrgAccessService } from '../services/orgAccessService';
+import { SubscriptionService } from '../services/subscriptionService';
 import { openai, isOpenAIConfigured } from '../utils/openai';
 import { supabase } from '../utils/supabase';
 
@@ -80,6 +81,17 @@ router.post('/generate-report', authenticateUser, async (req: AuthenticatedReque
         } catch (e) {
             const status = (e as any).status || 403;
             res.status(status).json({ error: (e as Error).message });
+            return;
+        }
+
+        // Enforce the plan's daily AI-report limit (Free = 1/day, paid = unlimited).
+        const quota = await SubscriptionService.checkAiReportQuota(req.user!.id, requestedOrgId);
+        if (!quota.canGenerate) {
+            res.status(403).json({
+                error: `You've used your ${quota.limit} AI report for today on the Free plan. Upgrade to Growth or Pro for unlimited reports.`,
+                code: 'AI_REPORT_LIMIT_REACHED',
+                quota,
+            });
             return;
         }
 
@@ -286,6 +298,12 @@ ${selectedStory ? '- DO NOT include a Story Section - the actual story will be i
         const reportText = completion.choices[0]?.message?.content || 'Failed to generate report';
 
         console.log('OpenAI API success, report length:', reportText.length);
+
+        // Record the generation for daily-quota accounting (best-effort).
+        if (quota.organizationId) {
+            await SubscriptionService.logAiReport(quota.organizationId, req.user!.id);
+        }
+
         res.json({ reportText });
     } catch (error: any) {
         console.error('OpenAI API error:', error);

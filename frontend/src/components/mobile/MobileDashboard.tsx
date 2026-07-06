@@ -1,10 +1,12 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, ChevronRight, Edit, Trash2, X, Zap, ArrowRight, Users, Settings } from 'lucide-react'
+import { Plus, ChevronRight, Edit, Trash2, X, Zap, ArrowRight, Users, Settings, Lock } from 'lucide-react'
 import { Initiative, CreateInitiativeForm } from '../../types'
 import { apiService } from '../../services/api'
+import { SubscriptionService } from '../../services/subscription'
 import { useTeam } from '../../context/TeamContext'
 import CreateInitiativeModal from '../CreateInitiativeModal'
+import UpgradeModal from '../UpgradeModal'
 import { notify } from '../../lib/notify'
 import { EmptyState, SectionLoader } from '../ui'
 
@@ -32,6 +34,27 @@ export default function MobileDashboard({
  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
  const [upgradeUsage, setUpgradeUsage] = useState<{ current: number; limit: number } | null>(null)
+ const [initiativesLimit, setInitiativesLimit] = useState<number | null>(null)
+
+ useEffect(() => {
+ SubscriptionService.getInitiativesUsage()
+ .then(u => setInitiativesLimit(u.limit))
+ .catch(() => { /* non-fatal — no locking if the lookup fails */ })
+ }, [])
+
+ // Over-limit initiatives are locked (oldest `limit` stay active) — mirrors
+ // the desktop dashboard + backend entitlement rule.
+ const lockedIds = useMemo(() => {
+ const set = new Set<string>()
+ if (initiativesLimit === null || initiatives.length <= initiativesLimit) return set
+ const byAge = [...initiatives].sort((a, b) => {
+ const ta = a.created_at ? new Date(a.created_at).getTime() : 0
+ const tb = b.created_at ? new Date(b.created_at).getTime() : 0
+ return ta - tb
+ })
+ byAge.slice(initiativesLimit).forEach(i => { if (i.id) set.add(i.id) })
+ return set
+ }, [initiatives, initiativesLimit])
 
  const handleCreateInitiative = async (formData: CreateInitiativeForm) => {
  try {
@@ -144,31 +167,35 @@ export default function MobileDashboard({
  />
  ) : (
  <div className="space-y-3">
- {initiatives.map((initiative) => (
+ {initiatives.map((initiative) => {
+ const locked = !!initiative.id && lockedIds.has(initiative.id)
+ return (
  <div
  key={initiative.id}
- className="app-card border-2 border-gray-100 overflow-hidden transition-all active:border-primary-300 relative"
+ className={`app-card border-2 overflow-hidden transition-all relative ${locked ? 'border-gray-100 opacity-80' : 'border-gray-100 active:border-primary-300'}`}
  >
  <div className="p-4 flex items-center gap-3">
- {/* Tappable area to enter initiative */}
+ {/* Tappable area to enter initiative (locked → upgrade) */}
  <button
- onClick={() => onEnterInitiative(initiative)}
+ onClick={() => locked ? setShowUpgradeModal(true) : onEnterInitiative(initiative)}
  className="flex-1 flex items-center gap-3 min-w-0 text-left active:bg-gray-50 -m-2 p-2 rounded-xl"
  >
- <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center flex-shrink-0">
- <img src="/Nexuslogo.png" alt="" className="w-5 h-5 object-contain" />
+ <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${locked ? 'bg-amber-50' : 'bg-primary-100'}`}>
+ {locked
+ ? <Lock className="w-4 h-4 text-amber-500" />
+ : <img src="/Nexuslogo.png" alt="" className="w-5 h-5 object-contain" />}
  </div>
  <div className="flex-1 min-w-0">
- <h3 className="font-semibold text-gray-800 truncate">
+ <h3 className={`font-semibold truncate ${locked ? 'text-gray-500' : 'text-gray-800'}`}>
  {initiative.title}
  </h3>
- {initiative.description && (
  <p className="text-xs text-gray-500 truncate mt-0.5">
- {initiative.description}
+ {locked ? 'Locked — upgrade to unlock' : initiative.description}
  </p>
- )}
  </div>
- <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+ {locked
+ ? <Lock className="w-4 h-4 text-amber-500 flex-shrink-0" />
+ : <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />}
  </button>
 
  {/* Settings menu */}
@@ -186,7 +213,8 @@ export default function MobileDashboard({
  )}
  </div>
  </div>
- ))}
+ )
+ })}
  </div>
  )}
 
@@ -307,62 +335,12 @@ export default function MobileDashboard({
  )}
 
  {/* Upgrade Modal - Initiative Limit Reached */}
- {showUpgradeModal && (
- <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[100]">
- <div className="app-card max-w-sm w-full overflow-hidden">
- {/* Header */}
- <div className="relative bg-gradient-to-br from-amber-50 to-orange-50 p-5 text-center border-b border-amber-100">
- <button
- onClick={() => setShowUpgradeModal(false)}
- className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 p-1.5 rounded-lg"
- >
- <X className="w-5 h-5" />
- </button>
- <div className="w-14 h-14 bg-gradient-to-br from-amber-100 to-amber-200 rounded-full flex items-center justify-center mx-auto mb-3">
- <Zap className="w-7 h-7 text-amber-600" />
- </div>
- <h2 className="text-lg font-bold text-gray-900 mb-1">Initiative Limit Reached</h2>
- <p className="text-gray-600 text-sm">
- {upgradeUsage?.current || initiatives.length}/{upgradeUsage?.limit || 2} initiatives used
- </p>
- </div>
-
- {/* Body */}
- <div className="p-5">
- <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 mb-5 border border-amber-100">
- <h3 className="font-semibold text-gray-900 mb-2 text-sm">
- ⚡ Initiative Limit Reached
- </h3>
- <div className="space-y-1.5 text-xs text-gray-700">
- <p>• You've used all {upgradeUsage?.limit || 2} initiatives</p>
- <p>• <strong>+$1/day</strong> per additional (coming soon)</p>
- <p>• Delete an initiative to create a new one</p>
- </div>
- </div>
-
- {/* Actions */}
- <div className="flex flex-col gap-2">
- <button
- onClick={() => {
- setShowUpgradeModal(false)
- onNavigateToAccount?.()
- }}
- className="app-btn app-btn-primary w-full py-3"
- >
- Manage Subscription
- <ArrowRight className="w-4 h-4" />
- </button>
- <button
- onClick={() => setShowUpgradeModal(false)}
- className="app-btn app-btn-ghost w-full py-2.5"
- >
- Maybe Later
- </button>
- </div>
- </div>
- </div>
- </div>
- )}
+ <UpgradeModal
+ isOpen={showUpgradeModal}
+ onClose={() => setShowUpgradeModal(false)}
+ title="You've hit your initiative limit"
+ subtitle={`You're using ${upgradeUsage?.current ?? initiatives.length} of ${upgradeUsage?.limit ?? 1} initiatives. Upgrade for more.`}
+ />
  </div>
  )
 }

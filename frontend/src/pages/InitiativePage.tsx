@@ -196,7 +196,15 @@ export default function InitiativePage() {
  }
 
  setLoadingState({ isLoading: false })
- } catch (error) {
+ } catch (error: any) {
+ // Over-limit initiative on the current plan — locked, not broken.
+ // Send them back to the dashboard where the locked card + upgrade
+ // modal live.
+ if (error?.code === 'INITIATIVE_LOCKED') {
+ notify.error('This initiative is locked on your current plan. Upgrade to unlock it.')
+ navigate('/')
+ return
+ }
  const message = error instanceof Error ? error.message : 'Failed to load dashboard'
  setLoadingState({ isLoading: false, error: message })
  notify.error(message)

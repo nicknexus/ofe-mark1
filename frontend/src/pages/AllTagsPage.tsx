@@ -23,6 +23,8 @@ import { CSS } from '@dnd-kit/utilities'
 import { apiService } from '../services/api'
 import { MetricTag } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
+import UpgradeModal from '../components/UpgradeModal'
+import { SubscriptionService } from '../services/subscription'
 import { PageHeader, SectionLoader, EmptyState } from '../components/ui'
 import { useTeam } from '../context/TeamContext'
 
@@ -151,6 +153,15 @@ export default function AllTagsPage() {
  const [editingId, setEditingId] = useState<string | null>(null)
  const [editName, setEditName] = useState('')
  const [deleteConfirm, setDeleteConfirm] = useState<{ tag: MetricTag; message: string } | null>(null)
+ const [showUpgrade, setShowUpgrade] = useState(false)
+ // Free plan: tags render locked (read-only) until upgrade.
+ const [tagsLocked, setTagsLocked] = useState(false)
+
+ useEffect(() => {
+ SubscriptionService.getFeatures()
+ .then(f => setTagsLocked(!f.tags))
+ .catch(() => { /* fail open */ })
+ }, [])
 
  const sensors = useSensors(
  useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -181,8 +192,13 @@ export default function AllTagsPage() {
  setNewName('')
  setShowInput(false)
  await load()
- } catch (e) {
+ } catch (e: any) {
+ if (e?.code === 'FEATURE_NOT_IN_PLAN') {
+ setShowInput(false)
+ setShowUpgrade(true)
+ } else {
  notify.error((e as Error).message || 'Failed to create tag')
+ }
  } finally {
  setCreating(false)
  }
@@ -194,7 +210,12 @@ export default function AllTagsPage() {
  await apiService.updateMetricTag(id, { name: editName.trim() })
  setEditingId(null)
  await load()
- } catch (e) {
+ } catch (e: any) {
+ if (e?.code === 'FEATURE_NOT_IN_PLAN') {
+ setEditingId(null)
+ setShowUpgrade(true)
+ return
+ }
  notify.error((e as Error).message || 'Failed to update tag')
  }
  }
@@ -214,7 +235,12 @@ export default function AllTagsPage() {
  setDeleteConfirm(null)
  notify.success('Tag deleted')
  await load()
- } catch (e) {
+ } catch (e: any) {
+ if (e?.code === 'FEATURE_NOT_IN_PLAN') {
+ setDeleteConfirm(null)
+ setShowUpgrade(true)
+ return
+ }
  notify.error((e as Error).message || 'Failed to delete tag')
  }
  }
@@ -262,12 +288,24 @@ export default function AllTagsPage() {
  backTo="/"
  icon={TagIcon}
  actions={canEditTags ? (
- <button type="button" onClick={() => setShowInput(s => !s)} className="app-btn app-btn-primary app-btn-sm">
+ <button type="button" onClick={() => tagsLocked ? setShowUpgrade(true) : setShowInput(s => !s)} className="app-btn app-btn-primary app-btn-sm">
  <Plus className="w-4 h-4" />
  New tag
  </button>
  ) : undefined}
  />
+
+ {/* Free-plan lock banner: tags are preserved but read-only until upgrade */}
+ {tagsLocked && tags.length > 0 && (
+ <button
+ type="button"
+ onClick={() => setShowUpgrade(true)}
+ className="flex items-center gap-2 w-full px-4 py-3 mb-4 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-xl hover:bg-amber-100 transition-colors"
+ >
+ <TagIcon className="w-4 h-4 flex-shrink-0" />
+ Tags are locked on the Free plan — your tags are saved and will unlock when you upgrade.
+ </button>
+ )}
 
  <div className="app-card overflow-hidden">
  {showInput && (
@@ -352,6 +390,13 @@ export default function AllTagsPage() {
  onCancel={() => setDeleteConfirm(null)}
  />
  )}
+
+ <UpgradeModal
+ isOpen={showUpgrade}
+ onClose={() => setShowUpgrade(false)}
+ title="Tags are a paid feature"
+ subtitle="Upgrade to Growth or Pro to organize metrics with themes and tags."
+ />
  </div>
  )
 }

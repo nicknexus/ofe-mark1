@@ -6,6 +6,7 @@ import LocationMap from './LocationMap'
 import LocationModal from './LocationModal'
 import ModalFrame from './ModalFrame'
 import ConfirmDialog from './ConfirmDialog'
+import UpgradeModal from './UpgradeModal'
 import { useTeam } from '../context/TeamContext'
 import { notify } from '../lib/notify'
 import { SectionLoader } from './ui'
@@ -22,6 +23,7 @@ export default function AllLocationsModal({ isOpen, onClose }: AllLocationsModal
  const [search, setSearch] = useState('')
  const [selectedId, setSelectedId] = useState<string | null>(null)
  const [isCreateOpen, setIsCreateOpen] = useState(false)
+ const [showUpgrade, setShowUpgrade] = useState(false)
  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
  const load = async () => {
@@ -55,10 +57,19 @@ export default function AllLocationsModal({ isOpen, onClose }: AllLocationsModal
  }, [locations, search])
 
  const handleCreate = async (data: Partial<Location>) => {
+ try {
  await apiService.createLocation(data)
  notify.success('Location added')
  await load()
  setIsCreateOpen(false)
+ } catch (error: any) {
+ if (error?.code === 'LOCATION_LIMIT_REACHED') {
+ setIsCreateOpen(false)
+ setShowUpgrade(true)
+ return
+ }
+ throw error
+ }
  }
 
  const handleDelete = async (id: string) => {
@@ -203,6 +214,13 @@ export default function AllLocationsModal({ isOpen, onClose }: AllLocationsModal
  onClose={() => setIsCreateOpen(false)}
  onSubmit={handleCreate}
  initialLocation={null}
+ />
+
+ <UpgradeModal
+ isOpen={showUpgrade}
+ onClose={() => setShowUpgrade(false)}
+ title="You've hit your location limit"
+ subtitle="Upgrade to Growth or Pro to add more locations."
  />
 
  {/* Delete Confirmation */}

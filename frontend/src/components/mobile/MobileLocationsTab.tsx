@@ -338,9 +338,13 @@ function MobileLocationForm({ initiativeId, editLocation, onClose, onSuccess }: 
  notify.success('Location created!')
  }
  onSuccess()
- } catch (error) {
+ } catch (error: any) {
+ if (error?.code === 'LOCATION_LIMIT_REACHED') {
+ notify.error('Location limit reached. Upgrade to Growth or Pro in Settings → Billing to add more.')
+ } else {
  const message = error instanceof Error ? error.message : 'Failed to save location'
  notify.error(message)
+ }
  } finally {
  setLoading(false)
  }

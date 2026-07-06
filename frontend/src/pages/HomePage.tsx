@@ -20,7 +20,9 @@ const SectionLoader = () => (
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const handleGetStarted = () => navigate('/login');
+  // "Get Started" / pricing cards / CTAs → sign up. Only the nav "Sign In" → login.
+  const handleGetStarted = () => navigate('/login?signup=true');
+  const handleSignIn = () => navigate('/login');
 
   return (
     <main className="relative min-h-screen bg-background font-figtree landing-page">
@@ -29,7 +31,7 @@ export default function HomePage() {
         <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(210,220,230,0.2)_1px,transparent_1px),linear-gradient(to_bottom,rgba(210,220,230,0.2)_1px,transparent_1px)] bg-[size:60px_60px]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_50%,transparent_0%,white_70%)]" />
       </div>
-      <LandingNavbar onGetStarted={handleGetStarted} />
+      <LandingNavbar onGetStarted={handleGetStarted} onSignIn={handleSignIn} />
       <HeroSection onGetStarted={handleGetStarted} />
       <Suspense fallback={<SectionLoader />}>
         <ExplorePromoSection />
