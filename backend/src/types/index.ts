@@ -281,6 +281,43 @@ export interface EvidenceType {
     financials: number;
 }
 
+// Unified initiative Timeline (claims + evidence + connections in one payload).
+// Claims/evidence reuse the KPIUpdate/Evidence shapes with derived counts added.
+export interface TimelineClaim extends KPIUpdate {
+    evidence_count: number;
+}
+
+export interface TimelineEvidence extends Evidence {
+    claim_count: number;
+}
+
+export interface TimelineConnection {
+    evidence_id: string;
+    kpi_update_id: string;
+}
+
+export interface TimelineContributor {
+    name: string | null;
+    email: string | null;
+}
+
+export interface TimelineStats {
+    total: number;
+    connected: number;
+    not_connected: number;
+    claims_total: number;
+    evidence_total: number;
+}
+
+export interface TimelineResponse {
+    kpis: KPI[];
+    claims: TimelineClaim[];
+    evidence: TimelineEvidence[];
+    connections: TimelineConnection[];
+    contributors: Record<string, TimelineContributor>;
+    stats: TimelineStats;
+}
+
 export interface User {
     id: string;
     email: string;

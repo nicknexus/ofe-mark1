@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
  Home,
+ Activity,
  BarChart3,
  MapPin,
  Users,
@@ -55,6 +56,7 @@ export default function InitiativeSidebar({
  }, [])
  const tabs = [
  { id: 'home', label: 'Home', icon: Home, description: 'Overview' },
+ { id: 'timeline', label: 'Timeline', icon: Activity, description: 'Impact activity' },
  { id: 'metrics', label: 'Metrics', icon: BarChart3, description: 'Track metrics' },
  { id: 'evidence', label: 'Evidence', icon: FileText, description: 'Evidence Library' },
  { id: 'location', label: 'Location', icon: MapPin, description: 'Locations' },

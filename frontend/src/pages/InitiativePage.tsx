@@ -35,6 +35,7 @@ import MetricsDashboard from '../components/MetricsDashboard'
 import ExpandableKPICard from '../components/ExpandableKPICard'
 import InitiativeSidebar from '../components/InitiativeSidebar'
 import HomeTab from '../components/InitiativeTabs/HomeTab'
+import TimelineTab from '../components/InitiativeTabs/TimelineTab'
 import MetricsTab from '../components/InitiativeTabs/MetricsTab'
 import EvidenceTab from '../components/InitiativeTabs/EvidenceTab'
 import LocationTab from '../components/InitiativeTabs/LocationTab'
@@ -52,7 +53,7 @@ export default function InitiativePage() {
  const [user, setUser] = useState<User | null>(null)
  const [organization, setOrganization] = useState<Organization | null>(null)
  const { id, kpiId } = useParams<{ id: string; kpiId?: string }>()
- const [searchParams] = useSearchParams()
+ const [searchParams, setSearchParams] = useSearchParams()
  const navigate = useNavigate()
  const [dashboard, setDashboard] = useState<InitiativeDashboard | null>(null)
  const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: true })
@@ -73,6 +74,8 @@ export default function InitiativePage() {
  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
  const [isImpactClaimModalWithSelectionOpen, setIsImpactClaimModalWithSelectionOpen] = useState(false)
  const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false)
+ // Timeline "Add claim + evidence": opens the evidence modal after the claim modal creates.
+ const [pendingEvidenceAfterClaim, setPendingEvidenceAfterClaim] = useState(false)
  const [isEditKPIModalOpen, setIsEditKPIModalOpen] = useState(false)
  const [deleteConfirmKPI, setDeleteConfirmKPI] = useState<any>(null)
  const [deleteConfirmText, setDeleteConfirmText] = useState('')
@@ -83,7 +86,7 @@ export default function InitiativePage() {
  // Handle URL query param for tab
  useEffect(() => {
  const tab = searchParams.get('tab')
- if (tab && ['home', 'metrics', 'evidence', 'location', 'beneficiaries', 'stories', 'report'].includes(tab)) {
+ if (tab && ['home', 'timeline', 'metrics', 'evidence', 'location', 'beneficiaries', 'stories', 'report'].includes(tab)) {
  setActiveTab(tab)
  }
  }, [searchParams])
@@ -404,12 +407,13 @@ export default function InitiativePage() {
  const handleTabChange = (tab: string) => {
  setActiveTab(tab)
  // Clear expanded KPIs and navigate to base initiative URL when switching tabs
- if (tab === 'metrics' && kpiId) {
- navigate(`/initiatives/${id}`)
+ if ((tab === 'metrics' && kpiId) || expandedKPIs.size > 0) {
+ navigate(`/initiatives/${id}?tab=${tab}`)
  setExpandedKPIs(new Set())
- } else if (expandedKPIs.size > 0) {
- navigate(`/initiatives/${id}`)
- setExpandedKPIs(new Set())
+ } else {
+ // Keep the tab in the URL so Timeline sub-views/filters can deep-link;
+ // drop stale view/filter params from the previous tab.
+ setSearchParams(new URLSearchParams({ tab }), { replace: true })
  }
  }
 
@@ -499,6 +503,19 @@ export default function InitiativePage() {
  <HomeTab>
  {renderHomeContent()}
  </HomeTab>
+ )
+ case 'timeline':
+ return (
+ <TimelineTab
+ initiativeId={id!}
+ onAddClaim={canAddImpactClaims ? () => setIsImpactClaimModalWithSelectionOpen(true) : undefined}
+ onAddEvidence={canEditEvidence ? () => openEvidenceModal() : undefined}
+ onAddBoth={canAddImpactClaims && canEditEvidence ? () => {
+ setPendingEvidenceAfterClaim(true)
+ setIsImpactClaimModalWithSelectionOpen(true)
+ } : undefined}
+ onRefresh={loadDashboard}
+ />
  )
  case 'metrics':
  return (
@@ -632,10 +649,16 @@ export default function InitiativePage() {
  setIsUpdateModalOpen(false)
  setIsImpactClaimModalWithSelectionOpen(false)
  setSelectedKPI(null)
+ setPendingEvidenceAfterClaim(false)
  }}
  onCreated={(newUpdates) => {
  if (newUpdates?.length) setAllKPIUpdates(prev => [...prev, ...newUpdates])
  refreshAfterClaim()
+ // Timeline "Add claim + evidence": chain straight into the evidence upload.
+ if (pendingEvidenceAfterClaim) {
+ setPendingEvidenceAfterClaim(false)
+ setIsEvidenceModalOpen(true)
+ }
  }}
  initiativeId={id!}
  preSelectedKPI={selectedKPI ?? undefined}

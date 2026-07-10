@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { InitiativeService } from '../services/initiativeService';
 import { KPIService } from '../services/kpiService';
 import { EvidenceService } from '../services/evidenceService';
+import { TimelineService } from '../services/timelineService';
 import { SubscriptionService } from '../services/subscriptionService';
 import { EntitlementService } from '../services/entitlementService';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
@@ -178,4 +179,21 @@ router.get('/:id/kpi-updates', authenticateUser, async (req: AuthenticatedReques
     }
 });
 
-export default router; 
+// Unified timeline payload: claims + evidence + connections + contributors
+// for the whole initiative in one round trip (powers the Timeline tab).
+router.get('/:id/timeline', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        if (!(await assertInitiativeUnlocked(req, res, req.params.id))) return;
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const timeline = await TimelineService.getForInitiative(
+            req.params.id,
+            req.user!.id,
+            requestedOrgId
+        );
+        res.json(timeline);
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+export default router;

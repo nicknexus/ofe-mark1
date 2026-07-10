@@ -18,7 +18,8 @@ import {
  OrganizationContext,
  Donor,
  DonorCredit,
- MetricTag
+ MetricTag,
+ TimelineResponse
 } from '../types'
 import { OnboardingChatResponse, ChatStage, ChatContext } from '../components/onboarding/planTypes'
 
@@ -385,6 +386,14 @@ class ApiService {
 
  async getInitiativeDashboard(id: string): Promise<InitiativeDashboard> {
  return this.request<InitiativeDashboard>(`/initiatives/${id}/dashboard`)
+ }
+
+ /**
+ * Unified Timeline payload: every claim, evidence record, and stored
+ * claim↔evidence connection for the initiative in one round trip.
+ */
+ async getInitiativeTimeline(id: string): Promise<TimelineResponse> {
+ return this.request<TimelineResponse>(`/initiatives/${id}/timeline`)
  }
 
  // KPIs
