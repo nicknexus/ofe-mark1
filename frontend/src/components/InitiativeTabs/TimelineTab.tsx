@@ -27,6 +27,7 @@ import TimelineAddMenu from '../timeline/TimelineAddMenu'
 import ClaimsView from '../timeline/ClaimsView'
 import EvidenceView from '../timeline/EvidenceView'
 import ConnectionsView from '../timeline/ConnectionsView'
+import ConnectEvidenceDialog from '../timeline/ConnectEvidenceDialog'
 import EvidencePreviewModal from '../EvidencePreviewModal'
 import DataPointPreviewModal from '../DataPointPreviewModal'
 import AddEvidenceModal from '../AddEvidenceModal'
@@ -74,6 +75,7 @@ export default function TimelineTab({ initiativeId, onAddClaim, onAddEvidence, o
  const [selectedDataPointKpi, setSelectedDataPointKpi] = useState<any>(null)
  const [isDataPointPreviewOpen, setIsDataPointPreviewOpen] = useState(false)
  const [deleteEvidence, setDeleteEvidence] = useState<Evidence | null>(null)
+ const [connectTarget, setConnectTarget] = useState<{ evidence: TimelineEvidence; claimId?: string } | null>(null)
 
  const rawView = searchParams.get('view')
  const view: TimelineView = rawView === 'evidence' || rawView === 'connections' ? rawView : 'claims'
@@ -279,9 +281,27 @@ export default function TimelineTab({ initiativeId, onAddClaim, onAddEvidence, o
  filters={filters}
  onOpenClaim={handleOpenClaim}
  onOpenEvidence={handleOpenEvidence}
+ onConnectEvidence={canEditEvidence
+ ? (ev, claimId) => setConnectTarget({ evidence: ev, claimId })
+ : undefined}
  />
  )}
  </div>
+
+ {/* Connect evidence → claim (re-scope + link) */}
+ {connectTarget && data && (
+ <ConnectEvidenceDialog
+ evidence={connectTarget.evidence}
+ claims={data.claims}
+ kpis={data.kpis}
+ locations={locations}
+ tags={tags}
+ beneficiaryGroups={beneficiaryGroups}
+ preselectedClaimId={connectTarget.claimId}
+ onClose={() => setConnectTarget(null)}
+ onConnected={refresh}
+ />
+ )}
 
  {/* Evidence preview */}
  {isPreviewModalOpen && selectedEvidence && (

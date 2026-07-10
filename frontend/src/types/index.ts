@@ -244,6 +244,24 @@ export interface TimelineResponse {
  stats: TimelineStats;
 }
 
+// Connect-evidence-to-claim flow. Connecting re-scopes the evidence so the
+// auto-matcher's gates pass; meaning-changing re-scopes require confirmation.
+export type ConnectPlanChange =
+ | { kind: 'link_metric'; kpi_id: string; kpi_title: string }
+ | { kind: 'add_location'; location_id: string }
+ | { kind: 'extend_dates'; date_range_start: string; date_range_end: string }
+ | { kind: 'add_tag'; tag_id: string }
+ | { kind: 'add_beneficiary_groups'; group_ids: string[] };
+
+export interface ConnectEvidenceResult {
+ connected: boolean;
+ requires_confirmation?: boolean;
+ conflict?: string;
+ changes: ConnectPlanChange[];
+ will_disconnect: Array<{ kpi_update_id: string; value: number; kpi_title: string }>;
+ reconcile?: { created: number; pruned: number };
+}
+
 export interface Story {
  id?: string;
  initiative_id: string;

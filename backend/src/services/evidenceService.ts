@@ -1,5 +1,5 @@
 import { supabase } from '../utils/supabase'
-import { Evidence } from '../types'
+import { ConnectEvidenceResult, ConnectPlanChange, Evidence } from '../types'
 import { deleteFromSupabase } from '../utils/fileUpload'
 import { StorageService } from './storageService'
 import { BeneficiaryService } from './beneficiaryService'
@@ -1046,6 +1046,288 @@ export class EvidenceService {
             console.error('reconcileLinksForEvidence failed:', err)
             return { created: 0, pruned: 0 }
         }
+    }
+
+    /**
+     * Connect one evidence row to one impact claim by re-scoping the
+     * evidence until the auto-matcher's gates pass (metric link, location,
+     * date overlap, tag, ben groups), then reconciling. A bare junction
+     * insert would be pruned by the next reconcile, so scope must actually
+     * match — this is the "slot mis-scoped evidence into the right claim"
+     * action on the Timeline.
+     *
+     * Two-phase: without `confirm`, changes that alter the evidence's
+     * meaning (date extension) or break existing links (first tag / first
+     * ben-group scoping) are returned as a dry-run plan. Scope REMOVALS are
+     * never automatic — those return `conflict` and the user is pointed at
+     * the evidence editor.
+     */
+    static async connectToClaim(
+        evidenceId: string,
+        kpiUpdateId: string,
+        confirm: boolean,
+        userId: string,
+        requestedOrgId?: string
+    ): Promise<ConnectEvidenceResult> {
+        const { initiativeId } = await OrgAccessService.assertEvidenceAccess(evidenceId, userId, requestedOrgId)
+
+        const { PermissionService } = await import('./permissionService')
+        await PermissionService.assert(userId, requestedOrgId, 'evidence', 'edit', {
+            resourceId: evidenceId,
+            initiativeId,
+        })
+
+        const { data: claim } = await supabase
+            .from('kpi_updates')
+            .select('id, kpi_id, value, location_id, date_represented, date_range_start, date_range_end, kpis(id, title, initiative_id)')
+            .eq('id', kpiUpdateId)
+            .maybeSingle()
+        const claimKpi: any = (claim as any)?.kpis
+        if (!claim || !claimKpi || claimKpi.initiative_id !== initiativeId) {
+            throw new Error('Impact claim not found in this initiative')
+        }
+
+        const [
+            { data: ev },
+            { data: kpiLinks },
+            { data: locLinks },
+            { data: existingLinks },
+            evTagIds,
+            evBgMap,
+            claimBgMap,
+            claimTagMap,
+        ] = await Promise.all([
+            supabase.from('evidence').select('id, date_represented, date_range_start, date_range_end').eq('id', evidenceId).maybeSingle(),
+            supabase.from('evidence_kpis').select('kpi_id').eq('evidence_id', evidenceId),
+            supabase.from('evidence_locations').select('location_id').eq('evidence_id', evidenceId),
+            supabase.from('evidence_kpi_updates').select('kpi_update_id').eq('evidence_id', evidenceId),
+            MetricTagService.getTagIdsForEvidence(evidenceId),
+            BeneficiaryService.getBenGroupsForEvidence([evidenceId]),
+            BeneficiaryService.getBenGroupsForUpdates([kpiUpdateId]),
+            MetricTagService.getTagIdsForUpdates([kpiUpdateId]),
+        ])
+        if (!ev) throw new Error('Evidence not found')
+
+        const evKpiIds = (kpiLinks || []).map((l: any) => l.kpi_id)
+        const evLocIds = (locLinks || []).map((l: any) => l.location_id)
+        const evBgIds = evBgMap[evidenceId] || []
+        const claimBgIds = claimBgMap[kpiUpdateId] || []
+        const claimTagId = claimTagMap[kpiUpdateId] ?? null
+        const alreadyLinked = (existingLinks || []).map((l: any) => l.kpi_update_id)
+
+        if (alreadyLinked.includes(kpiUpdateId)) {
+            return { connected: true, changes: [], will_disconnect: [] }
+        }
+
+        const changes: ConnectPlanChange[] = []
+
+        // Gate 1 — metric link (candidate precondition). Additive-safe.
+        if (!evKpiIds.includes(claim.kpi_id)) {
+            changes.push({ kind: 'link_metric', kpi_id: claim.kpi_id, kpi_title: claimKpi.title })
+        }
+
+        // Gate 2 — location. Additive-safe.
+        if (!claim.location_id) {
+            return {
+                connected: false,
+                conflict: 'This impact claim has no location, so evidence cannot be matched to it. Add a location to the claim first.',
+                changes: [],
+                will_disconnect: [],
+            }
+        }
+        if (!evLocIds.includes(claim.location_id)) {
+            changes.push({ kind: 'add_location', location_id: claim.location_id })
+        }
+
+        // Gate 3 — date overlap. Widening the evidence range changes what the
+        // evidence asserts, so it always needs confirmation.
+        const evStart = (ev.date_range_start || ev.date_represented || '') as string
+        const evEnd = (ev.date_range_end || ev.date_represented || evStart) as string
+        const claimStart = (claim.date_range_start || claim.date_represented || '') as string
+        const claimEnd = (claim.date_range_end || claim.date_represented || claimStart) as string
+        let plannedDates: { start: string; end: string } | null = null
+        if (!evStart || !claimStart) {
+            return {
+                connected: false,
+                conflict: 'Evidence or claim is missing an activity date.',
+                changes: [],
+                will_disconnect: [],
+            }
+        }
+        if (!this.datesOverlap(evStart, evEnd, claimStart, claimEnd)) {
+            plannedDates = {
+                start: evStart < claimStart ? evStart : claimStart,
+                end: evEnd > claimEnd ? evEnd : claimEnd,
+            }
+            changes.push({ kind: 'extend_dates', date_range_start: plannedDates.start, date_range_end: plannedDates.end })
+        }
+
+        // Gate 4 — tag. Claim untagged + evidence tagged can only be fixed by
+        // REMOVING evidence tags (breaks its links to tagged claims) → conflict.
+        let plannedTagIds = evTagIds
+        if (claimTagId) {
+            if (!evTagIds.includes(claimTagId)) {
+                plannedTagIds = [...evTagIds, claimTagId]
+                changes.push({ kind: 'add_tag', tag_id: claimTagId })
+            }
+        } else if (evTagIds.length > 0) {
+            return {
+                connected: false,
+                conflict: 'This evidence is tagged but the claim has no tag. Connections are automatic while scope matches — remove the evidence\'s tags in the evidence editor if it should support untagged claims.',
+                changes: [],
+                will_disconnect: [],
+            }
+        }
+
+        // Gate 5 — beneficiary groups. Claim unscoped + evidence scoped needs a
+        // scope REMOVAL → conflict. Otherwise add the claim's groups.
+        let plannedBgIds = evBgIds
+        if (claimBgIds.length > 0) {
+            if (!claimBgIds.some(id => evBgIds.includes(id))) {
+                plannedBgIds = [...new Set([...evBgIds, ...claimBgIds])]
+                changes.push({ kind: 'add_beneficiary_groups', group_ids: claimBgIds.filter(id => !evBgIds.includes(id)) })
+            }
+        } else if (evBgIds.length > 0) {
+            return {
+                connected: false,
+                conflict: 'This evidence is scoped to beneficiary groups but the claim is not. Remove the evidence\'s beneficiary groups in the evidence editor if it should support unscoped claims.',
+                changes: [],
+                will_disconnect: [],
+            }
+        }
+
+        // Simulate the re-scoped evidence against every currently-linked claim:
+        // any link whose gate now fails will be pruned by the reconcile.
+        const will_disconnect: ConnectEvidenceResult['will_disconnect'] = []
+        if (changes.length > 0 && alreadyLinked.length > 0) {
+            const plannedStart = plannedDates?.start || evStart
+            const plannedEnd = plannedDates?.end || evEnd
+            const { data: linkedClaims } = await supabase
+                .from('kpi_updates')
+                .select('id, kpi_id, value, location_id, date_represented, date_range_start, date_range_end, kpis(title)')
+                .in('id', alreadyLinked)
+            const linkedIds = (linkedClaims || []).map((c: any) => c.id)
+            const [linkedBgMap, linkedTagMap] = await Promise.all([
+                BeneficiaryService.getBenGroupsForUpdates(linkedIds),
+                MetricTagService.getTagIdsForUpdates(linkedIds),
+            ])
+            for (const linked of (linkedClaims || []) as any[]) {
+                const lStart = linked.date_range_start || linked.date_represented
+                const lEnd = linked.date_range_end || null
+                const stillPasses =
+                    this.datesOverlap(plannedStart, plannedEnd, lStart, lEnd) &&
+                    !!linked.location_id && evLocIds.concat(claim.location_id).includes(linked.location_id) &&
+                    BeneficiaryService.beneficiaryGroupsMatch(linkedBgMap[linked.id] || [], plannedBgIds) &&
+                    MetricTagService.evidenceMatchesClaimTag(linkedTagMap[linked.id] ?? null, plannedTagIds)
+                if (!stillPasses) {
+                    will_disconnect.push({
+                        kpi_update_id: linked.id,
+                        value: linked.value,
+                        kpi_title: linked.kpis?.title || 'Unknown metric',
+                    })
+                }
+            }
+        }
+
+        const needsConfirmation = plannedDates !== null || will_disconnect.length > 0
+        if (needsConfirmation && !confirm) {
+            return {
+                connected: false,
+                requires_confirmation: true,
+                changes,
+                will_disconnect,
+            }
+        }
+
+        // Apply the plan (all additive except the date extension).
+        for (const change of changes) {
+            if (change.kind === 'link_metric') {
+                const { error } = await supabase
+                    .from('evidence_kpis')
+                    .insert([{ evidence_id: evidenceId, kpi_id: change.kpi_id }])
+                if (error) throw new Error(`Failed to link evidence to metric: ${error.message}`)
+            } else if (change.kind === 'add_location') {
+                const { error } = await supabase
+                    .from('evidence_locations')
+                    .insert([{ evidence_id: evidenceId, location_id: change.location_id, user_id: userId }])
+                if (error) throw new Error(`Failed to add location to evidence: ${error.message}`)
+            } else if (change.kind === 'extend_dates') {
+                const { error } = await supabase
+                    .from('evidence')
+                    .update({
+                        date_range_start: change.date_range_start,
+                        date_range_end: change.date_range_end,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', evidenceId)
+                if (error) throw new Error(`Failed to extend evidence dates: ${error.message}`)
+            } else if (change.kind === 'add_tag') {
+                const { error } = await supabase
+                    .from('evidence_metric_tags')
+                    .insert([{ evidence_id: evidenceId, tag_id: change.tag_id }])
+                if (error) throw new Error(`Failed to tag evidence: ${error.message}`)
+            } else if (change.kind === 'add_beneficiary_groups') {
+                const links = change.group_ids.map(groupId => ({
+                    evidence_id: evidenceId,
+                    beneficiary_group_id: groupId,
+                }))
+                const { error } = await supabase
+                    .from('evidence_beneficiary_groups')
+                    .insert(links)
+                if (error) throw new Error(`Failed to add beneficiary groups to evidence: ${error.message}`)
+            }
+        }
+
+        const reconcile = await this.reconcileLinksForEvidence(evidenceId, userId)
+
+        // The gates all pass now, so the reconcile must have written the row —
+        // verify rather than assume.
+        const { data: verifyLink } = await supabase
+            .from('evidence_kpi_updates')
+            .select('id')
+            .eq('evidence_id', evidenceId)
+            .eq('kpi_update_id', kpiUpdateId)
+            .maybeSingle()
+
+        return {
+            connected: !!verifyLink,
+            conflict: verifyLink ? undefined : 'Connection could not be established — the records\' scopes still don\'t match.',
+            changes,
+            will_disconnect,
+            reconcile,
+        }
+    }
+
+    /**
+     * Stable disconnect: remove the evidence→metric (`evidence_kpis`) link
+     * and reconcile. A bare `evidence_kpi_updates` delete would be undone by
+     * the next reconcile while scope still matches; removing the metric link
+     * removes the candidate precondition, so links to that metric's claims
+     * are pruned and stay pruned.
+     */
+    static async disconnectFromKpi(
+        evidenceId: string,
+        kpiId: string,
+        userId: string,
+        requestedOrgId?: string
+    ): Promise<{ pruned: number }> {
+        const { initiativeId } = await OrgAccessService.assertEvidenceAccess(evidenceId, userId, requestedOrgId)
+
+        const { PermissionService } = await import('./permissionService')
+        await PermissionService.assert(userId, requestedOrgId, 'evidence', 'edit', {
+            resourceId: evidenceId,
+            initiativeId,
+        })
+
+        const { error } = await supabase
+            .from('evidence_kpis')
+            .delete()
+            .eq('evidence_id', evidenceId)
+            .eq('kpi_id', kpiId)
+        if (error) throw new Error(`Failed to disconnect evidence from metric: ${error.message}`)
+
+        const reconcile = await this.reconcileLinksForEvidence(evidenceId, userId)
+        return { pruned: reconcile.pruned }
     }
 
     /**

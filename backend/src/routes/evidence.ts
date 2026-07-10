@@ -50,6 +50,54 @@ router.post('/backfill-links', authenticateUser, async (req: AuthenticatedReques
     }
 });
 
+// Connect evidence to an impact claim by re-scoping the evidence until the
+// auto-match gates pass (Timeline "slot evidence into the right claim").
+// Two-phase: meaning-changing re-scopes return a dry-run plan until the
+// request is repeated with { confirm: true }; scope removals 409.
+router.post('/:id/connect-to-claim', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const { kpi_update_id, confirm } = req.body || {};
+        if (!kpi_update_id) {
+            res.status(400).json({ error: 'kpi_update_id is required' });
+            return;
+        }
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const result = await EvidenceService.connectToClaim(
+            req.params.id,
+            kpi_update_id,
+            !!confirm,
+            req.user!.id,
+            requestedOrgId
+        );
+        if (result.conflict) {
+            res.status(409).json({ ...result, code: 'SCOPE_CONFLICT', error: result.conflict });
+            return;
+        }
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+        return;
+    }
+});
+
+// Disconnect evidence from a metric (removes the evidence_kpis candidate
+// link and prunes that metric's claim connections — stable under reconcile).
+router.delete('/:id/kpi-link/:kpiId', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const result = await EvidenceService.disconnectFromKpi(
+            req.params.id,
+            req.params.kpiId,
+            req.user!.id,
+            requestedOrgId
+        );
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+        return;
+    }
+});
+
 // Get evidence statistics - MUST come before /:id route
 router.get('/stats/by-type', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {

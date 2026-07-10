@@ -318,6 +318,28 @@ export interface TimelineResponse {
     stats: TimelineStats;
 }
 
+// Connect-evidence-to-claim flow (Timeline). Connecting re-scopes the
+// evidence so the auto-matcher's gates pass and the link survives future
+// reconciles; changes that alter the evidence's meaning or break other
+// links require explicit confirmation.
+export type ConnectPlanChange =
+    | { kind: 'link_metric'; kpi_id: string; kpi_title: string }
+    | { kind: 'add_location'; location_id: string }
+    | { kind: 'extend_dates'; date_range_start: string; date_range_end: string }
+    | { kind: 'add_tag'; tag_id: string }
+    | { kind: 'add_beneficiary_groups'; group_ids: string[] };
+
+export interface ConnectEvidenceResult {
+    connected: boolean;
+    requires_confirmation?: boolean;
+    /** Set when the connection cannot be made without removing evidence scope. */
+    conflict?: string;
+    changes: ConnectPlanChange[];
+    /** Currently-linked claims whose connection would be pruned by the re-scope. */
+    will_disconnect: Array<{ kpi_update_id: string; value: number; kpi_title: string }>;
+    reconcile?: { created: number; pruned: number };
+}
+
 export interface User {
     id: string;
     email: string;

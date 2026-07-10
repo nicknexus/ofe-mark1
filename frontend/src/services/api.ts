@@ -19,7 +19,8 @@ import {
  Donor,
  DonorCredit,
  MetricTag,
- TimelineResponse
+ TimelineResponse,
+ ConnectEvidenceResult
 } from '../types'
 import { OnboardingChatResponse, ChatStage, ChatContext } from '../components/onboarding/planTypes'
 
@@ -394,6 +395,25 @@ class ApiService {
  */
  async getInitiativeTimeline(id: string): Promise<TimelineResponse> {
  return this.request<TimelineResponse>(`/initiatives/${id}/timeline`)
+ }
+
+ /**
+ * Connect evidence to a claim by re-scoping the evidence until the
+ * auto-match gates pass. Without `confirm`, meaning-changing re-scopes
+ * come back as a dry-run plan (`requires_confirmation: true`).
+ */
+ async connectEvidenceToClaim(evidenceId: string, kpiUpdateId: string, confirm = false): Promise<ConnectEvidenceResult> {
+ return this.request<ConnectEvidenceResult>(`/evidence/${evidenceId}/connect-to-claim`, {
+ method: 'POST',
+ body: JSON.stringify({ kpi_update_id: kpiUpdateId, confirm })
+ })
+ }
+
+ /** Disconnect evidence from a metric (prunes that metric's claim links, stable under reconcile). */
+ async disconnectEvidenceFromKpi(evidenceId: string, kpiId: string): Promise<{ pruned: number }> {
+ return this.request<{ pruned: number }>(`/evidence/${evidenceId}/kpi-link/${kpiId}`, {
+ method: 'DELETE'
+ })
  }
 
  // KPIs

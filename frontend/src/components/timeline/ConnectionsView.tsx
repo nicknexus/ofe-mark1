@@ -1,4 +1,15 @@
 import React, { useMemo } from 'react'
+import {
+ DndContext,
+ DragEndEvent,
+ DragOverlay,
+ DragStartEvent,
+ PointerSensor,
+ useDraggable,
+ useDroppable,
+ useSensor,
+ useSensors,
+} from '@dnd-kit/core'
 import { Link2, Unlink, AlertCircle, FileText, Camera, MessageSquare, DollarSign, BarChart3 } from 'lucide-react'
 import { AppCard, Badge, EmptyState } from '../ui'
 import { KPI, Location, TimelineClaim, TimelineContributor, TimelineEvidence } from '../../types'
@@ -28,21 +39,18 @@ interface ConnectionsViewProps {
  filters: TimelineFilters
  onOpenClaim: (claim: TimelineClaim, kpi: KPI | undefined) => void
  onOpenEvidence: (evidence: TimelineEvidence) => void
- /** Phase 3: opens the connect flow for an unlinked evidence record. */
- onConnectEvidence?: (evidence: TimelineEvidence) => void
+ /** Opens the connect flow for an unlinked evidence record (claim optional, from drag-drop). */
+ onConnectEvidence?: (evidence: TimelineEvidence, claimId?: string) => void
 }
 
-function EvidenceChip({ ev, onClick }: { ev: TimelineEvidence; onClick: () => void }) {
+function EvidenceChipContent({ ev }: { ev: TimelineEvidence }) {
  const typeInfo = getEvidenceTypeInfo(ev.type)
  const bgColor = typeInfo.color.split(' ')[0]
  const Icon = TYPE_ICONS[ev.type] || FileText
  const thumbnailUrl = getEvidenceImageUrl(ev)
 
  return (
- <button
- onClick={onClick}
- className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-colors text-left"
- >
+ <>
  {thumbnailUrl ? (
  <img src={thumbnailUrl} alt="" className="w-8 h-8 rounded-lg object-cover bg-gray-100 flex-shrink-0" loading="lazy" />
  ) : (
@@ -52,9 +60,53 @@ function EvidenceChip({ ev, onClick }: { ev: TimelineEvidence; onClick: () => vo
  )}
  <div className="min-w-0 flex-1">
  <p className="text-xs font-medium text-gray-800 truncate">{ev.title || 'Untitled Evidence'}</p>
- <p className="text-[11px] text-gray-500 truncate">{typeInfo.label}</p>
+ <p className="text-[11px] text-gray-500 truncate">{getEvidenceTypeInfo(ev.type).label}</p>
  </div>
+ </>
+ )
+}
+
+function EvidenceChip({ ev, onClick }: { ev: TimelineEvidence; onClick: () => void }) {
+ return (
+ <button
+ onClick={onClick}
+ className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-colors text-left"
+ >
+ <EvidenceChipContent ev={ev} />
  </button>
+ )
+}
+
+/** Unlinked evidence chip that can be dragged onto a claim card to connect. */
+function DraggableEvidenceChip({ ev, onClick, draggable }: { ev: TimelineEvidence; onClick: () => void; draggable: boolean }) {
+ const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+ id: `evidence-${ev.id}`,
+ data: { evidenceId: ev.id },
+ disabled: !draggable,
+ })
+
+ return (
+ <button
+ ref={setNodeRef}
+ {...attributes}
+ {...listeners}
+ onClick={onClick}
+ className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-colors text-left ${draggable ? 'cursor-grab active:cursor-grabbing' : ''} ${isDragging ? 'opacity-40' : ''}`}
+ >
+ <EvidenceChipContent ev={ev} />
+ </button>
+ )
+}
+
+function DroppableClaimCard({ claimId, active, children }: { claimId: string; active: boolean; children: React.ReactNode }) {
+ const { setNodeRef, isOver } = useDroppable({ id: `claim-${claimId}`, data: { claimId } })
+ return (
+ <div
+ ref={setNodeRef}
+ className={`rounded-2xl transition-shadow ${active ? 'ring-2 ring-dashed ring-primary-400' : ''} ${isOver ? 'ring-2 ring-primary-500 shadow-card-hover' : ''}`}
+ >
+ {children}
+ </div>
  )
 }
 
@@ -62,6 +114,8 @@ function EvidenceChip({ ev, onClick }: { ev: TimelineEvidence; onClick: () => vo
  * Claim-first connections map: every claim with its connected evidence
  * grouped beside it (evidence repeats under each claim it supports), claims
  * missing evidence flagged, and a distinct section for unconnected evidence.
+ * Unlinked evidence can be dragged onto a claim (or use its Connect button)
+ * to open the re-scope-and-connect flow.
  */
 export default function ConnectionsView({
  claims,
@@ -76,6 +130,7 @@ export default function ConnectionsView({
 }: ConnectionsViewProps) {
  const kpiById = useMemo(() => new Map(kpis.map(k => [k.id, k])), [kpis])
  const locationById = useMemo(() => new Map(locations.map(l => [l.id, l.name])), [locations])
+ const evidenceById = useMemo(() => new Map(evidence.map(e => [e.id, e])), [evidence])
  const evidenceByClaimId = useMemo(() => {
  const map = new Map<string, TimelineEvidence[]>()
  for (const ev of evidence) {
@@ -97,6 +152,24 @@ export default function ConnectionsView({
  [evidence, filters]
  )
 
+ const [draggingEvidenceId, setDraggingEvidenceId] = React.useState<string | null>(null)
+ const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+ const canDrag = !!onConnectEvidence
+
+ const handleDragStart = (event: DragStartEvent) => {
+ setDraggingEvidenceId((event.active.data.current as any)?.evidenceId || null)
+ }
+
+ const handleDragEnd = (event: DragEndEvent) => {
+ setDraggingEvidenceId(null)
+ const evidenceId = (event.active.data.current as any)?.evidenceId
+ const claimId = (event.over?.data.current as any)?.claimId
+ if (evidenceId && claimId && onConnectEvidence) {
+ const ev = evidenceById.get(evidenceId)
+ if (ev) onConnectEvidence(ev, claimId)
+ }
+ }
+
  if (visibleClaims.length === 0 && unlinkedEvidence.length === 0) {
  return (
  <div className="app-card md:p-8">
@@ -113,7 +186,10 @@ export default function ConnectionsView({
  )
  }
 
+ const draggingEvidence = draggingEvidenceId ? evidenceById.get(draggingEvidenceId) : null
+
  return (
+ <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
  <div className="space-y-4">
  {visibleClaims.map(claim => {
  const kpi = kpiById.get(claim.kpi_id)
@@ -125,7 +201,8 @@ export default function ConnectionsView({
  : formatDate(claim.date_represented)
 
  return (
- <AppCard key={claim.id} padded>
+ <DroppableClaimCard key={claim.id} claimId={claim.id!} active={!!draggingEvidenceId}>
+ <AppCard padded>
  <div className="flex flex-col md:flex-row md:items-stretch gap-4">
  {/* Claim (left) */}
  <button
@@ -173,12 +250,16 @@ export default function ConnectionsView({
  ) : (
  <div className="h-full flex items-center gap-2 rounded-xl border border-dashed border-red-200 bg-red-50/40 px-4 py-3">
  <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
- <p className="text-xs text-red-600">No evidence connected to this claim yet</p>
+ <p className="text-xs text-red-600">
+ No evidence connected to this claim yet
+ {canDrag && unlinkedEvidence.length > 0 ? ' — drag unconnected evidence here' : ''}
+ </p>
  </div>
  )}
  </div>
  </div>
  </AppCard>
+ </DroppableClaimCard>
  )
  })}
 
@@ -191,7 +272,10 @@ export default function ConnectionsView({
  </div>
  <div>
  <h3 className="text-sm font-semibold text-gray-800">Unconnected evidence</h3>
- <p className="text-xs text-gray-500">Evidence not currently supporting any claim</p>
+ <p className="text-xs text-gray-500">
+ Evidence not currently supporting any claim
+ {canDrag ? ' — drag onto a claim or use Connect' : ''}
+ </p>
  </div>
  <Badge tone="danger" className="ml-auto">{unlinkedEvidence.length}</Badge>
  </div>
@@ -199,7 +283,7 @@ export default function ConnectionsView({
  {unlinkedEvidence.map(ev => (
  <div key={ev.id} className="flex items-center gap-2">
  <div className="flex-1 min-w-0">
- <EvidenceChip ev={ev} onClick={() => onOpenEvidence(ev)} />
+ <DraggableEvidenceChip ev={ev} onClick={() => onOpenEvidence(ev)} draggable={canDrag} />
  </div>
  {onConnectEvidence && (
  <button
@@ -216,5 +300,14 @@ export default function ConnectionsView({
  </AppCard>
  )}
  </div>
+
+ <DragOverlay>
+ {draggingEvidence && (
+ <div className="w-64 flex items-center gap-2.5 px-3 py-2 rounded-xl border border-primary-300 bg-white shadow-card-hover">
+ <EvidenceChipContent ev={draggingEvidence} />
+ </div>
+ )}
+ </DragOverlay>
+ </DndContext>
  )
 }
