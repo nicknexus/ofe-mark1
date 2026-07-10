@@ -3,13 +3,11 @@ import { Link, useNavigate } from 'react-router-dom'
 import {
  Home,
  Activity,
- BarChart3,
  MapPin,
  Users,
  ArrowLeft,
  BookOpen,
  Sparkles,
- FileText,
  Settings,
  LogOut,
  User as UserIcon
@@ -55,10 +53,8 @@ export default function InitiativeSidebar({
  }
  }, [])
  const tabs = [
- { id: 'home', label: 'Home', icon: Home, description: 'Overview' },
  { id: 'timeline', label: 'Timeline', icon: Activity, description: 'Impact activity' },
- { id: 'metrics', label: 'Metrics', icon: BarChart3, description: 'Track metrics' },
- { id: 'evidence', label: 'Evidence', icon: FileText, description: 'Evidence Library' },
+ { id: 'home', label: 'Overview', icon: Home, description: 'Overview' },
  { id: 'location', label: 'Location', icon: MapPin, description: 'Locations' },
  { id: 'beneficiaries', label: 'Beneficiaries', icon: Users, description: 'People Management' },
  { id: 'stories', label: 'Stories', icon: BookOpen, description: 'Impact Stories' },

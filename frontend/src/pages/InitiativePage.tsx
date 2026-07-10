@@ -37,7 +37,6 @@ import InitiativeSidebar from '../components/InitiativeSidebar'
 import HomeTab from '../components/InitiativeTabs/HomeTab'
 import TimelineTab from '../components/InitiativeTabs/TimelineTab'
 import MetricsTab from '../components/InitiativeTabs/MetricsTab'
-import EvidenceTab from '../components/InitiativeTabs/EvidenceTab'
 import LocationTab from '../components/InitiativeTabs/LocationTab'
 import BeneficiariesTab from '../components/InitiativeTabs/BeneficiariesTab'
 import StoriesTab from '../components/InitiativeTabs/StoriesTab'
@@ -64,8 +63,8 @@ export default function InitiativePage() {
  const [allKPIUpdates, setAllKPIUpdates] = useState<any[]>([])
  const [orderedKPIIds, setOrderedKPIIds] = useState<string[]>([])
 
- // Sidebar navigation state
- const [activeTab, setActiveTab] = useState('home')
+ // Sidebar navigation state — Timeline is the default operational page
+ const [activeTab, setActiveTab] = useState('timeline')
  const [previousTab, setPreviousTab] = useState<string | null>(null) // Track tab before viewing metric
  const [initialStoryId, setInitialStoryId] = useState<string | undefined>(undefined)
 
@@ -83,10 +82,20 @@ export default function InitiativePage() {
  // Selected KPI for modals
  const [selectedKPI, setSelectedKPI] = useState<any>(null)
 
- // Handle URL query param for tab
+ // Handle URL query param for tab. The old Metrics/Evidence tabs were
+ // consolidated into the Timeline — legacy links redirect to the matching
+ // Timeline view so bookmarks and onboarding checklists keep working.
  useEffect(() => {
  const tab = searchParams.get('tab')
- if (tab && ['home', 'timeline', 'metrics', 'evidence', 'location', 'beneficiaries', 'stories', 'report'].includes(tab)) {
+ if (tab === 'metrics' || tab === 'evidence') {
+ const params = new URLSearchParams(searchParams)
+ params.set('tab', 'timeline')
+ if (tab === 'evidence') params.set('view', 'evidence')
+ else params.delete('view')
+ setSearchParams(params, { replace: true })
+ return
+ }
+ if (tab && ['home', 'timeline', 'location', 'beneficiaries', 'stories', 'report'].includes(tab)) {
  setActiveTab(tab)
  }
  }, [searchParams])
@@ -393,11 +402,13 @@ export default function InitiativePage() {
  // Closing the metric - navigate back to initiative
  navigate(`/initiatives/${id}`)
  setExpandedKPIs(new Set())
- // Return to previous tab if we came from somewhere other than metrics
- if (previousTab) {
- setActiveTab(previousTab)
+ // Return to the previous tab; the removed metrics/evidence tabs and
+ // direct URL loads fall back to the Timeline.
+ const fallback = !previousTab || previousTab === 'metrics' || previousTab === 'evidence'
+ ? 'timeline'
+ : previousTab
+ setActiveTab(fallback)
  setPreviousTab(null)
- }
  } else {
  // Opening a metric - navigate to metric URL
  navigate(`/initiatives/${id}/metrics/${kpiIdToToggle}`)
@@ -451,11 +462,11 @@ export default function InitiativePage() {
  <span>Add First Metric</span>
  </button>
  <button
- onClick={() => handleTabChange('metrics')}
+ onClick={() => handleTabChange('timeline')}
             className="app-btn app-btn-secondary inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm"
  >
  <BarChart3 className="w-4 h-4" />
- <span>View Metrics</span>
+ <span>View Timeline</span>
  </button>
  </div>
  <div className="mt-6 p-3 bg-gray-50/50 rounded-xl border border-gray-100">
@@ -505,6 +516,7 @@ export default function InitiativePage() {
  </HomeTab>
  )
  case 'timeline':
+ default:
  return (
  <TimelineTab
  initiativeId={id!}
@@ -538,8 +550,6 @@ export default function InitiativePage() {
  onRefresh={loadDashboard}
  />
  )
- case 'evidence':
- return <EvidenceTab initiativeId={id!} onRefresh={loadDashboard} />
  case 'location':
  return <LocationTab 
  onStoryClick={(storyId) => {
@@ -562,12 +572,6 @@ export default function InitiativePage() {
  return <StoriesTab initiativeId={id!} onRefresh={loadDashboard} initialStoryId={initialStoryId} />
  case 'report':
  return <ReportTab initiativeId={id!} dashboard={dashboard} />
- default:
- return (
- <HomeTab>
- {renderHomeContent()}
- </HomeTab>
- )
  }
  }
 
