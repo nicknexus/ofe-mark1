@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Calendar, X } from 'lucide-react'
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths, addYears, subYears, isBefore, isAfter, startOfDay } from 'date-fns'
+import { format, startOfMonth, startOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths, addYears, subYears, isBefore, isAfter, startOfDay } from 'date-fns'
 import { getLocalDateString, parseLocalDate } from '../utils'
 
 interface DateRangePickerProps {
@@ -13,12 +13,15 @@ interface DateRangePickerProps {
  onChange: (value: { singleDate?: string; startDate?: string; endDate?: string }) => void
  minDate?: string // YYYY-MM-DD format
  maxDate?: string // YYYY-MM-DD format
- placeholder?: string
- className?: string
- // When set + value is non-empty, the trigger button gets a colored border
- // + ring instead of the default gray. Used by public org pages to brand
- // the active filter.
- activeColor?: string
+  placeholder?: string
+  className?: string
+  // When set + value is non-empty, the trigger button gets a colored border
+  // + ring instead of the default gray. Used by public org pages to brand
+  // the active filter.
+  activeColor?: string
+  // 'pill' renders a simple flat white pill (icon + label inline) used by the
+  // Timeline filter bar; 'default' keeps the legacy icon-well trigger.
+  variant?: 'default' | 'pill'
 }
 
 export default function DateRangePicker({
@@ -26,9 +29,10 @@ export default function DateRangePicker({
  onChange,
  minDate,
  maxDate,
- placeholder = 'Select date or range',
- className = '',
- activeColor,
+  placeholder = 'Select date or range',
+  className = '',
+  activeColor,
+  variant = 'default',
 }: DateRangePickerProps) {
  const [isOpen, setIsOpen] = useState(false)
  const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -82,9 +86,9 @@ export default function DateRangePicker({
  const handleToggle = (e: React.MouseEvent<HTMLButtonElement>) => {
  if (!isOpen && buttonRef.current) {
  const rect = buttonRef.current.getBoundingClientRect()
- // Height accounts for: year row (~24px) + month row (~36px) + day labels (~30px) + 6 rows (~192px) + preview (~40px) + buttons (~50px) + padding (~32px) = ~404px
- const dropdownHeight = 410
- const dropdownWidth = 280 // Approximate width of the calendar dropdown
+      // Height accounts for: year row (~28px) + month row (~40px) + day labels (~30px) + 6 rows (~212px) + preview (~40px) + buttons (~56px) + padding (~24px) ≈ 460px
+      const dropdownHeight = 460
+      const dropdownWidth = 300 // Approximate width of the calendar dropdown
  const padding = 8 // Padding from viewport edges
  
  // Calculate available space below and above
@@ -219,17 +223,15 @@ export default function DateRangePicker({
  })
  }
 
- const monthStart = startOfMonth(currentMonth)
- const monthEnd = endOfMonth(currentMonth)
- const calendarStart = startOfWeek(monthStart)
- const calendarEnd = endOfWeek(monthEnd)
+  const monthStart = startOfMonth(currentMonth)
+  const calendarStart = startOfWeek(monthStart)
 
- const days: Date[] = []
- let day = calendarStart
- while (day <= calendarEnd) {
- days.push(day)
- day = addDays(day, 1)
- }
+  // Always render a fixed 6-week (42 day) grid so every month shows all its
+  // days without scrolling and the dropdown height stays constant.
+  const days: Date[] = []
+  for (let i = 0; i < 42; i++) {
+    days.push(addDays(calendarStart, i))
+  }
 
  // Use temp dates for preview in calendar
  const previewStartDate = tempStartDate
@@ -267,39 +269,64 @@ export default function DateRangePicker({
  return format(previewStartDate, 'MMM dd, yyyy')
  }
 
- return (
- <div ref={containerRef} className={`relative ${className}`}>
- <button
- ref={buttonRef}
- type="button"
- onClick={handleToggle}
- className={`flex items-center pl-0 pr-2.5 md:pr-4 h-8 md:h-10 bg-white hover:bg-gray-50 text-gray-700 rounded-r-full rounded-l-full text-xs md:text-sm font-medium transition-all duration-200 border border-l-0 focus:outline-none focus:ring-2 focus:ring-primary-500 ${className}`}
- style={(() => {
- const hasValue = !!(value && (value.singleDate || value.startDate || value.endDate))
- if (hasValue && activeColor) {
- return {
- borderColor: activeColor,
- borderWidth: '1.5px',
- boxShadow: `0 0 0 3px ${activeColor}20`,
- }
- }
- return { borderColor: '#e5e7eb' }
- })()}
- >
- <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
- <Calendar className="w-4 h-4 md:w-5 md:h-5 text-gray-600" />
- </div>
- <span className={`ml-2 md:ml-3 ${value ? 'text-gray-900' : 'text-gray-500'}`}>{getDisplayText()}</span>
- {value && (value.singleDate || value.startDate || value.endDate) && (
- <X
- className="w-3 h-3 text-gray-400 hover:text-gray-600 ml-auto"
- onClick={(e) => {
- e.stopPropagation()
- handleClear()
- }}
- />
- )}
- </button>
+  const hasValue = !!(value && (value.singleDate || value.startDate || value.endDate))
+
+  return (
+    <div ref={containerRef} className={`relative ${variant === 'pill' ? '' : className}`}>
+      {variant === 'pill' ? (
+        <button
+          ref={buttonRef}
+          type="button"
+          onClick={handleToggle}
+          className={`inline-flex items-center gap-2 h-9 pl-3 pr-2.5 rounded-full border text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 ${hasValue
+            ? 'border-primary-300 bg-primary-50 text-primary-800 hover:bg-primary-100'
+            : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+            } ${className}`}
+        >
+          <Calendar className={`w-4 h-4 flex-shrink-0 ${hasValue ? 'text-primary-600' : 'text-gray-400'}`} />
+          <span className={hasValue ? '' : 'text-gray-500'}>{getDisplayText()}</span>
+          {hasValue && (
+            <X
+              className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600 ml-0.5"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleClear()
+              }}
+            />
+          )}
+        </button>
+      ) : (
+        <button
+          ref={buttonRef}
+          type="button"
+          onClick={handleToggle}
+          className={`flex items-center pl-0 pr-2.5 md:pr-4 h-8 md:h-10 bg-white hover:bg-gray-50 text-gray-700 rounded-r-full rounded-l-full text-xs md:text-sm font-medium transition-all duration-200 border border-l-0 focus:outline-none focus:ring-2 focus:ring-primary-500 ${className}`}
+          style={(() => {
+            if (hasValue && activeColor) {
+              return {
+                borderColor: activeColor,
+                borderWidth: '1.5px',
+                boxShadow: `0 0 0 3px ${activeColor}20`,
+              }
+            }
+            return { borderColor: '#e5e7eb' }
+          })()}
+        >
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
+            <Calendar className="w-4 h-4 md:w-5 md:h-5 text-gray-600" />
+          </div>
+          <span className={`ml-2 md:ml-3 ${value ? 'text-gray-900' : 'text-gray-500'}`}>{getDisplayText()}</span>
+          {value && (value.singleDate || value.startDate || value.endDate) && (
+            <X
+              className="w-3 h-3 text-gray-400 hover:text-gray-600 ml-auto"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleClear()
+              }}
+            />
+          )}
+        </button>
+      )}
 
  {isOpen && createPortal(
  <>
@@ -316,17 +343,15 @@ export default function DateRangePicker({
  }
  }} 
  />
- {/* Calendar dropdown */}
- <div 
- className="fixed bg-white border border-gray-200 rounded-lg shadow-modal z-[9999] min-w-[280px] flex flex-col"
- style={{
- top: `${dropdownPosition.top}px`,
- left: `${dropdownPosition.left}px`,
- height: '410px',
- maxHeight: `${Math.min(410, window.innerHeight - Math.max(dropdownPosition.top, 8) - 8)}px`
- }}
- onClick={(e) => e.stopPropagation()}
- >
+          {/* Calendar dropdown */}
+          <div 
+            className="fixed bg-white border border-gray-200 rounded-xl shadow-modal z-[9999] w-[300px] flex flex-col"
+            style={{
+              top: `${dropdownPosition.top}px`,
+              left: `${dropdownPosition.left}px`,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
  {/* Year nav row */}
  <div className="flex items-center justify-between px-4 pt-3 pb-0 flex-shrink-0">
  <button
@@ -376,8 +401,8 @@ export default function DateRangePicker({
  </button>
  </div>
 
- {/* Day labels - Fixed */}
- <div className="grid grid-cols-7 gap-1 px-4 pb-2 flex-shrink-0">
+            {/* Day labels - Fixed */}
+            <div className="grid grid-cols-7 gap-1 px-4 pb-2 flex-shrink-0 justify-items-center">
  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
  <div key={day} className="text-center text-xs font-medium text-gray-500 py-1">
  {day}
@@ -385,9 +410,9 @@ export default function DateRangePicker({
  ))}
  </div>
 
- {/* Calendar grid - Flexible height with scroll fallback */}
- <div className="px-4 flex-1 min-h-0 overflow-y-auto">
- <div className="grid grid-cols-7 gap-1 pb-2">
+            {/* Calendar grid - fixed 6-week grid, never scrolls */}
+            <div className="px-4">
+              <div className="grid grid-cols-7 gap-1 pb-2 justify-items-center">
  {days.map((day, idx) => {
  const isCurrentMonth = isSameMonth(day, currentMonth)
  const isToday = isSameDay(day, today)

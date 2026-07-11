@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import { apiService } from '../../services/api'
 import {
  BeneficiaryGroup,
@@ -14,16 +15,17 @@ import {
 import { notify } from '../../lib/notify'
 import { useTeam } from '../../context/TeamContext'
 import { SectionLoader, EmptyState } from '../ui'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, Plus } from 'lucide-react'
 import {
  TimelineFilters,
  TimelineView,
  applyFiltersToParams,
  filtersFromParams,
 } from '../../utils/timeline'
+import { viewSwap } from '../timeline/motion'
 import TimelineStatCards from '../timeline/TimelineStatCards'
 import TimelineFilterBar from '../timeline/TimelineFilterBar'
-import TimelineAddMenu from '../timeline/TimelineAddMenu'
+import UploadWizard from '../upload/UploadWizard'
 import ClaimsView from '../timeline/ClaimsView'
 import EvidenceView from '../timeline/EvidenceView'
 import ConnectionsView from '../timeline/ConnectionsView'
@@ -41,12 +43,6 @@ const VIEWS: Array<{ id: TimelineView; label: string }> = [
 
 interface TimelineTabProps {
  initiativeId: string
- /** Opens the existing impact-claim creation modal (permission-gated by caller). */
- onAddClaim?: () => void
- /** Opens the existing evidence upload modal (permission-gated by caller). */
- onAddEvidence?: () => void
- /** Claim-then-evidence combined flow (permission-gated by caller). */
- onAddBoth?: () => void
  onRefresh?: () => void
 }
 
@@ -56,8 +52,8 @@ interface TimelineTabProps {
  * filtered views can be deep-linked, refreshed, and navigated with browser
  * controls (?tab=timeline&view=...&metric=...).
  */
-export default function TimelineTab({ initiativeId, onAddClaim, onAddEvidence, onAddBoth, onRefresh }: TimelineTabProps) {
- const { canEditEvidence, canDelete } = useTeam()
+export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProps) {
+ const { canAddImpactClaims, canEditEvidence, canDelete } = useTeam()
  const [searchParams, setSearchParams] = useSearchParams()
 
  const [data, setData] = useState<TimelineResponse | null>(null)
@@ -76,6 +72,7 @@ export default function TimelineTab({ initiativeId, onAddClaim, onAddEvidence, o
  const [isDataPointPreviewOpen, setIsDataPointPreviewOpen] = useState(false)
  const [deleteEvidence, setDeleteEvidence] = useState<Evidence | null>(null)
  const [connectTarget, setConnectTarget] = useState<{ evidence: TimelineEvidence; claimId?: string } | null>(null)
+ const [isWizardOpen, setIsWizardOpen] = useState(false)
 
  const rawView = searchParams.get('view')
  const view: TimelineView = rawView === 'evidence' || rawView === 'connections' ? rawView : 'claims'
@@ -190,103 +187,147 @@ export default function TimelineTab({ initiativeId, onAddClaim, onAddEvidence, o
  }
 
  return (
- <div className="h-screen overflow-hidden flex flex-col mobile-content-padding">
- {/* Header */}
- <div className="p-4 sm:p-6 border-b border-gray-100 bg-white space-y-4">
- <div className="flex items-center justify-between">
- <div>
- <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Timeline</h2>
- <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">
- All claims, evidence, and connections for this initiative
- </p>
- </div>
- <TimelineAddMenu onAddClaim={onAddClaim} onAddEvidence={onAddEvidence} onAddBoth={onAddBoth} />
+    <div className="h-screen overflow-hidden flex flex-col mobile-content-padding">
+      {/* Header + toolbar (kept compact so the list below is the focus) */}
+      <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-gray-100 bg-white space-y-3">
+        {/* Title row */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800 leading-tight">Timeline</h2>
+            <p className="text-xs text-gray-500 hidden sm:block">
+              All claims, evidence, and connections for this initiative
+            </p>
+          </div>
+          {(canAddImpactClaims || canEditEvidence) && (
+            <button
+              onClick={() => setIsWizardOpen(true)}
+              className="app-btn app-btn-primary app-btn-sm flex-shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Add</span>
+            </button>
+          )}
+        </div>
+
+        {/* View switcher + at-a-glance stats */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-gray-100 border border-gray-200 self-start">
+            {VIEWS.map(v => {
+              const isActive = view === v.id
+              return (
+                <button
+                  key={v.id}
+                  onClick={() => setView(v.id)}
+                  className={`relative px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${isActive ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="timelineViewSeg"
+                      className="absolute inset-0 rounded-full bg-white shadow-card"
+                      transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                    />
+                  )}
+                  <span className="relative z-10">{v.label}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          {data && (
+            <TimelineStatCards
+              stats={data.stats}
+              activeStatus={filters.status}
+              onStatusClick={(status) => setFilters({ ...filters, status })}
+            />
+          )}
+        </div>
+
+        {/* Filters */}
+        <TimelineFilterBar
+          view={view}
+          filters={filters}
+          onFiltersChange={setFilters}
+          kpis={data?.kpis || []}
+          locations={locations}
+          beneficiaryGroups={beneficiaryGroups}
+          tags={tags}
+          contributors={data?.contributors || {}}
+        />
+      </div>
+
+      {/* Active view — primary focus of the page */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50">
+        {loading ? (
+          <SectionLoader className="h-64" />
+        ) : !data ? (
+          <div className="app-card md:p-8">
+            <EmptyState
+              icon={AlertCircle}
+              title="Timeline unavailable"
+              description="Something went wrong loading this initiative's activity. Try refreshing the page."
+            />
+          </div>
+        ) : (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={view}
+              initial={viewSwap.initial}
+              animate={viewSwap.animate}
+              exit={viewSwap.exit}
+            >
+              {view === 'claims' ? (
+                <ClaimsView
+                  claims={data.claims}
+                  kpis={data.kpis}
+                  locations={locations}
+                  contributors={data.contributors}
+                  filters={filters}
+                  onOpenClaim={handleOpenClaim}
+                />
+              ) : view === 'evidence' ? (
+                <EvidenceView
+                  evidence={data.evidence}
+                  locations={locations}
+                  contributors={data.contributors}
+                  filters={filters}
+                  onOpenEvidence={handleOpenEvidence}
+                />
+              ) : (
+                <ConnectionsView
+                  claims={data.claims}
+                  evidence={data.evidence}
+                  kpis={data.kpis}
+                  locations={locations}
+                  contributors={data.contributors}
+                  filters={filters}
+                  onOpenClaim={handleOpenClaim}
+                  onOpenEvidence={handleOpenEvidence}
+                  onConnectEvidence={canEditEvidence
+                    ? (ev, claimId) => setConnectTarget({ evidence: ev, claimId })
+                    : undefined}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
+        )}
  </div>
 
- {data && (
- <TimelineStatCards
- stats={data.stats}
- activeStatus={filters.status}
- onStatusClick={(status) => setFilters({ ...filters, status })}
- />
- )}
-
- {/* View selector */}
- <div className="flex items-center gap-1 border-b border-gray-100 -mb-4 sm:-mb-6 pt-1">
- {VIEWS.map(v => (
- <button
- key={v.id}
- onClick={() => setView(v.id)}
- className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${view === v.id
- ? 'border-primary-500 text-gray-900'
- : 'border-transparent text-gray-500 hover:text-gray-700'
- }`}
- >
- {v.label}
- </button>
- ))}
- </div>
- </div>
-
- {/* Filters */}
- <div className="px-4 sm:px-6 pt-4 bg-white">
- <TimelineFilterBar
- view={view}
- filters={filters}
- onFiltersChange={setFilters}
- kpis={data?.kpis || []}
+ {/* Full-screen add flow (evidence / claim / both) */}
+ {isWizardOpen && data && (
+ <UploadWizard
+ initiativeId={initiativeId}
+ canCreateClaim={canAddImpactClaims}
+ canCreateEvidence={canEditEvidence}
+ kpis={data.kpis}
  locations={locations}
- beneficiaryGroups={beneficiaryGroups}
  tags={tags}
- contributors={data?.contributors || {}}
- />
- </div>
-
- {/* Active view */}
- <div className="flex-1 overflow-y-auto p-4 sm:p-6">
- {loading ? (
- <SectionLoader className="h-64" />
- ) : !data ? (
- <div className="app-card md:p-8">
- <EmptyState
- icon={AlertCircle}
- title="Timeline unavailable"
- description="Something went wrong loading this initiative's activity. Try refreshing the page."
- />
- </div>
- ) : view === 'claims' ? (
- <ClaimsView
- claims={data.claims}
- kpis={data.kpis}
- locations={locations}
- contributors={data.contributors}
- filters={filters}
- onOpenClaim={handleOpenClaim}
- />
- ) : view === 'evidence' ? (
- <EvidenceView
- evidence={data.evidence}
- locations={locations}
- contributors={data.contributors}
- filters={filters}
- onOpenEvidence={handleOpenEvidence}
- />
- ) : (
- <ConnectionsView
- claims={data.claims}
- evidence={data.evidence}
- kpis={data.kpis}
- locations={locations}
- contributors={data.contributors}
- filters={filters}
- onOpenClaim={handleOpenClaim}
- onOpenEvidence={handleOpenEvidence}
- onConnectEvidence={canEditEvidence
- ? (ev, claimId) => setConnectTarget({ evidence: ev, claimId })
- : undefined}
+ beneficiaryGroups={beneficiaryGroups}
+ existingClaims={data.claims}
+ existingEvidence={data.evidence}
+ onClose={() => setIsWizardOpen(false)}
+ onCreated={refresh}
  />
  )}
- </div>
 
  {/* Connect evidence → claim (re-scope + link) */}
  {connectTarget && data && (

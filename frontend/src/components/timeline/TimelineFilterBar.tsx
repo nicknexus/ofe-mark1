@@ -1,20 +1,24 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
- Search,
- MapPin,
- Users,
- Tag as TagIcon,
- BarChart3,
- UserCircle,
- FileText,
- ChevronDown,
- LucideIcon,
+  Search,
+  MapPin,
+  Users,
+  Tag as TagIcon,
+  BarChart3,
+  UserCircle,
+  FileText,
+  ChevronDown,
+  Check,
+  X,
+  LucideIcon,
 } from 'lucide-react'
 import { Location, BeneficiaryGroup, MetricTag, KPI, TimelineContributor } from '../../types'
 import DateRangePicker from '../DateRangePicker'
 import { getLocalDateString } from '../../utils'
 import { TimelineFilters, TimelineView, hasActiveFilters } from '../../utils/timeline'
+import { dropdownPop } from './motion'
 
 interface FilterOption {
  id: string
@@ -50,73 +54,80 @@ function FilterPill({ icon: Icon, label, pluralLabel, options, selected, onChang
 
  const active = selected.length > 0
 
- return (
- <div className="relative">
- <button
- ref={buttonRef}
- onClick={() => setOpen(!open)}
- className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 ${active
- ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
- : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
- }`}
- >
- <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${active
- ? 'bg-primary-100 border-primary-500'
- : 'bg-gray-100 border-gray-200'
- }`}>
- <Icon className={`w-5 h-5 ${active ? 'text-primary-500' : 'text-gray-600'}`} />
- </div>
- <span className="ml-3">
- {selected.length === 0
- ? label
- : selected.length === 1
- ? options.find(o => o.id === selected[0])?.name || `1 ${label.toLowerCase()}`
- : `${selected.length} ${pluralLabel}`}
- </span>
- {active && (
- <span className="ml-1 app-chip app-chip-accent text-xs px-1.5 py-0">{selected.length}</span>
- )}
- <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${open ? 'rotate-180' : ''}`} />
- </button>
+  return (
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        onClick={() => setOpen(!open)}
+        className={`inline-flex items-center gap-2 h-9 px-3 rounded-full border text-sm font-medium transition-colors ${active
+          ? 'border-primary-300 bg-primary-50 text-primary-800 hover:bg-primary-100'
+          : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+          }`}
+      >
+        <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-primary-600' : 'text-gray-400'}`} />
+        <span className="truncate max-w-[140px]">
+          {selected.length === 0
+            ? label
+            : selected.length === 1
+              ? options.find(o => o.id === selected[0])?.name || `1 ${label.toLowerCase()}`
+              : `${selected.length} ${pluralLabel}`}
+        </span>
+        {active && selected.length > 1 && (
+          <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-primary-600 text-white text-[11px] font-semibold">{selected.length}</span>
+        )}
+        <ChevronDown className={`w-3.5 h-3.5 -mr-0.5 transition-transform ${active ? 'text-primary-500' : 'text-gray-400'} ${open ? 'rotate-180' : ''}`} />
+      </button>
 
- {open && buttonRef.current && createPortal(
- <>
- <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
- <div
- className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
- style={{ top: `${position.top}px`, left: `${position.left}px` }}
- onClick={(e) => e.stopPropagation()}
- >
- {options.length === 0 ? (
- <p className="text-xs text-gray-500">{emptyText}</p>
- ) : (
- <>
- <div className="flex items-center justify-between mb-2">
- <span className="text-xs font-semibold text-gray-700">Select {pluralLabel}</span>
- {active && (
- <button onClick={(e) => { e.stopPropagation(); onChange([]) }} className="text-xs text-primary-700 hover:text-primary-800">Clear</button>
- )}
- </div>
- {options.map(option => (
- <label key={option.id} className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
- <input
- type="checkbox"
- checked={selected.includes(option.id)}
- onChange={(e) => {
- if (e.target.checked) onChange([...selected, option.id])
- else onChange(selected.filter(id => id !== option.id))
- }}
- className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
- />
- <span className="text-xs text-gray-700 truncate flex-1">{option.name}</span>
- </label>
- ))}
- </>
- )}
- </div>
- </>,
- document.body
- )}
+      {buttonRef.current && createPortal(
+        <AnimatePresence>
+          {open && (
+          <>
+          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
+          <motion.div
+            initial={dropdownPop.initial}
+            animate={dropdownPop.animate}
+            exit={dropdownPop.exit}
+            className="fixed bg-white border border-gray-200 rounded-xl shadow-modal z-[9999] p-2 min-w-[220px] max-h-72 overflow-y-auto"
+            style={{ top: `${position.top}px`, left: `${position.left}px`, transformOrigin: 'top left' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {options.length === 0 ? (
+              <p className="text-xs text-gray-500 px-2 py-1.5">{emptyText}</p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between px-2 pb-1.5 mb-1 border-b border-gray-100">
+                  <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{pluralLabel}</span>
+                  {active && (
+                    <button onClick={(e) => { e.stopPropagation(); onChange([]) }} className="text-xs font-medium text-primary-700 hover:text-primary-800">Clear</button>
+                  )}
+                </div>
+                {options.map(option => {
+                  const checked = selected.includes(option.id)
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => {
+                        if (checked) onChange(selected.filter(id => id !== option.id))
+                        else onChange([...selected, option.id])
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left transition-colors ${checked ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
+                    >
+                      <span className={`w-4 h-4 rounded flex items-center justify-center border flex-shrink-0 transition-colors ${checked ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-300'}`}>
+                        {checked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                      </span>
+                      <span className={`text-sm truncate flex-1 ${checked ? 'text-primary-800 font-medium' : 'text-gray-700'}`}>{option.name}</span>
+                    </button>
+                  )
+                })}
+              </>
+            )}
+          </motion.div>
+          </>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
  </div>
  )
 }
@@ -178,34 +189,34 @@ export default function TimelineFilterBar({
  }
 
  return (
- <div className="space-y-3">
- {/* Search */}
- <div className="relative hidden md:block">
- <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
- <input
- type="text"
- value={filters.q}
- onChange={(e) => set({ q: e.target.value })}
- placeholder="Search claims and evidence..."
- className="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
- />
- </div>
+    <div className="flex flex-col lg:flex-row lg:items-center gap-2">
+      {/* Search */}
+      <div className="relative w-full lg:w-60 flex-shrink-0">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          type="text"
+          value={filters.q}
+          onChange={(e) => set({ q: e.target.value })}
+          placeholder="Search claims and evidence…"
+          className="w-full h-9 pl-10 pr-3 bg-white border border-gray-200 rounded-full text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+        />
+      </div>
 
- <div className="flex flex-wrap items-center gap-2">
- <DateRangePicker
- value={activityDateValue}
- onChange={dateChange(['activityFrom', 'activityTo'])}
- maxDate={getLocalDateString(new Date())}
- placeholder="Activity date"
- className="w-auto text-xs"
- />
- <DateRangePicker
- value={uploadDateValue}
- onChange={dateChange(['uploadFrom', 'uploadTo'])}
- maxDate={getLocalDateString(new Date())}
- placeholder="Upload date"
- className="w-auto text-xs"
- />
+      <div className="flex flex-wrap items-center gap-2">
+        <DateRangePicker
+          value={activityDateValue}
+          onChange={dateChange(['activityFrom', 'activityTo'])}
+          maxDate={getLocalDateString(new Date())}
+          placeholder="Activity date"
+          variant="pill"
+        />
+        <DateRangePicker
+          value={uploadDateValue}
+          onChange={dateChange(['uploadFrom', 'uploadTo'])}
+          maxDate={getLocalDateString(new Date())}
+          placeholder="Upload date"
+          variant="pill"
+        />
 
  <FilterPill
  icon={BarChart3}
@@ -285,12 +296,13 @@ export default function TimelineFilterBar({
  uploadFrom: null,
  uploadTo: null,
  })}
- className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded-md hover:bg-gray-100 transition-colors"
- >
- Clear all
- </button>
- )}
- </div>
- </div>
- )
+          className="inline-flex items-center gap-1 h-9 px-3 rounded-full text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+        >
+          <X className="w-3.5 h-3.5" />
+          Clear all
+        </button>
+        )}
+      </div>
+    </div>
+  )
 }

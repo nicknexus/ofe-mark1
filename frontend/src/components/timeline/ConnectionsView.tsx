@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react'
+import { motion } from 'framer-motion'
 import {
- DndContext,
+  DndContext,
  DragEndEvent,
  DragOverlay,
  DragStartEvent,
@@ -19,9 +20,10 @@ import {
  filterClaims,
  filterEvidence,
  getEvidenceImageUrl,
- hasActiveFilters,
- sortByUploadDate,
+  hasActiveFilters,
+  sortByUploadDate,
 } from '../../utils/timeline'
+import { fadeUp, rowEntrance } from './motion'
 
 const TYPE_ICONS = {
  visual_proof: Camera,
@@ -190,9 +192,9 @@ export default function ConnectionsView({
 
  return (
  <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
- <div className="space-y-4">
- {visibleClaims.map(claim => {
- const kpi = kpiById.get(claim.kpi_id)
+      <div className="space-y-4">
+        {visibleClaims.map((claim, claimIndex) => {
+          const kpi = kpiById.get(claim.kpi_id)
  const connectedEvidence = evidenceByClaimId.get(claim.id!) || []
  const contributor = claim.user_id ? contributors[claim.user_id] : undefined
  const locationName = claim.location_id ? locationById.get(claim.location_id) : undefined
@@ -200,9 +202,11 @@ export default function ConnectionsView({
  ? `${formatDate(claim.date_range_start)} – ${formatDate(claim.date_range_end)}`
  : formatDate(claim.date_represented)
 
- return (
- <DroppableClaimCard key={claim.id} claimId={claim.id!} active={!!draggingEvidenceId}>
- <AppCard padded>
+          const entrance = rowEntrance(claimIndex)
+          return (
+            <motion.div key={claim.id} initial={entrance.initial} animate={entrance.animate}>
+              <DroppableClaimCard claimId={claim.id!} active={!!draggingEvidenceId}>
+              <AppCard padded>
  <div className="flex flex-col md:flex-row md:items-stretch gap-4">
  {/* Claim (left) */}
  <button
@@ -258,14 +262,16 @@ export default function ConnectionsView({
  )}
  </div>
  </div>
- </AppCard>
- </DroppableClaimCard>
- )
- })}
+              </AppCard>
+              </DroppableClaimCard>
+            </motion.div>
+          )
+        })}
 
- {/* Unconnected evidence */}
- {unlinkedEvidence.length > 0 && (
- <AppCard padded>
+        {/* Unconnected evidence */}
+        {unlinkedEvidence.length > 0 && (
+          <motion.div variants={fadeUp} initial="hidden" animate="visible">
+          <AppCard padded>
  <div className="flex items-center gap-2 mb-3">
  <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center">
  <Unlink className="w-4 h-4 text-red-500" />
@@ -295,11 +301,12 @@ export default function ConnectionsView({
  </button>
  )}
  </div>
- ))}
- </div>
- </AppCard>
- )}
- </div>
+              ))}
+            </div>
+          </AppCard>
+          </motion.div>
+        )}
+      </div>
 
  <DragOverlay>
  {draggingEvidence && (

@@ -49,14 +49,17 @@ export default function ClaimsView({ claims, kpis, locations, contributors, filt
  )
  }
 
- return (
- <div className="app-card overflow-hidden">
- <TimelineRowHeader kindLabel="Claim" />
- <div className="divide-y divide-gray-100">
- {groups.map((group, groupIndex) => (
- <React.Fragment key={group.items[0].id || groupIndex}>
- {group.isPackage && <TimelinePackageHeader count={group.items.length} />}
- {group.items.map((claim, index) => {
+  let flatIndex = 0
+
+  return (
+    <div className="app-card overflow-hidden">
+      <TimelineRowHeader kindLabel="Claim" />
+      <div className="divide-y divide-gray-100">
+        {groups.map((group, groupIndex) => (
+          <React.Fragment key={group.items[0].id || groupIndex}>
+            {group.isPackage && <TimelinePackageHeader count={group.items.length} />}
+            {group.items.map((claim, index) => {
+              const rowIndex = flatIndex++
  const kpi = kpiById.get(claim.kpi_id)
  const locationName = claim.location_id
  ? locationById.get(claim.location_id) || '—'
@@ -85,10 +88,11 @@ export default function ClaimsView({ claims, kpis, locations, contributors, filt
  whereWhen={{ location: locationName, date: activityDate }}
  uploadedBy={contributor?.name || contributor?.email || '—'}
  connectionSummary={`${count} evidence`}
- status={deriveClaimStatus(claim)}
- groupPosition={group.isPackage ? groupPositionFor(index, group.items.length) : 'single'}
- onClick={() => onOpenClaim(claim, kpi)}
- />
+                  status={deriveClaimStatus(claim)}
+                  groupPosition={group.isPackage ? groupPositionFor(index, group.items.length) : 'single'}
+                  index={rowIndex}
+                  onClick={() => onOpenClaim(claim, kpi)}
+                />
  )
  })}
  </React.Fragment>

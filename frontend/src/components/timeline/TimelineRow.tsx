@@ -1,19 +1,23 @@
 import React from 'react'
+import { motion } from 'framer-motion'
 import { Package } from 'lucide-react'
 import { Badge } from '../ui'
 import { ConnectionStatus, GroupPosition } from '../../utils/timeline'
+import { rowEntrance } from './motion'
 
 export interface TimelineRowProps {
- leading: React.ReactNode
- title: React.ReactNode
- subtitle?: React.ReactNode
- whereWhen: { location: string; date: string }
- uploadedBy: string
- connectionSummary: string
- status: ConnectionStatus
- groupPosition: GroupPosition
- onClick: () => void
- actions?: React.ReactNode
+  leading: React.ReactNode
+  title: React.ReactNode
+  subtitle?: React.ReactNode
+  whereWhen: { location: string; date: string }
+  uploadedBy: string
+  connectionSummary: string
+  status: ConnectionStatus
+  groupPosition: GroupPosition
+  onClick: () => void
+  actions?: React.ReactNode
+  /** Position in the flattened list, used to cap the entrance stagger. */
+  index?: number
 }
 
 /** Column headers matching the row grid below. Rendered once per list. */
@@ -52,18 +56,22 @@ export default function TimelineRow({
  whereWhen,
  uploadedBy,
  connectionSummary,
- status,
- groupPosition,
- onClick,
- actions,
+  status,
+  groupPosition,
+  onClick,
+  actions,
+  index = 0,
 }: TimelineRowProps) {
- const inGroup = groupPosition !== 'single'
+  const inGroup = groupPosition !== 'single'
+  const entrance = rowEntrance(index)
 
- return (
- <div
- className="px-6 py-4 hover:bg-gray-50/50 transition-all duration-200 cursor-pointer group grid grid-cols-12 gap-4 items-center"
- onClick={onClick}
- >
+  return (
+    <motion.div
+      initial={entrance.initial}
+      animate={entrance.animate}
+      className="px-6 py-4 hover:bg-gray-50 transition-colors duration-200 cursor-pointer group grid grid-cols-12 gap-4 items-center"
+      onClick={onClick}
+    >
  {/* Item + package connector */}
  <div className="col-span-4 min-w-0 flex items-center gap-3 relative">
  {inGroup && (
@@ -99,12 +107,12 @@ export default function TimelineRow({
  <Badge tone={status === 'connected' ? 'impact' : 'danger'}>
  {status === 'connected' ? 'Connected' : 'Not connected'}
  </Badge>
- {actions && (
- <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
- {actions}
- </div>
- )}
- </div>
- </div>
- )
+        {actions && (
+          <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+            {actions}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  )
 }

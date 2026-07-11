@@ -232,6 +232,86 @@ export function groupPackages<T extends { created_at?: string; user_id?: string 
  return groups
 }
 
+/**
+ * Client-side mirror of the backend auto-match gates, used by the upload
+ * wizard to preview which existing claims a piece of evidence will connect
+ * to before it's saved. Must stay in sync with the server rules
+ * (evidenceService.autoLinkToMatchingUpdates / reconcileLinksForEvidence):
+ *  - claim's metric ∈ evidence's linked metrics
+ *  - claim's location ∈ evidence's locations
+ *  - activity dates overlap
+ *  - tag: untagged claim needs untagged evidence; tagged claim needs its tag
+ *  - ben groups: both unscoped, or both scoped with an intersection
+ */
+export interface EvidenceScopePreview {
+ kpiIds: string[]
+ locationIds: string[]
+ tagIds: string[]
+ beneficiaryGroupIds: string[]
+ dateStart: string
+ dateEnd: string
+}
+
+export function previewMatchingClaims(claims: TimelineClaim[], scope: EvidenceScopePreview): TimelineClaim[] {
+ if (!scope.dateStart || scope.kpiIds.length === 0 || scope.locationIds.length === 0) return []
+ const dateEnd = scope.dateEnd || scope.dateStart
+ return claims.filter(claim => {
+ if (!scope.kpiIds.includes(claim.kpi_id)) return false
+ if (!claim.location_id || !scope.locationIds.includes(claim.location_id)) return false
+ const claimStart = claim.date_range_start || claim.date_represented
+ const claimEnd = claim.date_range_end || claimStart
+ if (!claimStart) return false
+ if (!(scope.dateStart <= claimEnd && claimStart <= dateEnd)) return false
+ if (claim.tag_id) {
+ if (!scope.tagIds.includes(claim.tag_id)) return false
+ } else if (scope.tagIds.length > 0) {
+ return false
+ }
+ const claimGroups = claim.beneficiary_group_ids || []
+ const claimScoped = claimGroups.length > 0
+ const evidenceScoped = scope.beneficiaryGroupIds.length > 0
+ if (claimScoped !== evidenceScoped) return false
+ if (claimScoped && !claimGroups.some(id => scope.beneficiaryGroupIds.includes(id))) return false
+ return true
+ })
+}
+
+/** Mirror preview for a new claim: which existing evidence will auto-connect. */
+export interface ClaimScopePreview {
+ kpiId: string
+ locationId: string
+ tagId: string | null
+ beneficiaryGroupIds: string[]
+ dateStart: string
+ dateEnd: string
+}
+
+export function previewMatchingEvidence(evidence: TimelineEvidence[], scope: ClaimScopePreview): TimelineEvidence[] {
+ if (!scope.dateStart || !scope.kpiId || !scope.locationId) return []
+ const dateEnd = scope.dateEnd || scope.dateStart
+ return evidence.filter(ev => {
+ if (!(ev.kpi_ids || []).includes(scope.kpiId)) return false
+ const evLocations = ev.location_ids || (ev.location_id ? [ev.location_id] : [])
+ if (!evLocations.includes(scope.locationId)) return false
+ const evStart = ev.date_range_start || ev.date_represented
+ const evEnd = ev.date_range_end || evStart
+ if (!evStart) return false
+ if (!(evStart <= dateEnd && scope.dateStart <= evEnd)) return false
+ const evTags = ev.tag_ids || []
+ if (scope.tagId) {
+ if (!evTags.includes(scope.tagId)) return false
+ } else if (evTags.length > 0) {
+ return false
+ }
+ const evGroups = ev.beneficiary_group_ids || []
+ const claimScoped = scope.beneficiaryGroupIds.length > 0
+ const evidenceScoped = evGroups.length > 0
+ if (claimScoped !== evidenceScoped) return false
+ if (claimScoped && !scope.beneficiaryGroupIds.some(id => evGroups.includes(id))) return false
+ return true
+ })
+}
+
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif']
 
 function isImageLike(file: { file_url?: string; file_name?: string; file_type?: string }): boolean {

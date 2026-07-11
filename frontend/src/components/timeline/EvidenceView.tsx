@@ -55,14 +55,17 @@ export default function EvidenceView({ evidence, locations, contributors, filter
  )
  }
 
- return (
- <div className="app-card overflow-hidden">
- <TimelineRowHeader kindLabel="Evidence" />
- <div className="divide-y divide-gray-100">
- {groups.map((group, groupIndex) => (
- <React.Fragment key={group.items[0].id || groupIndex}>
- {group.isPackage && <TimelinePackageHeader count={group.items.length} />}
- {group.items.map((ev, index) => {
+  let flatIndex = 0
+
+  return (
+    <div className="app-card overflow-hidden">
+      <TimelineRowHeader kindLabel="Evidence" />
+      <div className="divide-y divide-gray-100">
+        {groups.map((group, groupIndex) => (
+          <React.Fragment key={group.items[0].id || groupIndex}>
+            {group.isPackage && <TimelinePackageHeader count={group.items.length} />}
+            {group.items.map((ev, index) => {
+              const rowIndex = flatIndex++
  const typeInfo = getEvidenceTypeInfo(ev.type)
  const bgColor = typeInfo.color.split(' ')[0]
  const Icon = TYPE_ICONS[ev.type] || FileText
@@ -106,10 +109,11 @@ export default function EvidenceView({ evidence, locations, contributors, filter
  whereWhen={{ location: locationLabel, date: activityDate }}
  uploadedBy={contributor?.name || contributor?.email || '—'}
  connectionSummary={`${count} ${count === 1 ? 'claim' : 'claims'}`}
- status={deriveEvidenceStatus(ev)}
- groupPosition={group.isPackage ? groupPositionFor(index, group.items.length) : 'single'}
- onClick={() => onOpenEvidence(ev)}
- />
+                  status={deriveEvidenceStatus(ev)}
+                  groupPosition={group.isPackage ? groupPositionFor(index, group.items.length) : 'single'}
+                  index={rowIndex}
+                  onClick={() => onOpenEvidence(ev)}
+                />
  )
  })}
  </React.Fragment>

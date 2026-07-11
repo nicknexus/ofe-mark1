@@ -31,7 +31,7 @@ import ImpactClaimUploadModal from '../components/impactClaims/ImpactClaimUpload
 import EvidenceUploadModal from '../components/evidence/EvidenceUploadModal'
 import InitiativeCharts from '../components/InitiativeCharts'
 import BeneficiaryManager from '../components/BeneficiaryManager'
-import MetricsDashboard from '../components/MetricsDashboard'
+import MetricsOverview from '../components/overview/MetricsOverview'
 import ExpandableKPICard from '../components/ExpandableKPICard'
 import InitiativeSidebar from '../components/InitiativeSidebar'
 import HomeTab from '../components/InitiativeTabs/HomeTab'
@@ -73,8 +73,6 @@ export default function InitiativePage() {
  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
  const [isImpactClaimModalWithSelectionOpen, setIsImpactClaimModalWithSelectionOpen] = useState(false)
  const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false)
- // Timeline "Add claim + evidence": opens the evidence modal after the claim modal creates.
- const [pendingEvidenceAfterClaim, setPendingEvidenceAfterClaim] = useState(false)
  const [isEditKPIModalOpen, setIsEditKPIModalOpen] = useState(false)
  const [deleteConfirmKPI, setDeleteConfirmKPI] = useState<any>(null)
  const [deleteConfirmText, setDeleteConfirmText] = useState('')
@@ -477,31 +475,17 @@ export default function InitiativePage() {
  </div>
  </div>
  ) : (
- /* Analytics Dashboard - Flush to Top */
- <div className="h-full overflow-hidden">
- <MetricsDashboard
+ /* Metrics-focused overview: cards + trends, no map / stat tiles */
+ <MetricsOverview
+ initiativeId={id!}
  kpis={kpis}
  kpiTotals={kpiTotals}
- stats={stats}
  kpiUpdates={allKPIUpdates}
- initiativeId={id}
- onNavigateToLocations={() => setActiveTab('location')}
- onMetricCardClick={handleMetricCardClick}
  onAddKPI={canEditMetrics ? () => setIsKPIModalOpen(true) : undefined}
- onStoryClick={(storyId) => {
- setInitialStoryId(storyId)
- setActiveTab('stories')
- }}
+ onMetricDetailClick={handleMetricCardClick}
  user={user}
  organization={organization}
- onOrderChange={setOrderedKPIIds}
- onAddImpactClaim={canAddImpactClaims ? () => setIsImpactClaimModalWithSelectionOpen(true) : undefined}
- onAddEvidence={canEditEvidence ? () => {
- setSelectedKPI(null)
- setIsEvidenceModalOpen(true)
- } : undefined}
  />
- </div>
  )}
  </div>
  )
@@ -520,12 +504,6 @@ export default function InitiativePage() {
  return (
  <TimelineTab
  initiativeId={id!}
- onAddClaim={canAddImpactClaims ? () => setIsImpactClaimModalWithSelectionOpen(true) : undefined}
- onAddEvidence={canEditEvidence ? () => openEvidenceModal() : undefined}
- onAddBoth={canAddImpactClaims && canEditEvidence ? () => {
- setPendingEvidenceAfterClaim(true)
- setIsImpactClaimModalWithSelectionOpen(true)
- } : undefined}
  onRefresh={loadDashboard}
  />
  )
@@ -653,16 +631,10 @@ export default function InitiativePage() {
  setIsUpdateModalOpen(false)
  setIsImpactClaimModalWithSelectionOpen(false)
  setSelectedKPI(null)
- setPendingEvidenceAfterClaim(false)
  }}
  onCreated={(newUpdates) => {
  if (newUpdates?.length) setAllKPIUpdates(prev => [...prev, ...newUpdates])
  refreshAfterClaim()
- // Timeline "Add claim + evidence": chain straight into the evidence upload.
- if (pendingEvidenceAfterClaim) {
- setPendingEvidenceAfterClaim(false)
- setIsEvidenceModalOpen(true)
- }
  }}
  initiativeId={id!}
  preSelectedKPI={selectedKPI ?? undefined}
