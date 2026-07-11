@@ -11,7 +11,7 @@ import {
  useSensor,
  useSensors,
 } from '@dnd-kit/core'
-import { Link2, Unlink, AlertCircle, FileText, Camera, MessageSquare, DollarSign, BarChart3 } from 'lucide-react'
+import { Link2, Unlink, AlertCircle, FileText, Camera, MessageSquare, DollarSign, BarChart3, Paperclip } from 'lucide-react'
 import { AppCard, Badge, EmptyState } from '../ui'
 import { KPI, Location, TimelineClaim, TimelineContributor, TimelineEvidence } from '../../types'
 import { formatDate, getEvidenceTypeInfo } from '../../utils'
@@ -43,6 +43,10 @@ interface ConnectionsViewProps {
  onOpenEvidence: (evidence: TimelineEvidence) => void
  /** Opens the connect flow for an unlinked evidence record (claim optional, from drag-drop). */
  onConnectEvidence?: (evidence: TimelineEvidence, claimId?: string) => void
+ /** Quick-upload new evidence scoped to this claim. */
+ onAddEvidenceToClaim?: (claim: TimelineClaim, kpi: KPI | undefined) => void
+ /** Attach an existing unconnected evidence record to this claim. */
+ onConnectExistingToClaim?: (claim: TimelineClaim) => void
 }
 
 function EvidenceChipContent({ ev }: { ev: TimelineEvidence }) {
@@ -129,6 +133,8 @@ export default function ConnectionsView({
  onOpenClaim,
  onOpenEvidence,
  onConnectEvidence,
+ onAddEvidenceToClaim,
+ onConnectExistingToClaim,
 }: ConnectionsViewProps) {
  const kpiById = useMemo(() => new Map(kpis.map(k => [k.id, k])), [kpis])
  const locationById = useMemo(() => new Map(locations.map(l => [l.id, l.name])), [locations])
@@ -241,7 +247,7 @@ export default function ConnectionsView({
  </div>
 
  {/* Evidence (right) */}
- <div className="flex-1 min-w-0">
+ <div className="flex-1 min-w-0 flex flex-col gap-2">
  {connectedEvidence.length > 0 ? (
  <div className="space-y-1.5">
  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
@@ -252,12 +258,35 @@ export default function ConnectionsView({
  ))}
  </div>
  ) : (
- <div className="h-full flex items-center gap-2 rounded-xl border border-dashed border-red-200 bg-red-50/40 px-4 py-3">
+ <div className="flex-1 flex items-center gap-2 rounded-xl border border-dashed border-red-200 bg-red-50/40 px-4 py-3">
  <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
  <p className="text-xs text-red-600">
  No evidence connected to this claim yet
  {canDrag && unlinkedEvidence.length > 0 ? ' — drag unconnected evidence here' : ''}
  </p>
+ </div>
+ )}
+
+ {(onAddEvidenceToClaim || (onConnectExistingToClaim && unlinkedEvidence.length > 0)) && (
+ <div className="flex items-center gap-1.5">
+ {onAddEvidenceToClaim && (
+ <button
+ onClick={() => onAddEvidenceToClaim(claim, kpi)}
+ className="app-btn app-btn-secondary app-btn-sm"
+ >
+ <Paperclip className="w-3.5 h-3.5" />
+ <span>Add evidence</span>
+ </button>
+ )}
+ {onConnectExistingToClaim && unlinkedEvidence.length > 0 && (
+ <button
+ onClick={() => onConnectExistingToClaim(claim)}
+ className="app-btn app-btn-ghost app-btn-sm"
+ >
+ <Link2 className="w-3.5 h-3.5" />
+ <span>Add existing</span>
+ </button>
+ )}
  </div>
  )}
  </div>

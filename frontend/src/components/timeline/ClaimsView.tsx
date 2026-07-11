@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { TrendingUp, BarChart3 } from 'lucide-react'
+import { TrendingUp, BarChart3, Paperclip, Link2 } from 'lucide-react'
 import { EmptyState } from '../ui'
 import { KPI, Location, TimelineClaim, TimelineContributor } from '../../types'
 import { formatDate } from '../../utils'
@@ -21,10 +21,14 @@ interface ClaimsViewProps {
  contributors: Record<string, TimelineContributor>
  filters: TimelineFilters
  onOpenClaim: (claim: TimelineClaim, kpi: KPI | undefined) => void
+ /** Quick-upload new evidence scoped to this claim. */
+ onAddEvidenceToClaim?: (claim: TimelineClaim, kpi: KPI | undefined) => void
+ /** Attach an existing unconnected evidence record to this claim. */
+ onConnectExistingToClaim?: (claim: TimelineClaim) => void
 }
 
 /** All impact claims in the initiative, newest upload first. */
-export default function ClaimsView({ claims, kpis, locations, contributors, filters, onOpenClaim }: ClaimsViewProps) {
+export default function ClaimsView({ claims, kpis, locations, contributors, filters, onOpenClaim, onAddEvidenceToClaim, onConnectExistingToClaim }: ClaimsViewProps) {
  const kpiById = useMemo(() => new Map(kpis.map(k => [k.id, k])), [kpis])
  const locationById = useMemo(() => new Map(locations.map(l => [l.id, l.name])), [locations])
 
@@ -92,6 +96,34 @@ export default function ClaimsView({ claims, kpis, locations, contributors, filt
                   groupPosition={group.isPackage ? groupPositionFor(index, group.items.length) : 'single'}
                   index={rowIndex}
                   onClick={() => onOpenClaim(claim, kpi)}
+                  actions={(onAddEvidenceToClaim || onConnectExistingToClaim) ? (
+                    <>
+                      {onAddEvidenceToClaim && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onAddEvidenceToClaim(claim, kpi)
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-primary-700 rounded-lg hover:bg-primary-50 transition-all duration-200"
+                          title="Add evidence to this claim"
+                        >
+                          <Paperclip className="w-4 h-4" />
+                        </button>
+                      )}
+                      {onConnectExistingToClaim && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onConnectExistingToClaim(claim)
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-primary-700 rounded-lg hover:bg-primary-50 transition-all duration-200"
+                          title="Connect existing evidence"
+                        >
+                          <Link2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </>
+                  ) : undefined}
                 />
  )
  })}

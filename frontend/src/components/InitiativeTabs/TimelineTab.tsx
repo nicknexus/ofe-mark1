@@ -30,6 +30,7 @@ import ClaimsView from '../timeline/ClaimsView'
 import EvidenceView from '../timeline/EvidenceView'
 import ConnectionsView from '../timeline/ConnectionsView'
 import ConnectEvidenceDialog from '../timeline/ConnectEvidenceDialog'
+import AddEvidenceToClaimDialog from '../timeline/AddEvidenceToClaimDialog'
 import EvidencePreviewModal from '../EvidencePreviewModal'
 import DataPointPreviewModal from '../DataPointPreviewModal'
 import AddEvidenceModal from '../AddEvidenceModal'
@@ -71,7 +72,9 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  const [selectedDataPointKpi, setSelectedDataPointKpi] = useState<any>(null)
  const [isDataPointPreviewOpen, setIsDataPointPreviewOpen] = useState(false)
  const [deleteEvidence, setDeleteEvidence] = useState<Evidence | null>(null)
- const [connectTarget, setConnectTarget] = useState<{ evidence: TimelineEvidence; claimId?: string } | null>(null)
+ // evidence set = evidence-first (pick a claim); evidence omitted = claim-first (pick from unconnected evidence)
+ const [connectTarget, setConnectTarget] = useState<{ evidence?: TimelineEvidence; claimId?: string } | null>(null)
+ const [addEvidenceTarget, setAddEvidenceTarget] = useState<{ claim: TimelineClaim; kpi: KPI | undefined } | null>(null)
  const [isWizardOpen, setIsWizardOpen] = useState(false)
 
  const rawView = searchParams.get('view')
@@ -142,6 +145,18 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  setSelectedEvidence(ev)
  setIsPreviewModalOpen(true)
  }
+
+ const unlinkedEvidence = useMemo(
+ () => (data?.evidence || []).filter(ev => ev.claim_count === 0),
+ [data]
+ )
+
+ const handleAddEvidenceToClaim = canEditEvidence
+ ? (claim: TimelineClaim, kpi: KPI | undefined) => setAddEvidenceTarget({ claim, kpi })
+ : undefined
+ const handleConnectExistingToClaim = canEditEvidence && unlinkedEvidence.length > 0
+ ? (claim: TimelineClaim) => setConnectTarget({ claimId: claim.id })
+ : undefined
 
  const handleEditEvidence = async (ev: Evidence) => {
  setIsPreviewModalOpen(false)
@@ -283,6 +298,8 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
                   contributors={data.contributors}
                   filters={filters}
                   onOpenClaim={handleOpenClaim}
+                  onAddEvidenceToClaim={handleAddEvidenceToClaim}
+                  onConnectExistingToClaim={handleConnectExistingToClaim}
                 />
               ) : view === 'evidence' ? (
                 <EvidenceView
@@ -305,6 +322,8 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
                   onConnectEvidence={canEditEvidence
                     ? (ev, claimId) => setConnectTarget({ evidence: ev, claimId })
                     : undefined}
+                  onAddEvidenceToClaim={handleAddEvidenceToClaim}
+                  onConnectExistingToClaim={handleConnectExistingToClaim}
                 />
               )}
             </motion.div>
@@ -329,10 +348,11 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  />
  )}
 
- {/* Connect evidence → claim (re-scope + link) */}
+ {/* Connect evidence ↔ claim (re-scope + link), from either side */}
  {connectTarget && data && (
  <ConnectEvidenceDialog
  evidence={connectTarget.evidence}
+ evidenceOptions={connectTarget.evidence ? undefined : unlinkedEvidence}
  claims={data.claims}
  kpis={data.kpis}
  locations={locations}
@@ -341,6 +361,20 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  preselectedClaimId={connectTarget.claimId}
  onClose={() => setConnectTarget(null)}
  onConnected={refresh}
+ />
+ )}
+
+ {/* Quick evidence upload scoped to one claim */}
+ {addEvidenceTarget && (
+ <AddEvidenceToClaimDialog
+ claim={addEvidenceTarget.claim}
+ kpi={addEvidenceTarget.kpi}
+ initiativeId={initiativeId}
+ locations={locations}
+ tags={tags}
+ beneficiaryGroups={beneficiaryGroups}
+ onClose={() => setAddEvidenceTarget(null)}
+ onCreated={refresh}
  />
  )}
 

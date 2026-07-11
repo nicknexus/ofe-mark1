@@ -1,6 +1,7 @@
-import React, { useRef } from 'react'
-import { Camera, FileText, MessageSquare, DollarSign, UploadCloud, X, RefreshCw } from 'lucide-react'
+import React from 'react'
+import { Camera, FileText, MessageSquare, DollarSign } from 'lucide-react'
 import { WizardState } from './wizardTypes'
+import FileDropList from './FileDropList'
 
 const EVIDENCE_TYPES = [
  { value: 'visual_proof', label: 'Photo / Video', description: 'Pictures or footage of the work', icon: Camera },
@@ -21,76 +22,12 @@ interface WizardEvidenceStepProps {
  * and give the record a recognisable title.
  */
 export default function WizardEvidenceStep({ state, update, onAddFiles, onRemoveFile }: WizardEvidenceStepProps) {
- const fileInputRef = useRef<HTMLInputElement>(null)
-
- const handleDrop = (e: React.DragEvent) => {
- e.preventDefault()
- const files = Array.from(e.dataTransfer.files || [])
- if (files.length > 0) onAddFiles(files)
- }
-
  return (
  <div className="space-y-5 max-w-2xl">
  {/* 1 — files */}
  <div>
  <label className="block text-sm font-medium text-gray-700 mb-1.5">1. Add your files</label>
- <div
- onDrop={handleDrop}
- onDragOver={(e) => e.preventDefault()}
- onClick={() => fileInputRef.current?.click()}
- className="border-2 border-dashed border-gray-200 hover:border-primary-400 rounded-2xl p-8 text-center cursor-pointer transition-colors bg-white"
- >
- <UploadCloud className="w-9 h-9 text-gray-300 mx-auto mb-2" />
- <p className="text-sm font-medium text-gray-700">Drop files here, or click to browse</p>
- <p className="text-xs text-gray-400 mt-1">Photos, documents, receipts, recordings — as many as you need</p>
- <input
- ref={fileInputRef}
- type="file"
- multiple
- className="hidden"
- onChange={(e) => {
- const files = Array.from(e.target.files || [])
- if (files.length > 0) onAddFiles(files)
- e.target.value = ''
- }}
- />
- </div>
-
- {state.files.length > 0 && (
- <div className="space-y-1.5 mt-2">
- {state.files.map(file => (
- <div key={file.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-gray-100 bg-white">
- {file.previewUrl ? (
- <img src={file.previewUrl} alt="" className="w-9 h-9 rounded-lg object-cover bg-gray-100 flex-shrink-0" />
- ) : (
- <div className="p-2 rounded-lg bg-gray-100 flex-shrink-0">
- <FileText className="w-4 h-4 text-gray-500" />
- </div>
- )}
- <div className="min-w-0 flex-1">
- <p className="text-xs font-medium text-gray-800 truncate">{file.name}</p>
- <p className={`text-[11px] ${file.status === 'error' ? 'text-red-500' : 'text-gray-500'}`}>
- {file.status === 'uploading' && (
- <span className="inline-flex items-center gap-1">
- <RefreshCw className="w-3 h-3 animate-spin" /> Uploading…
- </span>
- )}
- {file.status === 'done' && `${(file.size / 1024 / 1024).toFixed(1)} MB · uploaded ✓`}
- {file.status === 'error' && (file.error || 'Upload failed')}
- </p>
- </div>
- <button
- type="button"
- onClick={() => onRemoveFile(file.id)}
- className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors flex-shrink-0"
- title="Remove"
- >
- <X className="w-3.5 h-3.5" />
- </button>
- </div>
- ))}
- </div>
- )}
+ <FileDropList files={state.files} onAddFiles={onAddFiles} onRemoveFile={onRemoveFile} />
  </div>
 
  {/* 2 — what kind */}

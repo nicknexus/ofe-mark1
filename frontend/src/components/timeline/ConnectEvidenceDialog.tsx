@@ -13,38 +13,46 @@ import {
  TimelineClaim,
  TimelineEvidence,
 } from '../../types'
-import { formatDate } from '../../utils'
+import { formatDate, getEvidenceTypeInfo } from '../../utils'
 
 interface ConnectEvidenceDialogProps {
- evidence: TimelineEvidence
  claims: TimelineClaim[]
  kpis: KPI[]
  locations: Location[]
  tags: MetricTag[]
  beneficiaryGroups: BeneficiaryGroup[]
- /** Skip the claim picker (e.g. after a drag-drop onto a claim card). */
+ /** Evidence-first mode: the evidence is fixed, the user picks a claim. */
+ evidence?: TimelineEvidence
+ /** Claim-first mode: the claim is fixed, the user picks from these evidence records. */
+ evidenceOptions?: TimelineEvidence[]
+ /** Fixes the claim (used by claim-first mode and drag-drop). */
  preselectedClaimId?: string
  onClose: () => void
  onConnected: () => void
 }
 
 /**
- * Two-phase connect flow: pick a claim, dry-run the connect, review the
- * re-scope plan (and any links that would be pruned), then confirm.
- * Safe/no-op connects complete without the review step.
+ * Two-phase connect flow, usable from either side of the relationship:
+ * evidence-first (pick the claim it supports) or claim-first (pick an
+ * unconnected evidence record). Either way: dry-run the connect, review the
+ * re-scope plan (and any links that would be pruned), then confirm. Safe
+ * connects complete without the review step.
  */
 export default function ConnectEvidenceDialog({
- evidence,
  claims,
  kpis,
  locations,
  tags,
  beneficiaryGroups,
+ evidence,
+ evidenceOptions,
  preselectedClaimId,
  onClose,
  onConnected,
 }: ConnectEvidenceDialogProps) {
+ const claimFirst = !evidence
  const [selectedClaimId, setSelectedClaimId] = useState<string | null>(preselectedClaimId || null)
+ const [selectedEvidenceId, setSelectedEvidenceId] = useState<string | null>(evidence?.id || null)
  const [search, setSearch] = useState('')
  const [dryRun, setDryRun] = useState<ConnectEvidenceResult | null>(null)
  const [error, setError] = useState<string | null>(null)
@@ -55,14 +63,26 @@ export default function ConnectEvidenceDialog({
  const tagById = useMemo(() => new Map(tags.map(t => [t.id, t.name])), [tags])
  const groupById = useMemo(() => new Map(beneficiaryGroups.map(g => [g.id, g.name])), [beneficiaryGroups])
 
+ const selectedEvidence = evidence || (evidenceOptions || []).find(ev => ev.id === selectedEvidenceId) || null
+ const selectedClaim = selectedClaimId ? claims.find(c => c.id === selectedClaimId) : null
+ const selectedKpiTitle = selectedClaim ? kpiById.get(selectedClaim.kpi_id)?.title || 'Unknown metric' : ''
+
  const candidateClaims = useMemo(() => {
  const q = search.trim().toLowerCase()
- return claims.filter(claim => {
+ return claims.filter(c => {
  if (!q) return true
- const kpiTitle = kpiById.get(claim.kpi_id)?.title || ''
- return `${claim.value} ${kpiTitle} ${claim.label || ''}`.toLowerCase().includes(q)
+ const kpiTitle = kpiById.get(c.kpi_id)?.title || ''
+ return `${c.value} ${kpiTitle} ${c.label || ''}`.toLowerCase().includes(q)
  })
  }, [claims, search, kpiById])
+
+ const candidateEvidence = useMemo(() => {
+ const q = search.trim().toLowerCase()
+ return (evidenceOptions || []).filter(ev => {
+ if (!q) return true
+ return `${ev.title || ''} ${ev.description || ''}`.toLowerCase().includes(q)
+ })
+ }, [evidenceOptions, search])
 
  const describeChange = (change: ConnectPlanChange): { icon: typeof Link2; text: string } => {
  switch (change.kind) {
@@ -86,11 +106,11 @@ export default function ConnectEvidenceDialog({
  }
 
  const attempt = async (confirm: boolean) => {
- if (!selectedClaimId) return
+ if (!selectedClaimId || !selectedEvidence?.id) return
  setSubmitting(true)
  setError(null)
  try {
- const result = await apiService.connectEvidenceToClaim(evidence.id!, selectedClaimId, confirm)
+ const result = await apiService.connectEvidenceToClaim(selectedEvidence.id, selectedClaimId, confirm)
  if (result.connected) {
  notify.success('Evidence connected')
  onConnected()
@@ -107,24 +127,27 @@ export default function ConnectEvidenceDialog({
  }
  }
 
- const selectedClaim = selectedClaimId ? claims.find(c => c.id === selectedClaimId) : null
- const selectedKpiTitle = selectedClaim ? kpiById.get(selectedClaim.kpi_id)?.title || 'Unknown metric' : ''
+ const headerSubtitle = claimFirst
+ ? `${selectedClaim?.value ?? ''} ${selectedKpiTitle}`.trim() || 'Choose evidence to connect'
+ : (evidence?.title || 'Untitled Evidence')
+
+ const canAttempt = !!selectedClaimId && !!selectedEvidence
 
  return (
  <ModalFrame size="sm">
  <ModalHeader
  icon={Link2}
- title="Connect evidence to a claim"
- subtitle={evidence.title || 'Untitled Evidence'}
+ title={claimFirst ? 'Add existing evidence' : 'Connect evidence to a claim'}
+ subtitle={headerSubtitle}
  onClose={onClose}
  />
  <ModalBody>
  {!dryRun ? (
  <div className="space-y-3">
  <p className="text-sm text-gray-600">
- Choose the impact claim this evidence supports. The evidence's scope
- (metric, location, dates, tags, groups) will be aligned so the
- connection holds.
+ {claimFirst
+ ? 'Pick an unconnected evidence record to attach to this claim. Its scope will be aligned so the connection holds.'
+ : 'Choose the impact claim this evidence supports. The evidence\'s scope (metric, location, dates, tags, groups) will be aligned so the connection holds.'}
  </p>
 
  <div className="relative">
@@ -133,37 +156,65 @@ export default function ConnectEvidenceDialog({
  type="text"
  value={search}
  onChange={(e) => setSearch(e.target.value)}
- placeholder="Search claims..."
+ placeholder={claimFirst ? 'Search evidence...' : 'Search claims...'}
  className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
  />
  </div>
 
  <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
- {candidateClaims.length === 0 ? (
- <p className="text-xs text-gray-500 px-1 py-4 text-center">No claims match your search</p>
- ) : candidateClaims.map(claim => {
- const kpiTitle = kpiById.get(claim.kpi_id)?.title || 'Unknown metric'
- const locationName = claim.location_id ? locationById.get(claim.location_id) : undefined
- const isSelected = selectedClaimId === claim.id
+ {claimFirst ? (
+ candidateEvidence.length === 0 ? (
+ <p className="text-xs text-gray-500 px-1 py-4 text-center">
+ {evidenceOptions && evidenceOptions.length > 0
+ ? 'No evidence matches your search'
+ : 'No unconnected evidence available — everything is already connected'}
+ </p>
+ ) : candidateEvidence.map(ev => {
+ const typeInfo = getEvidenceTypeInfo(ev.type)
+ const isSelected = selectedEvidenceId === ev.id
  return (
  <button
- key={claim.id}
- onClick={() => setSelectedClaimId(claim.id!)}
+ key={ev.id}
+ onClick={() => setSelectedEvidenceId(ev.id!)}
+ className={`w-full text-left px-3 py-2.5 rounded-xl border transition-colors ${isSelected
+ ? 'border-primary-500 bg-primary-50'
+ : 'border-gray-100 bg-white hover:bg-gray-50'
+ }`}
+ >
+ <p className="text-sm text-gray-800 truncate">{ev.title || 'Untitled Evidence'}</p>
+ <p className="text-xs text-gray-500 mt-0.5">
+ {typeInfo.label} · {formatDate(ev.date_represented)}
+ </p>
+ </button>
+ )
+ })
+ ) : (
+ candidateClaims.length === 0 ? (
+ <p className="text-xs text-gray-500 px-1 py-4 text-center">No claims match your search</p>
+ ) : candidateClaims.map(c => {
+ const kpiTitle = kpiById.get(c.kpi_id)?.title || 'Unknown metric'
+ const locationName = c.location_id ? locationById.get(c.location_id) : undefined
+ const isSelected = selectedClaimId === c.id
+ return (
+ <button
+ key={c.id}
+ onClick={() => setSelectedClaimId(c.id!)}
  className={`w-full text-left px-3 py-2.5 rounded-xl border transition-colors ${isSelected
  ? 'border-primary-500 bg-primary-50'
  : 'border-gray-100 bg-white hover:bg-gray-50'
  }`}
  >
  <p className="text-sm text-gray-800">
- <span className="font-semibold mr-1.5">{claim.value}</span>
+ <span className="font-semibold mr-1.5">{c.value}</span>
  {kpiTitle}
  </p>
  <p className="text-xs text-gray-500 mt-0.5">
- {[locationName, formatDate(claim.date_represented)].filter(Boolean).join(' · ')}
+ {[locationName, formatDate(c.date_represented)].filter(Boolean).join(' · ')}
  </p>
  </button>
  )
- })}
+ })
+ )}
  </div>
 
  {error && (
@@ -176,8 +227,9 @@ export default function ConnectEvidenceDialog({
  ) : (
  <div className="space-y-3">
  <p className="text-sm text-gray-600">
- Connecting to <span className="font-medium text-gray-800">{selectedClaim?.value} {selectedKpiTitle}</span> requires
- re-scoping this evidence:
+ Connecting <span className="font-medium text-gray-800">{selectedEvidence?.title || 'this evidence'}</span> to{' '}
+ <span className="font-medium text-gray-800">{selectedClaim?.value} {selectedKpiTitle}</span> requires
+ re-scoping the evidence:
  </p>
 
  <div className="space-y-1.5">
@@ -225,7 +277,7 @@ export default function ConnectEvidenceDialog({
  <button
  onClick={() => attempt(false)}
  className="app-btn app-btn-primary app-btn-sm"
- disabled={!selectedClaimId || submitting}
+ disabled={!canAttempt || submitting}
  >
  {submitting ? 'Connecting…' : 'Connect'}
  </button>
