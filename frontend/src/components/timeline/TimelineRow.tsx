@@ -11,7 +11,7 @@ export interface TimelineRowProps {
   subtitle?: React.ReactNode
   whereWhen: { location: string; date: string }
   uploadedBy: string
-  connectionSummary: string
+  connectionSummary: React.ReactNode
   status: ConnectionStatus
   groupPosition: GroupPosition
   onClick: () => void
@@ -99,7 +99,9 @@ export default function TimelineRow({
 
  {/* Connections */}
  <div className="col-span-2">
- <span className="app-chip text-xs">{connectionSummary}</span>
+ {typeof connectionSummary === 'string'
+ ? <span className="app-chip text-xs">{connectionSummary}</span>
+ : connectionSummary}
  </div>
 
  {/* Status + actions */}

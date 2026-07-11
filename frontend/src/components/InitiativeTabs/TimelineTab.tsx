@@ -31,8 +31,8 @@ import EvidenceView from '../timeline/EvidenceView'
 import ConnectionsView from '../timeline/ConnectionsView'
 import ConnectEvidenceDialog from '../timeline/ConnectEvidenceDialog'
 import AddEvidenceToClaimDialog from '../timeline/AddEvidenceToClaimDialog'
-import EvidencePreviewModal from '../EvidencePreviewModal'
-import DataPointPreviewModal from '../DataPointPreviewModal'
+import EvidenceDetailModal from '../timeline/EvidenceDetailModal'
+import ClaimDetailModal from '../timeline/ClaimDetailModal'
 import AddEvidenceModal from '../AddEvidenceModal'
 import ConfirmDialog from '../ConfirmDialog'
 
@@ -63,14 +63,11 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
  const [tags, setTags] = useState<MetricTag[]>([])
 
- // Modal state (same wiring as EvidenceTab)
- const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null)
- const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
+ // Detail + edit modal state
+ const [selectedEvidence, setSelectedEvidence] = useState<TimelineEvidence | null>(null)
+ const [selectedClaim, setSelectedClaim] = useState<{ claim: TimelineClaim; kpi: KPI | undefined } | null>(null)
  const [editingEvidence, setEditingEvidence] = useState<Evidence | null>(null)
  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
- const [selectedDataPoint, setSelectedDataPoint] = useState<any>(null)
- const [selectedDataPointKpi, setSelectedDataPointKpi] = useState<any>(null)
- const [isDataPointPreviewOpen, setIsDataPointPreviewOpen] = useState(false)
  const [deleteEvidence, setDeleteEvidence] = useState<Evidence | null>(null)
  // evidence set = evidence-first (pick a claim); evidence omitted = claim-first (pick from unconnected evidence)
  const [connectTarget, setConnectTarget] = useState<{ evidence?: TimelineEvidence; claimId?: string } | null>(null)
@@ -136,14 +133,13 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  }, [load, onRefresh])
 
  const handleOpenClaim = (claim: TimelineClaim, kpi: KPI | undefined) => {
- setSelectedDataPoint(claim)
- setSelectedDataPointKpi(kpi || null)
- setIsDataPointPreviewOpen(true)
+ setSelectedEvidence(null)
+ setSelectedClaim({ claim, kpi })
  }
 
  const handleOpenEvidence = (ev: TimelineEvidence) => {
+ setSelectedClaim(null)
  setSelectedEvidence(ev)
- setIsPreviewModalOpen(true)
  }
 
  const unlinkedEvidence = useMemo(
@@ -159,7 +155,6 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  : undefined
 
  const handleEditEvidence = async (ev: Evidence) => {
- setIsPreviewModalOpen(false)
  setSelectedEvidence(null)
  try {
  const fullEvidence = await apiService.getEvidenceItem(ev.id!)
@@ -193,7 +188,6 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  await apiService.deleteEvidence(ev.id)
  notify.success('Evidence deleted successfully')
  setDeleteEvidence(null)
- setIsPreviewModalOpen(false)
  setSelectedEvidence(null)
  await refresh()
  } catch (error) {
@@ -295,6 +289,7 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
                   claims={data.claims}
                   kpis={data.kpis}
                   locations={locations}
+                  evidence={data.evidence}
                   contributors={data.contributors}
                   filters={filters}
                   onOpenClaim={handleOpenClaim}
@@ -378,42 +373,41 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  />
  )}
 
- {/* Evidence preview */}
- {isPreviewModalOpen && selectedEvidence && (
- <EvidencePreviewModal
- isOpen={isPreviewModalOpen}
- onClose={() => {
- setIsPreviewModalOpen(false)
- setSelectedEvidence(null)
- }}
+ {/* Evidence detail */}
+ {selectedEvidence && data && (
+ <EvidenceDetailModal
  evidence={selectedEvidence}
- onEdit={canEditEvidence ? handleEditEvidence : undefined}
- onDelete={canDelete ? setDeleteEvidence : undefined}
- onDataPointClick={(dataPoint, kpi) => {
- setSelectedDataPoint(dataPoint)
- setSelectedDataPointKpi(kpi)
- setIsPreviewModalOpen(false)
- setIsDataPointPreviewOpen(true)
- }}
+ kpis={data.kpis}
+ locations={locations}
+ tags={tags}
+ beneficiaryGroups={beneficiaryGroups}
+ contributors={data.contributors}
+ connectedClaims={data.claims.filter(c => (selectedEvidence.kpi_update_ids || []).includes(c.id!))}
+ onClose={() => setSelectedEvidence(null)}
+ onOpenClaim={(claim) => handleOpenClaim(claim, data.kpis.find(k => k.id === claim.kpi_id))}
+ onEdit={canEditEvidence ? () => handleEditEvidence(selectedEvidence) : undefined}
+ onDelete={canDelete ? () => setDeleteEvidence(selectedEvidence) : undefined}
  />
  )}
 
- {/* Claim preview */}
- {selectedDataPoint && (
- <DataPointPreviewModal
- isOpen={isDataPointPreviewOpen}
- onClose={() => {
- setIsDataPointPreviewOpen(false)
- setSelectedDataPoint(null)
- setSelectedDataPointKpi(null)
- }}
- dataPoint={selectedDataPoint}
- kpi={selectedDataPointKpi || selectedDataPoint.kpi}
- onEvidenceClick={(ev) => {
- setSelectedEvidence(ev)
- setIsDataPointPreviewOpen(false)
- setIsPreviewModalOpen(true)
- }}
+ {/* Claim detail */}
+ {selectedClaim && data && (
+ <ClaimDetailModal
+ claim={selectedClaim.claim}
+ kpi={selectedClaim.kpi}
+ evidence={data.evidence.filter(ev => (ev.kpi_update_ids || []).includes(selectedClaim.claim.id!))}
+ locations={locations}
+ tags={tags}
+ beneficiaryGroups={beneficiaryGroups}
+ contributors={data.contributors}
+ onClose={() => setSelectedClaim(null)}
+ onOpenEvidence={handleOpenEvidence}
+ onAddEvidence={canEditEvidence
+ ? () => setAddEvidenceTarget({ claim: selectedClaim.claim, kpi: selectedClaim.kpi })
+ : undefined}
+ onConnectExisting={canEditEvidence && unlinkedEvidence.length > 0
+ ? () => setConnectTarget({ claimId: selectedClaim.claim.id })
+ : undefined}
  />
  )}
 

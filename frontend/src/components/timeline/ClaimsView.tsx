@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 import { TrendingUp, BarChart3, Paperclip, Link2 } from 'lucide-react'
 import { EmptyState } from '../ui'
-import { KPI, Location, TimelineClaim, TimelineContributor } from '../../types'
+import { KPI, Location, TimelineClaim, TimelineContributor, TimelineEvidence } from '../../types'
 import { formatDate } from '../../utils'
 import {
  TimelineFilters,
@@ -13,11 +13,14 @@ import {
  sortByUploadDate,
 } from '../../utils/timeline'
 import TimelineRow, { TimelineRowHeader, TimelinePackageHeader } from './TimelineRow'
+import EvidenceTypeCounts, { EvidenceTypeCountMap, countEvidenceTypes } from './EvidenceTypeCounts'
 
 interface ClaimsViewProps {
  claims: TimelineClaim[]
  kpis: KPI[]
  locations: Location[]
+ /** Full evidence list, used to break each claim's support down by type. */
+ evidence: TimelineEvidence[]
  contributors: Record<string, TimelineContributor>
  filters: TimelineFilters
  onOpenClaim: (claim: TimelineClaim, kpi: KPI | undefined) => void
@@ -28,9 +31,26 @@ interface ClaimsViewProps {
 }
 
 /** All impact claims in the initiative, newest upload first. */
-export default function ClaimsView({ claims, kpis, locations, contributors, filters, onOpenClaim, onAddEvidenceToClaim, onConnectExistingToClaim }: ClaimsViewProps) {
+export default function ClaimsView({ claims, kpis, locations, evidence, contributors, filters, onOpenClaim, onAddEvidenceToClaim, onConnectExistingToClaim }: ClaimsViewProps) {
  const kpiById = useMemo(() => new Map(kpis.map(k => [k.id, k])), [kpis])
  const locationById = useMemo(() => new Map(locations.map(l => [l.id, l.name])), [locations])
+
+ // Per-claim evidence-type breakdown for the glanceable icon strip.
+ const typeCountsByClaim = useMemo(() => {
+ const evidenceByClaim = new Map<string, TimelineEvidence[]>()
+ for (const ev of evidence) {
+ for (const claimId of ev.kpi_update_ids || []) {
+ const list = evidenceByClaim.get(claimId) || []
+ list.push(ev)
+ evidenceByClaim.set(claimId, list)
+ }
+ }
+ const map = new Map<string, EvidenceTypeCountMap>()
+ for (const [claimId, list] of evidenceByClaim) {
+ map.set(claimId, countEvidenceTypes(list))
+ }
+ return map
+ }, [evidence])
 
  const groups = useMemo(
  () => groupPackages(sortByUploadDate(filterClaims(claims, filters))),
@@ -72,7 +92,8 @@ export default function ClaimsView({ claims, kpis, locations, contributors, filt
  const activityDate = claim.date_range_start && claim.date_range_end
  ? `${formatDate(claim.date_range_start)} – ${formatDate(claim.date_range_end)}`
  : formatDate(claim.date_represented)
- const count = claim.evidence_count
+ const metricTitle = kpi?.title || 'Unknown metric'
+ const typeCounts = typeCountsByClaim.get(claim.id!) || countEvidenceTypes([])
 
  return (
  <TimelineRow
@@ -85,13 +106,19 @@ export default function ClaimsView({ claims, kpis, locations, contributors, filt
  title={
  <>
  <span className="text-base font-semibold text-gray-900 mr-1.5">{claim.value}</span>
- <span>{kpi?.title || 'Unknown metric'}</span>
+ <span>{claim.label || metricTitle}</span>
  </>
  }
- subtitle={claim.label || claim.note || undefined}
+ subtitle={claim.label ? (
+ // The metric stays visible even when the claim has its own label.
+ <span className="inline-flex items-center gap-1">
+ <BarChart3 className="w-3 h-3 text-primary-800 flex-shrink-0" />
+ {metricTitle}
+ </span>
+ ) : (claim.note || undefined)}
  whereWhen={{ location: locationName, date: activityDate }}
  uploadedBy={contributor?.name || contributor?.email || '—'}
- connectionSummary={`${count} evidence`}
+ connectionSummary={<EvidenceTypeCounts counts={typeCounts} />}
                   status={deriveClaimStatus(claim)}
                   groupPosition={group.isPackage ? groupPositionFor(index, group.items.length) : 'single'}
                   index={rowIndex}
