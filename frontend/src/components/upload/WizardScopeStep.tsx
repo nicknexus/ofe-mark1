@@ -2,6 +2,7 @@ import React from 'react'
 import { MapPin, CalendarRange, Tag as TagIcon, Users, LucideIcon } from 'lucide-react'
 import { BeneficiaryGroup, Location, MetricTag } from '../../types'
 import { getLocalDateString } from '../../utils'
+import DateRangePicker from '../DateRangePicker'
 import { WizardState, includesClaim } from './wizardTypes'
 
 interface ScopeOption {
@@ -110,8 +111,6 @@ export default function WizardScopeStep({ state, update, locations, tags, benefi
  const evidenceOnly = state.kind === 'evidence'
  const today = getLocalDateString(new Date())
 
- const dateInputClass = 'px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent'
-
  return (
  <div className="space-y-5 max-w-2xl">
  {/* Location */}
@@ -125,56 +124,32 @@ export default function WizardScopeStep({ state, update, locations, tags, benefi
  single={claim}
  />
 
- {/* Date */}
+ {/* Date — the app's own picker (calendar with day + range modes), not the native input */}
  <div>
- <div className="flex items-center justify-between mb-1.5">
- <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
+ <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 mb-1.5">
  <CalendarRange className="w-3.5 h-3.5 text-gray-400" />
  When did this happen?
  </label>
- <div className="flex rounded-full border border-gray-200 overflow-hidden">
- {(['single', 'range'] as const).map(mode => (
- <button
- key={mode}
- type="button"
- onClick={() => update({ dateMode: mode })}
- className={`px-3 py-1 text-xs font-medium transition-colors ${state.dateMode === mode
- ? 'bg-primary-500 text-white'
- : 'bg-white text-gray-500 hover:bg-gray-50'
- }`}
- >
- {mode === 'single' ? 'One day' : 'Date range'}
- </button>
- ))}
- </div>
- </div>
- {state.dateMode === 'single' ? (
- <input
- type="date"
- value={state.dateSingle}
- max={today}
- onChange={(e) => update({ dateSingle: e.target.value })}
- className={`w-full sm:w-56 ${dateInputClass}`}
+ <DateRangePicker
+ value={state.dateMode === 'single'
+ ? { singleDate: state.dateSingle || undefined }
+ : { startDate: state.dateStart || undefined, endDate: state.dateEnd || undefined }}
+ onChange={(value) => {
+ if (value.singleDate) {
+ update({ dateMode: 'single', dateSingle: value.singleDate, dateStart: '', dateEnd: '' })
+ } else {
+ update({
+ dateMode: 'range',
+ dateSingle: '',
+ dateStart: value.startDate || '',
+ dateEnd: value.endDate || '',
+ })
+ }
+ }}
+ maxDate={today}
+ placeholder="Pick a date or range"
+ className="w-full sm:w-72"
  />
- ) : (
- <div className="flex items-center gap-2">
- <input
- type="date"
- value={state.dateStart}
- max={today}
- onChange={(e) => update({ dateStart: e.target.value })}
- className={`flex-1 sm:flex-none sm:w-44 ${dateInputClass}`}
- />
- <span className="text-xs text-gray-400">to</span>
- <input
- type="date"
- value={state.dateEnd}
- max={today}
- onChange={(e) => update({ dateEnd: e.target.value })}
- className={`flex-1 sm:flex-none sm:w-44 ${dateInputClass}`}
- />
- </div>
- )}
  {evidenceOnly && (
  <p className="text-[11px] text-gray-400 mt-1.5">
  A broad range (e.g. the whole year) connects this evidence to every claim inside it.
