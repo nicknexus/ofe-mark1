@@ -21,6 +21,8 @@ interface EvidenceUploadModalProps {
  onCreated?: () => void | Promise<void>
  initiativeId: string
  preSelectedKPIId?: string
+ /** Skip the chooser and open straight into this mode (e.g. 'batch' from the wizard). */
+ initialMode?: UploadMode
 }
 
 type UploadMode = 'choose' | 'single' | 'batch'
@@ -29,13 +31,14 @@ export default function EvidenceUploadModal(props: EvidenceUploadModalProps) {
  const newFlowEnabled = isNewEvidenceUploadEnabled()
  // Reset mode every time the modal reopens so the chooser is the first thing
  // the user sees. Kill-switch keeps the legacy modal direct (no chooser).
- const [mode, setMode] = useState<UploadMode>(() => (newFlowEnabled ? 'choose' : 'single'))
+ const defaultMode = props.initialMode ?? (newFlowEnabled ? 'choose' : 'single')
+ const [mode, setMode] = useState<UploadMode>(defaultMode)
 
  useEffect(() => {
  if (props.isOpen) {
- setMode(newFlowEnabled ? 'choose' : 'single')
+ setMode(defaultMode)
  }
- }, [props.isOpen, newFlowEnabled])
+ }, [props.isOpen, defaultMode])
 
  if (!props.isOpen) return null
 

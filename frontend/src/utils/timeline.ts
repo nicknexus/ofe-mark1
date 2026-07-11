@@ -186,52 +186,6 @@ export function sortByUploadDate<T extends { created_at?: string }>(rows: T[]): 
  .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
 }
 
-export type GroupPosition = 'single' | 'first' | 'middle' | 'last'
-
-export interface PackageGroup<T> {
- items: T[]
- /** True when the group came from one batch upload (2+ items). */
- isPackage: boolean
-}
-
-/**
- * Heuristic package grouping: no batch id exists in the schema, but batch
- * claim inserts share one created_at and the kanban evidence flow fires
- * sequential creates within seconds. Rows already sorted created_at DESC
- * are grouped when the same contributor uploaded them within 60s of the
- * group's newest item.
- */
-export function groupPackages<T extends { created_at?: string; user_id?: string }>(
- rows: T[]
-): PackageGroup<T>[] {
- const WINDOW_MS = 60_000
- const groups: PackageGroup<T>[] = []
- let current: T[] = []
- let anchorTime = 0
-
- const flush = () => {
- if (current.length > 0) {
- groups.push({ items: current, isPackage: current.length > 1 })
- current = []
- }
- }
-
- for (const row of rows) {
- const time = row.created_at ? new Date(row.created_at).getTime() : 0
- const prev = current[current.length - 1]
- const sameUploader = prev ? prev.user_id === row.user_id : false
- if (prev && sameUploader && anchorTime - time <= WINDOW_MS) {
- current.push(row)
- } else {
- flush()
- current = [row]
- anchorTime = time
- }
- }
- flush()
- return groups
-}
-
 /**
  * Client-side mirror of the backend auto-match gates, used by the upload
  * wizard to preview which existing claims a piece of evidence will connect
@@ -335,9 +289,3 @@ export function getEvidenceImageUrl(evidence: TimelineEvidence): string | null {
  return image?.file_url || null
 }
 
-export function groupPositionFor(index: number, length: number): GroupPosition {
- if (length <= 1) return 'single'
- if (index === 0) return 'first'
- if (index === length - 1) return 'last'
- return 'middle'
-}

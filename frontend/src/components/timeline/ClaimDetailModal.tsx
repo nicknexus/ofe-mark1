@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
-import { BarChart3, Camera, FileText, MessageSquare, DollarSign, Paperclip, Link2, Unlink } from 'lucide-react'
+import { Camera, FileText, MessageSquare, DollarSign, Paperclip, Link2, Unlink } from 'lucide-react'
+import { ImpactClaimGlyph } from './ImpactClaimGlyph'
 import ModalFrame, { ModalHeader, ModalBody, ModalFooter, ModalFieldGrid, ModalField } from '../ModalFrame'
 import { Badge } from '../ui'
 import {
@@ -74,8 +75,8 @@ export default function ClaimDetailModal({
 
  return (
  <ModalFrame size="md">
- <ModalHeader
- icon={BarChart3}
+      <ModalHeader
+ icon={ImpactClaimGlyph}
  title={
  <h2 className="app-modal-title truncate">
  <span className="font-bold mr-1.5">{claim.value}</span>

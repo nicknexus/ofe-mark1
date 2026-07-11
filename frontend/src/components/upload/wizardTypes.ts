@@ -2,7 +2,7 @@ import { Evidence } from '../../types'
 
 export type WizardKind = 'evidence' | 'claim' | 'both'
 
-export type WizardStepId = 'type' | 'metric' | 'scope' | 'claim' | 'evidence' | 'review'
+export type WizardStepId = 'type' | 'mode' | 'metric' | 'scope' | 'claim' | 'evidence' | 'review'
 
 export interface WizardFile {
  /** uploadId from the upload manager. */

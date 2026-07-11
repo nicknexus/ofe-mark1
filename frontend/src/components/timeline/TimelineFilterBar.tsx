@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Search,
   MapPin,
   Users,
   Tag as TagIcon,
@@ -189,19 +188,6 @@ export default function TimelineFilterBar({
  }
 
  return (
-    <div className="flex flex-col lg:flex-row lg:items-center gap-2">
-      {/* Search */}
-      <div className="relative w-full lg:w-60 flex-shrink-0">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input
-          type="text"
-          value={filters.q}
-          onChange={(e) => set({ q: e.target.value })}
-          placeholder="Search claims and evidence…"
-          className="w-full h-9 pl-10 pr-3 bg-white border border-gray-200 rounded-full text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-        />
-      </div>
-
       <div className="flex flex-wrap items-center gap-2">
         <DateRangePicker
           value={activityDateValue}
@@ -303,6 +289,5 @@ export default function TimelineFilterBar({
         </button>
         )}
       </div>
-    </div>
   )
 }

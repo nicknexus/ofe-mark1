@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react'
-import { Camera, FileText, MessageSquare, DollarSign, ExternalLink, BarChart3, Edit, Trash2 } from 'lucide-react'
+import { Camera, FileText, MessageSquare, DollarSign, ExternalLink, Edit, Trash2 } from 'lucide-react'
 import ModalFrame, { ModalHeader, ModalBody, ModalFooter, ModalFieldGrid, ModalField } from '../ModalFrame'
 import { Badge } from '../ui'
+import { ImpactClaimBadge } from './ImpactClaimGlyph'
 import {
  BeneficiaryGroup,
  KPI,
@@ -184,9 +185,7 @@ export default function EvidenceDetailModal({
  onClick={() => onOpenClaim(claim)}
  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-colors text-left"
  >
- <div className="p-1.5 rounded-lg bg-primary-100 flex-shrink-0">
- <BarChart3 className="w-3.5 h-3.5 text-primary-800" />
- </div>
+ <ImpactClaimBadge className="w-7 h-7" textClassName="text-[10px]" />
  <span className="text-xs text-gray-800 truncate">
  <span className="font-semibold mr-1">{claim.value}</span>
  {kpiById.get(claim.kpi_id)?.title || 'Unknown metric'}

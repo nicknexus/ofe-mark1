@@ -20,20 +20,23 @@ interface ImpactClaimUploadModalProps {
   onSimpleSubmit?: (data: CreateKPIUpdateForm, kpiId: string) => Promise<void>
   /** Called by simple mode (single KPI path) */
   onSimpleSubmitSingle?: (data: CreateKPIUpdateForm) => Promise<void>
+  /** Skip the chooser and open straight into this mode (e.g. 'advanced' from the wizard). */
+  initialMode?: ClaimMode
 }
 
 type ClaimMode = 'choose' | 'simple' | 'advanced'
 
 export default function ImpactClaimUploadModal(props: ImpactClaimUploadModalProps) {
   const advancedEnabled = isAdvancedImpactClaimEnabled()
-  const [mode, setMode] = useState<ClaimMode>(() => (advancedEnabled ? 'choose' : 'simple'))
+  const defaultMode = props.initialMode ?? (advancedEnabled ? 'choose' : 'simple')
+  const [mode, setMode] = useState<ClaimMode>(defaultMode)
 
   // Reset when closed so the next open doesn't flash the previous mode (advanced/simple).
   useLayoutEffect(() => {
     if (!props.isOpen) {
-      setMode(advancedEnabled ? 'choose' : 'simple')
+      setMode(defaultMode)
     }
-  }, [props.isOpen, advancedEnabled])
+  }, [props.isOpen, defaultMode])
 
   if (!props.isOpen) return null
 

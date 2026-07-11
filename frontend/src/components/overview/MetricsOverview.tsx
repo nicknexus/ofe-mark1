@@ -26,6 +26,8 @@ interface MetricsOverviewProps {
  onAddKPI?: () => void
  /** Opens the full metric detail (chart + edit/delete) at /metrics/:kpiId. */
  onMetricDetailClick?: (kpiId: string) => void
+ /** Overrides the default URL navigation to the metric-filtered Timeline (mobile). */
+ onOpenTimelineForMetric?: (kpiId: string) => void
  user?: User | null
  organization?: Organization | null
 }
@@ -77,6 +79,7 @@ export default function MetricsOverview({
  kpiUpdates,
  onAddKPI,
  onMetricDetailClick,
+ onOpenTimelineForMetric,
  user,
  organization,
 }: MetricsOverviewProps) {
@@ -112,6 +115,10 @@ export default function MetricsOverview({
  }), [kpiUpdates, kpis, timeFrame, isCumulative])
 
  const openTimelineForMetric = (kpiId: string) => {
+ if (onOpenTimelineForMetric) {
+ onOpenTimelineForMetric(kpiId)
+ return
+ }
  navigate(`/initiatives/${initiativeId}?tab=timeline&metric=${kpiId}`)
  }
 

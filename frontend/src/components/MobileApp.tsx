@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { 
- Zap,
- FileText, 
- MapPin, 
- BookOpen, 
- BarChart3,
+import {
+ Home,
+ Activity,
+ MapPin,
+ BookOpen,
  User,
  ChevronLeft,
  Layers,
@@ -13,19 +12,22 @@ import {
  Building2,
  Users,
  ChevronDown,
- Check
+ Check,
+ Plus,
+ X
 } from 'lucide-react'
 import { apiService } from '../services/api'
 import { Initiative, User as UserType, SubscriptionStatus } from '../types'
 import { useTeam } from '../context/TeamContext'
+import { notify } from '../lib/notify'
 import MobileDashboard from './mobile/MobileDashboard'
 import { PageLoader } from './ui'
-import MobileActionsTab from './mobile/MobileActionsTab'
-import MobileEvidenceTab from './mobile/MobileEvidenceTab'
-import MobileMetricsTab from './mobile/MobileMetricsTab'
 import MobileLocationsTab from './mobile/MobileLocationsTab'
 import MobileStoriesTab from './mobile/MobileStoriesTab'
 import MobileAccountTab from './mobile/MobileAccountTab'
+import TimelineTab from './InitiativeTabs/TimelineTab'
+import MobileOverview from './overview/MobileOverview'
+import UploadWizardLauncher from './upload/UploadWizardLauncher'
 import ExplorePage from '../pages/ExplorePage'
 
 interface MobileAppProps {
@@ -33,8 +35,8 @@ interface MobileAppProps {
  subscriptionStatus: SubscriptionStatus | null
 }
 
-type TopLevelView = 'actions' | 'initiatives' | 'explore' | 'account'
-type InitiativeTab = 'evidence' | 'metrics' | 'locations' | 'stories'
+type TopLevelView = 'initiatives' | 'explore' | 'account'
+type InitiativeTab = 'timeline' | 'overview' | 'stories' | 'locations'
 
 export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) {
  const navigate = useNavigate()
@@ -42,8 +44,8 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
  const { accessibleOrganizations, activeOrganization, switchOrganization, hasMultipleOrgs, isSharedMember } = useTeam()
  const [view, setViewRaw] = useState<TopLevelView>(() => {
  const saved = sessionStorage.getItem('mobile-view')
- if (saved === 'explore' || saved === 'account' || saved === 'actions' || saved === 'initiatives') return saved
- return 'actions'
+ if (saved === 'explore' || saved === 'account' || saved === 'initiatives') return saved
+ return 'initiatives'
  })
  const setView = (v: TopLevelView) => {
  sessionStorage.setItem('mobile-view', v)
@@ -51,11 +53,14 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
  }
  const [initiatives, setInitiatives] = useState<Initiative[]>([])
  const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null)
- const [initiativeTab, setInitiativeTab] = useState<InitiativeTab>('evidence')
- const [autoAdd, setAutoAdd] = useState(false)
+ const [initiativeTab, setInitiativeTab] = useState<InitiativeTab>('timeline')
  const [loading, setLoading] = useState(true)
  const [orgDropdownOpen, setOrgDropdownOpen] = useState(false)
  const orgDropdownRef = useRef<HTMLDivElement>(null)
+
+ // The + flow: pick an initiative (when more than one), then the wizard.
+ const [showAddPicker, setShowAddPicker] = useState(false)
+ const [addInitiativeId, setAddInitiativeId] = useState<string | null>(null)
 
  useEffect(() => {
  if (location.pathname === '/explore') {
@@ -91,27 +96,30 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
 
  const handleEnterInitiative = (initiative: Initiative) => {
  setSelectedInitiative(initiative)
- setInitiativeTab('evidence')
- setAutoAdd(false)
+ setInitiativeTab('timeline')
  }
 
  const handleExitInitiative = () => {
  setSelectedInitiative(null)
- setAutoAdd(false)
  }
 
- const handleQuickAction = (initiativeId: string, action: 'evidence' | 'impact_claim' | 'story' | 'location') => {
- const initiative = initiatives.find(i => i.id === initiativeId)
- if (!initiative) return
- setSelectedInitiative(initiative)
- setAutoAdd(true)
- const tabMap: Record<string, InitiativeTab> = {
- evidence: 'evidence',
- impact_claim: 'metrics',
- story: 'stories',
- location: 'locations',
+ const handlePlusClick = () => {
+ // Inside an initiative the + isn't shown; this always starts from the top level.
+ if (initiatives.length === 0) {
+ notify.error('Create an initiative first')
+ setView('initiatives')
+ return
  }
- setInitiativeTab(tabMap[action])
+ if (initiatives.length === 1) {
+ setAddInitiativeId(initiatives[0].id!)
+ return
+ }
+ setShowAddPicker(true)
+ }
+
+ const openTimelineForMetric = (kpiId: string) => {
+ setInitiativeTab('timeline')
+ navigate(`/?metric=${kpiId}`, { replace: true })
  }
 
  if (loading) {
@@ -143,33 +151,28 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
  </div>
 
  <div className="flex-1">
- {initiativeTab === 'evidence' && (
- <MobileEvidenceTab 
- key={`${selectedInitiative.id}-${autoAdd}`}
+ {initiativeTab === 'timeline' && (
+ <TimelineTab
  initiativeId={selectedInitiative.id!}
  onRefresh={() => {}}
- autoAdd={autoAdd}
  />
  )}
- {initiativeTab === 'metrics' && (
- <MobileMetricsTab 
- key={`${selectedInitiative.id}-${autoAdd}`}
+ {initiativeTab === 'overview' && (
+ <MobileOverview
  initiativeId={selectedInitiative.id!}
- autoAdd={autoAdd}
- />
- )}
- {initiativeTab === 'locations' && (
- <MobileLocationsTab 
- key={`${selectedInitiative.id}-${autoAdd}`}
- initiativeId={selectedInitiative.id!}
- autoAdd={autoAdd}
+ onOpenTimelineForMetric={openTimelineForMetric}
  />
  )}
  {initiativeTab === 'stories' && (
- <MobileStoriesTab 
- key={`${selectedInitiative.id}-${autoAdd}`}
+ <MobileStoriesTab
+ key={selectedInitiative.id}
  initiativeId={selectedInitiative.id!}
- autoAdd={autoAdd}
+ />
+ )}
+ {initiativeTab === 'locations' && (
+ <MobileLocationsTab
+ key={selectedInitiative.id}
+ initiativeId={selectedInitiative.id!}
  />
  )}
  </div>
@@ -177,8 +180,8 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
  <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 safe-area-pb z-50">
  <div className="flex justify-around items-center h-16">
  {[
- { id: 'evidence' as InitiativeTab, label: 'Evidence', icon: FileText },
- { id: 'metrics' as InitiativeTab, label: 'Metrics', icon: BarChart3 },
+ { id: 'timeline' as InitiativeTab, label: 'Timeline', icon: Activity },
+ { id: 'overview' as InitiativeTab, label: 'Overview', icon: Home },
  { id: 'stories' as InitiativeTab, label: 'Stories', icon: BookOpen },
  { id: 'locations' as InitiativeTab, label: 'Locations', icon: MapPin },
  ].map((tab) => {
@@ -187,10 +190,10 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
  return (
  <button
  key={tab.id}
- onClick={() => { setInitiativeTab(tab.id); setAutoAdd(false) }}
+ onClick={() => setInitiativeTab(tab.id)}
  className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
- isActive 
- ? 'text-primary-600' 
+ isActive
+ ? 'text-primary-600'
  : 'text-gray-400 hover:text-gray-600'
  }`}
  >
@@ -209,8 +212,8 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
 
  return (
  <div className="min-h-screen pb-20" style={{ backgroundColor: '#F9FAFB' }}>
- {/* Org Switcher - shown on Actions and Initiatives tabs */}
- {hasMultipleOrgs && (view === 'actions' || view === 'initiatives') && (
+ {/* Org Switcher - shown on Initiatives tab */}
+ {hasMultipleOrgs && view === 'initiatives' && (
  <div className="bg-white border-b border-gray-100 px-4 py-2.5 sticky top-0 z-40" ref={orgDropdownRef}>
  <button
  onClick={() => setOrgDropdownOpen(!orgDropdownOpen)}
@@ -280,14 +283,8 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
  )}
 
  <div className="flex-1">
- {view === 'actions' && (
- <MobileActionsTab
- initiatives={initiatives}
- onAction={handleQuickAction}
- />
- )}
  {view === 'initiatives' && (
- <MobileDashboard 
+ <MobileDashboard
  initiatives={initiatives}
  onEnterInitiative={handleEnterInitiative}
  onRefresh={loadInitiatives}
@@ -299,38 +296,37 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
  <ExplorePage embedded />
  )}
  {view === 'account' && (
- <MobileAccountTab 
+ <MobileAccountTab
  user={user}
  subscriptionStatus={subscriptionStatus}
  />
  )}
  </div>
 
+ {/* Bottom nav: Initiatives · [ + ] · Explore · Account */}
  <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 safe-area-pb z-50">
  <div className="flex justify-around items-center h-16">
- {[
- { id: 'actions' as TopLevelView, label: 'Actions', icon: Zap },
- { id: 'initiatives' as TopLevelView, label: 'Initiatives', icon: Layers },
- ].map((tab) => {
- const Icon = tab.icon
- const isActive = view === tab.id
- return (
  <button
- key={tab.id}
- onClick={() => { setView(tab.id); if (location.pathname !== '/') navigate('/', { replace: true }) }}
+ onClick={() => { setView('initiatives'); if (location.pathname !== '/') navigate('/', { replace: true }) }}
  className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
- isActive 
- ? 'text-primary-600' 
- : 'text-gray-400 hover:text-gray-600'
+ view === 'initiatives' ? 'text-primary-600' : 'text-gray-400 hover:text-gray-600'
  }`}
  >
- <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5]' : ''}`} />
- <span className={`text-xs mt-1 ${isActive ? 'font-semibold' : 'font-medium'}`}>
- {tab.label}
- </span>
+ <Layers className={`w-5 h-5 ${view === 'initiatives' ? 'stroke-[2.5]' : ''}`} />
+ <span className={`text-xs mt-1 ${view === 'initiatives' ? 'font-semibold' : 'font-medium'}`}>Initiatives</span>
  </button>
- )
- })}
+
+ {/* Big + — add a claim, evidence, or both */}
+ <div className="flex-1 flex items-center justify-center">
+ <button
+ onClick={handlePlusClick}
+ aria-label="Add claim or evidence"
+ className="-mt-7 w-14 h-14 rounded-full bg-primary-500 text-white shadow-lg shadow-primary-500/30 flex items-center justify-center active:scale-95 transition-transform"
+ >
+ <Plus className="w-7 h-7" strokeWidth={2.5} />
+ </button>
+ </div>
+
  <button
  onClick={() => { setView('explore'); if (location.pathname !== '/') navigate('/', { replace: true }) }}
  className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
@@ -351,6 +347,59 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
  </button>
  </div>
  </nav>
+
+ {/* Initiative picker for the + button */}
+ {showAddPicker && (
+ <div className="fixed inset-0 z-[90]">
+ <div className="absolute inset-0 bg-black/40" onClick={() => setShowAddPicker(false)} />
+ <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl safe-area-pb max-h-[70vh] flex flex-col">
+ <div className="flex items-center justify-between px-5 pt-4 pb-2">
+ <div>
+ <h2 className="text-base font-semibold text-gray-900">Add to which initiative?</h2>
+ <p className="text-xs text-gray-500">Claims and evidence live inside an initiative</p>
+ </div>
+ <button
+ onClick={() => setShowAddPicker(false)}
+ className="p-2 -mr-2 text-gray-400 hover:text-gray-600"
+ aria-label="Close"
+ >
+ <X className="w-5 h-5" />
+ </button>
+ </div>
+ <div className="overflow-y-auto px-3 pb-4 space-y-1">
+ {initiatives.map(initiative => (
+ <button
+ key={initiative.id}
+ onClick={() => {
+ setShowAddPicker(false)
+ setAddInitiativeId(initiative.id!)
+ }}
+ className="w-full flex items-center gap-3 px-3 py-3 rounded-xl active:bg-gray-50 text-left"
+ >
+ <div className="w-9 h-9 rounded-xl bg-primary-100 flex items-center justify-center flex-shrink-0">
+ <Layers className="w-4 h-4 text-primary-800" />
+ </div>
+ <div className="min-w-0">
+ <p className="text-sm font-medium text-gray-900 truncate">{initiative.title}</p>
+ {initiative.description && (
+ <p className="text-xs text-gray-500 truncate">{initiative.description}</p>
+ )}
+ </div>
+ </button>
+ ))}
+ </div>
+ </div>
+ </div>
+ )}
+
+ {/* Full-screen guided upload (same wizard as desktop) */}
+ {addInitiativeId && (
+ <UploadWizardLauncher
+ initiativeId={addInitiativeId}
+ onClose={() => setAddInitiativeId(null)}
+ onCreated={loadInitiatives}
+ />
+ )}
  </div>
  )
 }

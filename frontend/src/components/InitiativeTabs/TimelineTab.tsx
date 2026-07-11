@@ -15,7 +15,7 @@ import {
 import { notify } from '../../lib/notify'
 import { useTeam } from '../../context/TeamContext'
 import { SectionLoader, EmptyState } from '../ui'
-import { AlertCircle, Plus } from 'lucide-react'
+import { AlertCircle, Plus, Search } from 'lucide-react'
 import {
  TimelineFilters,
  TimelineView,
@@ -35,6 +35,8 @@ import EvidenceDetailModal from '../timeline/EvidenceDetailModal'
 import ClaimDetailModal from '../timeline/ClaimDetailModal'
 import AddEvidenceModal from '../AddEvidenceModal'
 import ConfirmDialog from '../ConfirmDialog'
+import ImpactClaimUploadModal from '../impactClaims/ImpactClaimUploadModal'
+import EvidenceUploadModal from '../evidence/EvidenceUploadModal'
 
 const VIEWS: Array<{ id: TimelineView; label: string }> = [
  { id: 'claims', label: 'Claims' },
@@ -73,6 +75,8 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  const [connectTarget, setConnectTarget] = useState<{ evidence?: TimelineEvidence; claimId?: string } | null>(null)
  const [addEvidenceTarget, setAddEvidenceTarget] = useState<{ claim: TimelineClaim; kpi: KPI | undefined } | null>(null)
  const [isWizardOpen, setIsWizardOpen] = useState(false)
+ // Advanced flows picked from the wizard's Simple/Advanced step
+ const [advancedUpload, setAdvancedUpload] = useState<'claim' | 'evidence' | null>(null)
 
  const rawView = searchParams.get('view')
  const view: TimelineView = rawView === 'evidence' || rawView === 'connections' ? rawView : 'claims'
@@ -210,17 +214,17 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
           {(canAddImpactClaims || canEditEvidence) && (
             <button
               onClick={() => setIsWizardOpen(true)}
-              className="app-btn app-btn-primary app-btn-sm flex-shrink-0"
+              className="app-btn app-btn-primary app-btn-lg shadow-sm flex-shrink-0"
             >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Add</span>
+              <Plus className="w-5 h-5" />
+              <span>Add</span>
             </button>
           )}
         </div>
 
-        {/* View switcher + at-a-glance stats */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-gray-100 border border-gray-200 self-start">
+        {/* View switcher + search + at-a-glance stats */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-gray-100 border border-gray-200 flex-shrink-0">
             {VIEWS.map(v => {
               const isActive = view === v.id
               return (
@@ -242,12 +246,26 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
             })}
           </div>
 
-          {data && (
-            <TimelineStatCards
-              stats={data.stats}
-              activeStatus={filters.status}
-              onStatusClick={(status) => setFilters({ ...filters, status })}
+          {/* Search — inline with the view switcher */}
+          <div className="relative flex-1 min-w-[180px] max-w-sm">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={filters.q}
+              onChange={(e) => setFilters({ ...filters, q: e.target.value })}
+              placeholder="Search claims and evidence…"
+              className="w-full h-9 pl-10 pr-3 bg-white border border-gray-200 rounded-full text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
+          </div>
+
+          {data && (
+            <div className="ml-auto">
+              <TimelineStatCards
+                stats={data.stats}
+                activeStatus={filters.status}
+                onStatusClick={(status) => setFilters({ ...filters, status })}
+              />
+            </div>
           )}
         </div>
 
@@ -299,6 +317,7 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
               ) : view === 'evidence' ? (
                 <EvidenceView
                   evidence={data.evidence}
+                  kpis={data.kpis}
                   locations={locations}
                   contributors={data.contributors}
                   filters={filters}
@@ -332,6 +351,8 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  initiativeId={initiativeId}
  canCreateClaim={canAddImpactClaims}
  canCreateEvidence={canEditEvidence}
+ onAdvancedClaim={() => { setIsWizardOpen(false); setAdvancedUpload('claim') }}
+ onAdvancedEvidence={() => { setIsWizardOpen(false); setAdvancedUpload('evidence') }}
  kpis={data.kpis}
  locations={locations}
  tags={tags}
@@ -340,6 +361,29 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  existingEvidence={data.evidence}
  onClose={() => setIsWizardOpen(false)}
  onCreated={refresh}
+ />
+ )}
+
+ {/* Advanced claim board (existing multi-claim flow) */}
+ {advancedUpload === 'claim' && data && (
+ <ImpactClaimUploadModal
+ isOpen
+ initialMode="advanced"
+ initiativeId={initiativeId}
+ availableKPIs={data.kpis}
+ onClose={() => setAdvancedUpload(null)}
+ onCreated={() => refresh()}
+ />
+ )}
+
+ {/* Advanced evidence batch organizer (existing kanban flow) */}
+ {advancedUpload === 'evidence' && (
+ <EvidenceUploadModal
+ isOpen
+ initialMode="batch"
+ initiativeId={initiativeId}
+ onClose={() => setAdvancedUpload(null)}
+ onCreated={() => refresh()}
  />
  )}
 

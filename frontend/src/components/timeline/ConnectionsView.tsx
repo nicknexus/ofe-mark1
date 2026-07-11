@@ -11,7 +11,7 @@ import {
  useSensor,
  useSensors,
 } from '@dnd-kit/core'
-import { Link2, Unlink, AlertCircle, FileText, Camera, MessageSquare, DollarSign, BarChart3, Paperclip } from 'lucide-react'
+import { Link2, Unlink, AlertCircle, FileText, Camera, MessageSquare, DollarSign, Paperclip } from 'lucide-react'
 import { AppCard, Badge, EmptyState } from '../ui'
 import { KPI, Location, TimelineClaim, TimelineContributor, TimelineEvidence } from '../../types'
 import { formatDate, getEvidenceTypeInfo } from '../../utils'
@@ -24,6 +24,8 @@ import {
   sortByUploadDate,
 } from '../../utils/timeline'
 import { fadeUp, rowEntrance } from './motion'
+import MetricChip from './MetricChip'
+import { ImpactClaimBadge } from './ImpactClaimGlyph'
 
 const TYPE_ICONS = {
  visual_proof: Camera,
@@ -220,15 +222,16 @@ export default function ConnectionsView({
  className="flex-1 min-w-0 text-left rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors p-4"
  >
  <div className="flex items-center gap-3">
- <div className="p-2 rounded-xl bg-primary-100 flex-shrink-0">
- <BarChart3 className="w-4 h-4 text-primary-800" />
- </div>
+                    <ImpactClaimBadge />
  <div className="min-w-0">
  <p className="font-medium text-gray-800 truncate">
  <span className="text-base font-semibold text-gray-900 mr-1.5">{claim.value}</span>
- {kpi?.title || 'Unknown metric'}
+ {claim.label || kpi?.title || 'Unknown metric'}
  </p>
- <p className="text-xs text-gray-500 truncate mt-0.5">
+ <p className="mt-1">
+ <MetricChip kpi={kpi} kpis={kpis} />
+ </p>
+ <p className="text-xs text-gray-500 truncate mt-1">
  {[locationName, activityDate, contributor?.name || contributor?.email]
  .filter(Boolean)
  .join(' · ')}

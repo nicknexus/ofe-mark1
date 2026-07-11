@@ -63,6 +63,10 @@ interface UploadWizardProps {
  initiativeId: string
  canCreateClaim: boolean
  canCreateEvidence: boolean
+ /** When provided, claim-only gets a Simple/Advanced choice; Advanced closes the wizard and opens the claim board. */
+ onAdvancedClaim?: () => void
+ /** When provided, evidence-only gets a Simple/Advanced choice; Advanced closes the wizard and opens the batch organizer. */
+ onAdvancedEvidence?: () => void
  /** Everything the wizard needs to preview connections; from the Timeline payload. */
  kpis: KPI[]
  locations: Location[]
@@ -79,6 +83,11 @@ const STEP_META: Record<WizardStepId, { label: string; title: (s: WizardState) =
  label: 'Type',
  title: () => 'What would you like to add?',
  subtitle: () => 'Everything ends up in one Timeline either way',
+ },
+ mode: {
+ label: 'How',
+ title: (s) => s.kind === 'claim' ? 'How do you want to add claims?' : 'How do you want to upload evidence?',
+ subtitle: () => 'Simple walks you through step by step; Advanced is the power tool for bulk work',
  },
  metric: {
  label: 'Metric',
@@ -120,6 +129,8 @@ export default function UploadWizard({
  initiativeId,
  canCreateClaim,
  canCreateEvidence,
+ onAdvancedClaim,
+ onAdvancedEvidence,
  kpis,
  locations,
  tags,
@@ -148,15 +159,18 @@ export default function UploadWizard({
  const stateRef = useRef(state)
  stateRef.current = state
 
+ const hasModeChoice = (state.kind === 'claim' && !!onAdvancedClaim) || (state.kind === 'evidence' && !!onAdvancedEvidence)
+
  const steps: WizardStepId[] = useMemo(() => {
  const list: WizardStepId[] = []
  if (availableKinds.length > 1) list.push('type')
+ if (hasModeChoice) list.push('mode')
  list.push('metric', 'scope')
  if (includesClaim(state.kind)) list.push('claim')
  if (includesEvidence(state.kind)) list.push('evidence')
  list.push('review')
  return list
- }, [availableKinds.length, state.kind])
+ }, [availableKinds.length, state.kind, hasModeChoice])
 
  const step = steps[Math.min(stepIndex, steps.length - 1)]
 
@@ -226,6 +240,7 @@ export default function UploadWizard({
  const validateCurrent = (): string | null => {
  switch (step) {
  case 'type': return state.kind ? null : 'Choose what you want to add'
+ case 'mode': return null
  case 'metric': return validateMetricStep(state)
  case 'scope': return validateScopeStep(state)
  case 'claim': return validateClaimStep(state)
@@ -419,6 +434,47 @@ export default function UploadWizard({
  </div>
  )}
 
+ {step === 'mode' && (
+ <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+ <button
+ type="button"
+ onClick={advance}
+ className="relative text-left p-6 md:p-7 rounded-3xl border-2 border-gray-200 bg-white hover:border-primary-300 hover:-translate-y-0.5 hover:shadow-card-hover transition-all"
+ >
+ <span className="absolute top-4 right-4 px-2 py-0.5 rounded-full bg-primary-500 text-white text-[10px] font-semibold uppercase tracking-wide">
+ Recommended
+ </span>
+ <div className="w-12 h-12 rounded-2xl bg-primary-100 flex items-center justify-center mb-4">
+ <Check className="w-6 h-6 text-primary-800" />
+ </div>
+ <p className="text-base font-semibold text-gray-800 mb-1.5">Simple</p>
+ <p className="text-sm text-gray-500 leading-relaxed">
+ A guided flow, one question at a time. Best for adding one {state.kind === 'claim' ? 'result' : 'batch of files'}.
+ </p>
+ </button>
+ <button
+ type="button"
+ // Parent decides whether to unmount the wizard — calling onClose here
+ // would tear down self-fetching wrappers before they can swap modals.
+ onClick={() => {
+ if (state.kind === 'claim') onAdvancedClaim?.()
+ else onAdvancedEvidence?.()
+ }}
+ className="text-left p-6 md:p-7 rounded-3xl border-2 border-gray-200 bg-white hover:border-primary-300 hover:-translate-y-0.5 hover:shadow-card-hover transition-all"
+ >
+ <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+ <Layers className="w-6 h-6 text-gray-600" />
+ </div>
+ <p className="text-base font-semibold text-gray-800 mb-1.5">Advanced</p>
+ <p className="text-sm text-gray-500 leading-relaxed">
+ {state.kind === 'claim'
+ ? 'The full claim board — add many claims across metrics at once.'
+ : 'The batch organizer — sort many files into multiple evidence records.'}
+ </p>
+ </button>
+ </div>
+ )}
+
  {step === 'metric' && (
  <WizardMetricStep
  state={state}
@@ -479,7 +535,7 @@ export default function UploadWizard({
  Back
  </button>
  )}
- {step === 'type' ? null : !isLastStep ? (
+ {step === 'type' || step === 'mode' ? null : !isLastStep ? (
  <button onClick={goNext} className="app-btn app-btn-primary app-btn-sm">
  Next
  <ArrowRight className="w-4 h-4" />
