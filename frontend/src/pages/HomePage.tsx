@@ -1,14 +1,19 @@
 import { lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { MotionConfig } from 'framer-motion';
 import { LandingNavbar, HeroSection } from '../components/landing';
 
 // Lazy load below-the-fold sections for faster initial load
-const ExplorePromoSection = lazy(() => import('../components/landing/ExplorePromoSection'));
-const FeaturesSection = lazy(() => import('../components/landing/FeaturesSection'));
+const WalkthroughSection = lazy(() => import('../components/landing/WalkthroughSection'));
+const ProblemsSection = lazy(() => import('../components/landing/ProblemsSection'));
 const HowItWorksSection = lazy(() => import('../components/landing/HowItWorksSection'));
+const ExplorePromoSection = lazy(() => import('../components/landing/ExplorePromoSection'));
+const LiveImpactSection = lazy(() => import('../components/landing/LiveImpactSection'));
+const WhyItMattersSection = lazy(() => import('../components/landing/WhyItMattersSection'));
+const WhoItServesSection = lazy(() => import('../components/landing/WhoItServesSection'));
 // const TestimonialsSection = lazy(() => import('../components/landing/TestimonialsSection'));
-const CTASection = lazy(() => import('../components/landing/CTASection'));
 const PricingSection = lazy(() => import('../components/landing/PricingSection'));
+const CTASection = lazy(() => import('../components/landing/CTASection'));
 const Footer = lazy(() => import('../components/landing/Footer'));
 
 // Simple loading placeholder
@@ -23,6 +28,7 @@ export default function HomePage() {
   const handleGetStarted = () => navigate('/login');
 
   return (
+    <MotionConfig reducedMotion="user">
     <main className="relative min-h-screen bg-background font-figtree landing-page">
       {/* Global graph-paper grid + fade */}
       <div className="pointer-events-none fixed inset-0 z-0">
@@ -32,26 +38,39 @@ export default function HomePage() {
       <LandingNavbar onGetStarted={handleGetStarted} />
       <HeroSection onGetStarted={handleGetStarted} />
       <Suspense fallback={<SectionLoader />}>
-        <ExplorePromoSection />
+        <WalkthroughSection />
       </Suspense>
       <Suspense fallback={<SectionLoader />}>
-        <FeaturesSection onGetStarted={handleGetStarted} />
+        <ProblemsSection onGetStarted={handleGetStarted} />
       </Suspense>
       <Suspense fallback={<SectionLoader />}>
         <HowItWorksSection />
+      </Suspense>
+      <Suspense fallback={<SectionLoader />}>
+        <ExplorePromoSection />
+      </Suspense>
+      <Suspense fallback={<SectionLoader />}>
+        <LiveImpactSection />
+      </Suspense>
+      <Suspense fallback={<SectionLoader />}>
+        <WhyItMattersSection />
+      </Suspense>
+      <Suspense fallback={<SectionLoader />}>
+        <WhoItServesSection onGetStarted={handleGetStarted} />
       </Suspense>
       {/* <Suspense fallback={<SectionLoader />}>
         <TestimonialsSection />
       </Suspense> */}
       <Suspense fallback={<SectionLoader />}>
-        <CTASection onGetStarted={handleGetStarted} />
+        <PricingSection onGetStarted={handleGetStarted} />
       </Suspense>
       <Suspense fallback={<SectionLoader />}>
-        <PricingSection onGetStarted={handleGetStarted} />
+        <CTASection onGetStarted={handleGetStarted} />
       </Suspense>
       <Suspense fallback={<SectionLoader />}>
         <Footer />
       </Suspense>
     </main>
+    </MotionConfig>
   );
 }

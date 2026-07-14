@@ -142,7 +142,7 @@ const TestimonialsSection = () => {
             </span>
             <span className="text-sm font-medium text-muted-foreground">Real stories from our community</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-newsreader font-extralight text-foreground mb-6">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-fraunces font-extralight text-foreground mb-6">
             Stories that{" "}
             <span className="relative inline-block">
               <span className="relative z-10">inspire</span>

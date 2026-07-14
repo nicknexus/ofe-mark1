@@ -103,10 +103,34 @@ export default {
                     light: "#e8f3df",
                     dark: "#90b171",
                 },
+                // Nexus brand/deck palette — darker + richer accents for the
+                // landing surface. Sourced from the brand voice & deck sites.
+                ink: {
+                    DEFAULT: '#2A333A',  // near-black charcoal for dark sections
+                    soft: '#2F3A43',
+                },
+                steel: {
+                    DEFAULT: '#4E5B67',  // slate — dark section base
+                    deep: '#3B454F',
+                    ink: '#2C343B',
+                    light: '#42505B',
+                },
+                sage: {
+                    DEFAULT: '#8FB49B',  // muted sage
+                    deep: '#6B8F87',     // deep sage-teal
+                },
+                seafoam: '#97C7CB',      // teal accent (named to avoid clashing with Tailwind's `teal`)
+                terracotta: {
+                    DEFAULT: '#A65D57',  // soft rust (voice site)
+                    bright: '#C24A38',   // punchy rust (deck site)
+                    deep: '#8E3325',
+                },
+                sand: '#FAFBF9',         // warm off-white paper
             },
             fontFamily: {
                 sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
                 newsreader: ['Newsreader', 'serif'],
+                fraunces: ['Fraunces', 'Newsreader', 'Georgia', 'serif'],
                 figtree: ['Figtree', 'system-ui', 'sans-serif'],
             },
             /** 12px floor for UI copy; same rem as `text-xs`, semantic alias for chips/metadata. */

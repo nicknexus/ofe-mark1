@@ -1,290 +1,103 @@
-import { useState, useRef, useEffect } from "react";
-import { LineChart, Sparkles, ArrowRight, Check, Image, FileText, Camera, PartyPopper } from "lucide-react";
+import { Plug, Share2, PlayCircle } from "lucide-react";
+import { motion } from "framer-motion";
+import { spring, easeOut, viewportOnce } from "./motion";
+import { Reveal, StaggerGroup, StaggerItem } from "./Reveal";
 
 const steps = [
   {
-    number: "01",
-    title: "Setup Your Initiative",
-    description: "Create the metrics you want the world to see.",
-    icon: LineChart,
-    color: "from-[#c0dea0] to-[#80b092]",
-    features: ["Custom metrics", "Impact locations", "Beneficiary groups"],
-    visual: "discover",
+    number: "Step 1",
+    icon: Plug,
+    title: "Plug in what you have",
+    description:
+      "Upload the stories, photos, videos, and data your team already collects — from anywhere, on any device.",
   },
   {
-    number: "02",
-    title: "Build Trust",
-    description: "Upload proof and experiences.",
-    icon: Image,
-    color: "from-[#80b092] to-[#5e8380]",
-    features: ["Impact claims", "Evidence", "Stories"],
-    visual: "donate",
+    number: "Step 2",
+    icon: Share2,
+    title: "Nexus connects the proof",
+    description:
+      "Everything is organized by initiative, location, outcome, and evidence — the full picture, automatically assembled.",
   },
   {
-    number: "03",
-    title: "Connect With the World",
-    description: "Share real-time updates, stories, videos, and the difference your donors are making.",
-    icon: Sparkles,
-    color: "from-[#5e8380] to-[#80b092]",
-    features: ["Live updates", "Photos, Videos, Stories", "Impact Dashboard", "AI Reports"],
-    visual: "track",
+    number: "Step 3",
+    icon: PlayCircle,
+    title: "Press play, go live",
+    description:
+      "A public impact page, donor experiences, embeds, and ready-to-share reports — live in moments, updating as you work.",
   },
 ];
 
-// Mock phone UI for each step
-const PhoneVisual = ({ step, isActive }: { step: typeof steps[0]; isActive: boolean }) => {
-  const Icon = step.icon;
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  
-  useEffect(() => {
-    if (textareaRef.current && step.visual === "donate") {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
-  }, [step.visual]);
-  
-  return (
-    <div className={`relative transition-all duration-700 ${isActive ? 'scale-100 opacity-100' : 'scale-95 opacity-50'}`}>
-      {/* Phone frame */}
-      <div className="relative w-[280px] h-[560px] bg-foreground/95 rounded-[3rem] p-3 shadow-lg border-2 border-foreground/35">
-        {/* Screen */}
-        <div className="relative w-full h-full bg-background rounded-[2.5rem] overflow-hidden">
-          {/* Status bar */}
-          <div className="flex items-center justify-between px-6 py-3 bg-muted/50">
-            <span className="text-xs text-muted-foreground">9:41</span>
-            <div className="flex items-center gap-1">
-              <div className="w-4 h-2 bg-muted-foreground/50 rounded-sm" />
-              <div className="w-6 h-3 border border-muted-foreground/50 rounded-sm">
-                <div className="w-4 h-full bg-accent rounded-sm" />
-              </div>
-            </div>
-          </div>
-          
-          {/* Content based on step */}
-          <div className="p-6 h-full">
-            {step.visual === "discover" && (
-              <div className="space-y-6 animate-fade-in mt-8">
-                <div className="flex items-center gap-2 mb-8">
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${step.color} flex items-center justify-center`}>
-                    <Icon className="w-5 h-5 text-white" />
-                  </div>
-                  <span className="font-semibold text-foreground">Discover</span>
-                </div>
-                {["Create Metrics", "Insert Location", "Add Beneficiary Group"].map((btn, i) => (
-                  <button key={btn} className={`w-full glass-card p-4 rounded-xl flex items-center justify-between transition-all duration-300 hover:shadow-glass-lg`} style={{ animationDelay: `${i * 100}ms` }}>
-                    <p className="text-sm font-medium text-foreground">{btn}</p>
-                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                  </button>
-                ))}
-              </div>
-            )}
-            
-            {step.visual === "donate" && (
-              <div className="space-y-4 animate-fade-in">
-                <div className="flex items-center gap-2 mb-6">
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${step.color} flex items-center justify-center`}>
-                    <Icon className="w-5 h-5 text-white" />
-                  </div>
-                  <span className="font-semibold text-foreground">Create Story</span>
-                </div>
-                <div className="bg-white/60 backdrop-blur-2xl p-3 rounded-xl shadow-lg overflow-hidden">
-                  <input 
-                    type="text" 
-                    placeholder="Story title..." 
-                    className="w-full bg-transparent text-xs font-medium text-foreground placeholder:text-muted-foreground outline-none border-0 focus:border-0 focus:ring-0"
-                    defaultValue="Clean water reaches village"
-                    readOnly
-                    style={{ maxWidth: '100%', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div className="bg-white/60 backdrop-blur-2xl p-3 rounded-xl shadow-lg">
-                  <textarea 
-                    ref={textareaRef}
-                    placeholder="Share your impact story..." 
-                    className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none resize-none border-0 focus:border-0 focus:ring-0"
-                    defaultValue="Today we delivered clean water to 50 families in Kenya. The joy on their faces was incredible..."
-                    readOnly
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <button className="flex-1 glass-card p-3 rounded-xl flex items-center justify-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors border-0">
-                    <Camera className="w-4 h-4" />
-                    <span>Add Photo</span>
-                  </button>
-                  <button className="flex-1 glass-card p-3 rounded-xl flex items-center justify-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors border-0">
-                    <FileText className="w-4 h-4" />
-                    <span>Evidence</span>
-                  </button>
-                </div>
-                <button className={`w-full py-3 rounded-xl bg-gradient-to-r ${step.color} text-white font-semibold text-sm shadow-md`}>
-                  Publish Story
-                </button>
-              </div>
-            )}
-            
-            {step.visual === "track" && (
-              <div className="space-y-3 animate-fade-in">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${step.color} flex items-center justify-center`}>
-                    <Icon className="w-5 h-5 text-white" />
-                  </div>
-                  <span className="font-semibold text-foreground">Your Impact</span>
-                </div>
-                <div className="glass-card p-4 rounded-xl">
-                  <div className="flex items-start gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-accent/30 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs text-accent font-medium">Impact Claim</p>
-                      <p className="text-sm text-foreground flex items-center gap-1">
-                      A new well installed for a village in Kenya! 
-                        <PartyPopper className="w-4 h-4 text-accent inline" />
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="glass-card p-4 rounded-xl opacity-80">
-                  <div className="flex items-start gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-muted flex-shrink-0" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Evidence</p>
-                      <p className="text-sm text-foreground">
-                        8 photos
-                        <br />
-                        3 documents
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="glass-card p-4 rounded-xl opacity-60">
-                  <div className="flex items-start gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-muted flex-shrink-0" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Story</p>
-                      <p className="text-sm text-foreground">Video of family sharing their gratitude!</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-        
-        {/* Home indicator */}
-        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-32 h-1 bg-foreground/20 rounded-full" />
-      </div>
-      
-      {/* Floating notification */}
-      {isActive && step.visual === "track" && (
-        <div className="absolute -top-4 -right-8 glass-card p-3 rounded-xl shadow-glass-lg animate-float">
-          <div className="flex items-center gap-2">
-            <PartyPopper className="w-5 h-5 text-accent" />
-            <span className="text-xs font-medium text-foreground">Impact received!</span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
 const HowItWorksSection = () => {
-  const [activeStep, setActiveStep] = useState(0);
-
   return (
-    <section id="how-it-works" className="py-24 md:py-32 relative overflow-hidden">
-      
-      <div className="relative z-10 max-w-7xl mx-auto px-6">
+    <section id="how-it-works" className="py-16 md:py-24 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-b from-background via-sage-light/10 to-background" />
+
+      <div className="relative z-10 max-w-6xl mx-auto px-6">
         {/* Header */}
-        <div className="text-center mb-20">
+        <Reveal direction="up" className="text-center mb-12">
           <div className="inline-flex items-center gap-2 glass-card px-4 py-2 rounded-full mb-6">
-            <span className="text-sm font-medium text-muted-foreground">Simple by design</span>
+            <span className="text-sm font-medium text-muted-foreground">How it works</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-newsreader font-extralight text-foreground mb-6">
-            Three steps to{" "}
-            <span className="bg-gradient-to-r from-foreground via-slate-light to-foreground bg-clip-text text-transparent">
-              share your{" "}
-            </span>
-            <span className="relative inline-block">
-              <span className="bg-gradient-to-r from-foreground via-slate-light to-foreground bg-clip-text text-transparent">
-                impact
-              </span>
-              <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 12" fill="none">
-                <path d="M2 8C50 2 150 2 198 8" stroke="#c0dfa1" strokeWidth="4" strokeLinecap="round" className="animate-pulse-soft-landing"/>
-              </svg>
-            </span>
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-fraunces font-light text-foreground mb-4 leading-tight">
+            Plug in. Nexus connects. Press play.
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Show the world in seconds
+          <p className="text-lg text-muted-foreground">
+            Instead of adding another task, we bring relief.
           </p>
-        </div>
-        
-        {/* Interactive content */}
-        <div className="grid lg:grid-cols-2 gap-16 items-center">
-          {/* Steps list */}
-          <div className="space-y-6 order-2 lg:order-1">
-            {steps.map((step, index) => {
-              const Icon = step.icon;
-              const isActive = activeStep === index;
-              
-              return (
-                <div
-                  key={step.number}
-                  className={`relative cursor-pointer transition-all duration-500 ${isActive ? 'scale-100' : 'scale-[0.98] opacity-70 hover:opacity-90'}`}
-                  onClick={() => setActiveStep(index)}
-                  onMouseEnter={() => setActiveStep(index)}
+        </Reveal>
+
+        {/* Steps */}
+        <div className="relative">
+          {/* Animated connecting line behind the cards (md+ only) */}
+          <motion.div
+            aria-hidden
+            className="hidden md:block absolute left-0 right-0 top-1/2 -translate-y-1/2 h-0.5 bg-gradient-to-r from-accent/0 via-accent/40 to-accent/0 origin-left"
+            initial={{ scaleX: 0 }}
+            whileInView={{ scaleX: 1 }}
+            viewport={viewportOnce}
+            transition={{ duration: 1, ease: easeOut, delay: 0.15 }}
+          />
+
+          <StaggerGroup className="relative z-10 grid md:grid-cols-3 gap-5">
+            {steps.map((step) => (
+              <StaggerItem key={step.number}>
+                <motion.div
+                  whileHover={{ y: -6 }}
+                  transition={spring}
+                  className="glass-card rounded-2xl p-6 flex flex-col hover:shadow-glass-lg transition-shadow duration-300 h-full"
                 >
-                  {/* Connection line */}
-                  {index < steps.length - 1 && (
-                    <div className="absolute left-8 top-24 w-0.5 h-16 bg-gradient-to-b from-border to-transparent" />
-                  )}
-                  
-                  <div className={`glass-card p-6 rounded-2xl transition-all duration-500 ${isActive ? 'shadow-glass-lg border-accent/30' : ''}`}>
-                    <div className="flex items-start gap-5">
-                      {/* Icon */}
-                      <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center flex-shrink-0 shadow-md border-2 border-white/35 transition-transform duration-500 ${isActive ? 'scale-110' : ''}`}>
-                        <Icon className="w-7 h-7 text-white" />
-                      </div>
-                      
-                      {/* Content */}
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="text-xs font-bold text-accent uppercase tracking-wider">Step {step.number}</span>
-                        </div>
-                        <h3 className="text-xl font-bold text-foreground mb-2">{step.title}</h3>
-                        <p className="text-muted-foreground mb-4">{step.description}</p>
-                        
-                        {/* Features - show when active */}
-                        <div className={`grid gap-2 transition-all duration-500 ${isActive ? 'opacity-100 max-h-40' : 'opacity-0 max-h-0 overflow-hidden'}`}>
-                          {step.features.map((feature) => (
-                            <div key={feature} className="flex items-center gap-2">
-                              <div className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center">
-                                <Check className="w-3 h-3 text-accent-foreground" />
-                              </div>
-                              <span className="text-sm text-muted-foreground">{feature}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
+                  <div className="flex items-center justify-between mb-6">
+                    <motion.div
+                      className="w-11 h-11 rounded-xl bg-accent/20 flex items-center justify-center"
+                      variants={{
+                        hidden: { scale: 0.6, opacity: 0 },
+                        visible: {
+                          scale: [0.6, 1.12, 1],
+                          opacity: 1,
+                          transition: { duration: 0.5, ease: easeOut },
+                        },
+                      }}
+                    >
+                      <step.icon className="w-5 h-5 text-accent-foreground" />
+                    </motion.div>
+                    <span className="text-xs font-medium text-accent uppercase tracking-wider">
+                      {step.number}
+                    </span>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-          
-          {/* Phone mockup */}
-          <div className="hidden lg:flex justify-center order-1 lg:order-2">
-            <div className="relative">
-              {/* Glow behind phone */}
-              <div className={`absolute inset-0 bg-gradient-to-br ${steps[activeStep].color} opacity-20 blur-3xl rounded-full scale-150`} />
-              
-              {/* Decorative elements */}
-              <div className="absolute -top-8 -left-8 w-16 h-16 border-2 border-accent/20 rounded-2xl rotate-12 animate-float" />
-              <div className="absolute -bottom-8 -right-8 w-12 h-12 bg-accent/20 rounded-full animate-float-delayed" />
-              
-              <PhoneVisual step={steps[activeStep]} isActive={true} />
-            </div>
-          </div>
+                  <h3 className="text-lg font-fraunces font-medium text-foreground mb-2">{step.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{step.description}</p>
+                </motion.div>
+              </StaggerItem>
+            ))}
+          </StaggerGroup>
         </div>
+
+        {/* Footer line */}
+        <Reveal direction="up" delay={0.1}>
+          <p className="text-center text-foreground/70 font-fraunces italic text-lg mt-10">
+            A report is one page. Nexus helps you share the whole story.
+          </p>
+        </Reveal>
       </div>
     </section>
   );

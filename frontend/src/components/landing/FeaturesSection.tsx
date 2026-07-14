@@ -35,7 +35,7 @@ const FeaturesSection = ({ onGetStarted }: FeaturesSectionProps) => {
       
       <div className="relative z-10 max-w-7xl mx-auto px-6">
         <div className="text-center mb-16">
-          <h2 className="text-3xl sm:text-4xl font-newsreader font-extralight text-foreground mb-4">
+          <h2 className="text-3xl sm:text-4xl font-fraunces font-extralight text-foreground mb-4">
             Impact sharing made{" "}
             <span className="relative inline-block">
               simple
