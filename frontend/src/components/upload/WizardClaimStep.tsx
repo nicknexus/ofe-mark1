@@ -58,7 +58,7 @@ export default function WizardClaimStep({ state, update, kpis }: WizardClaimStep
  placeholder="e.g. July training cohort"
  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
  />
- <p className="text-xs text-gray-400 mt-1.5">A short name to recognise this claim in the Timeline.</p>
+ <p className="text-xs text-gray-400 mt-1.5">A short name to recognise this claim in your Logs.</p>
  </div>
  </div>
  )

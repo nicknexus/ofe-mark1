@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
- Home,
+  LayoutDashboard,
  Activity,
  MapPin,
  BookOpen,
@@ -36,7 +36,7 @@ interface MobileAppProps {
 }
 
 type TopLevelView = 'initiatives' | 'explore' | 'account'
-type InitiativeTab = 'timeline' | 'overview' | 'stories' | 'locations'
+type InitiativeTab = 'logs' | 'overview' | 'stories' | 'locations'
 
 export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) {
  const navigate = useNavigate()
@@ -53,7 +53,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
  }
  const [initiatives, setInitiatives] = useState<Initiative[]>([])
  const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null)
- const [initiativeTab, setInitiativeTab] = useState<InitiativeTab>('timeline')
+  const [initiativeTab, setInitiativeTab] = useState<InitiativeTab>('overview')
  const [loading, setLoading] = useState(true)
  const [orgDropdownOpen, setOrgDropdownOpen] = useState(false)
  const orgDropdownRef = useRef<HTMLDivElement>(null)
@@ -94,10 +94,10 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
  }
  }
 
- const handleEnterInitiative = (initiative: Initiative) => {
- setSelectedInitiative(initiative)
- setInitiativeTab('timeline')
- }
+  const handleEnterInitiative = (initiative: Initiative) => {
+    setSelectedInitiative(initiative)
+    setInitiativeTab('overview')
+  }
 
  const handleExitInitiative = () => {
  setSelectedInitiative(null)
@@ -118,7 +118,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
  }
 
  const openTimelineForMetric = (kpiId: string) => {
- setInitiativeTab('timeline')
+ setInitiativeTab('logs')
  navigate(`/?metric=${kpiId}`, { replace: true })
  }
 
@@ -151,7 +151,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
  </div>
 
  <div className="flex-1">
- {initiativeTab === 'timeline' && (
+ {initiativeTab === 'logs' && (
  <TimelineTab
  initiativeId={selectedInitiative.id!}
  onRefresh={() => {}}
@@ -179,12 +179,12 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
 
  <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 safe-area-pb z-50">
  <div className="flex justify-around items-center h-16">
- {[
- { id: 'timeline' as InitiativeTab, label: 'Timeline', icon: Activity },
- { id: 'overview' as InitiativeTab, label: 'Overview', icon: Home },
- { id: 'stories' as InitiativeTab, label: 'Stories', icon: BookOpen },
- { id: 'locations' as InitiativeTab, label: 'Locations', icon: MapPin },
- ].map((tab) => {
+          {[
+            { id: 'overview' as InitiativeTab, label: 'Metrics', icon: LayoutDashboard },
+            { id: 'logs' as InitiativeTab, label: 'Logs', icon: Activity },
+            { id: 'stories' as InitiativeTab, label: 'Stories', icon: BookOpen },
+            { id: 'locations' as InitiativeTab, label: 'Locations', icon: MapPin },
+          ].map((tab) => {
  const Icon = tab.icon
  const isActive = initiativeTab === tab.id
  return (
@@ -316,11 +316,11 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
  <span className={`text-xs mt-1 ${view === 'initiatives' ? 'font-semibold' : 'font-medium'}`}>Initiatives</span>
  </button>
 
- {/* Big + — add a claim, evidence, or both */}
+ {/* Big + — add a log (claims, evidence, or both) */}
  <div className="flex-1 flex items-center justify-center">
  <button
  onClick={handlePlusClick}
- aria-label="Add claim or evidence"
+ aria-label="Add log"
  className="-mt-7 w-14 h-14 rounded-full bg-primary-500 text-white shadow-lg shadow-primary-500/30 flex items-center justify-center active:scale-95 transition-transform"
  >
  <Plus className="w-7 h-7" strokeWidth={2.5} />
@@ -355,8 +355,8 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
  <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl safe-area-pb max-h-[70vh] flex flex-col">
  <div className="flex items-center justify-between px-5 pt-4 pb-2">
  <div>
- <h2 className="text-base font-semibold text-gray-900">Add to which initiative?</h2>
- <p className="text-xs text-gray-500">Claims and evidence live inside an initiative</p>
+ <h2 className="text-base font-semibold text-gray-900">Add a log to which initiative?</h2>
+ <p className="text-xs text-gray-500">Logs of claims and evidence live inside an initiative</p>
  </div>
  <button
  onClick={() => setShowAddPicker(false)}

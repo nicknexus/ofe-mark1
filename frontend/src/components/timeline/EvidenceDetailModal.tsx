@@ -175,7 +175,7 @@ export default function EvidenceDetailModal({
  </p>
  {connectedClaims.length === 0 ? (
  <p className="text-xs text-gray-400">
- Not connected to any claim yet — connect it from the Timeline's Connections view.
+ Not connected to any claim yet — connect it from the Logs tab's Connections view.
  </p>
  ) : (
  <div className="space-y-1.5">

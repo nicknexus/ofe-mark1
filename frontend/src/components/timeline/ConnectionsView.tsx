@@ -1,352 +1,396 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import {
-  DndContext,
- DragEndEvent,
- DragOverlay,
- DragStartEvent,
- PointerSensor,
- useDraggable,
- useDroppable,
- useSensor,
- useSensors,
-} from '@dnd-kit/core'
-import { Link2, Unlink, AlertCircle, FileText, Camera, MessageSquare, DollarSign, Paperclip } from 'lucide-react'
-import { AppCard, Badge, EmptyState } from '../ui'
+import { Link2, AlertCircle, FileText, Camera, MessageSquare, DollarSign, Paperclip, ChevronDown, MapPin, Calendar, User } from 'lucide-react'
+import { AppCard, EmptyState } from '../ui'
 import { KPI, Location, TimelineClaim, TimelineContributor, TimelineEvidence } from '../../types'
 import { formatDate, getEvidenceTypeInfo } from '../../utils'
 import {
- TimelineFilters,
- filterClaims,
- filterEvidence,
- getEvidenceImageUrl,
+  TimelineFilters,
+  filterClaims,
+  getEvidenceImageUrl,
   hasActiveFilters,
   sortByUploadDate,
 } from '../../utils/timeline'
-import { fadeUp, rowEntrance } from './motion'
-import MetricChip from './MetricChip'
-import { ImpactClaimBadge } from './ImpactClaimGlyph'
+import { rowEntrance, easeOut } from './motion'
+import { getKPIColor } from '../metricsDashboard/metricColorPalette'
 
 const TYPE_ICONS = {
- visual_proof: Camera,
- documentation: FileText,
- testimony: MessageSquare,
- financials: DollarSign,
+  visual_proof: Camera,
+  documentation: FileText,
+  testimony: MessageSquare,
+  financials: DollarSign,
 } as const
 
-interface ConnectionsViewProps {
- claims: TimelineClaim[]
- evidence: TimelineEvidence[]
- kpis: KPI[]
- locations: Location[]
- contributors: Record<string, TimelineContributor>
- filters: TimelineFilters
- onOpenClaim: (claim: TimelineClaim, kpi: KPI | undefined) => void
- onOpenEvidence: (evidence: TimelineEvidence) => void
- /** Opens the connect flow for an unlinked evidence record (claim optional, from drag-drop). */
- onConnectEvidence?: (evidence: TimelineEvidence, claimId?: string) => void
- /** Quick-upload new evidence scoped to this claim. */
- onAddEvidenceToClaim?: (claim: TimelineClaim, kpi: KPI | undefined) => void
- /** Attach an existing unconnected evidence record to this claim. */
- onConnectExistingToClaim?: (claim: TimelineClaim) => void
+/**
+ * Shared geometry for the evidence column and the SVG connector. Evidence
+ * rows are fixed-height and the list scroll-snaps in whole-row increments,
+ * so the (at most) MAX_ROWS anchor points never move — the connection lines
+ * are static while the rows scroll into the slots beneath them.
+ */
+const ROW_H = 64
+const ROW_GAP = 8
+const MAX_ROWS = 4
+const CONNECTOR_W = 56
+const slotCenter = (i: number) => i * (ROW_H + ROW_GAP) + ROW_H / 2
+const columnHeight = (rows: number) => rows * ROW_H + (rows - 1) * ROW_GAP
+
+const GRID_COLS = 'md:grid-cols-[minmax(0,1fr)_3.5rem_minmax(0,1.15fr)]'
+
+/**
+ * The animated claim → evidence connector. One origin dot on the claim side
+ * fans out into a curve per visible evidence slot; a claim without evidence
+ * gets a single dashed red line to the placeholder.
+ */
+function ConnectorLines({ rows, empty }: { rows: number; empty?: boolean }) {
+  const height = columnHeight(Math.max(rows, 1))
+  const claimY = height / 2
+  const startX = 4
+  const endX = CONNECTOR_W - 4
+
+  return (
+    <svg
+      width={CONNECTOR_W}
+      height={height}
+      viewBox={`0 0 ${CONNECTOR_W} ${height}`}
+      fill="none"
+      aria-hidden="true"
+      className={empty ? 'text-red-400' : 'text-impact-500'}
+    >
+      <motion.circle
+        cx={startX}
+        cy={claimY}
+        r={3.5}
+        className="fill-current"
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ duration: 0.25, ease: easeOut }}
+      />
+      {empty ? (
+        <motion.path
+          d={`M ${startX} ${claimY} L ${endX} ${claimY}`}
+          stroke="currentColor"
+          strokeOpacity={0.6}
+          strokeWidth={1.5}
+          strokeDasharray="4 5"
+          strokeLinecap="round"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+        />
+      ) : (
+        Array.from({ length: rows }).map((_, i) => {
+          const y = slotCenter(i)
+          return (
+            <g key={i}>
+              <motion.path
+                d={`M ${startX} ${claimY} C ${CONNECTOR_W * 0.55} ${claimY}, ${CONNECTOR_W * 0.45} ${y}, ${endX} ${y}`}
+                stroke="currentColor"
+                strokeOpacity={0.5}
+                strokeWidth={1.5}
+                strokeLinecap="round"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                transition={{ duration: 0.45, ease: 'easeOut', delay: 0.05 + i * 0.07 }}
+              />
+              <motion.circle
+                cx={endX}
+                cy={y}
+                r={3}
+                className="fill-current"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.2, ease: easeOut, delay: 0.3 + i * 0.07 }}
+              />
+            </g>
+          )
+        })
+      )}
+    </svg>
+  )
 }
 
-function EvidenceChipContent({ ev }: { ev: TimelineEvidence }) {
- const typeInfo = getEvidenceTypeInfo(ev.type)
- const bgColor = typeInfo.color.split(' ')[0]
- const Icon = TYPE_ICONS[ev.type] || FileText
- const thumbnailUrl = getEvidenceImageUrl(ev)
+function EvidenceRow({ ev, onClick }: { ev: TimelineEvidence; onClick: () => void }) {
+  const typeInfo = getEvidenceTypeInfo(ev.type)
+  const bgColor = typeInfo.color.split(' ')[0]
+  const Icon = TYPE_ICONS[ev.type] || FileText
+  const thumbnailUrl = getEvidenceImageUrl(ev)
+  const claimCount = (ev.kpi_update_ids || []).length
 
- return (
- <>
- {thumbnailUrl ? (
- <img src={thumbnailUrl} alt="" className="w-8 h-8 rounded-lg object-cover bg-gray-100 flex-shrink-0" loading="lazy" />
- ) : (
- <div className={`p-1.5 rounded-lg flex-shrink-0 ${bgColor}`}>
- <Icon className="w-3.5 h-3.5" />
- </div>
- )}
- <div className="min-w-0 flex-1">
- <p className="text-xs font-medium text-gray-800 truncate">{ev.title || 'Untitled Evidence'}</p>
- <p className="text-[11px] text-gray-500 truncate">{getEvidenceTypeInfo(ev.type).label}</p>
- </div>
- </>
- )
-}
-
-function EvidenceChip({ ev, onClick }: { ev: TimelineEvidence; onClick: () => void }) {
- return (
- <button
- onClick={onClick}
- className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-colors text-left"
- >
- <EvidenceChipContent ev={ev} />
- </button>
- )
-}
-
-/** Unlinked evidence chip that can be dragged onto a claim card to connect. */
-function DraggableEvidenceChip({ ev, onClick, draggable }: { ev: TimelineEvidence; onClick: () => void; draggable: boolean }) {
- const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
- id: `evidence-${ev.id}`,
- data: { evidenceId: ev.id },
- disabled: !draggable,
- })
-
- return (
- <button
- ref={setNodeRef}
- {...attributes}
- {...listeners}
- onClick={onClick}
- className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 transition-colors text-left ${draggable ? 'cursor-grab active:cursor-grabbing' : ''} ${isDragging ? 'opacity-40' : ''}`}
- >
- <EvidenceChipContent ev={ev} />
- </button>
- )
-}
-
-function DroppableClaimCard({ claimId, active, children }: { claimId: string; active: boolean; children: React.ReactNode }) {
- const { setNodeRef, isOver } = useDroppable({ id: `claim-${claimId}`, data: { claimId } })
- return (
- <div
- ref={setNodeRef}
- className={`rounded-2xl transition-shadow ${active ? 'ring-2 ring-dashed ring-primary-400' : ''} ${isOver ? 'ring-2 ring-primary-500 shadow-card-hover' : ''}`}
- >
- {children}
- </div>
- )
+  return (
+    <button
+      onClick={onClick}
+      style={{ height: ROW_H }}
+      className="w-full flex items-center gap-2.5 px-3 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 hover:border-gray-200 transition-colors text-left snap-start mb-2 last:mb-0"
+    >
+      {thumbnailUrl ? (
+        <img src={thumbnailUrl} alt="" className="w-9 h-9 rounded-lg object-cover bg-gray-100 flex-shrink-0" loading="lazy" />
+      ) : (
+        <div className={`p-2 rounded-lg flex-shrink-0 ${bgColor}`}>
+          <Icon className="w-3.5 h-3.5" />
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium text-gray-800 truncate">{ev.title || 'Untitled Evidence'}</p>
+        <p className="text-[11px] text-gray-500 truncate">{typeInfo.label}</p>
+      </div>
+      {claimCount > 1 && (
+        <span
+          title={`Also supports ${claimCount - 1} other claim${claimCount === 2 ? '' : 's'}`}
+          className="flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-gray-100 text-[10px] font-semibold text-gray-500"
+        >
+          <Link2 className="w-3 h-3" />
+          ×{claimCount}
+        </span>
+      )}
+    </button>
+  )
 }
 
 /**
- * Claim-first connections map: every claim with its connected evidence
- * grouped beside it (evidence repeats under each claim it supports), claims
- * missing evidence flagged, and a distinct section for unconnected evidence.
- * Unlinked evidence can be dragged onto a claim (or use its Connect button)
- * to open the re-scope-and-connect flow.
+ * Evidence side of one connection group. Shows up to MAX_ROWS rows; longer
+ * lists scroll inside a fixed-height, scroll-snapped viewport so rows always
+ * land exactly on the connector line anchors.
+ */
+function EvidenceColumn({ list, onOpen }: { list: TimelineEvidence[]; onOpen: (ev: TimelineEvidence) => void }) {
+  const overflow = list.length > MAX_ROWS
+  const height = columnHeight(Math.min(list.length, MAX_ROWS))
+  const [atEnd, setAtEnd] = useState(!overflow)
+
+  return (
+    <div className="relative">
+      <div
+        style={{ height }}
+        onScroll={overflow ? (e) => {
+          const el = e.currentTarget
+          setAtEnd(el.scrollTop + el.clientHeight >= el.scrollHeight - 4)
+        } : undefined}
+        className={overflow ? 'overflow-y-auto snap-y snap-mandatory overscroll-contain' : undefined}
+      >
+        {list.map(ev => (
+          <EvidenceRow key={ev.id} ev={ev} onClick={() => onOpen(ev)} />
+        ))}
+      </div>
+      {overflow && !atEnd && (
+        <>
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-white to-transparent rounded-b-xl" />
+          <div className="pointer-events-none absolute bottom-1.5 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-800/80 text-white text-[10px] font-medium shadow-sm">
+            <ChevronDown className="w-3 h-3" />
+            {list.length - MAX_ROWS} more
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+interface ConnectionsViewProps {
+  claims: TimelineClaim[]
+  evidence: TimelineEvidence[]
+  kpis: KPI[]
+  locations: Location[]
+  contributors: Record<string, TimelineContributor>
+  filters: TimelineFilters
+  onOpenClaim: (claim: TimelineClaim, kpi: KPI | undefined) => void
+  onOpenEvidence: (evidence: TimelineEvidence) => void
+  /** Quick-upload new evidence scoped to this claim. */
+  onAddEvidenceToClaim?: (claim: TimelineClaim, kpi: KPI | undefined) => void
+  /** Attach an existing unconnected evidence record to this claim. */
+  onConnectExistingToClaim?: (claim: TimelineClaim) => void
+}
+
+/**
+ * Two-sided connections map (T-chart): impact claims on the left, their
+ * supporting evidence on the right, joined by animated connector lines so
+ * relationships read visually. Evidence repeats under each claim it supports
+ * (with a ×N chip when it backs several claims). Unconnected evidence is
+ * intentionally not listed here — it lives in the Evidence view behind the
+ * "Not connected" status filter, which scales past thousands of records.
+ * Existing evidence can still be attached to a claim via "Add existing evidence".
  */
 export default function ConnectionsView({
- claims,
- evidence,
- kpis,
- locations,
- contributors,
- filters,
- onOpenClaim,
- onOpenEvidence,
- onConnectEvidence,
- onAddEvidenceToClaim,
- onConnectExistingToClaim,
+  claims,
+  evidence,
+  kpis,
+  locations,
+  contributors,
+  filters,
+  onOpenClaim,
+  onOpenEvidence,
+  onAddEvidenceToClaim,
+  onConnectExistingToClaim,
 }: ConnectionsViewProps) {
- const kpiById = useMemo(() => new Map(kpis.map(k => [k.id, k])), [kpis])
- const locationById = useMemo(() => new Map(locations.map(l => [l.id, l.name])), [locations])
- const evidenceById = useMemo(() => new Map(evidence.map(e => [e.id, e])), [evidence])
- const evidenceByClaimId = useMemo(() => {
- const map = new Map<string, TimelineEvidence[]>()
- for (const ev of evidence) {
- for (const claimId of ev.kpi_update_ids || []) {
- const list = map.get(claimId) || []
- list.push(ev)
- map.set(claimId, list)
- }
- }
- return map
- }, [evidence])
+  const kpiById = useMemo(() => new Map(kpis.map(k => [k.id, k])), [kpis])
+  const locationById = useMemo(() => new Map(locations.map(l => [l.id, l.name])), [locations])
+  const evidenceByClaimId = useMemo(() => {
+    const map = new Map<string, TimelineEvidence[]>()
+    for (const ev of evidence) {
+      for (const claimId of ev.kpi_update_ids || []) {
+        const list = map.get(claimId) || []
+        list.push(ev)
+        map.set(claimId, list)
+      }
+    }
+    return map
+  }, [evidence])
 
- const visibleClaims = useMemo(
- () => sortByUploadDate(filterClaims(claims, filters)),
- [claims, filters]
- )
- const unlinkedEvidence = useMemo(
- () => sortByUploadDate(filterEvidence(evidence, filters)).filter(ev => ev.claim_count === 0),
- [evidence, filters]
- )
+  const visibleClaims = useMemo(
+    () => sortByUploadDate(filterClaims(claims, filters)),
+    [claims, filters]
+  )
 
- const [draggingEvidenceId, setDraggingEvidenceId] = React.useState<string | null>(null)
- const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
- const canDrag = !!onConnectEvidence
+  if (visibleClaims.length === 0) {
+    return (
+      <div className="app-card md:p-8">
+        <EmptyState
+          icon={Link2}
+          title="No connections to show"
+          description={
+            hasActiveFilters(filters)
+              ? 'Try adjusting your filters or search query'
+              : 'Add logs with claims and evidence to see how they connect'
+          }
+        />
+      </div>
+    )
+  }
 
- const handleDragStart = (event: DragStartEvent) => {
- setDraggingEvidenceId((event.active.data.current as any)?.evidenceId || null)
- }
-
- const handleDragEnd = (event: DragEndEvent) => {
- setDraggingEvidenceId(null)
- const evidenceId = (event.active.data.current as any)?.evidenceId
- const claimId = (event.over?.data.current as any)?.claimId
- if (evidenceId && claimId && onConnectEvidence) {
- const ev = evidenceById.get(evidenceId)
- if (ev) onConnectEvidence(ev, claimId)
- }
- }
-
- if (visibleClaims.length === 0 && unlinkedEvidence.length === 0) {
- return (
- <div className="app-card md:p-8">
- <EmptyState
- icon={Link2}
- title="No connections to show"
- description={
- hasActiveFilters(filters)
- ? 'Try adjusting your filters or search query'
- : 'Add claims and evidence to see how they connect'
- }
- />
- </div>
- )
- }
-
- const draggingEvidence = draggingEvidenceId ? evidenceById.get(draggingEvidenceId) : null
-
- return (
- <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="space-y-4">
-        {visibleClaims.map((claim, claimIndex) => {
-          const kpi = kpiById.get(claim.kpi_id)
- const connectedEvidence = evidenceByClaimId.get(claim.id!) || []
- const contributor = claim.user_id ? contributors[claim.user_id] : undefined
- const locationName = claim.location_id ? locationById.get(claim.location_id) : undefined
- const activityDate = claim.date_range_start && claim.date_range_end
- ? `${formatDate(claim.date_range_start)} – ${formatDate(claim.date_range_end)}`
- : formatDate(claim.date_represented)
-
-          const entrance = rowEntrance(claimIndex)
-          return (
-            <motion.div key={claim.id} initial={entrance.initial} animate={entrance.animate}>
-              <DroppableClaimCard claimId={claim.id!} active={!!draggingEvidenceId}>
-              <AppCard padded>
- <div className="flex flex-col md:flex-row md:items-stretch gap-4">
- {/* Claim (left) */}
- <button
- onClick={() => onOpenClaim(claim, kpi)}
- className="flex-1 min-w-0 text-left rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors p-4"
- >
- <div className="flex items-center gap-3">
-                    <ImpactClaimBadge />
- <div className="min-w-0">
- <p className="font-medium text-gray-800 truncate">
- <span className="text-base font-semibold text-gray-900 mr-1.5">{claim.value}</span>
- {claim.label || kpi?.title || 'Unknown metric'}
- </p>
- <p className="mt-1">
- <MetricChip kpi={kpi} kpis={kpis} />
- </p>
- <p className="text-xs text-gray-500 truncate mt-1">
- {[locationName, activityDate, contributor?.name || contributor?.email]
- .filter(Boolean)
- .join(' · ')}
- </p>
- </div>
- </div>
- </button>
-
- {/* Link indicator */}
- <div className="hidden md:flex items-center justify-center flex-shrink-0 w-12">
- <div className={`w-9 h-9 rounded-full flex items-center justify-center ${connectedEvidence.length > 0 ? 'bg-impact-50' : 'bg-red-50'}`}>
- {connectedEvidence.length > 0
- ? <Link2 className="w-4 h-4 text-impact-500" />
- : <Unlink className="w-4 h-4 text-red-500" />}
- </div>
- </div>
-
- {/* Evidence (right) */}
- <div className="flex-1 min-w-0 flex flex-col gap-2">
- {connectedEvidence.length > 0 ? (
- <div className="space-y-1.5">
- <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
- Evidence ({connectedEvidence.length})
- </p>
- {connectedEvidence.map(ev => (
- <EvidenceChip key={ev.id} ev={ev} onClick={() => onOpenEvidence(ev)} />
- ))}
- </div>
- ) : (
- <div className="flex-1 flex items-center gap-2 rounded-xl border border-dashed border-red-200 bg-red-50/40 px-4 py-3">
- <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
- <p className="text-xs text-red-600">
- No evidence connected to this claim yet
- {canDrag && unlinkedEvidence.length > 0 ? ' — drag unconnected evidence here' : ''}
- </p>
- </div>
- )}
-
- {(onAddEvidenceToClaim || (onConnectExistingToClaim && unlinkedEvidence.length > 0)) && (
- <div className="flex items-center gap-1.5">
- {onAddEvidenceToClaim && (
- <button
- onClick={() => onAddEvidenceToClaim(claim, kpi)}
- className="app-btn app-btn-secondary app-btn-sm"
- >
- <Paperclip className="w-3.5 h-3.5" />
- <span>Add evidence</span>
- </button>
- )}
- {onConnectExistingToClaim && unlinkedEvidence.length > 0 && (
- <button
- onClick={() => onConnectExistingToClaim(claim)}
- className="app-btn app-btn-ghost app-btn-sm"
- >
- <Link2 className="w-3.5 h-3.5" />
- <span>Add existing</span>
- </button>
- )}
- </div>
- )}
- </div>
- </div>
-              </AppCard>
-              </DroppableClaimCard>
-            </motion.div>
-          )
-        })}
-
-        {/* Unconnected evidence */}
-        {unlinkedEvidence.length > 0 && (
-          <motion.div variants={fadeUp} initial="hidden" animate="visible">
-          <AppCard padded>
- <div className="flex items-center gap-2 mb-3">
- <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center">
- <Unlink className="w-4 h-4 text-red-500" />
- </div>
- <div>
- <h3 className="text-sm font-semibold text-gray-800">Unconnected evidence</h3>
- <p className="text-xs text-gray-500">
- Evidence not currently supporting any claim
- {canDrag ? ' — drag onto a claim or use Connect' : ''}
- </p>
- </div>
- <Badge tone="danger" className="ml-auto">{unlinkedEvidence.length}</Badge>
- </div>
- <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
- {unlinkedEvidence.map(ev => (
- <div key={ev.id} className="flex items-center gap-2">
- <div className="flex-1 min-w-0">
- <DraggableEvidenceChip ev={ev} onClick={() => onOpenEvidence(ev)} draggable={canDrag} />
- </div>
- {onConnectEvidence && (
- <button
- onClick={() => onConnectEvidence(ev)}
- className="app-btn app-btn-secondary app-btn-sm flex-shrink-0"
- >
- <Link2 className="w-3.5 h-3.5" />
- <span>Connect</span>
- </button>
- )}
- </div>
-              ))}
-            </div>
-          </AppCard>
-          </motion.div>
-        )}
+  return (
+    <div className="space-y-4">
+      {/* Column headers — the two sides of the chart */}
+      <div className={`hidden md:grid ${GRID_COLS} px-4 sm:px-5`}>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          Impact Claims ({visibleClaims.length})
+        </p>
+        <div />
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          Supporting Evidence
+        </p>
       </div>
 
- <DragOverlay>
- {draggingEvidence && (
- <div className="w-64 flex items-center gap-2.5 px-3 py-2 rounded-xl border border-primary-300 bg-white shadow-card-hover">
- <EvidenceChipContent ev={draggingEvidence} />
- </div>
- )}
- </DragOverlay>
- </DndContext>
- )
+      {visibleClaims.map((claim, claimIndex) => {
+        const kpi = kpiById.get(claim.kpi_id)
+        const connectedEvidence = evidenceByClaimId.get(claim.id!) || []
+        const contributor = claim.user_id ? contributors[claim.user_id] : undefined
+        const locationName = claim.location_id ? locationById.get(claim.location_id) : undefined
+        // Same color coding as MetricChip / the Metrics dashboard cards
+        const metricColor = kpi
+          ? getKPIColor(kpi.category, Math.max(kpis.findIndex(k => k.id === kpi.id), 0))
+          : '#9ca3af'
+        const activityDate = claim.date_range_start && claim.date_range_end
+          ? `${formatDate(claim.date_range_start)} – ${formatDate(claim.date_range_end)}`
+          : formatDate(claim.date_represented)
+
+        const entrance = rowEntrance(claimIndex)
+        return (
+          <motion.div key={claim.id} initial={entrance.initial} animate={entrance.animate}>
+            <AppCard padded>
+              <div className={`flex flex-col gap-3 md:grid ${GRID_COLS} md:items-center md:gap-0`}>
+                {/* Claim (left) — actions live inside the card so its visual
+                    center is exactly where the connector line originates */}
+                <div className="min-w-0">
+                  <p className="md:hidden text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+                    Impact claim
+                  </p>
+                  <div className="min-w-0 rounded-2xl border border-gray-200/70 bg-white shadow-sm hover:shadow-card hover:border-primary-200 transition-all overflow-hidden">
+                    {/* Metric band — names the metric across the whole card top */}
+                    <div className="flex items-center gap-2 px-4 py-2 bg-gray-50/80 border-b border-gray-100">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: metricColor }} />
+                      <p className="text-xs font-semibold text-gray-600 truncate">
+                        {kpi?.title || 'Unknown metric'}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => onOpenClaim(claim, kpi)}
+                      className="w-full text-left px-4 py-3.5"
+                    >
+                      <p className="flex items-baseline gap-1.5 flex-wrap">
+                        <span className="text-3xl font-semibold text-gray-900 tabular-nums leading-none">
+                          {typeof claim.value === 'number' ? claim.value.toLocaleString() : claim.value}
+                        </span>
+                        {(kpi?.metric_type === 'percentage' ? '%' : kpi?.unit_of_measurement) && (
+                          <span className="text-base font-medium text-gray-500">
+                            {kpi?.metric_type === 'percentage' ? '%' : kpi?.unit_of_measurement}
+                          </span>
+                        )}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 mt-2.5">
+                        {locationName && (
+                          <span className="inline-flex items-center gap-1 text-xs text-gray-500 min-w-0">
+                            <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                            <span className="truncate">{locationName}</span>
+                          </span>
+                        )}
+                        <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                          <Calendar className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                          {activityDate}
+                        </span>
+                        {(contributor?.name || contributor?.email) && (
+                          <span className="inline-flex items-center gap-1 text-xs text-gray-500 min-w-0">
+                            <User className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                            <span className="truncate">{contributor?.name || contributor?.email}</span>
+                          </span>
+                        )}
+                      </div>
+                    </button>
+
+                    {(onAddEvidenceToClaim || onConnectExistingToClaim) && (
+                      <div className="flex items-center gap-4 px-4 py-2.5 border-t border-gray-100 bg-gray-50/50">
+                        {onAddEvidenceToClaim && (
+                          <button
+                            onClick={() => onAddEvidenceToClaim(claim, kpi)}
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                          >
+                            <Paperclip className="w-3.5 h-3.5" />
+                            <span>Add evidence</span>
+                          </button>
+                        )}
+                        {onConnectExistingToClaim && (
+                          <button
+                            onClick={() => onConnectExistingToClaim(claim)}
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                          >
+                            <Link2 className="w-3.5 h-3.5" />
+                            <span>Add existing evidence</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Connection lines (center, desktop only) */}
+                <div className="hidden md:flex items-center justify-center">
+                  <ConnectorLines
+                    rows={Math.min(connectedEvidence.length, MAX_ROWS)}
+                    empty={connectedEvidence.length === 0}
+                  />
+                </div>
+
+                {/* Evidence (right) */}
+                <div className="min-w-0">
+                  <p className="md:hidden text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+                    Evidence ({connectedEvidence.length})
+                  </p>
+                  {connectedEvidence.length > 0 ? (
+                    <EvidenceColumn list={connectedEvidence} onOpen={onOpenEvidence} />
+                  ) : (
+                    <div
+                      style={{ height: ROW_H }}
+                      className="flex items-center gap-2 rounded-xl border border-dashed border-red-200 bg-red-50/40 px-4"
+                    >
+                      <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                      <p className="text-xs text-red-600">
+                        No evidence connected to this claim yet
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </AppCard>
+          </motion.div>
+        )
+      })}
+    </div>
+  )
 }

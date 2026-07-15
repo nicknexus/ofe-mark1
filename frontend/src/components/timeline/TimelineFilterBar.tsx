@@ -139,11 +139,13 @@ const EVIDENCE_TYPE_OPTIONS: FilterOption[] = [
 ]
 
 export interface TimelineFilterBarProps {
- view: TimelineView
- filters: TimelineFilters
- onFiltersChange: (filters: TimelineFilters) => void
- kpis: KPI[]
- locations: Location[]
+  view: TimelineView
+  filters: TimelineFilters
+  onFiltersChange: (filters: TimelineFilters) => void
+  kpis: KPI[]
+  /** Hide the Metric pill (used when the page is already scoped to one metric). */
+  hideMetric?: boolean
+  locations: Location[]
  beneficiaryGroups: BeneficiaryGroup[]
  tags: MetricTag[]
  contributors: Record<string, TimelineContributor>
@@ -155,14 +157,15 @@ export interface TimelineFilterBarProps {
  * the existing Free-tier behavior: hidden when the org has no options.
  */
 export default function TimelineFilterBar({
- view,
- filters,
- onFiltersChange,
- kpis,
- locations,
- beneficiaryGroups,
- tags,
- contributors,
+  view,
+  filters,
+  onFiltersChange,
+  kpis,
+  hideMetric,
+  locations,
+  beneficiaryGroups,
+  tags,
+  contributors,
 }: TimelineFilterBarProps) {
  const set = (patch: Partial<TimelineFilters>) => onFiltersChange({ ...filters, ...patch })
 
@@ -204,19 +207,21 @@ export default function TimelineFilterBar({
           variant="pill"
         />
 
- <FilterPill
- icon={BarChart3}
- label="Metric"
- pluralLabel="metrics"
- options={kpis.map(k => ({ id: k.id!, name: k.title }))}
- selected={filters.metrics}
- onChange={(ids) => set({ metrics: ids })}
- emptyText="No metrics available"
- />
- <FilterPill
- icon={MapPin}
- label="Location"
- pluralLabel="locations"
+        {!hideMetric && (
+          <FilterPill
+            icon={BarChart3}
+            label="Metric"
+            pluralLabel="metrics"
+            options={kpis.map(k => ({ id: k.id!, name: k.title }))}
+            selected={filters.metrics}
+            onChange={(ids) => set({ metrics: ids })}
+            emptyText="No metrics available"
+          />
+        )}
+        <FilterPill
+          icon={MapPin}
+          label="Location"
+          pluralLabel="locations"
  options={locations.map(l => ({ id: l.id!, name: l.name }))}
  selected={filters.locations}
  onChange={(ids) => set({ locations: ids })}

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { Link2, AlertTriangle, CalendarRange, MapPin, Tag as TagIcon, Users, BarChart3, Search } from 'lucide-react'
+import { Link2, AlertTriangle, CalendarRange, MapPin, Tag as TagIcon, Users, BarChart3, Search, Check, Camera, FileText, MessageSquare, DollarSign, Paperclip } from 'lucide-react'
 import ModalFrame, { ModalHeader, ModalBody, ModalFooter } from '../ModalFrame'
 import { apiService } from '../../services/api'
 import { notify } from '../../lib/notify'
@@ -14,6 +14,14 @@ import {
  TimelineEvidence,
 } from '../../types'
 import { formatDate, getEvidenceTypeInfo } from '../../utils'
+import { getEvidenceImageUrl } from '../../utils/timeline'
+
+const TYPE_ICONS = {
+ visual_proof: Camera,
+ documentation: FileText,
+ testimony: MessageSquare,
+ financials: DollarSign,
+} as const
 
 interface ConnectEvidenceDialogProps {
  claims: TimelineClaim[]
@@ -171,20 +179,50 @@ export default function ConnectEvidenceDialog({
  </p>
  ) : candidateEvidence.map(ev => {
  const typeInfo = getEvidenceTypeInfo(ev.type)
+ const TypeIcon = TYPE_ICONS[ev.type] || FileText
+ const iconBg = typeInfo.color.split(' ')[0]
+ const thumbnailUrl = getEvidenceImageUrl(ev)
+ const fileCount = ev.files?.length || (ev.file_url ? 1 : 0)
  const isSelected = selectedEvidenceId === ev.id
  return (
  <button
  key={ev.id}
  onClick={() => setSelectedEvidenceId(ev.id!)}
- className={`w-full text-left px-3 py-2.5 rounded-xl border transition-colors ${isSelected
- ? 'border-primary-500 bg-primary-50'
+ className={`w-full flex items-center gap-3 text-left p-2.5 rounded-xl border transition-colors ${isSelected
+ ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500'
  : 'border-gray-100 bg-white hover:bg-gray-50'
  }`}
  >
- <p className="text-sm text-gray-800 truncate">{ev.title || 'Untitled Evidence'}</p>
- <p className="text-xs text-gray-500 mt-0.5">
+ {/* Preview: image thumbnail, or the evidence-type tile */}
+ {thumbnailUrl ? (
+ <img
+ src={thumbnailUrl}
+ alt=""
+ className="w-14 h-14 rounded-lg object-cover bg-gray-100 flex-shrink-0"
+ loading="lazy"
+ />
+ ) : (
+ <div className={`w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBg}`}>
+ <TypeIcon className="w-5 h-5" />
+ </div>
+ )}
+ <div className="min-w-0 flex-1">
+ <p className="text-sm font-medium text-gray-800 truncate">{ev.title || 'Untitled Evidence'}</p>
+ <p className="text-xs text-gray-500 truncate mt-0.5">
  {typeInfo.label} · {formatDate(ev.date_represented)}
  </p>
+ {ev.description ? (
+ <p className="text-xs text-gray-400 truncate mt-0.5">{ev.description}</p>
+ ) : fileCount > 0 ? (
+ <p className="inline-flex items-center gap-1 text-xs text-gray-400 mt-0.5">
+ <Paperclip className="w-3 h-3" />
+ {fileCount} file{fileCount === 1 ? '' : 's'}
+ </p>
+ ) : null}
+ </div>
+ <span className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-primary-500 border-primary-500' : 'border-gray-300 bg-white'}`}>
+ {isSelected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+ </span>
  </button>
  )
  })

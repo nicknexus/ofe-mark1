@@ -1,13 +1,13 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import {
- Home,
- Activity,
- MapPin,
- Users,
- BookOpen,
- FileBarChart,
- ArrowLeft
+  LayoutDashboard,
+  Activity,
+  MapPin,
+  Users,
+  BookOpen,
+  FileBarChart,
+  ArrowLeft
 } from 'lucide-react'
 
 interface MobileBottomNavProps {
@@ -16,10 +16,10 @@ interface MobileBottomNavProps {
 }
 
 export default function MobileBottomNav({ activeTab, onTabChange }: MobileBottomNavProps) {
- const tabs = [
- { id: 'timeline', label: 'Timeline', icon: Activity },
- { id: 'home', label: 'Overview', icon: Home },
- { id: 'location', label: 'Locations', icon: MapPin },
+  const tabs = [
+    { id: 'metrics', label: 'Metrics', icon: LayoutDashboard },
+    { id: 'logs', label: 'Logs', icon: Activity },
+    { id: 'location', label: 'Locations', icon: MapPin },
  { id: 'beneficiaries', label: 'People', icon: Users },
  { id: 'stories', label: 'Stories', icon: BookOpen },
  { id: 'report', label: 'Report', icon: FileBarChart },

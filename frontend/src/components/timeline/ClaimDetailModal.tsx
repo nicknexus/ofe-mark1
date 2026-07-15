@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { Camera, FileText, MessageSquare, DollarSign, Paperclip, Link2, Unlink } from 'lucide-react'
+import { Camera, FileText, MessageSquare, DollarSign, Paperclip, Link2, Unlink, Pencil } from 'lucide-react'
 import { ImpactClaimGlyph } from './ImpactClaimGlyph'
 import ModalFrame, { ModalHeader, ModalBody, ModalFooter, ModalFieldGrid, ModalField } from '../ModalFrame'
 import { Badge } from '../ui'
@@ -33,6 +33,8 @@ interface ClaimDetailModalProps {
  contributors: Record<string, TimelineContributor>
  onClose: () => void
  onOpenEvidence: (evidence: TimelineEvidence) => void
+ /** Edit this claim (value, label, date, location, tag, groups). */
+ onEdit?: () => void
  /** Quick-upload new evidence scoped to this claim. */
  onAddEvidence?: () => void
  /** Attach an existing unconnected evidence record. */
@@ -53,6 +55,7 @@ export default function ClaimDetailModal({
  contributors,
  onClose,
  onOpenEvidence,
+ onEdit,
  onAddEvidence,
  onConnectExisting,
 }: ClaimDetailModalProps) {
@@ -184,12 +187,18 @@ export default function ClaimDetailModal({
  </div>
  </div>
  </ModalBody>
- {(onAddEvidence || onConnectExisting) && (
+ {(onEdit || onAddEvidence || onConnectExisting) && (
  <ModalFooter>
+ {onEdit && (
+ <button onClick={onEdit} className="app-btn app-btn-ghost app-btn-sm">
+ <Pencil className="w-4 h-4" />
+ Edit claim
+ </button>
+ )}
  {onConnectExisting && (
  <button onClick={onConnectExisting} className="app-btn app-btn-ghost app-btn-sm">
  <Link2 className="w-4 h-4" />
- Add existing
+ Add existing evidence
  </button>
  )}
  <div className="flex-1" />

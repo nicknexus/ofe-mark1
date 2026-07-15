@@ -159,7 +159,7 @@ export default function WizardReviewStep({
 
  {state.kind === 'evidence' && matchedClaims.length === 0 && (
  <p className="text-xs text-amber-700">
- It will appear as unconnected evidence on the Timeline — you can connect it manually there, or it
+ It will appear as unconnected evidence in your Logs — you can connect it manually there, or it
  will link automatically when a matching claim is added.
  </p>
  )}

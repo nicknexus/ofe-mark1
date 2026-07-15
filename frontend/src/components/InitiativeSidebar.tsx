@@ -1,16 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
- Home,
- Activity,
- MapPin,
- Users,
- ArrowLeft,
- BookOpen,
- Sparkles,
- Settings,
- LogOut,
- User as UserIcon
+  LayoutDashboard,
+  Activity,
+  MapPin,
+  Users,
+  ArrowLeft,
+  BookOpen,
+  Sparkles,
+  Settings,
+  LogOut,
+  User as UserIcon
 } from 'lucide-react'
 import { User } from '../types'
 import { useTeam } from '../context/TeamContext'
@@ -52,10 +52,10 @@ export default function InitiativeSidebar({
  document.removeEventListener('mousedown', handleClickOutside)
  }
  }, [])
- const tabs = [
- { id: 'timeline', label: 'Timeline', icon: Activity, description: 'Impact activity' },
- { id: 'home', label: 'Overview', icon: Home, description: 'Overview' },
- { id: 'location', label: 'Location', icon: MapPin, description: 'Locations' },
+  const tabs = [
+    { id: 'metrics', label: 'Metrics', icon: LayoutDashboard, description: 'Dashboard' },
+    { id: 'logs', label: 'Logs', icon: Activity, description: 'Impact activity' },
+    { id: 'location', label: 'Location', icon: MapPin, description: 'Locations' },
  { id: 'beneficiaries', label: 'Beneficiaries', icon: Users, description: 'People Management' },
  { id: 'stories', label: 'Stories', icon: BookOpen, description: 'Impact Stories' },
  { id: 'report', label: 'AI Report', icon: Sparkles, description: 'Generate Impact Report' }

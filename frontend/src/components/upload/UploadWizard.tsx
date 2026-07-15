@@ -72,17 +72,21 @@ interface UploadWizardProps {
  locations: Location[]
  tags: MetricTag[]
  beneficiaryGroups: BeneficiaryGroup[]
- existingClaims: TimelineClaim[]
- existingEvidence: TimelineEvidence[]
- onClose: () => void
- onCreated: () => void
+  existingClaims: TimelineClaim[]
+  existingEvidence: TimelineEvidence[]
+  /** Start on a specific kind and skip the "What would you like to add?" step. */
+  initialKind?: WizardKind
+  /** Pre-scope to one metric and skip the metric-picker step (used by the Metrics dashboard's per-metric add). */
+  lockedMetricId?: string
+  onClose: () => void
+  onCreated: () => void
 }
 
 const STEP_META: Record<WizardStepId, { label: string; title: (s: WizardState) => string; subtitle: (s: WizardState) => string }> = {
  type: {
  label: 'Type',
- title: () => 'What would you like to add?',
- subtitle: () => 'Everything ends up in one Timeline either way',
+ title: () => 'What does this log contain?',
+ subtitle: () => 'A log is one record of work — claims, evidence, or both together',
  },
  mode: {
  label: 'How',
@@ -119,11 +123,12 @@ const STEP_META: Record<WizardStepId, { label: string; title: (s: WizardState) =
 }
 
 /**
- * Full-screen guided flow for adding evidence, an impact claim, or both.
- * Small, clearly-named steps: choose type → choose metric(s) → where & when
- * → claim the result → add the proof → review. One shared Where & When
- * scope means claim + evidence added together always auto-link, and the
- * review step previews every connection before anything is saved.
+ * Full-screen guided "Add Log" flow — one log can hold evidence, an impact
+ * claim, or both. Small, clearly-named steps: choose type → choose metric(s)
+ * → where & when → claim the result → add the proof → review. One shared
+ * Where & When scope means claim + evidence logged together always
+ * auto-link, and the review step previews every connection before anything
+ * is saved.
  */
 export default function UploadWizard({
  initiativeId,
@@ -131,28 +136,34 @@ export default function UploadWizard({
  canCreateEvidence,
  onAdvancedClaim,
  onAdvancedEvidence,
- kpis,
- locations,
- tags,
- beneficiaryGroups,
- existingClaims,
- existingEvidence,
- onClose,
- onCreated,
+  kpis,
+  locations,
+  tags,
+  beneficiaryGroups,
+  existingClaims,
+  existingEvidence,
+  initialKind,
+  lockedMetricId,
+  onClose,
+  onCreated,
 }: UploadWizardProps) {
- const { queueUpload, cancelUpload, setPanelSuppressed } = useUploadManager()
+  const { queueUpload, cancelUpload, setPanelSuppressed } = useUploadManager()
 
- const availableKinds = KIND_OPTIONS.filter(o =>
- o.kind === 'evidence' ? canCreateEvidence
- : o.kind === 'claim' ? canCreateClaim
- : canCreateClaim && canCreateEvidence
- )
+  const availableKinds = KIND_OPTIONS.filter(o =>
+    o.kind === 'evidence' ? canCreateEvidence
+      : o.kind === 'claim' ? canCreateClaim
+        : canCreateClaim && canCreateEvidence
+  )
 
- const [state, setState] = useState<WizardState>(() => ({
- ...INITIAL_WIZARD_STATE,
- // Single-capability users skip the type step entirely.
- kind: availableKinds.length === 1 ? availableKinds[0].kind : null,
- }))
+  const [state, setState] = useState<WizardState>(() => ({
+    ...INITIAL_WIZARD_STATE,
+    // A caller-provided kind (Metrics dashboard) or single-capability users
+    // skip the type step entirely.
+    kind: initialKind ?? (availableKinds.length === 1 ? availableKinds[0].kind : null),
+    // Pre-scope to the metric the user added from, so we can skip the picker.
+    claimKpiId: lockedMetricId ?? null,
+    evidenceKpiIds: lockedMetricId ? [lockedMetricId] : [],
+  }))
  const [stepIndex, setStepIndex] = useState(0)
  const [stepError, setStepError] = useState<string | null>(null)
  const [submitting, setSubmitting] = useState(false)
@@ -161,16 +172,17 @@ export default function UploadWizard({
 
  const hasModeChoice = (state.kind === 'claim' && !!onAdvancedClaim) || (state.kind === 'evidence' && !!onAdvancedEvidence)
 
- const steps: WizardStepId[] = useMemo(() => {
- const list: WizardStepId[] = []
- if (availableKinds.length > 1) list.push('type')
- if (hasModeChoice) list.push('mode')
- list.push('metric', 'scope')
- if (includesClaim(state.kind)) list.push('claim')
- if (includesEvidence(state.kind)) list.push('evidence')
- list.push('review')
- return list
- }, [availableKinds.length, state.kind, hasModeChoice])
+  const steps: WizardStepId[] = useMemo(() => {
+    const list: WizardStepId[] = []
+    if (availableKinds.length > 1 && !initialKind) list.push('type')
+    if (hasModeChoice) list.push('mode')
+    if (!lockedMetricId) list.push('metric')
+    list.push('scope')
+    if (includesClaim(state.kind)) list.push('claim')
+    if (includesEvidence(state.kind)) list.push('evidence')
+    list.push('review')
+    return list
+  }, [availableKinds.length, state.kind, hasModeChoice, initialKind, lockedMetricId])
 
  const step = steps[Math.min(stepIndex, steps.length - 1)]
 
@@ -330,9 +342,9 @@ export default function UploadWizard({
  }
 
  notify.success(
- state.kind === 'both' ? 'Claim and evidence added — connected automatically'
- : state.kind === 'claim' ? 'Impact claim added'
- : 'Evidence uploaded'
+ state.kind === 'both' ? 'Log saved — claim and evidence connected automatically'
+ : state.kind === 'claim' ? 'Log saved — impact claim added'
+ : 'Log saved — evidence uploaded'
  )
  state.files.forEach(f => f.previewUrl && URL.revokeObjectURL(f.previewUrl))
  onCreated()
@@ -543,7 +555,7 @@ export default function UploadWizard({
  ) : (
  <button onClick={handleSubmit} disabled={submitting} className="app-btn app-btn-primary app-btn-sm">
  <Check className="w-4 h-4" />
- {submitting ? 'Saving…' : 'Save'}
+ {submitting ? 'Saving…' : 'Save Log'}
  </button>
  )}
  </div>

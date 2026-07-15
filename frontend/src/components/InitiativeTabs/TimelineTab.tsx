@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { apiService } from '../../services/api'
 import {
  BeneficiaryGroup,
+ CreateKPIUpdateForm,
  Evidence,
  KPI,
  Location,
@@ -33,29 +34,36 @@ import ConnectEvidenceDialog from '../timeline/ConnectEvidenceDialog'
 import AddEvidenceToClaimDialog from '../timeline/AddEvidenceToClaimDialog'
 import EvidenceDetailModal from '../timeline/EvidenceDetailModal'
 import ClaimDetailModal from '../timeline/ClaimDetailModal'
-import AddEvidenceModal from '../AddEvidenceModal'
+import EditEvidenceModal from '../timeline/EditEvidenceModal'
+import AddKPIUpdateModal from '../AddKPIUpdateModal'
 import ConfirmDialog from '../ConfirmDialog'
 import ImpactClaimUploadModal from '../impactClaims/ImpactClaimUploadModal'
 import EvidenceUploadModal from '../evidence/EvidenceUploadModal'
 
 const VIEWS: Array<{ id: TimelineView; label: string }> = [
+ { id: 'connections', label: 'Connections' },
  { id: 'claims', label: 'Claims' },
  { id: 'evidence', label: 'Evidence' },
- { id: 'connections', label: 'Connections' },
 ]
 
 interface TimelineTabProps {
  initiativeId: string
  onRefresh?: () => void
+ /** When set, the logs are locked to this metric: all views/filters/counts are
+  * scoped to it and the Metric filter is hidden. Used by the metric detail page. */
+ lockedMetricId?: string
+ /** Renders inside another page (metric detail) rather than as a full-screen tab:
+  * drops the fixed height + big title so the parent page owns scrolling. */
+ embedded?: boolean
 }
 
 /**
- * Unified operational view over the initiative's impact claims, evidence,
- * and their connections. Sub-view and every filter live in URL params so
- * filtered views can be deep-linked, refreshed, and navigated with browser
- * controls (?tab=timeline&view=...&metric=...).
+ * Logs — unified operational view over the initiative's impact claims,
+ * evidence, and their connections. Sub-view and every filter live in URL
+ * params so filtered views can be deep-linked, refreshed, and navigated with
+ * browser controls (?tab=logs&view=...&metric=...).
  */
-export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProps) {
+export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, embedded }: TimelineTabProps) {
  const { canAddImpactClaims, canEditEvidence, canDelete } = useTeam()
  const [searchParams, setSearchParams] = useSearchParams()
 
@@ -70,6 +78,7 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  const [selectedClaim, setSelectedClaim] = useState<{ claim: TimelineClaim; kpi: KPI | undefined } | null>(null)
  const [editingEvidence, setEditingEvidence] = useState<Evidence | null>(null)
  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+ const [editingClaim, setEditingClaim] = useState<{ claim: TimelineClaim; kpi: KPI } | null>(null)
  const [deleteEvidence, setDeleteEvidence] = useState<Evidence | null>(null)
  // evidence set = evidence-first (pick a claim); evidence omitted = claim-first (pick from unconnected evidence)
  const [connectTarget, setConnectTarget] = useState<{ evidence?: TimelineEvidence; claimId?: string } | null>(null)
@@ -79,12 +88,16 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  const [advancedUpload, setAdvancedUpload] = useState<'claim' | 'evidence' | null>(null)
 
  const rawView = searchParams.get('view')
- const view: TimelineView = rawView === 'evidence' || rawView === 'connections' ? rawView : 'claims'
- const filters = useMemo(() => filtersFromParams(searchParams), [searchParams])
+ const view: TimelineView = rawView === 'evidence' || rawView === 'claims' ? rawView : 'connections'
+ // When locked to a metric, force the metric filter so every view/count is scoped.
+ const filters = useMemo(() => {
+ const base = filtersFromParams(searchParams)
+ return lockedMetricId ? { ...base, metrics: [lockedMetricId] } : base
+ }, [searchParams, lockedMetricId])
 
  const setView = (next: TimelineView) => {
  const params = new URLSearchParams(searchParams)
- if (next === 'claims') params.delete('view')
+ if (next === 'connections') params.delete('view')
  else params.set('view', next)
  setSearchParams(params, { replace: true })
  }
@@ -151,6 +164,18 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  [data]
  )
 
+ // Status counts: initiative-wide normally, but scoped to the metric when locked.
+ const displayStats = useMemo(() => {
+ if (!data) return null
+ if (!lockedMetricId) return data.stats
+ const mClaims = data.claims.filter(c => c.kpi_id === lockedMetricId)
+ const mEvidence = data.evidence.filter(e => (e.kpi_ids || []).includes(lockedMetricId))
+ const connected = mClaims.filter(c => c.evidence_count > 0).length + mEvidence.filter(e => e.claim_count > 0).length
+ const total = mClaims.length + mEvidence.length
+ return { total, connected, not_connected: total - connected, claims_total: mClaims.length, evidence_total: mEvidence.length }
+ }, [data, lockedMetricId])
+
+
  const handleAddEvidenceToClaim = canEditEvidence
  ? (claim: TimelineClaim, kpi: KPI | undefined) => setAddEvidenceTarget({ claim, kpi })
  : undefined
@@ -186,6 +211,20 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  }
  }
 
+ const handleUpdateClaim = async (data: CreateKPIUpdateForm) => {
+ if (!editingClaim?.claim.id) return
+ try {
+ await apiService.updateKPIUpdate(editingClaim.claim.id, data)
+ notify.success('Impact claim updated')
+ setEditingClaim(null)
+ await refresh()
+ } catch (error) {
+ const message = error instanceof Error ? error.message : 'Failed to update claim'
+ notify.error(message)
+ throw error
+ }
+ }
+
  const handleDeleteEvidence = async (ev: Evidence) => {
  if (!ev.id) return
  try {
@@ -200,53 +239,59 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  }
 
  return (
-    <div className="h-screen overflow-hidden flex flex-col mobile-content-padding">
+    <div className={embedded ? 'flex flex-col' : 'h-screen overflow-hidden flex flex-col mobile-content-padding'}>
       {/* Header + toolbar (kept compact so the list below is the focus) */}
       <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-gray-100 bg-white space-y-3">
         {/* Title row */}
         <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-800 leading-tight">Timeline</h2>
-            <p className="text-xs text-gray-500 hidden sm:block">
-              All claims, evidence, and connections for this initiative
-            </p>
-          </div>
+          {embedded ? (
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-gray-800 leading-tight">Logs</h3>
+              <p className="text-xs text-gray-500 hidden sm:block">Claims, evidence, and connections for this metric</p>
+            </div>
+          ) : (
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800 leading-tight">Logs</h2>
+              <p className="text-xs text-gray-500 hidden sm:block">
+                Every logged claim, piece of evidence, and connection for this initiative
+              </p>
+            </div>
+          )}
           {(canAddImpactClaims || canEditEvidence) && (
             <button
               onClick={() => setIsWizardOpen(true)}
-              className="app-btn app-btn-primary app-btn-lg shadow-sm flex-shrink-0"
+              className={`app-btn app-btn-primary shadow-sm flex-shrink-0 ${embedded ? 'app-btn-sm' : 'app-btn-lg'}`}
             >
-              <Plus className="w-5 h-5" />
-              <span>Add</span>
+              <Plus className={embedded ? 'w-4 h-4' : 'w-5 h-5'} />
+              <span>Add Log</span>
             </button>
           )}
         </div>
 
-        {/* View switcher + search + at-a-glance stats */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-gray-100 border border-gray-200 flex-shrink-0">
-            {VIEWS.map(v => {
-              const isActive = view === v.id
-              return (
-                <button
-                  key={v.id}
-                  onClick={() => setView(v.id)}
-                  className={`relative px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${isActive ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  {isActive && (
-                    <motion.div
-                      layoutId="timelineViewSeg"
-                      className="absolute inset-0 rounded-full bg-white shadow-card"
-                      transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-                    />
-                  )}
-                  <span className="relative z-10">{v.label}</span>
-                </button>
-              )
-            })}
-          </div>
+        {/* Main filters */}
+        <TimelineFilterBar
+          view={view}
+          filters={filters}
+          onFiltersChange={setFilters}
+          kpis={data?.kpis || []}
+          hideMetric={!!lockedMetricId}
+          locations={locations}
+          beneficiaryGroups={beneficiaryGroups}
+          tags={tags}
+          contributors={data?.contributors || {}}
+        />
 
-          {/* Search — inline with the view switcher */}
+        {/* Connection status filters + search + metrics control */}
+        <div className="flex flex-wrap items-center gap-3">
+          {data && displayStats && (
+            <TimelineStatCards
+              stats={displayStats}
+              activeStatus={filters.status}
+              onStatusClick={(status) => setFilters({ ...filters, status })}
+            />
+          )}
+
+          {/* Search — inline with the status filters */}
           <div className="relative flex-1 min-w-[180px] max-w-sm">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -257,40 +302,37 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
               className="w-full h-9 pl-10 pr-3 bg-white border border-gray-200 rounded-full text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
-
-          {data && (
-            <div className="ml-auto">
-              <TimelineStatCards
-                stats={data.stats}
-                activeStatus={filters.status}
-                onStatusClick={(status) => setFilters({ ...filters, status })}
-              />
-            </div>
-          )}
         </div>
+      </div>
 
-        {/* Filters */}
-        <TimelineFilterBar
-          view={view}
-          filters={filters}
-          onFiltersChange={setFilters}
-          kpis={data?.kpis || []}
-          locations={locations}
-          beneficiaryGroups={beneficiaryGroups}
-          tags={tags}
-          contributors={data?.contributors || {}}
-        />
+      {/* View switcher — full-width, equal, squared buttons above the rows */}
+      <div className="px-4 sm:px-6 pt-4 pb-1 bg-gray-50 flex-shrink-0">
+        <div className="grid grid-cols-3 gap-2">
+          {VIEWS.map(v => {
+            const isActive = view === v.id
+            return (
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => setView(v.id)}
+                className={`inline-flex items-center justify-center h-10 rounded-lg border text-sm font-medium transition-colors ${isActive ? 'border-primary-300 bg-primary-50 ring-1 ring-primary-400 text-gray-900' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
+              >
+                {v.label}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Active view — primary focus of the page */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50">
+      <div className={`px-4 sm:px-6 pb-4 sm:pb-6 pt-2 bg-gray-50 ${embedded ? '' : 'flex-1 overflow-y-auto'}`}>
         {loading ? (
           <SectionLoader className="h-64" />
         ) : !data ? (
           <div className="app-card md:p-8">
             <EmptyState
               icon={AlertCircle}
-              title="Timeline unavailable"
+              title="Logs unavailable"
               description="Something went wrong loading this initiative's activity. Try refreshing the page."
             />
           </div>
@@ -333,9 +375,6 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
                   filters={filters}
                   onOpenClaim={handleOpenClaim}
                   onOpenEvidence={handleOpenEvidence}
-                  onConnectEvidence={canEditEvidence
-                    ? (ev, claimId) => setConnectTarget({ evidence: ev, claimId })
-                    : undefined}
                   onAddEvidenceToClaim={handleAddEvidenceToClaim}
                   onConnectExistingToClaim={handleConnectExistingToClaim}
                 />
@@ -351,8 +390,9 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  initiativeId={initiativeId}
  canCreateClaim={canAddImpactClaims}
  canCreateEvidence={canEditEvidence}
- onAdvancedClaim={() => { setIsWizardOpen(false); setAdvancedUpload('claim') }}
- onAdvancedEvidence={() => { setIsWizardOpen(false); setAdvancedUpload('evidence') }}
+ lockedMetricId={lockedMetricId}
+ onAdvancedClaim={lockedMetricId ? undefined : () => { setIsWizardOpen(false); setAdvancedUpload('claim') }}
+ onAdvancedEvidence={lockedMetricId ? undefined : () => { setIsWizardOpen(false); setAdvancedUpload('evidence') }}
  kpis={data.kpis}
  locations={locations}
  tags={tags}
@@ -446,6 +486,12 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  contributors={data.contributors}
  onClose={() => setSelectedClaim(null)}
  onOpenEvidence={handleOpenEvidence}
+ onEdit={canAddImpactClaims && selectedClaim.kpi
+ ? () => {
+ setEditingClaim({ claim: selectedClaim.claim, kpi: selectedClaim.kpi! })
+ setSelectedClaim(null)
+ }
+ : undefined}
  onAddEvidence={canEditEvidence
  ? () => setAddEvidenceTarget({ claim: selectedClaim.claim, kpi: selectedClaim.kpi })
  : undefined}
@@ -455,18 +501,35 @@ export default function TimelineTab({ initiativeId, onRefresh }: TimelineTabProp
  />
  )}
 
- {/* Edit evidence (legacy single-record form, same as EvidenceTab) */}
+ {/* Edit evidence — modern details/scope editor (files stay untouched) */}
  {isEditModalOpen && editingEvidence && (
- <AddEvidenceModal
- isOpen={isEditModalOpen}
+ <EditEvidenceModal
+ evidence={editingEvidence}
+ kpis={data?.kpis || []}
+ locations={locations}
+ tags={tags}
+ beneficiaryGroups={beneficiaryGroups}
  onClose={() => {
  setIsEditModalOpen(false)
  setEditingEvidence(null)
  }}
- onSubmit={handleSaveEvidence}
- availableKPIs={data?.kpis || []}
+ onSave={handleSaveEvidence}
+ />
+ )}
+
+ {/* Edit claim — same form used across the app, in edit mode */}
+ {editingClaim && (
+ <AddKPIUpdateModal
+ isOpen
+ onClose={() => setEditingClaim(null)}
+ onSubmit={handleUpdateClaim}
+ kpiTitle={editingClaim.kpi.title}
+ kpiId={editingClaim.kpi.id!}
+ metricType={(editingClaim.kpi.metric_type as 'number' | 'percentage') || 'number'}
+ unitOfMeasurement={editingClaim.kpi.unit_of_measurement || ''}
  initiativeId={initiativeId}
- editData={editingEvidence}
+ kpiTagIds={(editingClaim.kpi as any).tag_ids || []}
+ editData={editingClaim.claim}
  />
  )}
 

@@ -714,9 +714,9 @@ export default function Dashboard() {
  { id: 'statement', label: 'Write mission statement', done: !!(o?.statement && o.statement.trim().length > 0), to: '/account?tab=organization' },
  { id: 'public', label: 'Make organization public', done: !!o?.is_public, to: '/account?tab=organization' },
  { id: 'initiative', label: 'Create an initiative', done: initiatives.length > 0, to: '/' },
- { id: 'metric', label: 'Add at least one metric', done: allKPIs.length > 0, to: firstInit ? `/initiatives/${firstInit}?tab=home` : '/' },
+    { id: 'metric', label: 'Add at least one metric', done: allKPIs.length > 0, to: firstInit ? `/initiatives/${firstInit}?tab=metrics` : '/' },
  { id: 'location', label: 'Add at least one location', done: allLocations.length > 0, to: firstInit ? `/initiatives/${firstInit}?tab=location` : '/' },
- { id: 'evidence', label: 'Add at least one evidence', done: totalEvidence > 0, to: firstInit ? `/initiatives/${firstInit}?tab=timeline&view=evidence` : '/' },
+ { id: 'evidence', label: 'Add at least one evidence', done: totalEvidence > 0, to: firstInit ? `/initiatives/${firstInit}?tab=logs&view=evidence` : '/' },
  ]
  }, [ownedOrganization, initiatives, allKPIs, allLocations, totalEvidence])
 
@@ -755,13 +755,13 @@ export default function Dashboard() {
  if (initiatives.length === 0) steps.push({ id: 'initiative', label: 'Create your first initiative', onClick: () => setShowCreateModal(true), icon: <Plus className="w-4 h-4" /> })
  initiatives.forEach((init) => {
  const initKpis = allKPIs.filter(k => k.initiative_id === init.id)
- if (initKpis.length === 0) steps.push({ id: `metrics-${init.id}`, label: `Add metrics to "${init.title}"`, to: `/initiatives/${init.id}?tab=home`, icon: <BarChart3 className="w-4 h-4" /> })
+    if (initKpis.length === 0) steps.push({ id: `metrics-${init.id}`, label: `Add metrics to "${init.title}"`, to: `/initiatives/${init.id}?tab=metrics`, icon: <BarChart3 className="w-4 h-4" /> })
  })
  if (allLocations.length === 0 && firstInit) {
  steps.push({ id: 'locations', label: 'Add locations to an initiative', to: `/initiatives/${firstInit}?tab=location`, icon: <MapPin className="w-4 h-4" /> })
  }
  if (totalEvidence === 0 && firstInit) {
- steps.push({ id: 'evidence', label: 'Add evidence to an initiative', to: `/initiatives/${firstInit}?tab=timeline&view=evidence`, icon: <FileText className="w-4 h-4" /> })
+ steps.push({ id: 'evidence', label: 'Add evidence to an initiative', to: `/initiatives/${firstInit}?tab=logs&view=evidence`, icon: <FileText className="w-4 h-4" /> })
  }
  if (contextScore.done < contextScore.total) {
  steps.push({ id: 'context', label: `Finish context page (${contextScore.done}/${contextScore.total})`, to: '/context', icon: <Compass className="w-4 h-4" /> })
@@ -796,7 +796,7 @@ export default function Dashboard() {
 
  const handleLocationClick = (location: Location) => {
  if (location.initiative_id) {
- navigate(`/initiatives/${location.initiative_id}?tab=locations`)
+    navigate(`/initiatives/${location.initiative_id}?tab=location`)
  }
  }
 

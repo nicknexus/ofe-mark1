@@ -31,12 +31,12 @@ import ImpactClaimUploadModal from '../components/impactClaims/ImpactClaimUpload
 import EvidenceUploadModal from '../components/evidence/EvidenceUploadModal'
 import InitiativeCharts from '../components/InitiativeCharts'
 import BeneficiaryManager from '../components/BeneficiaryManager'
-import MetricsOverview from '../components/overview/MetricsOverview'
+import MetricsDashboardTab from '../components/metricsDashboard/MetricsDashboardTab'
+import MetricDetailTab from '../components/InitiativeTabs/MetricDetailTab'
 import ExpandableKPICard from '../components/ExpandableKPICard'
 import InitiativeSidebar from '../components/InitiativeSidebar'
 import HomeTab from '../components/InitiativeTabs/HomeTab'
 import TimelineTab from '../components/InitiativeTabs/TimelineTab'
-import MetricsTab from '../components/InitiativeTabs/MetricsTab'
 import LocationTab from '../components/InitiativeTabs/LocationTab'
 import BeneficiariesTab from '../components/InitiativeTabs/BeneficiariesTab'
 import StoriesTab from '../components/InitiativeTabs/StoriesTab'
@@ -63,8 +63,8 @@ export default function InitiativePage() {
  const [allKPIUpdates, setAllKPIUpdates] = useState<any[]>([])
  const [orderedKPIIds, setOrderedKPIIds] = useState<string[]>([])
 
- // Sidebar navigation state — Timeline is the default operational page
- const [activeTab, setActiveTab] = useState('timeline')
+  // Sidebar navigation state — Metrics dashboard is the default landing page
+  const [activeTab, setActiveTab] = useState('metrics')
  const [previousTab, setPreviousTab] = useState<string | null>(null) // Track tab before viewing metric
  const [initialStoryId, setInitialStoryId] = useState<string | undefined>(undefined)
 
@@ -80,23 +80,35 @@ export default function InitiativePage() {
  // Selected KPI for modals
  const [selectedKPI, setSelectedKPI] = useState<any>(null)
 
- // Handle URL query param for tab. The old Metrics/Evidence tabs were
- // consolidated into the Timeline — legacy links redirect to the matching
- // Timeline view so bookmarks and onboarding checklists keep working.
- useEffect(() => {
- const tab = searchParams.get('tab')
- if (tab === 'metrics' || tab === 'evidence') {
- const params = new URLSearchParams(searchParams)
- params.set('tab', 'timeline')
- if (tab === 'evidence') params.set('view', 'evidence')
- else params.delete('view')
- setSearchParams(params, { replace: true })
- return
- }
- if (tab && ['home', 'timeline', 'location', 'beneficiaries', 'stories', 'report'].includes(tab)) {
- setActiveTab(tab)
- }
- }, [searchParams])
+  // Handle URL query param for tab. The old `home` (Overview) tab is now the
+  // `metrics` dashboard; legacy `?tab=home` links redirect there. The old
+  // Timeline tab is now `logs`, and the old standalone Evidence tab redirects
+  // into the Logs tab's evidence view.
+  useEffect(() => {
+    const tab = searchParams.get('tab')
+    if (tab === 'home') {
+      const params = new URLSearchParams(searchParams)
+      params.set('tab', 'metrics')
+      setSearchParams(params, { replace: true })
+      return
+    }
+    if (tab === 'timeline') {
+      const params = new URLSearchParams(searchParams)
+      params.set('tab', 'logs')
+      setSearchParams(params, { replace: true })
+      return
+    }
+    if (tab === 'evidence') {
+      const params = new URLSearchParams(searchParams)
+      params.set('tab', 'logs')
+      params.set('view', 'evidence')
+      setSearchParams(params, { replace: true })
+      return
+    }
+    if (tab && ['metrics', 'logs', 'location', 'beneficiaries', 'stories', 'report'].includes(tab)) {
+      setActiveTab(tab)
+    }
+  }, [searchParams])
 
  useEffect(() => {
  // Load user and organization
@@ -399,13 +411,13 @@ export default function InitiativePage() {
  if (isExpanded) {
  // Closing the metric - navigate back to initiative
  navigate(`/initiatives/${id}`)
- setExpandedKPIs(new Set())
- // Return to the previous tab; the removed metrics/evidence tabs and
- // direct URL loads fall back to the Timeline.
- const fallback = !previousTab || previousTab === 'metrics' || previousTab === 'evidence'
- ? 'timeline'
- : previousTab
- setActiveTab(fallback)
+      setExpandedKPIs(new Set())
+      // Return to the previous tab; direct URL loads (or the removed evidence
+      // tab) fall back to the Metrics dashboard.
+      const fallback = !previousTab || previousTab === 'evidence'
+        ? 'metrics'
+        : previousTab
+      setActiveTab(fallback)
  setPreviousTab(null)
  } else {
  // Opening a metric - navigate to metric URL
@@ -431,103 +443,114 @@ export default function InitiativePage() {
  navigate(`/initiatives/${id}/metrics/${kpiIdToOpen}`)
  }
 
- const renderHomeContent = () => {
- if (!dashboard) return null
+  const renderMetricsContent = () => {
+    if (!dashboard) return null
 
- const { initiative, kpis, stats } = dashboard
+    const { kpis } = dashboard
 
- return (
- <div className="h-full overflow-hidden">
- {kpis.length === 0 ? (
- /* Empty State - Compact for Laptop */
- <div className="flex items-center justify-center h-full p-6">
- <div className="app-card p-10 text-center max-w-md mx-auto">
- <div className="app-icon-tile mx-auto mb-6">
- <BarChart3 className="w-6 h-6 text-primary-500" />
- </div>
- <h3 className="text-xl font-semibold text-gray-800 mb-3">
- Create Your First Metric
- </h3>
- <p className="text-gray-500 text-sm mb-6 leading-relaxed">
- Metrics are the specific measurements you want to track, like "Students Trained" or "Wells Built"
- </p>
- <div className="flex flex-col sm:flex-row gap-3 justify-center">
- <button
- onClick={() => setIsKPIModalOpen(true)}
-            className="app-btn app-btn-primary inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm"
- >
- <Plus className="w-4 h-4" />
- <span>Add First Metric</span>
- </button>
- <button
- onClick={() => handleTabChange('timeline')}
-            className="app-btn app-btn-secondary inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm"
- >
- <BarChart3 className="w-4 h-4" />
- <span>View Timeline</span>
- </button>
- </div>
- <div className="mt-6 p-3 bg-gray-50/50 rounded-xl border border-gray-100">
- <p className="text-xs text-gray-500">
- 💡 Example: "Number of people trained" or "Clean water access provided"
- </p>
- </div>
- </div>
- </div>
- ) : (
- /* Metrics-focused overview: cards + trends, no map / stat tiles */
- <MetricsOverview
- initiativeId={id!}
- kpis={kpis}
- kpiTotals={kpiTotals}
- kpiUpdates={allKPIUpdates}
- onAddKPI={canEditMetrics ? () => setIsKPIModalOpen(true) : undefined}
- onMetricDetailClick={handleMetricCardClick}
- user={user}
- organization={organization}
- />
- )}
- </div>
- )
- }
+    if (kpis.length === 0) {
+      return (
+        <div className="h-full overflow-hidden">
+          {/* Empty State - Compact for Laptop */}
+          <div className="flex items-center justify-center h-full p-6">
+            <div className="app-card p-10 text-center max-w-md mx-auto">
+              <div className="app-icon-tile mx-auto mb-6">
+                <BarChart3 className="w-6 h-6 text-primary-500" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-800 mb-3">
+                Create Your First Metric
+              </h3>
+              <p className="text-gray-500 text-sm mb-6 leading-relaxed">
+                Metrics are the specific measurements you want to track, like "Students Trained" or "Wells Built"
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  onClick={() => setIsKPIModalOpen(true)}
+                   className="app-btn app-btn-primary inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add First Metric</span>
+                </button>
+                <button
+                  onClick={() => handleTabChange('logs')}
+                   className="app-btn app-btn-secondary inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  <span>View Logs</span>
+                </button>
+              </div>
+              <div className="mt-6 p-3 bg-gray-50/50 rounded-xl border border-gray-100">
+                <p className="text-xs text-gray-500">
+                  💡 Example: "Number of people trained" or "Clean water access provided"
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
 
- const renderActiveTab = () => {
- switch (activeTab) {
- case 'home':
- return (
- <HomeTab>
- {renderHomeContent()}
- </HomeTab>
- )
- case 'timeline':
- default:
- return (
- <TimelineTab
- initiativeId={id!}
- onRefresh={loadDashboard}
- />
- )
- case 'metrics':
- return (
- <MetricsTab
- dashboard={dashboard}
- kpiTotals={kpiTotals}
- categoryFilter={categoryFilter}
- setCategoryFilter={setCategoryFilter}
- expandedKPIs={expandedKPIs}
- setExpandedKPIs={setExpandedKPIs}
- allKPIUpdates={allKPIUpdates}
- onAddKPI={canEditMetrics ? () => setIsKPIModalOpen(true) : undefined}
- onAddUpdate={openUpdateModal}
- onAddEvidence={canEditEvidence ? openEvidenceModal : undefined}
- onEditKPI={canEditMetrics ? openEditModal : undefined}
- onDeleteKPI={canDelete ? openDeleteConfirm : undefined}
- orderedKPIIds={orderedKPIIds}
- onToggleKPIExpansion={toggleKPIExpansion}
- initiativeId={id}
- onRefresh={loadDashboard}
- />
- )
+    return (
+      <MetricsDashboardTab
+        initiativeId={id!}
+        kpis={kpis}
+        kpiTotals={kpiTotals}
+        kpiUpdates={allKPIUpdates}
+        onAddKPI={canEditMetrics ? () => setIsKPIModalOpen(true) : undefined}
+        onMetricDetailClick={handleMetricCardClick}
+        onOpenLocations={() => handleTabChange('location')}
+        onRefresh={refreshAfterClaim}
+        onStoryClick={(storyId) => {
+          setInitialStoryId(storyId)
+          setActiveTab('stories')
+        }}
+      />
+    )
+  }
+
+  const renderActiveTab = () => {
+    switch (activeTab) {
+      case 'logs':
+        return (
+          <TimelineTab
+            initiativeId={id!}
+            onRefresh={loadDashboard}
+          />
+        )
+      case 'metrics':
+      default: {
+        // A metric detail is open (via /metrics/:kpiId or after creation) →
+        // show the dedicated metric-detail page; otherwise the dashboard landing.
+        const detailKpiId = kpiId || (expandedKPIs.size > 0 ? Array.from(expandedKPIs)[0] : null)
+        const detailKpis = dashboard?.kpis || []
+        const detailKpi = detailKpiId ? detailKpis.find(k => k.id === detailKpiId) : null
+        if (detailKpi) {
+          return (
+            <MetricDetailTab
+              initiativeId={id!}
+              kpi={detailKpi}
+              kpis={detailKpis}
+              kpiTotal={kpiTotals[detailKpi.id!] || 0}
+              kpiUpdates={allKPIUpdates}
+              onBack={() => {
+                navigate(`/initiatives/${id}`)
+                setExpandedKPIs(new Set())
+                setActiveTab('metrics')
+              }}
+              onRefresh={loadDashboard}
+              onStoryClick={(storyId) => {
+                setInitialStoryId(storyId)
+                setActiveTab('stories')
+              }}
+            />
+          )
+        }
+        return (
+          <HomeTab>
+            {renderMetricsContent()}
+          </HomeTab>
+        )
+      }
  case 'location':
  return <LocationTab 
  onStoryClick={(storyId) => {
