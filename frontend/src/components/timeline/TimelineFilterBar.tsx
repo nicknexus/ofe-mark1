@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -174,37 +174,54 @@ export default function TimelineFilterBar({
  name: c.name || c.email || 'Unknown user',
  }))
 
- const activityDateValue = {
- startDate: filters.activityFrom || undefined,
- endDate: filters.activityTo || undefined,
- }
- const uploadDateValue = {
- startDate: filters.uploadFrom || undefined,
- endDate: filters.uploadTo || undefined,
- }
+ // Stable identity so toggling the order-by control (a parent re-render)
+ // doesn't reset an in-progress date selection inside the picker.
+ const dateValue = useMemo(() => ({
+ startDate: filters.dateFrom || undefined,
+ endDate: filters.dateTo || undefined,
+ }), [filters.dateFrom, filters.dateTo])
 
- const dateChange = (keys: ['activityFrom', 'activityTo'] | ['uploadFrom', 'uploadTo']) =>
- (value: { singleDate?: string; startDate?: string; endDate?: string }) => {
+ const dateChange = (value: { singleDate?: string; startDate?: string; endDate?: string }) => {
  const from = value.singleDate || value.startDate || null
  const to = value.singleDate || value.endDate || null
- set({ [keys[0]]: from, [keys[1]]: to } as Partial<TimelineFilters>)
+ set({ dateFrom: from, dateTo: to })
  }
+
+ // Order-by selector, hosted at the top of the date-range dropdown. Determines
+ // which date the range filters on and how the list is sorted.
+ const orderByToggle = (
+ <div>
+ <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Order by</p>
+ <div className="grid grid-cols-2 gap-0.5 p-0.5 rounded-full bg-gray-100 border border-gray-200">
+ {([
+ { id: 'upload', label: 'Upload date' },
+ { id: 'activity', label: 'Claim date' },
+ ] as const).map(o => {
+ const active = filters.orderMode === o.id
+ return (
+ <button
+ key={o.id}
+ type="button"
+ onClick={() => set({ orderMode: o.id })}
+ className={`h-8 rounded-full text-sm font-medium transition-colors ${active ? 'bg-white text-gray-900 shadow-card' : 'text-gray-500 hover:text-gray-700'}`}
+ >
+ {o.label}
+ </button>
+ )
+ })}
+ </div>
+ </div>
+ )
 
  return (
       <div className="flex flex-wrap items-center gap-2">
         <DateRangePicker
-          value={activityDateValue}
-          onChange={dateChange(['activityFrom', 'activityTo'])}
+          value={dateValue}
+          onChange={dateChange}
           maxDate={getLocalDateString(new Date())}
-          placeholder="Activity date"
+          placeholder="Date range"
           variant="pill"
-        />
-        <DateRangePicker
-          value={uploadDateValue}
-          onChange={dateChange(['uploadFrom', 'uploadTo'])}
-          maxDate={getLocalDateString(new Date())}
-          placeholder="Upload date"
-          variant="pill"
+          topSlot={orderByToggle}
         />
 
         {!hideMetric && (
@@ -279,14 +296,12 @@ export default function TimelineFilterBar({
  locations: [],
  beneficiaryGroups: [],
  tags: [],
- contributors: [],
- evidenceTypes: [],
- status: null,
- activityFrom: null,
- activityTo: null,
- uploadFrom: null,
- uploadTo: null,
- })}
+                contributors: [],
+                evidenceTypes: [],
+                status: null,
+                dateFrom: null,
+                dateTo: null,
+              })}
           className="inline-flex items-center gap-1 h-9 px-3 rounded-full text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
         >
           <X className="w-3.5 h-3.5" />

@@ -760,7 +760,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  }
 
  return (
- <div ref={containerRef} className="h-screen overflow-y-auto relative">
+ <div className="h-screen overflow-hidden flex flex-col mobile-content-padding relative">
  {/* Full-screen loading overlay */}
  {loadingReport && (
  <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
@@ -772,7 +772,15 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  </div>
  )}
 
- <div className="max-w-7xl mx-auto p-6 space-y-6">
+ <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-gray-100 bg-white flex-shrink-0">
+ <div className="min-w-0">
+ <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">AI Report</h2>
+ <p className="text-sm text-gray-500 mt-1 hidden sm:block">Generate professional impact reports powered by AI</p>
+ </div>
+ </div>
+
+ <div ref={containerRef} className="flex-1 bg-gray-50 overflow-y-auto min-h-0">
+ <div className="max-w-6xl mx-auto p-4 sm:p-8 space-y-6">
  {/* Report Dashboard - Shown at top when generated */}
  {showDashboard && reportText && reportDashboardData && reportData && (
  <>
@@ -781,7 +789,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  <NewReportButton />
  </div>
 
- <div className="app-card p-6">
+ <div className="rounded-2xl border border-gray-200/70 bg-white shadow-card p-6">
  <div className="flex items-center justify-between mb-4">
  <h2 className="text-base font-semibold text-gray-800">Report Dashboard</h2>
  <div className="flex items-center gap-2">
@@ -894,22 +902,9 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
  {/* Step Wizard - Only show if no report generated OR dashboard is hidden */}
  {(!reportText || !reportDashboardData || !showDashboard) && (
- <div className="app-card overflow-hidden">
- {/* Header */}
- <div className="app-card-header flex items-center justify-between px-5 py-3">
- <div className="flex items-center space-x-2.5 flex-1">
- <div className="app-icon-tile app-icon-tile-sm">
- <Sparkles className="w-5 h-5 text-primary-600" />
- </div>
- <div>
- <h2 className="text-lg font-semibold text-gray-800">AI Report Generator</h2>
- <p className="text-xs text-gray-500">Generate professional impact reports powered by AI</p>
- </div>
- </div>
- </div>
-
+ <div className="rounded-2xl border border-gray-200/70 bg-white shadow-card overflow-hidden">
  {/* Progress Steps Indicator */}
- <div className="px-5 py-2.5 border-b border-gray-100 bg-gray-50/50">
+ <div className="px-5 py-3 border-b border-gray-100 bg-white">
  <div className="flex items-center justify-center">
  {steps.map((step, index) => (
  <React.Fragment key={step.number}>
@@ -1396,6 +1391,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  </div>
  )}
 
+ </div>
  </div>
  </div>
  )

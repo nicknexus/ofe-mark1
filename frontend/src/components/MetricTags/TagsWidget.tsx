@@ -71,7 +71,7 @@ export default function TagsWidget({ compact }: TagsWidgetProps) {
 
  return (
  <>
- <div className={`app-card-interactive overflow-hidden flex flex-col ${compact ? '' : 'min-h-0'}`}>
+ <div className={`app-card-interactive overflow-hidden flex flex-col ${compact ? '' : 'min-h-0 h-full'}`}>
  <div className="px-4 py-3 border-b border-gray-100/70 bg-gradient-to-b from-gray-50/50 to-transparent flex items-center justify-between flex-shrink-0">
  <div className="flex items-center gap-2">
  <div className="w-7 h-7 rounded-lg bg-primary-50 ring-1 ring-primary-100/50 flex items-center justify-center">

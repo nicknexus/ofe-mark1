@@ -29,21 +29,24 @@ import TimelineFilterBar from '../timeline/TimelineFilterBar'
 import UploadWizard from '../upload/UploadWizard'
 import ClaimsView from '../timeline/ClaimsView'
 import EvidenceView from '../timeline/EvidenceView'
+import EvidenceViewModeToggle from '../timeline/EvidenceViewModeToggle'
+import type { EvidenceViewMode } from '../timeline/EvidenceViewModeToggle'
 import ConnectionsView from '../timeline/ConnectionsView'
 import ConnectEvidenceDialog from '../timeline/ConnectEvidenceDialog'
 import AddEvidenceToClaimDialog from '../timeline/AddEvidenceToClaimDialog'
 import EvidenceDetailModal from '../timeline/EvidenceDetailModal'
 import ClaimDetailModal from '../timeline/ClaimDetailModal'
-import EditEvidenceModal from '../timeline/EditEvidenceModal'
-import AddKPIUpdateModal from '../AddKPIUpdateModal'
 import ConfirmDialog from '../ConfirmDialog'
 import ImpactClaimUploadModal from '../impactClaims/ImpactClaimUploadModal'
 import EvidenceUploadModal from '../evidence/EvidenceUploadModal'
 
-const VIEWS: Array<{ id: TimelineView; label: string }> = [
- { id: 'connections', label: 'Connections' },
- { id: 'claims', label: 'Claims' },
- { id: 'evidence', label: 'Evidence' },
+// Each view wears its side's brand color when active: connections are the
+// impact green (the link color), claims are seafoam teal, evidence is the
+// primary brand green — matching the Add Log wizard's branding.
+const VIEWS: Array<{ id: TimelineView; label: string; activeClass: string }> = [
+ { id: 'connections', label: 'Connections', activeClass: 'border-primary-300 bg-gradient-to-r from-claim-50 to-primary-50 text-gray-900' },
+ { id: 'claims', label: 'Claims', activeClass: 'border-claim-300 bg-claim-50 text-gray-900' },
+ { id: 'evidence', label: 'Evidence', activeClass: 'border-primary-300 bg-primary-50 text-gray-900' },
 ]
 
 interface TimelineTabProps {
@@ -55,6 +58,9 @@ interface TimelineTabProps {
  /** Renders inside another page (metric detail) rather than as a full-screen tab:
   * drops the fixed height + big title so the parent page owns scrolling. */
  embedded?: boolean
+ /** Bump this counter to open the Add Log wizard from a parent (e.g. the
+  * metric detail header button). */
+ openAddLogSignal?: number
 }
 
 /**
@@ -63,7 +69,7 @@ interface TimelineTabProps {
  * params so filtered views can be deep-linked, refreshed, and navigated with
  * browser controls (?tab=logs&view=...&metric=...).
  */
-export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, embedded }: TimelineTabProps) {
+export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, embedded, openAddLogSignal }: TimelineTabProps) {
  const { canAddImpactClaims, canEditEvidence, canDelete } = useTeam()
  const [searchParams, setSearchParams] = useSearchParams()
 
@@ -77,15 +83,16 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  const [selectedEvidence, setSelectedEvidence] = useState<TimelineEvidence | null>(null)
  const [selectedClaim, setSelectedClaim] = useState<{ claim: TimelineClaim; kpi: KPI | undefined } | null>(null)
  const [editingEvidence, setEditingEvidence] = useState<Evidence | null>(null)
- const [isEditModalOpen, setIsEditModalOpen] = useState(false)
  const [editingClaim, setEditingClaim] = useState<{ claim: TimelineClaim; kpi: KPI } | null>(null)
  const [deleteEvidence, setDeleteEvidence] = useState<Evidence | null>(null)
+ const [deleteClaim, setDeleteClaim] = useState<TimelineClaim | null>(null)
  // evidence set = evidence-first (pick a claim); evidence omitted = claim-first (pick from unconnected evidence)
  const [connectTarget, setConnectTarget] = useState<{ evidence?: TimelineEvidence; claimId?: string } | null>(null)
  const [addEvidenceTarget, setAddEvidenceTarget] = useState<{ claim: TimelineClaim; kpi: KPI | undefined } | null>(null)
  const [isWizardOpen, setIsWizardOpen] = useState(false)
  // Advanced flows picked from the wizard's Simple/Advanced step
  const [advancedUpload, setAdvancedUpload] = useState<'claim' | 'evidence' | null>(null)
+ const [evidenceMode, setEvidenceMode] = useState<EvidenceViewMode>('list')
 
  const rawView = searchParams.get('view')
  const view: TimelineView = rawView === 'evidence' || rawView === 'claims' ? rawView : 'connections'
@@ -126,6 +133,11 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  setLoading(true)
  load()
  }, [load])
+
+ // Parent-triggered "Add Log" (e.g. metric detail header). Ignore the initial 0.
+ useEffect(() => {
+ if (openAddLogSignal) setIsWizardOpen(true)
+ }, [openAddLogSignal])
 
  useEffect(() => {
  if (!initiativeId) return
@@ -188,40 +200,10 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  try {
  const fullEvidence = await apiService.getEvidenceItem(ev.id!)
  setEditingEvidence(fullEvidence)
- setIsEditModalOpen(true)
  } catch (error) {
  console.error('Error loading evidence for edit:', error)
  notify.error('Failed to load evidence details')
  setEditingEvidence(ev)
- setIsEditModalOpen(true)
- }
- }
-
- const handleSaveEvidence = async (evidenceData: any) => {
- try {
- if (editingEvidence?.id) {
- await apiService.updateEvidence(editingEvidence.id, evidenceData)
- notify.success('Evidence updated successfully!')
- }
- await refresh()
- } catch (error) {
- const message = error instanceof Error ? error.message : 'Failed to save evidence'
- notify.error(message)
- throw error
- }
- }
-
- const handleUpdateClaim = async (data: CreateKPIUpdateForm) => {
- if (!editingClaim?.claim.id) return
- try {
- await apiService.updateKPIUpdate(editingClaim.claim.id, data)
- notify.success('Impact claim updated')
- setEditingClaim(null)
- await refresh()
- } catch (error) {
- const message = error instanceof Error ? error.message : 'Failed to update claim'
- notify.error(message)
- throw error
  }
  }
 
@@ -238,10 +220,23 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  }
  }
 
+ const handleDeleteClaim = async (claim: TimelineClaim) => {
+ if (!claim.id) return
+ try {
+ await apiService.deleteKPIUpdate(claim.id)
+ notify.success('Impact claim deleted')
+ setDeleteClaim(null)
+ setSelectedClaim(null)
+ await refresh()
+ } catch (error) {
+ notify.error('Failed to delete impact claim')
+ }
+ }
+
  return (
     <div className={embedded ? 'flex flex-col' : 'h-screen overflow-hidden flex flex-col mobile-content-padding'}>
       {/* Header + toolbar (kept compact so the list below is the focus) */}
-      <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-gray-100 bg-white space-y-3">
+      <div className={`px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-gray-100 space-y-3 ${embedded ? 'bg-gray-50' : 'bg-white'}`}>
         {/* Title row */}
         <div className="flex items-center justify-between gap-3">
           {embedded ? (
@@ -251,8 +246,8 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
             </div>
           ) : (
             <div className="min-w-0">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-800 leading-tight">Logs</h2>
-              <p className="text-xs text-gray-500 hidden sm:block">
+              <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Logs</h2>
+              <p className="text-sm text-gray-500 mt-1 hidden sm:block">
                 Every logged claim, piece of evidence, and connection for this initiative
               </p>
             </div>
@@ -260,10 +255,15 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
           {(canAddImpactClaims || canEditEvidence) && (
             <button
               onClick={() => setIsWizardOpen(true)}
-              className={`app-btn app-btn-primary shadow-sm flex-shrink-0 ${embedded ? 'app-btn-sm' : 'app-btn-lg'}`}
+              className={`app-btn app-btn-primary shadow-sm flex-shrink-0 ${
+                embedded
+                  ? 'app-btn-sm'
+                  : 'app-btn-sm md:h-12 md:px-6 md:text-base lg:h-14 lg:px-8 lg:text-[17px]'
+              }`}
             >
-              <Plus className={embedded ? 'w-4 h-4' : 'w-5 h-5'} />
-              <span>Add Log</span>
+              <Plus className={embedded ? 'w-4 h-4' : 'w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6'} />
+              <span className={embedded ? undefined : 'hidden sm:inline'}>Add Log</span>
+              {!embedded && <span className="sm:hidden">Add</span>}
             </button>
           )}
         </div>
@@ -281,18 +281,9 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
           contributors={data?.contributors || {}}
         />
 
-        {/* Connection status filters + search + metrics control */}
-        <div className="flex flex-wrap items-center gap-3">
-          {data && displayStats && (
-            <TimelineStatCards
-              stats={displayStats}
-              activeStatus={filters.status}
-              onStatusClick={(status) => setFilters({ ...filters, status })}
-            />
-          )}
-
-          {/* Search — inline with the status filters */}
-          <div className="relative flex-1 min-w-[180px] max-w-sm">
+        {/* Search (left) · status filters + evidence view mode (right) */}
+        <div className="flex flex-wrap items-center gap-3 justify-between">
+          <div className="relative flex-1 min-w-[200px] max-w-md">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
@@ -301,6 +292,19 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
               placeholder="Search claims and evidence…"
               className="w-full h-9 pl-10 pr-3 bg-white border border-gray-200 rounded-full text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {data && displayStats && (
+              <TimelineStatCards
+                stats={displayStats}
+                activeStatus={filters.status}
+                onStatusClick={(status) => setFilters({ ...filters, status })}
+              />
+            )}
+            {view === 'evidence' && (
+              <EvidenceViewModeToggle mode={evidenceMode} onChange={setEvidenceMode} />
+            )}
           </div>
         </div>
       </div>
@@ -315,7 +319,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
                 key={v.id}
                 type="button"
                 onClick={() => setView(v.id)}
-                className={`inline-flex items-center justify-center h-10 rounded-lg border text-sm font-medium transition-colors ${isActive ? 'border-primary-300 bg-primary-50 ring-1 ring-primary-400 text-gray-900' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
+                className={`inline-flex items-center justify-center h-10 rounded-lg border text-sm font-medium transition-colors ${isActive ? v.activeClass : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
               >
                 {v.label}
               </button>
@@ -363,6 +367,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
                   locations={locations}
                   contributors={data.contributors}
                   filters={filters}
+                  mode={evidenceMode}
                   onOpenEvidence={handleOpenEvidence}
                 />
               ) : (
@@ -430,6 +435,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  {/* Connect evidence ↔ claim (re-scope + link), from either side */}
  {connectTarget && data && (
  <ConnectEvidenceDialog
+ zIndexClass="z-[90]"
  evidence={connectTarget.evidence}
  evidenceOptions={connectTarget.evidence ? undefined : unlinkedEvidence}
  claims={data.claims}
@@ -498,38 +504,32 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  onConnectExisting={canEditEvidence && unlinkedEvidence.length > 0
  ? () => setConnectTarget({ claimId: selectedClaim.claim.id })
  : undefined}
+ onDelete={canDelete
+ ? () => setDeleteClaim(selectedClaim.claim)
+ : undefined}
  />
  )}
 
- {/* Edit evidence — modern details/scope editor (files stay untouched) */}
- {isEditModalOpen && editingEvidence && (
- <EditEvidenceModal
- evidence={editingEvidence}
- kpis={data?.kpis || []}
+ {/* Edit claim / evidence — the same Add Log wizard, prefilled, so
+ editing walks the exact same steps as adding */}
+ {(editingEvidence || editingClaim) && data && (
+ <UploadWizard
+ initiativeId={initiativeId}
+ canCreateClaim={canAddImpactClaims}
+ canCreateEvidence={canEditEvidence}
+ kpis={data.kpis}
  locations={locations}
  tags={tags}
  beneficiaryGroups={beneficiaryGroups}
+ existingClaims={data.claims}
+ existingEvidence={data.evidence}
+ editClaim={editingClaim?.claim}
+ editEvidence={editingEvidence ?? undefined}
  onClose={() => {
- setIsEditModalOpen(false)
  setEditingEvidence(null)
+ setEditingClaim(null)
  }}
- onSave={handleSaveEvidence}
- />
- )}
-
- {/* Edit claim — same form used across the app, in edit mode */}
- {editingClaim && (
- <AddKPIUpdateModal
- isOpen
- onClose={() => setEditingClaim(null)}
- onSubmit={handleUpdateClaim}
- kpiTitle={editingClaim.kpi.title}
- kpiId={editingClaim.kpi.id!}
- metricType={(editingClaim.kpi.metric_type as 'number' | 'percentage') || 'number'}
- unitOfMeasurement={editingClaim.kpi.unit_of_measurement || ''}
- initiativeId={initiativeId}
- kpiTagIds={(editingClaim.kpi as any).tag_ids || []}
- editData={editingClaim.claim}
+ onCreated={refresh}
  />
  )}
 
@@ -541,6 +541,17 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  tone="danger"
  onConfirm={() => handleDeleteEvidence(deleteEvidence)}
  onCancel={() => setDeleteEvidence(null)}
+ />
+ )}
+
+ {deleteClaim && (
+ <ConfirmDialog
+ title="Delete Impact Claim"
+ message="Delete this impact claim? Connected evidence stays, but this claim and its connections will be removed. This action cannot be undone."
+ confirmLabel="Delete Claim"
+ tone="danger"
+ onConfirm={() => handleDeleteClaim(deleteClaim)}
+ onCancel={() => setDeleteClaim(null)}
  />
  )}
  </div>

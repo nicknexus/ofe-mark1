@@ -6,7 +6,7 @@ import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import { apiService } from '../services/api'
 import EvidenceTagsList from './MetricTags/EvidenceTagsList'
 import { Button } from './ui/button'
-import ModalFrame from './ModalFrame'
+import ModalFrame, { ModalHeader, ModalBody, ModalFooter } from './ModalFrame'
 import { SectionLoader, Spinner } from './ui'
 
 interface EvidenceFile {
@@ -265,32 +265,31 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
  : formatDate(displayEvidence.date_represented)
 
  return (
- <ModalFrame
- zIndexClass="z-[70]"
- paddingClassName="p-0 md:p-4"
- panelClassName="bg-white md:app-card w-full h-full md:max-w-5xl md:w-full md:max-h-[90vh] md:h-auto overflow-hidden md:rounded-xl flex flex-col"
- >
- {/* Header - Evidence grey */}
- <div className="flex items-center justify-between p-4 md:p-5 bg-gradient-to-r from-evidence-500 to-evidence-600 flex-shrink-0">
- <div className="flex items-center gap-3">
- <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-white/25 flex items-center justify-center border border-white/30">
- <FileText className="w-4 h-4 md:w-5 md:h-5 text-white" />
- </div>
- <div>
- <h2 className="text-base md:text-lg font-bold text-white">Evidence</h2>
- <p className="text-xs md:text-sm text-white/80">{typeInfo.label}</p>
- </div>
- </div>
- <button
- onClick={onClose}
- className="p-2 rounded-xl hover:bg-white/25 transition-colors"
- >
- <X className="w-5 h-5 text-white" />
+ <ModalFrame size="xl" zIndexClass="z-[70]" paddingClassName="p-0 md:p-4">
+ <ModalHeader
+ icon={IconComponent}
+ title={displayEvidence.title || 'Evidence'}
+ subtitle={typeInfo.label}
+ onClose={onClose}
+ actions={(onEdit || onDelete) ? (
+ <div className="flex items-center gap-1">
+ {onEdit && (
+ <button type="button" onClick={() => onEdit(displayEvidence)} className="app-btn app-btn-secondary app-btn-sm">
+ <Edit className="w-4 h-4" />
+ <span>Edit</span>
  </button>
+ )}
+ {onDelete && (
+ <button type="button" onClick={() => onDelete(displayEvidence)} className="app-btn app-btn-danger app-btn-sm">
+ <Trash2 className="w-4 h-4" />
+ <span>Delete</span>
+ </button>
+ )}
  </div>
-
- {/* Content */}
- <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-y-auto md:overflow-visible">
+ ) : undefined}
+ />
+ <ModalBody className="!p-0">
+ <div className="flex flex-col lg:flex-row flex-1 min-h-0">
  {/* Left Side - File Preview - hidden on mobile */}
  {evidenceFiles.length > 0 && (
  <div className="hidden md:block w-full lg:w-1/2 p-5 border-r border-gray-200 overflow-y-auto">
@@ -738,44 +737,32 @@ export default function EvidencePreviewModal({ isOpen, onClose, evidence: eviden
  </div>
  </div>
  </div>
-
- {/* Footer Actions - Mobile optimized */}
- <div className="flex flex-col-reverse md:flex-row items-stretch md:items-center justify-between p-4 border-t border-gray-100 bg-gray-50/50 gap-3 md:gap-0 flex-shrink-0">
- <div className="hidden md:block">
+ </ModalBody>
+ {(onEdit || onDelete) && (
+ <ModalFooter className="md:hidden">
  {onDelete && (
  <button
- onClick={() => {
- onDelete(displayEvidence)
- onClose()
- }}
- className="flex items-center gap-2 px-4 py-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-colors text-sm font-medium"
+ type="button"
+ onClick={() => { onDelete(displayEvidence); onClose() }}
+ className="app-btn app-btn-danger"
  >
  <Trash2 className="w-4 h-4" />
- <span>Delete Evidence</span>
+ <span>Delete</span>
  </button>
  )}
- </div>
- <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
  {onEdit && (
  <button
- onClick={() => {
- onEdit(displayEvidence)
- onClose()
- }}
- className="flex items-center justify-center gap-2 py-3 md:py-2.5 px-5 text-sm bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25 order-first md:order-last"
+ type="button"
+ onClick={() => { onEdit(displayEvidence); onClose() }}
+ className="app-btn app-btn-primary"
  >
  <Edit className="w-4 h-4" />
- <span>Edit Evidence</span>
+ <span>Edit</span>
  </button>
  )}
- <Button
- onClick={onClose}
- variant="secondary"
- >
- Close
- </Button>
- </div>
- </div>
+ <Button onClick={onClose} variant="secondary">Close</Button>
+ </ModalFooter>
+ )}
  </ModalFrame>
  )
 }

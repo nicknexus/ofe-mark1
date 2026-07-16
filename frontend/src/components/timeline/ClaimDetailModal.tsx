@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react'
-import { Camera, FileText, MessageSquare, DollarSign, Paperclip, Link2, Unlink, Pencil } from 'lucide-react'
+import { Camera, FileText, MessageSquare, DollarSign, Paperclip, Link2, Unlink, Pencil, Trash2 } from 'lucide-react'
 import { ImpactClaimGlyph } from './ImpactClaimGlyph'
 import ModalFrame, { ModalHeader, ModalBody, ModalFooter, ModalFieldGrid, ModalField } from '../ModalFrame'
 import { Badge } from '../ui'
+import { getStatusStyle } from './statusStyles'
 import {
  BeneficiaryGroup,
  KPI,
@@ -39,6 +40,8 @@ interface ClaimDetailModalProps {
  onAddEvidence?: () => void
  /** Attach an existing unconnected evidence record. */
  onConnectExisting?: () => void
+ /** Delete this impact claim. */
+ onDelete?: () => void
 }
 
 /**
@@ -58,8 +61,11 @@ export default function ClaimDetailModal({
  onEdit,
  onAddEvidence,
  onConnectExisting,
+ onDelete,
 }: ClaimDetailModalProps) {
  const [typeFilter, setTypeFilter] = useState<EvidenceTypeKey | null>(null)
+ const status = getStatusStyle(evidence.length > 0 ? 'connected' : 'not_connected')
+ const StatusIcon = status.icon
 
  const locationName = claim.location_id
  ? locations.find(l => l.id === claim.location_id)?.name || '—'
@@ -98,7 +104,8 @@ export default function ClaimDetailModal({
  <ModalField label="Where">{locationName}</ModalField>
  <ModalField label="Recorded by">{contributor?.name || contributor?.email || '—'}</ModalField>
  <ModalField label="Status">
- <Badge tone={evidence.length > 0 ? 'impact' : 'danger'}>
+ <Badge tone={status.tone}>
+ <StatusIcon className="w-3.5 h-3.5" />
  {evidence.length > 0 ? 'Connected' : 'Missing evidence'}
  </Badge>
  </ModalField>
@@ -187,7 +194,7 @@ export default function ClaimDetailModal({
  </div>
  </div>
  </ModalBody>
- {(onEdit || onAddEvidence || onConnectExisting) && (
+ {(onEdit || onAddEvidence || onConnectExisting || onDelete) && (
  <ModalFooter>
  {onEdit && (
  <button onClick={onEdit} className="app-btn app-btn-ghost app-btn-sm">
@@ -195,13 +202,19 @@ export default function ClaimDetailModal({
  Edit claim
  </button>
  )}
- {onConnectExisting && (
- <button onClick={onConnectExisting} className="app-btn app-btn-ghost app-btn-sm">
- <Link2 className="w-4 h-4" />
- Add existing evidence
+ {onDelete && (
+ <button onClick={onDelete} className="app-btn app-btn-ghost app-btn-sm text-red-600 hover:bg-red-50">
+ <Trash2 className="w-4 h-4" />
+ Delete
  </button>
  )}
  <div className="flex-1" />
+ {onConnectExisting && (
+ <button onClick={onConnectExisting} className="app-btn app-btn-secondary app-btn-sm">
+ <Link2 className="w-4 h-4" />
+ Connect existing evidence
+ </button>
+ )}
  {onAddEvidence && (
  <button onClick={onAddEvidence} className="app-btn app-btn-primary app-btn-sm">
  <Paperclip className="w-4 h-4" />

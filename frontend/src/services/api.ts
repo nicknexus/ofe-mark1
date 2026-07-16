@@ -714,6 +714,21 @@ class ApiService {
  }
  }
 
+ // Delete an uploaded-but-unused file from storage (e.g. the user picked a
+ // file in the upload wizard, then cancelled before saving the log). Best
+ // effort — never let cleanup failures surface to the caller.
+ async deleteUploadedFile(fileUrl: string, fileSize?: number): Promise<void> {
+ try {
+ await this.request<void>('/upload/file', {
+ method: 'DELETE',
+ body: JSON.stringify({ fileUrl, fileSize: fileSize ?? 0 }),
+ })
+ window.dispatchEvent(new Event('storage-updated'))
+ } catch (error) {
+ console.warn('Failed to delete orphaned upload:', error)
+ }
+ }
+
  async createEvidence(evidence: CreateEvidenceForm): Promise<Evidence> {
  return this.request<Evidence>('/evidence', {
  method: 'POST',

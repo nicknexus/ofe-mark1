@@ -5,13 +5,10 @@ import {
  MapPin,
  Edit,
  Trash2,
- GraduationCap,
- Zap,
- X,
- ArrowRight,
  Users,
  Check,
  AlertCircle,
+ ArrowRight,
  Globe,
  Compass,
  Sparkles,
@@ -19,7 +16,8 @@ import {
  Palette,
  Image as ImageIcon,
  FileText,
- GripVertical
+ GripVertical,
+ ChevronRight
 } from 'lucide-react'
 import {
  DndContext,
@@ -49,15 +47,17 @@ import { SubscriptionService } from '../services/subscription'
 import TagsWidget from '../components/MetricTags/TagsWidget'
 import { ExternalLink, Lock } from 'lucide-react'
 import { useTutorial } from '../context/TutorialContext'
-import { useOnboarding } from '../context/OnboardingContext'
 import { useTeam } from '../context/TeamContext'
 import { Button, PageLoader, InlineAlert, EmptyState } from '../components/ui'
 
-// ============ Sortable initiative app-card ============
+// ============ Sortable initiative card ============
 // Owner/team can drag-reorder initiatives on the dashboard. Order is persisted
-// to the backend (display_order) and reflected on the public org page.
+// to the backend (display_order) and reflected on the public org page. Styled
+// like the Metrics-tab cards: hairline border, crisp shadow, hover lift, and a
+// chevron as the "this opens" affordance.
 function SortableInitiativeCard({
  initiative,
+ stats,
  canEditInitiatives,
  canDeleteInitiatives,
  openEditModal,
@@ -66,6 +66,8 @@ function SortableInitiativeCard({
  onLockedClick,
 }: {
  initiative: Initiative
+ /** Per-initiative counts; null while background stats are still loading. */
+ stats: { metrics: number; locations: number } | null
  canEditInitiatives: boolean
  canDeleteInitiatives: boolean
  openEditModal: (i: Initiative) => void
@@ -89,93 +91,104 @@ function SortableInitiativeCard({
  zIndex: isDragging ? 10 : 'auto' as const,
  }
 
- return (
- <div
- ref={setNodeRef}
- style={style}
- className={`group bg-gradient-to-br from-white to-gray-50/40 border rounded-xl p-3.5 transition-all duration-200 relative ${locked ? 'border-gray-200 hover:border-amber-200' : 'hover:from-primary-50/40 hover:to-primary-50/10 border-gray-100 hover:border-primary-200/70'}`}
- >
- {(() => {
  const inner = (
- <div className="flex items-start justify-between">
- <div className="flex items-center space-x-3 flex-1 min-w-0">
- <div className={`w-10 h-10 rounded-xl bg-white ring-1 shadow-sm flex items-center justify-center flex-shrink-0 transition-colors ${locked ? 'ring-gray-200/70' : 'ring-gray-200/70 group-hover:ring-primary-200/70'}`}>
- {locked
- ? <Lock className="w-4 h-4 text-amber-500" />
- : <img src="/Nexuslogo.png" alt="Nexus Logo" className="w-5 h-5 object-contain" />}
- </div>
- <div className="flex-1 min-w-0">
- <h3 className={`text-sm font-semibold truncate transition-colors ${locked ? 'text-gray-500' : 'text-gray-800 group-hover:text-primary-600'}`}>
+ <div className="p-4 h-full flex flex-col">
+ <div className="flex items-start gap-2 pr-16">
+ <h3 className={`text-sm font-semibold leading-snug line-clamp-1 transition-colors ${locked ? 'text-gray-500' : 'text-gray-900'}`} title={initiative.title}>
  {initiative.title}
  </h3>
- <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
- {locked ? 'Locked — upgrade to unlock this initiative' : truncateText(initiative.description, 60)}
+ </div>
+ <p className="text-xs text-gray-500 mt-1 line-clamp-1 leading-relaxed">
+ {locked ? 'Locked — upgrade to unlock this initiative' : truncateText(initiative.description, 90)}
  </p>
- </div>
- </div>
- <span className={`text-sm font-medium flex-shrink-0 ml-2 transition-transform ${locked ? 'text-amber-500' : 'text-primary-500 group-hover:translate-x-0.5'}`}>
- {locked ? <Lock className="w-3.5 h-3.5" /> : '→'}
+ <div className="flex items-center gap-3.5 mt-auto pt-3">
+ {locked ? (
+ <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600">
+ <Lock className="w-3.5 h-3.5" />
+ Locked
  </span>
+ ) : stats ? (
+ <>
+ <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+ <BarChart3 className="w-3.5 h-3.5" />
+ {stats.metrics} metric{stats.metrics === 1 ? '' : 's'}
+ </span>
+ <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+ <MapPin className="w-3.5 h-3.5" />
+ {stats.locations} location{stats.locations === 1 ? '' : 's'}
+ </span>
+ </>
+ ) : (
+ <span className="h-4 w-28 rounded bg-gray-100 animate-pulse" />
+ )}
+ </div>
  </div>
  )
- return locked ? (
- <button type="button" onClick={onLockedClick} className="block w-full text-left">
+
+ return (
+ <div ref={setNodeRef} style={style} className="h-full">
+ <div
+ className={`group relative h-full bg-white rounded-2xl border shadow-card transition-all duration-200 ${locked
+ ? 'border-gray-200/70 hover:border-amber-300/70 hover:shadow-card-hover'
+ : 'border-gray-200/70 hover:border-primary-300/70 hover:shadow-card-hover hover:-translate-y-0.5'
+ }`}
+ >
+ {locked ? (
+ <button type="button" onClick={onLockedClick} className="block w-full h-full text-left">
  {inner}
  </button>
  ) : (
- <Link to={`/initiatives/${initiative.id}`} className="block">
+ <Link to={`/initiatives/${initiative.id}`} className="block h-full">
  {inner}
  </Link>
- )
- })()}
-
- {/* Edit/Delete buttons - top right, gated per granular permission. */}
- {(canEditInitiatives || canDeleteInitiatives) && (
- <div className="absolute top-2 right-8 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
- {canEditInitiatives && (
- <button
- onClick={(e) => {
- e.preventDefault()
- e.stopPropagation()
- openEditModal(initiative)
- }}
- className="p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
- title="Edit Initiative"
- >
- <Edit className="w-3 h-3 text-gray-500" />
- </button>
- )}
- {canDeleteInitiatives && (
- <button
- onClick={(e) => {
- e.preventDefault()
- e.stopPropagation()
- openDeleteConfirm(initiative)
- }}
- className="p-1.5 bg-white border border-red-200 rounded-lg shadow-sm hover:bg-red-50 hover:border-red-300 transition-all duration-200"
- title="Delete Initiative"
- >
- <Trash2 className="w-3 h-3 text-red-500" />
- </button>
- )}
- </div>
  )}
 
- {/* Drag handle - bottom right, desktop only (MouseSensor excludes touch).
- Hidden until hover so it doesn't fight the rest of the layout. */}
- {canEditInitiatives && (
+ {/* Top-right: hover actions (drag / edit / delete) + open indicator */}
+ <div className="absolute top-3 right-3 flex items-center gap-0.5">
+ {!locked && canEditInitiatives && (
  <button
  type="button"
  {...attributes}
  {...listeners}
  onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
- className="hidden md:flex absolute bottom-2 right-2 p-1 rounded-md text-gray-300 hover:text-gray-500 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+ className="hidden md:flex p-1 rounded-lg text-gray-300 hover:text-gray-500 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-all cursor-grab active:cursor-grabbing"
  title="Drag to reorder"
  aria-label="Drag to reorder initiative"
  >
  <GripVertical className="w-3.5 h-3.5" />
  </button>
  )}
+ {!locked && canEditInitiatives && (
+ <button
+ onClick={(e) => {
+ e.preventDefault()
+ e.stopPropagation()
+ openEditModal(initiative)
+ }}
+ className="p-1 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-all"
+ title="Edit Initiative"
+ >
+ <Edit className="w-3.5 h-3.5" />
+ </button>
+ )}
+ {!locked && canDeleteInitiatives && (
+ <button
+ onClick={(e) => {
+ e.preventDefault()
+ e.stopPropagation()
+ openDeleteConfirm(initiative)
+ }}
+ className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+ title="Delete Initiative"
+ >
+ <Trash2 className="w-3.5 h-3.5" />
+ </button>
+ )}
+ {locked
+ ? <Lock className="w-4 h-4 text-amber-500" />
+ : <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all" />}
+ </div>
+ </div>
  </div>
  )
 }
@@ -280,7 +293,7 @@ function ContextScoreCard({
  return (
  <Link
  to="/context"
- className="group app-card-interactive p-4 flex flex-col gap-2.5 hover:ring-primary-200/60 hover:-translate-y-0.5 transition-all duration-200 min-h-0"
+ className="group bg-white rounded-2xl border border-gray-200/70 shadow-card hover:shadow-card-hover hover:border-primary-300/70 hover:-translate-y-0.5 p-4 flex flex-col gap-2.5 transition-all duration-200 min-h-0"
  >
  <div className="flex items-center gap-2.5">
  <div className="w-8 h-8 rounded-xl bg-primary-50 ring-1 ring-primary-100/50 flex items-center justify-center">
@@ -324,14 +337,14 @@ function NextStepsCard({
 }) {
  const rowClass = "group w-full text-left flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-gradient-to-br from-white to-gray-50/40 hover:from-primary-50/40 hover:to-primary-50/10 border border-gray-100 hover:border-primary-200/70 transition-all"
  return (
- <div className="app-card-interactive p-4 flex flex-col min-h-0 flex-1">
+ <div className="bg-white rounded-2xl border border-gray-200/70 shadow-card p-4 flex flex-col min-h-0 flex-1">
  <div className="flex items-center gap-2.5 mb-3 flex-shrink-0">
  <div className="w-8 h-8 rounded-xl bg-primary-50 ring-1 ring-primary-100/50 flex items-center justify-center">
  <Sparkles className="w-4 h-4 text-primary-600" />
  </div>
  <h3 className="text-[13px] font-semibold text-gray-900 tracking-tight">Next Steps</h3>
  </div>
- <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
+ <div className="flex-1 min-h-[6rem] overflow-y-auto space-y-1.5">
  {loading ? (
  <>
  <div className="h-[38px] rounded-xl bg-gray-100/70 animate-pulse" />
@@ -374,7 +387,6 @@ function NextStepsCard({
 export default function Dashboard() {
  const navigate = useNavigate()
  const { startTutorial } = useTutorial()
- const { startOnboarding } = useOnboarding()
  const {
  isOwner,
  isSharedMember,
@@ -705,6 +717,21 @@ export default function Dashboard() {
  return set
  }, [initiatives, initiativesLimit])
 
+ // Per-initiative counts for the hero cards (metrics + locations).
+ const initiativeStats = useMemo(() => {
+ const map: Record<string, { metrics: number; locations: number }> = {}
+ for (const i of initiatives) {
+ if (i.id) map[i.id] = { metrics: 0, locations: 0 }
+ }
+ for (const k of allKPIs) {
+ if (k.initiative_id && map[k.initiative_id]) map[k.initiative_id].metrics++
+ }
+ for (const l of allLocations) {
+ if (l.initiative_id && map[l.initiative_id]) map[l.initiative_id].locations++
+ }
+ return map
+ }, [initiatives, allKPIs, allLocations])
+
  const publicChecks = useMemo(() => {
  const o = ownedOrganization
  const firstInit = initiatives[0]?.id
@@ -802,73 +829,53 @@ export default function Dashboard() {
 
  return (
  <>
- <div className="h-screen overflow-hidden pt-24 pb-6 px-4 sm:px-6 flex flex-col">
- {/* Mobile Header - only visible on mobile */}
- <div className="mobile-only mb-4 -mt-8">
- <h1 className="text-xl font-semibold text-gray-800">Your Initiatives</h1>
+ <div className="min-h-screen lg:h-screen lg:overflow-hidden pt-24 pb-6 px-4 sm:px-6 lg:px-8 xl:px-10 flex flex-col">
+ <div className="max-w-[1600px] mx-auto w-full flex-1 min-h-0 flex flex-col gap-4">
+ {/* Header — the page is about the initiatives */}
+ <div className="flex-shrink-0 min-w-0">
+ <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">
+ {isSharedMember ? 'Team Initiatives' : 'Your Initiatives'}
+ </h1>
+ <p className="text-sm text-gray-500 mt-1">
+ {organizationName ? `Everything ${organizationName} is tracking, in one place` : 'Everything you’re tracking, in one place'}
+ </p>
  </div>
 
- {/* Bento Layout - fills remaining height */}
- <div className="flex-1 min-h-0">
- <div className={`grid grid-cols-1 ${showOwnerWidgets ? 'lg:grid-cols-5' : 'lg:grid-cols-3'} gap-4 h-full`}>
- {/* Initiatives Module - narrower on desktop (2/5), full width on mobile */}
- <div className={`col-span-1 ${showOwnerWidgets ? 'lg:col-span-2' : 'lg:col-span-2'} app-card-interactive overflow-hidden flex flex-col min-h-0`}>
- {/* Team Member Banner */}
+ {/* Team member banner */}
  {isSharedMember && organizationName && (
-<div className="px-6 py-3 bg-purple-50 border-b border-purple-100 flex items-center gap-2">
-<Users className="w-4 h-4 text-purple-600" />
-<span className="text-sm text-purple-800">
+ <div className="rounded-xl bg-purple-50 border border-purple-100 px-4 py-3 flex items-center gap-2 flex-shrink-0">
+ <Users className="w-4 h-4 text-purple-600 flex-shrink-0" />
+ <span className="text-sm text-purple-800">
  You're viewing <strong>{organizationName}</strong>'s initiatives as a team member
  </span>
  </div>
  )}
 
- <div className="px-6 py-4 border-b border-gray-100/70 bg-gradient-to-b from-gray-50/50 to-transparent flex items-center justify-between flex-shrink-0">
- <div className="flex items-center gap-2.5">
- <div className="w-8 h-8 rounded-xl bg-primary-50 ring-1 ring-primary-100/50 flex items-center justify-center">
- <img src="/Nexuslogo.png" alt="" className="w-4 h-4 object-contain" />
- </div>
- <h2 className="text-[15px] font-semibold text-gray-900 tracking-tight">
- {isSharedMember ? 'Team Initiatives' : 'Your Initiatives'}
- </h2>
- </div>
- <div className="flex items-center gap-2">
- <div className="relative">
- <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide rounded-full bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] text-white leading-none whitespace-nowrap z-10 shadow-sm">
- Beta
- </span>
- <button
- onClick={startOnboarding}
- className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200 flex items-center gap-1.5"
- title="Guided setup"
- >
- <Sparkles className="w-4 h-4" />
- <span className="hidden sm:inline">Setup</span>
- </button>
- </div>
- <button
- onClick={startTutorial}
- className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all duration-200 flex items-center gap-1.5"
- title="Start Tutorial"
- >
- <GraduationCap className="w-4 h-4" />
- <span className="hidden sm:inline">Tutorial</span>
- </button>
+ {/* Two-pane workspace: initiatives on the left (scrollable list, so
+ every initiative stays reachable and reorderable), everything else
+ stacked on the right — locked to the viewport on desktop. */}
+ <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4">
+ {/* Initiatives — the heart of the page (narrower column) */}
+ <section className="lg:col-span-5 xl:col-span-4 flex flex-col min-h-0">
+ <div className="flex items-center gap-2 mb-2.5 flex-shrink-0">
+ <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">All initiatives</h2>
+ <span className="app-chip text-[11px] px-1.5 py-0 tabular-nums">{initiatives.length}</span>
  {canCreateInitiatives && (
  <button
+ type="button"
  onClick={() => setShowCreateModal(true)}
- className="app-btn app-btn-primary app-btn-sm"
+ className="ml-auto app-btn app-btn-primary app-btn-sm shadow-sm"
+ title="New initiative"
  >
- <Plus className="w-4 h-4" />
- {initiatives.length === 0 ? 'Get Started' : 'New Initiative'}
+ <Plus className="w-3.5 h-3.5" />
+ <span className="hidden sm:inline">New initiative</span>
+ <span className="sm:hidden">Add</span>
  </button>
  )}
  </div>
- </div>
-
- <div className="p-6 flex-1 overflow-y-auto min-h-0">
+ <div className="flex-1 min-h-0 lg:overflow-y-auto lg:pr-1.5 lg:pt-1.5">
  {initiatives.length === 0 ? (
- <div className="text-center py-8">
+ <div className="app-card p-10 text-center">
  <div className="app-icon-tile mx-auto mb-4">
  <img src="/Nexuslogo.png" alt="Nexus Logo" className="w-6 h-6 object-contain" />
  </div>
@@ -899,11 +906,12 @@ export default function Dashboard() {
  items={initiatives.map(i => i.id!).filter(Boolean)}
  strategy={verticalListSortingStrategy}
  >
- <div className="space-y-2.5">
+ <div className="space-y-3">
  {initiatives.map((initiative) => (
  <SortableInitiativeCard
  key={initiative.id}
  initiative={initiative}
+ stats={isLoadingStats ? null : (initiative.id ? initiativeStats[initiative.id] : null) || { metrics: 0, locations: 0 }}
  canEditInitiatives={canEditInitiatives}
  canDeleteInitiatives={canDelete}
  openEditModal={openEditModal}
@@ -917,68 +925,61 @@ export default function Dashboard() {
  </DndContext>
  )}
  </div>
- </div>
+ </section>
 
- {/* Locations Map Module - hidden on mobile */}
- <div className={`col-span-1 ${showOwnerWidgets ? 'lg:col-span-2' : 'lg:col-span-1'} app-card-interactive overflow-hidden hidden md:flex flex-col min-h-0`}>
- <div className="px-6 py-4 border-b border-gray-100/70 bg-gradient-to-b from-gray-50/50 to-transparent flex items-center justify-between flex-shrink-0">
- <div className="flex items-center gap-2.5">
- <div className="w-8 h-8 rounded-xl bg-primary-50 ring-1 ring-primary-100/50 flex items-center justify-center">
- <MapPin className="w-4 h-4 text-primary-600" />
+ {/* Everything else — progress widgets in a row, map filling the rest */}
+ <section className="lg:col-span-7 xl:col-span-8 flex flex-col min-h-0">
+ <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2.5 flex-shrink-0">Progress & places</h2>
+ <div className="flex-1 min-h-0 flex flex-col gap-4">
+ {showOwnerWidgets ? (
+ <div className="flex-shrink-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+ <ContextScoreCard score={contextScore} checks={contextChecks} />
+ <NextStepsCard steps={nextSteps} loading={isLoadingStats || !contextLoaded} />
+ <div className="min-h-0 h-full">
+ <TagsWidget />
  </div>
- <h2 className="text-[15px] font-semibold text-gray-900 tracking-tight">All Locations</h2>
- <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100/70 text-gray-600">
- {allLocations.length}
- </span>
  </div>
- <div className="flex items-center gap-1.5">
- <button
- onClick={() => setShowAllLocationsModal(true)}
- className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 hover:bg-primary-100 text-primary-700 rounded-lg text-xs font-medium transition-all"
- title="View all org locations"
- >
- <ExternalLink className="w-3 h-3" />
- <span>View All</span>
- </button>
- {canEditLocations && (
- <button
- onClick={() => setShowAllLocationsModal(true)}
- className="app-btn app-btn-primary app-btn-sm"
- title="Add location"
- >
- <Plus className="w-3 h-3" />
- <span>Add</span>
- </button>
+ ) : (
+ <div className="flex-shrink-0 max-w-md max-h-56 lg:overflow-y-auto">
+ <TagsWidget compact />
+ </div>
  )}
- </div>
- </div>
 
- <div className="flex-1 min-h-0 rounded-b-2xl overflow-hidden">
+ {/* Locations map — chrome-less rounded frame with overlay actions,
+ same treatment as the Metrics Overview map. `isolate` keeps the
+ map's z-indexes (Leaflet panes + pills) inside this frame so they
+ never bleed through modals or full-screen overlays. */}
+ <div className="hidden md:block relative isolate h-64 lg:h-auto lg:flex-1 lg:min-h-[180px] rounded-3xl overflow-hidden border border-gray-200/60 shadow-card">
  <LocationMap
  locations={allLocations}
  onLocationClick={handleLocationClick}
  hideEmptyBanner
  autoFit
  />
- </div>
- </div>
-
- {/* Right Rail - Owner widgets (Context Score / Next Steps) + Tags */}
- {showOwnerWidgets && (
- <div className="col-span-1 hidden lg:flex flex-col gap-4 min-h-0">
- <ContextScoreCard score={contextScore} checks={contextChecks} />
- <NextStepsCard steps={nextSteps} loading={isLoadingStats || !contextLoaded} />
- <TagsWidget />
- </div>
+ <div className="absolute top-3 right-3 z-[400] flex items-center gap-1.5">
+ <button
+ onClick={() => setShowAllLocationsModal(true)}
+ className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-white/90 backdrop-blur border border-gray-200 shadow-sm text-xs font-medium text-gray-700 hover:bg-white transition-colors"
+ title="View all org locations"
+ >
+ <ExternalLink className="w-3.5 h-3.5 text-primary-600" />
+ View all · {allLocations.length}
+ </button>
+ {canEditLocations && (
+ <button
+ onClick={() => setShowAllLocationsModal(true)}
+ className="inline-flex items-center gap-1 h-8 px-3 rounded-full bg-white/90 backdrop-blur border border-gray-200 shadow-sm text-xs font-medium text-gray-700 hover:bg-white transition-colors"
+ title="Add location"
+ >
+ <Plus className="w-3.5 h-3.5 text-primary-600" />
+ Add
+ </button>
  )}
  </div>
-
- {/* Tags row for team members (no right rail) - desktop + mobile */}
- {!showOwnerWidgets && (
- <div className="mt-4">
- <TagsWidget compact />
  </div>
- )}
+ </div>
+ </section>
+ </div>
  </div>
  </div>
 

@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Plus } from 'lucide-react'
 import { KPI, Location } from '../../types'
 import { apiService } from '../../services/api'
+import { useTeam } from '../../context/TeamContext'
 import { getKPIColor } from '../metricsDashboard/metricColorPalette'
 import { generateMetricsDashboardChartData } from '../metricsDashboard/generateMetricsDashboardChartData'
 import { type TimeFrameKey } from '../expandableKpiCard/generateKpiChartData'
-import { fadeUp } from '../timeline/motion'
+import { fadeUp, staggerContainer } from '../timeline/motion'
 import LocationMap from '../LocationMap'
 import TimelineTab from './TimelineTab'
 
@@ -46,9 +47,11 @@ export default function MetricDetailTab({
   onRefresh,
   onStoryClick,
 }: MetricDetailTabProps) {
+  const { canAddImpactClaims, canEditEvidence } = useTeam()
   const [isCumulative, setIsCumulative] = useState(true)
   const [timeFrame, setTimeFrame] = useState<TimeFrameKey>('all')
   const [locations, setLocations] = useState<Location[]>([])
+  const [addLogSignal, setAddLogSignal] = useState(0)
 
   const isPct = kpi.metric_type === 'percentage'
   const color = useMemo(() => {
@@ -84,9 +87,14 @@ export default function MetricDetailTab({
 
   return (
     <div className="h-screen overflow-y-auto bg-gray-50 mobile-content-padding">
-        <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-4">
+        <motion.div
+          className="px-4 sm:px-6 py-5 space-y-4"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+        >
           {/* Header */}
-          <div className="flex items-start justify-between gap-3">
+          <motion.div variants={fadeUp} className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <button onClick={onBack} className="app-btn app-btn-ghost app-btn-icon flex-shrink-0" aria-label="Back">
                 <ArrowLeft className="w-5 h-5" />
@@ -94,28 +102,39 @@ export default function MetricDetailTab({
               <div className="min-w-0">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                  <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 leading-tight tracking-tight truncate">{kpi.title}</h2>
+                  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight truncate">{kpi.title}</h2>
                 </div>
-                <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+                <p className="text-sm text-gray-500 mt-1">
                   <span className="capitalize">{kpi.category}</span>
                   {` · ${claimCount} claim${claimCount === 1 ? '' : 's'}`}
                   {typeof (kpi as any).evidence_percentage === 'number' ? ` · ${(kpi as any).evidence_percentage}% evidenced` : ''}
                 </p>
               </div>
             </div>
-            <div className="text-right flex-shrink-0">
-              <div className="text-2xl sm:text-3xl font-semibold text-gray-900 tabular-nums leading-none">
-                {isPct ? `${Math.round(kpiTotal)}%` : kpiTotal.toLocaleString()}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <div className="text-right">
+                <div className="text-2xl sm:text-3xl font-semibold text-gray-900 tabular-nums leading-none">
+                  {isPct ? `${Math.round(kpiTotal)}%` : kpiTotal.toLocaleString()}
+                </div>
+                {!isPct && kpi.unit_of_measurement && (
+                  <div className="text-xs text-gray-400 mt-1">{kpi.unit_of_measurement}</div>
+                )}
               </div>
-              {!isPct && kpi.unit_of_measurement && (
-                <div className="text-xs text-gray-400 mt-1">{kpi.unit_of_measurement}</div>
+              {(canAddImpactClaims || canEditEvidence) && (
+                <button
+                  onClick={() => setAddLogSignal(n => n + 1)}
+                  className="app-btn app-btn-primary shadow-sm"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span>Add Log</span>
+                </button>
               )}
             </div>
-          </div>
+          </motion.div>
 
           {/* Trend chart (3/4) + locations map (1/4) */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-            <motion.div variants={fadeUp} initial="hidden" animate="visible" className="lg:col-span-3 app-card p-4 sm:p-5">
+          <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+            <motion.div variants={fadeUp} className="lg:col-span-3 app-card p-4 sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <h3 className="text-sm font-semibold text-gray-800">{isPct ? 'Metric over time (avg)' : 'Metric over time'}</h3>
                 <div className="flex items-center gap-2">
@@ -148,7 +167,7 @@ export default function MetricDetailTab({
                   </div>
                 </div>
               </div>
-              <div className="h-40 sm:h-48">
+              <div className="h-52 sm:h-64 xl:h-72">
                 {chartData.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-sm text-gray-400">No data yet</div>
                 ) : (
@@ -172,34 +191,35 @@ export default function MetricDetailTab({
               </div>
             </motion.div>
 
-            {/* Locations map */}
-            <motion.div variants={fadeUp} initial="hidden" animate="visible" className="lg:col-span-1 app-card overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-3">
-                <h3 className="text-sm font-semibold text-gray-800">Locations</h3>
-              </div>
-              <div className="flex-1 min-h-[200px]">
-                <LocationMap
-                  locations={mapLocations}
-                  autoFit
-                  flatTopCorners
-                  hideEmptyBanner
-                  initiativeId={initiativeId}
-                  onStoryClick={onStoryClick}
-                />
-              </div>
+            {/* Locations map — chrome-less rounded map for a modern feel */}
+            <motion.div variants={fadeUp} className="lg:col-span-1 relative min-h-[240px] rounded-3xl overflow-hidden border border-gray-200/60 shadow-card">
+              <LocationMap
+                locations={mapLocations}
+                autoFit
+                hideEmptyBanner
+                initiativeId={initiativeId}
+                onStoryClick={onStoryClick}
+              />
             </motion.div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
-        {/* Logs — its own full-width section, locked to this metric */}
-        <div className="border-t border-gray-200 bg-white">
+        {/* Logs — full-width section, locked to this metric. Same page bg so the
+            filter/header strip doesn't read as a separate white band. */}
+        <motion.div
+          className="bg-gray-50"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}
+        >
           <TimelineTab
             initiativeId={initiativeId}
             lockedMetricId={kpi.id}
             embedded
             onRefresh={onRefresh}
+            openAddLogSignal={addLogSignal}
           />
-        </div>
+        </motion.div>
     </div>
   )
 }

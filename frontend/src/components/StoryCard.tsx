@@ -40,12 +40,12 @@ export default function StoryCard({ story, onView }: StoryCardProps) {
  <button
  type="button"
  onClick={() => onView(story)}
-    className="group relative w-full text-left app-card-interactive overflow-hidden flex flex-col"
+    className="group relative w-full text-left rounded-2xl border border-gray-200/70 bg-white shadow-card hover:shadow-card-hover overflow-hidden flex flex-col transition-all"
  >
  {/* Media */}
  <div className="relative w-full aspect-[16/10] bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden">
  {story.media_type === 'text' ? (
- <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-evidence-50 via-evidence-50 to-purple-50">
+ <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
           <div className="app-icon-tile w-14 h-14 rounded-xl flex items-center justify-center">
  <FileText className="w-7 h-7 text-primary-700" />
  </div>

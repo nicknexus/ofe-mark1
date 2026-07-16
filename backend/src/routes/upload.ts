@@ -1,5 +1,5 @@
 import { Router, Response } from 'express'
-import { upload, uploadToSupabase } from '../utils/fileUpload'
+import { upload, uploadToSupabase, deleteFromSupabase } from '../utils/fileUpload'
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth'
 import { StorageService } from '../services/storageService'
 import { SubscriptionService } from '../services/subscriptionService'
@@ -202,6 +202,50 @@ router.post('/file', authenticateUser, upload.single('file'), async (req: Authen
         console.error('File upload error:', error)
         const errorMessage = error instanceof Error ? error.message : 'File upload failed'
         res.status(500).json({ error: errorMessage })
+    }
+})
+
+// Delete an orphaned upload — a file that made it into storage but was never
+// attached to an evidence row (e.g. the upload wizard was cancelled). Scoped to
+// the caller's own files so nobody can delete another user's uploads.
+router.delete('/file', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        if (!req.user?.id) {
+            res.status(401).json({ error: 'User not authenticated' })
+            return
+        }
+
+        const { fileUrl, fileSize } = req.body
+        if (!fileUrl || typeof fileUrl !== 'string') {
+            res.status(400).json({ error: 'fileUrl is required' })
+            return
+        }
+
+        // Ownership guard: uploads live at evidence/{userId}/{filename}. Only let
+        // users clean up files under their own prefix.
+        const parts = fileUrl.split('/evidence-files/')
+        const filePath = parts[1]
+        if (!filePath || !filePath.startsWith(`evidence/${req.user.id}/`)) {
+            res.status(403).json({ error: 'Not allowed to delete this file' })
+            return
+        }
+
+        await deleteFromSupabase(fileUrl)
+
+        // Roll back the storage counter that /confirm (or /file) bumped on upload.
+        const bytes = typeof fileSize === 'number' ? fileSize : 0
+        if (bytes > 0) {
+            const organizationId = await StorageService.getOrganizationIdForUser(req.user.id)
+            if (organizationId) {
+                await StorageService.decrementStorage(organizationId, bytes)
+            }
+        }
+
+        console.log(`[Upload] 🗑️  Orphaned upload removed: ${filePath} (${bytes} bytes)`)
+        res.json({ success: true })
+    } catch (error) {
+        console.error('Delete orphaned upload error:', error)
+        res.status(500).json({ error: 'Failed to delete file' })
     }
 })
 

@@ -79,9 +79,9 @@ function SortableLocationCard({
  }}
  style={style}
  onClick={() => onListItemClick(location)}
- className={`p-3 rounded-xl border cursor-pointer transition-all duration-200 relative group ${selectedLocationId === location.id
- ? 'border-primary-300 bg-primary-50 '
- : 'border-gray-100 hover:border-gray-200 bg-white hover:shadow-card'
+ className={`p-3 rounded-2xl border cursor-pointer transition-all duration-200 relative group ${selectedLocationId === location.id
+ ? 'border-primary-300 bg-primary-50 shadow-card'
+ : 'border-gray-200/70 bg-white shadow-card hover:shadow-card-hover hover:border-gray-200'
  }`}
  >
  {/* Drag Handle - Top Right Corner */}
@@ -367,26 +367,20 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  }
 
  return (
- <div className="h-screen overflow-hidden mobile-content-padding">
- <div className="h-full flex flex-col">
+ <div className="h-screen overflow-hidden flex flex-col mobile-content-padding">
  {/* Header */}
- <div className="bg-white border-b border-gray-100 p-4 flex-shrink-0">
- <div className="flex items-center justify-between">
- <div className="flex items-center space-x-3">
- <div className="app-icon-tile hidden sm:flex">
- <MapPin className="w-5 h-5 text-primary-500" />
- </div>
- <div>
- <h1 className="text-lg sm:text-xl font-semibold text-gray-800">Locations</h1>
- <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">Manage geographic locations for your initiative</p>
- </div>
+ <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-gray-100 bg-white flex-shrink-0">
+ <div className="flex items-center justify-between gap-3">
+ <div className="min-w-0">
+ <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Locations</h2>
+ <p className="text-sm text-gray-500 mt-1 hidden sm:block">Manage geographic locations for your initiative</p>
  </div>
  {canEditLocations && (
  <button
  onClick={handleAddClick}
- className="app-btn app-btn-primary app-btn-sm"
+ className="app-btn app-btn-primary app-btn-lg shadow-sm flex-shrink-0"
  >
- <Plus className="w-4 h-4" />
+ <Plus className="w-5 h-5" />
  <span className="hidden sm:inline">Add Location</span>
  <span className="sm:hidden">Add</span>
  </button>
@@ -395,9 +389,10 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  </div>
 
  {/* Main Content */}
- <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 p-4 overflow-hidden min-h-0">
+ <div className="flex-1 bg-gray-50 px-4 sm:px-6 py-4 overflow-hidden min-h-0">
+ <div className="h-full grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0">
  {/* Map - 2/3 width - hidden on mobile */}
- <div className="lg:col-span-2 app-card p-3 overflow-hidden flex-col min-h-0 h-full hidden md:flex">
+ <div className="lg:col-span-2 rounded-2xl border border-gray-200/70 bg-white shadow-card p-3 overflow-hidden flex-col min-h-0 h-full hidden md:flex">
  <LocationMap
  locations={orderedLocations}
  onLocationClick={handleLocationClick}
@@ -416,11 +411,11 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  </div>
 
  {/* Location List - 1/3 width on desktop, full width on mobile */}
- <div className="col-span-1 lg:col-span-1 app-card p-4 overflow-hidden flex flex-col min-h-0 h-full">
+ <div className="col-span-1 lg:col-span-1 rounded-2xl border border-gray-200/70 bg-white shadow-card p-4 overflow-hidden flex flex-col min-h-0 h-full">
  <div className="mb-3 flex-shrink-0">
- <h2 className="text-base font-semibold text-gray-800 mb-0.5">
- All Locations ({orderedLocations.length})
- </h2>
+ <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-0.5">
+ All locations ({orderedLocations.length})
+ </h3>
  <p className="text-xs text-gray-400 hidden sm:block">Click a location to view details • Edit button opens editor</p>
  <p className="text-xs text-gray-400 sm:hidden">Tap a location for details</p>
  </div>

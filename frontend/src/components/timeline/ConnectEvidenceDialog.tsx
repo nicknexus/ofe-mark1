@@ -15,6 +15,7 @@ import {
 } from '../../types'
 import { formatDate, getEvidenceTypeInfo } from '../../utils'
 import { getEvidenceImageUrl } from '../../utils/timeline'
+import { EVIDENCE_TYPE_ORDER, EvidenceTypeKey, countEvidenceTypes } from './EvidenceTypeCounts'
 
 const TYPE_ICONS = {
  visual_proof: Camera,
@@ -37,6 +38,8 @@ interface ConnectEvidenceDialogProps {
  preselectedClaimId?: string
  onClose: () => void
  onConnected: () => void
+ /** Stacking override so it can sit above an already-open claim detail modal. */
+ zIndexClass?: string
 }
 
 /**
@@ -57,11 +60,13 @@ export default function ConnectEvidenceDialog({
  preselectedClaimId,
  onClose,
  onConnected,
+ zIndexClass,
 }: ConnectEvidenceDialogProps) {
  const claimFirst = !evidence
  const [selectedClaimId, setSelectedClaimId] = useState<string | null>(preselectedClaimId || null)
  const [selectedEvidenceId, setSelectedEvidenceId] = useState<string | null>(evidence?.id || null)
  const [search, setSearch] = useState('')
+ const [typeFilter, setTypeFilter] = useState<EvidenceTypeKey | null>(null)
  const [dryRun, setDryRun] = useState<ConnectEvidenceResult | null>(null)
  const [error, setError] = useState<string | null>(null)
  const [submitting, setSubmitting] = useState(false)
@@ -84,13 +89,16 @@ export default function ConnectEvidenceDialog({
  })
  }, [claims, search, kpiById])
 
+ const typeCounts = useMemo(() => countEvidenceTypes(evidenceOptions || []), [evidenceOptions])
+
  const candidateEvidence = useMemo(() => {
  const q = search.trim().toLowerCase()
  return (evidenceOptions || []).filter(ev => {
+ if (typeFilter && ev.type !== typeFilter) return false
  if (!q) return true
  return `${ev.title || ''} ${ev.description || ''}`.toLowerCase().includes(q)
  })
- }, [evidenceOptions, search])
+ }, [evidenceOptions, search, typeFilter])
 
  const describeChange = (change: ConnectPlanChange): { icon: typeof Link2; text: string } => {
  switch (change.kind) {
@@ -142,10 +150,10 @@ export default function ConnectEvidenceDialog({
  const canAttempt = !!selectedClaimId && !!selectedEvidence
 
  return (
- <ModalFrame size="sm">
+ <ModalFrame size="md" zIndexClass={zIndexClass}>
  <ModalHeader
  icon={Link2}
- title={claimFirst ? 'Add existing evidence' : 'Connect evidence to a claim'}
+ title={claimFirst ? 'Connect existing evidence' : 'Connect evidence to a claim'}
  subtitle={headerSubtitle}
  onClose={onClose}
  />
@@ -169,10 +177,49 @@ export default function ConnectEvidenceDialog({
  />
  </div>
 
- <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
+ {/* Filter by evidence type */}
+ {claimFirst && (evidenceOptions?.length ?? 0) > 0 && (
+ <div className="flex flex-wrap items-center gap-1.5">
+ <button
+ type="button"
+ onClick={() => setTypeFilter(null)}
+ className={`px-2.5 py-1 rounded-full border text-xs font-medium transition-colors ${typeFilter === null
+ ? 'border-primary-500 bg-primary-50 text-primary-800'
+ : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+ }`}
+ >
+ All
+ </button>
+ {EVIDENCE_TYPE_ORDER.map(type => {
+ const count = typeCounts[type]
+ if (count === 0) return null
+ const Icon = TYPE_ICONS[type] || FileText
+ const active = typeFilter === type
+ return (
+ <button
+ key={type}
+ type="button"
+ onClick={() => setTypeFilter(active ? null : type)}
+ className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors ${active
+ ? 'border-primary-500 bg-primary-50 text-primary-800'
+ : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+ }`}
+ title={getEvidenceTypeInfo(type).label}
+ >
+ <Icon className="w-3.5 h-3.5" />
+ {count}
+ </button>
+ )
+ })}
+ </div>
+ )}
+
+ <div className={claimFirst
+ ? 'max-h-[55vh] overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-1.5 pr-1'
+ : 'max-h-[55vh] overflow-y-auto space-y-1.5 pr-1'}>
  {claimFirst ? (
  candidateEvidence.length === 0 ? (
- <p className="text-xs text-gray-500 px-1 py-4 text-center">
+ <p className="text-xs text-gray-500 px-1 py-4 text-center sm:col-span-2">
  {evidenceOptions && evidenceOptions.length > 0
  ? 'No evidence matches your search'
  : 'No unconnected evidence available — everything is already connected'}
@@ -188,7 +235,7 @@ export default function ConnectEvidenceDialog({
  <button
  key={ev.id}
  onClick={() => setSelectedEvidenceId(ev.id!)}
- className={`w-full flex items-center gap-3 text-left p-2.5 rounded-xl border transition-colors ${isSelected
+ className={`w-full flex items-center gap-2.5 text-left p-2 rounded-lg border transition-colors ${isSelected
  ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500'
  : 'border-gray-100 bg-white hover:bg-gray-50'
  }`}
@@ -198,30 +245,28 @@ export default function ConnectEvidenceDialog({
  <img
  src={thumbnailUrl}
  alt=""
- className="w-14 h-14 rounded-lg object-cover bg-gray-100 flex-shrink-0"
+ className="w-9 h-9 rounded-md object-cover bg-gray-100 flex-shrink-0"
  loading="lazy"
  />
  ) : (
- <div className={`w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBg}`}>
- <TypeIcon className="w-5 h-5" />
+ <div className={`w-9 h-9 rounded-md flex items-center justify-center flex-shrink-0 ${iconBg}`}>
+ <TypeIcon className="w-4 h-4" />
  </div>
  )}
  <div className="min-w-0 flex-1">
  <p className="text-sm font-medium text-gray-800 truncate">{ev.title || 'Untitled Evidence'}</p>
- <p className="text-xs text-gray-500 truncate mt-0.5">
- {typeInfo.label} · {formatDate(ev.date_represented)}
- </p>
- {ev.description ? (
- <p className="text-xs text-gray-400 truncate mt-0.5">{ev.description}</p>
- ) : fileCount > 0 ? (
- <p className="inline-flex items-center gap-1 text-xs text-gray-400 mt-0.5">
+ <p className="text-[11px] text-gray-500 truncate mt-0.5 inline-flex items-center gap-1">
+ <span className="truncate">{typeInfo.label} · {formatDate(ev.date_represented)}</span>
+ {fileCount > 0 && (
+ <span className="inline-flex items-center gap-0.5 flex-shrink-0">
  <Paperclip className="w-3 h-3" />
- {fileCount} file{fileCount === 1 ? '' : 's'}
+ {fileCount}
+ </span>
+ )}
  </p>
- ) : null}
  </div>
- <span className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-primary-500 border-primary-500' : 'border-gray-300 bg-white'}`}>
- {isSelected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+ <span className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-primary-500 border-primary-500' : 'border-gray-300 bg-white'}`}>
+ {isSelected && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
  </span>
  </button>
  )

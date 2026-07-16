@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { X, MapPin, Save, Search, Loader2, ChevronDown } from 'lucide-react'
 import { Location } from '../types'
 import { debounce } from '../utils'
-import ModalFrame from './ModalFrame'
+import ModalFrame, { ModalHeader, ModalBody, ModalFooter } from './ModalFrame'
 import { Spinner } from './ui'
 
 interface NominatimResult {
@@ -231,47 +231,24 @@ export default function LocationModal({
  const hasCoords = formData.latitude && formData.longitude
 
  return (
- <ModalFrame
- zIndexClass="z-[200]"
- panelClassName="bg-white rounded-xl max-w-xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-app-modal border border-gray-200"
- >
- {/* Header */}
- <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
- <div className="flex items-center gap-2.5">
- <div className="w-8 h-8 rounded-full bg-primary-50 flex items-center justify-center">
- <MapPin className="w-4 h-4 text-primary-500" />
- </div>
- <div>
- <h2 className="text-base font-semibold text-gray-900">
- {initialLocation ? 'Edit Location' : 'New Location'}
- </h2>
- <p className="text-xs text-gray-500">
- {initialLocation ? 'Update details' : 'Search a place or click on the map'}
- </p>
- </div>
- </div>
- <button
- onClick={onClose}
- className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
- >
- <X className="w-5 h-5" />
- </button>
- </div>
-
- {/* Form */}
- <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto min-h-0">
- <div className="px-5 py-4 space-y-4">
+ <ModalFrame size="md" zIndexClass="z-[200]">
+ <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1 overflow-hidden">
+ <ModalHeader
+ icon={MapPin}
+ title={initialLocation ? 'Edit Location' : 'New Location'}
+ subtitle={initialLocation ? 'Update details' : 'Search a place or click on the map'}
+ onClose={onClose}
+ />
+ <ModalBody rail>
  {error && (
- <div className="bg-red-50 border border-red-100 rounded-xl p-3">
+ <div className="bg-red-50 border border-red-100 rounded-xl p-3 mb-4">
  <p className="text-sm text-red-700">{error}</p>
  </div>
  )}
 
  {/* Address Search */}
  <div className="relative" ref={searchRef}>
- <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
- Search a place
- </label>
+ <label className="app-label">Search a place</label>
  <div className="relative">
  <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
  <input
@@ -279,7 +256,7 @@ export default function LocationModal({
  value={searchQuery}
  onChange={(e) => handleSearchChange(e.target.value)}
  onFocus={() => setShowResults(true)}
- className="w-full pl-10 pr-9 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder:text-gray-400"
+ className="app-input pl-10"
  placeholder="e.g. Central Park, New York"
  />
  {isSearching && (
@@ -311,14 +288,14 @@ export default function LocationModal({
 
  {/* Name */}
  <div>
- <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
- Name <span className="text-red-500 normal-case">*</span>
+ <label className="app-label">
+ Name <span className="text-red-500">*</span>
  </label>
  <input
  type="text"
  value={formData.name}
  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
- className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder:text-gray-400"
+ className="app-input"
  placeholder="e.g. Main Office"
  required
  />
@@ -326,13 +303,11 @@ export default function LocationModal({
 
  {/* Description */}
  <div>
- <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
- Description
- </label>
+ <label className="app-label">Description</label>
  <textarea
  value={formData.description}
  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
- className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none placeholder:text-gray-400"
+ className="app-input resize-none"
  rows={2}
  placeholder="Optional"
  />
@@ -390,23 +365,12 @@ export default function LocationModal({
  </div>
  )}
  </div>
- </div>
-
- {/* Actions */}
- <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end gap-2 flex-shrink-0 bg-gray-50/40">
- <button
- type="button"
- onClick={onClose}
- disabled={loading}
- className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50"
- >
+ </ModalBody>
+ <ModalFooter>
+ <button type="button" onClick={onClose} disabled={loading} className="app-btn app-btn-secondary">
  Cancel
  </button>
- <button
- type="submit"
- disabled={loading}
- className="inline-flex items-center gap-2 app-btn app-btn-primary app-btn-sm"
- >
+ <button type="submit" disabled={loading} className="app-btn app-btn-primary">
  {loading ? (
  <Spinner className="w-4 h-4" />
  ) : (
@@ -414,7 +378,7 @@ export default function LocationModal({
  )}
  <span>{loading ? 'Saving...' : initialLocation ? 'Update' : 'Create'}</span>
  </button>
- </div>
+ </ModalFooter>
  </form>
  </ModalFrame>
  )

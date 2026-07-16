@@ -8,6 +8,12 @@ import { TimelineClaim, TimelineEvidence } from '../types'
 
 export type TimelineView = 'claims' | 'evidence' | 'connections'
 export type ConnectionStatus = 'connected' | 'not_connected'
+/**
+ * Which date the results are ordered by / the date-range filter applies to.
+ * `activity` = when the impact happened (date_represented / range);
+ * `upload` = when the record was created (created_at).
+ */
+export type OrderMode = 'activity' | 'upload'
 
 export interface TimelineFilters {
  q: string
@@ -18,12 +24,13 @@ export interface TimelineFilters {
  contributors: string[]
  evidenceTypes: string[]
  status: ConnectionStatus | null
- /** Activity date (date_represented) range, YYYY-MM-DD. */
- activityFrom: string | null
- activityTo: string | null
- /** Upload date (created_at) range, YYYY-MM-DD. */
- uploadFrom: string | null
- uploadTo: string | null
+ /** Single "period of inspection" range, YYYY-MM-DD. Applies to the field
+  * chosen by `orderMode` (activity vs upload). */
+ dateFrom: string | null
+ dateTo: string | null
+ /** Ordering / date-range basis. Persistent so the user always knows how the
+  * list is arranged. */
+ orderMode: OrderMode
 }
 
 export const EMPTY_TIMELINE_FILTERS: TimelineFilters = {
@@ -35,10 +42,9 @@ export const EMPTY_TIMELINE_FILTERS: TimelineFilters = {
  contributors: [],
  evidenceTypes: [],
  status: null,
- activityFrom: null,
- activityTo: null,
- uploadFrom: null,
- uploadTo: null,
+ dateFrom: null,
+ dateTo: null,
+ orderMode: 'upload',
 }
 
 const CSV_KEYS = {
@@ -57,6 +63,7 @@ export function filtersFromParams(params: URLSearchParams): TimelineFilters {
  return raw ? raw.split(',').filter(Boolean) : []
  }
  const status = params.get('status')
+ const order = params.get('order')
  return {
  q: params.get('q') || '',
  metrics: csv(CSV_KEYS.metrics),
@@ -66,10 +73,9 @@ export function filtersFromParams(params: URLSearchParams): TimelineFilters {
  contributors: csv(CSV_KEYS.contributors),
  evidenceTypes: csv(CSV_KEYS.evidenceTypes),
  status: status === 'connected' || status === 'not_connected' ? status : null,
- activityFrom: params.get('from'),
- activityTo: params.get('to'),
- uploadFrom: params.get('ufrom'),
- uploadTo: params.get('uto'),
+ dateFrom: params.get('from'),
+ dateTo: params.get('to'),
+ orderMode: order === 'activity' ? 'activity' : 'upload',
  }
 }
 
@@ -87,10 +93,9 @@ export function applyFiltersToParams(params: URLSearchParams, filters: TimelineF
  setOrDelete(CSV_KEYS.contributors, filters.contributors.join(',') || null)
  setOrDelete(CSV_KEYS.evidenceTypes, filters.evidenceTypes.join(',') || null)
  setOrDelete('status', filters.status)
- setOrDelete('from', filters.activityFrom)
- setOrDelete('to', filters.activityTo)
- setOrDelete('ufrom', filters.uploadFrom)
- setOrDelete('uto', filters.uploadTo)
+ setOrDelete('from', filters.dateFrom)
+ setOrDelete('to', filters.dateTo)
+ setOrDelete('order', filters.orderMode === 'activity' ? 'activity' : null)
 }
 
 export function hasActiveFilters(filters: TimelineFilters): boolean {
@@ -103,10 +108,8 @@ export function hasActiveFilters(filters: TimelineFilters): boolean {
  filters.contributors.length ||
  filters.evidenceTypes.length ||
  filters.status ||
- filters.activityFrom ||
- filters.activityTo ||
- filters.uploadFrom ||
- filters.uploadTo
+ filters.dateFrom ||
+ filters.dateTo
  )
 }
 
@@ -143,6 +146,16 @@ function uploadDateInRange(createdAt: string | undefined, from: string | null, t
  return true
 }
 
+/** Range check on whichever date the current order mode inspects. */
+function dateInRange(
+ record: { date_represented: string; date_range_start?: string; date_range_end?: string; created_at?: string },
+ filters: TimelineFilters
+): boolean {
+ return filters.orderMode === 'activity'
+ ? activityDateInRange(record, filters.dateFrom, filters.dateTo)
+ : uploadDateInRange(record.created_at, filters.dateFrom, filters.dateTo)
+}
+
 export function filterClaims(claims: TimelineClaim[], filters: TimelineFilters): TimelineClaim[] {
  const q = filters.q.trim().toLowerCase()
  return claims.filter(claim => {
@@ -153,8 +166,7 @@ export function filterClaims(claims: TimelineClaim[], filters: TimelineFilters):
  if (filters.tags.length && !(claim.tag_id && filters.tags.includes(claim.tag_id))) return false
  if (filters.contributors.length && !(claim.user_id && filters.contributors.includes(claim.user_id))) return false
  if (filters.status && deriveClaimStatus(claim) !== filters.status) return false
- if (!activityDateInRange(claim, filters.activityFrom, filters.activityTo)) return false
- if (!uploadDateInRange(claim.created_at, filters.uploadFrom, filters.uploadTo)) return false
+ if (!dateInRange(claim, filters)) return false
  return true
  })
 }
@@ -173,8 +185,7 @@ export function filterEvidence(evidence: TimelineEvidence[], filters: TimelineFi
  if (filters.contributors.length && !(ev.user_id && filters.contributors.includes(ev.user_id))) return false
  if (filters.evidenceTypes.length && !filters.evidenceTypes.includes(ev.type)) return false
  if (filters.status && deriveEvidenceStatus(ev) !== filters.status) return false
- if (!activityDateInRange(ev, filters.activityFrom, filters.activityTo)) return false
- if (!uploadDateInRange(ev.created_at, filters.uploadFrom, filters.uploadTo)) return false
+ if (!dateInRange(ev, filters)) return false
  return true
  })
 }
@@ -184,6 +195,22 @@ export function sortByUploadDate<T extends { created_at?: string }>(rows: T[]): 
  return rows
  .slice()
  .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+}
+
+/** Effective activity date for ordering (range end, else the single date). */
+function activityDateOf(r: { date_represented?: string; date_range_end?: string; date_range_start?: string }): string {
+ return r.date_range_end || r.date_represented || r.date_range_start || ''
+}
+
+/** Sort rows newest-first by whichever date the order mode selects. */
+export function sortByMode<T extends { created_at?: string; date_represented?: string; date_range_start?: string; date_range_end?: string }>(
+ rows: T[],
+ orderMode: OrderMode
+): T[] {
+ if (orderMode === 'activity') {
+ return rows.slice().sort((a, b) => activityDateOf(b).localeCompare(activityDateOf(a)))
+ }
+ return sortByUploadDate(rows)
 }
 
 /**

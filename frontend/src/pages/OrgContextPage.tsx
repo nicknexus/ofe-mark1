@@ -378,33 +378,30 @@ export default function OrgContextPage() {
  <div className="min-h-screen pt-28 pb-16 px-4 sm:px-6">
  <div className="max-w-4xl mx-auto">
 
- <div className="mb-8">
+ <div className="mb-6">
  <Link
  to="/"
- className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors mb-4"
+ className="inline-flex items-center gap-1.5 px-2 py-1.5 -ml-2 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors mb-3"
  >
- <ArrowLeft className="w-4 h-4" />
- Back to dashboard
+ <ArrowLeft className="w-3.5 h-3.5" />
+ Dashboard
  </Link>
- <div className="flex items-center gap-3 mb-3">
- <div className="app-icon-tile app-icon-tile-accent w-11 h-11">
- <Compass className="w-5 h-5" />
- </div>
- <div>
- <h1 className="app-page-title">Context &amp; Challenges</h1>
- <p className="app-page-subtitle">Tell visitors the story behind your work.</p>
- </div>
+ <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+ <div className="min-w-0">
+ <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Context &amp; Challenges</h1>
+ <p className="text-sm text-gray-500 mt-1">Tell visitors the story behind your work</p>
  </div>
  {activeOrganization?.slug && (
  <Link
  to={`/org/${activeOrganization.slug}/context`}
  target="_blank"
- className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-primary-600 transition-colors"
+ className="app-btn app-btn-secondary app-btn-sm flex-shrink-0"
  >
- <ExternalLink className="w-3 h-3" />
+ <ExternalLink className="w-4 h-4" />
  Preview public page
  </Link>
  )}
+ </div>
  </div>
 
  {!canEditContext && !teamLoading && (
@@ -420,7 +417,7 @@ export default function OrgContextPage() {
  {showLoader ? (
  <div className="space-y-4">
  {[0, 1, 2, 3].map(i => (
- <div key={i} className="app-card p-6 animate-pulse">
+ <div key={i} className="bg-white rounded-2xl border border-gray-200/70 shadow-card p-6 animate-pulse">
  <div className="h-5 w-48 bg-gray-100 rounded mb-4" />
  <div className="h-32 bg-gray-50 rounded-xl" />
  </div>
@@ -484,7 +481,7 @@ export default function OrgContextPage() {
  </div>
 
  {canEditContext && (
- <div className="mt-6 flex items-center justify-between px-6 py-4 app-card sticky bottom-4 z-10">
+ <div className="mt-6 flex items-center justify-between px-6 py-4 bg-white/95 backdrop-blur rounded-2xl border border-gray-200/70 shadow-card-lg sticky bottom-4 z-10">
  <p className="text-xs text-gray-500">
  {hasChanges ? 'You have unsaved changes' : 'All changes saved'}
  </p>
@@ -518,19 +515,21 @@ function StatusBadge({ complete }: { complete: boolean }) {
  if (complete) {
  return (
  <span
- className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-impact-100 text-impact-600 flex-shrink-0"
+ className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-100 text-primary-900 ring-1 ring-primary-300/60 text-[11px] font-semibold flex-shrink-0"
  title="Section has content"
  >
- <Check className="w-3.5 h-3.5" strokeWidth={3} />
+ <Check className="w-3 h-3" strokeWidth={3} />
+ Complete
  </span>
  )
  }
  return (
  <span
- className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-600 flex-shrink-0 text-sm font-bold"
+ className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 ring-1 ring-gray-200/70 text-[11px] font-medium flex-shrink-0"
  title="Section is empty"
  >
- !
+ <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+ To do
  </span>
  )
 }
@@ -554,11 +553,11 @@ function SectionShell({
 }) {
  const [open, setOpen] = useState(defaultOpen)
  return (
- <div className="app-card overflow-hidden">
+ <div className={`bg-white rounded-2xl border shadow-card overflow-hidden transition-all hover:shadow-card-hover ${complete ? 'border-primary-300/60' : 'border-gray-200/70'}`}>
  <button
  type="button"
  onClick={() => setOpen(v => !v)}
- className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-gray-50/60 transition-colors"
+ className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-gray-50/60 transition-colors"
  aria-expanded={open}
  >
  <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${accent}`}>

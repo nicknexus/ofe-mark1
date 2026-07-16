@@ -42,7 +42,7 @@ export default function AddEvidenceToClaimDialog({
  onClose,
  onCreated,
 }: AddEvidenceToClaimDialogProps) {
- const { files, addFiles, removeFile, releasePreviews } = useFileUploads()
+ const { files, addFiles, removeFile, releasePreviews, markSaved } = useFileUploads()
  const [title, setTitle] = useState('')
  const [type, setType] = useState<Evidence['type']>('visual_proof')
  const [submitting, setSubmitting] = useState(false)
@@ -115,6 +115,7 @@ export default function AddEvidenceToClaimDialog({
  file_sizes: fileSizes,
  }
  await apiService.createEvidence(payload)
+ markSaved()
  notify.success('Evidence uploaded and connected to the claim')
  releasePreviews()
  onCreated()

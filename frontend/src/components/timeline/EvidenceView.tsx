@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react'
-import { FileText, Camera, MessageSquare, DollarSign, LayoutGrid, List, Link2, Unlink } from 'lucide-react'
+import React, { useMemo } from 'react'
+import { FileText, Camera, MessageSquare, DollarSign } from 'lucide-react'
 import { EmptyState } from '../ui'
+import { getStatusStyle } from './statusStyles'
 import { KPI, Location, TimelineContributor, TimelineEvidence } from '../../types'
 import { formatDate, getEvidenceTypeInfo } from '../../utils'
 import {
@@ -9,10 +10,11 @@ import {
   filterEvidence,
   getEvidenceImageUrl,
   hasActiveFilters,
-  sortByUploadDate,
+  sortByMode,
 } from '../../utils/timeline'
 import TimelineRow, { TimelineRowHeader } from './TimelineRow'
 import MetricChip from './MetricChip'
+import type { EvidenceViewMode } from './EvidenceViewModeToggle'
 
 const TYPE_ICONS = {
   visual_proof: Camera,
@@ -27,49 +29,25 @@ interface EvidenceViewProps {
   locations: Location[]
   contributors: Record<string, TimelineContributor>
   filters: TimelineFilters
+  mode: EvidenceViewMode
   onOpenEvidence: (evidence: TimelineEvidence) => void
 }
 
 /** All evidence in the initiative, newest upload first. */
-export default function EvidenceView({ evidence, kpis, locations, contributors, filters, onOpenEvidence }: EvidenceViewProps) {
+export default function EvidenceView({ evidence, kpis, locations, contributors, filters, mode, onOpenEvidence }: EvidenceViewProps) {
   const locationById = useMemo(() => new Map(locations.map(l => [l.id, l.name])), [locations])
   const kpiById = useMemo(() => new Map(kpis.map(k => [k.id, k])), [kpis])
-  const [mode, setMode] = useState<'list' | 'gallery'>('list')
 
   const rows = useMemo(
-    () => sortByUploadDate(filterEvidence(evidence, filters)),
+    () => sortByMode(filterEvidence(evidence, filters), filters.orderMode),
     [evidence, filters]
-  )
-
-  const modeToggle = (
-    <div className="flex items-center justify-end mb-3">
-      <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-gray-100 border border-gray-200">
-        {([
-          { id: 'list', label: 'List', icon: List },
-          { id: 'gallery', label: 'Gallery', icon: LayoutGrid },
-        ] as const).map(m => {
-          const active = mode === m.id
-          return (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => setMode(m.id)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${active ? 'bg-white text-gray-900 shadow-card' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              <m.icon className="w-3.5 h-3.5" />
-              {m.label}
-            </button>
-          )
-        })}
-      </div>
-    </div>
   )
 
   if (rows.length === 0) {
     return (
-      <>
-        {modeToggle}
-        <div className="app-card md:p-8">
+      <div className="app-card overflow-hidden">
+        <TimelineRowHeader kindLabel="Evidence" />
+        <div className="md:p-8">
           <EmptyState
             icon={FileText}
             title="No evidence found"
@@ -80,26 +58,27 @@ export default function EvidenceView({ evidence, kpis, locations, contributors, 
             }
           />
         </div>
-      </>
+      </div>
     )
   }
 
   if (mode === 'gallery') {
     return (
-      <>
-        {modeToggle}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div className="app-card overflow-hidden">
+        <TimelineRowHeader kindLabel="Evidence" />
+        <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {rows.map(ev => {
             const typeInfo = getEvidenceTypeInfo(ev.type)
             const bgColor = typeInfo.color.split(' ')[0]
             const Icon = TYPE_ICONS[ev.type] || FileText
             const thumbnailUrl = getEvidenceImageUrl(ev)
-            const connected = deriveEvidenceStatus(ev) === 'connected'
+            const style = getStatusStyle(deriveEvidenceStatus(ev))
+            const StatusIcon = style.icon
             return (
               <button
                 key={ev.id}
                 onClick={() => onOpenEvidence(ev)}
-                className="app-card-interactive overflow-hidden text-left flex flex-col"
+                className={`app-card-interactive overflow-hidden text-left flex flex-col border ${style.card}`}
               >
                 <div className="relative aspect-[4/3] bg-gray-100 flex items-center justify-center">
                   {thumbnailUrl ? (
@@ -110,10 +89,12 @@ export default function EvidenceView({ evidence, kpis, locations, contributors, 
                     </div>
                   )}
                   <span
-                    className={`absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${connected ? 'bg-impact-50 text-impact-600' : 'bg-red-50 text-red-600'}`}
+                    className={`absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                      style.badge ?? `bg-white/90 ${style.accent}`
+                    }`}
                   >
-                    {connected ? <Link2 className="w-3 h-3" /> : <Unlink className="w-3 h-3" />}
-                    {connected ? 'Connected' : 'Unconnected'}
+                    <StatusIcon className={`w-3 h-3 ${style.badge ? style.accent : ''}`} />
+                    {style.label}
                   </span>
                 </div>
                 <div className="p-2.5 min-w-0">
@@ -124,13 +105,11 @@ export default function EvidenceView({ evidence, kpis, locations, contributors, 
             )
           })}
         </div>
-      </>
+      </div>
     )
   }
 
   return (
-    <>
-    {modeToggle}
     <div className="app-card overflow-hidden">
       <TimelineRowHeader kindLabel="Evidence" />
       <div className="divide-y divide-gray-100">
@@ -200,6 +179,5 @@ export default function EvidenceView({ evidence, kpis, locations, contributors, 
         })}
       </div>
     </div>
-    </>
   )
 }

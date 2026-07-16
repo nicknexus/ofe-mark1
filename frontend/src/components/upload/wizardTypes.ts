@@ -16,15 +16,27 @@ export interface WizardFile {
  error?: string
  /** Local object URL for image thumbnails while uploading. */
  previewUrl?: string
+ /** Edit mode: a file already attached to the record — shown but not removable. */
+ existing?: boolean
+}
+
+/** One optional claim per metric in the "both" flow's stacked claims step. */
+export interface ClaimEntry {
+ value: string
+ label: string
 }
 
 export interface WizardState {
  kind: WizardKind | null
+ /** Edit mode: the wizard is updating an existing record, not creating one. */
+ editing?: boolean
 
- // Claim
+ // Claim (single — the claim-only flow)
  claimKpiId: string | null
  claimValue: string
  claimLabel: string
+ /** "Both" flow: optional claim per metric, keyed by kpi id. */
+ claimEntries: Record<string, ClaimEntry>
 
  // Evidence
  evidenceTitle: string
@@ -49,6 +61,7 @@ export const INITIAL_WIZARD_STATE: WizardState = {
  claimKpiId: null,
  claimValue: '',
  claimLabel: '',
+ claimEntries: {},
  evidenceTitle: '',
  evidenceType: 'visual_proof',
  evidenceDescription: '',
@@ -81,23 +94,40 @@ export function validateMetricStep(state: WizardState): string | null {
  return state.evidenceKpiIds.length > 0 ? null : 'Choose at least one metric this evidence supports'
 }
 
+/** The metrics that actually got a claim in the "both" flow's stacked step. */
+export function filledClaimEntries(state: WizardState): Array<[string, ClaimEntry]> {
+ return Object.entries(state.claimEntries).filter(([, entry]) => entry.value.trim() !== '')
+}
+
 export function validateClaimStep(state: WizardState): string | null {
+ if (state.kind === 'both') {
+ const filled = filledClaimEntries(state)
+ if (filled.length === 0) return 'Enter a result for at least one metric'
+ if (filled.some(([, entry]) => Number.isNaN(Number(entry.value)))) return 'Claim values must be numbers'
+ return null
+ }
  if (!state.claimValue.trim() || Number.isNaN(Number(state.claimValue))) return 'Enter the number you\'re claiming'
  return null
 }
 
 export function validateEvidenceStep(state: WizardState): string | null {
+ // Editing keeps the existing files untouched, so none are required.
+ if (!state.editing) {
  if (state.files.length === 0) return 'Add at least one file'
  if (state.files.some(f => f.status === 'uploading')) return 'Wait for uploads to finish'
  if (state.files.some(f => f.status === 'error')) return 'Remove or retry failed uploads'
+ }
  if (!state.evidenceTitle.trim()) return 'Give the evidence a short title'
  return null
 }
 
 /** All record-level validation, used as the final gate before saving. */
 export function validateAll(state: WizardState): string | null {
+ // The "both" flow has no metric step — its metrics come from the claims list.
+ if (state.kind !== 'both') {
  const metricError = validateMetricStep(state)
  if (metricError) return metricError
+ }
  if (includesClaim(state.kind)) {
  const claimError = validateClaimStep(state)
  if (claimError) return claimError

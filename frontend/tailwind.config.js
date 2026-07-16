@@ -62,6 +62,19 @@ export default {
                     600: '#6d8d8b',
                     700: '#5a7573',
                 },
+                // Claim branding — seafoam teal lifted from the landing page
+                // accent (#97C7CB on updated-landing). Claims are teal,
+                // evidence is the primary brand green.
+                claim: {
+                    50: '#F2F9F9',
+                    100: '#E3F1F2',
+                    200: '#CBE6E8',
+                    300: '#AFD8DB',
+                    400: '#A3CFD3',
+                    500: '#97C7CB',  // landing seafoam accent — buttons/badges
+                    600: '#7FB3B8',  // hover
+                    700: '#4E888E',  // readable text on the pale tints
+                },
                 impact: {
                     50: '#e4fce9',
                     100: '#bbf7c9',

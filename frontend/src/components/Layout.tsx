@@ -1,7 +1,6 @@
 import React, { ReactNode, useState, useEffect, useRef } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import {
- HelpCircle,
  Settings,
  Menu,
  X,
@@ -13,10 +12,14 @@ import {
  BookOpen,
  Eye,
  FlaskConical,
+ Sparkles,
+ GraduationCap,
 } from 'lucide-react'
 import { AuthService } from '../services/auth'
 import { apiService } from '../services/api'
 import { useTeam } from '../context/TeamContext'
+import { useTutorial } from '../context/TutorialContext'
+import { useOnboarding } from '../context/OnboardingContext'
 import { User, Organization } from '../types'
 import { notify } from '../lib/notify'
 import { UserProfileMenu } from './ui/UserProfileMenu'
@@ -28,7 +31,6 @@ interface LayoutProps {
 
 export default function Layout({ user, children }: LayoutProps) {
  const location = useLocation()
- const navigate = useNavigate()
  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
  const [orgMenuOpen, setOrgMenuOpen] = useState(false)
  const [organization, setOrganization] = useState<Organization | null>(null)
@@ -44,6 +46,8 @@ export default function Layout({ user, children }: LayoutProps) {
  hasOwnOrganization,
  canEditOrgContext
  } = useTeam()
+ const { startTutorial } = useTutorial()
+ const { startOnboarding } = useOnboarding()
  const isDemoOrg = !!activeOrganization?.is_demo
 
  useEffect(() => {
@@ -81,21 +85,6 @@ export default function Layout({ user, children }: LayoutProps) {
  notify.success('Signed out')
  } catch (error) {
  notify.error('Failed to sign out')
- }
- }
-
- const handleTutorialClick = () => {
- // If on dashboard, trigger tutorial via localStorage event
- if (location.pathname === '/') {
- localStorage.removeItem('ofe-tutorial-seen')
- window.dispatchEvent(new Event('show-tutorial'))
- } else {
- // Navigate to dashboard and trigger tutorial
- navigate('/')
- setTimeout(() => {
- localStorage.removeItem('ofe-tutorial-seen')
- window.dispatchEvent(new Event('show-tutorial'))
- }, 100)
  }
  }
 
@@ -277,15 +266,32 @@ export default function Layout({ user, children }: LayoutProps) {
  <span>Explore</span>
  </Link>
 
-
- {/* Tutorial Button - Circle Icon */}
+ {/* Beta setup + tutorial — inline with top nav */}
+ <div className="hidden lg:flex items-center gap-2">
+ <div className="relative">
+ <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide rounded-full bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] text-white leading-none whitespace-nowrap z-10 shadow-sm">
+ Beta
+ </span>
  <button
- onClick={handleTutorialClick}
- className="app-btn app-btn-icon app-btn-secondary rounded-full"
- title="Show tutorial"
+ type="button"
+ onClick={startOnboarding}
+ className="app-btn app-btn-secondary rounded-full !px-4 !py-2 gap-2"
+ title="Guided setup"
  >
- <HelpCircle className="w-5 h-5 text-gray-700" />
+ <Sparkles className="w-4 h-4" />
+ <span>Setup</span>
  </button>
+ </div>
+ <button
+ type="button"
+ onClick={startTutorial}
+ className="app-btn app-btn-secondary rounded-full !px-4 !py-2 gap-2"
+ title="Start tutorial"
+ >
+ <GraduationCap className="w-4 h-4" />
+ <span>Tutorial</span>
+ </button>
+ </div>
 
  {/* Settings Button - Circle Icon */}
  <Link
@@ -333,6 +339,29 @@ export default function Layout({ user, children }: LayoutProps) {
  <Compass className="w-5 h-5" />
  <span>Explore Organizations</span>
  </Link>
+ <button
+ type="button"
+ onClick={() => {
+ startOnboarding()
+ setMobileMenuOpen(false)
+ }}
+ className="flex items-center space-x-3 px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-colors w-full"
+ >
+ <Sparkles className="w-5 h-5" />
+ <span>Setup</span>
+ <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] text-white">Beta</span>
+ </button>
+ <button
+ type="button"
+ onClick={() => {
+ startTutorial()
+ setMobileMenuOpen(false)
+ }}
+ className="flex items-center space-x-3 px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-colors w-full"
+ >
+ <GraduationCap className="w-5 h-5" />
+ <span>Tutorial</span>
+ </button>
  {activeOrganization && canEditOrgContext && (
  <Link
  to="/context"
@@ -365,16 +394,6 @@ export default function Layout({ user, children }: LayoutProps) {
  </Link>
  )
  )}
- <button
- onClick={() => {
- handleTutorialClick()
- setMobileMenuOpen(false)
- }}
- className="flex items-center space-x-3 px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-colors w-full"
- >
- <HelpCircle className="w-5 h-5" />
- <span>Tutorial</span>
- </button>
  <Link
  to="/account"
  onClick={() => setMobileMenuOpen(false)}

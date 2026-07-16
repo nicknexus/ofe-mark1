@@ -1,14 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
-import { Plus, Search, X, MapPin, Users, Calendar, ChevronDown, Tag as TagIcon } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Plus, Search, X, MapPin, Users, Tag as TagIcon } from 'lucide-react'
 import { apiService } from '../../services/api'
 import { Story, Location, BeneficiaryGroup, MetricTag } from '../../types'
-import { formatDate } from '../../utils'
 import StoryCard from '../StoryCard'
 import AddStoryModal from '../AddStoryModal'
 import StoryDetailModal from '../StoryDetailModal'
 import DateRangePicker from '../DateRangePicker'
 import ConfirmDialog from '../ConfirmDialog'
+import FilterPill from '../shared/FilterPill'
 import { useTeam } from '../../context/TeamContext'
 import { notify } from '../../lib/notify'
 import { SectionLoader, EmptyState } from '../ui'
@@ -42,15 +41,6 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
  const [selectedBeneficiaryGroups, setSelectedBeneficiaryGroups] = useState<string[]>([])
  const [selectedTags, setSelectedTags] = useState<string[]>([])
  const [allTags, setAllTags] = useState<MetricTag[]>([])
- const [showLocationPicker, setShowLocationPicker] = useState(false)
- const [showBeneficiaryPicker, setShowBeneficiaryPicker] = useState(false)
- const [showTagPicker, setShowTagPicker] = useState(false)
- const locationButtonRef = useRef<HTMLButtonElement>(null)
- const beneficiaryButtonRef = useRef<HTMLButtonElement>(null)
- const tagButtonRef = useRef<HTMLButtonElement>(null)
- const [locationDropdownPosition, setLocationDropdownPosition] = useState({ top: 0, left: 0 })
- const [beneficiaryDropdownPosition, setBeneficiaryDropdownPosition] = useState({ top: 0, left: 0 })
- const [tagDropdownPosition, setTagDropdownPosition] = useState({ top: 0, left: 0 })
 
  // Load locations and beneficiary groups
  useEffect(() => {
@@ -175,414 +165,118 @@ export default function StoriesTab({ initiativeId, onRefresh, initialStoryId }: 
  onRefresh?.()
  }
 
- // Filter dropdown positioning - update when buttons are clicked
- useEffect(() => {
- if (showLocationPicker && locationButtonRef.current) {
- const rect = locationButtonRef.current.getBoundingClientRect()
- setLocationDropdownPosition({
- top: rect.bottom + 4,
- left: rect.left
- })
- }
- }, [showLocationPicker])
-
- useEffect(() => {
- if (showBeneficiaryPicker && beneficiaryButtonRef.current) {
- const rect = beneficiaryButtonRef.current.getBoundingClientRect()
- setBeneficiaryDropdownPosition({
- top: rect.bottom + 4,
- left: rect.left
- })
- }
- }, [showBeneficiaryPicker])
-
- useEffect(() => {
- if (showTagPicker && tagButtonRef.current) {
- const rect = tagButtonRef.current.getBoundingClientRect()
- setTagDropdownPosition({
- top: rect.bottom + 4,
- left: rect.left
- })
- }
- }, [showTagPicker])
-
  const hasActiveFilters = selectedLocations.length > 0 || selectedBeneficiaryGroups.length > 0 ||
- selectedTags.length > 0 ||
- datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate)
+   selectedTags.length > 0 ||
+   datePickerValue.singleDate || (datePickerValue.startDate && datePickerValue.endDate)
 
  const clearFilters = () => {
- setSelectedLocations([])
- setSelectedBeneficiaryGroups([])
- setSelectedTags([])
- setDatePickerValue({})
+   setSelectedLocations([])
+   setSelectedBeneficiaryGroups([])
+   setSelectedTags([])
+   setDatePickerValue({})
  }
 
  return (
- <div className="h-screen overflow-hidden">
- <div className="h-full w-full px-4 sm:px-6 py-6 overflow-y-auto mobile-content-padding">
- <div className="app-card overflow-hidden">
- {/* Header with Search and Add Button */}
- <div className="p-6 border-b border-gray-100">
- <div className="flex items-center justify-between mb-4">
- <div>
- <h2 className="text-xl font-semibold text-gray-800">Stories</h2>
- <p className="text-sm text-gray-500">Showcase your impact with photos and stories</p>
- </div>
- {canEditStories && (
- <button
- type="button"
- onClick={handleAddStory}
- className="app-btn app-btn-primary"
- >
- <Plus className="w-5 h-5" />
- <span>Add Story</span>
- </button>
- )}
- </div>
+   <div className="h-screen overflow-hidden flex flex-col mobile-content-padding">
+     {/* Header + filters */}
+     <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-gray-100 bg-white space-y-3 flex-shrink-0">
+       <div className="flex items-center justify-between gap-3">
+         <div className="min-w-0">
+           <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Stories</h2>
+           <p className="text-sm text-gray-500 mt-1 hidden sm:block">Showcase your impact with photos and stories</p>
+         </div>
+         {canEditStories && (
+           <button type="button" onClick={handleAddStory} className="app-btn app-btn-primary app-btn-lg shadow-sm flex-shrink-0">
+             <Plus className="w-5 h-5" />
+             <span>Add Story</span>
+           </button>
+         )}
+       </div>
 
- {/* Search Bar */}
- <div className="relative mb-3">
- <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
- <input
- type="text"
- placeholder="Search stories by title or description..."
- value={searchQuery}
- onChange={(e) => setSearchQuery(e.target.value)}
- className="app-input pl-10"
- />
- </div>
+       <div className="relative max-w-sm">
+         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+         <input
+           type="text"
+           placeholder="Search stories by title or description…"
+           value={searchQuery}
+           onChange={(e) => setSearchQuery(e.target.value)}
+           className="w-full h-9 pl-10 pr-3 bg-white border border-gray-200 rounded-full text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+         />
+       </div>
 
- {/* Master Filter */}
- <div className="flex items-center gap-2 flex-wrap">
- {/* Date Filter - First */}
- <div className="relative">
- <DateRangePicker
- value={datePickerValue}
- onChange={setDatePickerValue}
- placeholder="Filter by date"
- className="w-auto"
- />
- </div>
+       <div className="flex flex-wrap items-center gap-2">
+         <DateRangePicker
+           value={datePickerValue}
+           onChange={setDatePickerValue}
+           placeholder="Date"
+           variant="pill"
+         />
+         <FilterPill
+           icon={MapPin}
+           label="Location"
+           pluralLabel="locations"
+           options={locations.map(l => ({ id: l.id!, name: l.name }))}
+           selected={selectedLocations}
+           onChange={setSelectedLocations}
+           emptyText="No locations available"
+         />
+         {allTags.length > 0 && (
+           <FilterPill
+             icon={TagIcon}
+             label="Tag"
+             pluralLabel="tags"
+             options={allTags.map(t => ({ id: t.id, name: t.name }))}
+             selected={selectedTags}
+             onChange={setSelectedTags}
+             emptyText="No tags available"
+           />
+         )}
+         <FilterPill
+           icon={Users}
+           label="Group"
+           pluralLabel="groups"
+           options={beneficiaryGroups.map(g => ({ id: g.id!, name: g.name }))}
+           selected={selectedBeneficiaryGroups}
+           onChange={setSelectedBeneficiaryGroups}
+           emptyText="No beneficiary groups available"
+         />
+         {hasActiveFilters && (
+           <button
+             onClick={clearFilters}
+             className="inline-flex items-center gap-1 h-9 px-3 rounded-full text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+           >
+             <X className="w-3.5 h-3.5" />
+             Clear all
+           </button>
+         )}
+       </div>
+     </div>
 
- {/* Location Filter */}
- <div className="relative">
- <button
- ref={locationButtonRef}
- onClick={(e) => {
- const rect = e.currentTarget.getBoundingClientRect()
- setLocationDropdownPosition({
- top: rect.bottom + 4,
- left: rect.left
- })
- setShowLocationPicker(!showLocationPicker)
- setShowBeneficiaryPicker(false)
- setShowTagPicker(false)
- }}
- className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 ${
- selectedLocations.length > 0
- ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
- : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
- }`}
- >
- <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${
- selectedLocations.length > 0
- ? 'bg-primary-100 border-primary-500'
- : 'bg-gray-100 border-gray-200'
- }`}>
- <MapPin className={`w-5 h-5 ${
- selectedLocations.length > 0
- ? 'text-primary-500'
- : 'text-gray-600'
- }`} />
- </div>
- <span className="ml-3">Location</span>
- {selectedLocations.length > 0 && (
- <span className="ml-1 app-chip app-chip-accent text-xs px-1.5 py-0">
- {selectedLocations.length}
- </span>
- )}
- <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showLocationPicker ? 'rotate-180' : ''}`} />
- </button>
- </div>
-
- {/* Tag Filter */}
- <div className="relative">
- <button
- ref={tagButtonRef}
- onClick={(e) => {
- const rect = e.currentTarget.getBoundingClientRect()
- setTagDropdownPosition({ top: rect.bottom + 4, left: rect.left })
- setShowTagPicker(!showTagPicker)
- setShowLocationPicker(false)
- setShowBeneficiaryPicker(false)
- }}
- className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 ${
- selectedTags.length > 0
- ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
- : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
- }`}
- >
- <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${
- selectedTags.length > 0
- ? 'bg-primary-100 border-primary-500'
- : 'bg-gray-100 border-gray-200'
- }`}>
- <TagIcon className={`w-5 h-5 ${selectedTags.length > 0 ? 'text-primary-500' : 'text-gray-600'}`} />
- </div>
- <span className="ml-3">Tag</span>
- {selectedTags.length > 0 && (
- <span className="ml-1 app-chip app-chip-accent text-xs px-1.5 py-0">
- {selectedTags.length}
- </span>
- )}
- <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showTagPicker ? 'rotate-180' : ''}`} />
- </button>
- </div>
-
- {/* Beneficiary Filter */}
- <div className="relative">
- <button
- ref={beneficiaryButtonRef}
- onClick={(e) => {
- const rect = e.currentTarget.getBoundingClientRect()
- setBeneficiaryDropdownPosition({
- top: rect.bottom + 4,
- left: rect.left
- })
- setShowBeneficiaryPicker(!showBeneficiaryPicker)
- setShowLocationPicker(false)
- setShowTagPicker(false)
- }}
- className={`flex items-center pl-0 pr-4 h-10 rounded-r-full rounded-l-full text-sm font-medium transition-all duration-200 border-2 border-l-0 ${
- selectedBeneficiaryGroups.length > 0
- ? 'bg-primary-50 border-primary-500 hover:bg-primary-100 text-gray-700'
- : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
- }`}
- >
- <div className={`w-10 h-10 rounded-full border flex items-center justify-center flex-shrink-0 ${
- selectedBeneficiaryGroups.length > 0
- ? 'bg-primary-100 border-primary-500'
- : 'bg-gray-100 border-gray-200'
- }`}>
- <Users className={`w-5 h-5 ${
- selectedBeneficiaryGroups.length > 0
- ? 'text-primary-500'
- : 'text-gray-600'
- }`} />
- </div>
- <span className="ml-3">Beneficiary Group</span>
- {selectedBeneficiaryGroups.length > 0 && (
- <span className="ml-1 app-chip app-chip-accent text-xs px-1.5 py-0">
- {selectedBeneficiaryGroups.length}
- </span>
- )}
- <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showBeneficiaryPicker ? 'rotate-180' : ''}`} />
- </button>
- </div>
-
- {hasActiveFilters && (
- <button
- onClick={clearFilters}
- className="flex items-center space-x-1 px-2 py-1 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded text-xs font-medium transition-colors border border-gray-200"
- >
- <X className="w-3 h-3" />
- <span>Clear</span>
- </button>
- )}
- </div>
-
- {/* Location Dropdown */}
- {showLocationPicker && createPortal(
- <>
- <div className="fixed inset-0 z-[9998]" onClick={() => setShowLocationPicker(false)} />
- <div
- className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
- style={{
- top: `${locationDropdownPosition.top}px`,
- left: `${locationDropdownPosition.left}px`
- }}
- onClick={(e) => e.stopPropagation()}
- >
- {locations.length === 0 ? (
- <p className="text-xs text-gray-500">No locations available</p>
- ) : (
- <>
- <div className="flex items-center justify-between mb-2">
- <span className="text-xs font-semibold text-gray-700">Select Locations</span>
- {selectedLocations.length > 0 && (
- <button
- onClick={(e) => {
- e.stopPropagation()
- setSelectedLocations([])
- }}
- className="text-xs text-primary-700 hover:text-primary-800"
- >
- Clear
- </button>
- )}
- </div>
- {locations.map((location) => (
- <label
- key={location.id}
- className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
- >
- <input
- type="checkbox"
- checked={selectedLocations.includes(location.id!)}
- onChange={(e) => {
- if (e.target.checked) {
- setSelectedLocations([...selectedLocations, location.id!])
- } else {
- setSelectedLocations(selectedLocations.filter(id => id !== location.id))
- }
- }}
- className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
- />
- <span className="text-xs text-gray-700 truncate flex-1">{location.name}</span>
- </label>
- ))}
- </>
- )}
- </div>
- </>,
- document.body
- )}
-
- {/* Tag Dropdown */}
- {showTagPicker && createPortal(
- <>
- <div className="fixed inset-0 z-[9998]" onClick={() => setShowTagPicker(false)} />
- <div
- className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
- style={{ top: `${tagDropdownPosition.top}px`, left: `${tagDropdownPosition.left}px` }}
- onClick={(e) => e.stopPropagation()}
- >
- {allTags.length === 0 ? (
- <p className="text-xs text-gray-500">No tags available</p>
- ) : (
- <>
- <div className="flex items-center justify-between mb-2">
- <span className="text-xs font-semibold text-gray-700">Select Tags</span>
- {selectedTags.length > 0 && (
- <button
- onClick={(e) => { e.stopPropagation(); setSelectedTags([]) }}
- className="text-xs text-primary-700 hover:text-primary-800"
- >
- Clear
- </button>
- )}
- </div>
- {allTags.map((tag) => (
- <label
- key={tag.id}
- className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
- >
- <input
- type="checkbox"
- checked={selectedTags.includes(tag.id)}
- onChange={(e) => {
- if (e.target.checked) setSelectedTags([...selectedTags, tag.id])
- else setSelectedTags(selectedTags.filter(id => id !== tag.id))
- }}
- className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
- />
- <span className="text-xs text-gray-700 truncate flex-1">{tag.name}</span>
- </label>
- ))}
- </>
- )}
- </div>
- </>,
- document.body
- )}
-
- {/* Beneficiary Dropdown */}
- {showBeneficiaryPicker && createPortal(
- <>
- <div className="fixed inset-0 z-[9998]" onClick={() => setShowBeneficiaryPicker(false)} />
- <div
- className="fixed bg-white border border-gray-100 rounded-xl shadow-modal z-[9999] p-3 min-w-[200px] max-h-64 overflow-y-auto"
- style={{
- top: `${beneficiaryDropdownPosition.top}px`,
- left: `${beneficiaryDropdownPosition.left}px`
- }}
- onClick={(e) => e.stopPropagation()}
- >
- {beneficiaryGroups.length === 0 ? (
- <p className="text-xs text-gray-500">No beneficiary groups available</p>
- ) : (
- <>
- <div className="flex items-center justify-between mb-2">
- <span className="text-xs font-semibold text-gray-700">Select Beneficiary Groups</span>
- {selectedBeneficiaryGroups.length > 0 && (
- <button
- onClick={(e) => {
- e.stopPropagation()
- setSelectedBeneficiaryGroups([])
- }}
- className="text-xs text-primary-700 hover:text-primary-800"
- >
- Clear
- </button>
- )}
- </div>
- {beneficiaryGroups.map((group) => (
- <label
- key={group.id}
- className="flex items-center space-x-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
- >
- <input
- type="checkbox"
- checked={selectedBeneficiaryGroups.includes(group.id!)}
- onChange={(e) => {
- if (e.target.checked) {
- setSelectedBeneficiaryGroups([...selectedBeneficiaryGroups, group.id!])
- } else {
- setSelectedBeneficiaryGroups(selectedBeneficiaryGroups.filter(id => id !== group.id))
- }
- }}
- className="w-3 h-3 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
- />
- <span className="text-xs text-gray-700 truncate flex-1">{group.name}</span>
- </label>
- ))}
- </>
- )}
- </div>
- </>,
- document.body
- )}
- </div>
-
- {/* Stories Grid */}
- <div className="p-6">
- {loading ? (
- <SectionLoader className="h-64" />
- ) : stories.length === 0 ? (
- <EmptyState
- title="No stories yet"
- description="Add your first story to showcase your impact"
- action={canEditStories ? (
- <button type="button" onClick={handleAddStory} className="app-btn app-btn-primary">
- Add Story
- </button>
- ) : undefined}
- className="min-h-[16rem]"
- />
- ) : (
- <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
- {stories.map((story) => (
- <StoryCard
- key={story.id}
- story={story}
- onView={handleViewStory}
- />
- ))}
- </div>
- )}
- </div>
- </div>
- </div>
+     {/* Stories grid */}
+     <div className="flex-1 bg-gray-50 px-4 sm:px-6 py-4 overflow-y-auto min-h-0">
+       {loading ? (
+         <SectionLoader className="h-64" />
+       ) : stories.length === 0 ? (
+         <div className="rounded-2xl border border-gray-200/70 bg-white shadow-card md:p-8">
+           <EmptyState
+             title="No stories yet"
+             description="Add your first story to showcase your impact"
+             action={canEditStories ? (
+               <button type="button" onClick={handleAddStory} className="app-btn app-btn-primary">
+                 Add Story
+               </button>
+             ) : undefined}
+             className="min-h-[16rem]"
+           />
+         </div>
+       ) : (
+         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
+           {stories.map((story) => (
+             <StoryCard key={story.id} story={story} onView={handleViewStory} />
+           ))}
+         </div>
+       )}
+     </div>
 
  {/* Story Detail Modal */}
  {isDetailModalOpen && (

@@ -81,8 +81,8 @@ export default function DonorTab({ initiativeId, dashboard, onRefresh }: DonorTa
  <div className="p-6 border-b border-gray-100">
  <div className="flex items-center justify-between mb-4">
  <div>
- <h2 className="text-xl font-semibold text-gray-800">Donors</h2>
- <p className="text-sm text-gray-500">Manage donors and track their contributions to your metrics</p>
+ <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Donors</h2>
+ <p className="text-sm text-gray-500 mt-1 hidden sm:block">Manage donors and track their contributions to your metrics</p>
  </div>
  <button
  type="button"

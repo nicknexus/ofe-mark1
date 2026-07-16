@@ -282,18 +282,33 @@ export default function AllTagsPage() {
  return (
  <div className="min-h-screen app-canvas pt-24 pb-12 px-4 sm:px-6">
  <div className="max-w-5xl mx-auto">
- <PageHeader
- title="All Metric Tags"
- subtitle={`${tags.length} tag${tags.length !== 1 ? 's' : ''} · drag the handles to reorder`}
- backTo="/"
- icon={TagIcon}
- actions={canEditTags ? (
- <button type="button" onClick={() => tagsLocked ? setShowUpgrade(true) : setShowInput(s => !s)} className="app-btn app-btn-primary app-btn-sm">
+ <div className="mb-6">
+ <Link
+ to="/"
+ className="inline-flex items-center gap-1.5 px-2 py-1.5 -ml-2 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors mb-3"
+ >
+ <ArrowLeft className="w-3.5 h-3.5" />
+ Dashboard
+ </Link>
+ <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+ <div className="min-w-0">
+ <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Tags</h1>
+ <p className="text-sm text-gray-500 mt-1">
+ {tags.length} tag{tags.length !== 1 ? 's' : ''} · drag the handles to reorder
+ </p>
+ </div>
+ {canEditTags && (
+ <button
+ type="button"
+ onClick={() => tagsLocked ? setShowUpgrade(true) : setShowInput(s => !s)}
+ className="app-btn app-btn-primary shadow-sm flex-shrink-0"
+ >
  <Plus className="w-4 h-4" />
  New tag
  </button>
- ) : undefined}
- />
+ )}
+ </div>
+ </div>
 
  {/* Free-plan lock banner: tags are preserved but read-only until upgrade */}
  {tagsLocked && tags.length > 0 && (
@@ -307,7 +322,7 @@ export default function AllTagsPage() {
  </button>
  )}
 
- <div className="app-card overflow-hidden">
+ <div className="bg-white rounded-2xl border border-gray-200/70 shadow-card overflow-hidden">
  {showInput && (
  <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
  <input
@@ -327,15 +342,17 @@ export default function AllTagsPage() {
  </div>
  )}
 
- <div className="px-6 py-3 border-b border-gray-100 flex items-center gap-2">
- <Search className="w-4 h-4 text-gray-400" />
+ <div className="px-4 sm:px-6 py-3 border-b border-gray-100">
+ <div className="relative max-w-sm">
+ <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
  <input
  type="text"
  value={search}
  onChange={(e) => setSearch(e.target.value)}
- placeholder="Search tags..."
- className="flex-1 text-sm text-gray-700 placeholder-gray-400 bg-transparent outline-none"
+ placeholder="Search tags…"
+ className="w-full h-9 pl-10 pr-3 bg-gray-50 border border-gray-200 rounded-full text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
  />
+ </div>
  </div>
 
  {loading ? (

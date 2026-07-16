@@ -63,10 +63,11 @@ export default function FileDropList({ files, onAddFiles, onRemoveFile, compact 
  <RefreshCw className="w-3 h-3 animate-spin" /> Uploading…
  </span>
  )}
- {file.status === 'done' && `${(file.size / 1024 / 1024).toFixed(1)} MB · uploaded ✓`}
+ {file.status === 'done' && (file.existing ? 'Already attached' : `${(file.size / 1024 / 1024).toFixed(1)} MB · uploaded ✓`)}
  {file.status === 'error' && (file.error || 'Upload failed')}
  </p>
  </div>
+ {!file.existing && (
  <button
  type="button"
  onClick={() => onRemoveFile(file.id)}
@@ -75,6 +76,7 @@ export default function FileDropList({ files, onAddFiles, onRemoveFile, compact 
  >
  <X className="w-3.5 h-3.5" />
  </button>
+ )}
  </div>
  ))}
  </div>

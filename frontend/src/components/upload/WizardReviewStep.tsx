@@ -3,7 +3,7 @@ import { Link2, Unlink, TrendingUp, FileText, MapPin, CalendarRange, Tag as TagI
 import { BeneficiaryGroup, KPI, Location, MetricTag, TimelineClaim, TimelineEvidence } from '../../types'
 import { formatDate } from '../../utils'
 import { previewMatchingClaims, previewMatchingEvidence } from '../../utils/timeline'
-import { WizardState, includesClaim, includesEvidence, wizardDates } from './wizardTypes'
+import { WizardState, filledClaimEntries, includesClaim, includesEvidence, wizardDates } from './wizardTypes'
 
 interface WizardReviewStepProps {
  state: WizardState
@@ -35,6 +35,14 @@ export default function WizardReviewStep({
  const { start, end } = wizardDates(state)
  const kpiById = useMemo(() => new Map(kpis.map(k => [k.id, k])), [kpis])
 
+ // Claims to be created: per-metric entries in the "both" flow, or the
+ // single claim-only record, normalised to one shape for rendering.
+ const newClaims = state.kind === 'both'
+ ? filledClaimEntries(state).map(([kpiId, entry]) => ({ kpiId, value: entry.value, label: entry.label }))
+ : claim && state.claimKpiId
+ ? [{ kpiId: state.claimKpiId, value: state.claimValue, label: state.claimLabel }]
+ : []
+
  const dateLabel = start === end ? formatDate(start) : `${formatDate(start)} – ${formatDate(end)}`
  const locationNames = state.locationIds
  .map(id => locations.find(l => l.id === id)?.name)
@@ -48,7 +56,7 @@ export default function WizardReviewStep({
  const matchedClaims = useMemo(() => {
  if (!evidence) return []
  const kpiIds = state.kind === 'both'
- ? (state.claimKpiId ? [state.claimKpiId] : [])
+ ? filledClaimEntries(state).map(([kpiId]) => kpiId)
  : state.evidenceKpiIds
  return previewMatchingClaims(existingClaims, {
  kpiIds,
@@ -82,33 +90,34 @@ export default function WizardReviewStep({
  )
  }
 
- const connectionCount = (evidence ? matchedClaims.length : matchedEvidence.length) + (state.kind === 'both' ? 1 : 0)
+ const connectionCount = (evidence ? matchedClaims.length : matchedEvidence.length)
+ + (state.kind === 'both' ? newClaims.length : 0)
 
  return (
  <div className="space-y-4 max-w-2xl">
- {/* What will be created */}
+ {/* What will be created — claims are teal, evidence is green */}
  <div className="space-y-2">
- {claim && (
- <div className="app-card p-4">
+ {newClaims.map(c => (
+ <div key={c.kpiId} className="rounded-2xl border border-claim-200 bg-claim-50/60 p-4">
  <div className="flex items-center gap-3">
- <div className="p-2 rounded-xl bg-primary-100 flex-shrink-0">
- <TrendingUp className="w-4 h-4 text-primary-800" />
+ <div className="p-2 rounded-xl bg-claim-100 flex-shrink-0">
+ <TrendingUp className="w-4 h-4 text-claim-700" />
  </div>
  <div className="min-w-0">
  <p className="text-sm font-medium text-gray-800">
- <span className="text-base font-semibold mr-1.5">{state.claimValue}</span>
- {kpiById.get(state.claimKpiId || '')?.title || 'Impact claim'}
+ <span className="text-base font-semibold mr-1.5">{c.value}</span>
+ {kpiById.get(c.kpiId)?.title || 'Impact claim'}
  </p>
- {state.claimLabel && <p className="text-xs text-gray-500 truncate">{state.claimLabel}</p>}
+ {c.label && <p className="text-xs text-gray-500 truncate">{c.label}</p>}
  </div>
  </div>
  </div>
- )}
+ ))}
  {evidence && (
- <div className="app-card p-4">
+ <div className="rounded-2xl border border-primary-200 bg-primary-50/50 p-4">
  <div className="flex items-center gap-3">
- <div className="p-2 rounded-xl bg-evidence-100 flex-shrink-0">
- <FileText className="w-4 h-4 text-evidence-600" />
+ <div className="p-2 rounded-xl bg-primary-100 flex-shrink-0">
+ <FileText className="w-4 h-4 text-primary-800" />
  </div>
  <div className="min-w-0">
  <p className="text-sm font-medium text-gray-800 truncate">{state.evidenceTitle}</p>
@@ -129,9 +138,9 @@ export default function WizardReviewStep({
  {groupNames.length > 0 && scopeRow(Users, groupNames.length > 2 ? `${groupNames.length} groups` : groupNames.join(', '))}
  </div>
 
- {/* Connect preview */}
+ {/* Connect preview — connected state uses the Connections-tab gradient */}
  <div className={`rounded-2xl border p-4 ${connectionCount > 0
- ? 'border-impact-200 bg-impact-50/50'
+ ? 'border-primary-300 bg-gradient-to-r from-claim-50 to-primary-50'
  : 'border-amber-200 bg-amber-50/50'
  }`}>
  <div className="flex items-center gap-2 mb-1">
@@ -141,8 +150,8 @@ export default function WizardReviewStep({
  <p className="text-sm font-semibold text-gray-800">
  {state.kind === 'both' && (
  matchedClaims.length > 0
- ? `Claim and evidence will be connected, plus ${matchedClaims.length} other matching claim${matchedClaims.length === 1 ? '' : 's'}`
- : 'Claim and evidence will be connected to each other'
+ ? `${newClaims.length} claim${newClaims.length === 1 ? '' : 's'} and the evidence will be connected, plus ${matchedClaims.length} other matching claim${matchedClaims.length === 1 ? '' : 's'}`
+ : `${newClaims.length} claim${newClaims.length === 1 ? '' : 's'} and the evidence will be connected to each other`
  )}
  {state.kind === 'evidence' && (
  matchedClaims.length > 0

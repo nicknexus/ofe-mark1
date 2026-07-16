@@ -9,10 +9,11 @@ import {
   filterClaims,
   getEvidenceImageUrl,
   hasActiveFilters,
-  sortByUploadDate,
+  sortByMode,
 } from '../../utils/timeline'
 import { rowEntrance, easeOut } from './motion'
 import { getKPIColor } from '../metricsDashboard/metricColorPalette'
+import { getStatusStyle } from './statusStyles'
 
 const TYPE_ICONS = {
   visual_proof: Camera,
@@ -30,82 +31,120 @@ const TYPE_ICONS = {
 const ROW_H = 64
 const ROW_GAP = 8
 const MAX_ROWS = 4
-const CONNECTOR_W = 56
+const CONNECTOR_W = 128
+const NODE_R = 16
+const HALO_R = 24
 const slotCenter = (i: number) => i * (ROW_H + ROW_GAP) + ROW_H / 2
 const columnHeight = (rows: number) => rows * ROW_H + (rows - 1) * ROW_GAP
 
-const GRID_COLS = 'md:grid-cols-[minmax(0,1fr)_3.5rem_minmax(0,1.15fr)]'
+const GRID_COLS = 'md:grid-cols-[minmax(0,0.75fr)_8rem_minmax(0,0.85fr)]'
 
 /**
- * The animated claim → evidence connector. One origin dot on the claim side
- * fans out into a curve per visible evidence slot; a claim without evidence
- * gets a single dashed red line to the placeholder.
+ * The claim → connection-node → evidence connector. A soft green concentric
+ * node sits in the middle: the claim side runs a single line into it, then it
+ * fans smooth curves out to each evidence slot. A claim without evidence gets a
+ * single dashed red line from the node to the placeholder.
  */
 function ConnectorLines({ rows, empty }: { rows: number; empty?: boolean }) {
   const height = columnHeight(Math.max(rows, 1))
-  const claimY = height / 2
-  const startX = 4
-  const endX = CONNECTOR_W - 4
+  const midY = height / 2
+  const cx = CONNECTOR_W / 2
+  const startX = 2
+  const endX = CONNECTOR_W - 2
+  const leftEnd = cx - NODE_R
+  const rightStart = cx + NODE_R
+  const rightMid = (rightStart + endX) / 2
 
   return (
-    <svg
-      width={CONNECTOR_W}
-      height={height}
-      viewBox={`0 0 ${CONNECTOR_W} ${height}`}
-      fill="none"
-      aria-hidden="true"
-      className={empty ? 'text-red-400' : 'text-impact-500'}
-    >
-      <motion.circle
-        cx={startX}
-        cy={claimY}
-        r={3.5}
-        className="fill-current"
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ duration: 0.25, ease: easeOut }}
-      />
-      {empty ? (
+    <div className="relative" style={{ width: CONNECTOR_W, height }}>
+      <svg
+        width={CONNECTOR_W}
+        height={height}
+        viewBox={`0 0 ${CONNECTOR_W} ${height}`}
+        fill="none"
+        aria-hidden="true"
+        className={empty ? 'text-red-300' : undefined}
+      >
+        {/* Claim (seafoam) → evidence (brand green) gradient across the whole
+            lane; userSpaceOnUse so both segments pick up their position's hue. */}
+        {!empty && (
+          <defs>
+            <linearGradient
+              id="claim-evidence-lane"
+              gradientUnits="userSpaceOnUse"
+              x1="0" y1="0" x2={CONNECTOR_W} y2="0"
+            >
+              <stop offset="0%" stopColor="#AFD8DB" />
+              <stop offset="100%" stopColor="#c0dfa1" />
+            </linearGradient>
+          </defs>
+        )}
+
+        {/* Claim → node */}
         <motion.path
-          d={`M ${startX} ${claimY} L ${endX} ${claimY}`}
-          stroke="currentColor"
-          strokeOpacity={0.6}
-          strokeWidth={1.5}
-          strokeDasharray="4 5"
+          d={`M ${startX} ${midY} L ${leftEnd} ${midY}`}
+          stroke={empty ? 'currentColor' : 'url(#claim-evidence-lane)'}
+          strokeOpacity={empty ? 0.7 : 1}
+          strokeWidth={2}
           strokeLinecap="round"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.4, ease: 'easeOut' }}
+          initial={{ pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: 1, opacity: 1 }}
+          transition={{ duration: 0.35, ease: 'easeOut' }}
         />
-      ) : (
-        Array.from({ length: rows }).map((_, i) => {
-          const y = slotCenter(i)
-          return (
-            <g key={i}>
+
+        {/* Node → evidence */}
+        {empty ? (
+          <motion.path
+            d={`M ${rightStart} ${midY} L ${endX} ${midY}`}
+            stroke="currentColor"
+            strokeOpacity={0.8}
+            strokeWidth={1.75}
+            strokeDasharray="4 5"
+            strokeLinecap="round"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+          />
+        ) : (
+          Array.from({ length: rows }).map((_, i) => {
+            const y = slotCenter(i)
+            return (
               <motion.path
-                d={`M ${startX} ${claimY} C ${CONNECTOR_W * 0.55} ${claimY}, ${CONNECTOR_W * 0.45} ${y}, ${endX} ${y}`}
-                stroke="currentColor"
-                strokeOpacity={0.5}
-                strokeWidth={1.5}
+                key={i}
+                d={`M ${rightStart} ${midY} C ${rightMid} ${midY}, ${rightMid} ${y}, ${endX} ${y}`}
+                stroke="url(#claim-evidence-lane)"
+                strokeWidth={2}
                 strokeLinecap="round"
                 initial={{ pathLength: 0, opacity: 0 }}
                 animate={{ pathLength: 1, opacity: 1 }}
                 transition={{ duration: 0.45, ease: 'easeOut', delay: 0.05 + i * 0.07 }}
               />
-              <motion.circle
-                cx={endX}
-                cy={y}
-                r={3}
-                className="fill-current"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ duration: 0.2, ease: easeOut, delay: 0.3 + i * 0.07 }}
-              />
-            </g>
-          )
-        })
-      )}
-    </svg>
+            )
+          })
+        )}
+      </svg>
+
+      {/* Central concentric connection node — pale halo + inner ring with the
+          link glyph. Positioned with explicit left/top (no CSS translate)
+          because framer-motion's scale writes an inline transform that would
+          clobber a Tailwind -translate centering. */}
+      <motion.span
+        className={`absolute flex items-center justify-center rounded-full ${empty ? 'bg-red-50' : 'bg-gradient-to-r from-claim-100 to-primary-100'}`}
+        style={{ width: HALO_R * 2, height: HALO_R * 2, left: cx - HALO_R, top: midY - HALO_R, transformOrigin: 'center' }}
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ duration: 0.25, ease: easeOut, delay: 0.15 }}
+      >
+        <span
+          className={`flex items-center justify-center rounded-full shadow-sm ${empty
+            ? 'bg-white border border-red-200 text-red-400'
+            : 'bg-gradient-to-r from-claim-400 to-primary-500 text-white'}`}
+          style={{ width: NODE_R * 2, height: NODE_R * 2 }}
+        >
+          <Link2 className="w-4 h-4" strokeWidth={2.5} />
+        </span>
+      </motion.span>
+    </div>
   )
 }
 
@@ -234,7 +273,7 @@ export default function ConnectionsView({
   }, [evidence])
 
   const visibleClaims = useMemo(
-    () => sortByUploadDate(filterClaims(claims, filters)),
+    () => sortByMode(filterClaims(claims, filters), filters.orderMode),
     [claims, filters]
   )
 
@@ -280,6 +319,8 @@ export default function ConnectionsView({
           ? `${formatDate(claim.date_range_start)} – ${formatDate(claim.date_range_end)}`
           : formatDate(claim.date_represented)
 
+        const claimStyle = getStatusStyle(connectedEvidence.length > 0 ? 'connected' : 'not_connected')
+
         const entrance = rowEntrance(claimIndex)
         return (
           <motion.div key={claim.id} initial={entrance.initial} animate={entrance.animate}>
@@ -291,9 +332,9 @@ export default function ConnectionsView({
                   <p className="md:hidden text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
                     Impact claim
                   </p>
-                  <div className="min-w-0 rounded-2xl border border-gray-200/70 bg-white shadow-sm hover:shadow-card hover:border-primary-200 transition-all overflow-hidden">
+                  <div className={`min-w-0 rounded-2xl border ${claimStyle.card} shadow-sm hover:shadow-card transition-all overflow-hidden`}>
                     {/* Metric band — names the metric across the whole card top */}
-                    <div className="flex items-center gap-2 px-4 py-2 bg-gray-50/80 border-b border-gray-100">
+                    <div className="flex items-center gap-2 px-4 py-2 bg-white/50 border-b border-black/5">
                       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: metricColor }} />
                       <p className="text-xs font-semibold text-gray-600 truncate">
                         {kpi?.title || 'Unknown metric'}
@@ -335,7 +376,7 @@ export default function ConnectionsView({
                     </button>
 
                     {(onAddEvidenceToClaim || onConnectExistingToClaim) && (
-                      <div className="flex items-center gap-4 px-4 py-2.5 border-t border-gray-100 bg-gray-50/50">
+                      <div className="flex items-center gap-4 px-4 py-2.5 border-t border-black/5 bg-white/40">
                         {onAddEvidenceToClaim && (
                           <button
                             onClick={() => onAddEvidenceToClaim(claim, kpi)}
@@ -351,7 +392,7 @@ export default function ConnectionsView({
                             className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors"
                           >
                             <Link2 className="w-3.5 h-3.5" />
-                            <span>Add existing evidence</span>
+                            <span>Connect existing evidence</span>
                           </button>
                         )}
                       </div>

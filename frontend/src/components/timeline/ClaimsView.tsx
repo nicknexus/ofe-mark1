@@ -8,12 +8,11 @@ import {
   deriveClaimStatus,
   filterClaims,
   hasActiveFilters,
-  sortByUploadDate,
+  sortByMode,
 } from '../../utils/timeline'
 import TimelineRow, { TimelineRowHeader } from './TimelineRow'
 import EvidenceTypeCounts, { EvidenceTypeCountMap, countEvidenceTypes } from './EvidenceTypeCounts'
 import MetricChip from './MetricChip'
-import { ImpactClaimBadge } from './ImpactClaimGlyph'
 
 interface ClaimsViewProps {
   claims: TimelineClaim[]
@@ -53,7 +52,7 @@ export default function ClaimsView({ claims, kpis, locations, evidence, contribu
   }, [evidence])
 
   const rows = useMemo(
-    () => sortByUploadDate(filterClaims(claims, filters)),
+    () => sortByMode(filterClaims(claims, filters), filters.orderMode),
     [claims, filters]
   )
 
@@ -75,7 +74,7 @@ export default function ClaimsView({ claims, kpis, locations, evidence, contribu
 
   return (
     <div className="app-card overflow-hidden">
-      <TimelineRowHeader kindLabel="Claim" />
+      <TimelineRowHeader kindLabel="Claim" layout="claim" />
       <div className="divide-y divide-gray-100">
         {rows.map((claim, index) => {
           const kpi = kpiById.get(claim.kpi_id)
@@ -94,10 +93,10 @@ export default function ClaimsView({ claims, kpis, locations, evidence, contribu
           return (
             <TimelineRow
               key={claim.id}
-              leading={<ImpactClaimBadge />}
+              layout="claim"
               title={
                 <span className="inline-flex items-baseline gap-1">
-                  <span className="text-base font-semibold text-gray-900">
+                  <span className="text-lg font-bold text-gray-900 tabular-nums">
                     {claim.value}{isPct ? '%' : ''}
                   </span>
                   {unit && <span className="text-sm text-gray-500">{unit}</span>}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, Users, Edit, Trash2, X, MapPin, BarChart3 } from 'lucide-react'
+import { Plus, Users, Edit, Trash2 } from 'lucide-react'
 import { apiService } from '../services/api'
 import { BeneficiaryGroup, Location } from '../types'
 import { notify } from '../lib/notify'
@@ -24,7 +24,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Button } from './ui/button'
-import ModalFrame from './ModalFrame'
+import ModalFrame, { ModalHeader, ModalBody, ModalFooter } from './ModalFrame'
 import { useTeam } from '../context/TeamContext'
 
 // Sortable Beneficiary Group Card Component - Simple app-card like StoriesTab
@@ -68,44 +68,30 @@ function SortableBeneficiaryGroupCard({
  <div
  ref={setNodeRef}
  style={style}
- className="app-card overflow-hidden transition-all hover:shadow-card-hover cursor-pointer group relative min-w-0"
+ className="rounded-xl border border-gray-200/70 bg-white shadow-card overflow-hidden transition-all hover:shadow-card-hover cursor-pointer group relative min-w-0"
  onClick={onClick}
  >
- <div className="p-3 sm:p-4">
- <div className="flex items-start justify-between gap-2 mb-2 sm:mb-3">
- <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
- <div className="app-icon-tile-sm app-icon-tile-accent flex-shrink-0">
- <Users className="w-4 h-4" />
+ <div className="flex flex-col gap-2 py-3.5 px-3">
+ <div className="flex items-start gap-2.5">
+ <div className="w-7 h-7 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
+ <Users className="w-3.5 h-3.5 text-primary-600" />
  </div>
  <div className="min-w-0 flex-1">
- <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-1 line-clamp-1">
+ <h3 className="text-xs font-semibold text-gray-900 line-clamp-2 leading-snug">
  {group.name}
  </h3>
- <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
- {group.total_number !== null && group.total_number !== undefined && (
- <span className="whitespace-nowrap">{group.total_number.toLocaleString()} beneficiaries</span>
- )}
- {ageRange && <span className="whitespace-nowrap">Age: {ageRange}</span>}
- {locationNames.length > 0 && (
- <span className="flex items-center gap-1 min-w-0 max-w-full">
- <MapPin className="w-3 h-3 flex-shrink-0" />
- <span className="truncate">{locationNames.join(', ')}</span>
- </span>
- )}
  </div>
- </div>
- </div>
- <div className="flex items-center space-x-1 flex-shrink-0">
+ <div className="flex items-center flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity -mt-0.5">
  {canEdit && (
  <button
  onClick={(e) => {
  e.stopPropagation()
  onEdit(e)
  }}
- className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors opacity-0 group-hover:opacity-100"
+ className="p-1 hover:bg-gray-100 rounded-md text-gray-400 hover:text-gray-600 transition-colors"
  title="Edit Group"
  >
- <Edit className="w-4 h-4" />
+ <Edit className="w-3 h-3" />
  </button>
  )}
  {canDelete && (
@@ -114,19 +100,25 @@ function SortableBeneficiaryGroupCard({
  e.stopPropagation()
  onDelete(e)
  }}
- className="p-1.5 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
+ className="p-1 hover:bg-red-50 rounded-md text-gray-400 hover:text-red-600 transition-colors"
  title="Delete Group"
  >
- <Trash2 className="w-4 h-4" />
+ <Trash2 className="w-3 h-3" />
  </button>
  )}
  </div>
  </div>
- <div className="flex items-center gap-2 pt-3 border-t border-gray-100 min-w-0">
- <BarChart3 className="w-4 h-4 text-gray-400 flex-shrink-0" />
- <span className="text-xs sm:text-sm text-gray-600 truncate">
+ <div className="pl-9 space-y-1">
+ <p className="text-[11px] text-gray-500 leading-snug">
+ {[
+ group.total_number != null && group.total_number !== undefined ? `${group.total_number.toLocaleString()} beneficiaries` : null,
+ ageRange ? `Age ${ageRange}` : null,
+ locationNames.length > 0 ? locationNames[0] + (locationNames.length > 1 ? ` +${locationNames.length - 1}` : '') : null,
+ ].filter(Boolean).join(' · ') || '—'}
+ </p>
+ <p className="text-[11px] text-gray-500 leading-snug">
  {dataPointCount} {dataPointCount === 1 ? 'impact claim' : 'impact claims'}
- </span>
+ </p>
  </div>
  </div>
  </div>
@@ -209,37 +201,31 @@ function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiativeId }:
  if (!isOpen) return null
 
  return (
- <ModalFrame
- zIndexClass="z-[60]"
- backdropClassName="bg-black/50"
- panelClassName="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto"
- >
- <div className="flex items-center justify-between p-6 border-b border-gray-200">
- <h2 className="text-xl font-semibold text-gray-900">
- {editData ? 'Edit Beneficiary Group' : 'Create Beneficiary Group'}
- </h2>
- <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
- <X className="w-5 h-5" />
- </button>
- </div>
-
- <form onSubmit={handleSubmit} className="p-6 space-y-4">
+ <ModalFrame size="sm" zIndexClass="z-[60]">
+ <ModalHeader
+ title={editData ? 'Edit Beneficiary Group' : 'Create Beneficiary Group'}
+ onClose={onClose}
+ icon={Users}
+ />
+ <form onSubmit={handleSubmit}>
+ <ModalBody rail>
+ <div className="space-y-4">
  <div>
- <label className="label">
+ <label className="app-label">
  Group Name <span className="text-red-500">*</span>
  </label>
  <input
  type="text"
  value={formData.name}
  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
- className="input-field"
+ className="app-input"
  placeholder="e.g., Children 5-12, Women 18-35, Rural Community"
  required
  />
  </div>
 
  <div>
- <label className="label">Age Range (Optional)</label>
+ <label className="app-label">Age Range (Optional)</label>
  <div className="grid grid-cols-2 gap-3">
  <div>
  <label className="text-xs text-gray-600 mb-1 block">Min Age</label>
@@ -247,7 +233,7 @@ function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiativeId }:
  type="number"
  value={formData.age_range_start}
  onChange={(e) => setFormData(prev => ({ ...prev, age_range_start: e.target.value }))}
- className="input-field"
+ className="app-input"
  placeholder="Min"
  min="0"
  />
@@ -258,60 +244,51 @@ function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiativeId }:
  type="number"
  value={formData.age_range_end}
  onChange={(e) => setFormData(prev => ({ ...prev, age_range_end: e.target.value }))}
- className="input-field"
+ className="app-input"
  placeholder="Max"
  min={formData.age_range_start ? Number(formData.age_range_start) : 0}
  />
  </div>
  </div>
- {formData.age_range_start && formData.age_range_end && 
+ {formData.age_range_start && formData.age_range_end &&
  Number(formData.age_range_end) < Number(formData.age_range_start) && (
  <p className="text-xs text-red-500 mt-1">Max age must be greater than or equal to min age</p>
  )}
  </div>
 
  <div>
- <label className="label">Total Number (Optional)</label>
+ <label className="app-label">Total Number (Optional)</label>
  <input
  type="number"
  value={formData.total_number}
  onChange={(e) => setFormData(prev => ({ ...prev, total_number: e.target.value }))}
- className="input-field"
+ className="app-input"
  placeholder="e.g., 150"
  min="0"
  />
- <p className="text-xs text-gray-500 mt-1">Total number of beneficiaries in this group</p>
+ <p className="app-help">Total number of beneficiaries in this group</p>
  </div>
 
  <div>
- <label className="label">Description</label>
+ <label className="app-label">Description</label>
  <textarea
  value={formData.description}
  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
- className="input-field resize-none"
+ className="app-input resize-none"
  rows={3}
  placeholder="Describe this beneficiary group..."
  />
  </div>
-
- <div className="flex space-x-3 pt-4">
- <Button
- type="button"
- onClick={onClose}
- variant="secondary"
- className="flex-1"
- disabled={loading}
- >
+ </div>
+ </ModalBody>
+ <ModalFooter>
+ <Button type="button" onClick={onClose} variant="secondary" disabled={loading}>
  Cancel
  </Button>
- <Button
- type="submit"
- className="flex-1"
- disabled={loading || !formData.name}
- >
+ <Button type="submit" disabled={loading || !formData.name}>
  {loading ? 'Saving...' : editData ? 'Update Group' : 'Create Group'}
  </Button>
- </div>
+ </ModalFooter>
  </form>
  </ModalFrame>
  )
@@ -521,16 +498,16 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
  }
 
  return (
- <div className="h-full flex flex-col overflow-hidden px-3 pt-2 pb-2 space-y-1.5">
+ <div className="h-full flex flex-col overflow-hidden space-y-4">
  {/* Header */}
- <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2 flex-shrink-0">
- <h3 className="text-base sm:text-lg font-semibold text-gray-900">
- Beneficiary Groups ({orderedGroups.length})
+ <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 flex-shrink-0">
+ <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+ Beneficiary groups ({orderedGroups.length})
  </h3>
  {canEditBeneficiaries && (
  <button
  onClick={() => groupsLocked ? setShowUpgrade(true) : setIsCreateModalOpen(true)}
- className="app-btn app-btn-secondary w-full sm:w-auto justify-center sm:justify-start"
+ className="app-btn app-btn-primary app-btn-sm shadow-sm w-full sm:w-auto"
  >
  <Plus className="w-4 h-4 flex-shrink-0" />
  <span>Add Group</span>
@@ -577,7 +554,7 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
  items={orderedGroups.map(group => group.id!)}
  strategy={verticalListSortingStrategy}
  >
- <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 flex-1 overflow-y-auto pr-2 min-w-0">
+ <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 flex-1 overflow-y-auto pr-1 min-w-0 content-start">
  {orderedGroups.map(group => {
  const locIds = derivedLocationIds[group.id!] || []
  const locationNames = locIds

@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { apiService } from '../../services/api'
 import { useUploadManager } from '../../context/UploadContext'
 import { WizardFile } from './wizardTypes'
 
@@ -13,6 +14,8 @@ export function useFileUploads() {
  const [files, setFiles] = useState<WizardFile[]>([])
  const filesRef = useRef(files)
  filesRef.current = files
+ const savedRef = useRef(false)
+ const discardedRef = useRef(false)
 
  const addFiles = useCallback((picked: File[]) => {
  for (const file of picked) {
@@ -45,6 +48,7 @@ export function useFileUploads() {
  const file = filesRef.current.find(f => f.id === fileId)
  if (file?.status === 'uploading') cancelUpload(fileId)
  if (file?.previewUrl) URL.revokeObjectURL(file.previewUrl)
+ if (file?.url) void apiService.deleteUploadedFile(file.url, file.uploadedSize)
  setFiles(prev => prev.filter(f => f.id !== fileId))
  }, [cancelUpload])
 
@@ -52,5 +56,23 @@ export function useFileUploads() {
  filesRef.current.forEach(f => f.previewUrl && URL.revokeObjectURL(f.previewUrl))
  }, [])
 
- return { files, addFiles, removeFile, releasePreviews }
+ // Call once the uploads are attached to a saved record — stops the teardown
+ // cleanup from deleting files that are now owned by real evidence.
+ const markSaved = useCallback(() => { savedRef.current = true }, [])
+
+ // Files hit storage on pick but only become "real" on save. Anything left
+ // over when the flow is abandoned is an orphan — drop it (once).
+ const discardOrphans = useCallback(() => {
+ if (discardedRef.current || savedRef.current) return
+ discardedRef.current = true
+ for (const f of filesRef.current) {
+ if (f.status === 'uploading') cancelUpload(f.id)
+ if (f.previewUrl) URL.revokeObjectURL(f.previewUrl)
+ if (f.url) void apiService.deleteUploadedFile(f.url, f.uploadedSize)
+ }
+ }, [cancelUpload])
+
+ useEffect(() => () => discardOrphans(), [discardOrphans])
+
+ return { files, addFiles, removeFile, releasePreviews, markSaved, discardOrphans }
 }

@@ -26,8 +26,15 @@ export default function WizardEvidenceStep({ state, update, onAddFiles, onRemove
  <div className="space-y-5 max-w-2xl">
  {/* 1 — files */}
  <div>
- <label className="block text-sm font-medium text-gray-700 mb-1.5">1. Add your files</label>
+ <label className="block text-sm font-medium text-gray-700 mb-1.5">
+ {state.editing ? '1. Files' : '1. Add your files'}
+ </label>
  <FileDropList files={state.files} onAddFiles={onAddFiles} onRemoveFile={onRemoveFile} />
+ {state.editing && (
+ <p className="text-[11px] text-gray-400 mt-1.5">
+ Files already attached stay as they are — you can add more, but removing existing files isn't possible here.
+ </p>
+ )}
  </div>
 
  {/* 2 — what kind */}

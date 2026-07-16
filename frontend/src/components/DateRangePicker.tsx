@@ -21,7 +21,12 @@ interface DateRangePickerProps {
   activeColor?: string
   // 'pill' renders a simple flat white pill (icon + label inline) used by the
   // Timeline filter bar; 'default' keeps the legacy icon-well trigger.
-  variant?: 'default' | 'pill'
+  variant?: 'default' | 'pill' | 'inline'
+  // Optional content rendered at the very top of the dropdown (above the
+  // calendar) — used by the Timeline to host the order-by (upload/claim) toggle.
+  topSlot?: React.ReactNode
+  /** Tighter spacing for embedded inline use (e.g. upload wizard scope step). */
+  compact?: boolean
 }
 
 export default function DateRangePicker({
@@ -33,6 +38,8 @@ export default function DateRangePicker({
   className = '',
   activeColor,
   variant = 'default',
+  topSlot,
+  compact = false,
 }: DateRangePickerProps) {
  const [isOpen, setIsOpen] = useState(false)
  const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -65,22 +72,35 @@ export default function DateRangePicker({
  setAppliedEndDate(null)
  }
  } else {
- setAppliedStartDate(null)
- setAppliedEndDate(null)
+   setAppliedStartDate(null)
+   setAppliedEndDate(null)
  }
- // Reset temp selection when value changes externally
- setTempStartDate(null)
- setTempEndDate(null)
- }, [value])
+ if (variant !== 'inline') {
+   setTempStartDate(null)
+   setTempEndDate(null)
+ }
+ }, [value, variant])
 
- // Reset temp selection when calendar opens
+ // Reset temp selection when calendar opens (dropdown modes)
  useEffect(() => {
- if (isOpen) {
- // Initialize temp selection with applied values
- setTempStartDate(appliedStartDate)
- setTempEndDate(appliedEndDate)
- }
- }, [isOpen, appliedStartDate, appliedEndDate])
+   if (variant === 'inline') return
+   if (isOpen) {
+     setTempStartDate(appliedStartDate)
+     setTempEndDate(appliedEndDate)
+   }
+ }, [isOpen, appliedStartDate, appliedEndDate, variant])
+
+ // Inline: always show the calendar; keep temp in sync with applied value
+ useEffect(() => {
+   if (variant !== 'inline') return
+   setTempStartDate(appliedStartDate)
+   setTempEndDate(appliedEndDate)
+   if (appliedStartDate) {
+     setCurrentMonth(appliedStartDate)
+   } else if (minDate) {
+     setCurrentMonth(parseLocalDate(minDate))
+   }
+ }, [variant, appliedStartDate, appliedEndDate, minDate])
 
  // Calculate dropdown position when opening
  const handleToggle = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -190,27 +210,31 @@ export default function DateRangePicker({
  }
 
  const handleApply = () => {
- if (tempStartDate) {
- if (tempEndDate) {
- // Date range - normalize dates to midnight local time before formatting
- const normalizedStart = new Date(tempStartDate.getFullYear(), tempStartDate.getMonth(), tempStartDate.getDate())
- const normalizedEnd = new Date(tempEndDate.getFullYear(), tempEndDate.getMonth(), tempEndDate.getDate())
- onChange({
- singleDate: undefined,
- startDate: getLocalDateString(normalizedStart),
- endDate: getLocalDateString(normalizedEnd)
- })
- } else {
- // Single date - normalize date to midnight local time before formatting
- const normalizedDate = new Date(tempStartDate.getFullYear(), tempStartDate.getMonth(), tempStartDate.getDate())
- onChange({
- singleDate: getLocalDateString(normalizedDate),
- startDate: undefined,
- endDate: undefined
- })
+   if (tempStartDate) {
+     if (tempEndDate) {
+       const normalizedStart = new Date(tempStartDate.getFullYear(), tempStartDate.getMonth(), tempStartDate.getDate())
+       const normalizedEnd = new Date(tempEndDate.getFullYear(), tempEndDate.getMonth(), tempEndDate.getDate())
+       onChange({
+         singleDate: undefined,
+         startDate: getLocalDateString(normalizedStart),
+         endDate: getLocalDateString(normalizedEnd),
+       })
+     } else {
+       const normalizedDate = new Date(tempStartDate.getFullYear(), tempStartDate.getMonth(), tempStartDate.getDate())
+       onChange({
+         singleDate: getLocalDateString(normalizedDate),
+         startDate: undefined,
+         endDate: undefined,
+       })
+     }
+     if (variant !== 'inline') setIsOpen(false)
+   }
  }
- setIsOpen(false)
- }
+
+ const handleCancel = () => {
+   setTempStartDate(appliedStartDate)
+   setTempEndDate(appliedEndDate)
+   if (variant !== 'inline') setIsOpen(false)
  }
 
  const handleClear = () => {
@@ -270,6 +294,138 @@ export default function DateRangePicker({
  }
 
   const hasValue = !!(value && (value.singleDate || value.startDate || value.endDate))
+  const padX = compact ? 'px-2.5' : 'px-4'
+  const daySize = compact ? 'h-7 w-7 text-[11px]' : 'h-8 w-8 text-xs'
+  const navPad = compact ? 'pt-2 pb-0' : 'pt-3 pb-0'
+  const monthPad = compact ? 'pt-0.5 pb-1' : 'pt-1 pb-2'
+
+  const calendarPanel = (
+    <>
+      {topSlot && (
+        <div className={`${padX} pt-2.5 pb-2 border-b border-gray-100 flex-shrink-0`}>{topSlot}</div>
+      )}
+      <div className={`flex items-center justify-between ${padX} ${navPad} flex-shrink-0`}>
+        <button
+          type="button"
+          onClick={() => setCurrentMonth(subYears(currentMonth, 1))}
+          className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+          disabled={minDateObj ? isBefore(startOfMonth(subYears(currentMonth, 1)), startOfMonth(minDateObj)) : false}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <span className="text-xs font-medium text-gray-400">{format(currentMonth, 'yyyy')}</span>
+        <button
+          type="button"
+          onClick={() => setCurrentMonth(addYears(currentMonth, 1))}
+          className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+          disabled={isAfter(startOfMonth(addYears(currentMonth, 1)), startOfMonth(maxDateObj))}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+      <div className={`flex items-center justify-between ${padX} ${monthPad} flex-shrink-0`}>
+        <button
+          type="button"
+          onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+          className={`${compact ? 'p-0.5' : 'p-1'} hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed`}
+          disabled={minDateObj ? isBefore(startOfMonth(currentMonth), startOfMonth(addMonths(minDateObj, 1))) : false}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <h3 className={`font-semibold text-gray-900 ${compact ? 'text-sm' : ''}`}>{format(currentMonth, 'MMMM')}</h3>
+        <button
+          type="button"
+          onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+          className={`${compact ? 'p-0.5' : 'p-1'} hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed`}
+          disabled={isAfter(startOfMonth(addMonths(currentMonth, 1)), startOfMonth(maxDateObj))}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+      <div className={`grid grid-cols-7 gap-0.5 ${padX} ${compact ? 'pb-1' : 'pb-2'} flex-shrink-0 justify-items-center`}>
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+          <div key={day} className={`text-center text-[10px] font-medium text-gray-500 ${compact ? 'py-0' : 'py-1'}`}>
+            {compact ? day.charAt(0) : day}
+          </div>
+        ))}
+      </div>
+      <div className={padX}>
+        <div className={`grid grid-cols-7 gap-0.5 ${compact ? 'pb-1' : 'pb-2'} justify-items-center`}>
+          {days.map((day, idx) => {
+            const isCurrentMonth = isSameMonth(day, currentMonth)
+            const isToday = isSameDay(day, today)
+            const isSelected = isDateSelected(day)
+            const isInRange = isDateInRange(day)
+            const isDisabled = isAfter(day, maxDateObj) || (minDateObj ? isBefore(day, minDateObj) : false)
+            const isStart = previewStartDate && isSameDay(day, previewStartDate)
+            const isEnd = previewEndDate && isSameDay(day, previewEndDate)
+
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => handleDateClick(day)}
+                disabled={isDisabled}
+                className={`
+                  relative ${daySize} rounded transition-colors
+                  ${!isCurrentMonth ? 'text-gray-300' : ''}
+                  ${isDisabled ? 'cursor-not-allowed opacity-30' : 'hover:bg-gray-100 cursor-pointer'}
+                  ${isInRange ? 'bg-primary-50' : ''}
+                  ${isSelected ? 'bg-primary-600 text-white font-semibold' : ''}
+                  ${isToday && !isSelected ? 'ring-2 ring-primary-400' : ''}
+                  ${isStart && isEnd ? 'rounded-full' : ''}
+                  ${isStart && !isEnd ? 'rounded-l-full' : ''}
+                  ${isEnd && !isStart ? 'rounded-r-full' : ''}
+                `}
+              >
+                {format(day, 'd')}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+      <div className={`${compact ? 'p-2.5 pt-1.5' : 'p-4 pt-2'} flex-shrink-0 border-t border-gray-100`}>
+        {previewStartDate && (
+          <div className={`${compact ? 'mb-2 p-1.5' : 'mb-3 p-2'} bg-primary-50 rounded text-xs text-primary-700 text-center`}>
+            {getPreviewText()}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleCancel}
+            className={`flex-1 font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors ${compact ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'}`}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleApply}
+            disabled={!previewStartDate}
+            className={`flex-1 font-medium text-white app-btn-primary rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${compact ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'}`}
+          >
+            Apply
+          </button>
+        </div>
+      </div>
+    </>
+  )
+
+  if (variant === 'inline') {
+    return (
+      <div className={`flex flex-col w-full ${className}`}>
+        {calendarPanel}
+      </div>
+    )
+  }
 
   return (
     <div ref={containerRef} className={`relative ${variant === 'pill' ? '' : className}`}>
@@ -330,155 +486,25 @@ export default function DateRangePicker({
 
  {isOpen && createPortal(
  <>
- {/* Backdrop */}
  <div 
  className="fixed inset-0 z-[9998]" 
  onClick={() => {
  if (tempStartDate) {
  handleApply()
  } else {
- setIsOpen(false)
- setTempStartDate(appliedStartDate)
- setTempEndDate(appliedEndDate)
+ handleCancel()
  }
  }} 
  />
-          {/* Calendar dropdown */}
-          <div 
-            className="fixed bg-white border border-gray-200 rounded-xl shadow-modal z-[9999] w-[300px] flex flex-col"
-            style={{
-              top: `${dropdownPosition.top}px`,
-              left: `${dropdownPosition.left}px`,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
- {/* Year nav row */}
- <div className="flex items-center justify-between px-4 pt-3 pb-0 flex-shrink-0">
- <button
- type="button"
- onClick={() => setCurrentMonth(subYears(currentMonth, 1))}
- className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
- disabled={minDateObj ? isBefore(startOfMonth(subYears(currentMonth, 1)), startOfMonth(minDateObj)) : false}
- >
- <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
- <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
- </svg>
- </button>
- <span className="text-xs font-medium text-gray-400">{format(currentMonth, 'yyyy')}</span>
- <button
- type="button"
- onClick={() => setCurrentMonth(addYears(currentMonth, 1))}
- className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
- disabled={isAfter(startOfMonth(addYears(currentMonth, 1)), startOfMonth(maxDateObj))}
- >
- <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
- <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
- </svg>
- </button>
- </div>
- {/* Month nav row */}
- <div className="flex items-center justify-between px-4 pt-1 pb-2 flex-shrink-0">
- <button
- type="button"
- onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
- className="p-1 hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
- disabled={minDateObj ? isBefore(startOfMonth(currentMonth), startOfMonth(addMonths(minDateObj, 1))) : false}
- >
- <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
- <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
- </svg>
- </button>
- <h3 className="font-semibold text-gray-900">{format(currentMonth, 'MMMM')}</h3>
- <button
- type="button"
- onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
- className="p-1 hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
- disabled={isAfter(startOfMonth(addMonths(currentMonth, 1)), startOfMonth(maxDateObj))}
- >
- <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
- <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
- </svg>
- </button>
- </div>
-
-            {/* Day labels - Fixed */}
-            <div className="grid grid-cols-7 gap-1 px-4 pb-2 flex-shrink-0 justify-items-center">
- {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
- <div key={day} className="text-center text-xs font-medium text-gray-500 py-1">
- {day}
- </div>
- ))}
- </div>
-
-            {/* Calendar grid - fixed 6-week grid, never scrolls */}
-            <div className="px-4">
-              <div className="grid grid-cols-7 gap-1 pb-2 justify-items-center">
- {days.map((day, idx) => {
- const isCurrentMonth = isSameMonth(day, currentMonth)
- const isToday = isSameDay(day, today)
- const isSelected = isDateSelected(day)
- const isInRange = isDateInRange(day)
- const isDisabled = isAfter(day, maxDateObj) || (minDateObj ? isBefore(day, minDateObj) : false)
- const isStart = previewStartDate && isSameDay(day, previewStartDate)
- const isEnd = previewEndDate && isSameDay(day, previewEndDate)
-
- return (
- <button
- key={idx}
- type="button"
- onClick={() => handleDateClick(day)}
- disabled={isDisabled}
- className={`
- relative h-8 w-8 text-xs rounded transition-colors
- ${!isCurrentMonth ? 'text-gray-300' : ''}
- ${isDisabled ? 'cursor-not-allowed opacity-30' : 'hover:bg-gray-100 cursor-pointer'}
- ${isInRange ? 'bg-primary-50' : ''}
- ${isSelected ? 'bg-primary-600 text-white font-semibold' : ''}
- ${isToday && !isSelected ? 'ring-2 ring-primary-400' : ''}
- ${isStart && isEnd ? 'rounded-full' : ''}
- ${isStart && !isEnd ? 'rounded-l-full' : ''}
- ${isEnd && !isStart ? 'rounded-r-full' : ''}
- `}
- >
- {format(day, 'd')}
- </button>
- )
- })}
- </div>
- </div>
-
- {/* Preview text and buttons - Fixed at bottom */}
- <div className="p-4 pt-2 flex-shrink-0 border-t border-gray-100">
- {/* Preview text */}
- {previewStartDate && (
- <div className="mb-3 p-2 bg-primary-50 rounded text-xs text-primary-700 text-center">
- {getPreviewText()}
- </div>
- )}
-
- {/* Apply button */}
- <div className="flex gap-2">
- <button
- type="button"
- onClick={() => {
- setIsOpen(false)
- setTempStartDate(appliedStartDate)
- setTempEndDate(appliedEndDate)
+ <div 
+ className="fixed bg-white border border-gray-200 rounded-xl shadow-modal z-[9999] w-[300px] flex flex-col"
+ style={{
+ top: `${dropdownPosition.top}px`,
+ left: `${dropdownPosition.left}px`,
  }}
- className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+ onClick={(e) => e.stopPropagation()}
  >
- Cancel
- </button>
- <button
- type="button"
- onClick={handleApply}
- disabled={!previewStartDate}
- className="flex-1 px-3 py-2 text-sm font-medium text-white app-btn-primary rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
- >
- Apply
- </button>
- </div>
- </div>
+ {calendarPanel}
  </div>
  </>,
  document.body

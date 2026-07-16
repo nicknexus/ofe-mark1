@@ -1,10 +1,10 @@
 import React, { useState } from 'react'
-import { X, Edit, Trash2, MapPin, Calendar, Users, Image, Video, Mic, FileText, Tag as TagIcon } from 'lucide-react'
+import { Edit, Trash2, MapPin, Calendar, Users, Image, Video, Mic, FileText, Tag as TagIcon } from 'lucide-react'
 import { Story } from '../types'
 import { formatDate } from '../utils'
 import EvidenceTagsList from './MetricTags/EvidenceTagsList'
 import ConfirmDialog from './ConfirmDialog'
-import ModalFrame from './ModalFrame'
+import ModalFrame, { ModalHeader, ModalBody, ModalFooter } from './ModalFrame'
 
 interface StoryDetailModalProps {
  isOpen: boolean
@@ -31,30 +31,19 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
 
  return (
  <>
- <ModalFrame panelClassName="bg-white rounded-xl border border-gray-200 max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-app-modal transform transition-all duration-200 ease-out">
- {/* Header */}
- <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-evidence-50 to-evidence-50 flex-shrink-0">
- <h2 className="text-2xl font-semibold text-gray-900">{story.title}</h2>
- <button
- onClick={onClose}
- className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
- >
- <X className="w-5 h-5" />
- </button>
- </div>
-
- {/* Content */}
- <div className="overflow-y-auto flex-1 min-h-0">
- <div className="p-6 space-y-6">
+ <ModalFrame size="lg">
+ <ModalHeader icon={FileText} title={story.title} onClose={onClose} />
+ <ModalBody>
+ <div className="space-y-6">
  {/* Media Section */}
  {story.media_type === 'text' ? (
- <div className="relative w-full bg-gradient-to-br from-evidence-50 to-evidence-50 rounded-lg p-8 border-2 border-evidence-200">
+ <div className="relative w-full bg-gray-50 rounded-2xl p-8 border border-gray-200">
  <div className="text-center">
- <div className="w-20 h-20 bg-evidence-300 rounded-full mx-auto mb-4 flex items-center justify-center">
- <FileText className="w-10 h-10 text-primary-700" />
+ <div className="app-icon-tile mx-auto mb-4">
+ <FileText className="w-8 h-8 text-primary-500" />
  </div>
- <p className="text-lg font-medium text-evidence-700">Text Story</p>
- <p className="text-sm text-primary-700 mt-1">This story contains text content only</p>
+ <p className="text-base font-medium text-gray-800">Text Story</p>
+ <p className="text-sm text-gray-500 mt-1">This story contains text content only</p>
  </div>
  </div>
  ) : story.media_url && story.media_url.trim() ? (
@@ -98,19 +87,19 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
  </div>
  )
  ) : (
- <div className="relative w-full aspect-video bg-gradient-to-br from-primary-100 to-primary-200 rounded-lg flex items-center justify-center">
+ <div className="relative w-full aspect-video bg-gray-50 rounded-2xl border border-gray-200 flex items-center justify-center">
  <div className="text-center p-6">
- <div className="w-20 h-20 bg-primary-300 rounded-full mx-auto mb-3 flex items-center justify-center">
+ <div className="app-icon-tile mx-auto mb-3">
  {story.media_type === 'photo' ? (
- <Image className="w-10 h-10 text-primary-500" />
+ <Image className="w-8 h-8 text-gray-400" />
  ) : story.media_type === 'video' ? (
- <Video className="w-10 h-10 text-primary-500" />
+ <Video className="w-8 h-8 text-gray-400" />
  ) : (
- <Mic className="w-10 h-10 text-primary-500" />
+ <Mic className="w-8 h-8 text-gray-400" />
  )}
  </div>
- <p className="text-lg font-medium text-primary-700">No Media</p>
- <p className="text-sm text-primary-500 mt-1">Media not uploaded</p>
+ <p className="text-base font-medium text-gray-700">No Media</p>
+ <p className="text-sm text-gray-500 mt-1">Media not uploaded</p>
  </div>
  </div>
  )}
@@ -164,7 +153,7 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
  {story.beneficiary_groups.map((group) => (
  <span
  key={group.id}
- className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-700"
+ className="app-chip"
  >
  {group.name}
  </span>
@@ -186,14 +175,9 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
  )}
  </div>
  </div>
- </div>
-
- {/* Footer with Actions */}
- <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50 flex-shrink-0">
- <button
- onClick={onClose}
- className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
- >
+ </ModalBody>
+ <ModalFooter>
+ <button onClick={onClose} className="app-btn app-btn-secondary">
  Close
  </button>
  {onEdit && (
@@ -202,7 +186,7 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
  onEdit(story)
  onClose()
  }}
- className="px-4 py-2 bg-primary-600 text-secondary-900 rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
+ className="app-btn app-btn-primary"
  >
  <Edit className="w-4 h-4" />
  <span>Edit</span>
@@ -211,13 +195,13 @@ export default function StoryDetailModal({ isOpen, onClose, story, onEdit, onDel
  {onDelete && (
  <button
  onClick={() => setShowDeleteConfirm(true)}
- className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
+ className="app-btn app-btn-danger"
  >
  <Trash2 className="w-4 h-4" />
  <span>Delete</span>
  </button>
  )}
- </div>
+ </ModalFooter>
  </ModalFrame>
  {showDeleteConfirm && (
  <ConfirmDialog
