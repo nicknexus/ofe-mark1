@@ -1,5 +1,5 @@
 import React from 'react'
-import { BarChart3, Plus, Target } from 'lucide-react'
+import { BarChart3, Plus, Target, Sparkles } from 'lucide-react'
 import { EmptyState } from '../ui'
 import { InitiativeDashboard } from '../../types'
 import ExpandableKPICard from '../ExpandableKPICard'
@@ -37,6 +37,7 @@ interface MetricsTabProps {
  setExpandedKPIs: React.Dispatch<React.SetStateAction<Set<string>>>
  allKPIUpdates: any[]
  onAddKPI?: () => void
+ onImportReport?: () => void
  onAddUpdate: (kpi: any) => void
  onAddEvidence?: (kpi?: any) => void
  onEditKPI?: (kpi: any) => void
@@ -56,6 +57,7 @@ export default function MetricsTab({
  setExpandedKPIs,
  allKPIUpdates,
  onAddKPI,
+ onImportReport,
  onAddUpdate,
  onAddEvidence,
  onEditKPI,
@@ -160,11 +162,21 @@ export default function MetricsTab({
  icon={BarChart3}
  title="No Metrics Yet"
  description="Add your first metric to track impact"
- action={onAddKPI ? (
+ action={(onAddKPI || onImportReport) ? (
+ <div className="flex flex-col items-center gap-2">
+ {onImportReport && (
+ <button type="button" onClick={onImportReport} className="app-btn app-btn-secondary">
+ <Sparkles className="w-5 h-5" />
+ <span>Import from report</span>
+ </button>
+ )}
+ {onAddKPI && (
  <button type="button" onClick={onAddKPI} className="app-btn app-btn-primary">
  <Plus className="w-5 h-5" />
  <span>Add Metric</span>
  </button>
+ )}
+ </div>
  ) : undefined}
  />
  ) : (
@@ -172,6 +184,17 @@ export default function MetricsTab({
  <div className="space-y-3">
  <div className="flex items-center justify-between mb-3">
  <h2 className="mobile-section-title mb-0">Your Metrics</h2>
+ <div className="flex items-center gap-2">
+ {onImportReport && (
+ <button
+ type="button"
+ onClick={onImportReport}
+ className="app-btn app-btn-secondary app-btn-icon"
+ title="Import from report"
+ >
+ <Sparkles className="w-5 h-5" />
+ </button>
+ )}
  {onAddKPI && (
  <button
  type="button"
@@ -181,6 +204,7 @@ export default function MetricsTab({
  <Plus className="w-5 h-5" />
  </button>
  )}
+ </div>
  </div>
 
  {filteredKpis.map((kpi) => {
@@ -217,12 +241,22 @@ export default function MetricsTab({
  <EmptyState
  icon={BarChart3}
  title="No Metrics Yet"
- description="Create your first metric to start tracking your initiative's impact"
- action={onAddKPI ? (
+ description="Create your first metric to start tracking your initiative's impact — or import them from your annual report"
+ action={(onAddKPI || onImportReport) ? (
+ <div className="flex flex-col sm:flex-row items-center gap-2">
+ {onImportReport && (
+ <button type="button" onClick={onImportReport} className="app-btn app-btn-secondary">
+ <Sparkles className="w-4 h-4" />
+ <span>Import from report</span>
+ </button>
+ )}
+ {onAddKPI && (
  <button type="button" onClick={onAddKPI} className="app-btn app-btn-primary">
  <Plus className="w-4 h-4" />
  <span>Add Metric</span>
  </button>
+ )}
+ </div>
  ) : undefined}
  />
  </div>
@@ -280,6 +314,17 @@ export default function MetricsTab({
  Impacts
  </button>
  </div>
+
+ {onImportReport && (
+ <button
+ type="button"
+ onClick={onImportReport}
+ className="app-btn app-btn-secondary app-btn-sm"
+ >
+ <Sparkles className="w-4 h-4" />
+ <span>Import from report</span>
+ </button>
+ )}
 
  {onAddKPI && (
  <button

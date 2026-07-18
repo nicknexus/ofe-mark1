@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion, useReducedMotion } from "framer-motion";
+import { useReducedMotion } from "framer-motion";
 import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
 import { ArrowRight, MapPin, Calendar, Play, Building2, ChevronLeft, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { publicApi, type Showcase, type ShowcaseStory } from "../../services/publicApi";
-import { Reveal, StaggerGroup, StaggerItem } from "./Reveal";
-import { AnimatedNumber } from "./AnimatedNumber";
-import { easeOut } from "./motion";
+import { Reveal } from "./Reveal";
 
-// Resolve a usable thumbnail for a story's media.
+type EmblaApi = NonNullable<ReturnType<typeof useEmblaCarousel>[1]>;
+
 function resolveThumb(story: ShowcaseStory): { kind: "img" | "video" | "none"; src?: string } {
   const url = story.media_url;
   if (!url) return { kind: "none" };
@@ -29,22 +28,19 @@ function safeDate(value?: string) {
   return isNaN(d.getTime()) ? "" : format(d, "MMM d, yyyy");
 }
 
-const StatCard = ({ value, label, delay }: { value: number; label: string; delay: number }) => (
-  <StaggerItem>
-    <motion.div
-      className="glass-card rounded-2xl px-5 py-6 text-center h-full"
-      whileHover={{ y: -4 }}
-      transition={{ duration: 0.3, ease: easeOut }}
-    >
-      <p className="text-3xl sm:text-4xl font-fraunces font-light text-sage-deep mb-1">
-        <AnimatedNumber value={value} duration={1.6 + delay} />
-      </p>
-      <p className="text-xs sm:text-sm text-muted-foreground">{label}</p>
-    </motion.div>
-  </StaggerItem>
-);
+function clamp(n: number, min: number, max: number) {
+  return Math.min(Math.max(n, min), max);
+}
 
-const StoryCard = ({ story }: { story: ShowcaseStory }) => {
+const TWEEN_FACTOR = 0.9;
+
+function StoryCard({
+  story,
+  active,
+}: {
+  story: ShowcaseStory;
+  active?: boolean;
+}) {
   const thumb = resolveThumb(story);
   const to =
     story.org_slug && story.initiative_slug
@@ -55,129 +51,195 @@ const StoryCard = ({ story }: { story: ShowcaseStory }) => {
   const accent = story.org_brand_color || "#c0dfa1";
 
   return (
-      <motion.div
-        whileHover={{ y: -6 }}
-        transition={{ type: "spring", stiffness: 300, damping: 22 }}
-        className="h-full"
-      >
-        <Link
-          to={to}
-          className="group block h-full rounded-2xl overflow-hidden bg-white border border-border/60 shadow-glass hover:shadow-glass-lg transition-shadow"
-        >
-          {/* Media */}
-          <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-sage-light/40 to-accent/10">
-            {thumb.kind === "img" && (
-              <img
-                src={thumb.src}
-                alt={story.title}
-                loading="lazy"
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              />
-            )}
-            {thumb.kind === "video" && (
-              <video
-                src={thumb.src}
-                muted
-                playsInline
-                preload="metadata"
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-            )}
-            {thumb.kind === "none" && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="font-fraunces text-2xl font-light text-foreground/40 px-6 text-center line-clamp-3">
-                  {story.title}
-                </span>
-              </div>
-            )}
-            {(story.media_type === "video") && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-12 h-12 rounded-full bg-white/85 backdrop-blur flex items-center justify-center shadow-lg">
-                  <Play className="w-5 h-5 text-foreground translate-x-0.5" fill="currentColor" />
-                </div>
-              </div>
-            )}
-            {/* Live badge */}
-            <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/85 backdrop-blur text-[10px] font-semibold uppercase tracking-wider text-foreground">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full rounded-full bg-accent opacity-75 animate-ping" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
+    <Link
+      to={to}
+      className={`group relative block h-full rounded-2xl overflow-hidden bg-white border transition-[box-shadow,border-color] duration-300 ${
+        active
+          ? "border-accent/40 shadow-[0_18px_40px_-12px_rgba(70,83,96,0.35),0_8px_16px_-8px_rgba(70,83,96,0.2),0_0_0_1px_rgba(192,223,161,0.25)]"
+          : "border-border/50 shadow-[0_12px_28px_-10px_rgba(70,83,96,0.28),0_4px_10px_-6px_rgba(70,83,96,0.18)]"
+      }`}
+      style={{
+        transformStyle: "preserve-3d",
+        backgroundImage:
+          "linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(255,255,255,0.96) 100%)",
+      }}
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-px z-20"
+        style={{
+          background:
+            "linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent)",
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-3 left-[8%] right-[8%] h-6 rounded-[100%] blur-md z-0"
+        style={{
+          background: active ? "rgba(70,83,96,0.28)" : "rgba(70,83,96,0.16)",
+        }}
+      />
+
+      <div className="relative z-10">
+        <div className="relative aspect-[16/10] overflow-hidden bg-gradient-to-br from-sage-light/40 to-accent/10">
+          {thumb.kind === "img" && (
+            <img
+              src={thumb.src}
+              alt={story.title}
+              loading="lazy"
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
+          )}
+          {thumb.kind === "video" && (
+            <video
+              src={thumb.src}
+              muted
+              playsInline
+              preload="metadata"
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          )}
+          {thumb.kind === "none" && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="font-fraunces text-xl font-light text-foreground/40 px-6 text-center line-clamp-3">
+                {story.title}
               </span>
-              Live
+            </div>
+          )}
+          {story.media_type === "video" && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-white/85 backdrop-blur flex items-center justify-center shadow-lg">
+                <Play className="w-4 h-4 text-foreground translate-x-0.5" fill="currentColor" />
+              </div>
+            </div>
+          )}
+          <span className="absolute top-2.5 left-2.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/85 backdrop-blur text-[10px] font-semibold uppercase tracking-wider text-foreground">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-accent opacity-75 animate-ping" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
+            </span>
+            Live
+          </span>
+        </div>
+
+        <div className="p-3.5">
+          <div className="flex items-center gap-2 mb-2">
+            <span
+              className="w-5 h-5 rounded-md overflow-hidden flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: `${accent}26` }}
+            >
+              {story.org_logo_url ? (
+                <img src={story.org_logo_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <Building2 className="w-3 h-3 text-foreground/60" />
+              )}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground truncate">
+              {story.org_name || "Nexus organization"}
             </span>
           </div>
 
-          {/* Body */}
-          <div className="p-5">
-            {/* Org row */}
-            <div className="flex items-center gap-2 mb-3">
-              <span
-                className="w-6 h-6 rounded-md overflow-hidden flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: `${accent}26` }}
-              >
-                {story.org_logo_url ? (
-                  <img src={story.org_logo_url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <Building2 className="w-3.5 h-3.5 text-foreground/60" />
-                )}
-              </span>
-              <span className="text-xs font-medium text-muted-foreground truncate">
-                {story.org_name || "Nexus organization"}
-              </span>
-            </div>
+          <h3 className="font-semibold text-sm text-foreground mb-1 leading-snug line-clamp-2">
+            {story.title}
+          </h3>
+          {story.description && (
+            <p className="text-xs text-muted-foreground line-clamp-2 mb-2.5">{story.description}</p>
+          )}
 
-            <h3 className="font-semibold text-foreground mb-2 leading-snug line-clamp-2">
-              {story.title}
-            </h3>
-            {story.description && (
-              <p className="text-sm text-muted-foreground line-clamp-2 mb-4">{story.description}</p>
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+            {story.location_name ? (
+              <span className="flex items-center gap-1 truncate">
+                <MapPin className="w-3 h-3 text-accent flex-shrink-0" />
+                <span className="truncate">{story.location_name}</span>
+              </span>
+            ) : (
+              <span />
             )}
-
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              {story.location_name ? (
-                <span className="flex items-center gap-1 truncate">
-                  <MapPin className="w-3.5 h-3.5 text-accent flex-shrink-0" />
-                  <span className="truncate">{story.location_name}</span>
-                </span>
-              ) : (
-                <span />
-              )}
-              {safeDate(story.date_represented) && (
-                <span className="flex items-center gap-1 flex-shrink-0">
-                  <Calendar className="w-3.5 h-3.5 text-accent" />
-                  {safeDate(story.date_represented)}
-                </span>
-              )}
-            </div>
+            {safeDate(story.date_represented) && (
+              <span className="flex items-center gap-1 flex-shrink-0">
+                <Calendar className="w-3 h-3 text-accent" />
+                {safeDate(story.date_represented)}
+              </span>
+            )}
           </div>
-        </Link>
-      </motion.div>
+        </div>
+      </div>
+    </Link>
   );
-};
+}
 
 const SkeletonCard = () => (
-  <div className="rounded-2xl overflow-hidden bg-white border border-border/60 shadow-glass">
-    <div className="aspect-[4/3] bg-muted animate-pulse" />
-    <div className="p-5 space-y-3">
+  <div className="rounded-2xl overflow-hidden bg-white border border-border/60 shadow-[0_12px_28px_-10px_rgba(70,83,96,0.28)]">
+    <div className="aspect-[16/10] bg-muted animate-pulse" />
+    <div className="p-3.5 space-y-2">
       <div className="h-3 w-1/3 bg-muted rounded animate-pulse" />
-      <div className="h-4 w-3/4 bg-muted rounded animate-pulse" />
+      <div className="h-3.5 w-3/4 bg-muted rounded animate-pulse" />
       <div className="h-3 w-full bg-muted rounded animate-pulse" />
     </div>
   </div>
 );
+
+function applyCoverflow(
+  emblaApi: EmblaApi,
+  slideNodes: HTMLElement[],
+  reduceMotion: boolean | null
+) {
+  const scrollProgress = emblaApi.scrollProgress();
+  const engine = emblaApi.internalEngine();
+  const snapCount = emblaApi.scrollSnapList().length;
+
+  emblaApi.scrollSnapList().forEach((scrollSnap: number, snapIndex: number) => {
+    let diffToTarget = scrollSnap - scrollProgress;
+    const slidesInSnap = engine.slideRegistry[snapIndex] as number[];
+
+    slidesInSnap.forEach((slideIndex: number) => {
+      const node = slideNodes[slideIndex];
+      if (!node) return;
+
+      if (engine.options.loop) {
+        engine.slideLooper.loopPoints.forEach((loopItem: { index: number; target: () => number }) => {
+          const target = loopItem.target();
+          if (slideIndex === loopItem.index && target !== 0) {
+            const sign = Math.sign(target);
+            if (sign === -1) diffToTarget = scrollSnap - (1 + scrollProgress);
+            if (sign === 1) diffToTarget = scrollSnap + (1 - scrollProgress);
+          }
+        });
+      }
+
+      if (reduceMotion) {
+        node.style.transform = "";
+        node.style.opacity = "1";
+        node.style.zIndex = String(Math.round(1 - Math.abs(diffToTarget) * 10));
+        return;
+      }
+
+      const abs = Math.abs(diffToTarget);
+      const proximity = clamp(1 - abs * TWEEN_FACTOR * snapCount, 0, 1);
+      const scale = 0.78 + proximity * 0.3;
+      const rotateY = clamp(diffToTarget * snapCount * -18, -28, 28);
+      const translateY = (1 - proximity) * 28;
+      const opacity = 0.55 + proximity * 0.45;
+
+      node.style.transform = `translateY(${translateY}px) scale(${scale}) rotateY(${rotateY}deg)`;
+      node.style.opacity = String(opacity);
+      node.style.zIndex = String(Math.round(proximity * 20));
+    });
+  });
+}
 
 const LiveImpactSection = () => {
   const [data, setData] = useState<Showcase | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "empty">("loading");
 
   const reduceMotion = useReducedMotion();
+  const slideNodesRef = useRef<HTMLElement[]>([]);
 
-  // Horizontal carousel — shows 3 cards at a time and scrolls through the rest.
   const autoplay = useRef(
     Autoplay({ delay: 4000, stopOnInteraction: false, stopOnMouseEnter: true })
   );
   const [emblaRef, emblaApi] = useEmblaCarousel(
-    { loop: true, align: "start", containScroll: "trimSnaps" },
+    { loop: true, align: "center", containScroll: false, skipSnaps: false },
     reduceMotion ? [] : [autoplay.current]
   );
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -187,21 +249,31 @@ const LiveImpactSection = () => {
   const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
   const scrollTo = useCallback((i: number) => emblaApi?.scrollTo(i), [emblaApi]);
 
+  const setSlideRef = useCallback((el: HTMLDivElement | null, index: number) => {
+    if (el) slideNodesRef.current[index] = el;
+  }, []);
+
   useEffect(() => {
     if (!emblaApi) return;
+
+    const tween = () => applyCoverflow(emblaApi, slideNodesRef.current, reduceMotion);
     const onSelect = () => setSelectedIndex(emblaApi.selectedScrollSnap());
     const onReInit = () => {
       setSnaps(emblaApi.scrollSnapList());
       onSelect();
+      tween();
     };
+
     onReInit();
     emblaApi.on("select", onSelect);
+    emblaApi.on("scroll", tween);
     emblaApi.on("reInit", onReInit);
     return () => {
       emblaApi.off("select", onSelect);
+      emblaApi.off("scroll", tween);
       emblaApi.off("reInit", onReInit);
     };
-  }, [emblaApi, data]);
+  }, [emblaApi, data, reduceMotion]);
 
   useEffect(() => {
     let alive = true;
@@ -222,27 +294,14 @@ const LiveImpactSection = () => {
     };
   }, []);
 
-  // If there's genuinely nothing to show (fresh install / API down), render
-  // nothing rather than an awkward empty band.
   if (status === "empty") return null;
-
-  const stats = data?.stats;
-  const statCards = stats
-    ? [
-        { value: stats.organizations, label: stats.organizations === 1 ? "Organization" : "Organizations" },
-        { value: stats.stories, label: "Moments captured" },
-        { value: stats.countries, label: stats.countries === 1 ? "Country" : "Countries" },
-        { value: stats.locations, label: "Locations" },
-      ].filter((s) => s.value > 0)
-    : [];
 
   return (
     <section className="py-16 md:py-24 relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-background via-sage-light/10 to-background" />
 
       <div className="relative z-10 max-w-7xl mx-auto px-6">
-        {/* Header */}
-        <Reveal className="max-w-2xl mb-10">
+        <Reveal className="max-w-3xl mb-10">
           <p className="inline-flex items-center gap-2 text-xs font-semibold text-accent uppercase tracking-[0.2em] mb-4">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full rounded-full bg-accent opacity-75 animate-ping" />
@@ -250,21 +309,13 @@ const LiveImpactSection = () => {
             </span>
             Live on Nexus right now
           </p>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-fraunces font-light text-foreground leading-tight">
-            Real organizations. Real moments. Happening as you read this.
+          <h2 className="text-3xl sm:text-4xl font-fraunces font-light text-foreground leading-snug">
+            Real organizations. Real moments.
+            <br className="hidden sm:block" />
+            {" "}Happening as you read this.
           </h2>
         </Reveal>
 
-        {/* Live stats */}
-        {statCards.length > 0 && (
-          <StaggerGroup className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12" gap={0.08}>
-            {statCards.map((s, i) => (
-              <StatCard key={s.label} value={s.value} label={s.label} delay={i * 0.05} />
-            ))}
-          </StaggerGroup>
-        )}
-
-        {/* Story cards — horizontal carousel, 3 in view */}
         {status === "loading" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -273,24 +324,35 @@ const LiveImpactSection = () => {
           </div>
         ) : (
           <div className="relative">
-            {/* Viewport */}
-            <div className="overflow-hidden" ref={emblaRef}>
-              <div className="flex -ml-6">
-                {data!.stories.map((story) => (
+            <div
+              className="overflow-hidden py-6"
+              ref={emblaRef}
+              style={{ perspective: reduceMotion ? undefined : 1200 }}
+            >
+              <div className="flex touch-pan-y" style={{ transformStyle: "preserve-3d" }}>
+                {data!.stories.map((story, i) => (
                   <div
                     key={story.id}
-                    className="min-w-0 flex-[0_0_100%] sm:flex-[0_0_50%] lg:flex-[0_0_33.333%] pl-6"
+                    ref={(el) => setSlideRef(el, i)}
+                    className="min-w-0 flex-[0_0_82%] sm:flex-[0_0_52%] lg:flex-[0_0_38%] px-3 sm:px-4 will-change-transform"
+                    style={{ transformStyle: "preserve-3d" }}
                   >
-                    <StoryCard story={story} />
+                    <StoryCard story={story} active={i === selectedIndex} />
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Controls */}
-            <div className="flex items-center justify-between mt-6">
-              {/* Dots */}
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-4 mt-2 px-1">
+              <button
+                onClick={scrollPrev}
+                aria-label="Previous"
+                className="w-10 h-10 shrink-0 rounded-xl bg-white border border-border/60 shadow-glass hover:shadow-glass-lg hover:border-accent/40 flex items-center justify-center transition-all active:scale-95"
+              >
+                <ChevronLeft className="w-5 h-5 text-foreground" />
+              </button>
+
+              <div className="flex items-center justify-center gap-2 flex-1">
                 {snaps.map((_, i) => (
                   <button
                     key={i}
@@ -302,28 +364,18 @@ const LiveImpactSection = () => {
                   />
                 ))}
               </div>
-              {/* Arrows */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={scrollPrev}
-                  aria-label="Previous"
-                  className="w-10 h-10 rounded-xl bg-white border border-border/60 shadow-glass hover:shadow-glass-lg hover:border-accent/40 flex items-center justify-center transition-all active:scale-95"
-                >
-                  <ChevronLeft className="w-5 h-5 text-foreground" />
-                </button>
-                <button
-                  onClick={scrollNext}
-                  aria-label="Next"
-                  className="w-10 h-10 rounded-xl bg-white border border-border/60 shadow-glass hover:shadow-glass-lg hover:border-accent/40 flex items-center justify-center transition-all active:scale-95"
-                >
-                  <ChevronRight className="w-5 h-5 text-foreground" />
-                </button>
-              </div>
+
+              <button
+                onClick={scrollNext}
+                aria-label="Next"
+                className="w-10 h-10 shrink-0 rounded-xl bg-white border border-border/60 shadow-glass hover:shadow-glass-lg hover:border-accent/40 flex items-center justify-center transition-all active:scale-95"
+              >
+                <ChevronRight className="w-5 h-5 text-foreground" />
+              </button>
             </div>
           </div>
         )}
 
-        {/* CTA */}
         <Reveal className="flex justify-center mt-12" delay={0.1}>
           <Link
             to="/explore"

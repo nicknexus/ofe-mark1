@@ -25,6 +25,7 @@ import { formatDate, getEvidenceColor, getCategoryColor, getEvidenceTypeInfo, ge
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import { AuthService } from '../services/auth'
 import CreateKPIModal from '../components/CreateKPIModal'
+import ReportImportModal from '../components/reportImport/ReportImportModal'
 import AddKPIUpdateModal from '../components/AddKPIUpdateModal'
 import AddKPIUpdateModalWithMetricSelection from '../components/AddKPIUpdateModalWithMetricSelection'
 import ImpactClaimUploadModal from '../components/impactClaims/ImpactClaimUploadModal'
@@ -70,6 +71,7 @@ export default function InitiativePage() {
 
  // Modal states
  const [isKPIModalOpen, setIsKPIModalOpen] = useState(false)
+ const [isReportImportOpen, setIsReportImportOpen] = useState(false)
  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
  const [isImpactClaimModalWithSelectionOpen, setIsImpactClaimModalWithSelectionOpen] = useState(false)
  const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false)
@@ -503,6 +505,7 @@ export default function InitiativePage() {
  setExpandedKPIs={setExpandedKPIs}
  allKPIUpdates={allKPIUpdates}
  onAddKPI={canEditMetrics ? () => setIsKPIModalOpen(true) : undefined}
+ onImportReport={canEditMetrics ? () => setIsReportImportOpen(true) : undefined}
  onAddUpdate={openUpdateModal}
  onAddEvidence={canEditEvidence ? openEvidenceModal : undefined}
  onEditKPI={canEditMetrics ? openEditModal : undefined}
@@ -616,6 +619,16 @@ export default function InitiativePage() {
  onSubmit={handleCreateKPI}
  initiativeId={id!}
  />
+
+ {isReportImportOpen && (
+ <ReportImportModal
+ scope="initiative"
+ initiativeId={id!}
+ initiativeTitle={dashboard?.initiative?.title}
+ onClose={() => setIsReportImportOpen(false)}
+ onApplied={loadDashboard}
+ />
+ )}
 
  {/* Unified impact claim modal — covers both single-KPI and multi-KPI flows */}
  <ImpactClaimUploadModal

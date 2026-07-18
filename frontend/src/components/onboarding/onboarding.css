@@ -627,6 +627,57 @@
   opacity: 0.5;
 }
 
+/* Annual-report import banner */
+.onboarding-import-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  width: 100%;
+  text-align: left;
+  margin-top: 2rem;
+  padding: 1rem 1.125rem;
+  border-radius: 0.875rem;
+  border: 1px solid var(--ob-border-strong);
+  background: var(--ob-grad-soft);
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.onboarding-import-banner:hover {
+  border-color: var(--ob-accent-2);
+  box-shadow: var(--ob-shadow-accent, 0 4px 14px rgba(120, 154, 89, 0.18));
+  transform: translateY(-1px);
+}
+
+.onboarding-import-banner-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.onboarding-import-banner-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.onboarding-import-banner-desc {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin-top: 0.125rem;
+}
+
+.onboarding-import-banner-arrow {
+  color: var(--ob-accent);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.onboarding-import-banner:hover .onboarding-import-banner-arrow {
+  transform: translateX(3px);
+}
+
 /* Mode cards */
 .onboarding-mode-grid {
   display: grid;

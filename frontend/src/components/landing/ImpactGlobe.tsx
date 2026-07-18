@@ -36,9 +36,11 @@ interface ImpactGlobeProps {
   showLabels?: boolean;
   brandColor?: string;
   enableZoom?: boolean;
+  /** Smoothly rotate the globe to this pin when it changes. */
+  focusLocation?: { lat: number; lng: number } | null;
 }
 
-const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoom = false }: ImpactGlobeProps) => {
+const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoom = false, focusLocation }: ImpactGlobeProps) => {
   const globeRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -107,12 +109,14 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
     return { lat: 20, lng: 0, altitude: 2.5 };
   }, [locations]);
 
-  // Globe color based on brand color
-  const globeColor = brandColor || "#c0dfa1";
+  // Land defaults to seafoam; atmosphere stays brand dark grey; rings seafoam (or org brand).
+  const landColor = brandColor || "#c0dfa1";
+  const atmosphereColor = brandColor || "#465360";
+  const ringAccent = brandColor || "#c0dfa1";
 
   // Convert hex (#rrggbb) to {r,g,b}; fallback to brand-ish green if invalid
   const brandRgb = useMemo(() => {
-    const hex = (globeColor || "").replace('#', '');
+    const hex = (ringAccent || "").replace('#', '');
     if (hex.length === 6) {
       const r = parseInt(hex.slice(0, 2), 16);
       const g = parseInt(hex.slice(2, 4), 16);
@@ -120,14 +124,24 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
       if ([r, g, b].every(n => Number.isFinite(n))) return { r, g, b };
     }
     return { r: 192, g: 223, b: 161 };
-  }, [globeColor]);
+  }, [ringAccent]);
 
   // Stable callback refs so Globe doesn't re-process on every render
-  const polygonCapColorFn = useCallback(() => `${globeColor}99`, [globeColor]);
-  const polygonSideColorFn = useCallback(() => `${globeColor}26`, [globeColor]);
+  const polygonCapColorFn = useCallback(() => `${landColor}99`, [landColor]);
+  const polygonSideColorFn = useCallback(() => `${landColor}26`, [landColor]);
   const polygonStrokeColorFn = useCallback(() => "rgba(255, 255, 255, 0.3)", []);
-  // Pins are pure white — pop against the brand-tinted globe.
-  const pointColorFn = useCallback(() => '#ffffff', []);
+  // Flat CSS dots in brand grey — 3D cylinders pick up lighting and drift off-color.
+  const htmlElementFn = useCallback(() => {
+    const el = document.createElement("div");
+    const size = locations ? 6 : 5;
+    el.style.width = `${size}px`;
+    el.style.height = `${size}px`;
+    el.style.borderRadius = "50%";
+    el.style.background = "#465360";
+    el.style.boxShadow = "none";
+    el.style.pointerEvents = "none";
+    return el;
+  }, [locations]);
   const arcColorFn = useCallback(() => ["rgba(255, 255, 255, 0.55)", "rgba(255, 255, 255, 0.05)"], []);
   // Glow effect: ring starts bright white at the pin, blends with a touch of
   // brand color as it propagates, fades out. ringRepeatPeriod below is set
@@ -211,13 +225,29 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
       controls.minDistance = 105;
       controls.maxDistance = 600;
 
+      // Force true canvas transparency (backgroundColor alone can leave a black clear).
+      const renderer = typeof globeRef.current.renderer === "function"
+        ? globeRef.current.renderer()
+        : null;
+      renderer?.setClearColor?.(0x000000, 0);
+
       // Only set initial POV once
       if (!hasSetInitialPov.current) {
         globeRef.current.pointOfView(initialPov);
         hasSetInitialPov.current = true;
       }
+
     }
   }, [dimensions, initialPov, locations, enableZoom]);
+
+  // Animate POV when the landing page rotates to a new featured claim.
+  useEffect(() => {
+    if (!globeRef.current || !focusLocation) return;
+    globeRef.current.pointOfView(
+      { lat: focusLocation.lat, lng: focusLocation.lng, altitude: 1.85 },
+      1200
+    );
+  }, [focusLocation?.lat, focusLocation?.lng]);
 
   // Dispose the WebGL context on unmount.
   //
@@ -272,18 +302,16 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
           backgroundColor="rgba(0,0,0,0)"
           showGlobe={false}
           showAtmosphere={true}
-          atmosphereColor={globeColor}
-          atmosphereAltitude={0.2}
+          atmosphereColor={atmosphereColor}
+          atmosphereAltitude={0.06}
           polygonsData={countries.features}
           polygonCapColor={polygonCapColorFn}
           polygonSideColor={polygonSideColorFn}
           polygonStrokeColor={polygonStrokeColorFn}
           polygonAltitude={0.006}
-          pointsData={pointsData}
-          pointAltitude={locations ? 0.02 : 0.012}
-          pointRadius={locations ? 0.85 : 0.6}
-          pointColor={pointColorFn}
-          pointsMerge={false}
+          htmlElementsData={pointsData}
+          htmlElement={htmlElementFn}
+          htmlAltitude={0.012}
           arcsData={arcsData}
           arcColor={arcColorFn}
           arcAltitude={(d: any) => d.altitude ?? 0.25}

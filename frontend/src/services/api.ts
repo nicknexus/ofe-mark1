@@ -18,7 +18,8 @@ import {
  OrganizationContext,
  Donor,
  DonorCredit,
- MetricTag
+ MetricTag,
+ ReportImport
 } from '../types'
 import { OnboardingChatResponse, ChatStage, ChatContext } from '../components/onboarding/planTypes'
 
@@ -1186,6 +1187,53 @@ class ApiService {
  method: 'POST',
  body: JSON.stringify({ messages, stage, context })
  })
+ }
+
+ // Annual report import.
+ // Uses direct fetch (not the cached/retrying `request` wrapper): extraction is
+ // a long, non-idempotent, one-shot operation, and polling needs fresh reads.
+ private async reportImportFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+ const headers = await this.getAuthHeaders()
+ const response = await fetch(`${API_BASE_URL}/api${path}`, {
+ ...options,
+ headers: { ...headers, ...options.headers }
+ })
+ if (!response.ok) {
+ let message = `HTTP ${response.status}`
+ try {
+ const body = await response.json()
+ message = body.error || body.message || message
+ const err = new Error(message) as any
+ err.code = body.code
+ err.status = response.status
+ throw err
+ } catch (e: any) {
+ if (e?.status) throw e
+ throw new Error(message)
+ }
+ }
+ return response.json()
+ }
+
+ // Create a job from an already-uploaded file and run extraction. This request
+ // can take 30-90s for a large report.
+ async createReportImport(input: {
+ file_name?: string
+ file_path?: string
+ file_url?: string
+ }): Promise<ReportImport> {
+ return this.reportImportFetch<ReportImport>('/report-imports', {
+ method: 'POST',
+ body: JSON.stringify(input)
+ })
+ }
+
+ async getReportImport(id: string): Promise<ReportImport> {
+ return this.reportImportFetch<ReportImport>(`/report-imports/${id}`)
+ }
+
+ async listReportImports(): Promise<ReportImport[]> {
+ return this.reportImportFetch<ReportImport[]>('/report-imports')
  }
 
  // Storage - Phase 1: Tracking Only

@@ -9,7 +9,6 @@ interface LandingNavbarProps {
 }
 
 const navLinks = [
-  { href: "#how-it-works", label: "How It Works" },
   { href: "#why-it-matters", label: "Why It Matters" },
   { href: "#pricing", label: "Pricing" },
 ];

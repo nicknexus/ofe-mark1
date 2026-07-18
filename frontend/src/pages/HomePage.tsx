@@ -6,11 +6,9 @@ import { LandingNavbar, HeroSection } from '../components/landing';
 // Lazy load below-the-fold sections for faster initial load
 const WalkthroughSection = lazy(() => import('../components/landing/WalkthroughSection'));
 const ProblemsSection = lazy(() => import('../components/landing/ProblemsSection'));
-const HowItWorksSection = lazy(() => import('../components/landing/HowItWorksSection'));
 const ExplorePromoSection = lazy(() => import('../components/landing/ExplorePromoSection'));
 const LiveImpactSection = lazy(() => import('../components/landing/LiveImpactSection'));
 const WhyItMattersSection = lazy(() => import('../components/landing/WhyItMattersSection'));
-const WhoItServesSection = lazy(() => import('../components/landing/WhoItServesSection'));
 // const TestimonialsSection = lazy(() => import('../components/landing/TestimonialsSection'));
 const PricingSection = lazy(() => import('../components/landing/PricingSection'));
 const CTASection = lazy(() => import('../components/landing/CTASection'));
@@ -32,7 +30,7 @@ export default function HomePage() {
     <main className="relative min-h-screen bg-background font-figtree landing-page">
       {/* Global graph-paper grid + fade */}
       <div className="pointer-events-none fixed inset-0 z-0">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(210,220,230,0.2)_1px,transparent_1px),linear-gradient(to_bottom,rgba(210,220,230,0.2)_1px,transparent_1px)] bg-[size:60px_60px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(210,220,230,0.3)_1px,transparent_1px),linear-gradient(to_bottom,rgba(210,220,230,0.2)_1px,transparent_1px)] bg-[size:60px_60px]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_50%,transparent_0%,white_70%)]" />
       </div>
       <LandingNavbar onGetStarted={handleGetStarted} />
@@ -44,9 +42,6 @@ export default function HomePage() {
         <ProblemsSection onGetStarted={handleGetStarted} />
       </Suspense>
       <Suspense fallback={<SectionLoader />}>
-        <HowItWorksSection />
-      </Suspense>
-      <Suspense fallback={<SectionLoader />}>
         <ExplorePromoSection />
       </Suspense>
       <Suspense fallback={<SectionLoader />}>
@@ -54,9 +49,6 @@ export default function HomePage() {
       </Suspense>
       <Suspense fallback={<SectionLoader />}>
         <WhyItMattersSection />
-      </Suspense>
-      <Suspense fallback={<SectionLoader />}>
-        <WhoItServesSection onGetStarted={handleGetStarted} />
       </Suspense>
       {/* <Suspense fallback={<SectionLoader />}>
         <TestimonialsSection />

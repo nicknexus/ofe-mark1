@@ -57,7 +57,11 @@ export default function OnboardingWizard() {
   const [step, setStep] = useState(0)
   const [dir, setDir] = useState(1)
   const [completed, setCompleted] = useState({ account: false, initiative: false })
+  const [reloadKey, setReloadKey] = useState(0)
   const hydratedFor = useRef<string | null>(null)
+
+  // Re-pull org data (e.g. after an annual-report import created new content).
+  const reloadHubData = () => { hydratedFor.current = null; setReloadKey(k => k + 1) }
 
   // Hydrate existing org data once per activation so re-opening setup shows
   // prior work (with those items locked, create-only).
@@ -97,7 +101,7 @@ export default function OnboardingWizard() {
       } catch { /* non-fatal — start empty */ }
     })()
     return () => { cancelled = true }
-  }, [isActive, orgId, hydrate])
+  }, [isActive, orgId, hydrate, reloadKey])
 
   // When the wizard closes, reset so re-opening always lands on the selection
   // hub (not wherever you left off) and re-pulls fresh data.
@@ -247,7 +251,7 @@ export default function OnboardingWizard() {
                       <ModeChooserStep onChooseChat={() => setView('chat')} onChooseManual={() => setView('hub')} />
                     )}
                     {view === 'hub' && (
-                      <SetupHubStep completed={completed} onSelect={selectTrack} onFinish={completeAll} />
+                      <SetupHubStep completed={completed} onSelect={selectTrack} onFinish={completeAll} onImported={reloadHubData} />
                     )}
                     {isTrack && renderTrackStep()}
                   </motion.div>

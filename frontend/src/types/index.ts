@@ -426,4 +426,91 @@ export interface ModalState {
  isOpen: boolean;
  type?: 'create' | 'edit' | 'view';
  data?: any;
+}
+
+// --- Annual report import ---------------------------------------------------
+// Suggestions extracted from an uploaded annual report (PDF). These mirror the
+// create payloads used elsewhere; the user reviews/edits them before applying.
+
+export type ReportImportStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+export interface ExtractedOrganization {
+ statement?: string;
+ description?: string;
+ website_url?: string;
+ donation_url?: string;
+}
+
+export interface ExtractedStatCard {
+ type: 'stat' | 'statement';
+ value?: string;
+ title: string;
+ description?: string;
+ source?: string;
+}
+
+export interface ExtractedContext {
+ problem_statement?: string;
+ theory_of_change?: string;
+ strategies?: { title: string; description?: string }[];
+ stats_and_statements?: ExtractedStatCard[];
+ additional_info?: string;
+}
+
+export interface ExtractedLocation {
+ name: string;
+ country?: string;
+}
+
+export interface ExtractedInitiative {
+ title: string;
+ description?: string;
+ region?: string;
+}
+
+export interface ExtractedMetric {
+ title: string;
+ description?: string;
+ unit_of_measurement: string;
+ metric_type: 'number' | 'percentage';
+ category: 'input' | 'output' | 'impact';
+ initiative?: string;
+ value?: number;
+ period_start?: string;
+ period_end?: string;
+ period_label?: string;
+ tags?: string[];
+}
+
+export interface ExtractedBeneficiaryGroup {
+ name: string;
+ description?: string;
+ total_number?: number | null;
+ age_range_start?: number | null;
+ age_range_end?: number | null;
+ initiative?: string;
+}
+
+export interface ExtractedSuggestions {
+ organization?: ExtractedOrganization;
+ context?: ExtractedContext;
+ locations?: ExtractedLocation[];
+ initiatives?: ExtractedInitiative[];
+ metrics?: ExtractedMetric[];
+ beneficiary_groups?: ExtractedBeneficiaryGroup[];
+ summary?: string;
+}
+
+export interface ReportImport {
+ id: string;
+ organization_id: string;
+ user_id?: string | null;
+ file_name?: string | null;
+ file_path?: string | null;
+ file_url?: string | null;
+ status: ReportImportStatus;
+ error?: string | null;
+ extracted: ExtractedSuggestions;
+ created_at?: string;
+ updated_at?: string;
 } 
