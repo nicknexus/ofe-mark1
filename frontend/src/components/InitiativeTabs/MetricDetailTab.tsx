@@ -62,7 +62,6 @@ export default function MetricDetailTab({
   }, [kpis, kpi])
 
   const updates = useMemo(() => kpiUpdates.filter(u => u.kpi_id === kpi.id), [kpiUpdates, kpi.id])
-  const claimCount = updates.length
 
   useEffect(() => {
     if (!initiativeId) return
@@ -95,26 +94,33 @@ export default function MetricDetailTab({
           initial="hidden"
           animate="visible"
         >
-          {/* Header — title left, total centered in header band, actions right */}
-          <motion.div variants={fadeUp} className="relative pb-1">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-start gap-3 min-w-0 flex-1 md:max-w-[38%]">
-                <button onClick={onBack} className="app-btn app-btn-ghost app-btn-icon flex-shrink-0 mt-0.5" aria-label="Back">
+          {/* Header — title | total inline, actions right */}
+          <motion.div variants={fadeUp}>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0 flex-1 flex-wrap">
+                <button onClick={onBack} className="app-btn app-btn-ghost app-btn-icon flex-shrink-0" aria-label="Back">
                   <ArrowLeft className="w-5 h-5" />
                 </button>
-                <div className="min-w-0 flex-1">
-                  <h2 className="flex items-start gap-2 text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">
-                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-2 sm:mt-2.5" style={{ backgroundColor: color }} />
-                    <span className="min-w-0 break-words">{kpi.title}</span>
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-1.5">
-                    <span className="capitalize">{kpi.category}</span>
-                    {` · ${claimCount} claim${claimCount === 1 ? '' : 's'}`}
-                    {typeof (kpi as any).evidence_percentage === 'number' ? ` · ${(kpi as any).evidence_percentage}% evidenced` : ''}
-                  </p>
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight min-w-0 break-words">
+                  {kpi.title}
+                </h2>
+                <span
+                  className="w-px h-8 sm:h-9 bg-gray-200 flex-shrink-0 mx-0.5 sm:mx-1 self-center"
+                  aria-hidden
+                />
+                <div className="flex items-baseline gap-1.5 flex-shrink-0">
+                  <span className="text-3xl sm:text-4xl font-bold text-gray-900 tabular-nums leading-none tracking-tight">
+                    {isPct ? `${Math.round(kpiTotal)}%` : kpiTotal.toLocaleString()}
+                  </span>
+                  {!isPct && kpi.unit_of_measurement && (
+                    <span className="text-sm sm:text-base font-semibold text-gray-500 leading-none">
+                      {kpi.unit_of_measurement}
+                    </span>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0 pt-0.5">
+              <div className="flex items-center gap-2 flex-shrink-0">
               {canEditMetrics && onEdit && (
                 <button
                   onClick={onEdit}
@@ -135,16 +141,6 @@ export default function MetricDetailTab({
                 </button>
               )}
               </div>
-            </div>
-            <div className="absolute left-1/2 top-[58%] -translate-x-1/2 -translate-y-1/2 flex items-baseline justify-center gap-2 pointer-events-none max-w-[44%]">
-              <span className="text-4xl sm:text-5xl font-bold text-gray-900 tabular-nums leading-none tracking-tight">
-                {isPct ? `${Math.round(kpiTotal)}%` : kpiTotal.toLocaleString()}
-              </span>
-              {!isPct && kpi.unit_of_measurement && (
-                <span className="text-base sm:text-lg font-semibold text-gray-500 leading-none truncate">
-                  {kpi.unit_of_measurement}
-                </span>
-              )}
             </div>
           </motion.div>
 
