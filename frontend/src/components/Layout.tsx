@@ -14,6 +14,8 @@ import {
  FlaskConical,
  Sparkles,
  GraduationCap,
+ Globe,
+ ArrowRight,
 } from 'lucide-react'
 import { AuthService } from '../services/auth'
 import { apiService } from '../services/api'
@@ -44,7 +46,8 @@ export default function Layout({ user, children }: LayoutProps) {
  isSharedMember,
  ownedOrganization,
  hasOwnOrganization,
- canEditOrgContext
+ canEditOrgContext,
+ loading: teamLoading
  } = useTeam()
  const { startTutorial } = useTutorial()
  const { startOnboarding } = useOnboarding()
@@ -108,7 +111,9 @@ export default function Layout({ user, children }: LayoutProps) {
  />
  </Link>
  <div className="hidden md:flex flex-col items-start justify-center min-w-0" ref={orgMenuRef}>
- {hasMultipleOrgs ? (
+ {teamLoading ? (
+ <div className="h-9 w-40 rounded-xl bg-gray-100 animate-pulse" />
+ ) : hasMultipleOrgs ? (
  <div className="relative">
  <button
  onClick={() => setOrgMenuOpen(!orgMenuOpen)}
@@ -216,6 +221,28 @@ export default function Layout({ user, children }: LayoutProps) {
  </button>
  )}
  </div>
+ {/* Public page status — inline beside the org name */}
+ {!isSharedMember && !teamLoading && activeOrganization && !isDemoOrg && (() => {
+ const live = !!activeOrganization?.is_public
+ return (
+ <Link
+ to="/account?tab=organization"
+ className={`group hidden md:inline-flex items-center gap-2 h-8 pl-2.5 pr-3 rounded-full border text-xs font-medium transition-colors ${live
+ ? 'bg-impact-50 border-impact-100 text-impact-700 hover:bg-impact-100/70'
+ : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+ }`}
+ title={live ? 'Your public page is live — click to manage' : 'Your public page is off — click to publish'}
+ >
+ <span className="relative flex h-2 w-2">
+ {live && <span className="absolute inline-flex h-full w-full rounded-full bg-impact-400 opacity-60 animate-ping" />}
+ <span className={`relative inline-flex h-2 w-2 rounded-full ${live ? 'bg-impact-500' : 'bg-gray-300'}`} />
+ </span>
+ <Globe className="w-3.5 h-3.5" />
+ {live ? 'Public page live' : 'Public page not live'}
+ <ArrowRight className="w-3.5 h-3.5 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+ </Link>
+ )
+ })()}
  </div>
 
  {/* Right side: Explore, Tutorial, Settings, User Profile */}

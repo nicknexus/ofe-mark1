@@ -135,9 +135,11 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
  const savedOrgValid = savedOrgId && orgs.some(o => o.id === savedOrgId)
 
  if (!savedOrgValid) {
- const teamOrg = orgs.find(o => o.role === 'member' && !o.is_demo)
+ // A fresh login always defaults to the user's OWN org; only fall back
+ // to a team-member org (or anything) when they don't own one.
  const realOwnedOrg = orgs.find(o => o.role === 'owner' && !o.is_demo)
- const defaultOrg = teamOrg || realOwnedOrg || orgs[0]
+ const teamOrg = orgs.find(o => o.role === 'member' && !o.is_demo)
+ const defaultOrg = realOwnedOrg || teamOrg || orgs[0]
  setActiveOrgId(defaultOrg.id)
  localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, defaultOrg.id)
  }

@@ -884,9 +884,9 @@ export default function Dashboard() {
  return (
  <>
  <div className="min-h-screen lg:h-screen lg:overflow-hidden pt-24 pb-6 px-4 sm:px-6 lg:px-8 xl:px-10 flex flex-col">
- <div className="max-w-[1600px] mx-auto w-full flex-1 min-h-0 flex flex-col gap-4">
+ <div className="max-w-[1600px] mx-auto w-full flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-x-4 gap-y-2 lg:grid-rows-[auto_minmax(0,1fr)]">
           {/* Command-center header — title, at-a-glance stats, primary action */}
-          <div className="flex-shrink-0 min-w-0 flex flex-wrap items-center gap-x-4 gap-y-3">
+          <div className="lg:col-start-1 lg:row-start-1 lg:col-span-5 xl:col-span-4 min-w-0 flex flex-wrap items-center gap-x-4 gap-y-2">
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 leading-tight tracking-tight">
@@ -906,52 +906,28 @@ export default function Dashboard() {
                 {organizationName ? `Everything ${organizationName} is tracking, in one place` : 'Everything you’re tracking, in one place'}
               </p>
             </div>
-
-            {/* Public page status — click to toggle in org settings */}
-            {!isSharedMember && (() => {
-              const live = !!dashboardOrg?.is_public
-              return (
-                <Link
-                  to="/account?tab=organization"
-                  className={`group inline-flex items-center gap-2 h-8 pl-2.5 pr-3 rounded-full border text-xs font-medium transition-colors ${live
-                    ? 'bg-impact-50 border-impact-100 text-impact-700 hover:bg-impact-100/70'
-                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                    }`}
-                  title={live ? 'Your public page is live — click to manage' : 'Your public page is off — click to publish'}
-                >
-                  <span className="relative flex h-2 w-2">
-                    {live && <span className="absolute inline-flex h-full w-full rounded-full bg-impact-400 opacity-60 animate-ping" />}
-                    <span className={`relative inline-flex h-2 w-2 rounded-full ${live ? 'bg-impact-500' : 'bg-gray-300'}`} />
-                  </span>
-                  <Globe className="w-3.5 h-3.5" />
-                  {live ? 'Public page live' : 'Public page not live'}
-                  <ArrowRight className="w-3.5 h-3.5 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
-                </Link>
-              )
-            })()}
-
-            {canCreateInitiatives && (
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(true)}
-                className="ml-auto app-btn app-btn-primary shadow-sm"
-                title="New initiative"
-              >
-                <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">New initiative</span>
-                <span className="sm:hidden">Add</span>
-              </button>
-            )}
           </div>
 
  {/* Two-pane workspace: initiatives on the left (scrollable list, so
  every initiative stays reachable and reorderable), everything else
  stacked on the right — locked to the viewport on desktop. */}
- <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4">
+ <div className="contents">
  {/* Initiatives — the heart of the page (narrower column) */}
- <section className="lg:col-span-5 xl:col-span-4 flex flex-col min-h-0">
+ <section className="lg:col-start-1 lg:row-start-2 lg:col-span-5 xl:col-span-4 flex flex-col min-h-0">
               <div className="flex items-center gap-2 mb-2.5 flex-shrink-0">
-                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">All initiatives</h2>
+                {canCreateInitiatives && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(true)}
+                    className="app-btn app-btn-primary app-btn-sm shadow-sm"
+                    title="New initiative"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline">New initiative</span>
+                    <span className="sm:hidden">Add</span>
+                  </button>
+                )}
+                <h2 className="ml-auto text-xs font-semibold text-gray-400 uppercase tracking-wider">All initiatives</h2>
                 <span className="app-chip text-[11px] px-1.5 py-0 tabular-nums">{initiatives.length}</span>
               </div>
  <div className="flex-1 min-h-0 lg:overflow-y-auto lg:pr-1.5 lg:pt-1.5">
@@ -1020,8 +996,8 @@ export default function Dashboard() {
           </section>
 
  {/* Everything else — progress widgets in a row, map filling the rest */}
- <section className="lg:col-span-7 xl:col-span-8 flex flex-col min-h-0">
- <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2.5 flex-shrink-0">Progress & places</h2>
+ <section className="lg:col-start-6 xl:col-start-5 lg:row-start-1 lg:row-span-2 lg:col-span-7 xl:col-span-8 flex flex-col min-h-0">
+ <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2.5 flex-shrink-0">Progress & locations</h2>
  <div className="flex-1 min-h-0 flex flex-col gap-4">
  {showOwnerWidgets ? (
  <div className="flex-shrink-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

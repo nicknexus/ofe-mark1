@@ -103,9 +103,9 @@ export default function MetricDetailTab({
                   <ArrowLeft className="w-5 h-5" />
                 </button>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight truncate flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                    {kpi.title}
+                  <h2 className="flex items-start gap-2 text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-2 sm:mt-2.5" style={{ backgroundColor: color }} />
+                    <span className="min-w-0 break-words">{kpi.title}</span>
                   </h2>
                   <p className="text-sm text-gray-500 mt-1.5">
                     <span className="capitalize">{kpi.category}</span>
