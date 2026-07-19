@@ -875,12 +875,6 @@ export default function Dashboard() {
  )
  }
 
- const handleLocationClick = (location: Location) => {
- if (location.initiative_id) {
-    navigate(`/initiatives/${location.initiative_id}?tab=location`)
- }
- }
-
  return (
  <>
  <div className="min-h-screen lg:h-screen lg:overflow-hidden pt-24 pb-6 px-4 sm:px-6 lg:px-8 xl:px-10 flex flex-col">
@@ -1020,9 +1014,9 @@ export default function Dashboard() {
  <div className="hidden md:block relative isolate h-64 lg:h-auto lg:flex-1 lg:min-h-[180px] rounded-3xl overflow-hidden border border-gray-200/60 shadow-card">
  <LocationMap
  locations={allLocations}
- onLocationClick={handleLocationClick}
  hideEmptyBanner
  autoFit
+ interactivePins={false}
  />
  <div className="absolute top-3 right-3 z-[400] flex items-center gap-1.5">
  <button

@@ -1,12 +1,16 @@
 import React, { useState } from 'react'
-import { MapPin, Calendar, Users, Image as ImageIcon, Video, Mic, FileText, Play } from 'lucide-react'
+import { MapPin, Calendar, Users, Image as ImageIcon, Video, Mic, FileText, Play, Check } from 'lucide-react'
 import { Story } from '../types'
 import { formatDate } from '../utils'
 import EvidenceTagsList from './MetricTags/EvidenceTagsList'
 
 interface StoryCardProps {
  story: Story
- onView: (story: Story) => void
+ onView?: (story: Story) => void
+ /** Read-only selection mode (e.g. report builder). */
+ selectable?: boolean
+ selected?: boolean
+ onSelect?: () => void
 }
 
 const YT_DETECT = /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/
@@ -19,7 +23,7 @@ const MEDIA_BADGE: Record<string, { label: string; Icon: React.ComponentType<{ c
  text: { label: 'Text', Icon: FileText },
 }
 
-export default function StoryCard({ story, onView }: StoryCardProps) {
+export default function StoryCard({ story, onView, selectable = false, selected = false, onSelect }: StoryCardProps) {
  const [imageError, setImageError] = useState(false)
  const handleImageError = () => setImageError(true)
 
@@ -39,8 +43,14 @@ export default function StoryCard({ story, onView }: StoryCardProps) {
  return (
  <button
  type="button"
- onClick={() => onView(story)}
-    className="group relative w-full text-left rounded-2xl border border-gray-200/70 bg-white shadow-card hover:shadow-card-hover overflow-hidden flex flex-col transition-all"
+ onClick={() => (selectable ? onSelect?.() : onView?.(story))}
+    className={`group relative w-full text-left rounded-2xl border bg-white shadow-card overflow-hidden flex flex-col transition-all ${
+      selectable
+        ? selected
+          ? 'border-primary-400 ring-2 ring-primary-200 shadow-card-hover'
+          : 'border-gray-200/70 hover:shadow-card-hover hover:border-primary-300/70'
+        : 'border-gray-200/70 hover:shadow-card-hover'
+    }`}
  >
  {/* Media */}
  <div className="relative w-full aspect-[16/10] bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden">
@@ -106,6 +116,11 @@ export default function StoryCard({ story, onView }: StoryCardProps) {
  <badge.Icon className="w-3 h-3" />
  {badge.label}
  </div>
+ )}
+ {selectable && selected && (
+   <span className="absolute top-3 right-3 w-6 h-6 rounded-full bg-primary-500 flex items-center justify-center shadow-sm z-10">
+     <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+   </span>
  )}
  </div>
 

@@ -3,6 +3,8 @@ import { BarChart3, Calendar, Camera, DollarSign, FileText, MessageSquare, type 
 import { Evidence, KPIUpdate, Story } from '../../types'
 import { formatDate, getEvidenceTypeInfo } from '../../utils'
 import { getEvidenceImageUrl } from '../../utils/timeline'
+import ReportMetricCard from '../report/ReportMetricCard'
+import { getKPIColor } from '../metricsDashboard/metricColorPalette'
 
 const TYPE_ICONS: Record<string, LucideIcon> = {
   visual_proof: Camera,
@@ -95,7 +97,7 @@ export function StoriesList({ stories, onStoryClick, onClose }: StoriesListProps
 }
 
 interface MetricGroup {
-  kpi: { id?: string; title?: string; unit_of_measurement?: string }
+  kpi: { id?: string; title?: string; unit_of_measurement?: string; category?: string; metric_type?: string }
   updates: KPIUpdate[]
   total: number
 }
@@ -113,39 +115,29 @@ export function MetricsList({ metricsByKPI, onMetricClick, onClose }: MetricsLis
   }
 
   return (
-    <div className="space-y-2.5">
-      {groups.map((group, idx) => (
-        <div
-          key={group.kpi?.id || idx}
-          onClick={(e) => {
-            e.stopPropagation()
-            if (group.kpi?.id && onMetricClick) {
-              onClose?.()
-              onMetricClick(group.kpi.id)
+    <div className="space-y-3">
+      {groups.map((group, idx) => {
+        const kpiId = group.kpi?.id
+        const color = getKPIColor(group.kpi?.category || 'output', idx)
+        return (
+          <ReportMetricCard
+            key={kpiId || idx}
+            title={group.kpi?.title || 'Unknown metric'}
+            color={color}
+            total={group.total}
+            unit={group.kpi?.unit_of_measurement}
+            metricType={group.kpi?.metric_type}
+            onClick={
+              kpiId && onMetricClick
+                ? () => {
+                    onClose?.()
+                    onMetricClick(kpiId)
+                  }
+                : undefined
             }
-          }}
-          className={`rounded-2xl border border-gray-200/70 bg-white shadow-card p-4 transition-all ${onMetricClick && group.kpi?.id
-            ? 'hover:shadow-card-hover hover:border-primary-200 cursor-pointer'
-            : ''
-            }`}
-        >
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-gray-800 truncate">{group.kpi?.title || 'Unknown Metric'}</p>
-              <div className="flex items-baseline gap-1.5 mt-1">
-                <span className="text-xl font-semibold text-gray-900 tabular-nums">{group.total.toLocaleString()}</span>
-                {group.kpi?.unit_of_measurement && (
-                  <span className="text-xs text-gray-400">{group.kpi.unit_of_measurement}</span>
-                )}
-              </div>
-            </div>
-            <BarChart3 className="w-4 h-4 text-gray-300 flex-shrink-0" />
-          </div>
-          <p className="text-xs text-gray-500 pt-2 border-t border-gray-100">
-            {group.updates.length} {group.updates.length === 1 ? 'impact claim' : 'impact claims'}
-          </p>
-        </div>
-      ))}
+          />
+        )
+      })}
     </div>
   )
 }

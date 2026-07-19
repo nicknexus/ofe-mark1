@@ -40,6 +40,8 @@ interface LocationMapProps {
  * map; leave off for views where the user pans manually.
  */
  autoFit?: boolean
+ /** When false, pins are display-only (no click, no details modal). */
+ interactivePins?: boolean
 }
 
 // Component to handle map click events
@@ -324,6 +326,7 @@ function LocationMarker({
  onMarkerClick,
  onMarkerMouseEnter,
  onMarkerMouseLeave,
+ interactive = true,
 }: {
  location: Location
  isHovered: boolean
@@ -332,6 +335,7 @@ function LocationMarker({
  onMarkerClick: (location: Location, event: L.LeafletMouseEvent) => void
  onMarkerMouseEnter: () => void
  onMarkerMouseLeave: () => void
+ interactive?: boolean
 }) {
  // Create custom icon using DivIcon
  const icon = useMemo(() => {
@@ -348,7 +352,7 @@ function LocationMarker({
  display: flex;
  align-items: center;
  justify-content: center;
- cursor: pointer;
+ cursor: ${interactive ? 'pointer' : 'default'};
  ">
  ${(isSelected || isHovered) ? `
  <div style="
@@ -395,19 +399,23 @@ function LocationMarker({
  iconSize: [size, size],
  iconAnchor: [size / 2, size / 2],
  })
- }, [isSelected, isHovered])
+ }, [isSelected, isHovered, interactive])
 
  return (
  <Marker
  position={[location.latitude, location.longitude]}
  icon={icon}
- eventHandlers={{
+ eventHandlers={
+ interactive
+ ? {
  click: (e) => {
  onMarkerClick(location, e)
  },
  mouseover: onMarkerMouseEnter,
  mouseout: onMarkerMouseLeave,
- }}
+ }
+ : undefined
+ }
  >
  <Tooltip permanent={false} direction="top" offset={[0, -10]}>
  {location.name}
@@ -429,6 +437,7 @@ export default function LocationMap({
  onStoryClick,
  hideEmptyBanner,
  autoFit,
+ interactivePins = true,
 }: LocationMapProps) {
  const [center, setCenter] = useState<[number, number]>([20, 0]) // [lat, lng]
  const [zoom, setZoom] = useState(2)
@@ -542,6 +551,7 @@ export default function LocationMap({
  onMarkerClick={handleMarkerClick}
  onMarkerMouseEnter={() => handleMarkerMouseEnter(location)}
  onMarkerMouseLeave={handleMarkerMouseLeave}
+ interactive={interactivePins}
  />
  )
  })}
@@ -646,6 +656,7 @@ export default function LocationMap({
  })()}
 
  {/* Location Details Modal */}
+ {interactivePins && (
  <LocationDetailsModal
  isOpen={detailsModalOpen}
  onClose={() => {
@@ -660,6 +671,7 @@ export default function LocationMap({
  refreshKey={refreshKey}
  initiativeId={initiativeId}
  />
+ )}
 
  {/* Zoom Controls */}
  <div className="absolute bottom-4 right-4 flex flex-col space-y-2 z-[50]">

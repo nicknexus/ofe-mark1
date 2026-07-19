@@ -227,6 +227,25 @@ Date: ${selectedStory.date_represented}`
             ? `\n**IMPORTANT - Donor-Focused Report:** This report is specifically focused on the impact credited to ${donor.name}${donor.organization ? ` (${donor.organization})` : ''}. All metrics and values shown represent only the portion of impact that has been credited to this donor. Frame the entire report around this donor's specific contribution and impact.`
             : '';
 
+        // Only ask the model for sections the report layout will actually use,
+        // and only when there is data to write about — this keeps the output
+        // aligned with the adaptive PDF template on the frontend.
+        const hasMetrics = Array.isArray(totals) && totals.length > 0;
+        const hasBeneficiaries = enrichedBeneficiaryGroups.length > 0;
+
+        const sectionInstructions: string[] = [
+            '**## Overview Summary** - A single paragraph (4-5 sentences) highlighting key achievements and impact'
+        ];
+        if (hasMetrics) {
+            sectionInstructions.push('**## Total Metrics with Descriptions** - Present the totals in a clear, narrative format explaining what each metric means and why it matters (1-2 paragraphs)');
+        }
+        if (hasBeneficiaries) {
+            sectionInstructions.push('**## Beneficiary Breakdown** - Explain who was served and how (1-2 paragraphs)');
+        }
+        const sectionsText = sectionInstructions
+            .map((s, i) => `${i + 1}. ${s}`)
+            .join('\n');
+
         const userPrompt = `Create a detailed initiative impact report using the following inputs.
 
 **Initiative:** ${initiativeTitle}
@@ -252,25 +271,18 @@ ${beneficiaryGroupsText}
 
 ${deepLink ? `**Deep Link:** ${deepLink}` : ''}
 
-Please structure the report with the following sections. Use EXACT section headers as shown:
+Please structure the report with the following sections ONLY. Use EXACT section headers as shown:
 
-1. **## Overview Summary** - A single paragraph (4-5 sentences) highlighting key achievements and impact
-2. **## Total Metrics with Descriptions** - Present the totals in a clear, narrative format explaining what each metric means (2-3 paragraphs). This section will appear right after the date range.
-3. **## Beneficiary Breakdown** - Explain who was served and how (1-2 paragraphs)
-4. **## Visual Metrics Description** - ONE SENTENCE describing what the bar chart shows (e.g., "The bar chart below illustrates the total values for each metric tracked during this reporting period.")
-5. **## Location Information** - ONE SENTENCE describing the geographic reach (e.g., "The map below shows the geographic distribution of impact across [X] locations.")
-6. **## Map Section Text** - ONE SENTENCE describing the geographic distribution (e.g., "Impact was delivered across [X] locations, with activities concentrated in [region/area].")
-7. **## Evidence and More Information**${deepLink ? ` - ONE SENTENCE: For evidence and more info, apply these filters at this link: ${deepLink}` : ' - ONE SENTENCE: Additional evidence and detailed information is available in the system'}
-8. **## Footer** - End with: "Nexus Impacts | Know Your Mark On The World"
+${sectionsText}
 
-IMPORTANT: 
-${selectedStory ? '- DO NOT include a Story Section - the actual story will be inserted separately' : '- Since no story was selected, focus the report on metrics, impact data, and achievements without a narrative story section'}
-- Use EXACTLY the section headers shown above (e.g., "## Visual Metrics Description", "## Location Information")
-- Sections 4, 5, 6, and 7 must be EXACTLY ONE SENTENCE each
+IMPORTANT:
+${selectedStory ? '- DO NOT include a Story Section - the actual story will be inserted separately' : '- Since no story was selected, focus the report on the available data without a narrative story section'}
+${hasMetrics ? '- Use specific numbers throughout' : '- No metrics were recorded for this period, so focus the Overview on the initiative\'s purpose, activities, locations, and the people served — do NOT invent numbers'}
+- Do NOT add any other sections beyond those listed above
+- Use EXACTLY the section headers shown above (e.g., "## Overview Summary")
 - The Overview Summary must be exactly ONE paragraph (4-5 sentences)
-- When themes/tags are provided, reference them naturally in the Total Metrics section to frame the areas of impact (do not add a separate themes section)
-- Make the report professional, engaging, and data-driven
-- Use specific numbers throughout`;
+- When themes/tags are provided, reference them naturally in the metrics narrative to frame the areas of impact (do not add a separate themes section)
+- Make the report professional, engaging, and data-driven`;
 
         // Call OpenAI
         console.log('Calling OpenAI API...');

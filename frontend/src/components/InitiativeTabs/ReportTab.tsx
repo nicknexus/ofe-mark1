@@ -1,14 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { FileText, Calendar, BarChart3, MapPin, Users, Sparkles, Download, X, ChevronLeft, ChevronRight, Check, BookOpen, Plus, Pencil, Save, Tag } from 'lucide-react'
-import { SectionLoader, EmptyState, Spinner } from '../ui'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { FileText, Calendar, CalendarRange, BarChart3, MapPin, Users, Sparkles, Download, X, ChevronLeft, ChevronRight, Check, BookOpen, Plus, Pencil, Save, Tag } from 'lucide-react'
+import { SectionLoader, EmptyState, Spinner, InlineAlert } from '../ui'
+import FilterPill from '../shared/FilterPill'
+import { ScopeColumn, ScopeChips } from '../shared/ScopeFilterColumns'
+import ReportMetricCard, { REPORT_METRIC_CARD_H } from '../report/ReportMetricCard'
+import { getKPIColor } from '../metricsDashboard/metricColorPalette'
+import { fadeUp, staggerContainer, viewSwap } from '../timeline/motion'
+import { getLocalDateString } from '../../utils'
 import { apiService } from '../../services/api'
 import { KPI, Location, BeneficiaryGroup, Story, InitiativeDashboard, MetricTag } from '../../types'
+import StoryCard from '../StoryCard'
 import DateRangePicker from '../DateRangePicker'
 import { notify } from '../../lib/notify'
 import L from 'leaflet'
 import html2canvas from 'html2canvas'
-import ReportDashboard from '../ReportDashboard'
-import { convertReportToPDF } from '../../utils/reportToPDF'
+import ReportCanvas, { REPORT_CANVAS_ID, REPORT_CANVAS_W, REPORT_CANVAS_H, ReportCanvasProps } from '../report/ReportCanvas'
+import { convertReportToImage } from '../../utils/reportToImage'
+import { imageToDataUrl } from '../../utils/imageToDataUrl'
 import { useTeam } from '../../context/TeamContext'
 
 interface ReportTabProps {
@@ -67,6 +76,22 @@ interface ReportData {
  }>
 }
 
+function reportStoryToCard(story: ReportData['stories'][number], initiativeId: string): Story {
+ return {
+ initiative_id: initiativeId,
+ id: story.id,
+ title: story.title,
+ description: story.description,
+ date_represented: story.date_represented,
+ media_url: story.media_url,
+ media_type: story.media_type ?? 'photo',
+ location_id: story.location_id,
+ location: story.location_name
+ ? { id: story.location_id, name: story.location_name, latitude: 0, longitude: 0 }
+ : undefined,
+ }
+}
+
 export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  const { canExportReports, activeOrganization } = useTeam()
  // Filter state
@@ -90,6 +115,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  const [reportText, setReportText] = useState<string | null>(null)
  const [reportDashboardData, setReportDashboardData] = useState<{
  overviewSummary: string
+ metricsNarrative?: string
  beneficiaryText: string
  mapImage: string | null
  hasBeneficiaryGroups: boolean
@@ -102,30 +128,32 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  const [loadingData, setLoadingData] = useState(false)
 
  // UI state
- const [showKPIPicker, setShowKPIPicker] = useState(false)
- const [showLocationPicker, setShowLocationPicker] = useState(false)
- const [showBeneficiaryPicker, setShowBeneficiaryPicker] = useState(false)
- const [showTagPicker, setShowTagPicker] = useState(false)
  const [showDashboard, setShowDashboard] = useState(true)
  const [isEditingReport, setIsEditingReport] = useState(false)
  
  // Editable text state (separate from source data so we can edit without losing original)
  const [editableOverview, setEditableOverview] = useState<string>('')
+ const [editableMetricsNarrative, setEditableMetricsNarrative] = useState<string>('')
  const [editableBeneficiaryText, setEditableBeneficiaryText] = useState<string>('')
  const [editableStoryTitle, setEditableStoryTitle] = useState<string>('')
  const [editableStoryDescription, setEditableStoryDescription] = useState<string>('')
 
- // Step wizard state
- const [currentStep, setCurrentStep] = useState(1)
- const totalSteps = 4
- const containerRef = useRef<HTMLDivElement>(null)
- const formContentRef = useRef<HTMLDivElement>(null)
+ // Pre-fetched PNG data URLs for images embedded in the PDF (react-pdf can't
+ // rely on remote URLs — CORS/format issues would break rendering).
+ const [nexusLogoData, setNexusLogoData] = useState<string | null>(null)
+ const [orgLogoData, setOrgLogoData] = useState<string | null>(null)
+ const [storyPhotoData, setStoryPhotoData] = useState<string | null>(null)
 
- // Refs for click outside detection
- const kpiPickerRef = useRef<HTMLDivElement>(null)
- const locationPickerRef = useRef<HTMLDivElement>(null)
- const beneficiaryPickerRef = useRef<HTMLDivElement>(null)
- const tagPickerRef = useRef<HTMLDivElement>(null)
+  // Step wizard state
+  const [currentStep, setCurrentStep] = useState(1)
+  const totalSteps = 4
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // The report canvas is a fixed 1123×794 landscape frame. We scale it down to
+  // fit the preview column; the image is captured from a separate full-size
+  // off-screen copy so it stays crisp and un-warped.
+  const previewWrapRef = useRef<HTMLDivElement>(null)
+  const [previewScale, setPreviewScale] = useState(0.5)
 
  // Storage key for this initiative's report
  const storageKey = `report-${initiativeId}`
@@ -149,6 +177,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  setReportDashboardData(parsed.reportDashboardData)
  // Initialize editable fields from saved data
  setEditableOverview(parsed.editableOverview ?? parsed.reportDashboardData.overviewSummary ?? '')
+ setEditableMetricsNarrative(parsed.editableMetricsNarrative ?? parsed.reportDashboardData.metricsNarrative ?? '')
  setEditableBeneficiaryText(parsed.editableBeneficiaryText ?? parsed.reportDashboardData.beneficiaryText ?? '')
  }
  if (parsed.reportData) setReportData(parsed.reportData)
@@ -167,6 +196,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  setSelectedStory(null)
  setShowDashboard(true)
  setEditableOverview('')
+ setEditableMetricsNarrative('')
  setEditableBeneficiaryText('')
  setEditableStoryTitle('')
  setEditableStoryDescription('')
@@ -180,6 +210,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  setSelectedStory(null)
  setShowDashboard(true)
  setEditableOverview('')
+ setEditableMetricsNarrative('')
  setEditableBeneficiaryText('')
  setEditableStoryTitle('')
  setEditableStoryDescription('')
@@ -198,6 +229,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  dateRange,
  showDashboard,
  editableOverview,
+ editableMetricsNarrative,
  editableBeneficiaryText,
  editableStoryTitle,
  editableStoryDescription
@@ -207,7 +239,29 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  console.error('Failed to save report to localStorage:', error)
  }
  }
- }, [reportText, reportDashboardData, reportData, selectedStory, dateRange, showDashboard, storageKey, editableOverview, editableBeneficiaryText, editableStoryTitle, editableStoryDescription])
+ }, [reportText, reportDashboardData, reportData, selectedStory, dateRange, showDashboard, storageKey, editableOverview, editableMetricsNarrative, editableBeneficiaryText, editableStoryTitle, editableStoryDescription])
+
+ // Pre-fetch images for PDF embedding
+ useEffect(() => {
+ imageToDataUrl('/Nexuslogo.png').then(setNexusLogoData)
+ }, [])
+
+ useEffect(() => {
+ const url = activeOrganization?.logo_url
+ if (url) {
+ imageToDataUrl(url).then(setOrgLogoData)
+ } else {
+ setOrgLogoData(null)
+ }
+ }, [activeOrganization?.logo_url])
+
+ useEffect(() => {
+ if (selectedStory?.media_url && selectedStory.media_type === 'photo') {
+ imageToDataUrl(selectedStory.media_url).then(setStoryPhotoData)
+ } else {
+ setStoryPhotoData(null)
+ }
+ }, [selectedStory?.media_url, selectedStory?.media_type])
 
  // Load filter options
  useEffect(() => {
@@ -228,35 +282,31 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  }
  }, [initiativeId])
 
- // Close dropdowns when clicking outside
- useEffect(() => {
- const handleClickOutside = (event: MouseEvent) => {
- if (kpiPickerRef.current && !kpiPickerRef.current.contains(event.target as Node)) {
- setShowKPIPicker(false)
- }
- if (locationPickerRef.current && !locationPickerRef.current.contains(event.target as Node)) {
- setShowLocationPicker(false)
- }
- if (beneficiaryPickerRef.current && !beneficiaryPickerRef.current.contains(event.target as Node)) {
- setShowBeneficiaryPicker(false)
- }
- if (tagPickerRef.current && !tagPickerRef.current.contains(event.target as Node)) {
- setShowTagPicker(false)
- }
- }
+  // Scroll to top when step changes
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [currentStep])
 
- document.addEventListener('mousedown', handleClickOutside)
- return () => {
- document.removeEventListener('mousedown', handleClickOutside)
- }
- }, [])
-
- // Scroll to top when step changes
- useEffect(() => {
- if (formContentRef.current) {
- formContentRef.current.scrollTop = 0
- }
- }, [currentStep])
+  // Keep the scaled preview matched to its column width.
+  useEffect(() => {
+    const wrap = previewWrapRef.current
+    if (!wrap) return
+    const update = () => {
+      const w = wrap.clientWidth
+      if (w > 0) setPreviewScale(w / REPORT_CANVAS_W)
+    }
+    const raf = requestAnimationFrame(update)
+    const ro = new ResizeObserver(update)
+    ro.observe(wrap)
+    window.addEventListener('resize', update)
+    return () => {
+      cancelAnimationFrame(raf)
+      ro.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [showDashboard, isEditingReport, reportText, reportData])
 
  const handleApplyFilters = async () => {
  if (!initiativeId) return
@@ -345,36 +395,24 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
  // Parse report text and extract sections
  const reportText = result.reportText
- let overviewSummary = ''
- let beneficiaryText = ''
 
- // Extract Overview Summary and limit to 2 sentences
- const overviewMatch = reportText.match(/##?\s*Overview Summary[\s\S]*?(?=##?\s*|$)/i)
- if (overviewMatch) {
- const fullSummary = overviewMatch[0]
- .replace(/##?\s*Overview Summary\s*/i, '')
+ // Pull a named "## Section" block out of the markdown, flattened to plain text.
+ const extractSection = (heading: string): string => {
+ const match = reportText.match(new RegExp(`##?\\s*${heading}[\\s\\S]*?(?=##?\\s|$)`, 'i'))
+ if (!match) return ''
+ return match[0]
+ .replace(new RegExp(`##?\\s*${heading}\\s*`, 'i'), '')
  .split('\n')
  .map(l => l.trim())
  .filter(l => l && !l.startsWith('##'))
  .join(' ')
- .trim()
-
- // Extract first 2 sentences
- const sentences = fullSummary.match(/[^.!?]+[.!?]+/g) || []
- overviewSummary = sentences.slice(0, 2).join(' ').trim()
- }
-
- // Extract Beneficiary Breakdown
- const beneficiaryMatch = reportText.match(/##?\s*Beneficiary Breakdown[\s\S]*?(?=##?\s*|$)/i)
- if (beneficiaryMatch) {
- beneficiaryText = beneficiaryMatch[0]
- .replace(/##?\s*Beneficiary Breakdown\s*/i, '')
- .split('\n')
- .map(l => l.trim())
- .filter(l => l && !l.startsWith('##'))
- .join(' ')
+ .replace(/\*\*/g, '')
  .trim()
  }
+
+ const overviewSummary = extractSection('Overview Summary')
+ const metricsNarrative = extractSection('Total Metrics with Descriptions')
+ const beneficiaryText = extractSection('Beneficiary Breakdown')
 
  // Helper function to export Leaflet map as image using html2canvas
  const exportLeafletMapAsImage = async (mapDiv: HTMLElement): Promise<string> => {
@@ -573,14 +611,16 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  // Store dashboard data for rendering
  setReportDashboardData({
  overviewSummary: overviewSummary || 'No overview available',
- beneficiaryText: beneficiaryText || 'No beneficiary information available',
+ metricsNarrative,
+ beneficiaryText,
  mapImage,
  hasBeneficiaryGroups: selectedBeneficiaryGroupIds.length > 0
  })
- 
+
  // Initialize editable fields
  setEditableOverview(overviewSummary || 'No overview available')
- setEditableBeneficiaryText(beneficiaryText || 'No beneficiary information available')
+ setEditableMetricsNarrative(metricsNarrative)
+ setEditableBeneficiaryText(beneficiaryText)
  if (selectedStory) {
  setEditableStoryTitle(selectedStory.title)
  setEditableStoryDescription(selectedStory.description || '')
@@ -595,7 +635,8 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  reportText: result.reportText,
  reportDashboardData: {
  overviewSummary: overviewSummary || 'No overview available',
- beneficiaryText: beneficiaryText || 'No beneficiary information available',
+ metricsNarrative,
+ beneficiaryText,
  mapImage,
  hasBeneficiaryGroups: selectedBeneficiaryGroupIds.length > 0
  },
@@ -651,30 +692,6 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  )
  }
 
- const toggleLocation = (locationId: string) => {
- setSelectedLocationIds(prev =>
- prev.includes(locationId)
- ? prev.filter(id => id !== locationId)
- : [...prev, locationId]
- )
- }
-
- const toggleBeneficiaryGroup = (groupId: string) => {
- setSelectedBeneficiaryGroupIds(prev =>
- prev.includes(groupId)
- ? prev.filter(id => id !== groupId)
- : [...prev, groupId]
- )
- }
-
- const toggleTag = (tagId: string) => {
- setSelectedTagIds(prev =>
- prev.includes(tagId)
- ? prev.filter(id => id !== tagId)
- : [...prev, tagId]
- )
- }
-
  const canProceedToNextStep = () => {
  switch (currentStep) {
  case 1:
@@ -724,6 +741,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  setShowDashboard(true)
  setIsEditingReport(false)
  setEditableOverview('')
+ setEditableMetricsNarrative('')
  setEditableBeneficiaryText('')
  setEditableStoryTitle('')
  setEditableStoryDescription('')
@@ -743,6 +761,84 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  window.scrollTo({ top: 0, behavior: 'smooth' })
  }, 100)
  }
+
+ const kpiById = useMemo(() => new Map(kpis.map(k => [k.id!, k])), [kpis])
+
+ const kpiColorById = useMemo(() => {
+ const map: Record<string, string> = {}
+ kpis.forEach((kpi, index) => { map[kpi.id!] = getKPIColor(kpi.category, index) })
+ return map
+ }, [kpis])
+
+ const stepMeta = useMemo(() => ({
+ 1: { title: 'Select report filters', subtitle: 'Choose the data you want to include in your report' },
+ 2: { title: 'Review your data', subtitle: 'Summary of metrics and locations included in this report' },
+ 3: { title: 'Add a story', subtitle: 'Optionally anchor the report with a beneficiary story' },
+ 4: { title: 'Generate report', subtitle: 'Confirm scope and create your AI-powered impact report' },
+ }), [])
+
+  // The report canvas props — a locked-size (A4 landscape) element rendered
+  // twice: a scaled on-screen preview and a full-size off-screen node that is
+  // the exact artwork captured into the PDF.
+  const canvasProps = useMemo((): ReportCanvasProps | null => {
+    if (!reportData || !reportDashboardData || !dashboard) return null
+    return {
+      initiativeTitle: dashboard.initiative.title,
+      organizationName: activeOrganization?.name,
+      brandColor: activeOrganization?.brand_color,
+      orgLogo: orgLogoData,
+      nexusLogo: nexusLogoData,
+      storyPhoto: storyPhotoData,
+      mapImage: reportDashboardData.mapImage,
+      overviewSummary: editableOverview || reportDashboardData.overviewSummary,
+      metricsNarrative: editableMetricsNarrative || reportDashboardData.metricsNarrative,
+      beneficiaryText: editableBeneficiaryText || reportDashboardData.beneficiaryText,
+      hasBeneficiaryGroups: reportDashboardData.hasBeneficiaryGroups,
+      totals: reportData.totals.map(t => ({
+        ...t,
+        color: kpiColorById[t.kpi_id] || '#608341',
+        metricType: kpiById.get(t.kpi_id)?.metric_type
+      })),
+      tags: reportData.tags,
+      story: selectedStory ? {
+        title: editableStoryTitle || selectedStory.title,
+        description: editableStoryDescription || selectedStory.description,
+        date_represented: selectedStory.date_represented,
+        location_name: selectedStory.location_name
+      } : null,
+      locations: reportData.locations,
+      dateStart: dateRange.startDate || dateRange.singleDate,
+      dateEnd: dateRange.endDate || dateRange.singleDate
+    }
+  }, [
+ reportData, reportDashboardData, dashboard, activeOrganization?.name, activeOrganization?.brand_color,
+ orgLogoData, nexusLogoData, storyPhotoData, selectedStory, kpiColorById, kpiById,
+ editableOverview, editableMetricsNarrative, editableBeneficiaryText, editableStoryTitle, editableStoryDescription,
+ dateRange.startDate, dateRange.endDate, dateRange.singleDate
+ ])
+
+  const handleDownloadImage = async () => {
+    if (!canvasProps) return
+    try {
+      notify.loading('Generating image...', { id: 'report-download' })
+      const filename = `${dashboard?.initiative.title.replace(/[^a-z0-9]/gi, '_')}_Report_${new Date().toISOString().split('T')[0]}.png`
+      const blob = await convertReportToImage(REPORT_CANVAS_ID)
+
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      notify.success('Report downloaded successfully!', { id: 'report-download' })
+    } catch (error) {
+      console.error('Error downloading report:', error)
+      notify.error('Failed to download report', { id: 'report-download' })
+    }
+  }
 
  // New Report Button Component
  const NewReportButton = () => {
@@ -781,17 +877,40 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
  <div ref={containerRef} className="flex-1 bg-gray-50 overflow-y-auto min-h-0">
  <div className="max-w-6xl mx-auto p-4 sm:p-8 space-y-6">
- {/* Report Dashboard - Shown at top when generated */}
- {showDashboard && reportText && reportDashboardData && reportData && (
- <>
- {/* Make New Report Button - Above Dashboard */}
- <div className="flex justify-center">
- <NewReportButton />
- </div>
+          {/* Full-size off-screen capture node — the exact 1:1 artwork PDF
+              export reads from. Kept off-screen (not scaled) so html2canvas
+              captures it without transform warping. */}
+          {canvasProps && (
+            <div
+              aria-hidden
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: -99999,
+                width: REPORT_CANVAS_W,
+                height: REPORT_CANVAS_H,
+                pointerEvents: 'none',
+                zIndex: -1,
+              }}
+            >
+              <ReportCanvas {...canvasProps} />
+            </div>
+          )}
 
- <div className="rounded-2xl border border-gray-200/70 bg-white shadow-card p-6">
- <div className="flex items-center justify-between mb-4">
- <h2 className="text-base font-semibold text-gray-800">Report Dashboard</h2>
+          {/* Report preview - Shown at top when generated */}
+          {showDashboard && reportText && reportDashboardData && reportData && (
+            <>
+              {/* Make New Report Button - Above Report */}
+              <div className="flex justify-center">
+                <NewReportButton />
+              </div>
+
+ <div className="app-card-elevated app-pad-lg">
+ <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+ <div>
+ <h2 className="app-card-title">Impact Report</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">Live preview — this is exactly what your downloaded image will look like</p>
+ </div>
  <div className="flex items-center gap-2">
  {canExportReports && (isEditingReport ? (
  <button
@@ -800,7 +919,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  className="app-btn app-btn-primary app-btn-sm"
  >
  <Save className="w-4 h-4" />
- <span>Save Changes</span>
+ <span>Done Editing</span>
  </button>
  ) : (
  <button
@@ -813,34 +932,13 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  </button>
  ))}
  {canExportReports && (
- <button
- onClick={async () => {
- try {
- notify.loading('Generating PDF...', { id: 'pdf-download' })
- const filename = `${dashboard?.initiative.title.replace(/[^a-z0-9]/gi, '_')}_Report_${new Date().toISOString().split('T')[0]}.pdf`
- const pdfBlob = await convertReportToPDF('report-dashboard', filename)
-
- const url = URL.createObjectURL(pdfBlob)
- const link = document.createElement('a')
- link.href = url
- link.download = filename
- document.body.appendChild(link)
- link.click()
- document.body.removeChild(link)
- URL.revokeObjectURL(url)
-
- notify.success('PDF downloaded successfully!', { id: 'pdf-download' })
- } catch (error) {
- console.error('Error downloading PDF:', error)
- notify.error('Failed to download PDF', { id: 'pdf-download' })
- }
- }}
- disabled={isEditingReport}
- className={`app-btn app-btn-sm ${isEditingReport ? 'app-btn-secondary opacity-50' : 'app-btn-primary'}`}
- >
- <Download className="w-4 h-4" />
- <span>Download as PDF</span>
- </button>
+                    <button
+                      onClick={handleDownloadImage}
+                      className="app-btn app-btn-primary app-btn-sm"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Download PNG</span>
+                    </button>
  )}
  <button
  onClick={() => {
@@ -858,42 +956,98 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  }
  }}
  className="app-btn app-btn-icon app-btn-ghost"
- title="Close dashboard"
+ title="Close report"
  >
  <X className="w-5 h-5" />
  </button>
  </div>
  </div>
- <div className="border border-gray-100 rounded-xl overflow-auto bg-gray-50/50" style={{ maxHeight: '900px' }}>
- {dashboard && (
- <ReportDashboard
- dashboard={dashboard}
- organization={activeOrganization}
- tags={reportData.tags}
- overviewSummary={editableOverview || reportDashboardData.overviewSummary}
- totals={reportData.totals}
- beneficiaryText={editableBeneficiaryText || reportDashboardData.beneficiaryText}
- hasBeneficiaryGroups={reportDashboardData.hasBeneficiaryGroups}
- selectedStory={selectedStory ? {
- ...selectedStory,
- title: editableStoryTitle || selectedStory.title,
- description: editableStoryDescription || selectedStory.description
- } : undefined}
- locations={reportData.locations}
- dateStart={dateRange.startDate || dateRange.singleDate}
- dateEnd={dateRange.endDate || dateRange.singleDate}
- mapImage={reportDashboardData.mapImage}
- isEditing={isEditingReport}
- onOverviewChange={setEditableOverview}
- onBeneficiaryTextChange={setEditableBeneficiaryText}
- onStoryTitleChange={setEditableStoryTitle}
- onStoryDescriptionChange={setEditableStoryDescription}
+
+ <div className={`flex gap-4 ${isEditingReport ? 'flex-col lg:flex-row' : ''}`}>
+ {/* Edit panel - text fields update the preview live */}
+ {isEditingReport && (
+ <div className="w-full lg:w-80 flex-shrink-0 space-y-4 overflow-y-auto pr-1" style={{ maxHeight: '640px' }}>
+ <div>
+ <label className="app-label mb-1.5 block">Overview</label>
+ <textarea
+ value={editableOverview}
+ onChange={(e) => setEditableOverview(e.target.value)}
+ rows={6}
+ className="app-input w-full text-sm resize-y"
  />
+ </div>
+ <div>
+ <label className="app-label mb-1.5 block">What These Numbers Mean</label>
+ <textarea
+ value={editableMetricsNarrative}
+ onChange={(e) => setEditableMetricsNarrative(e.target.value)}
+ rows={6}
+ className="app-input w-full text-sm resize-y"
+ placeholder="Narrative explaining your metrics..."
+ />
+ </div>
+ {reportDashboardData.hasBeneficiaryGroups && (
+ <div>
+ <label className="app-label mb-1.5 block">Who We Reached</label>
+ <textarea
+ value={editableBeneficiaryText}
+ onChange={(e) => setEditableBeneficiaryText(e.target.value)}
+ rows={5}
+ className="app-input w-full text-sm resize-y"
+ />
+ </div>
  )}
+ {selectedStory && (
+ <>
+ <div>
+ <label className="app-label mb-1.5 block">Story Title</label>
+ <input
+ type="text"
+ value={editableStoryTitle}
+ onChange={(e) => setEditableStoryTitle(e.target.value)}
+ className="app-input w-full text-sm"
+ />
+ </div>
+ <div>
+ <label className="app-label mb-1.5 block">Story Description</label>
+ <textarea
+ value={editableStoryDescription}
+ onChange={(e) => setEditableStoryDescription(e.target.value)}
+ rows={6}
+ className="app-input w-full text-sm resize-y"
+ />
+ </div>
+ </>
+ )}
+ <p className="text-xs text-gray-400">Changes appear in the preview after a short pause.</p>
+ </div>
+ )}
+
+                {/* Live report preview — a scaled copy of the report. The
+                    exact image artwork is the full-size off-screen node above. */}
+                <div
+                  ref={previewWrapRef}
+                  className="flex-1 min-w-0 border border-gray-200 rounded-xl overflow-hidden bg-gray-100 shadow-inner"
+                >
+                  {canvasProps && (
+                    <div style={{ width: REPORT_CANVAS_W * previewScale, height: REPORT_CANVAS_H * previewScale }}>
+                      <div
+                        style={{
+                          width: REPORT_CANVAS_W,
+                          height: REPORT_CANVAS_H,
+                          transform: `scale(${previewScale})`,
+                          transformOrigin: 'top left',
+                        }}
+                      >
+                        <ReportCanvas {...canvasProps} domId="report-canvas-preview" />
+                      </div>
+                    </div>
+                  )}
+                </div>
  </div>
  </div>
 
- {/* Make New Report Button - Below Dashboard */}
+ {/* Make New Report Button - Below Report */}
  <div className="flex justify-center">
  <NewReportButton />
  </div>
@@ -902,292 +1056,216 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
  {/* Step Wizard - Only show if no report generated OR dashboard is hidden */}
  {(!reportText || !reportDashboardData || !showDashboard) && (
- <div className="rounded-2xl border border-gray-200/70 bg-white shadow-card overflow-hidden">
- {/* Progress Steps Indicator */}
- <div className="px-5 py-3 border-b border-gray-100 bg-white">
- <div className="flex items-center justify-center">
- {steps.map((step, index) => (
+ <motion.div
+ initial={{ opacity: 0, y: 8 }}
+ animate={{ opacity: 1, y: 0, transition: { duration: 0.35 } }}
+ className="app-card"
+ >
+ {/* Stepper */}
+ <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100">
+ <div className="flex items-center justify-center gap-1 overflow-x-auto">
+ {steps.map((step, index) => {
+ const isCurrent = currentStep === step.number
+ const isDone = currentStep > step.number
+ return (
  <React.Fragment key={step.number}>
- <div className="flex flex-col items-center">
- <div className={`flex items-center justify-center w-8 h-8 rounded-lg border-2 transition-all duration-200 ${currentStep > step.number
- ? 'bg-primary-500 border-primary-500 text-secondary-900'
- : currentStep === step.number
- ? 'bg-primary-500 border-primary-500 text-secondary-900 ring-2 ring-primary-200'
- : 'bg-white border-gray-200 text-gray-400'
- }`}>
- {currentStep > step.number ? (
- <Check className="w-4 h-4" />
- ) : (
- <step.icon className="w-4 h-4" />
+ {index > 0 && (
+ <div className={`w-6 sm:w-10 h-px flex-shrink-0 transition-colors ${isDone || isCurrent ? 'bg-primary-300' : 'bg-gray-200'}`} />
  )}
- </div>
- <div className="mt-1 text-center">
- <div className={`text-xs font-medium whitespace-nowrap ${currentStep >= step.number ? 'text-gray-700' : 'text-gray-400'
+ <div className="flex items-center gap-1.5 flex-shrink-0">
+ <span className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${isCurrent
+ ? 'bg-primary-500 text-white'
+ : isDone
+ ? 'bg-primary-100 text-primary-800'
+ : 'bg-gray-100 text-gray-400'
  }`}>
+ {isDone ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : <step.icon className="w-3.5 h-3.5" />}
+ </span>
+ <span className={`text-xs font-medium whitespace-nowrap hidden sm:inline ${isCurrent ? 'text-gray-800' : isDone ? 'text-gray-500' : 'text-gray-400'}`}>
  {step.title}
+ </span>
  </div>
- </div>
- </div>
- {index < steps.length - 1 && (
- <div className={`flex-1 h-0.5 mx-3 rounded-full transition-all duration-200 ${currentStep > step.number ? 'bg-primary-500' : 'bg-gray-200/60'
- }`} style={{ maxWidth: '80px' }} />
- )}
  </React.Fragment>
- ))}
+ )
+ })}
  </div>
  </div>
 
- {/* Step Content */}
- <div ref={formContentRef} className="p-5 min-h-[440px] max-h-[70vh] overflow-y-auto">
+ {/* Step body — scrolls with the page, not in its own pane */}
+ <div className="p-5 sm:p-8">
+ <AnimatePresence mode="wait">
+ <motion.div
+ key={currentStep}
+ initial={viewSwap.initial}
+ animate={viewSwap.animate}
+ exit={viewSwap.exit}
+ className={`mx-auto ${currentStep === 3 ? 'max-w-6xl' : 'max-w-4xl'}`}
+ >
+ <h3 className="text-2xl sm:text-3xl font-semibold text-gray-900 tracking-tight">
+ {stepMeta[currentStep as 1 | 2 | 3 | 4].title}
+ </h3>
+ <p className="text-sm text-gray-500 mt-1.5 mb-6">
+ {stepMeta[currentStep as 1 | 2 | 3 | 4].subtitle}
+ </p>
+
  {/* Step 1: Filters */}
  {currentStep === 1 && (
- <div className="space-y-4 animate-fade-in max-w-3xl mx-auto">
- <div className="text-center mb-4">
- <h3 className="text-lg font-semibold text-gray-900 mb-1">Select Report Filters</h3>
- <p className="text-sm text-gray-600">Choose the data you want to include in your report</p>
- </div>
-
- <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
- {/* Date Range */}
- <div>
- <label className="app-label mb-2 block">
- <Calendar className="w-4 h-4 inline mr-1.5 text-primary-600" />
- Date Range
- </label>
+ <div className="space-y-6">
+ <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 w-full">
+ <ScopeColumn
+ icon={CalendarRange}
+ title="Date"
+ done={!!(dateRange.singleDate || dateRange.startDate)}
+ bodyClassName="max-h-none overflow-visible py-2"
+ >
  <DateRangePicker
+ variant="inline"
+ compact
  value={dateRange}
  onChange={setDateRange}
+ maxDate={getLocalDateString(new Date())}
+ className="w-full -mx-1"
+ />
+ </ScopeColumn>
+
+ <ScopeColumn
+ icon={MapPin}
+ title="Locations"
+ done={selectedLocationIds.length > 0}
+ >
+ <ScopeChips
+ icon={MapPin}
+ label="Locations"
+ options={locations.map(l => ({ id: l.id!, name: l.name }))}
+ selected={selectedLocationIds}
+ onChange={setSelectedLocationIds}
+ hideHeader
+ />
+ </ScopeColumn>
+ </div>
+
+ <div className="flex flex-wrap gap-2">
+ <FilterPill
+ icon={Users}
+ label="All groups"
+ pluralLabel="groups"
+ options={beneficiaryGroups.map(g => ({ id: g.id!, name: g.name }))}
+ selected={selectedBeneficiaryGroupIds}
+ onChange={setSelectedBeneficiaryGroupIds}
+ emptyText="No beneficiary groups available"
+ />
+ <FilterPill
+ icon={Tag}
+ label="All tags"
+ pluralLabel="tags"
+ options={metricTags.map(t => ({ id: t.id, name: t.name, color: t.color ?? undefined }))}
+ selected={selectedTagIds}
+ onChange={setSelectedTagIds}
+ emptyText="No tags available"
  />
  </div>
 
- {/* KPI Multi-Select */}
- <div className="relative" ref={kpiPickerRef}>
- <label className="app-label mb-2 block">
- <BarChart3 className="w-4 h-4 inline mr-1.5 text-primary-600" />
- Metrics ({selectedKPIIds.length} selected)
- </label>
- <button
- type="button"
- onClick={() => setShowKPIPicker(!showKPIPicker)}
- className="app-input w-full text-left cursor-pointer"
- >
+ <div>
+ <div className="flex items-center justify-between gap-3 mb-3">
+ <h4 className="app-section-title flex items-center gap-1.5">
+ <BarChart3 className="w-4 h-4 text-primary-600" />
+ Metrics
+ </h4>
+ <p className="text-xs text-gray-500">
  {selectedKPIIds.length === 0
- ? 'All metrics (default)'
- : `${selectedKPIIds.length} metric${selectedKPIIds.length > 1 ? 's' : ''} selected`
- }
- </button>
- {showKPIPicker && (
- <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-200 rounded-xl shadow-card max-h-60 overflow-y-auto">
+ ? 'All metrics included'
+ : `${selectedKPIIds.length} selected`}
+ </p>
+ </div>
  {kpis.length === 0 ? (
- <div className="p-4 text-sm text-gray-500">No metrics available</div>
+ <EmptyState title="No metrics available" description="Add metrics to your initiative first." />
  ) : (
- kpis.map(kpi => (
- <label
+ <motion.div
+ variants={staggerContainer}
+ initial="hidden"
+ animate="visible"
+ className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"
+ >
+ {kpis.map(kpi => (
+ <ReportMetricCard
  key={kpi.id}
- className={`flex items-center px-4 py-3 cursor-pointer transition-all ${selectedKPIIds.includes(kpi.id!) ? 'bg-primary-50' : 'hover:bg-gray-50'
- }`}
- >
- <input
- type="checkbox"
- checked={selectedKPIIds.includes(kpi.id!)}
- onChange={() => toggleKPI(kpi.id!)}
- className="mr-3 w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+ animate
+ title={kpi.title}
+ color={kpiColorById[kpi.id!] || '#608341'}
+ metricType={kpi.metric_type}
+ selectable
+ selected={selectedKPIIds.length > 0 && selectedKPIIds.includes(kpi.id!)}
+ onToggle={() => toggleKPI(kpi.id!)}
  />
- <span className="text-sm font-medium">{kpi.title}</span>
- </label>
- ))
+ ))}
+ </motion.div>
  )}
- </div>
- )}
+ <p className="text-xs text-gray-400 mt-3">
+ Tap metrics to limit scope. Leave none selected to include all.
+ </p>
  </div>
 
- {/* Location Multi-Select */}
- <div className="relative" ref={locationPickerRef}>
- <label className="app-label mb-2 block">
- <MapPin className="w-4 h-4 inline mr-1.5 text-primary-600" />
- Locations ({selectedLocationIds.length} selected)
- </label>
- <button
- type="button"
- onClick={() => setShowLocationPicker(!showLocationPicker)}
- className="app-input w-full text-left cursor-pointer"
- >
- {selectedLocationIds.length === 0
- ? 'All locations (default)'
- : `${selectedLocationIds.length} location${selectedLocationIds.length > 1 ? 's' : ''} selected`
- }
- </button>
- {showLocationPicker && (
- <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-200 rounded-xl shadow-card max-h-60 overflow-y-auto">
- {locations.length === 0 ? (
- <div className="p-4 text-sm text-gray-500">No locations available</div>
- ) : (
- locations.map(location => (
- <label
- key={location.id}
- className={`flex items-center px-4 py-3 cursor-pointer transition-all ${selectedLocationIds.includes(location.id!) ? 'bg-primary-50' : 'hover:bg-gray-50'
- }`}
- >
- <input
- type="checkbox"
- checked={selectedLocationIds.includes(location.id!)}
- onChange={() => toggleLocation(location.id!)}
- className="mr-3 w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
- />
- <span className="text-sm font-medium">{location.name}</span>
- </label>
- ))
- )}
- </div>
- )}
- </div>
-
- {/* Beneficiary Group Multi-Select */}
- <div className="relative" ref={beneficiaryPickerRef}>
- <label className="app-label mb-2 block">
- <Users className="w-4 h-4 inline mr-1.5 text-primary-600" />
- Beneficiary Groups ({selectedBeneficiaryGroupIds.length} selected)
- </label>
- <button
- type="button"
- onClick={() => setShowBeneficiaryPicker(!showBeneficiaryPicker)}
- className="app-input w-full text-left cursor-pointer"
- >
- {selectedBeneficiaryGroupIds.length === 0
- ? 'All groups (default)'
- : `${selectedBeneficiaryGroupIds.length} group${selectedBeneficiaryGroupIds.length > 1 ? 's' : ''} selected`
- }
- </button>
- {showBeneficiaryPicker && (
- <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-200 rounded-xl shadow-card max-h-60 overflow-y-auto">
- {beneficiaryGroups.length === 0 ? (
- <div className="p-4 text-sm text-gray-500">No beneficiary groups available</div>
- ) : (
- beneficiaryGroups.map(group => (
- <label
- key={group.id}
- className={`flex items-center px-4 py-3 cursor-pointer transition-all ${selectedBeneficiaryGroupIds.includes(group.id!) ? 'bg-primary-50' : 'hover:bg-gray-50'
- }`}
- >
- <input
- type="checkbox"
- checked={selectedBeneficiaryGroupIds.includes(group.id!)}
- onChange={() => toggleBeneficiaryGroup(group.id!)}
- className="mr-3 w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
- />
- <span className="text-sm font-medium">{group.name}</span>
- </label>
- ))
- )}
- </div>
- )}
- </div>
-
- {/* Tag Multi-Select */}
- <div className="relative" ref={tagPickerRef}>
- <label className="app-label mb-2 block">
- <Tag className="w-4 h-4 inline mr-1.5 text-primary-600" />
- Tags ({selectedTagIds.length} selected)
- </label>
- <button
- type="button"
- onClick={() => setShowTagPicker(!showTagPicker)}
- className="app-input w-full text-left cursor-pointer"
- >
- {selectedTagIds.length === 0
- ? 'All tags (default)'
- : `${selectedTagIds.length} tag${selectedTagIds.length > 1 ? 's' : ''} selected`
- }
- </button>
- {showTagPicker && (
- <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-200 rounded-xl shadow-card max-h-60 overflow-y-auto">
- {metricTags.length === 0 ? (
- <div className="p-4 text-sm text-gray-500">No tags available</div>
- ) : (
- metricTags.map(tag => (
- <label
- key={tag.id}
- className={`flex items-center px-4 py-3 cursor-pointer transition-all ${selectedTagIds.includes(tag.id) ? 'bg-primary-50' : 'hover:bg-gray-50'
- }`}
- >
- <input
- type="checkbox"
- checked={selectedTagIds.includes(tag.id)}
- onChange={() => toggleTag(tag.id)}
- className="mr-3 w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
- />
- <span
- className="inline-block w-2.5 h-2.5 rounded-full mr-2 flex-shrink-0"
- style={{ background: tag.color || '#608341' }}
- />
- <span className="text-sm font-medium">{tag.name}</span>
- </label>
- ))
- )}
- </div>
- )}
- </div>
- </div>
-
- {/* Beneficiary Group Scoping Disclaimer */}
  {selectedBeneficiaryGroupIds.length > 0 ? (
- <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-1">
- <p className="text-xs text-amber-800">
- <strong>Scoped Report:</strong> Only includes data for selected beneficiary group{selectedBeneficiaryGroupIds.length > 1 ? 's' : ''}.
- </p>
- </div>
- ) : beneficiaryGroups.length > 0 && (
- <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mt-1">
- <p className="text-xs text-gray-600">
- <strong>Full Report:</strong> Includes all metrics across your initiative.
- </p>
- </div>
- )}
+ <InlineAlert tone="warning" title="Scoped report">
+ Only includes data for selected beneficiary group{selectedBeneficiaryGroupIds.length > 1 ? 's' : ''}.
+ </InlineAlert>
+ ) : beneficiaryGroups.length > 0 ? (
+ <InlineAlert tone="info" title="Full report">
+ Includes all metrics across your initiative unless you narrow filters above.
+ </InlineAlert>
+ ) : null}
  </div>
  )}
 
  {/* Step 2: Review Data */}
  {currentStep === 2 && (
- <div className="space-y-4 animate-fade-in max-w-4xl mx-auto">
- <div className="text-center mb-4">
- <h3 className="text-lg font-semibold text-gray-900 mb-1">Review Your Data</h3>
- <p className="text-sm text-gray-600">Summary of data included in your report</p>
- </div>
-
+ <div className="space-y-6">
  {loadingData ? (
  <SectionLoader label="Loading data..." />
  ) : reportData ? (
- <div className="space-y-4">
- {/* Metrics Summary */}
+ <>
  {reportData.totals.length > 0 && (
- <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
- <h4 className="font-semibold text-gray-800 mb-3 flex items-center text-sm">
- <BarChart3 className="w-4 h-4 mr-1.5 text-primary-600" />
+ <div>
+ <h4 className="app-section-title mb-3 flex items-center gap-1.5">
+ <BarChart3 className="w-4 h-4 text-primary-600" />
  Metrics ({reportData.totals.length})
  </h4>
- <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
- {reportData.totals.map(total => (
- <div key={total.kpi_id} className="p-2.5 bg-white rounded-lg border border-gray-100 shadow-sm">
- <h5 className="font-medium text-gray-700 text-xs truncate">{total.kpi_title}</h5>
- <p className="text-lg font-bold text-evidence-500 mt-1">
- {total.total_value} <span className="text-xs font-normal text-gray-500">{total.unit_of_measurement}</span>
- </p>
- </div>
- ))}
- </div>
+ <motion.div
+ variants={staggerContainer}
+ initial="hidden"
+ animate="visible"
+ className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"
+ >
+ {reportData.totals.map(total => {
+ const kpi = kpiById.get(total.kpi_id)
+ return (
+ <ReportMetricCard
+ key={total.kpi_id}
+ animate
+ title={total.kpi_title}
+ color={kpiColorById[total.kpi_id] || '#608341'}
+ total={total.total_value}
+ unit={total.unit_of_measurement}
+ metricType={kpi?.metric_type}
+ />
+ )
+ })}
+ </motion.div>
  </div>
  )}
 
- {/* Locations */}
  {reportData.locations.length > 0 && (
- <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
- <h4 className="font-semibold text-gray-800 mb-2 flex items-center text-sm">
- <MapPin className="w-4 h-4 mr-1.5 text-primary-600" />
+ <div className="app-card-muted p-4 sm:p-5">
+ <h4 className="app-section-title mb-3 flex items-center gap-1.5">
+ <MapPin className="w-4 h-4 text-primary-600" />
  Locations ({reportData.locations.length})
  </h4>
- <div className="flex flex-wrap gap-1.5">
+ <div className="flex flex-wrap gap-2">
  {reportData.locations.map(location => (
- <span key={location.id} className="px-2.5 py-1 bg-white rounded-full border border-gray-200 text-xs font-medium text-gray-700">
+ <span
+ key={location.id}
+ className="inline-flex items-center h-8 px-3 rounded-full border border-gray-200 bg-white text-sm font-medium text-gray-700"
+ >
  {location.name}
  </span>
  ))}
@@ -1195,72 +1273,47 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  </div>
  )}
 
- {/* No data warning */}
  {reportData.totals.length === 0 && reportData.locations.length === 0 && (
  <EmptyState
  icon={FileText}
  title="No data found for the selected filters"
  description="Try adjusting your filter selections."
- className="bg-amber-50 rounded-xl border border-amber-200"
  />
  )}
- </div>
+ </>
  ) : (
- <EmptyState
- title="No data loaded"
- description="Go back to filters and try again."
- />
+ <EmptyState title="No data loaded" description="Go back to filters and try again." />
  )}
  </div>
  )}
 
  {/* Step 3: Add Story */}
  {currentStep === 3 && (
- <div className="space-y-4 animate-fade-in max-w-3xl mx-auto">
- <div className="text-center mb-4">
- <h3 className="text-lg font-semibold text-gray-900 mb-1">Add a Story (Optional)</h3>
- <p className="text-sm text-gray-600">Select a story to anchor your report, or skip</p>
- </div>
-
+ <div className="space-y-4">
  {reportData?.stories && reportData.stories.length > 0 ? (
- <div className="space-y-2 max-h-[250px] overflow-y-auto">
- {reportData.stories.map(story => (
- <div
- key={story.id}
- onClick={() => setSelectedStory(selectedStory?.id === story.id ? null : story)}
- className={`p-3 border-2 rounded-lg cursor-pointer transition-all duration-200 ${selectedStory?.id === story.id
- ? 'border-primary-400 bg-primary-50 shadow-md shadow-primary-500/10'
- : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
- }`}
+ <>
+ <p className="text-xs text-gray-500">Tap a story to include it, or tap again to clear.</p>
+ <motion.div
+ variants={staggerContainer}
+ initial="hidden"
+ animate="visible"
+ className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch"
  >
- <div className="flex items-start justify-between">
- <div className="flex-1">
- <h4 className="font-semibold text-gray-800 text-sm">{story.title}</h4>
- {story.description && (
- <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{story.description}</p>
- )}
- <div className="flex items-center space-x-3 mt-1.5 text-xs text-gray-400">
- {story.location_name && (
- <span className="flex items-center">
- <MapPin className="w-3 h-3 mr-0.5" />
- {story.location_name}
- </span>
- )}
- <span className="flex items-center">
- <Calendar className="w-3 h-3 mr-0.5" />
- {story.date_represented}
- </span>
- </div>
- </div>
- {selectedStory?.id === story.id && (
- <div className="w-5 h-5 bg-primary-500 rounded-full flex items-center justify-center ml-2">
- <Check className="w-3 h-3 text-white" />
- </div>
- )}
- </div>
- </div>
- ))}
- </div>
+ {reportData.stories.map(story => {
+ const isSelected = selectedStory?.id === story.id
+ return (
+ <motion.div key={story.id} variants={fadeUp} className="h-full">
+ <StoryCard
+ story={reportStoryToCard(story, initiativeId)}
+ selectable
+ selected={isSelected}
+ onSelect={() => setSelectedStory(isSelected ? null : story)}
+ />
+ </motion.div>
+ )
+ })}
+ </motion.div>
+ </>
  ) : (
  <EmptyState
  icon={BookOpen}
@@ -1270,71 +1323,94 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  )}
 
  {selectedStory && (
- <div className="bg-primary-50 border-2 border-primary-200 rounded-xl p-4">
- <p className="text-sm text-primary-800">
- <strong>Selected:</strong> {selectedStory.title}
- </p>
+ <InlineAlert tone="info" title={`Selected: ${selectedStory.title}`}>
  <button
+ type="button"
  onClick={() => setSelectedStory(null)}
- className="text-xs text-primary-600 hover:text-primary-700 underline mt-1"
+ className="text-xs text-primary-700 hover:text-primary-800 underline mt-1"
  >
  Clear selection
  </button>
- </div>
+ </InlineAlert>
  )}
  </div>
  )}
 
  {/* Step 4: Generate */}
  {currentStep === 4 && (
- <div className="space-y-4 animate-fade-in max-w-2xl mx-auto">
- <div className="text-center mb-4">
- <h3 className="text-lg font-semibold text-gray-900 mb-1">Ready to Generate</h3>
- <p className="text-sm text-gray-600">Review and generate your AI-powered report</p>
- </div>
-
- {/* Summary */}
- <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-3">
- <h4 className="font-semibold text-gray-800 text-sm">Report Summary</h4>
-
- <div className="grid grid-cols-2 gap-2 text-sm">
- <div className="bg-white rounded-lg p-2.5 border border-gray-100">
- <span className="text-xs text-gray-500">Metrics</span>
- <p className="font-semibold text-gray-800">{reportData?.totals.length || 0}</p>
- </div>
- <div className="bg-white rounded-lg p-2.5 border border-gray-100">
- <span className="text-xs text-gray-500">Locations</span>
- <p className="font-semibold text-gray-800">{reportData?.locations.length || 0}</p>
- </div>
- <div className="bg-white rounded-lg p-2.5 border border-gray-100">
- <span className="text-xs text-gray-500">Date Range</span>
- <p className="font-semibold text-gray-800 text-xs">
- {dateRange.startDate && dateRange.endDate
- ? `${dateRange.startDate} - ${dateRange.endDate}`
- : dateRange.singleDate || 'All dates'
- }
+ <div className="space-y-6">
+ <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+ {[
+ { label: 'Metrics', value: reportData?.totals.length || 0 },
+ { label: 'Locations', value: reportData?.locations.length || 0 },
+ {
+ label: 'Date range',
+ value: dateRange.startDate && dateRange.endDate
+ ? `${dateRange.startDate} – ${dateRange.endDate}`
+ : dateRange.singleDate || 'All dates',
+ small: true,
+ },
+ { label: 'Story', value: selectedStory?.title || 'None', small: true },
+ ].map((item, i) => (
+ <motion.div
+ key={item.label}
+ initial={{ opacity: 0, y: 8 }}
+ animate={{ opacity: 1, y: 0, transition: { delay: i * 0.05 } }}
+ className="app-card p-3 sm:p-4"
+ >
+ <span className="text-xs text-gray-500">{item.label}</span>
+ <p className={`font-semibold text-gray-900 mt-1 ${item.small ? 'text-xs leading-snug line-clamp-2' : 'text-lg tabular-nums'}`}>
+ {item.value}
  </p>
- </div>
- <div className="bg-white rounded-lg p-2.5 border border-gray-100">
- <span className="text-xs text-gray-500">Story</span>
- <p className="font-semibold text-gray-800 text-xs truncate">{selectedStory?.title || 'None'}</p>
- </div>
- </div>
+ </motion.div>
+ ))}
  </div>
 
- <div className="bg-primary-50 border border-primary-200 rounded-xl p-4 text-center">
- <Sparkles className="w-8 h-8 text-primary-500 mx-auto mb-2" />
- <p className="text-xs text-primary-800 leading-relaxed">
- AI will analyze your data and generate a professional impact report.
- </p>
+ {reportData && reportData.totals.length > 0 && (
+ <div>
+ <h4 className="app-section-title mb-3">Included metrics</h4>
+ <motion.div
+ variants={staggerContainer}
+ initial="hidden"
+ animate="visible"
+ className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+ >
+ {reportData.totals.slice(0, 6).map(total => {
+ const kpi = kpiById.get(total.kpi_id)
+ return (
+ <div key={total.kpi_id} className={REPORT_METRIC_CARD_H}>
+ <ReportMetricCard
+ title={total.kpi_title}
+ color={kpiColorById[total.kpi_id] || '#608341'}
+ total={total.total_value}
+ unit={total.unit_of_measurement}
+ metricType={kpi?.metric_type}
+ />
  </div>
- </div>
+ )
+ })}
+ </motion.div>
+ {reportData.totals.length > 6 && (
+ <p className="text-xs text-gray-400 mt-2">+ {reportData.totals.length - 6} more</p>
  )}
  </div>
+ )}
 
- {/* Navigation Footer */}
- <div className="app-divider px-5 py-3 bg-gray-50/50">
- <div className="flex items-center justify-between max-w-3xl mx-auto">
+ <InlineAlert tone="info">
+ <span className="inline-flex items-center gap-2">
+ <Sparkles className="w-4 h-4 text-primary-600 flex-shrink-0" />
+ AI will analyze your filtered data and generate a professional impact report.
+ </span>
+ </InlineAlert>
+ </div>
+ )}
+ </motion.div>
+ </AnimatePresence>
+ </div>
+
+ {/* Navigation footer — same scroll as step body */}
+ <div className="app-divider px-5 py-3.5 bg-gray-50/80">
+ <div className="flex items-center justify-between max-w-4xl mx-auto">
  <button
  type="button"
  onClick={handleBack}
@@ -1360,7 +1436,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  </>
  ) : (
  <>
- <span>{currentStep === 1 ? 'Apply & Continue' : 'Next'}</span>
+ <span>{currentStep === 1 ? 'Apply & continue' : 'Next'}</span>
  <ChevronRight className="w-4 h-4" />
  </>
  )}
@@ -1380,7 +1456,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  ) : (
  <>
  <Sparkles className="w-4 h-4" />
- <span>Generate Report</span>
+ <span>Generate report</span>
  </>
  )}
  </button>
@@ -1388,7 +1464,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  </div>
  </div>
  </div>
- </div>
+ </motion.div>
  )}
 
  </div>

@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X, type LucideIcon } from 'lucide-react'
 import { cn } from '../lib/utils'
 
@@ -48,13 +49,26 @@ export default function ModalFrame({
 
  const panel = panelClassName ?? cn(PANEL_BASE, sizeMaxW[size])
 
- return (
- <div className={cn('fixed inset-0 flex items-center justify-center', paddingClassName, zIndexClass, backdropClassName, animate && 'animate-fade-in')}>
- <div className={cn(panel, animate && 'animate-slide-up-fast')}>
+ const overlay = (
+ <div
+ className={cn('fixed inset-0 min-h-dvh w-full', zIndexClass)}
+ role="presentation"
+ >
+ {/* Full-viewport scrim — separate layer so padding/centering can't leave gaps */}
+ <div
+ className={cn('absolute inset-0', backdropClassName, animate && 'animate-fade-in')}
+ aria-hidden
+ />
+ <div className={cn('absolute inset-0 flex items-center justify-center pointer-events-none', paddingClassName)}>
+ <div className={cn(panel, animate && 'animate-slide-up-fast', 'pointer-events-auto max-h-[min(90dvh,100%)]')}>
  {children}
  </div>
  </div>
+ </div>
  )
+
+ if (typeof document === 'undefined') return null
+ return createPortal(overlay, document.body)
 }
 
 /* ----------------------------------------------------------------------------
