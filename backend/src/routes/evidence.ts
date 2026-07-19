@@ -80,6 +80,30 @@ router.post('/:id/connect-to-claim', authenticateUser, async (req: Authenticated
     }
 });
 
+// Review gate: flip evidence between approved and pending (owner/admin only).
+// Approving connects it via the matcher; marking pending strips its claim
+// links so it immediately stops connecting/counting everywhere.
+router.post('/:id/approval', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const { status } = req.body || {};
+        if (status !== 'approved' && status !== 'pending') {
+            res.status(400).json({ error: "status must be 'approved' or 'pending'" });
+            return;
+        }
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const evidence = await EvidenceService.setApprovalStatus(
+            req.params.id,
+            status,
+            req.user!.id,
+            requestedOrgId
+        );
+        res.json(evidence);
+    } catch (error) {
+        res.status(403).json({ error: (error as Error).message });
+        return;
+    }
+});
+
 // Disconnect evidence from a metric (removes the evidence_kpis candidate
 // link and prunes that metric's claim connections — stable under reconcile).
 router.delete('/:id/kpi-link/:kpiId', authenticateUser, async (req: AuthenticatedRequest, res) => {

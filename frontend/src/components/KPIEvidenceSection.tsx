@@ -32,7 +32,7 @@ interface KPIEvidenceSectionProps {
 }
 
 export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateFilter }: KPIEvidenceSectionProps) {
- const { canEditEvidence, canDelete } = useTeam()
+ const { canAddEvidence, canEditEvidence, canDelete } = useTeam()
  const [evidence, setEvidence] = useState<Evidence[]>([])
  const [loading, setLoading] = useState(true)
  const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false)
@@ -164,7 +164,7 @@ export default function KPIEvidenceSection({ kpi, onRefresh, initiativeId, dateF
  <div className="text-lg font-bold text-evidence-500">{dateFilter?.isActive ? filteredEvidence.length : evidence.length}</div>
  <div className="text-xs text-gray-500">Items</div>
  </div>
- {canEditEvidence && (
+ {canAddEvidence && (
  <button
  onClick={() => setIsEvidenceModalOpen(true)}
  className="flex items-center justify-center space-x-2 px-4 py-2 bg-evidence-500 hover:bg-evidence-600 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg shadow-evidence-500/25"

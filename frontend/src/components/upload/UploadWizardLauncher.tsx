@@ -20,7 +20,7 @@ interface UploadWizardLauncherProps {
  * actions). Loads everything the wizard needs, then hands over.
  */
 export default function UploadWizardLauncher({ initiativeId, onClose, onCreated }: UploadWizardLauncherProps) {
- const { canAddImpactClaims, canEditEvidence } = useTeam()
+ const { canAddImpactClaims, canAddEvidence } = useTeam()
  const [data, setData] = useState<TimelineResponse | null>(null)
  const [locations, setLocations] = useState<Location[]>([])
  const [beneficiaryGroups, setBeneficiaryGroups] = useState<BeneficiaryGroup[]>([])
@@ -88,7 +88,7 @@ export default function UploadWizardLauncher({ initiativeId, onClose, onCreated 
  <UploadWizard
  initiativeId={initiativeId}
  canCreateClaim={canAddImpactClaims}
- canCreateEvidence={canEditEvidence}
+ canCreateEvidence={canAddEvidence}
  onAdvancedClaim={() => setAdvanced('claim')}
  onAdvancedEvidence={() => setAdvanced('evidence')}
  kpis={data.kpis}

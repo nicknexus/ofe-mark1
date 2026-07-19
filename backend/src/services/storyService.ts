@@ -161,7 +161,7 @@ export class StoryService {
             const initiative = await InitiativeService.getById(storyData.initiative_id, userId, requestedOrgId)
             if (!initiative) throw new Error('Initiative not found or access denied')
         }
-        await PermissionService.assert(userId, requestedOrgId, 'stories', 'edit', {
+        await PermissionService.assert(userId, requestedOrgId, 'stories', 'create', {
             initiativeId: storyData.initiative_id,
         })
 

@@ -3,7 +3,8 @@ import { Link2, Unlink, TrendingUp, FileText, MapPin, CalendarRange, Tag as TagI
 import { BeneficiaryGroup, KPI, Location, MetricTag, TimelineClaim, TimelineEvidence } from '../../types'
 import { formatDate } from '../../utils'
 import { previewMatchingClaims, previewMatchingEvidence } from '../../utils/timeline'
-import { WizardState, filledClaimEntries, includesClaim, includesEvidence, wizardDates } from './wizardTypes'
+import { WizardState, filledClaimEntries, includesClaim, includesEvidence, wizardDates, evidenceBuckets, EVIDENCE_TYPE_LABELS } from './wizardTypes'
+import { EVIDENCE_TYPE_STYLE } from '../timeline/EvidenceTypeCounts'
 
 interface WizardReviewStepProps {
  state: WizardState
@@ -32,6 +33,7 @@ export default function WizardReviewStep({
 }: WizardReviewStepProps) {
  const claim = includesClaim(state.kind)
  const evidence = includesEvidence(state.kind)
+ const evBuckets = evidence && !state.editing ? evidenceBuckets(state.files) : []
  const { start, end } = wizardDates(state)
  const kpiById = useMemo(() => new Map(kpis.map(k => [k.id, k])), [kpis])
 
@@ -113,7 +115,7 @@ export default function WizardReviewStep({
  </div>
  </div>
  ))}
- {evidence && (
+   {evidence && (state.editing ? (
  <div className="rounded-2xl border border-primary-200 bg-primary-50/50 p-4">
  <div className="flex items-center gap-3">
  <div className="p-2 rounded-xl bg-primary-100 flex-shrink-0">
@@ -127,7 +129,30 @@ export default function WizardReviewStep({
  </div>
  </div>
  </div>
- )}
+ ) : (
+ // One card per type bucket — this is exactly what will be created.
+       evBuckets.map(bucket => {
+ const multi = evBuckets.length > 1
+ const TypeIcon = EVIDENCE_TYPE_STYLE[bucket.type].icon
+ return (
+ <div key={bucket.type} className="rounded-2xl border border-primary-200 bg-primary-50/50 p-4">
+ <div className="flex items-center gap-3">
+ <div className={`p-2 rounded-xl flex-shrink-0 ${EVIDENCE_TYPE_STYLE[bucket.type].iconBox}`}>
+ <TypeIcon className="w-4 h-4" />
+ </div>
+ <div className="min-w-0">
+ <p className="text-sm font-medium text-gray-800 truncate">
+ {multi ? `${state.evidenceTitle} — ${EVIDENCE_TYPE_LABELS[bucket.type]}` : state.evidenceTitle}
+ </p>
+ <p className="text-xs text-gray-500">
+ {EVIDENCE_TYPE_LABELS[bucket.type]} · {bucket.files.length} file{bucket.files.length === 1 ? '' : 's'}
+ </p>
+ </div>
+ </div>
+ </div>
+ )
+ })
+ ))}
  </div>
 
  {/* Shared scope summary */}

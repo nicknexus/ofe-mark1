@@ -88,9 +88,14 @@ export class TimelineService {
             ...evidence.map(e => e.user_id),
         ]);
 
+        // Pending evidence rides along in the payload (the Logs render it as
+        // the approval queue) but is excluded from every stat except its own.
+        const approvedEvidence = evidence.filter(e => (e as any).approval_status !== 'pending');
+        const pendingTotal = evidence.length - approvedEvidence.length;
+
         const connectedClaims = claims.filter(c => c.evidence_count > 0).length;
-        const connectedEvidence = evidence.filter(e => e.claim_count > 0).length;
-        const total = claims.length + evidence.length;
+        const connectedEvidence = approvedEvidence.filter(e => e.claim_count > 0).length;
+        const total = claims.length + approvedEvidence.length;
         const connected = connectedClaims + connectedEvidence;
 
         return {
@@ -104,7 +109,8 @@ export class TimelineService {
                 connected,
                 not_connected: total - connected,
                 claims_total: claims.length,
-                evidence_total: evidence.length,
+                evidence_total: approvedEvidence.length,
+                pending_total: pendingTotal,
             },
         };
     }

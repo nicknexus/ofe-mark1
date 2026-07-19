@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ArrowLeft, ArrowRight, Check, TrendingUp, FileText, Layers } from 'lucide-react'
+import { X, ArrowLeft, ArrowRight, Check, TrendingUp, FileText, Layers, Clock } from 'lucide-react'
 import { apiService } from '../../services/api'
 import { notify } from '../../lib/notify'
 import { useUploadManager } from '../../context/UploadContext'
+import { useTeam } from '../../context/TeamContext'
 import {
  BeneficiaryGroup,
  CreateEvidenceForm,
@@ -16,6 +17,7 @@ import {
  TimelineEvidence,
 } from '../../types'
 import { viewSwap } from '../timeline/motion'
+import { type DateRangePickerHandle } from '../DateRangePicker'
 import {
  INITIAL_WIZARD_STATE,
  WizardKind,
@@ -24,6 +26,9 @@ import {
  filledClaimEntries,
  includesClaim,
  includesEvidence,
+ inferEvidenceType,
+ evidenceBuckets,
+ EVIDENCE_TYPE_LABELS,
  validateAll,
  validateClaimStep,
  validateEvidenceStep,
@@ -122,6 +127,9 @@ interface UploadWizardProps {
   editClaim?: TimelineClaim
   /** Edit mode: update this existing evidence record instead of creating. */
   editEvidence?: Evidence
+  /** Add-evidence-for-a-claim: force evidence kind, lock the claim's metric,
+   *  and prefill the claim's scope so the new evidence auto-connects to it. */
+  evidenceForClaim?: TimelineClaim
   onClose: () => void
   onCreated: () => void
 }
@@ -171,6 +179,24 @@ function stateFromEdit(editClaim?: TimelineClaim, editEvidence?: Evidence): Part
       url: f.url,
       existing: true,
     })),
+  }
+}
+
+/** Prefill evidence scope from a claim so the new evidence auto-connects to it
+ *  (same scope-copy trick the old quick-add dialog used). */
+function stateFromClaimScope(claim?: TimelineClaim): Partial<WizardState> {
+  if (!claim) return {}
+  const isRange = !!(claim.date_range_start && claim.date_range_end)
+  return {
+    kind: 'evidence',
+    evidenceKpiIds: claim.kpi_id ? [claim.kpi_id] : [],
+    locationIds: claim.location_id ? [claim.location_id] : [],
+    tagIds: (claim as any).tag_id ? [(claim as any).tag_id] : [],
+    beneficiaryGroupIds: claim.beneficiary_group_ids || [],
+    dateMode: isRange ? 'range' : 'single',
+    dateSingle: isRange ? '' : (claim.date_represented || ''),
+    dateStart: claim.date_range_start || '',
+    dateEnd: claim.date_range_end || '',
   }
 }
 
@@ -246,11 +272,17 @@ export default function UploadWizard({
   lockedMetricId,
   editClaim,
   editEvidence,
+  evidenceForClaim,
   onClose,
   onCreated,
 }: UploadWizardProps) {
   const { queueUpload, cancelUpload, setPanelSuppressed } = useUploadManager()
+  const { requiresEvidenceApproval } = useTeam()
   const isEdit = !!editClaim || !!editEvidence
+
+  // Add-evidence-for-a-claim implies evidence kind + the claim's metric locked.
+  const startKind = initialKind ?? (evidenceForClaim ? 'evidence' : undefined)
+  const lockedMetric = lockedMetricId ?? evidenceForClaim?.kpi_id
 
   const availableKinds = KIND_OPTIONS.filter(o =>
     o.kind === 'evidence' ? canCreateEvidence
@@ -262,10 +294,12 @@ export default function UploadWizard({
     ...INITIAL_WIZARD_STATE,
     // A caller-provided kind (Metrics dashboard) or single-capability users
     // skip the type step entirely.
-    kind: initialKind ?? (availableKinds.length === 1 ? availableKinds[0].kind : null),
+    kind: startKind ?? (availableKinds.length === 1 ? availableKinds[0].kind : null),
     // Pre-scope to the metric the user added from, so we can skip the picker.
-    claimKpiId: lockedMetricId ?? null,
-    evidenceKpiIds: lockedMetricId ? [lockedMetricId] : [],
+    claimKpiId: lockedMetric ?? null,
+    evidenceKpiIds: lockedMetric ? [lockedMetric] : [],
+    // Add-evidence-for-a-claim: prefill the claim's scope so it auto-connects.
+    ...stateFromClaimScope(evidenceForClaim),
     // Edit mode: everything prefilled from the record being edited.
     ...stateFromEdit(editClaim, editEvidence),
   }))
@@ -273,6 +307,7 @@ export default function UploadWizard({
  const [stepError, setStepError] = useState<string | null>(null)
  const [submitting, setSubmitting] = useState(false)
  const stateRef = useRef(state)
+ const scopeDatePickerRef = useRef<DateRangePickerHandle>(null)
  stateRef.current = state
 
  // Files upload to storage the moment they're picked, but the evidence row is
@@ -310,21 +345,21 @@ export default function UploadWizard({
     if (editClaim) return ['scope', 'claim', 'review']
     if (editEvidence) return ['metric', 'scope', 'evidence', 'review']
     const list: WizardStepId[] = []
-    if (availableKinds.length > 1 && !initialKind) list.push('type')
+    if (availableKinds.length > 1 && !startKind) list.push('type')
     if (hasModeChoice) list.push('mode')
     if (state.kind === 'both') {
       // Scope comes first and is shared by everything; claims are entered
       // per-metric in a stacked list, so there is no separate metric step.
       list.push('scope', 'claim', 'evidence')
     } else {
-      if (!lockedMetricId) list.push('metric')
+      if (!lockedMetric) list.push('metric')
       list.push('scope')
       if (includesClaim(state.kind)) list.push('claim')
       if (includesEvidence(state.kind)) list.push('evidence')
     }
     list.push('review')
     return list
-  }, [availableKinds.length, state.kind, hasModeChoice, initialKind, lockedMetricId, editClaim, editEvidence])
+  }, [availableKinds.length, state.kind, hasModeChoice, startKind, lockedMetric, editClaim, editEvidence])
 
   const step = steps[Math.min(stepIndex, steps.length - 1)]
 
@@ -355,7 +390,11 @@ export default function UploadWizard({
  }, [handleClose, submitting])
 
  const update = (patch: Partial<WizardState>) => {
- setState(prev => ({ ...prev, ...patch }))
+ setState(prev => {
+ const next = { ...prev, ...patch }
+ stateRef.current = next
+ return next
+ })
  setStepError(null)
  }
 
@@ -390,9 +429,20 @@ export default function UploadWizard({
  status: 'uploading',
  progress: 0,
  previewUrl,
+ type: inferEvidenceType(file.name, file.type),
  }],
  }))
  }
+ setStepError(null)
+ }
+
+ const handleSetFileType = (fileId: string, type: Evidence['type']) => {
+ setState(prev => ({ ...prev, files: prev.files.map(f => f.id === fileId ? { ...f, type } : f) }))
+ setStepError(null)
+ }
+
+ const handleSetAllFileTypes = (type: Evidence['type']) => {
+ setState(prev => ({ ...prev, files: prev.files.map(f => f.existing ? f : { ...f, type }) }))
  setStepError(null)
  }
 
@@ -408,13 +458,14 @@ export default function UploadWizard({
  }
 
  const validateCurrent = (): string | null => {
+ const snapshot = stateRef.current
  switch (step) {
- case 'type': return state.kind ? null : 'Choose what you want to add'
+ case 'type': return snapshot.kind ? null : 'Choose what you want to add'
  case 'mode': return null
- case 'metric': return validateMetricStep(state)
- case 'scope': return validateScopeStep(state)
- case 'claim': return validateClaimStep(state)
- case 'evidence': return validateEvidenceStep(state)
+ case 'metric': return validateMetricStep(snapshot)
+ case 'scope': return validateScopeStep(snapshot)
+ case 'claim': return validateClaimStep(snapshot)
+ case 'evidence': return validateEvidenceStep(snapshot)
  default: return null
  }
  }
@@ -425,6 +476,7 @@ export default function UploadWizard({
  }
 
  const goNext = () => {
+ if (step === 'scope') scopeDatePickerRef.current?.applyPending()
  const error = validateCurrent()
  if (error) {
  setStepError(error)
@@ -538,13 +590,19 @@ export default function UploadWizard({
  if (state.claimKpiId) claimedKpiIds.push(state.claimKpiId)
  }
 
+ let evidenceRecordCount = 0
  if (includesEvidence(state.kind)) {
- const fileUrls = state.files.filter(f => f.url).map(f => f.url!)
- const fileSizes = state.files.filter(f => f.url).map(f => f.uploadedSize ?? 0)
+ // Split the uploaded files into one evidence record per type (max four).
+ const buckets = evidenceBuckets(state.files)
+ const multi = buckets.length > 1
+ const baseTitle = state.evidenceTitle.trim()
+ for (const bucket of buckets) {
+ const fileUrls = bucket.files.map(f => f.url!)
+ const fileSizes = bucket.files.map(f => f.uploadedSize ?? 0)
  const evidencePayload: CreateEvidenceForm = {
- title: state.evidenceTitle.trim(),
+ title: multi ? `${baseTitle} — ${EVIDENCE_TYPE_LABELS[bucket.type]}` : baseTitle,
  description: state.evidenceDescription.trim() || undefined,
- type: state.evidenceType,
+ type: bucket.type,
  ...dateFields,
  initiative_id: initiativeId,
  location_ids: state.locationIds,
@@ -559,13 +617,15 @@ export default function UploadWizard({
  file_sizes: fileSizes,
  }
  await apiService.createEvidence(evidencePayload)
+ evidenceRecordCount++
+ }
  }
 
  notify.success(
  state.kind === 'both'
- ? `Log saved — ${createdClaimIds.length} claim${createdClaimIds.length === 1 ? '' : 's'} and evidence connected automatically`
+ ? `Log saved — ${createdClaimIds.length} claim${createdClaimIds.length === 1 ? '' : 's'} and ${evidenceRecordCount} evidence record${evidenceRecordCount === 1 ? '' : 's'} connected automatically`
  : state.kind === 'claim' ? 'Log saved — impact claim added'
- : 'Log saved — evidence uploaded'
+ : `Log saved — ${evidenceRecordCount} evidence record${evidenceRecordCount === 1 ? '' : 's'} uploaded`
  )
  savedRef.current = true
  state.files.forEach(f => f.previewUrl && URL.revokeObjectURL(f.previewUrl))
@@ -778,6 +838,7 @@ export default function UploadWizard({
  locations={locations}
  tags={tags}
  beneficiaryGroups={beneficiaryGroups}
+ datePickerRef={scopeDatePickerRef}
  />
  )}
 
@@ -800,10 +861,23 @@ export default function UploadWizard({
  update={update}
  onAddFiles={handleAddFiles}
  onRemoveFile={handleRemoveFile}
+ onSetFileType={handleSetFileType}
+ onSetAllTypes={handleSetAllFileTypes}
  />
  )}
 
  {step === 'review' && (
+ <>
+ {/* Review gate: flagged members' evidence goes to the approval queue */}
+ {requiresEvidenceApproval && includesEvidence(state.kind) && !isEdit && (
+ <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-3 mb-4 max-w-2xl">
+ <Clock className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+ <p className="text-xs text-amber-700">
+ <span className="font-semibold text-amber-800">Submitted for approval:</span>{' '}
+ your evidence is saved right away, but it won't connect to claims or count in any totals until an admin approves it.
+ </p>
+ </div>
+ )}
  <WizardReviewStep
  state={state}
  kpis={kpis}
@@ -813,6 +887,7 @@ export default function UploadWizard({
  existingClaims={existingClaims}
  existingEvidence={existingEvidence}
  />
+ </>
  )}
  </motion.div>
  </AnimatePresence>

@@ -208,7 +208,7 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
  await TeamService.sendInvite({
  email: inviteEmail.trim(),
  memberType: inviteMemberType,
- canAddImpactClaims: invitePermissionToggles.addImpactClaims,
+ canAddImpactClaims: invitePermissionToggles.addClaims,
  permissions:
  inviteMemberType === 'team_member'
  ? togglesToGrants(invitePermissionToggles)
@@ -521,8 +521,8 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
  </div>
  {inviteMemberType === 'team_member' && (
  <div className="space-y-2 text-sm text-gray-600">
- <label className="flex items-center gap-2"><input type="checkbox" checked={invitePermissionToggles.addImpactClaims} onChange={e => setInvitePermissionToggles({ ...invitePermissionToggles, addImpactClaims: e.target.checked })} className="rounded" /> Add impact claims</label>
- <label className="flex items-center gap-2"><input type="checkbox" checked={invitePermissionToggles.addEditEvidence} onChange={e => setInvitePermissionToggles({ ...invitePermissionToggles, addEditEvidence: e.target.checked })} className="rounded" /> Add & edit evidence</label>
+ <label className="flex items-center gap-2"><input type="checkbox" checked={invitePermissionToggles.addClaims} onChange={e => setInvitePermissionToggles({ ...invitePermissionToggles, addClaims: e.target.checked, editClaims: e.target.checked })} className="rounded" /> Add & edit impact claims</label>
+ <label className="flex items-center gap-2"><input type="checkbox" checked={invitePermissionToggles.addEvidence} onChange={e => setInvitePermissionToggles({ ...invitePermissionToggles, addEvidence: e.target.checked, editEvidence: e.target.checked })} className="rounded" /> Add & edit evidence</label>
  <label className="flex items-center gap-2"><input type="checkbox" checked={invitePermissionToggles.deleteContent} onChange={e => setInvitePermissionToggles({ ...invitePermissionToggles, deleteContent: e.target.checked })} className="rounded" /> Delete content</label>
  </div>
  )}

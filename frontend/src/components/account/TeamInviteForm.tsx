@@ -12,6 +12,8 @@ type TeamInviteFormProps = {
  setPermissionToggles: (value: TeamMemberPermissionToggles) => void
  scope: TeamMemberScope
  setScope: (value: TeamMemberScope) => void
+ requiresEvidenceApproval: boolean
+ setRequiresEvidenceApproval: (value: boolean) => void
  sending: boolean
  onSubmit: (e: FormEvent) => void
  disabled?: boolean
@@ -26,6 +28,8 @@ export function TeamInviteForm({
  setPermissionToggles,
  scope,
  setScope,
+ requiresEvidenceApproval,
+ setRequiresEvidenceApproval,
  sending,
  onSubmit,
  disabled,
@@ -41,6 +45,8 @@ export function TeamInviteForm({
  setPermissionToggles={setPermissionToggles}
  scope={scope}
  setScope={setScope}
+ requiresEvidenceApproval={requiresEvidenceApproval}
+ setRequiresEvidenceApproval={setRequiresEvidenceApproval}
  />
 
  {/* Email + send inline at the bottom */}

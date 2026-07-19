@@ -46,29 +46,45 @@ export const emptyScope: TeamMemberScope = {
  locationIds: [],
 }
 
-/** UI toggles when inviting a team_member (not admin). */
+/** UI toggles when inviting a team_member (not admin). Add and edit are
+ *  separate columns per resource: add* gates create flows, edit* gates
+ *  changing existing records. */
 export interface TeamMemberPermissionToggles {
  viewData: boolean
- addImpactClaims: boolean
- addEditEvidence: boolean
- editInitiatives: boolean
+ addMetrics: boolean
  editMetrics: boolean
- editLocations: boolean
- editBeneficiaries: boolean
+ addClaims: boolean
+ editClaims: boolean
+ addEvidence: boolean
+ editEvidence: boolean
+ addStories: boolean
  editStories: boolean
+ addBeneficiaries: boolean
+ editBeneficiaries: boolean
+ addTags: boolean
+ editTags: boolean
+ editInitiatives: boolean
+ editLocations: boolean
  deleteContent: boolean
  exportReports: boolean
 }
 
 export const defaultTeamMemberToggles: TeamMemberPermissionToggles = {
  viewData: true,
- addImpactClaims: false,
- addEditEvidence: false,
- editInitiatives: false,
+ addMetrics: false,
  editMetrics: false,
- editLocations: false,
- editBeneficiaries: false,
+ addClaims: false,
+ editClaims: false,
+ addEvidence: false,
+ editEvidence: false,
+ addStories: false,
  editStories: false,
+ addBeneficiaries: false,
+ editBeneficiaries: false,
+ addTags: false,
+ editTags: false,
+ editInitiatives: false,
+ editLocations: false,
  deleteContent: false,
  exportReports: false,
 }
@@ -94,31 +110,28 @@ export function togglesToGrants(toggles: TeamMemberPermissionToggles): Permissio
  }
  }
 
- if (toggles.addImpactClaims) {
- grants.push({ resource: 'impact_claims', action: 'create', allowed: true })
- }
-
- if (toggles.addEditEvidence) {
- grants.push({ resource: 'evidence', action: 'view', allowed: true })
+ // Add/edit matrix — one grant per checked cell.
+ if (toggles.addMetrics) grants.push({ resource: 'metrics', action: 'create', allowed: true })
+ if (toggles.editMetrics) grants.push({ resource: 'metrics', action: 'edit', allowed: true })
+ if (toggles.addClaims) grants.push({ resource: 'impact_claims', action: 'create', allowed: true })
+ if (toggles.editClaims) grants.push({ resource: 'impact_claims', action: 'edit', allowed: true })
+ if (toggles.addEvidence) {
  grants.push({ resource: 'evidence', action: 'create', allowed: true })
- grants.push({ resource: 'evidence', action: 'edit', allowed: true })
  grants.push({ resource: 'evidence', action: 'upload', allowed: true })
  }
+ if (toggles.editEvidence) grants.push({ resource: 'evidence', action: 'edit', allowed: true })
+ if (toggles.addStories) grants.push({ resource: 'stories', action: 'create', allowed: true })
+ if (toggles.editStories) grants.push({ resource: 'stories', action: 'edit', allowed: true })
+ if (toggles.addBeneficiaries) grants.push({ resource: 'beneficiaries', action: 'create', allowed: true })
+ if (toggles.editBeneficiaries) grants.push({ resource: 'beneficiaries', action: 'edit', allowed: true })
+ if (toggles.addTags) grants.push({ resource: 'tags', action: 'create', allowed: true })
+ if (toggles.editTags) grants.push({ resource: 'tags', action: 'edit', allowed: true })
 
  if (toggles.editInitiatives) {
  grants.push({ resource: 'initiatives', action: 'edit', allowed: true })
  }
- if (toggles.editMetrics) {
- grants.push({ resource: 'metrics', action: 'edit', allowed: true })
- }
  if (toggles.editLocations) {
  grants.push({ resource: 'locations', action: 'edit', allowed: true })
- }
- if (toggles.editBeneficiaries) {
- grants.push({ resource: 'beneficiaries', action: 'edit', allowed: true })
- }
- if (toggles.editStories) {
- grants.push({ resource: 'stories', action: 'edit', allowed: true })
  }
 
  if (toggles.deleteContent) {
@@ -147,15 +160,24 @@ export function grantsToToggles(grants: PermissionGrant[]): TeamMemberPermission
  has('evidence', 'view') ||
  has('metrics', 'view')
 
+ // Legacy blobs are expanded server-side (edit implied add pre-split), so a
+ // straight per-cell read is correct for both old and new members.
  return {
  viewData,
- addImpactClaims: has('impact_claims', 'create'),
- addEditEvidence: has('evidence', 'edit') || has('evidence', 'create'),
- editInitiatives: has('initiatives', 'edit'),
+ addMetrics: has('metrics', 'create'),
  editMetrics: has('metrics', 'edit'),
- editLocations: has('locations', 'edit'),
- editBeneficiaries: has('beneficiaries', 'edit'),
+ addClaims: has('impact_claims', 'create'),
+ editClaims: has('impact_claims', 'edit'),
+ addEvidence: has('evidence', 'create'),
+ editEvidence: has('evidence', 'edit'),
+ addStories: has('stories', 'create'),
  editStories: has('stories', 'edit'),
+ addBeneficiaries: has('beneficiaries', 'create'),
+ editBeneficiaries: has('beneficiaries', 'edit'),
+ addTags: has('tags', 'create'),
+ editTags: has('tags', 'edit'),
+ editInitiatives: has('initiatives', 'edit'),
+ editLocations: has('locations', 'edit'),
  deleteContent:
  has('evidence', 'delete') ||
  has('initiatives', 'delete') ||

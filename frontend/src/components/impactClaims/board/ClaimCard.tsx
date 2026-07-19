@@ -165,7 +165,7 @@ export default function ClaimCard({
         <input
           type="text"
           value={claim.label}
-          placeholder="Label…"
+          placeholder="Title…"
           onChange={(e) => onInlineChange({ label: e.target.value })}
           className="w-full text-xs font-medium text-gray-700 placeholder-gray-300 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 outline-none hover:border-gray-300 focus:border-primary-400 focus:bg-white focus:ring-1 focus:ring-primary-100 transition-colors"
         />

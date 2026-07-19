@@ -1,4 +1,4 @@
-import { Shield, UserCog, Check, AlertTriangle } from 'lucide-react'
+import { Shield, UserCog, Check, AlertTriangle, ShieldCheck } from 'lucide-react'
 import {
  MemberType,
  TeamMemberPermissionToggles,
@@ -9,13 +9,24 @@ import { TeamScopeFields } from './TeamScopeFields'
 
 type PermRow = { key: keyof TeamMemberPermissionToggles; label: string; description?: string }
 
-// All grantable keys (viewData is always-on baseline, excluded from "enable all")
-const ADD_EDIT_ROWS: PermRow[] = [
- { key: 'addImpactClaims', label: 'Add impact claims', description: 'Record data points by location & date' },
- { key: 'editMetrics', label: 'Edit metrics', description: 'Create and update KPIs' },
- { key: 'addEditEvidence', label: 'Add & edit evidence', description: 'Upload files and documents' },
- { key: 'editStories', label: 'Edit stories', description: 'Impact stories & testimonials' },
- { key: 'editBeneficiaries', label: 'Edit beneficiaries', description: 'Manage beneficiary groups' },
+/** Add | Edit matrix: one row per content type, a checkbox per column. */
+type MatrixRow = {
+ addKey: keyof TeamMemberPermissionToggles
+ editKey: keyof TeamMemberPermissionToggles
+ label: string
+ description?: string
+}
+
+const MATRIX_ROWS: MatrixRow[] = [
+ { addKey: 'addMetrics', editKey: 'editMetrics', label: 'Metrics', description: 'KPIs the initiative tracks' },
+ { addKey: 'addClaims', editKey: 'editClaims', label: 'Impact claims', description: 'Results by location & date' },
+ { addKey: 'addEvidence', editKey: 'editEvidence', label: 'Evidence', description: 'Files, photos, documents' },
+ { addKey: 'addStories', editKey: 'editStories', label: 'Stories', description: 'Impact stories & testimonials' },
+ { addKey: 'addBeneficiaries', editKey: 'editBeneficiaries', label: 'Beneficiary groups', description: 'People management' },
+ { addKey: 'addTags', editKey: 'editTags', label: 'Tags', description: 'Organize metrics & claims' },
+]
+
+const STRUCTURE_ROWS: PermRow[] = [
  { key: 'editInitiatives', label: 'Edit initiatives' },
  { key: 'editLocations', label: 'Edit locations' },
 ]
@@ -26,8 +37,10 @@ const DELETE_ROWS: PermRow[] = [
  { key: 'deleteContent', label: 'Delete content', description: 'Remove evidence, metrics & initiatives' },
 ]
 
+// All grantable keys (viewData is always-on baseline, excluded from "enable all")
 const ALL_GRANTABLE: (keyof TeamMemberPermissionToggles)[] = [
- ...ADD_EDIT_ROWS.map(r => r.key),
+ ...MATRIX_ROWS.flatMap(r => [r.addKey, r.editKey]),
+ ...STRUCTURE_ROWS.map(r => r.key),
  ...REPORT_ROWS.map(r => r.key),
  ...DELETE_ROWS.map(r => r.key),
 ]
@@ -94,9 +107,12 @@ type Props = {
  setPermissionToggles: (v: TeamMemberPermissionToggles) => void
  scope?: TeamMemberScope
  setScope?: (v: TeamMemberScope) => void
+ /** Review gate: this member's evidence needs admin approval before it connects/counts. */
+ requiresEvidenceApproval?: boolean
+ setRequiresEvidenceApproval?: (v: boolean) => void
 }
 
-export function TeamRolePermissionFields({ memberType, setMemberType, permissionToggles, setPermissionToggles, scope, setScope }: Props) {
+export function TeamRolePermissionFields({ memberType, setMemberType, permissionToggles, setPermissionToggles, scope, setScope, requiresEvidenceApproval, setRequiresEvidenceApproval }: Props) {
  const validationError = memberType === 'team_member' ? validateTeamMemberInvite(memberType, permissionToggles, scope) : null
 
  const allOn = ALL_GRANTABLE.every(k => permissionToggles[k])
@@ -152,11 +168,58 @@ export function TeamRolePermissionFields({ memberType, setMemberType, permission
  </div>
 
  <div className="space-y-4">
- {/* Add & edit */}
+ {/* Add | Edit matrix per content type */}
  <div>
  <SectionLabel>Add &amp; edit</SectionLabel>
+ <div className="rounded-xl border border-gray-200 overflow-hidden bg-white">
+ <div className="grid grid-cols-[1fr_3.25rem_3.25rem] items-center px-3.5 py-2 bg-gray-50/80 border-b border-gray-100">
+ <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Content</span>
+ <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 text-center">Add</span>
+ <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 text-center">Edit</span>
+ </div>
+ {MATRIX_ROWS.map(row => {
+ const addOn = permissionToggles[row.addKey]
+ const editOn = permissionToggles[row.editKey]
+ return (
+ <div
+ key={row.addKey}
+ className={`grid grid-cols-[1fr_3.25rem_3.25rem] items-center px-3.5 py-2.5 border-b border-gray-50 last:border-b-0 transition-colors ${addOn || editOn ? 'bg-primary-50/40' : 'hover:bg-gray-50/60'}`}
+ >
+ <span className="min-w-0 pr-2">
+ <span className="block text-sm font-medium text-gray-800 leading-tight">{row.label}</span>
+ {row.description && (
+ <span className="block text-xs text-gray-500 mt-0.5 leading-tight">{row.description}</span>
+ )}
+ </span>
+ <span className="flex justify-center">
+ <input
+ type="checkbox"
+ checked={addOn}
+ onChange={e => toggle(row.addKey, e.target.checked)}
+ aria-label={`Add ${row.label.toLowerCase()}`}
+ className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-1 focus:ring-primary-500 cursor-pointer"
+ />
+ </span>
+ <span className="flex justify-center">
+ <input
+ type="checkbox"
+ checked={editOn}
+ onChange={e => toggle(row.editKey, e.target.checked)}
+ aria-label={`Edit ${row.label.toLowerCase()}`}
+ className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-1 focus:ring-primary-500 cursor-pointer"
+ />
+ </span>
+ </div>
+ )
+ })}
+ </div>
+ </div>
+
+ {/* Structure (single toggles) */}
+ <div>
+ <SectionLabel>Structure</SectionLabel>
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
- {ADD_EDIT_ROWS.map(row => (
+ {STRUCTURE_ROWS.map(row => (
  <Toggle key={row.key} row={row} checked={permissionToggles[row.key]} onChange={v => toggle(row.key, v)} />
  ))}
  </div>
@@ -171,6 +234,30 @@ export function TeamRolePermissionFields({ memberType, setMemberType, permission
  ))}
  </div>
  </div>
+
+ {/* Review gate — not a capability grant, its own section */}
+ {setRequiresEvidenceApproval && (
+ <div>
+ <SectionLabel>Review</SectionLabel>
+ <label className={`flex items-start gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${requiresEvidenceApproval ? 'border-amber-300 bg-amber-50/60' : 'border-gray-200 hover:bg-gray-50'}`}>
+ <input
+ type="checkbox"
+ checked={!!requiresEvidenceApproval}
+ onChange={e => setRequiresEvidenceApproval(e.target.checked)}
+ className="mt-0.5 rounded border-gray-300 text-amber-600 focus:ring-1 focus:ring-amber-400"
+ />
+ <span className="min-w-0">
+ <span className="flex items-center gap-1.5 text-sm font-medium text-gray-800 leading-tight">
+ <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+ Evidence needs admin approval
+ </span>
+ <span className="block text-xs text-gray-500 mt-0.5 leading-tight">
+ Their evidence uploads are held in a review queue — they don't connect to claims or count in any totals until an admin approves them.
+ </span>
+ </span>
+ </label>
+ </div>
+ )}
 
  {/* Delete — danger */}
  <div className="pt-1 border-t border-dashed border-red-200">

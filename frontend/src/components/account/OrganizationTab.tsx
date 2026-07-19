@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react'
 import {
- Building2,
- Globe,
- Heart,
- Link as LinkIcon,
- Save,
+  Building2,
+  Globe,
+  Heart,
+  ExternalLink,
+  Link as LinkIcon,
+  Lock,
+  Save,
 } from 'lucide-react'
 import { notify } from '../../lib/notify'
 import { Spinner } from '../ui'
@@ -14,8 +16,23 @@ import type { OrganizationTabProps } from './accountTypes'
 export function OrganizationTab({ organization, refreshPermissions }: OrganizationTabProps) {
  const [statement, setStatement] = useState(organization?.statement || '')
  const [websiteUrl, setWebsiteUrl] = useState(organization?.website_url || '')
- const [donationUrl, setDonationUrl] = useState(organization?.donation_url || '')
- const [saving, setSaving] = useState(false)
+  const [donationUrl, setDonationUrl] = useState(organization?.donation_url || '')
+  const [saving, setSaving] = useState(false)
+  const [updatingPublic, setUpdatingPublic] = useState(false)
+
+  const handleTogglePublic = async (makePublic: boolean) => {
+    if (!organization?.id) return
+    setUpdatingPublic(true)
+    try {
+      await apiService.updateOrganization(organization.id, { is_public: makePublic })
+      notify.success(makePublic ? 'Your organization is now public!' : 'Your organization is now private')
+      await refreshPermissions()
+    } catch (error) {
+      notify.error((error as Error).message || 'Failed to update visibility')
+    } finally {
+      setUpdatingPublic(false)
+    }
+  }
 
  // Sync state when organization changes
  useEffect(() => {
@@ -58,9 +75,66 @@ export function OrganizationTab({ organization, refreshPermissions }: Organizati
  donationUrl !== (organization?.donation_url || '')
 
  return (
- <div className="space-y-6">
- {/* Organization Name (Read-only) */}
- <div className="app-card p-6">
+    <div className="space-y-6">
+      {/* Public Visibility — top of the page so it's the first thing owners see */}
+      <div className={`rounded-xl shadow-card p-6 ${organization?.is_public ? 'app-card' : 'bg-amber-50 border-2 border-amber-200'}`}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className={`relative p-2 rounded-xl ${organization?.is_public ? 'bg-impact-50' : 'bg-amber-100'}`}>
+            {organization?.is_public ? <Globe className="w-5 h-5 text-impact-600" /> : <Lock className="w-5 h-5 text-amber-600" />}
+            {!organization?.is_public && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center">!</span>
+            )}
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-gray-800">Public Visibility</h2>
+              {!organization?.is_public && (
+                <span className="px-2 py-0.5 bg-amber-500 text-white text-xs font-medium rounded-full">Action Required</span>
+              )}
+            </div>
+          </div>
+          {organization?.is_public && organization?.slug && (
+            <a
+              href={`${window.location.origin}/org/${organization.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-white border border-impact-200 text-impact-700 text-xs font-medium hover:bg-impact-50 transition-colors flex-shrink-0"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              View public page
+            </a>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+          <div className="flex items-center gap-3">
+            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium ${organization?.is_public ? 'bg-impact-100 text-impact-700' : 'bg-gray-200 text-gray-700'}`}>
+              {organization?.is_public ? 'Public' : 'Private'}
+            </span>
+            <span className="text-sm text-gray-600">
+              {organization?.is_public
+                ? 'Your organization is visible on the Explore page'
+                : 'Your organization is hidden from the public site'}
+            </span>
+          </div>
+          <button
+            onClick={() => handleTogglePublic(!organization?.is_public)}
+            disabled={updatingPublic}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${organization?.is_public ? 'bg-impact-500' : 'bg-gray-300'}`}
+          >
+            {updatingPublic ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Spinner className="w-3 h-3 border-white border-t-white/30" />
+              </div>
+            ) : (
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${organization?.is_public ? 'translate-x-6' : 'translate-x-1'}`} />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Organization Name (Read-only) */}
+      <div className="app-card p-6">
  <div className="flex items-center gap-3 mb-5">
  <div className="p-2 bg-primary-50 rounded-xl">
  <Building2 className="w-5 h-5 text-primary-600" />

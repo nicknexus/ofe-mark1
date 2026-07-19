@@ -1,6 +1,6 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { UploadCloud, Link2, Unlink } from 'lucide-react'
+import { UploadCloud, Link2, Unlink, Clock } from 'lucide-react'
 import { TimelineStats } from '../../types'
 import { ConnectionStatus } from '../../utils/timeline'
 
@@ -13,7 +13,8 @@ interface TimelineStatCardsProps {
 /**
  * Connection-status filter, rendered as a small segmented pill (same styling as
  * the view switcher). Total clears the status filter; Connected / Not connected
- * scope to that state. Single-select with a sliding active indicator.
+ * scope to that state. Single-select with a sliding active indicator. A yellow
+ * "Needs approval" segment appears only while something is awaiting review.
  */
 export default function TimelineStatCards({ stats, activeStatus, onStatusClick }: TimelineStatCardsProps) {
   const segments: Array<{
@@ -28,6 +29,16 @@ export default function TimelineStatCards({ stats, activeStatus, onStatusClick }
     { key: 'connected', label: 'Connected', value: stats.connected, icon: Link2, iconClass: 'text-impact-500', status: 'connected' },
     { key: 'not_connected', label: 'Not connected', value: stats.not_connected, icon: Unlink, iconClass: 'text-red-500', status: 'not_connected' },
   ]
+  if ((stats.pending_total ?? 0) > 0) {
+    segments.push({
+      key: 'pending',
+      label: 'Needs approval',
+      value: stats.pending_total ?? 0,
+      icon: Clock,
+      iconClass: 'text-amber-500',
+      status: 'pending',
+    })
+  }
 
   return (
     <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-gray-100 border border-gray-200 flex-shrink-0">

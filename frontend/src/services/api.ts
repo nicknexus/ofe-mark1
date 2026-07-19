@@ -744,6 +744,17 @@ class ApiService {
  }
 
  /**
+ * Review gate: approve pending evidence (connects + counts it) or flip any
+ * evidence back to pending (strips its connections). Owner/admin only.
+ */
+ async setEvidenceApproval(id: string, status: 'approved' | 'pending'): Promise<Evidence> {
+ return this.request<Evidence>(`/evidence/${id}/approval`, {
+ method: 'POST',
+ body: JSON.stringify({ status })
+ })
+ }
+
+ /**
  * Recomputes evidence ↔ claim links under the current matching rules
  * (date + location + ben groups + tag). Idempotent. Used to backfill
  * historical data created before the tag-gate rule existed.
@@ -863,12 +874,17 @@ class ApiService {
  })
  }
 
- async updateOrganization(id: string, data: Partial<Organization>): Promise<Organization> {
- return this.request<Organization>(`/organizations/${id}`, {
- method: 'PUT',
- body: JSON.stringify(data)
- })
- }
+  async updateOrganization(id: string, data: Partial<Organization>): Promise<Organization> {
+    const result = await this.request<Organization>(`/organizations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    })
+    // Bust the cached accessible-orgs list so refreshPermissions() re-reads the
+    // new values (e.g. is_public) instead of a stale snapshot.
+    this.clearCacheByPattern('/team/organizations')
+    this.clearCacheByPattern(`/organizations/${id}`)
+    return result
+  }
 
  async getOrgContext(id: string): Promise<OrganizationContext | null> {
  return this.request<OrganizationContext | null>(`/organizations/${id}/context`)

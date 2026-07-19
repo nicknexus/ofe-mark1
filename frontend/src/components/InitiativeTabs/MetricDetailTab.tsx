@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { ArrowLeft, Plus } from 'lucide-react'
+import { ArrowLeft, Edit, Plus } from 'lucide-react'
 import { KPI, Location } from '../../types'
 import { apiService } from '../../services/api'
 import { useTeam } from '../../context/TeamContext'
@@ -27,6 +27,7 @@ interface MetricDetailTabProps {
   kpiTotal: number
   kpiUpdates: any[]
   onBack: () => void
+  onEdit?: () => void
   onRefresh?: () => void
   onStoryClick?: (storyId: string) => void
 }
@@ -44,10 +45,11 @@ export default function MetricDetailTab({
   kpiTotal,
   kpiUpdates,
   onBack,
+  onEdit,
   onRefresh,
   onStoryClick,
 }: MetricDetailTabProps) {
-  const { canAddImpactClaims, canEditEvidence } = useTeam()
+  const { canAddImpactClaims, canAddEvidence, canEditMetrics } = useTeam()
   const [isCumulative, setIsCumulative] = useState(true)
   const [timeFrame, setTimeFrame] = useState<TimeFrameKey>('all')
   const [locations, setLocations] = useState<Location[]>([])
@@ -93,34 +95,37 @@ export default function MetricDetailTab({
           initial="hidden"
           animate="visible"
         >
-          {/* Header */}
-          <motion.div variants={fadeUp} className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <button onClick={onBack} className="app-btn app-btn-ghost app-btn-icon flex-shrink-0" aria-label="Back">
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight truncate">{kpi.title}</h2>
+          {/* Header — title left, total centered in header band, actions right */}
+          <motion.div variants={fadeUp} className="relative pb-1">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3 min-w-0 flex-1 md:max-w-[38%]">
+                <button onClick={onBack} className="app-btn app-btn-ghost app-btn-icon flex-shrink-0 mt-0.5" aria-label="Back">
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight truncate flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                    {kpi.title}
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1.5">
+                    <span className="capitalize">{kpi.category}</span>
+                    {` · ${claimCount} claim${claimCount === 1 ? '' : 's'}`}
+                    {typeof (kpi as any).evidence_percentage === 'number' ? ` · ${(kpi as any).evidence_percentage}% evidenced` : ''}
+                  </p>
                 </div>
-                <p className="text-sm text-gray-500 mt-1">
-                  <span className="capitalize">{kpi.category}</span>
-                  {` · ${claimCount} claim${claimCount === 1 ? '' : 's'}`}
-                  {typeof (kpi as any).evidence_percentage === 'number' ? ` · ${(kpi as any).evidence_percentage}% evidenced` : ''}
-                </p>
               </div>
-            </div>
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <div className="text-right">
-                <div className="text-2xl sm:text-3xl font-semibold text-gray-900 tabular-nums leading-none">
-                  {isPct ? `${Math.round(kpiTotal)}%` : kpiTotal.toLocaleString()}
-                </div>
-                {!isPct && kpi.unit_of_measurement && (
-                  <div className="text-xs text-gray-400 mt-1">{kpi.unit_of_measurement}</div>
-                )}
-              </div>
-              {(canAddImpactClaims || canEditEvidence) && (
+              <div className="flex items-center gap-2 flex-shrink-0 pt-0.5">
+              {canEditMetrics && onEdit && (
+                <button
+                  onClick={onEdit}
+                  className="app-btn app-btn-secondary shadow-sm"
+                >
+                  <Edit className="w-5 h-5" />
+                  <span className="hidden sm:inline">Edit Metric</span>
+                  <span className="sm:hidden">Edit</span>
+                </button>
+              )}
+              {(canAddImpactClaims || canAddEvidence) && (
                 <button
                   onClick={() => setAddLogSignal(n => n + 1)}
                   className="app-btn app-btn-primary shadow-sm"
@@ -129,11 +134,22 @@ export default function MetricDetailTab({
                   <span>Add Log</span>
                 </button>
               )}
+              </div>
+            </div>
+            <div className="absolute left-1/2 top-[58%] -translate-x-1/2 -translate-y-1/2 flex items-baseline justify-center gap-2 pointer-events-none max-w-[44%]">
+              <span className="text-4xl sm:text-5xl font-bold text-gray-900 tabular-nums leading-none tracking-tight">
+                {isPct ? `${Math.round(kpiTotal)}%` : kpiTotal.toLocaleString()}
+              </span>
+              {!isPct && kpi.unit_of_measurement && (
+                <span className="text-base sm:text-lg font-semibold text-gray-500 leading-none truncate">
+                  {kpi.unit_of_measurement}
+                </span>
+              )}
             </div>
           </motion.div>
 
           {/* Trend chart (3/4) + locations map (1/4) */}
-          <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-4 gap-4 mt-1">
             <motion.div variants={fadeUp} className="lg:col-span-3 app-card p-4 sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <h3 className="text-sm font-semibold text-gray-800">{isPct ? 'Metric over time (avg)' : 'Metric over time'}</h3>

@@ -136,7 +136,7 @@ export default function AddKPIUpdateModalWithMetricSelection({
 
  // Validate label is required
  if (!formData.label || !formData.label.trim()) {
- throw new Error('Label or Title is required')
+ throw new Error('Title is required')
  }
 
  // Validate location is required
@@ -576,7 +576,7 @@ export default function AddKPIUpdateModalWithMetricSelection({
  <div>
  <label className="block text-sm font-semibold text-gray-900 mb-3">
  <FileText className="w-5 h-5 inline mr-2 text-primary-700" />
- Label or Title <span className="text-red-500">*</span>
+ Title <span className="text-red-500">*</span>
  </label>
  <input
  type="text"

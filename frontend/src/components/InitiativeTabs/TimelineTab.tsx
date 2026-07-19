@@ -33,7 +33,6 @@ import EvidenceViewModeToggle from '../timeline/EvidenceViewModeToggle'
 import type { EvidenceViewMode } from '../timeline/EvidenceViewModeToggle'
 import ConnectionsView from '../timeline/ConnectionsView'
 import ConnectEvidenceDialog from '../timeline/ConnectEvidenceDialog'
-import AddEvidenceToClaimDialog from '../timeline/AddEvidenceToClaimDialog'
 import EvidenceDetailModal from '../timeline/EvidenceDetailModal'
 import ClaimDetailModal from '../timeline/ClaimDetailModal'
 import ConfirmDialog from '../ConfirmDialog'
@@ -70,7 +69,7 @@ interface TimelineTabProps {
  * browser controls (?tab=logs&view=...&metric=...).
  */
 export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, embedded, openAddLogSignal }: TimelineTabProps) {
- const { canAddImpactClaims, canEditEvidence, canDelete } = useTeam()
+ const { canAddImpactClaims, canEditClaims, canAddEvidence, canEditEvidence, canDelete, canManageTeam } = useTeam()
  const [searchParams, setSearchParams] = useSearchParams()
 
  const [data, setData] = useState<TimelineResponse | null>(null)
@@ -119,7 +118,17 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  if (!initiativeId) return
  try {
  const timeline = await apiService.getInitiativeTimeline(initiativeId)
- setData(timeline)
+ // Normalise defensively: a backend older than this frontend (or a
+ // cached/partial payload) may omit arrays, and every view assumes
+ // they exist. Missing pieces degrade to empty instead of crashing.
+ setData({
+ kpis: timeline?.kpis || [],
+ claims: timeline?.claims || [],
+ evidence: timeline?.evidence || [],
+ connections: timeline?.connections || [],
+ contributors: timeline?.contributors || {},
+ stats: timeline?.stats || { total: 0, connected: 0, not_connected: 0, claims_total: 0, evidence_total: 0 },
+ })
  } catch (error) {
  console.error('Error loading timeline:', error)
  notify.error('Failed to load timeline')
@@ -157,9 +166,13 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  }, [initiativeId])
 
  const refresh = useCallback(async () => {
+ // Post-mutation reload must not serve cached payloads — approval status,
+ // connections, and aggregates would appear stale until the cache expired.
+ apiService.clearCache(`/initiatives/${initiativeId}/timeline`)
+ apiService.clearCache(`/initiatives/${initiativeId}/dashboard`)
  await load()
  onRefresh?.()
- }, [load, onRefresh])
+ }, [initiativeId, load, onRefresh])
 
  const handleOpenClaim = (claim: TimelineClaim, kpi: KPI | undefined) => {
  setSelectedEvidence(null)
@@ -188,7 +201,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  }, [data, lockedMetricId])
 
 
- const handleAddEvidenceToClaim = canEditEvidence
+ const handleAddEvidenceToClaim = canAddEvidence
  ? (claim: TimelineClaim, kpi: KPI | undefined) => setAddEvidenceTarget({ claim, kpi })
  : undefined
  const handleConnectExistingToClaim = canEditEvidence && unlinkedEvidence.length > 0
@@ -217,6 +230,22 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  await refresh()
  } catch (error) {
  notify.error('Failed to delete evidence')
+ }
+ }
+
+ // Review gate: approve pending evidence (creates connections) or send any
+ // evidence back to the approval queue (strips connections).
+ const handleSetApproval = async (ev: TimelineEvidence, status: 'approved' | 'pending') => {
+ if (!ev.id) return
+ try {
+ await apiService.setEvidenceApproval(ev.id, status)
+ notify.success(status === 'approved'
+ ? 'Evidence approved — connections created'
+ : 'Evidence marked as pending — it no longer connects or counts until re-approved')
+ setSelectedEvidence(null)
+ await refresh()
+ } catch (error) {
+ notify.error((error as Error).message || 'Failed to update approval status')
  }
  }
 
@@ -252,7 +281,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
               </p>
             </div>
           )}
-          {(canAddImpactClaims || canEditEvidence) && (
+          {(canAddImpactClaims || canAddEvidence) && (
             <button
               onClick={() => setIsWizardOpen(true)}
               className={`app-btn app-btn-primary shadow-sm flex-shrink-0 ${
@@ -299,7 +328,14 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
               <TimelineStatCards
                 stats={displayStats}
                 activeStatus={filters.status}
-                onStatusClick={(status) => setFilters({ ...filters, status })}
+                onStatusClick={(status) => {
+                  // Pending items only render in the Evidence view, so the
+                  // approval-queue filter jumps there from Connections.
+                  const params = new URLSearchParams(searchParams)
+                  applyFiltersToParams(params, { ...filters, status })
+                  if (status === 'pending' && view === 'connections') params.set('view', 'evidence')
+                  setSearchParams(params, { replace: true })
+                }}
               />
             )}
             {view === 'evidence' && (
@@ -394,7 +430,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  <UploadWizard
  initiativeId={initiativeId}
  canCreateClaim={canAddImpactClaims}
- canCreateEvidence={canEditEvidence}
+ canCreateEvidence={canAddEvidence}
  lockedMetricId={lockedMetricId}
  onAdvancedClaim={lockedMetricId ? undefined : () => { setIsWizardOpen(false); setAdvancedUpload('claim') }}
  onAdvancedEvidence={lockedMetricId ? undefined : () => { setIsWizardOpen(false); setAdvancedUpload('evidence') }}
@@ -449,15 +485,20 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  />
  )}
 
- {/* Quick evidence upload scoped to one claim */}
- {addEvidenceTarget && (
- <AddEvidenceToClaimDialog
- claim={addEvidenceTarget.claim}
- kpi={addEvidenceTarget.kpi}
+ {/* Add evidence scoped to one claim — the full Add Log flow (evidence mode),
+ prefilled with the claim's scope so it auto-connects. */}
+ {addEvidenceTarget && data && (
+ <UploadWizard
  initiativeId={initiativeId}
+ canCreateClaim={canAddImpactClaims}
+ canCreateEvidence={canAddEvidence}
+ kpis={data.kpis}
  locations={locations}
  tags={tags}
  beneficiaryGroups={beneficiaryGroups}
+ existingClaims={data.claims}
+ existingEvidence={data.evidence}
+ evidenceForClaim={addEvidenceTarget.claim}
  onClose={() => setAddEvidenceTarget(null)}
  onCreated={refresh}
  />
@@ -473,10 +514,15 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  beneficiaryGroups={beneficiaryGroups}
  contributors={data.contributors}
  connectedClaims={data.claims.filter(c => (selectedEvidence.kpi_update_ids || []).includes(c.id!))}
+ allClaims={data.claims}
+ canReview={canManageTeam}
+ onSetApproval={canManageTeam ? (status) => handleSetApproval(selectedEvidence, status) : undefined}
  onClose={() => setSelectedEvidence(null)}
  onOpenClaim={(claim) => handleOpenClaim(claim, data.kpis.find(k => k.id === claim.kpi_id))}
  onEdit={canEditEvidence ? () => handleEditEvidence(selectedEvidence) : undefined}
- onDelete={canDelete ? () => setDeleteEvidence(selectedEvidence) : undefined}
+ onDelete={canDelete || (canManageTeam && selectedEvidence.approval_status === 'pending')
+ ? () => setDeleteEvidence(selectedEvidence)
+ : undefined}
  />
  )}
 
@@ -492,14 +538,17 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  contributors={data.contributors}
  onClose={() => setSelectedClaim(null)}
  onOpenEvidence={handleOpenEvidence}
- onEdit={canAddImpactClaims && selectedClaim.kpi
+ onEdit={canEditClaims && selectedClaim.kpi
  ? () => {
  setEditingClaim({ claim: selectedClaim.claim, kpi: selectedClaim.kpi! })
  setSelectedClaim(null)
  }
  : undefined}
- onAddEvidence={canEditEvidence
- ? () => setAddEvidenceTarget({ claim: selectedClaim.claim, kpi: selectedClaim.kpi })
+ onAddEvidence={canAddEvidence
+ ? () => {
+ setAddEvidenceTarget({ claim: selectedClaim.claim, kpi: selectedClaim.kpi })
+ setSelectedClaim(null)
+ }
  : undefined}
  onConnectExisting={canEditEvidence && unlinkedEvidence.length > 0
  ? () => setConnectTarget({ claimId: selectedClaim.claim.id })
@@ -516,7 +565,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  <UploadWizard
  initiativeId={initiativeId}
  canCreateClaim={canAddImpactClaims}
- canCreateEvidence={canEditEvidence}
+ canCreateEvidence={canAddEvidence}
  kpis={data.kpis}
  locations={locations}
  tags={tags}

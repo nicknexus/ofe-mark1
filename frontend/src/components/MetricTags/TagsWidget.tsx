@@ -17,7 +17,7 @@ interface TagsWidgetProps {
 }
 
 export default function TagsWidget({ compact }: TagsWidgetProps) {
- const { canEditTags } = useTeam()
+ const { canAddTags } = useTeam()
  const [tags, setTags] = useState<MetricTag[]>([])
  const [loading, setLoading] = useState(true)
  const [creating, setCreating] = useState(false)
@@ -87,7 +87,7 @@ export default function TagsWidget({ compact }: TagsWidgetProps) {
  See all
  <ArrowRight className="w-3 h-3" />
  </Link>
- {canEditTags && (
+ {canAddTags && (
  <button
  type="button"
  onClick={() => tagsLocked ? setShowUpgrade(true) : setShowInput(s => !s)}

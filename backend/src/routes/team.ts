@@ -95,7 +95,7 @@ router.get('/my-pending-invite', authenticateUser, async (req: AuthenticatedRequ
  */
 router.post('/invite', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const { email, canAddImpactClaims, memberType, permissions, scope } = req.body;
+        const { email, canAddImpactClaims, memberType, permissions, scope, requiresEvidenceApproval } = req.body;
 
         if (!email || typeof email !== 'string') {
             res.status(400).json({ error: 'Email is required' });
@@ -124,6 +124,7 @@ router.post('/invite', authenticateUser, async (req: AuthenticatedRequest, res) 
             memberType: memberType as 'admin' | 'team_member' | undefined,
             permissions: Array.isArray(permissions) ? permissions : undefined,
             scope,
+            requiresEvidenceApproval: !!requiresEvidenceApproval,
         });
 
         // Send email
@@ -371,8 +372,11 @@ router.get('/members/:id/permissions', authenticateUser, async (req: Authenticat
         }
         await TeamService.assertMemberInOrganization(req.params.id, org.id);
         const { TeamMemberPermissionsService } = await import('../services/teamMemberPermissionsService');
-        const blob = await TeamMemberPermissionsService.getMemberBlob(req.params.id);
-        res.json({ grants: blob.grants, scope: blob.scope });
+        const [blob, requiresEvidenceApproval] = await Promise.all([
+            TeamMemberPermissionsService.getMemberBlob(req.params.id),
+            TeamMemberPermissionsService.getMemberReviewFlag(req.params.id),
+        ]);
+        res.json({ grants: blob.grants, scope: blob.scope, requiresEvidenceApproval });
     } catch (error) {
         console.error('Error fetching member permissions:', error);
         res.status(404).json({ error: (error as Error).message });
@@ -385,7 +389,7 @@ router.get('/members/:id/permissions', authenticateUser, async (req: Authenticat
  */
 router.put('/members/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const { memberType, permissions, scope, canAddImpactClaims, canEditEvidence } = req.body;
+        const { memberType, permissions, scope, canAddImpactClaims, canEditEvidence, requiresEvidenceApproval } = req.body;
 
         const org = await requireTeamManagementOrg(req);
         if (!org) {
@@ -403,6 +407,7 @@ router.put('/members/:id', authenticateUser, async (req: AuthenticatedRequest, r
                 memberType,
                 permissions: Array.isArray(permissions) ? permissions : undefined,
                 scope,
+                requiresEvidenceApproval: !!requiresEvidenceApproval,
             });
         } else if (canAddImpactClaims !== undefined || canEditEvidence !== undefined) {
             member = await TeamService.updateMemberPermissions(req.params.id, org.id, {
@@ -433,8 +438,11 @@ router.get('/invite/:id/permissions', authenticateUser, async (req: Authenticate
         }
         await TeamService.assertInvitationInOrganization(req.params.id, org.id);
         const { TeamMemberPermissionsService } = await import('../services/teamMemberPermissionsService');
-        const blob = await TeamMemberPermissionsService.getInvitationBlob(req.params.id);
-        res.json({ grants: blob.grants, scope: blob.scope });
+        const [blob, requiresEvidenceApproval] = await Promise.all([
+            TeamMemberPermissionsService.getInvitationBlob(req.params.id),
+            TeamMemberPermissionsService.getInvitationReviewFlag(req.params.id),
+        ]);
+        res.json({ grants: blob.grants, scope: blob.scope, requiresEvidenceApproval });
     } catch (error) {
         console.error('Error fetching invitation permissions:', error);
         res.status(404).json({ error: (error as Error).message });
@@ -447,7 +455,7 @@ router.get('/invite/:id/permissions', authenticateUser, async (req: Authenticate
  */
 router.put('/invite/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        const { memberType, permissions, scope } = req.body;
+        const { memberType, permissions, scope, requiresEvidenceApproval } = req.body;
 
         if (memberType !== 'admin' && memberType !== 'team_member') {
             res.status(400).json({ error: 'memberType must be admin or team_member' });
@@ -468,6 +476,7 @@ router.put('/invite/:id', authenticateUser, async (req: AuthenticatedRequest, re
             memberType,
             permissions: Array.isArray(permissions) ? permissions : undefined,
             scope,
+            requiresEvidenceApproval: !!requiresEvidenceApproval,
         });
         res.json(invitation);
     } catch (error) {

@@ -25,19 +25,24 @@ export const ADMIN_ALLOWED: PermissionGrant[] = [
     { resource: 'locations', action: 'view', allowed: true },
     { resource: 'locations', action: 'edit', allowed: true },
     { resource: 'metrics', action: 'view', allowed: true },
+    { resource: 'metrics', action: 'create', allowed: true },
     { resource: 'metrics', action: 'edit', allowed: true },
     { resource: 'metrics', action: 'delete', allowed: true },
     { resource: 'impact_claims', action: 'create', allowed: true },
+    { resource: 'impact_claims', action: 'edit', allowed: true },
     { resource: 'evidence', action: 'view', allowed: true },
     { resource: 'evidence', action: 'create', allowed: true },
     { resource: 'evidence', action: 'edit', allowed: true },
     { resource: 'evidence', action: 'delete', allowed: true },
     { resource: 'evidence', action: 'upload', allowed: true },
     { resource: 'stories', action: 'view', allowed: true },
+    { resource: 'stories', action: 'create', allowed: true },
     { resource: 'stories', action: 'edit', allowed: true },
     { resource: 'beneficiaries', action: 'view', allowed: true },
+    { resource: 'beneficiaries', action: 'create', allowed: true },
     { resource: 'beneficiaries', action: 'edit', allowed: true },
     { resource: 'tags', action: 'view', allowed: true },
+    { resource: 'tags', action: 'create', allowed: true },
     { resource: 'tags', action: 'edit', allowed: true },
     { resource: 'reports', action: 'view', allowed: true },
     { resource: 'reports', action: 'export', allowed: true },
@@ -75,6 +80,8 @@ export function legacyBooleansToGrants(
         { resource: 'analytics', action: 'view', allowed: true },
         { resource: 'tags', action: 'view', allowed: true },
         { resource: 'impact_claims', action: 'create', allowed: canAddImpactClaims },
+        // Pre-split, claim creation implied claim editing.
+        { resource: 'impact_claims', action: 'edit', allowed: canAddImpactClaims },
         { resource: 'evidence', action: 'edit', allowed: canEditEvidence },
         { resource: 'evidence', action: 'create', allowed: canEditEvidence },
         { resource: 'evidence', action: 'upload', allowed: canEditEvidence },
@@ -148,10 +155,39 @@ export function normalizeScope(raw: any): TeamMemberScope {
 export interface TeamPermissionsBlob {
     grants: PermissionGrant[];
     scope: TeamMemberScope;
+    /**
+     * Blob format version. Absent = legacy (pre add/edit split), where a
+     * single grant meant both creating and editing; v2 blobs are literal.
+     */
+    v?: number;
+}
+
+/** Current blob version written by the split add/edit permission UI. */
+export const PERMISSIONS_BLOB_VERSION = 2;
+
+/**
+ * Legacy (unversioned) blobs predate the add/edit split: one action stood in
+ * for both. Expand those grants so old members keep exactly the abilities
+ * they had, without touching stored data. v2 blobs are taken literally.
+ */
+function expandLegacyGrants(grants: PermissionGrant[]): PermissionGrant[] {
+    const expanded = [...grants];
+    const has = (resource: PermissionResource, action: PermissionAction) =>
+        grants.some((g) => g.resource === resource && g.action === action);
+    const addIfMissing = (resource: PermissionResource, action: PermissionAction) => {
+        if (!has(resource, action)) expanded.push({ resource, action, allowed: true });
+    };
+    // edit stood in for create on these resources…
+    for (const resource of ['metrics', 'stories', 'beneficiaries', 'tags'] as PermissionResource[]) {
+        if (has(resource, 'edit')) addIfMissing(resource, 'create');
+    }
+    // …and impact_claims:create gated claim update/delete too.
+    if (has('impact_claims', 'create')) addIfMissing('impact_claims', 'edit');
+    return expanded;
 }
 
 export function normalizePermissionsBlob(raw: any): TeamPermissionsBlob {
-    const grants = Array.isArray(raw?.grants)
+    let grants = Array.isArray(raw?.grants)
         ? dedupeGrants(
               raw.grants
                   .filter((g: any) => g && typeof g.resource === 'string' && typeof g.action === 'string')
@@ -162,7 +198,11 @@ export function normalizePermissionsBlob(raw: any): TeamPermissionsBlob {
                   }))
           )
         : [];
-    return { grants, scope: normalizeScope(raw?.scope) };
+    const version = typeof raw?.v === 'number' ? raw.v : undefined;
+    if (version === undefined) {
+        grants = dedupeGrants(expandLegacyGrants(grants));
+    }
+    return { grants, scope: normalizeScope(raw?.scope), v: version };
 }
 
 /** True when the member may touch the given initiative under their scope. */

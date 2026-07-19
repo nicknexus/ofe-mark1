@@ -114,14 +114,17 @@ export function getCategoryColor(category: 'input' | 'output' | 'impact'): strin
 // Get evidence type icon and color
 export function getEvidenceTypeInfo(type: 'visual_proof' | 'documentation' | 'testimony' | 'financials') {
  switch (type) {
+ // Colours are the canonical evidence-type palette (mirrors
+ // EVIDENCE_TYPE_STYLE in EvidenceTypeCounts): visual=red, docs=blue,
+ // financials=green, testimony=gold — kept consistent everywhere.
  case 'visual_proof':
- return { icon: '📷', color: 'bg-pink-100 text-pink-800', label: 'Visual Support' }
+ return { icon: '📷', color: 'bg-red-100 text-red-700', label: 'Visual Support' }
  case 'documentation':
- return { icon: '📄', color: 'bg-evidence-100 text-evidence-700', label: 'Documentation' }
+ return { icon: '📄', color: 'bg-blue-100 text-blue-700', label: 'Documentation' }
  case 'testimony':
- return { icon: '🗣️', color: 'bg-orange-100 text-orange-800', label: 'Testimonies' }
+ return { icon: '🗣️', color: 'bg-amber-100 text-amber-700', label: 'Testimonies' }
  case 'financials':
- return { icon: '💰', color: 'bg-primary-100 text-primary-800', label: 'Financials' }
+ return { icon: '💰', color: 'bg-green-100 text-green-700', label: 'Financials' }
  default:
  return { icon: '📎', color: 'bg-gray-100 text-gray-800', label: 'Other' }
  }

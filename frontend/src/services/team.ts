@@ -29,13 +29,19 @@ export type { MemberType, PermissionGrant, TeamMemberScope }
 
 export interface CapabilityFlags {
  canAddImpactClaims: boolean
+ canEditClaims?: boolean
+ canAddEvidence?: boolean
  canEditEvidence: boolean
+ canAddMetrics?: boolean
  canEditMetrics: boolean
  canEditInitiatives: boolean
  canCreateInitiatives: boolean
  canEditLocations: boolean
+ canAddBeneficiaries?: boolean
  canEditBeneficiaries: boolean
+ canAddStories?: boolean
  canEditStories: boolean
+ canAddTags?: boolean
  canEditTags: boolean
  canExportReports: boolean
  canEditOrgContext: boolean
@@ -54,6 +60,8 @@ export interface UserPermissions {
  capabilities?: CapabilityFlags
  /** Owners/admins are unrestricted; team_members carry an explicit scope. */
  scope?: TeamMemberScope
+ /** Review gate: this user's evidence uploads await admin approval. */
+ requiresEvidenceApproval?: boolean
  organizationId?: string
  organizationName?: string
 }
@@ -61,6 +69,8 @@ export interface UserPermissions {
 export interface MemberPermissionsResult {
  grants: PermissionGrant[]
  scope: TeamMemberScope
+ /** Review gate: this member's evidence needs admin approval. */
+ requiresEvidenceApproval?: boolean
 }
 
 export interface SendInvitePayload {
@@ -69,6 +79,7 @@ export interface SendInvitePayload {
  canAddImpactClaims?: boolean
  permissions?: PermissionGrant[]
  scope?: TeamMemberScope
+ requiresEvidenceApproval?: boolean
 }
 
 export interface TeamMember {
@@ -206,6 +217,7 @@ export class TeamService {
  if (payload.scope) {
  body.scope = payload.scope
  }
+ body.requiresEvidenceApproval = payload.requiresEvidenceApproval ?? false
  }
 
  const response = await fetch(`${API_BASE_URL}/api/team/invite`, {
@@ -416,7 +428,11 @@ export class TeamService {
  throw new Error(error.error || 'Failed to load member permissions')
  }
  const data = await response.json()
- return { grants: data.grants ?? [], scope: data.scope ?? { allInitiatives: true, initiativeIds: [], locationIds: [] } }
+ return {
+ grants: data.grants ?? [],
+ scope: data.scope ?? { allInitiatives: true, initiativeIds: [], locationIds: [] },
+ requiresEvidenceApproval: !!data.requiresEvidenceApproval,
+ }
  }
 
  static async getInvitationPermissions(invitationId: string): Promise<MemberPermissionsResult> {
@@ -427,12 +443,16 @@ export class TeamService {
  throw new Error(error.error || 'Failed to load invitation permissions')
  }
  const data = await response.json()
- return { grants: data.grants ?? [], scope: data.scope ?? { allInitiatives: true, initiativeIds: [], locationIds: [] } }
+ return {
+ grants: data.grants ?? [],
+ scope: data.scope ?? { allInitiatives: true, initiativeIds: [], locationIds: [] },
+ requiresEvidenceApproval: !!data.requiresEvidenceApproval,
+ }
  }
 
  static async updateMember(
  memberId: string,
- payload: { memberType: MemberType; permissions?: PermissionGrant[]; scope?: TeamMemberScope }
+ payload: { memberType: MemberType; permissions?: PermissionGrant[]; scope?: TeamMemberScope; requiresEvidenceApproval?: boolean }
  ): Promise<TeamMember> {
  const headers = await getAuthHeaders()
  const response = await fetch(`${API_BASE_URL}/api/team/members/${memberId}`, {
@@ -442,6 +462,7 @@ export class TeamService {
  memberType: payload.memberType,
  permissions: payload.permissions,
  scope: payload.scope,
+ requiresEvidenceApproval: payload.requiresEvidenceApproval ?? false,
  }),
  })
  if (!response.ok) {
@@ -453,7 +474,7 @@ export class TeamService {
 
  static async updateInvitation(
  invitationId: string,
- payload: { memberType: MemberType; permissions?: PermissionGrant[]; scope?: TeamMemberScope }
+ payload: { memberType: MemberType; permissions?: PermissionGrant[]; scope?: TeamMemberScope; requiresEvidenceApproval?: boolean }
  ): Promise<TeamInvitation> {
  const headers = await getAuthHeaders()
  const response = await fetch(`${API_BASE_URL}/api/team/invite/${invitationId}`, {
@@ -463,6 +484,7 @@ export class TeamService {
  memberType: payload.memberType,
  permissions: payload.permissions,
  scope: payload.scope,
+ requiresEvidenceApproval: payload.requiresEvidenceApproval ?? false,
  }),
  })
  if (!response.ok) {

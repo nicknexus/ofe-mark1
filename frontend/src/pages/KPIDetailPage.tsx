@@ -54,7 +54,7 @@ interface DataPointWithEvidence extends KPIUpdate {
 }
 
 function DataPointsList({ updates, kpi, onRefresh }: DataPointsListProps) {
- const { canEditEvidence, canDelete } = useTeam()
+ const { canAddEvidence, canEditEvidence, canDelete } = useTeam()
  const [expandedPoints, setExpandedPoints] = useState<string[]>([])
  const [dataPointsWithEvidence, setDataPointsWithEvidence] = useState<DataPointWithEvidence[]>([])
  const [loading, setLoading] = useState(false)

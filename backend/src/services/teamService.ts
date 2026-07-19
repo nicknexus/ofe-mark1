@@ -11,6 +11,7 @@ import {
     EMPTY_SCOPE,
     normalizeScope,
     normalizePermissionsBlob,
+    PERMISSIONS_BLOB_VERSION,
 } from '../constants/teamPermissionMatrix';
 import {
     resolveInvitationMemberType,
@@ -31,6 +32,8 @@ export interface TeamInvitation {
     status: 'pending' | 'accepted' | 'expired' | 'revoked' | 'declined';
     expires_at: string;
     can_add_impact_claims: boolean;
+    /** Review gate: this member's evidence needs admin approval (team_member only). */
+    requires_evidence_approval?: boolean;
     email_sent_at?: string;
     resend_count: number;
     last_email_error?: string;
@@ -44,6 +47,8 @@ export interface TeamMember {
     member_type?: 'admin' | 'team_member' | null;
     can_add_impact_claims: boolean;
     can_edit_evidence: boolean;
+    /** Review gate: this member's evidence needs admin approval (team_member only). */
+    requires_evidence_approval?: boolean;
     invited_by?: string;
     joined_at: string;
     created_at: string;
@@ -78,6 +83,8 @@ export interface UserPermissions {
     capabilities?: MemberCapabilities;
     /** team_member scope; owners/admins are unrestricted (FULL_SCOPE). */
     scope?: TeamMemberScope;
+    /** Review gate: this user's evidence uploads await admin approval. */
+    requiresEvidenceApproval?: boolean;
     organizationId?: string;
     organizationName?: string;
 }
@@ -364,6 +371,18 @@ export class TeamService {
     }
 
     /**
+     * Review gate: true when the user's evidence uploads must be approved by
+     * an admin before they connect/count. Only flagged team_members are gated;
+     * owners, admins, and non-members (platform support) never are.
+     */
+    static async evidenceRequiresApproval(userId: string, organizationId: string): Promise<boolean> {
+        const membership = await this.getUserTeamMembership(userId, organizationId);
+        if (!membership) return false;
+        return resolveMemberType(membership.member_type) === 'team_member'
+            && !!(membership as any).requires_evidence_approval;
+    }
+
+    /**
      * Get all organizations a user can access (their own + teams they're members of)
      */
     static async getUserAccessibleOrganizations(userId: string): Promise<Array<{
@@ -636,6 +655,9 @@ export class TeamService {
             capabilities: caps,
             // Admin = unrestricted; team_member = stored scope.
             scope: memberType === 'admin' ? { ...FULL_SCOPE } : blob.scope,
+            requiresEvidenceApproval: memberType === 'team_member'
+                ? !!(membership as any).requires_evidence_approval
+                : false,
             organizationId: ctx.organizationId,
             organizationName: org?.name,
         };
@@ -682,6 +704,7 @@ export class TeamService {
             memberType?: MemberType;
             permissions?: PermissionGrant[];
             scope?: TeamMemberScope;
+            requiresEvidenceApproval?: boolean;
         } = {}
     ): Promise<TeamInvitation> {
         const canAddImpactClaims = options.canAddImpactClaims ?? false;
@@ -766,7 +789,11 @@ export class TeamService {
                 // Legacy boolean kept in sync so the old deployed backend keeps working.
                 can_add_impact_claims: memberType === 'admin' ? true : legacy.can_add_impact_claims,
                 member_type: memberType,
-                permissions: { grants, scope },
+                permissions: { grants, scope, v: PERMISSIONS_BLOB_VERSION },
+                // Review gate only applies to team members; admins are never gated.
+                requires_evidence_approval: memberType === 'team_member'
+                    ? (options.requiresEvidenceApproval ?? false)
+                    : false,
             }])
             .select()
             .single();
@@ -1001,7 +1028,11 @@ export class TeamService {
                 can_edit_evidence: memberType === 'admin' ? true : legacy.can_edit_evidence,
                 member_type: memberType,
                 invited_by: invite.invited_by,
-                permissions: { grants, scope },
+                permissions: { grants, scope, v: PERMISSIONS_BLOB_VERSION },
+                // Carry the review gate over from the invitation.
+                requires_evidence_approval: memberType === 'team_member'
+                    ? (invite.requires_evidence_approval ?? false)
+                    : false,
             }])
             .select()
             .single();
@@ -1125,6 +1156,7 @@ export class TeamService {
             memberType: MemberType;
             permissions?: PermissionGrant[];
             scope?: TeamMemberScope;
+            requiresEvidenceApproval?: boolean;
         }
     ): Promise<TeamMember> {
         await this.assertMemberInOrganization(memberId, organizationId);
@@ -1148,7 +1180,10 @@ export class TeamService {
                 member_type: updates.memberType,
                 can_add_impact_claims: legacy.can_add_impact_claims,
                 can_edit_evidence: legacy.can_edit_evidence,
-                permissions: { grants, scope },
+                permissions: { grants, scope, v: PERMISSIONS_BLOB_VERSION },
+                requires_evidence_approval: updates.memberType === 'team_member'
+                    ? (updates.requiresEvidenceApproval ?? false)
+                    : false,
             })
             .eq('id', memberId)
             .select()
@@ -1186,6 +1221,7 @@ export class TeamService {
             memberType: MemberType;
             permissions?: PermissionGrant[];
             scope?: TeamMemberScope;
+            requiresEvidenceApproval?: boolean;
         }
     ): Promise<TeamInvitation> {
         await this.assertInvitationInOrganization(invitationId, organizationId);
@@ -1221,7 +1257,10 @@ export class TeamService {
             .update({
                 member_type: updates.memberType,
                 can_add_impact_claims: legacy.can_add_impact_claims,
-                permissions: { grants, scope },
+                permissions: { grants, scope, v: PERMISSIONS_BLOB_VERSION },
+                requires_evidence_approval: updates.memberType === 'team_member'
+                    ? (updates.requiresEvidenceApproval ?? false)
+                    : false,
             })
             .eq('id', invitationId)
             .select()

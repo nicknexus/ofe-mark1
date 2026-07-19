@@ -29,6 +29,7 @@ export function TeamsTab({
  inviteEmail, setInviteEmail, memberType, setMemberType,
  permissionToggles, setPermissionToggles,
  inviteScope, setInviteScope,
+ inviteRequiresApproval, setInviteRequiresApproval,
  sending, handleSendInvite,
  removingMember, resendingInvite, revokingInvite,
  handleRemoveMember, handleResendInvite, handleRevokeInvite, formatDate,
@@ -122,6 +123,8 @@ export function TeamsTab({
  setPermissionToggles={setPermissionToggles}
  scope={inviteScope}
  setScope={setInviteScope}
+ requiresEvidenceApproval={inviteRequiresApproval}
+ setRequiresEvidenceApproval={setInviteRequiresApproval}
  sending={sending}
  onSubmit={onInviteSubmit}
  />

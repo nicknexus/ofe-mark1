@@ -15,6 +15,6 @@ export function validateClaim(c: ClaimDraft): ClaimValidation {
   const hasDate = !!c.date_represented || !!(c.date_range_start && c.date_range_end)
   if (!hasDate) missing.push('Date')
   if (!c.location_id) missing.push('Location')
-  if (!c.label?.trim()) missing.push('Label')
+  if (!c.label?.trim()) missing.push('Title')
   return { ready: missing.length === 0, missing }
 }

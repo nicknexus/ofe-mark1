@@ -25,7 +25,7 @@ export default function MobileMetricDetail({
  onDataPointClick,
  initiativeId
 }: MobileMetricDetailProps) {
- const { canAddImpactClaims, canEditEvidence } = useTeam()
+ const { canAddImpactClaims, canAddEvidence } = useTeam()
  const [isEasyEvidenceOpen, setIsEasyEvidenceOpen] = useState(false)
  const [selectedClaim, setSelectedClaim] = useState<any>(null)
 
@@ -140,7 +140,7 @@ export default function MobileMetricDetail({
  </p>
  )}
  </div>
- {canEditEvidence && (
+ {canAddEvidence && (
  <div className="px-4 pb-3 pt-0">
  <button
  onClick={(e) => {

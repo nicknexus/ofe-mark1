@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { BarChart3 } from 'lucide-react'
+import { BarChart3, Trash2 } from 'lucide-react'
 import ModalFrame, { ModalHeader, ModalBody, ModalFooter } from './ModalFrame'
 import { CreateKPIForm } from '../types'
 import TagPicker from './MetricTags/TagPicker'
@@ -10,6 +10,8 @@ interface CreateKPIModalProps {
   onSubmit: (data: CreateKPIForm) => Promise<void>
   initiativeId: string
   editData?: any // Optional prop for editing existing KPI
+  /** Edit mode only: opens the typed-confirmation delete flow. */
+  onDelete?: () => void
 }
 
 const CATEGORIES = [
@@ -24,6 +26,7 @@ export default function CreateKPIModal({
   onSubmit,
   initiativeId,
   editData,
+  onDelete,
 }: CreateKPIModalProps) {
   const [formData, setFormData] = useState<CreateKPIForm>({
     title: editData?.title || '',
@@ -200,6 +203,12 @@ export default function CreateKPIModal({
         </ModalBody>
 
         <ModalFooter>
+          {editData && onDelete && (
+            <button type="button" onClick={onDelete} disabled={loading} className="app-btn app-btn-danger mr-auto">
+              <Trash2 className="w-4 h-4" />
+              Delete metric
+            </button>
+          )}
           <button type="button" onClick={onClose} disabled={loading} className="app-btn app-btn-secondary">
             Cancel
           </button>

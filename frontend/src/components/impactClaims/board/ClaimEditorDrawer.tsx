@@ -131,7 +131,7 @@ export default function ClaimEditorDrawer({
 
           {/* Label */}
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">Label <span className="text-gray-400 font-normal">(required)</span></label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5">Title <span className="text-gray-400 font-normal">(required)</span></label>
             <input
               type="text"
               value={draft.label}

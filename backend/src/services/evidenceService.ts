@@ -54,9 +54,23 @@ export class EvidenceService {
             initiativeId: evidenceData.initiative_id,
         });
 
+        // Review gate: evidence from a flagged team member is saved as
+        // 'pending' — the row and its files exist, but it gets no
+        // evidence_kpi_updates links until an admin approves it, so it never
+        // connects to claims or counts in any aggregate.
+        const { TeamService } = await import('./teamService');
+        const orgCtx = await OrgAccessService.resolveOrgContext(userId, requestedOrgId);
+        const requiresApproval = orgCtx && !orgCtx.isOwner
+            ? await TeamService.evidenceRequiresApproval(userId, orgCtx.organizationId)
+            : false;
+
         const { data, error } = await supabase
             .from('evidence')
-            .insert([{ ...evidenceData, user_id: userId }])
+            .insert([{
+                ...evidenceData,
+                user_id: userId,
+                approval_status: requiresApproval ? 'pending' : 'approved',
+            }])
             .select()
             .single();
 
@@ -130,8 +144,10 @@ export class EvidenceService {
             if (linkError) throw new Error(`Failed to link evidence to KPIs: ${linkError.message}`);
         }
 
-        // New: Link to specific KPI updates (data points) if provided
-        if (kpi_update_ids && kpi_update_ids.length > 0) {
+        // New: Link to specific KPI updates (data points) if provided.
+        // Pending evidence gets NO claim links — they're created on approval
+        // by reconcileLinksForEvidence (matching scope ⇒ auto-link).
+        if (!requiresApproval && kpi_update_ids && kpi_update_ids.length > 0) {
             const updateLinks = (kpi_update_ids as string[]).map((updateId: string) => ({
                 evidence_id: data.id,
                 kpi_update_id: updateId,
@@ -147,11 +163,13 @@ export class EvidenceService {
 
         // Auto-link to any existing matching impact claims not already linked.
         // Pass tag_ids alongside ben groups so the auto-link respects the tag gate.
-        await this.autoLinkToMatchingUpdates(data.id, kpi_ids || [], location_ids || [], {
-            date_represented: data.date_represented,
-            date_range_start: data.date_range_start,
-            date_range_end: data.date_range_end
-        }, kpi_update_ids || [], userId, beneficiary_group_ids || [], tag_ids || []);
+        if (!requiresApproval) {
+            await this.autoLinkToMatchingUpdates(data.id, kpi_ids || [], location_ids || [], {
+                date_represented: data.date_represented,
+                date_range_start: data.date_range_start,
+                date_range_end: data.date_range_end
+            }, kpi_update_ids || [], userId, beneficiary_group_ids || [], tag_ids || []);
+        }
 
         // Link to beneficiary groups if provided
         if (beneficiary_group_ids && beneficiary_group_ids.length > 0) {
@@ -667,6 +685,56 @@ export class EvidenceService {
         return;
     }
 
+    /**
+     * Review gate: flip an evidence record between pending and approved.
+     * Owner/admin only. Approving stamps the reviewer and runs the matcher so
+     * connections appear exactly as if the evidence were uploaded normally;
+     * marking pending strips every claim link so the record immediately stops
+     * connecting/counting (works on any evidence, including records that were
+     * never pending).
+     */
+    static async setApprovalStatus(
+        id: string,
+        status: 'approved' | 'pending',
+        userId: string,
+        requestedOrgId?: string
+    ): Promise<Evidence> {
+        await OrgAccessService.assertEvidenceAccess(id, userId, requestedOrgId);
+
+        const { TeamService } = await import('./teamService');
+        const managedOrgId = await TeamService.resolveTeamManagementOrganizationId(userId, requestedOrgId);
+        if (!managedOrgId) {
+            throw new Error('Only organization owners or admins can review evidence');
+        }
+
+        const { data, error } = await supabase
+            .from('evidence')
+            .update(status === 'approved'
+                ? { approval_status: 'approved', reviewed_by: userId, reviewed_at: new Date().toISOString() }
+                : { approval_status: 'pending', reviewed_by: null, reviewed_at: null })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw new Error(`Failed to update approval status: ${error.message}`);
+
+        if (status === 'approved') {
+            // Matching scope ⇒ auto-link: this creates the connections the
+            // upload would have made, plus anything else that now matches.
+            await this.reconcileLinksForEvidence(id, userId);
+        } else {
+            const { error: unlinkError } = await supabase
+                .from('evidence_kpi_updates')
+                .delete()
+                .eq('evidence_id', id);
+            if (unlinkError) {
+                console.error('Failed to unlink evidence on mark-as-pending:', unlinkError.message);
+            }
+        }
+
+        return data;
+    }
+
     static async getEvidenceStats(
         userId: string,
         requestedOrgId: string | undefined,
@@ -677,7 +745,9 @@ export class EvidenceService {
         let query = supabase
             .from('evidence')
             .select('type')
-            .eq('initiative_id', initiativeId);
+            .eq('initiative_id', initiativeId)
+            // Pending evidence doesn't count anywhere until approved.
+            .eq('approval_status', 'approved');
 
         const { data, error } = await query;
 
@@ -868,6 +938,15 @@ export class EvidenceService {
         try {
             if (kpiIds.length === 0 || locationIds.length === 0) return
 
+            // Review gate: pending evidence never links. Checked here (not just
+            // at call sites) so update/connect paths can't slip links through.
+            const { data: evRow } = await supabase
+                .from('evidence')
+                .select('approval_status')
+                .eq('id', evidenceId)
+                .maybeSingle()
+            if (evRow?.approval_status === 'pending') return
+
             const { data: kpiUpdates } = await supabase
                 .from('kpi_updates')
                 .select('id, date_represented, date_range_start, date_range_end, location_id')
@@ -946,10 +1025,12 @@ export class EvidenceService {
         try {
             const { data: ev } = await supabase
                 .from('evidence')
-                .select('id, date_represented, date_range_start, date_range_end')
+                .select('id, date_represented, date_range_start, date_range_end, approval_status')
                 .eq('id', evidenceId)
                 .maybeSingle()
             if (!ev) return { created: 0, pruned: 0 }
+            // Review gate: pending evidence never links until approved.
+            if ((ev as any).approval_status === 'pending') return { created: 0, pruned: 0 }
 
             const [
                 { data: kpiLinks },
@@ -1097,7 +1178,7 @@ export class EvidenceService {
             claimBgMap,
             claimTagMap,
         ] = await Promise.all([
-            supabase.from('evidence').select('id, date_represented, date_range_start, date_range_end').eq('id', evidenceId).maybeSingle(),
+            supabase.from('evidence').select('id, date_represented, date_range_start, date_range_end, approval_status').eq('id', evidenceId).maybeSingle(),
             supabase.from('evidence_kpis').select('kpi_id').eq('evidence_id', evidenceId),
             supabase.from('evidence_locations').select('location_id').eq('evidence_id', evidenceId),
             supabase.from('evidence_kpi_updates').select('kpi_update_id').eq('evidence_id', evidenceId),
@@ -1107,6 +1188,10 @@ export class EvidenceService {
             MetricTagService.getTagIdsForUpdates([kpiUpdateId]),
         ])
         if (!ev) throw new Error('Evidence not found')
+        // Review gate: pending evidence can't be connected — approve it first.
+        if ((ev as any).approval_status === 'pending') {
+            return { connected: false, changes: [], will_disconnect: [], conflict: 'This evidence is awaiting approval — approve it before connecting.' }
+        }
 
         const evKpiIds = (kpiLinks || []).map((l: any) => l.kpi_id)
         const evLocIds = (locLinks || []).map((l: any) => l.location_id)
@@ -1370,7 +1455,7 @@ export class EvidenceService {
 
             const { data: evidenceRows } = await supabase
                 .from('evidence')
-                .select('id, date_represented, date_range_start, date_range_end')
+                .select('id, date_represented, date_range_start, date_range_end, approval_status')
                 .in('id', allEvidenceIds)
             const evidenceList = (evidenceRows || []) as any[]
             const evidenceById = new Map<string, any>(evidenceList.map(e => [e.id, e]))
@@ -1396,6 +1481,8 @@ export class EvidenceService {
             const passes = (evId: string): boolean => {
                 const ev = evidenceById.get(evId)
                 if (!ev) return false
+                // Review gate: pending evidence never links (and any stray link prunes).
+                if (ev.approval_status === 'pending') return false
                 const evStart = (ev.date_range_start || ev.date_represented || '') as string
                 const evEnd = (ev.date_range_end || null) as string | null
                 if (!evStart || !claimStart) return false
@@ -1471,11 +1558,13 @@ export class EvidenceService {
             return { linksCreated: 0, linksPruned: 0, evidenceProcessed: 0, claimsScanned: 0 }
         }
 
-        // Pull all evidence in the org via initiative_id.
+        // Pull all evidence in the org via initiative_id. Pending evidence is
+        // excluded — the review gate means it must not gain links here.
         const { data: evidenceRows } = await supabase
             .from('evidence')
             .select('id, initiative_id, date_represented, date_range_start, date_range_end')
             .in('initiative_id', initiativeIds)
+            .eq('approval_status', 'approved')
         const evidenceList = (evidenceRows || []) as any[]
         if (evidenceList.length === 0) {
             return { linksCreated: 0, linksPruned: 0, evidenceProcessed: 0, claimsScanned: 0 }

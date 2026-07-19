@@ -30,7 +30,7 @@ interface MobileStoriesTabProps {
 }
 
 export default function MobileStoriesTab({ initiativeId, autoAdd }: MobileStoriesTabProps) {
- const { canEditStories } = useTeam()
+ const { canAddStories, canEditStories } = useTeam()
  const [stories, setStories] = useState<Story[]>([])
  const [loading, setLoading] = useState(true)
  const [showCreateFlow, setShowCreateFlow] = useState(!!autoAdd)
@@ -87,7 +87,7 @@ export default function MobileStoriesTab({ initiativeId, autoAdd }: MobileStorie
  <h1 className="text-xl font-bold text-gray-900">Stories</h1>
  <p className="text-sm text-gray-500">{stories.length} stor{stories.length !== 1 ? 'ies' : 'y'}</p>
  </div>
- {canEditStories && (
+ {canAddStories && (
  <button
  onClick={() => setShowCreateFlow(true)}
  className="app-btn app-btn-primary app-btn-sm active:scale-[0.98]"

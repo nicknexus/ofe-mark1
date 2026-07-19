@@ -14,19 +14,28 @@ import {
     EMPTY_SCOPE,
     normalizePermissionsBlob,
     normalizeScope,
+    PERMISSIONS_BLOB_VERSION,
 } from '../constants/teamPermissionMatrix';
 import { PermissionAction, PermissionResource } from '../types/permissions';
 
-/** Granular capability flags consumed by the frontend to gate UI. */
+/** Granular capability flags consumed by the frontend to gate UI.
+ *  Add/edit are split per resource: canAdd* gates create flows, canEdit*
+ *  gates mutating existing records. */
 export interface MemberCapabilities {
     canAddImpactClaims: boolean;
+    canEditClaims: boolean;
+    canAddEvidence: boolean;
     canEditEvidence: boolean;
+    canAddMetrics: boolean;
     canEditMetrics: boolean;
     canEditInitiatives: boolean;
     canCreateInitiatives: boolean;
     canEditLocations: boolean;
+    canAddBeneficiaries: boolean;
     canEditBeneficiaries: boolean;
+    canAddStories: boolean;
     canEditStories: boolean;
+    canAddTags: boolean;
     canEditTags: boolean;
     canExportReports: boolean;
     canEditOrgContext: boolean;
@@ -37,13 +46,19 @@ export interface MemberCapabilities {
 export function fullCapabilities(): MemberCapabilities {
     return {
         canAddImpactClaims: true,
+        canEditClaims: true,
+        canAddEvidence: true,
         canEditEvidence: true,
+        canAddMetrics: true,
         canEditMetrics: true,
         canEditInitiatives: true,
         canCreateInitiatives: true,
         canEditLocations: true,
+        canAddBeneficiaries: true,
         canEditBeneficiaries: true,
+        canAddStories: true,
         canEditStories: true,
+        canAddTags: true,
         canEditTags: true,
         canExportReports: true,
         canEditOrgContext: true,
@@ -54,13 +69,19 @@ export function fullCapabilities(): MemberCapabilities {
 export function noCapabilities(): MemberCapabilities {
     return {
         canAddImpactClaims: false,
+        canEditClaims: false,
+        canAddEvidence: false,
         canEditEvidence: false,
+        canAddMetrics: false,
         canEditMetrics: false,
         canEditInitiatives: false,
         canCreateInitiatives: false,
         canEditLocations: false,
+        canAddBeneficiaries: false,
         canEditBeneficiaries: false,
+        canAddStories: false,
         canEditStories: false,
+        canAddTags: false,
         canEditTags: false,
         canExportReports: false,
         canEditOrgContext: false,
@@ -121,6 +142,26 @@ export class TeamMemberPermissionsService {
         return normalizePermissionsBlob(data?.permissions);
     }
 
+    /** Review gate flag for the member edit modal. */
+    static async getMemberReviewFlag(teamMemberId: string): Promise<boolean> {
+        const { data } = await supabase
+            .from('team_members')
+            .select('requires_evidence_approval')
+            .eq('id', teamMemberId)
+            .maybeSingle();
+        return !!data?.requires_evidence_approval;
+    }
+
+    /** Review gate flag for the pending-invite edit modal. */
+    static async getInvitationReviewFlag(invitationId: string): Promise<boolean> {
+        const { data } = await supabase
+            .from('team_invitations')
+            .select('requires_evidence_approval')
+            .eq('id', invitationId)
+            .maybeSingle();
+        return !!data?.requires_evidence_approval;
+    }
+
     static async getMemberGrants(teamMemberId: string): Promise<PermissionGrant[]> {
         return (await this.getMemberBlob(teamMemberId)).grants;
     }
@@ -142,6 +183,7 @@ export class TeamMemberPermissionsService {
         const blob: TeamPermissionsBlob = {
             grants: dedupeGrants(grants),
             scope: normalizeScope(scope),
+            v: PERMISSIONS_BLOB_VERSION,
         };
         const { error } = await supabase
             .from('team_members')
@@ -158,6 +200,7 @@ export class TeamMemberPermissionsService {
         const blob: TeamPermissionsBlob = {
             grants: dedupeGrants(grants),
             scope: normalizeScope(scope),
+            v: PERMISSIONS_BLOB_VERSION,
         };
         const { error } = await supabase
             .from('team_invitations')
@@ -229,14 +272,19 @@ export class TeamMemberPermissionsService {
         const grants = this.resolveGrantsForMemberBlob(memberType, blob, legacyBooleans);
         return {
             canAddImpactClaims: grantsAllow(grants, 'impact_claims', 'create'),
-            canEditEvidence:
-                grantsAllow(grants, 'evidence', 'edit') || grantsAllow(grants, 'evidence', 'create'),
+            canEditClaims: grantsAllow(grants, 'impact_claims', 'edit'),
+            canAddEvidence: grantsAllow(grants, 'evidence', 'create'),
+            canEditEvidence: grantsAllow(grants, 'evidence', 'edit'),
+            canAddMetrics: grantsAllow(grants, 'metrics', 'create'),
             canEditMetrics: grantsAllow(grants, 'metrics', 'edit'),
             canEditInitiatives: grantsAllow(grants, 'initiatives', 'edit'),
             canCreateInitiatives: grantsAllow(grants, 'initiatives', 'create'),
             canEditLocations: grantsAllow(grants, 'locations', 'edit'),
+            canAddBeneficiaries: grantsAllow(grants, 'beneficiaries', 'create'),
             canEditBeneficiaries: grantsAllow(grants, 'beneficiaries', 'edit'),
+            canAddStories: grantsAllow(grants, 'stories', 'create'),
             canEditStories: grantsAllow(grants, 'stories', 'edit'),
+            canAddTags: grantsAllow(grants, 'tags', 'create'),
             canEditTags: grantsAllow(grants, 'tags', 'edit'),
             canExportReports: grantsAllow(grants, 'reports', 'export'),
             canEditOrgContext: false, // owner/admin only

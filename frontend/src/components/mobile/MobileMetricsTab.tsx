@@ -530,12 +530,12 @@ function MobileAddClaimFlow({ kpi, initiativeId, onClose, onSuccess }: AddClaimF
  <div className="space-y-4">
  <div className="text-center mb-6">
  <h2 className="text-xl font-bold text-gray-900">Details</h2>
- <p className="text-gray-500 text-sm mt-1">Label and any extra context</p>
+ <p className="text-gray-500 text-sm mt-1">Title and any extra context</p>
  </div>
 
  <div>
  <label className="app-label">
- Label <span className="text-red-500">*</span>
+ Title <span className="text-red-500">*</span>
  </label>
  <input
  type="text"

@@ -241,7 +241,7 @@ export default function PublicImpactClaimPage() {
 
                             {claim.label && (
                                 <div>
-                                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Label</p>
+                                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Title</p>
                                     <span className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 font-medium shadow-sm">{claim.label}</span>
                                 </div>
                             )}

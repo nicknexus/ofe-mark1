@@ -96,7 +96,7 @@ export default function ExpandableKPICard({
  const chartColor = metricColor || DEFAULT_METRIC_COLOR
 
  // Team permissions
- const { canAddImpactClaims, canEditEvidence, canEditMetrics, canDelete } = useTeam()
+ const { canAddImpactClaims, canEditClaims, canAddEvidence, canEditEvidence, canEditMetrics, canDelete } = useTeam()
 
  // Lock body scroll when expanded (only for portal mode, not page mode)
  useEffect(() => {
@@ -440,7 +440,7 @@ export default function ExpandableKPICard({
  const handleAddEvidenceForClaim = (claim: any, e: React.MouseEvent) => {
  e.stopPropagation()
  e.preventDefault()
- if (!canEditEvidence) return
+ if (!canAddEvidence) return
  setSelectedClaimForEvidence(claim)
  setIsEasyEvidenceModalOpen(true)
  }
@@ -540,7 +540,7 @@ export default function ExpandableKPICard({
  <span className="sm:hidden">Claim</span>
  </button>
  )}
- {canEditEvidence && (
+ {canAddEvidence && (
  <button onClick={(e) => { e.stopPropagation(); onAddEvidence?.() }} className="app-btn app-btn-evidence app-btn-sm whitespace-nowrap">
  <Upload className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
  <span className="hidden sm:inline">Add Evidence</span>
@@ -730,7 +730,7 @@ export default function ExpandableKPICard({
  )}
  </>
  )}
- {canEditEvidence && (
+ {canAddEvidence && (
  <button
  type="button"
  onClick={(e) => handleAddEvidenceForClaim(update, e)}
@@ -784,10 +784,10 @@ export default function ExpandableKPICard({
  kpi={selectedDataPoint.kpi || kpi}
  isOpen={isDataPointPreviewOpen}
  onClose={() => { setIsDataPointPreviewOpen(false); setSelectedDataPoint(null) }}
- onEdit={canEditMetrics ? (dp) => { setEditingDataPoint(dp); setIsDataPointPreviewOpen(false); setSelectedDataPoint(null); setIsEditDataPointModalOpen(true) } : undefined}
+ onEdit={canEditClaims ? (dp) => { setEditingDataPoint(dp); setIsDataPointPreviewOpen(false); setSelectedDataPoint(null); setIsEditDataPointModalOpen(true) } : undefined}
  onDelete={canDelete ? (dp) => { setDeleteConfirmDataPoint(dp); setIsDataPointPreviewOpen(false); setSelectedDataPoint(null) } : undefined}
  onEvidenceClick={(ev) => { setSelectedEvidence(ev); setIsDataPointPreviewOpen(false); setIsEvidencePreviewOpen(true) }}
- onAddEvidence={canEditEvidence ? (dp) => { setIsDataPointPreviewOpen(false); setSelectedDataPoint(null); setSelectedClaimForEvidence(dp); setIsEasyEvidenceModalOpen(true) } : undefined}
+ onAddEvidence={canAddEvidence ? (dp) => { setIsDataPointPreviewOpen(false); setSelectedDataPoint(null); setSelectedClaimForEvidence(dp); setIsEasyEvidenceModalOpen(true) } : undefined}
  />,
  document.body
  )}
@@ -1076,7 +1076,7 @@ export default function ExpandableKPICard({
  <span>Add Impact Claim</span>
  </button>
  )}
- {canEditEvidence && kpi.total_updates > 0 && (
+ {canAddEvidence && kpi.total_updates > 0 && (
  <button
  onClick={(e) => {
  e.stopPropagation()
@@ -1322,7 +1322,7 @@ export default function ExpandableKPICard({
  )}
  </>
  )}
- {canEditEvidence && (
+ {canAddEvidence && (
  <button
  type="button"
  onClick={(e) => handleAddEvidenceForClaim(update, e)}
@@ -1413,7 +1413,7 @@ export default function ExpandableKPICard({
  <span>Add Impact Claim</span>
  </button>
  )}
- {canEditEvidence && kpi.total_updates > 0 && (
+ {canAddEvidence && kpi.total_updates > 0 && (
  <button
  onClick={(e) => {
  e.stopPropagation()
@@ -1767,7 +1767,7 @@ export default function ExpandableKPICard({
  )}
  </>
  )}
- {canEditEvidence && (
+ {canAddEvidence && (
  <button
  type="button"
  onClick={(e) => handleAddEvidenceForClaim(update, e)}
@@ -1839,7 +1839,7 @@ export default function ExpandableKPICard({
  setIsDataPointPreviewOpen(false)
  setSelectedDataPoint(null)
  }}
- onEdit={canEditMetrics ? (dataPoint) => {
+ onEdit={canEditClaims ? (dataPoint) => {
  setEditingDataPoint(dataPoint)
  setIsDataPointPreviewOpen(false)
  setSelectedDataPoint(null)
@@ -1855,7 +1855,7 @@ export default function ExpandableKPICard({
  setIsDataPointPreviewOpen(false)
  setIsEvidencePreviewOpen(true)
  }}
- onAddEvidence={canEditEvidence ? (dp) => {
+ onAddEvidence={canAddEvidence ? (dp) => {
  setIsDataPointPreviewOpen(false)
  setSelectedDataPoint(null)
  setSelectedClaimForEvidence(dp)

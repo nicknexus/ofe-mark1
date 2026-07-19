@@ -197,6 +197,10 @@ export interface Evidence {
     beneficiary_group_ids?: string[];
     tag_ids?: string[];
     initiative_id?: string;
+    /** Review gate: 'pending' evidence has no claim links and counts nowhere. */
+    approval_status?: 'approved' | 'pending';
+    reviewed_by?: string;
+    reviewed_at?: string;
     created_at?: string;
     updated_at?: string;
     user_id?: string;
@@ -307,6 +311,8 @@ export interface TimelineStats {
     not_connected: number;
     claims_total: number;
     evidence_total: number;
+    /** Evidence awaiting admin approval — excluded from every other stat. */
+    pending_total: number;
 }
 
 export interface TimelineResponse {

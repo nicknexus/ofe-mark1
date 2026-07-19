@@ -143,7 +143,7 @@ function SortableTagRow({
 
 export default function AllTagsPage() {
  const navigate = useNavigate()
- const { canEditTags, canDelete } = useTeam()
+ const { canAddTags, canEditTags, canDelete } = useTeam()
  const [tags, setTags] = useState<MetricTag[]>([])
  const [loading, setLoading] = useState(true)
  const [search, setSearch] = useState('')
@@ -297,7 +297,7 @@ export default function AllTagsPage() {
  {tags.length} tag{tags.length !== 1 ? 's' : ''} · drag the handles to reorder
  </p>
  </div>
- {canEditTags && (
+ {canAddTags && (
  <button
  type="button"
  onClick={() => tagsLocked ? setShowUpgrade(true) : setShowInput(s => !s)}

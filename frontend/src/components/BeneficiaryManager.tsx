@@ -295,7 +295,7 @@ function CreateGroupModal({ isOpen, onClose, onSubmit, editData, initiativeId }:
 }
 
 export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryClick, onMetricClick }: BeneficiaryManagerProps) {
- const { canEditBeneficiaries } = useTeam()
+ const { canAddBeneficiaries, canEditBeneficiaries } = useTeam()
  const [groups, setGroups] = useState<BeneficiaryGroup[]>([])
  const [orderedGroups, setOrderedGroups] = useState<BeneficiaryGroup[]>([])
  const [loading, setLoading] = useState(true)
@@ -504,7 +504,7 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
  Beneficiary groups ({orderedGroups.length})
  </h3>
- {canEditBeneficiaries && (
+ {canAddBeneficiaries && (
  <button
  onClick={() => groupsLocked ? setShowUpgrade(true) : setIsCreateModalOpen(true)}
  className="app-btn app-btn-primary app-btn-sm shadow-sm w-full sm:w-auto"
@@ -534,7 +534,7 @@ export default function BeneficiaryManager({ initiativeId, onRefresh, onStoryCli
  <p className="text-gray-600 text-base mb-4">
  No beneficiary groups yet
  </p>
- {canEditBeneficiaries && (
+ {canAddBeneficiaries && (
  <Button
  onClick={() => groupsLocked ? setShowUpgrade(true) : setIsCreateModalOpen(true)}
  size="sm"

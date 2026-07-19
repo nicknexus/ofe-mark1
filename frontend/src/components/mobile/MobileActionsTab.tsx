@@ -59,12 +59,12 @@ const actions = [
 ]
 
 export default function MobileActionsTab({ initiatives, onAction }: MobileActionsTabProps) {
- const { organizationName, canEditEvidence, canAddImpactClaims, canEditStories, canEditLocations } = useTeam()
+ const { organizationName, canAddEvidence, canAddImpactClaims, canAddStories, canEditLocations } = useTeam()
 
  const visibleActions = actions.filter((action) => {
- if (action.id === 'evidence') return canEditEvidence
+ if (action.id === 'evidence') return canAddEvidence
  if (action.id === 'impact_claim') return canAddImpactClaims
- if (action.id === 'story') return canEditStories
+ if (action.id === 'story') return canAddStories
  if (action.id === 'location') return canEditLocations
  return true
  })

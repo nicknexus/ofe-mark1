@@ -48,7 +48,7 @@ import { Button, PageLoader, InlineAlert } from '../components/ui'
 import { useTeam } from '../context/TeamContext'
 
 export default function InitiativePage() {
- const { canAddImpactClaims, canEditEvidence, canEditMetrics, canDelete } = useTeam()
+ const { canAddImpactClaims, canEditEvidence, canAddMetrics, canEditMetrics, canDelete } = useTeam()
  const [user, setUser] = useState<User | null>(null)
  const [organization, setOrganization] = useState<Organization | null>(null)
  const { id, kpiId } = useParams<{ id: string; kpiId?: string }>()
@@ -496,7 +496,7 @@ export default function InitiativePage() {
         kpis={kpis}
         kpiTotals={kpiTotals}
         kpiUpdates={allKPIUpdates}
-        onAddKPI={canEditMetrics ? () => setIsKPIModalOpen(true) : undefined}
+        onAddKPI={canAddMetrics ? () => setIsKPIModalOpen(true) : undefined}
         onMetricDetailClick={handleMetricCardClick}
         onOpenLocations={() => handleTabChange('location')}
         onRefresh={refreshAfterClaim}
@@ -537,6 +537,7 @@ export default function InitiativePage() {
                 setExpandedKPIs(new Set())
                 setActiveTab('metrics')
               }}
+              onEdit={canEditMetrics ? () => openEditModal(detailKpi) : undefined}
               onRefresh={loadDashboard}
               onStoryClick={(storyId) => {
                 setInitialStoryId(storyId)
@@ -691,6 +692,7 @@ export default function InitiativePage() {
  onSubmit={handleEditKPI}
  initiativeId={id!}
  editData={selectedKPI}
+ onDelete={canDelete ? () => { setIsEditKPIModalOpen(false); openDeleteConfirm(selectedKPI) } : undefined}
  />
  )}
 

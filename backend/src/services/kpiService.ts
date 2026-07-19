@@ -18,8 +18,8 @@ export class KPIService {
             }
         }
 
-        // Capability gate: only members granted metric editing may create metrics.
-        await PermissionService.assert(userId, requestedOrgId, 'metrics', 'edit', {
+        // Capability gate: creating metrics is its own grant (add ≠ edit).
+        await PermissionService.assert(userId, requestedOrgId, 'metrics', 'create', {
             initiativeId: kpi.initiative_id,
         });
 
@@ -790,7 +790,8 @@ export class KPIService {
         if (!kpi) throw new Error('Access denied');
 
         const { PermissionService } = await import('./permissionService');
-        await PermissionService.assert(userId, requestedOrgId, 'metrics', 'edit', {
+        // Updating a claim is claim-editing, not metric-editing.
+        await PermissionService.assert(userId, requestedOrgId, 'impact_claims', 'edit', {
             resourceId: existingUpdate.kpi_id,
             initiativeId: kpi.initiative_id,
         });
@@ -972,7 +973,8 @@ export class KPIService {
         if (!kpi) throw new Error('Access denied');
 
         const { PermissionService } = await import('./permissionService');
-        await PermissionService.assert(userId, requestedOrgId, 'metrics', 'delete', {
+        // Removing a claim rides on the claim-editing grant.
+        await PermissionService.assert(userId, requestedOrgId, 'impact_claims', 'edit', {
             resourceId: existingUpdate.kpi_id,
             initiativeId: kpi.initiative_id,
         });

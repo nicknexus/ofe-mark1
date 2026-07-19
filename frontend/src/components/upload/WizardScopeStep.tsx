@@ -2,7 +2,7 @@ import React from 'react'
 import { MapPin, CalendarRange, Tag as TagIcon, Users, Check, LucideIcon } from 'lucide-react'
 import { BeneficiaryGroup, Location, MetricTag } from '../../types'
 import { getLocalDateString } from '../../utils'
-import DateRangePicker from '../DateRangePicker'
+import DateRangePicker, { type DateRangePickerHandle } from '../DateRangePicker'
 import { WizardState, includesClaim } from './wizardTypes'
 
 /**
@@ -162,6 +162,7 @@ interface WizardScopeStepProps {
  locations: Location[]
  tags: MetricTag[]
  beneficiaryGroups: BeneficiaryGroup[]
+ datePickerRef?: React.Ref<DateRangePickerHandle>
 }
 
 /**
@@ -173,7 +174,7 @@ interface WizardScopeStepProps {
  * columns (date · location · tags · groups) so the whole scope can be set at
  * a glance. Claim-only and evidence-only use the same column layout.
  */
-export default function WizardScopeStep({ state, update, locations, tags, beneficiaryGroups }: WizardScopeStepProps) {
+export default function WizardScopeStep({ state, update, locations, tags, beneficiaryGroups, datePickerRef }: WizardScopeStepProps) {
  const claim = includesClaim(state.kind)
  const today = getLocalDateString(new Date())
 
@@ -204,6 +205,7 @@ export default function WizardScopeStep({ state, update, locations, tags, benefi
  done: dateDone,
  body: (
    <DateRangePicker
+     ref={datePickerRef}
      variant="inline"
      compact
      value={dateValue}

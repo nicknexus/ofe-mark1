@@ -409,6 +409,165 @@ export default function MetricsDashboardTab({
 
   const metricOptions: FilterOption[] = orderedKPIs.map(k => ({ id: k.id, name: k.title, color: colorByKpi[k.id] }))
 
+  // Chart + map are shared by the Metrics view (below the cards) and the
+  // Overview view. Only one view renders at a time (AnimatePresence mode="wait"),
+  // so reusing the same element is safe. They fill their parent's height, so the
+  // caller supplies the height (fixed in the scrollable Metrics view, flex in
+  // the locked Overview view).
+  const renderChartPanel = () => (
+    <motion.div variants={fadeUp} className="h-full min-h-0 flex flex-col rounded-3xl bg-gradient-to-b from-white to-primary-50/20 border border-gray-200/60 shadow-card p-5 sm:p-6">
+      <div className="flex-shrink-0 flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+          <h3 className="text-base font-semibold text-gray-800">Metrics over time</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Progress across every metric you track</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center bg-gray-100 rounded-xl p-0.5 border border-gray-200">
+            {(['Monthly', 'Cumulative'] as const).map(mode => {
+              const active = (mode === 'Cumulative') === isCumulative
+              return (
+                <button
+                  key={mode}
+                  onClick={() => setIsCumulative(mode === 'Cumulative')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${active ? 'bg-gray-800 text-white' : 'text-gray-600 hover:text-gray-800'}`}
+                >
+                  {mode}
+                </button>
+              )
+            })}
+          </div>
+          <div className="hidden sm:flex items-center bg-gray-100 rounded-xl p-0.5 border border-gray-200">
+            {TIMEFRAMES.map(tf => (
+              <button
+                key={tf.key}
+                onClick={() => setTimeFrame(tf.key)}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${timeFrame === tf.key ? 'bg-gray-800 text-white' : 'text-gray-600 hover:text-gray-800'}`}
+              >
+                {tf.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="flex-1 min-h-0">
+        {chartKpis.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
+            <span className="w-14 h-14 rounded-2xl bg-primary-50 flex items-center justify-center">
+              <LineChart className="w-7 h-7 text-primary-400" />
+            </span>
+            <p className="text-sm text-gray-500 max-w-xs">
+              {kpis.length === 0 ? 'Add a metric to start seeing your progress here' : 'Select metrics above to see them trend over time'}
+            </p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData} margin={{ top: 12, right: 16, left: 4, bottom: 8 }}>
+              <defs>
+                {chartKpis.map(kpi => (
+                  <linearGradient key={kpi.id} id={`metrics-dash-gradient-${kpi.id}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={colorByKpi[kpi.id]} stopOpacity={0.18} />
+                    <stop offset="95%" stopColor={colorByKpi[kpi.id]} stopOpacity={0.01} />
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid strokeDasharray="4 6" stroke="#eef1f5" vertical={false} />
+              <XAxis
+                dataKey="date"
+                stroke="#9ca3af"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                tickMargin={12}
+                minTickGap={28}
+                padding={{ left: 12, right: 12 }}
+              />
+              <YAxis
+                stroke="#9ca3af"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                width={44}
+                tickFormatter={(value) => {
+                  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
+                  if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
+                  return value.toString()
+                }}
+              />
+              <Tooltip
+                cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }}
+                contentStyle={{
+                  backgroundColor: 'white',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '14px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
+                  fontSize: '12px',
+                  padding: '10px 12px',
+                }}
+                formatter={(value: any, name: any) => {
+                  const kpi = kpis.find(k => k.id === name)
+                  const num = typeof value === 'number' ? value.toLocaleString() : value
+                  return [`${num}${kpi?.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : ''}`, kpi?.title || name]
+                }}
+              />
+              {chartKpis.map(kpi => (
+                <Area
+                  key={kpi.id}
+                  type="monotone"
+                  dataKey={kpi.id}
+                  stroke={colorByKpi[kpi.id]}
+                  strokeWidth={2.5}
+                  fill={`url(#metrics-dash-gradient-${kpi.id})`}
+                  dot={false}
+                  activeDot={{ r: 4, strokeWidth: 2, stroke: '#fff' }}
+                  connectNulls
+                />
+              ))}
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+      {chartKpis.length > 0 && (
+        <div className="flex-shrink-0 flex flex-wrap justify-center gap-2 mt-4 pt-4 border-t border-gray-100 max-h-[72px] overflow-y-auto">
+          {chartKpis.map(kpi => (
+            <button
+              key={kpi.id}
+              onClick={() => openLogsForMetric(kpi.id)}
+              className="inline-flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full bg-gray-50 border border-gray-200/70 text-xs font-medium text-gray-600 hover:bg-white hover:border-gray-300 hover:text-gray-900 transition-colors"
+              title="View logs for this metric"
+            >
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: colorByKpi[kpi.id] }} />
+              {kpi.title}
+            </button>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  )
+
+  const renderMapPanel = () => (
+    // `isolate` keeps the map's internal z-indexes (Leaflet panes + the overlay
+    // pills) inside this frame so they never bleed through modals/overlays.
+    <motion.div variants={fadeUp} className="h-full relative isolate min-h-[240px] rounded-3xl overflow-hidden border border-gray-200/60 shadow-card">
+      <LocationMap
+        locations={mapLocations}
+        autoFit
+        hideEmptyBanner
+        initiativeId={initiativeId}
+        onMetricClick={onMetricDetailClick}
+        onStoryClick={onStoryClick}
+      />
+      {onOpenLocations && (
+        <button
+          onClick={onOpenLocations}
+          className="absolute top-3 right-3 z-[400] inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-white/90 backdrop-blur border border-gray-200 shadow-sm text-xs font-medium text-gray-700 hover:bg-white transition-colors"
+        >
+          <MapPin className="w-3.5 h-3.5 text-primary-600" />
+          Manage
+        </button>
+      )}
+    </motion.div>
+  )
+
   return (
     <div className="h-full overflow-hidden bg-gray-50">
       <motion.div
@@ -562,6 +721,21 @@ export default function MetricsDashboardTab({
             </motion.div>
           </SortableContext>
           </DndContext>
+
+          {/* Trends & places — pushed below the cards, so more metrics just
+              push these further down and the whole column scrolls. */}
+          <div className="flex items-center gap-2 mt-8 mb-3">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Trends &amp; places</h3>
+          </div>
+          <motion.div
+            className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-2"
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+          >
+            <div className="lg:col-span-2 h-[360px] lg:h-[440px]">{renderChartPanel()}</div>
+            <div className="lg:col-span-1 h-[300px] lg:h-[440px]">{renderMapPanel()}</div>
+          </motion.div>
         </motion.section>
         ) : (
         <motion.div
@@ -605,157 +779,8 @@ export default function MetricsDashboardTab({
             initial="hidden"
             animate="visible"
           >
-          <motion.div variants={fadeUp} className="lg:col-span-2 min-h-0 flex flex-col rounded-3xl bg-gradient-to-b from-white to-primary-50/20 border border-gray-200/60 shadow-card p-5 sm:p-6">
-            <div className="flex-shrink-0 flex flex-wrap items-center justify-between gap-3 mb-4">
-              <div>
-                <h3 className="text-base font-semibold text-gray-800">Metrics over time</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Progress across every metric you track</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center bg-gray-100 rounded-xl p-0.5 border border-gray-200">
-                  {(['Monthly', 'Cumulative'] as const).map(mode => {
-                    const active = (mode === 'Cumulative') === isCumulative
-                    return (
-                      <button
-                        key={mode}
-                        onClick={() => setIsCumulative(mode === 'Cumulative')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${active ? 'bg-gray-800 text-white' : 'text-gray-600 hover:text-gray-800'}`}
-                      >
-                        {mode}
-                      </button>
-                    )
-                  })}
-                </div>
-                <div className="hidden sm:flex items-center bg-gray-100 rounded-xl p-0.5 border border-gray-200">
-                  {TIMEFRAMES.map(tf => (
-                    <button
-                      key={tf.key}
-                      onClick={() => setTimeFrame(tf.key)}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${timeFrame === tf.key ? 'bg-gray-800 text-white' : 'text-gray-600 hover:text-gray-800'}`}
-                    >
-                      {tf.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="flex-1 min-h-0">
-              {chartKpis.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
-                  <span className="w-14 h-14 rounded-2xl bg-primary-50 flex items-center justify-center">
-                    <LineChart className="w-7 h-7 text-primary-400" />
-                  </span>
-                  <p className="text-sm text-gray-500 max-w-xs">
-                    {kpis.length === 0 ? 'Add a metric to start seeing your progress here' : 'Select metrics above to see them trend over time'}
-                  </p>
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 12, right: 16, left: 4, bottom: 8 }}>
-                    <defs>
-                      {chartKpis.map(kpi => (
-                        <linearGradient key={kpi.id} id={`metrics-dash-gradient-${kpi.id}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={colorByKpi[kpi.id]} stopOpacity={0.18} />
-                          <stop offset="95%" stopColor={colorByKpi[kpi.id]} stopOpacity={0.01} />
-                        </linearGradient>
-                      ))}
-                    </defs>
-                    <CartesianGrid strokeDasharray="4 6" stroke="#eef1f5" vertical={false} />
-                    <XAxis
-                      dataKey="date"
-                      stroke="#9ca3af"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={12}
-                      minTickGap={28}
-                      padding={{ left: 12, right: 12 }}
-                    />
-                    <YAxis
-                      stroke="#9ca3af"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                      width={44}
-                      tickFormatter={(value) => {
-                        if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
-                        if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
-                        return value.toString()
-                      }}
-                    />
-                    <Tooltip
-                      cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }}
-                      contentStyle={{
-                        backgroundColor: 'white',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '14px',
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
-                        fontSize: '12px',
-                        padding: '10px 12px',
-                      }}
-                      formatter={(value: any, name: any) => {
-                        const kpi = kpis.find(k => k.id === name)
-                        const num = typeof value === 'number' ? value.toLocaleString() : value
-                        return [`${num}${kpi?.unit_of_measurement ? ` ${kpi.unit_of_measurement}` : ''}`, kpi?.title || name]
-                      }}
-                    />
-                    {chartKpis.map(kpi => (
-                      <Area
-                        key={kpi.id}
-                        type="monotone"
-                        dataKey={kpi.id}
-                        stroke={colorByKpi[kpi.id]}
-                        strokeWidth={2.5}
-                        fill={`url(#metrics-dash-gradient-${kpi.id})`}
-                        dot={false}
-                        activeDot={{ r: 4, strokeWidth: 2, stroke: '#fff' }}
-                        connectNulls
-                      />
-                    ))}
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-            {chartKpis.length > 0 && (
-              <div className="flex-shrink-0 flex flex-wrap justify-center gap-2 mt-4 pt-4 border-t border-gray-100 max-h-[72px] overflow-y-auto">
-                {chartKpis.map(kpi => (
-                  <button
-                    key={kpi.id}
-                    onClick={() => openLogsForMetric(kpi.id)}
-                    className="inline-flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full bg-gray-50 border border-gray-200/70 text-xs font-medium text-gray-600 hover:bg-white hover:border-gray-300 hover:text-gray-900 transition-colors"
-                    title="View logs for this metric"
-                  >
-                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: colorByKpi[kpi.id] }} />
-                    {kpi.title}
-                  </button>
-                ))}
-              </div>
-            )}
-          </motion.div>
-
-          {/* Locations map — chrome-less, just a rounded map for a modern feel */}
-          {/* `isolate` keeps the map's internal z-indexes (Leaflet panes + the
-              overlay pills) inside this frame so they never bleed through
-              modals or full-screen overlays. */}
-          <motion.div variants={fadeUp} className="lg:col-span-1 relative isolate min-h-[240px] rounded-3xl overflow-hidden border border-gray-200/60 shadow-card">
-            <LocationMap
-              locations={mapLocations}
-              autoFit
-              hideEmptyBanner
-              initiativeId={initiativeId}
-              onMetricClick={onMetricDetailClick}
-              onStoryClick={onStoryClick}
-            />
-            {onOpenLocations && (
-              <button
-                onClick={onOpenLocations}
-                className="absolute top-3 right-3 z-[400] inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-white/90 backdrop-blur border border-gray-200 shadow-sm text-xs font-medium text-gray-700 hover:bg-white transition-colors"
-              >
-                <MapPin className="w-3.5 h-3.5 text-primary-600" />
-                Manage
-              </button>
-            )}
-          </motion.div>
+            <div className="lg:col-span-2 min-h-0">{renderChartPanel()}</div>
+            <div className="lg:col-span-1 min-h-0">{renderMapPanel()}</div>
           </motion.div>
         </section>
         </motion.div>

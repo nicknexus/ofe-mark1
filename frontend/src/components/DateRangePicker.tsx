@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { Calendar, X } from 'lucide-react'
 import { format, startOfMonth, startOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths, addYears, subYears, isBefore, isAfter, startOfDay } from 'date-fns'
@@ -29,7 +29,12 @@ interface DateRangePickerProps {
   compact?: boolean
 }
 
-export default function DateRangePicker({
+export type DateRangePickerHandle = {
+  /** Commit any in-progress calendar selection to `onChange`. */
+  applyPending: () => void
+}
+
+const DateRangePicker = forwardRef<DateRangePickerHandle, DateRangePickerProps>(function DateRangePicker({
  value,
  onChange,
  minDate,
@@ -40,7 +45,7 @@ export default function DateRangePicker({
   variant = 'default',
   topSlot,
   compact = false,
-}: DateRangePickerProps) {
+}, ref) {
  const [isOpen, setIsOpen] = useState(false)
  const [currentMonth, setCurrentMonth] = useState(new Date())
  // Temporary selection state (for preview before applying)
@@ -173,63 +178,88 @@ export default function DateRangePicker({
  const maxDateObj = maxDate ? startOfDay(parseLocalDate(maxDate)) : today
  const minDateObj = minDate ? startOfDay(parseLocalDate(minDate)) : null
 
+ const commitSelection = useCallback((start: Date | null, end: Date | null) => {
+   if (!start) return
+   if (end) {
+     const normalizedStart = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+     const normalizedEnd = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+     onChange({
+       singleDate: undefined,
+       startDate: getLocalDateString(normalizedStart),
+       endDate: getLocalDateString(normalizedEnd),
+     })
+   } else {
+     const normalizedDate = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+     onChange({
+       singleDate: getLocalDateString(normalizedDate),
+       startDate: undefined,
+       endDate: undefined,
+     })
+   }
+   if (variant !== 'inline') setIsOpen(false)
+ }, [onChange, variant])
+
  const handleDateClick = (date: Date) => {
  if (isAfter(date, maxDateObj)) return
  if (minDateObj && isBefore(date, minDateObj)) return
 
+ let newStart = tempStartDate
+ let newEnd = tempEndDate
+
  // If no start date selected, set it
  if (!tempStartDate) {
- setTempStartDate(date)
- setTempEndDate(null)
- return
- }
-
- // If start date is selected but no end date
- if (tempStartDate && !tempEndDate) {
+ newStart = date
+ newEnd = null
+ } else if (tempStartDate && !tempEndDate) {
  // If clicking the same date, keep it as single date selection
  if (isSameDay(date, tempStartDate)) {
- setTempEndDate(null)
- return
- }
-
+ newEnd = null
+ } else if (isBefore(date, tempStartDate)) {
  // If clicking a date before start date, make it the new start
- if (isBefore(date, tempStartDate)) {
- setTempStartDate(date)
- setTempEndDate(null)
- return
- }
-
+ newStart = date
+ newEnd = null
+ } else {
  // Otherwise, set as end date
- setTempEndDate(date)
- return
+ newEnd = date
+ }
+ } else {
+ // If both are selected, reset and start over
+ newStart = date
+ newEnd = null
  }
 
- // If both are selected, reset and start over
- setTempStartDate(date)
- setTempEndDate(null)
+ setTempStartDate(newStart)
+ setTempEndDate(newEnd)
+
+ // Inline (Add Log wizard): commit as soon as a date is picked — single on
+ // first click, range when the end is chosen. No separate Apply step.
+ if (variant === 'inline' && newStart) {
+ commitSelection(newStart, newEnd)
+ }
  }
 
  const handleApply = () => {
-   if (tempStartDate) {
-     if (tempEndDate) {
-       const normalizedStart = new Date(tempStartDate.getFullYear(), tempStartDate.getMonth(), tempStartDate.getDate())
-       const normalizedEnd = new Date(tempEndDate.getFullYear(), tempEndDate.getMonth(), tempEndDate.getDate())
-       onChange({
-         singleDate: undefined,
-         startDate: getLocalDateString(normalizedStart),
-         endDate: getLocalDateString(normalizedEnd),
-       })
-     } else {
-       const normalizedDate = new Date(tempStartDate.getFullYear(), tempStartDate.getMonth(), tempStartDate.getDate())
-       onChange({
-         singleDate: getLocalDateString(normalizedDate),
-         startDate: undefined,
-         endDate: undefined,
-       })
-     }
-     if (variant !== 'inline') setIsOpen(false)
-   }
+   commitSelection(tempStartDate, tempEndDate)
  }
+
+ useImperativeHandle(ref, () => ({
+   applyPending: () => {
+     if (tempStartDate) commitSelection(tempStartDate, tempEndDate)
+   },
+ }), [tempStartDate, tempEndDate, commitSelection])
+
+ // Inline: clicking elsewhere in the wizard should commit a partial selection
+ // (start only → single date), same as closing the dropdown calendar.
+ useEffect(() => {
+   if (variant !== 'inline') return
+   const onPointerDown = (e: PointerEvent) => {
+     if (!containerRef.current?.contains(e.target as Node) && tempStartDate) {
+       commitSelection(tempStartDate, tempEndDate)
+     }
+   }
+   document.addEventListener('pointerdown', onPointerDown)
+   return () => document.removeEventListener('pointerdown', onPointerDown)
+ }, [variant, tempStartDate, tempEndDate, commitSelection])
 
  const handleCancel = () => {
    setTempStartDate(appliedStartDate)
@@ -394,34 +424,36 @@ export default function DateRangePicker({
       </div>
       <div className={`${compact ? 'p-2.5 pt-1.5' : 'p-4 pt-2'} flex-shrink-0 border-t border-gray-100`}>
         {previewStartDate && (
-          <div className={`${compact ? 'mb-2 p-1.5' : 'mb-3 p-2'} bg-primary-50 rounded text-xs text-primary-700 text-center`}>
+          <div className={`${compact ? 'p-1.5' : 'p-2'} bg-primary-50 rounded text-xs text-primary-700 text-center`}>
             {getPreviewText()}
           </div>
         )}
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={handleCancel}
-            className={`flex-1 font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors ${compact ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'}`}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleApply}
-            disabled={!previewStartDate}
-            className={`flex-1 font-medium text-white app-btn-primary rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${compact ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'}`}
-          >
-            Apply
-          </button>
-        </div>
+        {variant !== 'inline' && (
+          <div className={`flex gap-2 ${previewStartDate ? (compact ? 'mt-2' : 'mt-3') : ''}`}>
+            <button
+              type="button"
+              onClick={handleCancel}
+              className={`flex-1 font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors ${compact ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'}`}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleApply}
+              disabled={!previewStartDate}
+              className={`flex-1 font-medium text-white app-btn-primary rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${compact ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'}`}
+            >
+              Apply
+            </button>
+          </div>
+        )}
       </div>
     </>
   )
 
   if (variant === 'inline') {
     return (
-      <div className={`flex flex-col w-full ${className}`}>
+      <div ref={containerRef} className={`flex flex-col w-full ${className}`}>
         {calendarPanel}
       </div>
     )
@@ -511,5 +543,7 @@ export default function DateRangePicker({
  )}
  </div>
  )
-}
+})
+
+export default DateRangePicker
 

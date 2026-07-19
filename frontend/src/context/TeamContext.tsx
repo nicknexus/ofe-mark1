@@ -15,19 +15,27 @@ interface TeamContextType {
  memberType?: 'admin' | 'team_member'
  canManageTeam: boolean
  canAddImpactClaims: boolean
+ canEditClaims: boolean
+ canAddEvidence: boolean
  canEditEvidence: boolean
  canDelete: boolean
+ canAddMetrics: boolean
  canEditMetrics: boolean
  canEditInitiatives: boolean
  canCreateInitiatives: boolean
  canEditLocations: boolean
+ canAddBeneficiaries: boolean
  canEditBeneficiaries: boolean
+ canAddStories: boolean
  canEditStories: boolean
+ canAddTags: boolean
  canEditTags: boolean
  canExportReports: boolean
  canEditOrgContext: boolean
  /** team_member initiative/location scope; owners/admins are unrestricted. */
  scope?: TeamMemberScope
+ /** Review gate: this user's evidence uploads await admin approval. */
+ requiresEvidenceApproval: boolean
  /** True when the caller may access the given initiative under their scope. */
  canAccessInitiative: (initiativeId: string) => boolean
  /** True when the caller may use/see the given location under their scope. */
@@ -61,17 +69,24 @@ const TeamContext = createContext<TeamContextType>({
  isAdmin: false,
  canManageTeam: false,
  canAddImpactClaims: false,
+ canEditClaims: false,
+ canAddEvidence: false,
  canEditEvidence: false,
  canDelete: false,
+ canAddMetrics: false,
  canEditMetrics: false,
  canEditInitiatives: false,
  canCreateInitiatives: false,
  canEditLocations: false,
+ canAddBeneficiaries: false,
  canEditBeneficiaries: false,
+ canAddStories: false,
  canEditStories: false,
+ canAddTags: false,
  canEditTags: false,
  canExportReports: false,
  canEditOrgContext: false,
+ requiresEvidenceApproval: false,
  canAccessInitiative: () => true,
  canAccessLocation: () => true,
  accessibleOrganizations: [],
@@ -220,18 +235,25 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
  memberType: permissions?.memberType,
  canManageTeam,
  canAddImpactClaims: cap('canAddImpactClaims'),
+ canEditClaims: cap('canEditClaims'),
+ canAddEvidence: cap('canAddEvidence'),
  canEditEvidence: cap('canEditEvidence'),
  canDelete: cap('canDelete'),
+ canAddMetrics: cap('canAddMetrics'),
  canEditMetrics: cap('canEditMetrics'),
  canEditInitiatives: cap('canEditInitiatives'),
  canCreateInitiatives: cap('canCreateInitiatives'),
  canEditLocations: cap('canEditLocations'),
+ canAddBeneficiaries: cap('canAddBeneficiaries'),
  canEditBeneficiaries: cap('canEditBeneficiaries'),
+ canAddStories: cap('canAddStories'),
  canEditStories: cap('canEditStories'),
+ canAddTags: cap('canAddTags'),
  canEditTags: cap('canEditTags'),
  canExportReports: cap('canExportReports'),
  canEditOrgContext: cap('canEditOrgContext'),
  scope,
+ requiresEvidenceApproval: !unrestricted && !!permissions?.requiresEvidenceApproval,
  canAccessInitiative,
  canAccessLocation,
  organizationId: activeOrganization?.id || permissions?.organizationId,

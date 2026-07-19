@@ -15,9 +15,9 @@ import {
  BarChart3,
  Palette,
  Image as ImageIcon,
- FileText,
- GripVertical,
- ChevronRight
+  FileText,
+  GripVertical,
+  ChevronRight
 } from 'lucide-react'
 import {
  DndContext,
@@ -47,6 +47,7 @@ import { SubscriptionService } from '../services/subscription'
 import TagsWidget from '../components/MetricTags/TagsWidget'
 import { ExternalLink, Lock } from 'lucide-react'
 import { useTutorial } from '../context/TutorialContext'
+import { useOnboarding } from '../context/OnboardingContext'
 import { useTeam } from '../context/TeamContext'
 import { Button, PageLoader, InlineAlert, EmptyState } from '../components/ui'
 
@@ -60,20 +61,23 @@ function SortableInitiativeCard({
  stats,
  canEditInitiatives,
  canDeleteInitiatives,
- openEditModal,
- openDeleteConfirm,
- locked = false,
- onLockedClick,
+  openEditModal,
+  openDeleteConfirm,
+  locked = false,
+  onLockedClick,
+  orgLogoUrl,
 }: {
- initiative: Initiative
- /** Per-initiative counts; null while background stats are still loading. */
- stats: { metrics: number; locations: number } | null
- canEditInitiatives: boolean
- canDeleteInitiatives: boolean
- openEditModal: (i: Initiative) => void
- openDeleteConfirm: (i: Initiative) => void
- locked?: boolean
- onLockedClick?: () => void
+  initiative: Initiative
+  /** Per-initiative counts; null while background stats are still loading. */
+  stats: { metrics: number; locations: number } | null
+  canEditInitiatives: boolean
+  canDeleteInitiatives: boolean
+  openEditModal: (i: Initiative) => void
+  openDeleteConfirm: (i: Initiative) => void
+  locked?: boolean
+  onLockedClick?: () => void
+  /** Organization logo; falls back to the Nexus mark when absent. */
+  orgLogoUrl?: string | null
 }) {
  const {
  attributes,
@@ -91,39 +95,60 @@ function SortableInitiativeCard({
  zIndex: isDragging ? 10 : 'auto' as const,
  }
 
- const inner = (
- <div className="p-4 h-full flex flex-col">
- <div className="flex items-start gap-2 pr-16">
- <h3 className={`text-sm font-semibold leading-snug line-clamp-1 transition-colors ${locked ? 'text-gray-500' : 'text-gray-900'}`} title={initiative.title}>
- {initiative.title}
- </h3>
- </div>
- <p className="text-xs text-gray-500 mt-1 line-clamp-1 leading-relaxed">
- {locked ? 'Locked — upgrade to unlock this initiative' : truncateText(initiative.description, 90)}
- </p>
- <div className="flex items-center gap-3.5 mt-auto pt-3">
- {locked ? (
- <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600">
- <Lock className="w-3.5 h-3.5" />
- Locked
- </span>
- ) : stats ? (
- <>
- <span className="inline-flex items-center gap-1 text-xs text-gray-400">
- <BarChart3 className="w-3.5 h-3.5" />
- {stats.metrics} metric{stats.metrics === 1 ? '' : 's'}
- </span>
- <span className="inline-flex items-center gap-1 text-xs text-gray-400">
- <MapPin className="w-3.5 h-3.5" />
- {stats.locations} location{stats.locations === 1 ? '' : 's'}
- </span>
- </>
- ) : (
- <span className="h-4 w-28 rounded bg-gray-100 animate-pulse" />
- )}
- </div>
- </div>
- )
+  const inner = (
+    <div className="p-4 h-full flex flex-col gap-2.5">
+      <div className="flex items-start gap-3 pr-14">
+        {locked ? (
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ring-1 bg-amber-50 text-amber-600 ring-amber-100">
+            <Lock className="w-4 h-4" />
+          </div>
+        ) : (
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-white ring-1 ring-gray-100 overflow-hidden">
+            <img
+              src={orgLogoUrl || '/Nexuslogo.png'}
+              alt=""
+              className="w-full h-full object-contain"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/Nexuslogo.png' }}
+            />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <h3 className={`text-sm font-semibold leading-snug line-clamp-1 transition-colors ${locked ? 'text-gray-500' : 'text-gray-900'}`} title={initiative.title}>
+            {initiative.title}
+          </h3>
+          <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">
+            {locked ? 'Locked — upgrade to unlock this initiative' : truncateText(initiative.description, 110)}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3.5 mt-auto pt-2.5 border-t border-gray-100">
+        {locked ? (
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600">
+            <Lock className="w-3.5 h-3.5" />
+            Locked
+          </span>
+        ) : stats ? (
+          <>
+            <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+              <BarChart3 className="w-3.5 h-3.5" />
+              {stats.metrics} metric{stats.metrics === 1 ? '' : 's'}
+            </span>
+            <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+              <MapPin className="w-3.5 h-3.5" />
+              {stats.locations} location{stats.locations === 1 ? '' : 's'}
+            </span>
+            {initiative.updated_at && (
+              <span className="ml-auto text-[11px] text-gray-400">
+                {formatDate(initiative.updated_at)}
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="h-4 w-28 rounded bg-gray-100 animate-pulse" />
+        )}
+      </div>
+    </div>
+  )
 
  return (
  <div ref={setNodeRef} style={style} className="h-full">
@@ -386,7 +411,8 @@ function NextStepsCard({
 
 export default function Dashboard() {
  const navigate = useNavigate()
- const { startTutorial } = useTutorial()
+ const { startTutorial, needsTutorial, isActive: tutorialActive } = useTutorial()
+ const { hasCompletedOnboarding, isActive: onboardingActive } = useOnboarding()
  const {
  isOwner,
  isSharedMember,
@@ -428,6 +454,9 @@ export default function Dashboard() {
  // Add loading cache to prevent duplicate requests
  const [isLoadingData, setIsLoadingData] = useState(false)
  const loadingPromise = useRef<Promise<void> | null>(null)
+ // Bumped on every load; an in-flight load whose token is no longer current
+ // (e.g. superseded by an org switch) must not write its results into state.
+ const loadTokenRef = useRef(0)
 
  useEffect(() => {
  if (!dashboardOrg?.id) return
@@ -501,6 +530,16 @@ export default function Dashboard() {
  }
  }, [])
 
+ // Auto-launch the (versioned) tutorial for returning users who haven't seen
+ // the current version. Held until onboarding is done and its wizard is closed
+ // so the two full-screen overlays never fight for the screen.
+ useEffect(() => {
+ if (!needsTutorial || tutorialActive) return
+ if (!hasCompletedOnboarding || onboardingActive) return
+ const t = setTimeout(() => startTutorial(), 900)
+ return () => clearTimeout(t)
+ }, [needsTutorial, tutorialActive, hasCompletedOnboarding, onboardingActive, startTutorial])
+
  // Refresh dashboard data when the onboarding wizard closes — entities it
  // created (initiatives, locations, metrics) should appear without a manual
  // reload. Mutations already busted the apiService cache, so this just
@@ -519,10 +558,18 @@ export default function Dashboard() {
  }, [])
 
  const loadAllData = async (): Promise<void> => {
- if (isLoadingData || loadingPromise.current) {
+ // Ref-based dedupe only. `isLoadingData` is React state that lags a render
+ // behind, so on a fast org switch it wrongly reported "still loading" and
+ // silently dropped the new org's fetch. The effect nulls this ref before a
+ // re-fetch, so a genuine org switch always proceeds.
+ if (loadingPromise.current) {
  console.log('Load already in progress, skipping...')
- return loadingPromise.current || Promise.resolve()
+ return loadingPromise.current
  }
+
+ // Any results from a load older than this token are stale and ignored.
+ const token = ++loadTokenRef.current
+ const isStale = () => token !== loadTokenRef.current
 
  // Check if all data is already cached - if so, load from cache without API calls
  const [initiativesCached, kpisCached, evidenceCached] = await Promise.all([
@@ -544,12 +591,13 @@ export default function Dashboard() {
  try {
  // Load initiatives - organization comes from TeamContext now
  const initiatives = await apiService.loadInitiativesOnly()
+ if (isStale()) return
  setInitiatives(initiatives)
  setLoadingState({ isLoading: false }) // Show initiatives immediately
 
  // Fetch the plan's initiative limit so we can lock over-limit initiatives.
  SubscriptionService.getInitiativesUsage()
- .then(u => setInitiativesLimit(u.limit))
+ .then(u => { if (!isStale()) setInitiativesLimit(u.limit) })
  .catch(() => { /* non-fatal */ })
 
  // Load KPIs, evidence, and locations in background
@@ -557,6 +605,7 @@ export default function Dashboard() {
  apiService.loadKPIsAndEvidence(),
  apiService.getLocations() // Get all locations across all initiatives
  ])
+ if (isStale()) return
  setAllKPIs(kpis)
  setTotalEvidence(evidence.length)
  setAllLocations(locations)
@@ -565,13 +614,18 @@ export default function Dashboard() {
  console.log('Dashboard data loaded successfully')
 
  } catch (error) {
+ if (isStale()) return
  const message = error instanceof Error ? error.message : 'Failed to load dashboard data'
  setLoadingState({ isLoading: false, error: message })
  notify.error(message)
  console.error('Dashboard loading error:', error)
  } finally {
+ // Only the current (winning) load resets shared state, so a superseded
+ // load finishing late can't clear the newer load's spinner or promise.
+ if (!isStale()) {
  setIsLoadingData(false)
  loadingPromise.current = null
+ }
  }
  }
 
@@ -831,25 +885,64 @@ export default function Dashboard() {
  <>
  <div className="min-h-screen lg:h-screen lg:overflow-hidden pt-24 pb-6 px-4 sm:px-6 lg:px-8 xl:px-10 flex flex-col">
  <div className="max-w-[1600px] mx-auto w-full flex-1 min-h-0 flex flex-col gap-4">
- {/* Header — the page is about the initiatives */}
- <div className="flex-shrink-0 min-w-0">
- <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">
- {isSharedMember ? 'Team Initiatives' : 'Your Initiatives'}
- </h1>
- <p className="text-sm text-gray-500 mt-1">
- {organizationName ? `Everything ${organizationName} is tracking, in one place` : 'Everything you’re tracking, in one place'}
- </p>
- </div>
+          {/* Command-center header — title, at-a-glance stats, primary action */}
+          <div className="flex-shrink-0 min-w-0 flex flex-wrap items-center gap-x-4 gap-y-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 leading-tight tracking-tight">
+                  {isSharedMember ? 'Team Initiatives' : 'Your Initiatives'}
+                </h1>
+                {isSharedMember && organizationName && (
+                  <span
+                    className="inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-purple-50 border border-purple-100 text-xs font-medium text-purple-700"
+                    title={`You're viewing ${organizationName}'s initiatives as a team member`}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    Team · {organizationName}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {organizationName ? `Everything ${organizationName} is tracking, in one place` : 'Everything you’re tracking, in one place'}
+              </p>
+            </div>
 
- {/* Team member banner */}
- {isSharedMember && organizationName && (
- <div className="rounded-xl bg-purple-50 border border-purple-100 px-4 py-3 flex items-center gap-2 flex-shrink-0">
- <Users className="w-4 h-4 text-purple-600 flex-shrink-0" />
- <span className="text-sm text-purple-800">
- You're viewing <strong>{organizationName}</strong>'s initiatives as a team member
- </span>
- </div>
- )}
+            {/* Public page status — click to toggle in org settings */}
+            {!isSharedMember && (() => {
+              const live = !!dashboardOrg?.is_public
+              return (
+                <Link
+                  to="/account?tab=organization"
+                  className={`group inline-flex items-center gap-2 h-8 pl-2.5 pr-3 rounded-full border text-xs font-medium transition-colors ${live
+                    ? 'bg-impact-50 border-impact-100 text-impact-700 hover:bg-impact-100/70'
+                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                    }`}
+                  title={live ? 'Your public page is live — click to manage' : 'Your public page is off — click to publish'}
+                >
+                  <span className="relative flex h-2 w-2">
+                    {live && <span className="absolute inline-flex h-full w-full rounded-full bg-impact-400 opacity-60 animate-ping" />}
+                    <span className={`relative inline-flex h-2 w-2 rounded-full ${live ? 'bg-impact-500' : 'bg-gray-300'}`} />
+                  </span>
+                  <Globe className="w-3.5 h-3.5" />
+                  {live ? 'Public page live' : 'Public page not live'}
+                  <ArrowRight className="w-3.5 h-3.5 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+                </Link>
+              )
+            })()}
+
+            {canCreateInitiatives && (
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(true)}
+                className="ml-auto app-btn app-btn-primary shadow-sm"
+                title="New initiative"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">New initiative</span>
+                <span className="sm:hidden">Add</span>
+              </button>
+            )}
+          </div>
 
  {/* Two-pane workspace: initiatives on the left (scrollable list, so
  every initiative stays reachable and reorderable), everything else
@@ -857,22 +950,10 @@ export default function Dashboard() {
  <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4">
  {/* Initiatives — the heart of the page (narrower column) */}
  <section className="lg:col-span-5 xl:col-span-4 flex flex-col min-h-0">
- <div className="flex items-center gap-2 mb-2.5 flex-shrink-0">
- <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">All initiatives</h2>
- <span className="app-chip text-[11px] px-1.5 py-0 tabular-nums">{initiatives.length}</span>
- {canCreateInitiatives && (
- <button
- type="button"
- onClick={() => setShowCreateModal(true)}
- className="ml-auto app-btn app-btn-primary app-btn-sm shadow-sm"
- title="New initiative"
- >
- <Plus className="w-3.5 h-3.5" />
- <span className="hidden sm:inline">New initiative</span>
- <span className="sm:hidden">Add</span>
- </button>
- )}
- </div>
+              <div className="flex items-center gap-2 mb-2.5 flex-shrink-0">
+                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">All initiatives</h2>
+                <span className="app-chip text-[11px] px-1.5 py-0 tabular-nums">{initiatives.length}</span>
+              </div>
  <div className="flex-1 min-h-0 lg:overflow-y-auto lg:pr-1.5 lg:pt-1.5">
  {initiatives.length === 0 ? (
  <div className="app-card p-10 text-center">
@@ -916,16 +997,27 @@ export default function Dashboard() {
  canDeleteInitiatives={canDelete}
  openEditModal={openEditModal}
  openDeleteConfirm={openDeleteConfirm}
- locked={!!initiative.id && lockedInitiativeIds.has(initiative.id)}
- onLockedClick={() => setShowUpgradeModal(true)}
- />
+                        locked={!!initiative.id && lockedInitiativeIds.has(initiative.id)}
+                        onLockedClick={() => setShowUpgradeModal(true)}
+                        orgLogoUrl={dashboardOrg?.logo_url}
+                      />
  ))}
- </div>
- </SortableContext>
- </DndContext>
- )}
- </div>
- </section>
+                    </div>
+                  </SortableContext>
+                  {canCreateInitiatives && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateModal(true)}
+                      className="mt-3 w-full flex items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-300 text-gray-500 hover:text-primary-700 hover:border-primary-300 hover:bg-primary-50/40 py-3.5 text-sm font-medium transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      New initiative
+                    </button>
+                  )}
+                </DndContext>
+              )}
+            </div>
+          </section>
 
  {/* Everything else — progress widgets in a row, map filling the rest */}
  <section className="lg:col-span-7 xl:col-span-8 flex flex-col min-h-0">

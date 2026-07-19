@@ -7,7 +7,7 @@ import { TimelineClaim, TimelineEvidence } from '../types'
  */
 
 export type TimelineView = 'claims' | 'evidence' | 'connections'
-export type ConnectionStatus = 'connected' | 'not_connected'
+export type ConnectionStatus = 'connected' | 'not_connected' | 'pending'
 /**
  * Which date the results are ordered by / the date-range filter applies to.
  * `activity` = when the impact happened (date_represented / range);
@@ -72,7 +72,7 @@ export function filtersFromParams(params: URLSearchParams): TimelineFilters {
  tags: csv(CSV_KEYS.tags),
  contributors: csv(CSV_KEYS.contributors),
  evidenceTypes: csv(CSV_KEYS.evidenceTypes),
- status: status === 'connected' || status === 'not_connected' ? status : null,
+ status: status === 'connected' || status === 'not_connected' || status === 'pending' ? status : null,
  dateFrom: params.get('from'),
  dateTo: params.get('to'),
  orderMode: order === 'activity' ? 'activity' : 'upload',
@@ -118,6 +118,9 @@ export function deriveClaimStatus(claim: TimelineClaim): ConnectionStatus {
 }
 
 export function deriveEvidenceStatus(evidence: TimelineEvidence): ConnectionStatus {
+ // Review gate wins: pending evidence has no links by definition, and it
+ // reads as "awaiting approval" rather than "missing connections".
+ if (evidence.approval_status === 'pending') return 'pending'
  return evidence.claim_count > 0 ? 'connected' : 'not_connected'
 }
 

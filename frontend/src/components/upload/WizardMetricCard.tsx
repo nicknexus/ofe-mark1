@@ -139,7 +139,7 @@ export function WizardMetricClaimCard({
             type="text"
             value={label}
             onChange={(e) => onLabelChange(e.target.value)}
-            placeholder="Label (optional)"
+            placeholder="Title (optional)"
             className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-claim-500 focus:border-transparent"
           />
         </div>
@@ -193,7 +193,7 @@ export function WizardMetricClaimEntryPanel({
         </div>
         <div>
           <label className="app-label">
-            Label <span className="text-gray-400 font-normal">(optional)</span>
+            Title <span className="text-gray-400 font-normal">(optional)</span>
           </label>
           <input
             type="text"

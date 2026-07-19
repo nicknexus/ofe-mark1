@@ -14,6 +14,7 @@ import {
 } from '../../utils/timeline'
 import TimelineRow, { TimelineRowHeader } from './TimelineRow'
 import MetricChip from './MetricChip'
+import { EvidenceTypeLabel } from './EvidenceTypeCounts'
 import type { EvidenceViewMode } from './EvidenceViewModeToggle'
 
 const TYPE_ICONS = {
@@ -69,7 +70,6 @@ export default function EvidenceView({ evidence, kpis, locations, contributors, 
         <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {rows.map(ev => {
             const typeInfo = getEvidenceTypeInfo(ev.type)
-            const bgColor = typeInfo.color.split(' ')[0]
             const Icon = TYPE_ICONS[ev.type] || FileText
             const thumbnailUrl = getEvidenceImageUrl(ev)
             const style = getStatusStyle(deriveEvidenceStatus(ev))
@@ -84,7 +84,7 @@ export default function EvidenceView({ evidence, kpis, locations, contributors, 
                   {thumbnailUrl ? (
                     <img src={thumbnailUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
                   ) : (
-                    <div className={`p-4 rounded-2xl ${bgColor}`}>
+                    <div className={`p-4 rounded-2xl ${typeInfo.color}`}>
                       <Icon className="w-6 h-6" />
                     </div>
                   )}
@@ -99,7 +99,7 @@ export default function EvidenceView({ evidence, kpis, locations, contributors, 
                 </div>
                 <div className="p-2.5 min-w-0">
                   <p className="text-xs font-medium text-gray-800 truncate">{ev.title || 'Untitled Evidence'}</p>
-                  <p className="text-[11px] text-gray-500 truncate">{typeInfo.label}</p>
+                  <EvidenceTypeLabel type={ev.type} className="text-[11px] text-gray-500" />
                 </div>
               </button>
             )
@@ -115,7 +115,6 @@ export default function EvidenceView({ evidence, kpis, locations, contributors, 
       <div className="divide-y divide-gray-100">
         {rows.map((ev, index) => {
           const typeInfo = getEvidenceTypeInfo(ev.type)
-          const bgColor = typeInfo.color.split(' ')[0]
           const Icon = TYPE_ICONS[ev.type] || FileText
           const thumbnailUrl = getEvidenceImageUrl(ev)
 
@@ -151,13 +150,13 @@ export default function EvidenceView({ evidence, kpis, locations, contributors, 
                     loading="lazy"
                   />
                 ) : (
-                  <div className={`p-2 rounded-xl ${bgColor}`}>
+                  <div className={`p-2 rounded-xl ${typeInfo.color}`}>
                     <Icon className="w-4 h-4" />
                   </div>
                 )
               }
               title={ev.title || 'Untitled Evidence'}
-              subtitle={typeInfo.label}
+              subtitle={<EvidenceTypeLabel type={ev.type} />}
               metric={metricKpis.length === 0 ? (
                 <span className="text-sm text-gray-400">—</span>
               ) : (

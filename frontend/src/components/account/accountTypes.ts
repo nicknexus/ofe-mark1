@@ -84,6 +84,8 @@ export type TeamsTabProps = {
     setPermissionToggles: Dispatch<SetStateAction<TeamMemberPermissionToggles>>
     inviteScope: TeamMemberScope
     setInviteScope: Dispatch<SetStateAction<TeamMemberScope>>
+    inviteRequiresApproval: boolean
+    setInviteRequiresApproval: Dispatch<SetStateAction<boolean>>
     sending: boolean
     handleSendInvite: (e: FormEvent) => Promise<void>
     removingMember: string | null

@@ -583,6 +583,8 @@ export class PublicService {
                 .select(SELECT)
                 .eq('initiatives.organizations.slug', orgSlug)
                 .eq('initiatives.organizations.is_public', true)
+                // Review gate: pending evidence never appears publicly.
+                .eq('approval_status', 'approved')
                 .order('date_represented', { ascending: false });
 
         const cap = limit && limit > 0 ? limit : undefined;
@@ -798,11 +800,12 @@ export class PublicService {
             locations = locs || [];
         }
 
-        // Get evidence count
+        // Get evidence count (approved only — pending never counts publicly)
         const { count: evidenceCount } = await supabase
             .from('evidence')
             .select('id', { count: 'exact', head: true })
-            .eq('initiative_id', initiative.id);
+            .eq('initiative_id', initiative.id)
+            .eq('approval_status', 'approved');
 
         // Get story count
         const { count: storyCount } = await supabase
@@ -896,6 +899,7 @@ export class PublicService {
                 evidence_kpi_updates(kpi_updates(id, value, date_represented, date_range_start, date_range_end, kpi_id, kpis(id, title, unit_of_measurement, metric_type)))
             `)
             .eq('initiative_id', initiative.id)
+            .eq('approval_status', 'approved')
             .order('date_represented', { ascending: false });
 
         if (error) throw new Error(`Failed to fetch evidence: ${error.message}`);
@@ -1017,6 +1021,7 @@ export class PublicService {
                 `)
                 .eq('initiative_id', initiative.id)
                 .in('id', evidenceIds)
+                .eq('approval_status', 'approved')
                 .order('date_represented', { ascending: false });
 
             evidence = (evidenceData || []).map((e: any) => ({
@@ -1239,6 +1244,7 @@ export class PublicService {
                 evidence_kpi_updates(kpi_updates(id, value, date_represented, date_range_start, date_range_end, kpi_id, kpis(id, title, unit_of_measurement, metric_type)))
                 `)
                 .in('id', evidenceIds)
+                .eq('approval_status', 'approved')
                 .order('date_represented', { ascending: false });
 
             const evIds = (evidenceData || []).map((e: any) => e.id);
@@ -1376,6 +1382,7 @@ export class PublicService {
                 evidence_kpi_updates(kpi_updates(id, value, date_represented, date_range_start, date_range_end, kpi_id, kpis(id, title, unit_of_measurement, metric_type)))
                 `)
                 .in('id', evidenceIds)
+                .eq('approval_status', 'approved')
                 .order('date_represented', { ascending: false });
 
             const evIds = (evidenceData || []).map((e: any) => e.id);
@@ -1549,6 +1556,7 @@ export class PublicService {
             `)
             .eq('id', evidenceId)
             .eq('initiative_id', initiative.id)
+            .eq('approval_status', 'approved')
             .single();
 
         if (error || !evidence) {
@@ -1684,6 +1692,7 @@ export class PublicService {
                 `)
                 .eq('initiative_id', initiative.id)
                 .in('id', evidenceIds)
+                .eq('approval_status', 'approved')
                 .order('date_represented', { ascending: false });
 
             const evIds = (evidenceData || []).map((e: any) => e.id);

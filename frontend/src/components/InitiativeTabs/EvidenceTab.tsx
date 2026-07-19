@@ -21,7 +21,7 @@ interface EvidenceTabProps {
 }
 
 export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProps) {
- const { canEditEvidence, canDelete } = useTeam()
+ const { canAddEvidence, canEditEvidence, canDelete } = useTeam()
  const [evidence, setEvidence] = useState<Evidence[]>([])
  const [loading, setLoading] = useState(false)
  const [locations, setLocations] = useState<Location[]>([])
@@ -399,7 +399,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Evidence</h2>
  <p className="text-sm text-gray-500 mt-1 hidden sm:block">View and manage all evidence uploaded for this initiative</p>
  </div>
- {canEditEvidence && (
+ {canAddEvidence && (
  <button
  onClick={() => {
  setEditingEvidence(null)
@@ -868,7 +868,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
  : 'Add your first evidence to support your impact claims'
  }
  action={
- !hasActiveFilters && !searchQuery && canEditEvidence ? (
+ !hasActiveFilters && !searchQuery && canAddEvidence ? (
  <button
  type="button"
  onClick={() => {

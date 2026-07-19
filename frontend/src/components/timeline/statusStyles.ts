@@ -69,6 +69,16 @@ export const STATUS_STYLES: Record<LogStatus, StatusStyle> = {
     card: 'bg-amber-50/60 border-amber-200',
     accent: 'text-amber-600',
   },
+  // Evidence awaiting admin approval (review gate) — yellow everywhere.
+  pending: {
+    label: 'Needs approval',
+    tone: 'warning',
+    icon: Clock,
+    row: 'bg-amber-50/50',
+    rowHover: 'hover:bg-amber-50/80',
+    card: 'bg-amber-50/60 border-amber-200',
+    accent: 'text-amber-600',
+  },
 }
 
 export function getStatusStyle(status: LogStatus): StatusStyle {

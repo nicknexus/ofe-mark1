@@ -66,7 +66,7 @@ export class BeneficiaryService {
             const initiative = await InitiativeService.getById(group.initiative_id, userId, requestedOrgId)
             if (!initiative) throw new Error('Initiative not found or access denied')
         }
-        await PermissionService.assert(userId, requestedOrgId, 'beneficiaries', 'edit', {
+        await PermissionService.assert(userId, requestedOrgId, 'beneficiaries', 'create', {
             initiativeId: group.initiative_id,
         })
 

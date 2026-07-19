@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react'
-import { Camera, FileText, MessageSquare, DollarSign, Paperclip, Link2, Unlink, Pencil, Trash2 } from 'lucide-react'
-import { ImpactClaimGlyph } from './ImpactClaimGlyph'
-import ModalFrame, { ModalHeader, ModalBody, ModalFooter, ModalFieldGrid, ModalField } from '../ModalFrame'
+import { Camera, FileText, MessageSquare, DollarSign, Paperclip, Link2, Unlink, Pencil, Trash2, X } from 'lucide-react'
+import ModalFrame, { ModalBody, ModalFooter, ModalFieldGrid, ModalField } from '../ModalFrame'
 import { Badge } from '../ui'
 import { getStatusStyle } from './statusStyles'
 import {
@@ -15,7 +14,7 @@ import {
 } from '../../types'
 import { formatDate, getEvidenceTypeInfo } from '../../utils'
 import { getEvidenceImageUrl } from '../../utils/timeline'
-import { EVIDENCE_TYPE_ORDER, EvidenceTypeKey, countEvidenceTypes } from './EvidenceTypeCounts'
+import { EVIDENCE_TYPE_ORDER, EvidenceTypeKey, countEvidenceTypes, EVIDENCE_TYPE_STYLE } from './EvidenceTypeCounts'
 
 const TYPE_ICONS = {
  visual_proof: Camera,
@@ -81,25 +80,47 @@ export default function ClaimDetailModal({
 
  const typeCounts = useMemo(() => countEvidenceTypes(evidence), [evidence])
  const visibleEvidence = typeFilter ? evidence.filter(ev => ev.type === typeFilter) : evidence
+ const isPct = kpi?.metric_type === 'percentage'
 
  return (
- <ModalFrame size="md">
-      <ModalHeader
- icon={ImpactClaimGlyph}
- title={
- <h2 className="app-modal-title truncate">
- <span className="font-bold mr-1.5">{claim.value}</span>
- {kpi?.title || 'Unknown metric'}
- </h2>
- }
- subtitle={claim.label || undefined}
- onClose={onClose}
- />
+ <ModalFrame
+ size="md"
+ panelClassName="bg-white rounded-xl border-2 border-claim-300 w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-app-modal flex flex-col"
+ >
+ {/* Claim-branded header */}
+ <div className="flex-shrink-0 px-4 py-3 bg-gradient-to-r from-claim-50 via-claim-50 to-claim-100/90 border-b border-claim-200">
+ <div className="flex items-start justify-between gap-3">
+ <div className="min-w-0 flex-1">
+ <p className="text-[11px] font-semibold uppercase tracking-wider text-claim-700 mb-1.5">
+ Impact Claim
+ </p>
+ <div className="flex items-baseline gap-2 flex-wrap">
+ <span className="text-2xl font-bold text-claim-700 tabular-nums leading-none">
+ {claim.value}{isPct ? '%' : ''}
+ </span>
+ {!isPct && kpi?.unit_of_measurement && (
+ <span className="text-sm font-semibold text-claim-600 leading-none">
+ {kpi.unit_of_measurement}
+ </span>
+ )}
+ </div>
+ </div>
+ <button
+ type="button"
+ onClick={onClose}
+ aria-label="Close"
+ className="app-btn-icon flex-shrink-0 rounded-lg text-claim-700/70 hover:bg-claim-100 hover:text-claim-800 transition-colors flex items-center justify-center"
+ >
+ <X className="w-5 h-5" />
+ </button>
+ </div>
+ </div>
  <ModalBody>
  <div className="space-y-5">
  {/* Key properties */}
  <ModalFieldGrid>
  <ModalField label="Metric">{kpi?.title || '—'}</ModalField>
+ {claim.label && <ModalField label="Title">{claim.label}</ModalField>}
  <ModalField label="When">{activityDate}</ModalField>
  <ModalField label="Where">{locationName}</ModalField>
  <ModalField label="Recorded by">{contributor?.name || contributor?.email || '—'}</ModalField>
@@ -141,12 +162,12 @@ export default function ClaimDetailModal({
  key={type}
  onClick={() => setTypeFilter(active ? null : type)}
  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors ${active
- ? 'border-primary-500 bg-primary-50 text-primary-800'
+ ? EVIDENCE_TYPE_STYLE[type].chip
  : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
  }`}
  title={getEvidenceTypeInfo(type).label}
  >
- <Icon className="w-3.5 h-3.5" />
+ <Icon className={`w-3.5 h-3.5 ${active ? '' : EVIDENCE_TYPE_STYLE[type].text}`} />
  {count}
  </button>
  )
@@ -164,7 +185,6 @@ export default function ClaimDetailModal({
  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
  {visibleEvidence.map(ev => {
  const typeInfo = getEvidenceTypeInfo(ev.type)
- const bgColor = typeInfo.color.split(' ')[0]
  const Icon = TYPE_ICONS[ev.type] || FileText
  const thumbnailUrl = getEvidenceImageUrl(ev)
  return (
@@ -176,7 +196,7 @@ export default function ClaimDetailModal({
  {thumbnailUrl ? (
  <img src={thumbnailUrl} alt="" className="w-full h-24 object-cover bg-gray-100" loading="lazy" />
  ) : (
- <div className={`w-full h-24 flex items-center justify-center ${bgColor}`}>
+ <div className={`w-full h-24 flex items-center justify-center ${typeInfo.color}`}>
  <Icon className="w-6 h-6 opacity-60" />
  </div>
  )}

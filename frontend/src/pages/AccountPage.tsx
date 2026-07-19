@@ -83,6 +83,7 @@ export default function AccountPage({ subscriptionStatus }: AccountPageOuterProp
  const [inviteMemberType, setInviteMemberType] = useState<MemberType>('admin')
  const [invitePermissionToggles, setInvitePermissionToggles] = useState<TeamMemberPermissionToggles>(defaultTeamMemberToggles)
  const [inviteScope, setInviteScope] = useState<TeamMemberScope>(fullScope)
+ const [inviteRequiresApproval, setInviteRequiresApproval] = useState(false)
  const [sending, setSending] = useState(false)
  const [removingMember, setRemovingMember] = useState<string | null>(null)
  const [resendingInvite, setResendingInvite] = useState<string | null>(null)
@@ -274,12 +275,13 @@ export default function AccountPage({ subscriptionStatus }: AccountPageOuterProp
  const result = await TeamService.sendInvite({
  email: inviteEmail.trim(),
  memberType: inviteMemberType,
- canAddImpactClaims: invitePermissionToggles.addImpactClaims,
+ canAddImpactClaims: invitePermissionToggles.addClaims,
  permissions:
  inviteMemberType === 'team_member'
  ? togglesToGrants(invitePermissionToggles)
  : undefined,
  scope: inviteMemberType === 'team_member' ? inviteScope : undefined,
+ requiresEvidenceApproval: inviteMemberType === 'team_member' ? inviteRequiresApproval : false,
  })
  if (result.emailSent) notify.success(`Invitation sent to ${inviteEmail}`)
  else notify.success('Invitation created, but email could not be sent.')
@@ -287,6 +289,7 @@ export default function AccountPage({ subscriptionStatus }: AccountPageOuterProp
  setInviteMemberType('admin')
  setInvitePermissionToggles(defaultTeamMemberToggles)
  setInviteScope(fullScope)
+ setInviteRequiresApproval(false)
  loadTeamData()
  } catch (error) {
  notify.error((error as Error).message)
@@ -513,6 +516,8 @@ export default function AccountPage({ subscriptionStatus }: AccountPageOuterProp
  setPermissionToggles={setInvitePermissionToggles}
  inviteScope={inviteScope}
  setInviteScope={setInviteScope}
+ inviteRequiresApproval={inviteRequiresApproval}
+ setInviteRequiresApproval={setInviteRequiresApproval}
  sending={sending}
  handleSendInvite={handleSendInvite}
  removingMember={removingMember}

@@ -40,7 +40,7 @@ interface MobileEvidenceTabProps {
 }
 
 export default function MobileEvidenceTab({ initiativeId, onRefresh, autoAdd }: MobileEvidenceTabProps) {
- const { canEditEvidence, canDelete } = useTeam()
+ const { canAddEvidence, canEditEvidence, canDelete } = useTeam()
  const [evidence, setEvidence] = useState<Evidence[]>([])
  const [loading, setLoading] = useState(true)
  const [showUploadFlow, setShowUploadFlow] = useState(!!autoAdd)
@@ -163,7 +163,7 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh, autoAdd }: 
  }
 
  // Show upload flow for new evidence
- if (showUploadFlow && canEditEvidence) {
+ if (showUploadFlow && canAddEvidence) {
  return (
  <MobileEvidenceUploadFlow
  initiativeId={initiativeId}
@@ -215,7 +215,7 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh, autoAdd }: 
  <Filter className="w-4 h-4" />
  {hasActiveFilters && <span className="w-1.5 h-1.5 rounded-full bg-evidence-500"></span>}
  </button>
- {canEditEvidence && (
+ {canAddEvidence && (
  <button
  onClick={() => setShowUploadFlow(true)}
  className="app-btn bg-evidence-500 text-secondary-900 hover:bg-evidence-600 shadow-sm app-btn-sm active:scale-[0.98]"
@@ -317,7 +317,7 @@ export default function MobileEvidenceTab({ initiativeId, onRefresh, autoAdd }: 
  title="No Evidence Yet"
  description="Add photos, documents, or recordings to support your impact claims."
  action={
- canEditEvidence ? (
+ canAddEvidence ? (
  <button type="button" onClick={() => setShowUploadFlow(true)} className="app-btn bg-evidence-500 text-secondary-900 hover:bg-evidence-600 shadow-sm">
  Add Evidence
  </button>

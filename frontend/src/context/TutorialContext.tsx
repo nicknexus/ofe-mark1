@@ -11,6 +11,8 @@ interface TutorialContextType {
  goToSlide: (index: number) => void
  closeTutorial: () => Promise<void>
  hasCompletedTutorial: boolean
+ /** True when the signed-in user hasn't seen the current tutorial version yet. */
+ needsTutorial: boolean
 }
 
 const TutorialContext = createContext<TutorialContextType | undefined>(undefined)
@@ -19,12 +21,22 @@ interface TutorialProviderProps {
  children: ReactNode
 }
 
+/**
+ * Bump this when the tutorial content changes enough that everyone should see it
+ * again. We gate on a *version* (stored in user_metadata) rather than a boolean,
+ * so raising this number re-shows the tour for all users on their next login —
+ * no database migration required. Existing users have no `tutorial_version_seen`
+ * field, so they're treated as "unseen" the first time this ships.
+ */
+export const TUTORIAL_VERSION = 2
+
 const TOTAL_SLIDES = 7
 
 export function TutorialProvider({ children }: TutorialProviderProps) {
  const [isActive, setIsActive] = useState(false)
  const [currentSlide, setCurrentSlide] = useState(0)
  const [hasCompletedTutorial, setHasCompletedTutorial] = useState(true)
+ const [needsTutorial, setNeedsTutorial] = useState(false)
 
  useEffect(() => {
  checkTutorialStatus()
@@ -34,12 +46,10 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
  try {
  const { data: { user } } = await supabase.auth.getUser()
  if (user) {
- const completed = user.user_metadata?.has_completed_tutorial === true
- setHasCompletedTutorial(completed)
-
- // Auto-launch is intentionally disabled — the OnboardingWizard is now the
- // first-run experience. This slide tour stays available as a manual
- // "Replay concepts" via startTutorial() (dashboard Tutorial button).
+ const seenVersion = Number(user.user_metadata?.tutorial_version_seen ?? 0)
+ const seen = seenVersion >= TUTORIAL_VERSION
+ setHasCompletedTutorial(seen)
+ setNeedsTutorial(!seen)
  }
  } catch (error) {
  console.error('Error checking tutorial status:', error)
@@ -66,10 +76,11 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
  const markTutorialComplete = async () => {
  try {
  const { error } = await supabase.auth.updateUser({
- data: { has_completed_tutorial: true }
+ data: { tutorial_version_seen: TUTORIAL_VERSION, has_completed_tutorial: true }
  })
  if (error) throw error
  setHasCompletedTutorial(true)
+ setNeedsTutorial(false)
  } catch (error) {
  console.error('Error marking tutorial complete:', error)
  }
@@ -78,6 +89,7 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
  const closeTutorial = useCallback(async () => {
  setIsActive(false)
  setCurrentSlide(0)
+ setNeedsTutorial(false)
  await markTutorialComplete()
  }, [])
 
@@ -92,7 +104,8 @@ export function TutorialProvider({ children }: TutorialProviderProps) {
  prevSlide,
  goToSlide,
  closeTutorial,
- hasCompletedTutorial
+ hasCompletedTutorial,
+ needsTutorial,
  }}
  >
  {children}

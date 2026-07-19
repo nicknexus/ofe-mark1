@@ -58,7 +58,7 @@ export default function TagPicker({
  const [creating, setCreating] = useState(false)
  const [newName, setNewName] = useState('')
  const [showCreateInput, setShowCreateInput] = useState(false)
- const { canEditTags } = useTeam()
+ const { canAddTags } = useTeam()
  // Free plan: tag picking is locked everywhere this picker is embedded
  // (metric create/edit, claims, evidence, stories) — one check covers all.
  const [tagsLocked, setTagsLocked] = useState(false)
@@ -69,7 +69,7 @@ export default function TagPicker({
  .catch(() => { /* fail open */ })
  }, [])
 
- const allowCreate = (canCreate ?? (mode === 'multi')) && canEditTags
+ const allowCreate = (canCreate ?? (mode === 'multi')) && canAddTags
 
  useEffect(() => {
  let active = true

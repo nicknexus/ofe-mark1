@@ -101,6 +101,9 @@ export class MetricTagService {
         const orgId = await this.getOrgId(userId, requestedOrgId)
         if (!orgId) throw new Error('No organization context')
 
+        const { PermissionService } = await import('./permissionService')
+        await PermissionService.assert(userId, requestedOrgId, 'tags', 'create', {})
+
         const cleanName = (name || '').trim()
         if (!cleanName) throw new Error('Tag name is required')
 
@@ -143,6 +146,9 @@ export class MetricTagService {
         const tag = await this.getById(id, userId, requestedOrgId)
         if (!tag) throw new Error('Metric tag not found or access denied')
 
+        const { PermissionService } = await import('./permissionService')
+        await PermissionService.assert(userId, requestedOrgId, 'tags', 'edit', {})
+
         const safeUpdates: any = { updated_at: new Date().toISOString() }
         if (typeof updates.name === 'string') safeUpdates.name = updates.name.trim()
         if (updates.color !== undefined) safeUpdates.color = updates.color
@@ -174,6 +180,9 @@ export class MetricTagService {
     static async delete(id: string, userId: string, requestedOrgId?: string): Promise<void> {
         const tag = await this.getById(id, userId, requestedOrgId)
         if (!tag) throw new Error('Metric tag not found or access denied')
+
+        const { PermissionService } = await import('./permissionService')
+        await PermissionService.assert(userId, requestedOrgId, 'tags', 'edit', {})
 
         const [{ data: claimLinks }, { data: evidenceLinks }] = await Promise.all([
             supabase.from('kpi_update_metric_tags').select('kpi_update_id').eq('tag_id', id),

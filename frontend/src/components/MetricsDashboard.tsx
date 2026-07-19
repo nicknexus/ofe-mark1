@@ -76,7 +76,7 @@ interface MetricsDashboardProps {
 }
 
 export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = [], initiativeId, onNavigateToLocations, onMetricCardClick, onAddKPI, onStoryClick, user, organization, onOrderChange, onAddImpactClaim, onAddEvidence }: MetricsDashboardProps) {
- const { canAddImpactClaims, canEditEvidence, canEditMetrics, ownedOrganization, hasOwnOrganization } = useTeam()
+ const { canAddImpactClaims, canAddEvidence, canEditMetrics, ownedOrganization, hasOwnOrganization } = useTeam()
  const [timeFrame, setTimeFrame] = useState<'all' | '1month' | '6months' | '1year' | '5years'>('all')
  const [isCumulative, setIsCumulative] = useState(false)
  const [isPercentageMode, setIsPercentageMode] = useState(false)
@@ -739,7 +739,7 @@ export default function MetricsDashboard({ kpis, kpiTotals, stats, kpiUpdates = 
  </button>
  )}
  {/* Add Evidence Button */}
- {onAddEvidence && canEditEvidence && (
+ {onAddEvidence && canAddEvidence && (
  <button
  onClick={onAddEvidence}
  className="app-btn app-btn-evidence app-btn-sm"

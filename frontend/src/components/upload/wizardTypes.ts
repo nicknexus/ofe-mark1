@@ -18,6 +18,9 @@ export interface WizardFile {
  previewUrl?: string
  /** Edit mode: a file already attached to the record — shown but not removable. */
  existing?: boolean
+ /** Per-file evidence type. Files are grouped by this on save so each type
+  *  becomes its own evidence record (max one per type). */
+ type?: Evidence['type']
 }
 
 /** One optional claim per metric in the "both" flow's stacked claims step. */
@@ -78,6 +81,46 @@ export const INITIAL_WIZARD_STATE: WizardState = {
 
 export const includesClaim = (kind: WizardKind | null) => kind === 'claim' || kind === 'both'
 export const includesEvidence = (kind: WizardKind | null) => kind === 'evidence' || kind === 'both'
+
+/** Canonical order for the four evidence types (drives the per-file picker
+ *  and the deterministic order buckets are created in). */
+export const EVIDENCE_TYPE_ORDER: Evidence['type'][] = ['visual_proof', 'documentation', 'financials', 'testimony']
+
+/** Human labels used when a multi-type upload splits into several records. */
+export const EVIDENCE_TYPE_LABELS: Record<Evidence['type'], string> = {
+ visual_proof: 'Photos / Videos',
+ documentation: 'Documents',
+ financials: 'Financials',
+ testimony: 'Testimonies',
+}
+
+/** Best-guess evidence type from a file's name/mime so the user rarely has to
+ *  change it. Financials can't be sniffed, so anything document-ish defaults to
+ *  Documents and the user re-tags receipts/statements. */
+export function inferEvidenceType(name: string, mime?: string): Evidence['type'] {
+ const ext = name.split('.').pop()?.toLowerCase() || ''
+ const m = (mime || '').toLowerCase()
+ if (m.startsWith('image/') || m.startsWith('video/') ||
+  ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'svg', 'bmp', 'tiff', 'mp4', 'mov', 'avi', 'webm', 'mkv', 'm4v'].includes(ext))
+  return 'visual_proof'
+ if (m.startsWith('audio/') || ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac'].includes(ext))
+  return 'testimony'
+ return 'documentation'
+}
+
+/** Group uploaded files into one bucket per evidence type (max four), in a
+ *  stable order. Only files that finished uploading (have a url) are included. */
+export function evidenceBuckets(files: WizardFile[]): Array<{ type: Evidence['type']; files: WizardFile[] }> {
+ const map = new Map<Evidence['type'], WizardFile[]>()
+ for (const f of files) {
+  if (!f.url) continue
+  const t = f.type || 'documentation'
+  const arr = map.get(t) || []
+  arr.push(f)
+  map.set(t, arr)
+ }
+ return EVIDENCE_TYPE_ORDER.filter(t => map.has(t)).map(t => ({ type: t, files: map.get(t)! }))
+}
 
 /** Effective activity-date range from the scope step (start, end). */
 export function wizardDates(state: WizardState): { start: string; end: string } {

@@ -29,6 +29,7 @@ export function TeamMemberEditModal({ target, onClose, onSaved }: TeamMemberEdit
  const [memberType, setMemberType] = useState<MemberType>('admin')
  const [permissionToggles, setPermissionToggles] = useState<TeamMemberPermissionToggles>(defaultTeamMemberToggles)
  const [scope, setScope] = useState<TeamMemberScope>(fullScope)
+ const [requiresEvidenceApproval, setRequiresEvidenceApproval] = useState(false)
  const [loading, setLoading] = useState(false)
  const [saving, setSaving] = useState(false)
 
@@ -49,12 +50,16 @@ export function TeamMemberEditModal({ target, onClose, onSaved }: TeamMemberEdit
  : await TeamService.getInvitationPermissions(target.record.id)
  const grants = result.grants
  setScope(result.scope ?? fullScope)
+ setRequiresEvidenceApproval(!!result.requiresEvidenceApproval)
  if (grants.length > 0) {
  setPermissionToggles(grantsToToggles(grants))
  } else if (target.kind === 'member') {
+ // Legacy boolean fallback — pre-split, one flag meant add AND edit.
  setPermissionToggles(
  grantsToToggles([
  { resource: 'impact_claims', action: 'create', allowed: target.record.can_add_impact_claims },
+ { resource: 'impact_claims', action: 'edit', allowed: target.record.can_add_impact_claims },
+ { resource: 'evidence', action: 'create', allowed: target.record.can_edit_evidence },
  { resource: 'evidence', action: 'edit', allowed: target.record.can_edit_evidence },
  ])
  )
@@ -66,12 +71,18 @@ export function TeamMemberEditModal({ target, onClose, onSaved }: TeamMemberEdit
  action: 'create',
  allowed: target.record.can_add_impact_claims,
  },
+ {
+ resource: 'impact_claims',
+ action: 'edit',
+ allowed: target.record.can_add_impact_claims,
+ },
  ])
  )
  }
  } else {
  setPermissionToggles(defaultTeamMemberToggles)
  setScope(fullScope)
+ setRequiresEvidenceApproval(false)
  }
  } catch (err) {
  notify.error((err as Error).message)
@@ -105,6 +116,7 @@ export function TeamMemberEditModal({ target, onClose, onSaved }: TeamMemberEdit
  memberType,
  permissions: memberType === 'team_member' ? togglesToGrants(permissionToggles) : undefined,
  scope: memberType === 'team_member' ? scope : undefined,
+ requiresEvidenceApproval: memberType === 'team_member' ? requiresEvidenceApproval : false,
  }
 
  if (target.kind === 'member') {
@@ -157,6 +169,8 @@ export function TeamMemberEditModal({ target, onClose, onSaved }: TeamMemberEdit
  setPermissionToggles={setPermissionToggles}
  scope={scope}
  setScope={setScope}
+ requiresEvidenceApproval={requiresEvidenceApproval}
+ setRequiresEvidenceApproval={setRequiresEvidenceApproval}
  />
  )}
  </div>
