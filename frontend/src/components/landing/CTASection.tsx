@@ -1,4 +1,5 @@
-import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Button } from "../ui/button";
 import { ArrowRight } from "lucide-react";
 import { Reveal } from "./Reveal";
@@ -8,7 +9,22 @@ interface CTASectionProps {
   onGetStarted: () => void;
 }
 
+const ROTATING_WORDS = ["See", "Experience", "Ignite"] as const;
+
 const CTASection = ({ onGetStarted }: CTASectionProps) => {
+  const reduceMotion = useReducedMotion();
+  const [wordIndex, setWordIndex] = useState(0);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    const id = window.setInterval(() => {
+      setWordIndex((i) => (i + 1) % ROTATING_WORDS.length);
+    }, 2200);
+    return () => window.clearInterval(id);
+  }, [reduceMotion]);
+
+  const word = ROTATING_WORDS[wordIndex];
+
   return (
     <section className="pt-8 pb-20 md:pt-12 md:pb-28 relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-steel-light to-ink-soft" />
@@ -33,24 +49,48 @@ const CTASection = ({ onGetStarted }: CTASectionProps) => {
 
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-fraunces font-light text-white leading-tight mb-8">
             Your impact is already happening.{" "}
-            <span className="relative inline-block">
-              <span className="relative z-10 italic inline-block pr-2 text-white">
-                Make it easy
+            <span className="italic text-white">
+              <span className="relative inline-block">
+                <span className="relative z-10 inline-block pr-2">Make it easy</span>
+                <svg
+                  className="pointer-events-none absolute -bottom-2 left-0 w-full"
+                  viewBox="0 0 200 12"
+                  fill="none"
+                  aria-hidden
+                >
+                  <motion.path
+                    d="M2 8C50 2 150 2 198 8"
+                    stroke="#c0dfa1"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    initial={{ pathLength: 0 }}
+                    whileInView={{ pathLength: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 1, ease: easeOut, delay: 0.3 }}
+                  />
+                </svg>
+              </span>{" "}
+              to{" "}
+              <span className="relative inline-block align-baseline text-left">
+                <span className="invisible" aria-hidden>
+                  Experience
+                </span>
+                <span className="absolute inset-0 overflow-hidden text-left">
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.span
+                      key={word}
+                      className="absolute left-0 top-0"
+                      initial={reduceMotion ? false : { opacity: 0, y: "40%" }}
+                      animate={{ opacity: 1, y: "0%" }}
+                      exit={reduceMotion ? undefined : { opacity: 0, y: "-40%" }}
+                      transition={{ duration: 0.35, ease: easeOut }}
+                    >
+                      {word}
+                    </motion.span>
+                  </AnimatePresence>
+                </span>
               </span>
-              <svg className="absolute -bottom-1 left-0 w-full" viewBox="0 0 200 12" fill="none">
-                <motion.path
-                  d="M2 8C50 2 150 2 198 8"
-                  stroke="#c0dfa1"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  initial={{ pathLength: 0 }}
-                  whileInView={{ pathLength: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 1, ease: easeOut, delay: 0.3 }}
-                />
-              </svg>
-            </span>{" "}
-            to see.
+            </span>
           </h2>
 
           <p className="text-lg text-white/70 max-w-2xl mx-auto mb-10">

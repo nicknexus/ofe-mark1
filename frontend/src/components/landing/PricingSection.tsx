@@ -78,7 +78,7 @@ const PricingSection = ({ onGetStarted }: PricingSectionProps) => {
       <div className="relative z-10 max-w-6xl mx-auto px-6">
         <Reveal as="div">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-fraunces font-light text-foreground text-center mb-8">
-            Start free. Grow when you're ready.
+            Share your impact, at your scale
           </h2>
         </Reveal>
 
