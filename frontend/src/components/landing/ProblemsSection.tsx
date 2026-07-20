@@ -61,14 +61,25 @@ interface ProblemsSectionProps {
   onGetStarted?: () => void;
 }
 
-const painPoints = [
+interface CardPoint {
+  number: number;
+  title: string;
+  description: string;
+  footer: string;
+  image: string;
+  /** Crop zoom for the compact card — trims baked-in PNG whitespace. Images
+   *  whose artwork reaches near the edges need a gentler value. */
+  zoom?: number;
+}
+
+const painPoints: CardPoint[] = [
   {
     number: 1,
     title: "Impact gets lost.",
     description:
       "Capturing moments and evidence is slow, inconsistent, and easy to avoid.",
     footer: "Inconsistent. Incomplete. Easy to lose.",
-    image: "/before%201.png",
+    image: "/before%202.png",
   },
   {
     number: 2,
@@ -76,7 +87,7 @@ const painPoints = [
     description:
       "Progress is scattered across folders, spreadsheets, emails, and disconnected systems.",
     footer: "Hard to find. Hard to trust. Hard to prove.",
-    image: "/before%202.png",
+    image: "/before%203.png",
   },
   {
     number: 3,
@@ -84,31 +95,33 @@ const painPoints = [
     description:
       "People receive reports and numbers, but cannot explore or experience the impact they helped create.",
     footer: "Reports inform. Experiences don't connect.",
-    image: "/before%203.png",
+    image: "/before%201.png",
   },
 ];
 
-const solutionPoints = [
+const solutionPoints: CardPoint[] = [
   {
     number: 1,
     title: "Plug In & Capture",
     description: "Plug in what you already have and capture impact easier.",
     footer: "Simple. Consistent. Easy.",
-    image: "/after%201.png",
+    image: "/after%203.png",
   },
   {
     number: 2,
     title: "Nexus Connects",
     description: "Everything in one consolidated location.",
     footer: "Connected. Clear. Navigable.",
-    image: "/after%202.png",
+    image: "/after%201.png",
+    zoom: 1.05,
   },
   {
     number: 3,
     title: "Supporters Experience Change",
     description: "From reports to a livable impact experience.",
     footer: "Reports inform. Real moments connect.",
-    image: "/after%203.png",
+    image: "/after%202.png",
+    zoom: 1.05,
   },
 ];
 
@@ -160,7 +173,6 @@ const ladder = [
   },
 ];
 
-type CardPoint = (typeof painPoints)[number];
 
 function PointCard({
   point,
@@ -183,7 +195,7 @@ function PointCard({
           compact ? "p-3.5 sm:p-4" : "p-6 sm:p-7"
         }`}
       >
-        <div className={`flex items-center gap-2.5 ${compact ? "mb-1.5" : "mb-3"}`}>
+        <div className={`flex items-center gap-2.5 ${compact ? "mb-1" : "mb-3"}`}>
           <span
             className={`rounded-full text-white font-bold flex items-center justify-center shrink-0 ${
               compact ? "w-6 h-6 text-xs" : "w-8 h-8 text-sm"
@@ -208,38 +220,48 @@ function PointCard({
         >
           {point.description}
         </p>
-        <div className={compact ? "" : "px-1"}>
-          <img
-            src={point.image}
-            alt=""
-            className={
-              compact
-                ? "w-full aspect-[4/3] object-cover rounded-lg"
-                : "w-full h-auto rounded-lg"
-            }
-            loading="lazy"
-          />
+        {/* Square illustrations, zoomed just enough to shave the whitespace
+            baked into the PNGs so the artwork reaches the rounded edges. */}
+        <div
+          className={
+            compact
+              ? "mt-auto -mx-2.5 flex items-center justify-center h-[clamp(14rem,44vh,26rem)]"
+              : "px-1"
+          }
+        >
+          {compact ? (
+            /* Always a true square (min of card width / height budget) so the
+               square artwork cover-fits exactly — no directional cropping. */
+            <div className="w-[min(100%,clamp(14rem,44vh,26rem))] aspect-square overflow-hidden rounded-2xl">
+              <img
+                src={point.image}
+                alt=""
+                className="w-full h-full object-cover"
+                style={{ transform: `scale(${point.zoom ?? 1.07})` }}
+                loading="lazy"
+              />
+            </div>
+          ) : (
+            <img src={point.image} alt="" className="w-full h-auto rounded-xl" loading="lazy" />
+          )}
         </div>
       </div>
-      <div
-        className={`border-t border-border/40 ${
-          compact ? "px-3.5 sm:px-4 py-2" : "px-6 sm:px-7 py-3.5"
-        } ${isSolution ? "bg-[#EAF4F5]" : "bg-[#F3F4F6]"}`}
-      >
-        <p
-          className={`font-medium flex items-center gap-2 ${
-            compact ? "text-[11px] sm:text-xs" : "text-xs sm:text-sm"
-          } ${isSolution ? "text-sage-deep" : "text-ink/70"}`}
+      {!compact && (
+        <div
+          className={`border-t border-border/40 px-6 sm:px-7 py-3.5 ${
+            isSolution ? "bg-[#EAF4F5]" : "bg-[#F3F4F6]"
+          }`}
         >
-          {isSolution && (
-            <Check
-              className={`shrink-0 ${compact ? "w-3 h-3" : "w-3.5 h-3.5"}`}
-              strokeWidth={2.5}
-            />
-          )}
-          {point.footer}
-        </p>
-      </div>
+          <p
+            className={`font-medium flex items-center gap-2 text-xs sm:text-sm ${
+              isSolution ? "text-sage-deep" : "text-ink/70"
+            }`}
+          >
+            {isSolution && <Check className="shrink-0 w-3.5 h-3.5" strokeWidth={2.5} />}
+            {point.footer}
+          </p>
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -295,7 +317,7 @@ function ScrollSwapPanel({ onGetStarted }: { onGetStarted?: () => void }) {
               </span>
             </div>
 
-            <div className="relative min-h-[5rem] sm:min-h-[5.75rem]">
+            <div className="relative min-h-[3.5rem] sm:min-h-[4rem]">
               <motion.div
                 className="absolute inset-0"
                 style={{ opacity: 1 - headerOut, y: headerOut * -28 }}
@@ -381,31 +403,29 @@ function ScrollSwapPanel({ onGetStarted }: { onGetStarted?: () => void }) {
 }
 
 function PainHeader({ compact = false }: { compact?: boolean }) {
+  // Compact (sticky-swap) mode keeps a single text level — the toggle labels
+  // above already set the context, so eyebrow + subtitle only add noise.
   return (
     <div className="text-center">
-      <p
-        className={`font-mono font-semibold uppercase tracking-[0.28em] text-seafoam ${
-          compact ? "text-[10px] sm:text-[11px] mb-2.5" : "text-[11px] sm:text-xs mb-5"
-        }`}
-      >
-        The challenge
-      </p>
+      {!compact && (
+        <p className="font-mono font-semibold uppercase tracking-[0.28em] text-seafoam text-[11px] sm:text-xs mb-5">
+          The challenge
+        </p>
+      )}
       <h2
         className={`font-fraunces font-light text-white leading-[1.15] max-w-3xl mx-auto ${
           compact
-            ? "text-xl sm:text-2xl lg:text-3xl mb-1.5"
+            ? "text-lg sm:text-xl lg:text-2xl"
             : "text-3xl sm:text-4xl lg:text-5xl mb-4"
         }`}
       >
-        Three pain points stand in the way of lasting impact.
+        Three things get in the way of lasting impact.
       </h2>
-      <p
-        className={`text-white/60 max-w-xl mx-auto ${
-          compact ? "text-sm" : "text-base sm:text-lg"
-        }`}
-      >
-        Too much impact is lost, buried, or invisible.
-      </p>
+      {!compact && (
+        <p className="text-white/60 max-w-xl mx-auto text-base sm:text-lg">
+          Too much impact is lost, buried, or invisible.
+        </p>
+      )}
     </div>
   );
 }
@@ -413,17 +433,15 @@ function PainHeader({ compact = false }: { compact?: boolean }) {
 function SolutionHeader({ compact = false }: { compact?: boolean }) {
   return (
     <div className="text-center">
-      <p
-        className={`font-mono font-semibold uppercase tracking-[0.28em] text-seafoam ${
-          compact ? "text-[10px] sm:text-[11px] mb-2.5" : "text-[11px] sm:text-xs mb-5"
-        }`}
-      >
-        The shift
-      </p>
+      {!compact && (
+        <p className="font-mono font-semibold uppercase tracking-[0.28em] text-seafoam text-[11px] sm:text-xs mb-5">
+          The shift
+        </p>
+      )}
       <h2
         className={`font-fraunces font-light text-white leading-[1.15] max-w-3xl mx-auto ${
           compact
-            ? "text-xl sm:text-2xl lg:text-3xl mb-1.5"
+            ? "text-lg sm:text-xl lg:text-2xl"
             : "text-3xl sm:text-4xl lg:text-5xl mb-4"
         }`}
       >
@@ -432,13 +450,11 @@ function SolutionHeader({ compact = false }: { compact?: boolean }) {
           visible.
         </span>
       </h2>
-      <p
-        className={`text-white/60 max-w-xl mx-auto ${
-          compact ? "text-sm" : "text-base sm:text-lg"
-        }`}
-      >
-        Moments are captured, proof is organized, and supporters can finally experience the change.
-      </p>
+      {!compact && (
+        <p className="text-white/60 max-w-xl mx-auto text-base sm:text-lg">
+          Moments are captured, proof is organized, and supporters can finally experience the change.
+        </p>
+      )}
     </div>
   );
 }
@@ -450,24 +466,27 @@ function PainFooter({
   onGetStarted?: () => void;
   compact?: boolean;
 }) {
-  return (
-    <div
-      className={`rounded-2xl bg-[#F3F4F6] flex flex-col sm:flex-row items-start sm:items-center ${
-        compact ? "px-4 py-3 gap-3" : "px-5 sm:px-7 py-5 sm:py-6 gap-5"
-      }`}
-    >
-      <div
-        className={`rounded-full bg-sage-deep flex items-center justify-center shrink-0 ${
-          compact ? "w-9 h-9" : "w-12 h-12"
-        }`}
-      >
-        <Heart className={compact ? "w-4 h-4 text-white" : "w-5 h-5 text-white"} strokeWidth={1.75} />
+  if (compact) {
+    return (
+      <div className="rounded-2xl bg-[#F3F4F6] flex flex-col sm:flex-row items-start sm:items-center px-4 py-2.5 gap-3">
+        <p className="flex-1 text-xs sm:text-sm text-foreground leading-snug">
+          We believe <span className="font-bold text-sage-deep">real impact</span> should never be invisible.
+        </p>
+        {onGetStarted && (
+          <Button variant="hero" size="default" className="group shrink-0 w-full sm:w-auto" onClick={onGetStarted}>
+            Get Started
+            <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+          </Button>
+        )}
       </div>
-      <p
-        className={`flex-1 text-foreground leading-relaxed ${
-          compact ? "text-xs sm:text-sm" : "text-sm sm:text-base"
-        }`}
-      >
+    );
+  }
+  return (
+    <div className="rounded-2xl bg-[#F3F4F6] flex flex-col sm:flex-row items-start sm:items-center px-5 sm:px-7 py-5 sm:py-6 gap-5">
+      <div className="rounded-full bg-sage-deep flex items-center justify-center shrink-0 w-12 h-12">
+        <Heart className="w-5 h-5 text-white" strokeWidth={1.75} />
+      </div>
+      <p className="flex-1 text-foreground leading-relaxed text-sm sm:text-base">
         We believe{" "}
         <span className="font-bold text-sage-deep">real impact</span>{" "}
         should never be invisible. It should be easy to capture, clear to understand,
@@ -476,7 +495,7 @@ function PainFooter({
       {onGetStarted && (
         <Button
           variant="hero"
-          size={compact ? "default" : "lg"}
+          size="lg"
           className="group shrink-0 w-full sm:w-auto"
           onClick={onGetStarted}
         >
@@ -495,32 +514,43 @@ function SolutionFooter({
   onGetStarted?: () => void;
   compact?: boolean;
 }) {
+  if (compact) {
+    return (
+      <div className="rounded-2xl bg-[#F3F4F6] flex flex-col sm:flex-row items-start sm:items-center px-4 py-2.5 gap-3">
+        <p className="flex-1 text-xs sm:text-sm text-foreground leading-snug">
+          Impact stays{" "}
+          <span className="font-bold bg-gradient-to-r from-seafoam via-[#7AADA8] to-sage-deep bg-clip-text text-transparent">
+            visible
+          </span>{" "}
+          with Nexus — capture it, prove it, let people experience it.
+        </p>
+        {onGetStarted && (
+          <Button variant="hero" size="default" className="group shrink-0 w-full sm:w-auto" onClick={onGetStarted}>
+            Get Started
+            <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+          </Button>
+        )}
+      </div>
+    );
+  }
   return (
-    <div
-      className={`rounded-2xl bg-[#F3F4F6] flex flex-col sm:flex-row items-start sm:items-center ${
-        compact ? "px-4 py-3 gap-3" : "px-5 sm:px-7 py-5 sm:py-6 gap-5"
-      }`}
-    >
+    <div className="rounded-2xl bg-[#F3F4F6] flex flex-col sm:flex-row items-start sm:items-center px-5 sm:px-7 py-5 sm:py-6 gap-5">
       <div className="flex-1">
-        <p
-          className={`text-foreground leading-snug mb-0.5 ${
-            compact ? "text-sm sm:text-base" : "text-base sm:text-lg"
-          }`}
-        >
+        <p className="text-foreground leading-snug mb-0.5 text-base sm:text-lg">
           Impact stays{" "}
           <span className="font-bold bg-gradient-to-r from-seafoam via-[#7AADA8] to-sage-deep bg-clip-text text-transparent">
             visible
           </span>{" "}
           with Nexus.
         </p>
-        <p className={`text-muted-foreground ${compact ? "text-xs" : "text-sm"}`}>
+        <p className="text-muted-foreground text-sm">
           Capture it. Prove it. Let people experience it.
         </p>
       </div>
       {onGetStarted && (
         <Button
           variant="hero"
-          size={compact ? "default" : "lg"}
+          size="lg"
           className="group shrink-0 w-full sm:w-auto"
           onClick={onGetStarted}
         >

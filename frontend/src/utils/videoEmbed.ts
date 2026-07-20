@@ -88,9 +88,14 @@ export function isValidVideoUrl(raw: string | null | undefined): boolean {
 export function getVideoThumbnailUrl(raw: string | null | undefined): string | null {
  const parsed = parseVideoUrl(raw)
  if (!parsed) return null
- if (parsed.provider === 'youtube') {
- // hqdefault is universally available; maxresdefault sometimes 404s.
- return `https://img.youtube.com/vi/${parsed.id}/hqdefault.jpg`
- }
- return null
+	if (parsed.provider === 'youtube') {
+		// hqdefault is universally available; maxresdefault sometimes 404s.
+		return `https://img.youtube.com/vi/${parsed.id}/hqdefault.jpg`
+	}
+	if (parsed.provider === 'vimeo') {
+		// vumbnail.com resolves the Vimeo oEmbed poster into a plain <img> src
+		// (no API key) — same approach the marketing/homepage cards use.
+		return `https://vumbnail.com/${parsed.id}.jpg`
+	}
+	return null
 }

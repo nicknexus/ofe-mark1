@@ -62,9 +62,11 @@ interface ImpactGlobeProps {
   enableZoom?: boolean;
   /** Smoothly rotate the globe to this pin when it changes. */
   focusLocation?: { lat: number; lng: number } | null;
+  /** Camera distance — lower is closer, so the globe fills more of the frame. */
+  initialAltitude?: number;
 }
 
-const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoom = false, focusLocation }: ImpactGlobeProps) => {
+const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoom = false, focusLocation, initialAltitude }: ImpactGlobeProps) => {
   const globeRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -128,10 +130,10 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
     if (locations && locations.length > 0) {
       const avgLat = locations.reduce((sum, loc) => sum + loc.lat, 0) / locations.length;
       const avgLng = locations.reduce((sum, loc) => sum + loc.lng, 0) / locations.length;
-      return { lat: avgLat, lng: avgLng, altitude: 1.8 };
+      return { lat: avgLat, lng: avgLng, altitude: initialAltitude ?? 1.8 };
     }
-    return { lat: 20, lng: 0, altitude: 2.5 };
-  }, [locations]);
+    return { lat: 20, lng: 0, altitude: initialAltitude ?? 2.5 };
+  }, [locations, initialAltitude]);
 
   // Land defaults to seafoam; atmosphere stays brand dark grey; rings seafoam (or org brand).
   const landColor = brandColor || "#c0dfa1";
@@ -268,10 +270,10 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
   useEffect(() => {
     if (!globeRef.current || !focusLocation) return;
     globeRef.current.pointOfView(
-      { lat: focusLocation.lat, lng: focusLocation.lng, altitude: 1.85 },
+      { lat: focusLocation.lat, lng: focusLocation.lng, altitude: initialAltitude ?? 1.85 },
       1200
     );
-  }, [focusLocation?.lat, focusLocation?.lng]);
+  }, [focusLocation?.lat, focusLocation?.lng, initialAltitude]);
 
   // Soft dispose only — forceContextLoss makes Chrome disable WebGL for the tab
   // after Strict Mode / HMR remounts.

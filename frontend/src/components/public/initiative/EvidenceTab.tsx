@@ -24,6 +24,7 @@ import PublicTagChip from '../PublicTagChip'
 import { formatDate } from '../../../utils'
 import { generateMetricSlug } from './metricColors'
 import { EmptyState, LoadingState } from './PublicInitiativeTabStates'
+import { getVideoThumbnailUrl, isValidVideoUrl, parseVideoUrl } from '../../../utils/videoEmbed'
 import {
     PUBLIC_PANEL_STATIC_CLASS,
     PUBLIC_PRIMARY_BUTTON_CLASS,
@@ -100,33 +101,24 @@ export function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', ta
         return ['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(ext)
     }
 
-    const isYouTubeUrl = (url: string) => {
-        if (!url) return false
-        return /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(url)
-    }
-
-    const getYouTubeVideoId = (url: string): string | null => {
-        if (!url) return null
-        const match = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
-        return match ? match[1] : null
-    }
+    const isEmbeddableVideoUrl = (url: string) => isValidVideoUrl(url)
 
     const getPreviewUrl = (item: PublicEvidence) => {
         if (item.files && item.files.length > 0) {
             const imageFile = item.files.find(f => isImageFile(f.file_url))
             if (imageFile) return imageFile.file_url
-            const ytFile = item.files.find(f => isYouTubeUrl(f.file_url))
-            if (ytFile) {
-                const vid = getYouTubeVideoId(ytFile.file_url)
-                if (vid) return `https://img.youtube.com/vi/${vid}/hqdefault.jpg`
+            const videoFile = item.files.find(f => isEmbeddableVideoUrl(f.file_url))
+            if (videoFile) {
+                const thumb = getVideoThumbnailUrl(videoFile.file_url)
+                if (thumb) return thumb
             }
         }
         if (item.file_url && isImageFile(item.file_url)) {
             return item.file_url
         }
-        if (item.file_url && isYouTubeUrl(item.file_url)) {
-            const vid = getYouTubeVideoId(item.file_url)
-            if (vid) return `https://img.youtube.com/vi/${vid}/hqdefault.jpg`
+        if (item.file_url && isEmbeddableVideoUrl(item.file_url)) {
+            const thumb = getVideoThumbnailUrl(item.file_url)
+            if (thumb) return thumb
         }
         return null
     }
@@ -509,12 +501,12 @@ export function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', ta
                                                     className="w-full h-full"
                                                     title={galleryFile.file_name || galleryItem.title}
                                                 />
-                                            ) : isYouTubeUrl(galleryFile.file_url) ? (
+                                            ) : isEmbeddableVideoUrl(galleryFile.file_url) ? (
                                                 <div className="w-full h-full flex items-center justify-center p-4">
                                                     <div className="relative w-full max-w-2xl" style={{ paddingBottom: '56.25%' }}>
                                                         <iframe
-                                                            src={`https://www.youtube.com/embed/${getYouTubeVideoId(galleryFile.file_url)}`}
-                                                            title="YouTube video"
+                                                            src={parseVideoUrl(galleryFile.file_url)?.embedUrl}
+                                                            title={parseVideoUrl(galleryFile.file_url)?.provider === 'vimeo' ? 'Vimeo video' : 'YouTube video'}
                                                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                                             allowFullScreen
                                                             className="absolute inset-0 w-full h-full rounded-lg"

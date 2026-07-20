@@ -5,6 +5,7 @@ import { PublicMetricTag, PublicStory } from '../../../services/publicApi'
 import PublicTagChip from '../PublicTagChip'
 import { formatDate } from '../../../utils'
 import { EmptyState, LoadingState } from './PublicInitiativeTabStates'
+import { getVideoThumbnailUrl, parseVideoUrl } from '../../../utils/videoEmbed'
 
 export function StoriesTab({ stories, orgSlug, initiativeSlug, dateQS = '', tagsById, onTagClick, selectedTagIds }: {
     stories: PublicStory[] | null
@@ -21,18 +22,21 @@ export function StoriesTab({ stories, orgSlug, initiativeSlug, dateQS = '', tags
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {stories.map((story) => (
+            {stories.map((story) => {
+                const parsedVideo = parseVideoUrl(story.media_url)
+                const videoThumb = getVideoThumbnailUrl(story.media_url)
+                return (
                 <Link
                     key={story.id}
                     to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/story/${story.id}${dateQS}`}
                     className="rounded-2xl overflow-hidden group bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 transition-all"
                 >
                     <div className="h-44 bg-gradient-to-br from-accent/10 to-accent/5 overflow-hidden">
-                        {story.media_url && /(?:youtube\.com\/(?:watch|embed|shorts)|youtu\.be\/)/.test(story.media_url) ? (
+                        {videoThumb ? (
                             <div className="relative w-full h-full">
-                                <img src={`https://img.youtube.com/vi/${(story.media_url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) || [])[1]}/hqdefault.jpg`} alt={story.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                <img src={videoThumb} alt={story.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                    <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg ${parsedVideo?.provider === 'youtube' ? 'bg-red-600' : 'bg-black/60'}`}>
                                         <svg className="w-4 h-4 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                                     </div>
                                 </div>
@@ -85,7 +89,8 @@ export function StoriesTab({ stories, orgSlug, initiativeSlug, dateQS = '', tags
                         </div>
                     </div>
                 </Link>
-            ))}
+                )
+            })}
         </div>
     )
 }

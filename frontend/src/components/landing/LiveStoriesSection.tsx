@@ -1,14 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Building2, MapPin, Calendar, Play } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { ArrowRight, Building2, MapPin, Calendar, Play, ChevronLeft, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { publicApi, type ShowcaseStory } from "../../services/publicApi";
 import { Reveal } from "./Reveal";
 import { easeOut } from "./motion";
 
-const SLOT_COUNT = 3;
-const ROTATE_MS = 3200;
+const AUTOPLAY_MS = 3000;
 
 function resolveThumb(story: ShowcaseStory): { kind: "img" | "video" | "none"; src?: string } {
   const url = story.media_url;
@@ -45,7 +44,7 @@ function StoryCard({ story }: { story: ShowcaseStory }) {
   return (
     <Link
       to={to}
-      className="group absolute inset-0 flex flex-col rounded-2xl overflow-hidden bg-white border border-border/50 shadow-[0_12px_28px_-10px_rgba(70,83,96,0.28),0_4px_10px_-6px_rgba(70,83,96,0.18)] hover:border-accent/40 hover:shadow-[0_18px_40px_-12px_rgba(70,83,96,0.35)] transition-[box-shadow,border-color] duration-300"
+      className="group flex flex-col h-full rounded-2xl overflow-hidden bg-white border border-border/50 shadow-[0_12px_28px_-10px_rgba(70,83,96,0.28),0_4px_10px_-6px_rgba(70,83,96,0.18)] hover:border-accent/40 hover:shadow-[0_22px_48px_-14px_rgba(70,83,96,0.4)] transition-[box-shadow,border-color] duration-300"
     >
       <div className="relative aspect-[16/10] overflow-hidden bg-gradient-to-br from-sage-light/40 to-accent/10 shrink-0">
         {thumb.kind === "img" && !imgError && (
@@ -76,15 +75,15 @@ function StoryCard({ story }: { story: ShowcaseStory }) {
         )}
         {story.media_type === "video" && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+            <div className="w-11 h-11 rounded-full bg-white/90 flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-110">
               <Play className="w-4 h-4 text-foreground translate-x-0.5" fill="currentColor" />
             </div>
           </div>
         )}
-        <span className="absolute top-2.5 left-2.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/90 text-[10px] font-semibold uppercase tracking-wider text-foreground">
+        <span className="absolute top-2.5 left-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent text-accent-foreground text-[11px] font-bold uppercase tracking-wider shadow-md ring-1 ring-white/50">
           <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full rounded-full bg-accent opacity-75 animate-ping" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
+            <span className="absolute inline-flex h-full w-full rounded-full bg-accent-foreground opacity-75 animate-ping" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent-foreground" />
           </span>
           Live
         </span>
@@ -136,7 +135,7 @@ function StoryCard({ story }: { story: ShowcaseStory }) {
 }
 
 const SkeletonCard = () => (
-  <div className="absolute inset-0 flex flex-col rounded-2xl overflow-hidden bg-white border border-border/60 shadow-[0_12px_28px_-10px_rgba(70,83,96,0.28)]">
+  <div className="flex flex-col h-full rounded-2xl overflow-hidden bg-white border border-border/60 shadow-[0_12px_28px_-10px_rgba(70,83,96,0.28)]">
     <div className="aspect-[16/10] bg-muted animate-pulse shrink-0" />
     <div className="p-3.5 space-y-2">
       <div className="h-3 w-1/3 bg-muted rounded animate-pulse" />
@@ -148,9 +147,8 @@ const SkeletonCard = () => (
 
 /**
  * Warm the browser cache for every thumbnail during idle time, off the main
- * scroll path. `.decode()` forces the decode to happen now (async, off the
- * critical path) so painting the image later — as the card scrolls in or
- * swaps — is instant and never janks the scroll.
+ * scroll path. `.decode()` forces the decode now (async) so painting a card
+ * as it scrolls into the carousel is instant and never janks.
  */
 function prefetchThumbs(stories: ShowcaseStory[]) {
   const run = () => {
@@ -170,9 +168,9 @@ function prefetchThumbs(stories: ShowcaseStory[]) {
   else setTimeout(run, 200);
 }
 
-/** Fisher–Yates shuffle of pool indices [0..n). */
-function shuffledIndices(n: number): number[] {
-  const arr = Array.from({ length: n }, (_, i) => i);
+/** Fisher–Yates shuffle. */
+function shuffle<T>(input: T[]): T[] {
+  const arr = [...input];
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
@@ -181,20 +179,22 @@ function shuffledIndices(n: number): number[] {
 }
 
 const LiveStoriesSection = () => {
-  const [pool, setPool] = useState<ShowcaseStory[]>([]);
+  const [stories, setStories] = useState<ShowcaseStory[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "empty">("loading");
-  const [slots, setSlots] = useState<number[]>([]); // indices into `pool`
+  const reduceMotion = useReducedMotion();
+
   const sectionRef = useRef<HTMLElement | null>(null);
+  const slideRef = useRef<HTMLDivElement | null>(null);
   const [inView, setInView] = useState(false);
-  const rotateSlotRef = useRef(0);
-  // Timestamp of the last scroll event. Card swaps mount new DOM (images,
-  // sometimes <video>), which is layout+paint work — never do it mid-scroll.
-  const lastScrollRef = useRef(0);
-  // Shuffled walk order over the whole pool + a pointer. Advancing the pointer
-  // (and skipping only currently-visible cards) means every story is shown once
-  // before any repeats — so a card that just left never pops back in next.
-  const orderRef = useRef<number[]>([]);
-  const orderPosRef = useRef(0);
+  const [hovered, setHovered] = useState(false);
+  const [paused, setPaused] = useState(false); // set once the user takes control
+
+  // `pos` walks forward/backward through the middle copy; it's normalized back
+  // into [0, n) after each move so the offset never runs away. Because we
+  // render three identical copies, snapping is visually seamless.
+  const [pos, setPos] = useState(0);
+  const [animate, setAnimate] = useState(false);
+  const [step, setStep] = useState(0); // px per card (incl. gutter)
 
   useEffect(() => {
     let alive = true;
@@ -202,20 +202,13 @@ const LiveStoriesSection = () => {
       .getShowcase(24)
       .then((res) => {
         if (!alive) return;
-        const stories = res?.stories ?? [];
-        if (stories.length === 0) {
+        const list = res?.stories ?? [];
+        if (list.length === 0) {
           setStatus("empty");
           return;
         }
-        setPool(stories);
-        prefetchThumbs(stories);
-        const order = shuffledIndices(stories.length);
-        orderRef.current = order;
-        // Seed slots from the front of the shuffled order; the pointer starts
-        // just past them so the first swaps pull brand-new stories.
-        const count = Math.min(SLOT_COUNT, stories.length);
-        orderPosRef.current = count;
-        setSlots(order.slice(0, count));
+        setStories(shuffle(list));
+        prefetchThumbs(list);
         setStatus("ready");
       })
       .catch(() => alive && setStatus("empty"));
@@ -224,7 +217,50 @@ const LiveStoriesSection = () => {
     };
   }, []);
 
-  // Only rotate while the section is on screen — no off-screen timers/work.
+  const n = stories.length;
+  // Triple the list so there's always a full screen of cards on both sides of
+  // the middle copy — enables seamless looping in either direction.
+  const loopStories = useMemo(
+    () => (n > 0 ? [...stories, ...stories, ...stories] : []),
+    [stories, n]
+  );
+
+  // Measure one card's width (including its horizontal gutter) so the track
+  // translate stays pixel-accurate across breakpoints.
+  //
+  // This must be resilient: if the first measurement lands before layout has
+  // settled (can happen when the lazy chunk mounts), width reads 0 and the
+  // track can't move — which looked like "the buttons don't work until I
+  // refresh". So we retry via rAF until we get a real width, and keep a
+  // ResizeObserver for subsequent breakpoint/resize changes.
+  useLayoutEffect(() => {
+    if (status !== "ready") return;
+    let raf = 0;
+    const readWidth = () => slideRef.current?.getBoundingClientRect().width ?? 0;
+    const measure = () => {
+      const w = readWidth();
+      if (w > 0) {
+        setStep(w);
+      } else {
+        raf = requestAnimationFrame(measure);
+      }
+    };
+    measure();
+    const el = slideRef.current;
+    const ro = el
+      ? new ResizeObserver(() => {
+          const w = readWidth();
+          if (w > 0) setStep(w);
+        })
+      : null;
+    if (el && ro) ro.observe(el);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro?.disconnect();
+    };
+  }, [status, inView, n]);
+
+  // Visibility gate — no autoplay work while off screen.
   useEffect(() => {
     const el = sectionRef.current;
     if (!el || typeof IntersectionObserver === "undefined") {
@@ -239,53 +275,50 @@ const LiveStoriesSection = () => {
     return () => observer.disconnect();
   }, []);
 
+  // Re-enable the transition on the frame after a seamless snap / first layout.
   useEffect(() => {
-    if (!inView) return;
-    const onScroll = () => {
-      lastScrollRef.current = performance.now();
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [inView]);
+    if (animate) return;
+    const id = requestAnimationFrame(() => setAnimate(true));
+    return () => cancelAnimationFrame(id);
+  }, [animate]);
+
+  const autoplayActive = status === "ready" && inView && !paused && !hovered && !reduceMotion && n > 1;
 
   useEffect(() => {
-    if (status !== "ready" || !inView) return;
-    if (pool.length <= slots.length) return; // nothing new to swap in
-
-    const timer = setInterval(() => {
-      // Skip the swap entirely while the user is (or just was) scrolling; the
-      // next tick will pick it up once the page has settled.
-      if (performance.now() - lastScrollRef.current < 500) return;
-      setSlots((prev) => {
-        const order = orderRef.current;
-        if (order.length === 0) return prev;
-        // Walk the shuffled order forward, skipping any card currently on
-        // screen, until we land on a fresh one.
-        let next = -1;
-        for (let tries = 0; tries < order.length; tries++) {
-          const cand = order[orderPosRef.current % order.length];
-          orderPosRef.current += 1;
-          if (!prev.includes(cand)) {
-            next = cand;
-            break;
-          }
-        }
-        if (next === -1) return prev;
-        const slot = rotateSlotRef.current % prev.length;
-        rotateSlotRef.current += 1;
-        const updated = [...prev];
-        updated[slot] = next;
-        return updated;
-      });
-    }, ROTATE_MS);
-
+    if (!autoplayActive) return;
+    const timer = setInterval(() => setPos((p) => p + 1), AUTOPLAY_MS);
     return () => clearInterval(timer);
-  }, [status, inView, pool, slots.length]);
+  }, [autoplayActive]);
 
-  const slotCards = useMemo(
-    () => slots.map((i) => pool[i]).filter(Boolean),
-    [slots, pool]
+  // After a move settles, fold `pos` back into [0, n) without animating so the
+  // translate offset never grows unbounded (the copies make this invisible).
+  const handleRest = useCallback(() => {
+    setPos((p) => {
+      if (p >= n || p < 0) {
+        const normalized = ((p % n) + n) % n;
+        if (normalized !== p) setAnimate(false);
+        return normalized;
+      }
+      return p;
+    });
+  }, [n]);
+
+  const step1 = useCallback((dir: 1 | -1) => {
+    setPaused(true); // user took over — stop the auto timer for good
+    setPos((p) => p + dir);
+  }, []);
+
+  const goTo = useCallback(
+    (target: number) => {
+      setPaused(true);
+      setPos(target);
+    },
+    []
   );
+
+  const activeIndex = n > 0 ? ((pos % n) + n) % n : 0;
+  // Start in the middle copy so there's room to loop both ways.
+  const x = -(n + pos) * step;
 
   if (status === "empty") return null;
 
@@ -309,30 +342,90 @@ const LiveStoriesSection = () => {
           </h2>
         </Reveal>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {status === "loading"
-            ? Array.from({ length: SLOT_COUNT }).map((_, i) => (
-                <div key={i} className="relative h-[420px]">
-                  <SkeletonCard />
-                </div>
-              ))
-            : slotCards.map((story, slot) => (
-                <div key={slot} className="relative h-[420px]">
-                  <AnimatePresence mode="wait">
+        {status === "loading" ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-[420px]">
+                <SkeletonCard />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div
+            className="relative"
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+          >
+            <div
+              className="overflow-hidden py-6"
+              style={{
+                // Feather only the outermost edge to transparent so the edge
+                // cards' shadows aren't sliced into a hard vertical line by the
+                // overflow clip. Transparent (reveals page bg) — not a white wash.
+                WebkitMaskImage:
+                  "linear-gradient(to right, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%)",
+                maskImage:
+                  "linear-gradient(to right, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%)",
+              }}
+            >
+              <motion.div
+                className="flex"
+                style={{ willChange: "transform" }}
+                animate={{ x }}
+                transition={animate ? { duration: 0.7, ease: easeOut } : { duration: 0 }}
+                onAnimationComplete={handleRest}
+              >
+                {loopStories.map((story, i) => (
+                  <div
+                    key={`${story.id}-${i}`}
+                    ref={i === 0 ? slideRef : undefined}
+                    className="shrink-0 w-[300px] sm:w-[340px] px-3 h-[420px]"
+                  >
                     <motion.div
-                      key={story.id}
-                      className="absolute inset-0"
-                      initial={{ opacity: 0, scale: 0.96, y: 14 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.98, y: -10 }}
-                      transition={{ duration: 0.5, ease: easeOut }}
+                      className="h-full"
+                      whileHover={reduceMotion ? undefined : { y: -8 }}
+                      transition={{ type: "spring", stiffness: 300, damping: 24 }}
                     >
                       <StoryCard story={story} />
                     </motion.div>
-                  </AnimatePresence>
-                </div>
-              ))}
-        </div>
+                  </div>
+                ))}
+              </motion.div>
+            </div>
+
+            {/* Overlay arrows — any interaction stops the auto timer */}
+            <button
+              onClick={() => step1(-1)}
+              aria-label="Previous"
+              className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-accent border-2 border-accent/60 shadow-glass-lg hover:bg-accent/90 flex items-center justify-center transition-all active:scale-95"
+            >
+              <ChevronLeft className="w-5 h-5 text-accent-foreground" />
+            </button>
+            <button
+              onClick={() => step1(1)}
+              aria-label="Next"
+              className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-accent border-2 border-accent/60 shadow-glass-lg hover:bg-accent/90 flex items-center justify-center transition-all active:scale-95"
+            >
+              <ChevronRight className="w-5 h-5 text-accent-foreground" />
+            </button>
+
+            {/* Dots */}
+            {n <= 12 && (
+              <div className="flex items-center justify-center gap-2 mt-4">
+                {stories.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => goTo(i)}
+                    aria-label={`Go to slide ${i + 1}`}
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      i === activeIndex ? "w-6 bg-accent" : "w-2 bg-accent/25 hover:bg-accent/40"
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <Reveal className="flex justify-center mt-12" delay={0.1}>
           <Link

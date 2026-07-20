@@ -33,7 +33,7 @@ const CARD_SLOTS = [
   { className: "absolute top-1/2 -translate-y-1/2 left-0", depth: -0.9 },
 ] as const;
 
-const CARD_ROTATION_MS = 10_000;
+const CARD_ROTATION_MS = 5_000;
 
 const FALLBACK_CLAIMS: ShowcaseImpactClaim[] = [
   {
@@ -239,7 +239,22 @@ const HeroSection = ({ onGetStarted }: HeroSectionProps) => {
   }, []);
 
   const hasRealClaims = claims.length > 0;
-  const claimPool = hasRealClaims ? claims : FALLBACK_CLAIMS;
+  // Prefer showing 5+ *different* charities on the globe — one card per org
+  // (claims arrive pre-sorted: evidence-image first, then most recent). If we
+  // can't muster 5 distinct orgs, fall back to the raw recent list so the
+  // globe isn't sparse (the rotation still varies org-to-org where it can).
+  const claimPool = useMemo(() => {
+    if (!hasRealClaims) return FALLBACK_CLAIMS;
+    const seen = new Set<string>();
+    const distinctByOrg: ShowcaseImpactClaim[] = [];
+    for (const claim of claims) {
+      const key = getOrgKey(claim);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      distinctByOrg.push(claim);
+    }
+    return distinctByOrg.length >= 5 ? distinctByOrg : claims;
+  }, [hasRealClaims, claims]);
 
   useEffect(() => {
     if (reduceMotion) return;

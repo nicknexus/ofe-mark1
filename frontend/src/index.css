@@ -585,6 +585,30 @@
     .scrollbar-thin::-webkit-scrollbar-thumb:hover {
         background: rgba(0, 0, 0, 0.2);
     }
+
+    /* Thin scrollbar for dark surfaces (explore atlas panel) */
+    .scrollbar-thin-light {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+    }
+
+    .scrollbar-thin-light::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+    }
+
+    .scrollbar-thin-light::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .scrollbar-thin-light::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 4px;
+    }
+
+    .scrollbar-thin-light::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
 }
 
 /* Ultra crisp fonts for report dashboard */
