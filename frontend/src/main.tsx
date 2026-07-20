@@ -6,10 +6,17 @@ import SupportModeBanner from './components/SupportModeBanner.tsx'
 import './index.css'
 import 'leaflet/dist/leaflet.css'
 
-if ('serviceWorker' in navigator && /Mobi|Android/i.test(navigator.userAgent)) {
- window.addEventListener('load', () => {
- navigator.serviceWorker.register('/service-worker.js').catch(() => {})
- })
+if ('serviceWorker' in navigator) {
+ if (import.meta.env.DEV) {
+  // Stale SWs from prod/mobile testing intercept Vite module fetches and break dev.
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+   regs.forEach((reg) => reg.unregister())
+  })
+ } else if (/Mobi|Android/i.test(navigator.userAgent)) {
+  window.addEventListener('load', () => {
+   navigator.serviceWorker.register('/service-worker.js').catch(() => {})
+  })
+ }
 }
 
 // Completely separate admin console: when the URL is under /admin, mount the

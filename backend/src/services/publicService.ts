@@ -1826,4 +1826,240 @@ export class PublicService {
         if (error) throw new Error(`Failed to fetch metric tags: ${error.message}`);
         return data || [];
     }
+
+    /** Pick the best image URL from an evidence row for marketing thumbnails. */
+    private static pickEvidenceImageUrl(evidence: any): string | undefined {
+        const isImageUrl = (url: string) =>
+            /\.(jpe?g|png|gif|webp|avif)(\?|$)/i.test(url) ||
+            /img\.youtube\.com/i.test(url);
+
+        const files = [...(evidence.evidence_files || [])].sort(
+            (a: any, b: any) => (a.display_order || 0) - (b.display_order || 0)
+        );
+        for (const file of files) {
+            if (!file.file_url) continue;
+            if (file.file_type?.startsWith('image/') || isImageUrl(file.file_url)) {
+                return file.file_url;
+            }
+        }
+        if (evidence.file_url) {
+            if (evidence.file_type?.startsWith('image/') || isImageUrl(evidence.file_url)) {
+                return evidence.file_url;
+            }
+            const yt = evidence.file_url.match(
+                /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+            );
+            if (yt) return `https://img.youtube.com/vi/${yt[1]}/hqdefault.jpg`;
+        }
+        return undefined;
+    }
+
+    /**
+     * Global "showcase" feed for the marketing landing page: recent real
+     * stories (with media) across ALL public, non-demo organizations, plus
+     * live aggregate stats. Bounded to a handful of queries regardless of how
+     * many orgs exist (no N+1).
+     */
+    static async getShowcase(limit = 12): Promise<{
+        stats: { organizations: number; initiatives: number; stories: number; locations: number; countries: number };
+        stories: any[];
+        impact_claims: any[];
+    }> {
+        const emptyStats = { organizations: 0, initiatives: 0, stories: 0, locations: 0, countries: 0 };
+
+        // 1. Public, non-demo organizations (the "real users").
+        const { data: orgs } = await supabase
+            .from('organizations')
+            .select('id, name, slug, logo_url, brand_color')
+            .eq('is_public', true)
+            .eq('is_demo', false);
+        const orgList = orgs || [];
+        if (orgList.length === 0) return { stats: emptyStats, stories: [], impact_claims: [] };
+
+        const orgById = new Map(orgList.map((o: any) => [o.id, o]));
+        const orgIds = orgList.map((o: any) => o.id);
+
+        // 2. Their initiatives.
+        const { data: inits } = await supabase
+            .from('initiatives')
+            .select('id, slug, title, organization_id')
+            .in('organization_id', orgIds);
+        const initList = inits || [];
+        const initById = new Map(initList.map((i: any) => [i.id, i]));
+        const initIds = initList.map((i: any) => i.id);
+
+        // 3. Recent stories that actually have visual media (photo/video).
+        let storyRows: any[] = [];
+        let storiesTotal = 0;
+        if (initIds.length) {
+            const { data: stories } = await supabase
+                .from('stories')
+                .select(`
+                    id, title, description, media_url, media_type, date_represented, initiative_id,
+                    story_locations(locations(id, name, country))
+                `)
+                .in('initiative_id', initIds)
+                .not('media_url', 'is', null)
+                .in('media_type', ['photo', 'video'])
+                .order('date_represented', { ascending: false })
+                .limit(limit);
+            storyRows = stories || [];
+
+            const { count } = await supabase
+                .from('stories')
+                .select('id', { count: 'exact', head: true })
+                .in('initiative_id', initIds);
+            storiesTotal = count || 0;
+        }
+
+        // 4. Location footprint + distinct countries.
+        const { count: locCount } = await supabase
+            .from('locations')
+            .select('id', { count: 'exact', head: true })
+            .in('organization_id', orgIds);
+        const { data: locCountries } = await supabase
+            .from('locations')
+            .select('country')
+            .in('organization_id', orgIds)
+            .not('country', 'is', null);
+        const countries = new Set((locCountries || []).map((l: any) => l.country).filter(Boolean)).size;
+
+        const showcaseStories = storyRows.map((s: any) => {
+            const init = initById.get(s.initiative_id) as any;
+            const org = init ? (orgById.get(init.organization_id) as any) : null;
+            const locations = (s.story_locations || []).map((sl: any) => sl.locations).filter(Boolean);
+            return {
+                id: s.id,
+                title: s.title,
+                description: s.description,
+                media_url: s.media_url,
+                media_type: s.media_type,
+                date_represented: s.date_represented,
+                location_name: locations[0]?.name,
+                country: locations[0]?.country,
+                initiative_slug: init?.slug,
+                initiative_title: init?.title,
+                org_slug: org?.slug,
+                org_name: org?.name,
+                org_logo_url: org?.logo_url,
+                org_brand_color: org?.brand_color,
+            };
+        });
+
+        // 5. Recent impact claims with coordinates for the hero globe + floating cards.
+        let impactClaims: any[] = [];
+        if (initIds.length) {
+            const { data: kpis } = await supabase
+                .from('kpis')
+                .select('id, title, unit_of_measurement, metric_type, initiative_id')
+                .in('initiative_id', initIds);
+            const kpiList = kpis || [];
+            const kpiById = new Map(kpiList.map((k: any) => [k.id, k]));
+            const kpiIds = kpiList.map((k: any) => k.id);
+
+            if (kpiIds.length) {
+                const { data: updates } = await supabase
+                    .from('kpi_updates')
+                    .select(`
+                        id, value, label, date_represented, date_range_start, date_range_end, kpi_id,
+                        locations!inner(id, name, country, latitude, longitude)
+                    `)
+                    .in('kpi_id', kpiIds)
+                    .not('location_id', 'is', null)
+                    .order('date_represented', { ascending: false })
+                    .limit(36);
+
+                const updateRows = (updates || []).filter((u: any) => {
+                    const loc = u.locations;
+                    return loc && loc.latitude != null && loc.longitude != null;
+                });
+
+                const updateIds = updateRows.map((u: any) => u.id);
+                const evidenceImageByUpdate = new Map<string, string>();
+
+                if (updateIds.length) {
+                    const { data: evidenceLinks } = await supabase
+                        .from('evidence_kpi_updates')
+                        .select('kpi_update_id, evidence_id')
+                        .in('kpi_update_id', updateIds);
+
+                    const evidenceIds = [...new Set((evidenceLinks || []).map((l: any) => l.evidence_id))];
+                    const evidenceById = new Map<string, any>();
+
+                    if (evidenceIds.length) {
+                        const { data: evidenceRows } = await supabase
+                            .from('evidence')
+                            .select(`
+                                id, file_url, file_type,
+                                evidence_files(id, file_url, file_type, display_order)
+                            `)
+                            .in('id', evidenceIds)
+                            .eq('type', 'visual_proof');
+
+                        for (const row of evidenceRows || []) {
+                            evidenceById.set(row.id, row);
+                        }
+                    }
+
+                    for (const link of evidenceLinks || []) {
+                        if (evidenceImageByUpdate.has(link.kpi_update_id)) continue;
+                        const evidence = evidenceById.get(link.evidence_id);
+                        if (!evidence) continue;
+                        const imageUrl = this.pickEvidenceImageUrl(evidence);
+                        if (imageUrl) evidenceImageByUpdate.set(link.kpi_update_id, imageUrl);
+                    }
+                }
+
+                impactClaims = updateRows.map((u: any) => {
+                    const kpi = kpiById.get(u.kpi_id) as any;
+                    const init = kpi ? (initById.get(kpi.initiative_id) as any) : null;
+                    const org = init ? (orgById.get(init.organization_id) as any) : null;
+                    const loc = u.locations;
+                    return {
+                        id: u.id,
+                        value: u.value,
+                        label: u.label,
+                        date_represented: u.date_represented,
+                        date_range_start: u.date_range_start,
+                        date_range_end: u.date_range_end,
+                        metric_title: kpi?.title,
+                        unit_of_measurement: kpi?.unit_of_measurement,
+                        metric_type: kpi?.metric_type,
+                        lat: loc.latitude,
+                        lng: loc.longitude,
+                        location_name: loc.name,
+                        country: loc.country,
+                        initiative_slug: init?.slug,
+                        initiative_title: init?.title,
+                        org_slug: org?.slug,
+                        org_name: org?.name,
+                        org_logo_url: org?.logo_url,
+                        org_brand_color: org?.brand_color,
+                        evidence_image_url: evidenceImageByUpdate.get(u.id),
+                    };
+                });
+
+                // Prefer claims that have evidence imagery, then newest first.
+                impactClaims.sort((a, b) => {
+                    const aImg = a.evidence_image_url ? 1 : 0;
+                    const bImg = b.evidence_image_url ? 1 : 0;
+                    if (bImg !== aImg) return bImg - aImg;
+                    return String(b.date_represented).localeCompare(String(a.date_represented));
+                });
+                impactClaims = impactClaims.slice(0, 24);
+            }
+        }
+
+        return {
+            stats: {
+                organizations: orgList.length,
+                initiatives: initList.length,
+                stories: storiesTotal,
+                locations: locCount || 0,
+                countries,
+            },
+            stories: showcaseStories,
+            impact_claims: impactClaims,
+        };
+    }
 }

@@ -1,5 +1,29 @@
-import { useRef, useEffect, useState, memo, useMemo, useCallback } from "react";
+import React, { useRef, useEffect, useState, memo, useMemo, useCallback } from "react";
 import Globe from "react-globe.gl";
+
+/** Keeps a WebGL failure from blanking the whole React tree. */
+class GlobeErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: Error) {
+    console.warn("[ImpactGlobe] WebGL unavailable:", error.message);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-full h-full flex items-center justify-center">
+          <div className="w-48 h-48 rounded-full bg-gradient-to-br from-accent/60 to-accent/30" />
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Default demo locations for homepage
 const defaultLocations = [
@@ -36,9 +60,11 @@ interface ImpactGlobeProps {
   showLabels?: boolean;
   brandColor?: string;
   enableZoom?: boolean;
+  /** Smoothly rotate the globe to this pin when it changes. */
+  focusLocation?: { lat: number; lng: number } | null;
 }
 
-const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoom = false }: ImpactGlobeProps) => {
+const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoom = false, focusLocation }: ImpactGlobeProps) => {
   const globeRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -107,12 +133,14 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
     return { lat: 20, lng: 0, altitude: 2.5 };
   }, [locations]);
 
-  // Globe color based on brand color
-  const globeColor = brandColor || "#c0dfa1";
+  // Land defaults to seafoam; atmosphere stays brand dark grey; rings seafoam (or org brand).
+  const landColor = brandColor || "#c0dfa1";
+  const atmosphereColor = brandColor || "#465360";
+  const ringAccent = brandColor || "#c0dfa1";
 
   // Convert hex (#rrggbb) to {r,g,b}; fallback to brand-ish green if invalid
   const brandRgb = useMemo(() => {
-    const hex = (globeColor || "").replace('#', '');
+    const hex = (ringAccent || "").replace('#', '');
     if (hex.length === 6) {
       const r = parseInt(hex.slice(0, 2), 16);
       const g = parseInt(hex.slice(2, 4), 16);
@@ -120,14 +148,24 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
       if ([r, g, b].every(n => Number.isFinite(n))) return { r, g, b };
     }
     return { r: 192, g: 223, b: 161 };
-  }, [globeColor]);
+  }, [ringAccent]);
 
   // Stable callback refs so Globe doesn't re-process on every render
-  const polygonCapColorFn = useCallback(() => `${globeColor}99`, [globeColor]);
-  const polygonSideColorFn = useCallback(() => `${globeColor}26`, [globeColor]);
+  const polygonCapColorFn = useCallback(() => `${landColor}99`, [landColor]);
+  const polygonSideColorFn = useCallback(() => `${landColor}26`, [landColor]);
   const polygonStrokeColorFn = useCallback(() => "rgba(255, 255, 255, 0.3)", []);
-  // Pins are pure white — pop against the brand-tinted globe.
-  const pointColorFn = useCallback(() => '#ffffff', []);
+  // Flat CSS dots in brand grey — 3D cylinders pick up lighting and drift off-color.
+  const htmlElementFn = useCallback(() => {
+    const el = document.createElement("div");
+    const size = locations ? 6 : 5;
+    el.style.width = `${size}px`;
+    el.style.height = `${size}px`;
+    el.style.borderRadius = "50%";
+    el.style.background = "#465360";
+    el.style.boxShadow = "none";
+    el.style.pointerEvents = "none";
+    return el;
+  }, [locations]);
   const arcColorFn = useCallback(() => ["rgba(255, 255, 255, 0.55)", "rgba(255, 255, 255, 0.05)"], []);
   // Glow effect: ring starts bright white at the pin, blends with a touch of
   // brand color as it propagates, fades out. ringRepeatPeriod below is set
@@ -211,35 +249,40 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
       controls.minDistance = 105;
       controls.maxDistance = 600;
 
+      // Force true canvas transparency (backgroundColor alone can leave a black clear).
+      const renderer = typeof globeRef.current.renderer === "function"
+        ? globeRef.current.renderer()
+        : null;
+      renderer?.setClearColor?.(0x000000, 0);
+
       // Only set initial POV once
       if (!hasSetInitialPov.current) {
         globeRef.current.pointOfView(initialPov);
         hasSetInitialPov.current = true;
       }
+
     }
   }, [dimensions, initialPov, locations, enableZoom]);
 
-  // Dispose the WebGL context on unmount.
-  //
-  // react-globe.gl does NOT release its WebGLRenderer when the React component
-  // unmounts, so during dev with HMR (and in any SPA route change that
-  // remounts the globe) Chrome accumulates contexts until it hits the per-page
-  // limit (~16) and blocks new ones with:
-  //   "WebGLRenderer: Error creating WebGL context."
-  //   "Web page caused context loss and was blocked"
-  // Calling `forceContextLoss()` + `dispose()` here tells the GPU driver to
-  // reclaim the context immediately instead of waiting on GC.
+  // Animate POV when the landing page rotates to a new featured claim.
+  useEffect(() => {
+    if (!globeRef.current || !focusLocation) return;
+    globeRef.current.pointOfView(
+      { lat: focusLocation.lat, lng: focusLocation.lng, altitude: 1.85 },
+      1200
+    );
+  }, [focusLocation?.lat, focusLocation?.lng]);
+
+  // Soft dispose only — forceContextLoss makes Chrome disable WebGL for the tab
+  // after Strict Mode / HMR remounts.
   useEffect(() => {
     return () => {
       try {
         const inst = globeRef.current as any;
         if (!inst) return;
-        const renderer = typeof inst.renderer === 'function' ? inst.renderer() : null;
-        if (renderer) {
-          renderer.forceContextLoss?.();
-          renderer.dispose?.();
-        }
-        const scene = typeof inst.scene === 'function' ? inst.scene() : null;
+        const renderer = typeof inst.renderer === "function" ? inst.renderer() : null;
+        renderer?.dispose?.();
+        const scene = typeof inst.scene === "function" ? inst.scene() : null;
         if (scene) {
           scene.traverse?.((obj: any) => {
             obj.geometry?.dispose?.();
@@ -257,64 +300,61 @@ const ImpactGlobe = memo(({ locations, showLabels = false, brandColor, enableZoo
   }, []);
 
   return (
-    <div ref={containerRef} className="w-full h-full">
-      {/* Loading placeholder */}
-      {(!isLoaded || dimensions.width === 0) && (
-        <div className="w-full h-full flex items-center justify-center">
-          <div className="w-48 h-48 rounded-full bg-gradient-to-br from-accent/60 to-accent/30 animate-pulse" />
-        </div>
-      )}
-      {dimensions.width > 0 && isLoaded && (
-        <Globe
-          ref={globeRef}
-          width={dimensions.width}
-          height={dimensions.height}
-          backgroundColor="rgba(0,0,0,0)"
-          showGlobe={false}
-          showAtmosphere={true}
-          atmosphereColor={globeColor}
-          atmosphereAltitude={0.2}
-          polygonsData={countries.features}
-          polygonCapColor={polygonCapColorFn}
-          polygonSideColor={polygonSideColorFn}
-          polygonStrokeColor={polygonStrokeColorFn}
-          polygonAltitude={0.006}
-          pointsData={pointsData}
-          pointAltitude={locations ? 0.02 : 0.012}
-          pointRadius={locations ? 0.85 : 0.6}
-          pointColor={pointColorFn}
-          pointsMerge={false}
-          arcsData={arcsData}
-          arcColor={arcColorFn}
-          arcAltitude={(d: any) => d.altitude ?? 0.25}
-          arcStroke={0.4}
-          arcDashLength={(d: any) => d.dashLength ?? 0.5}
-          arcDashGap={0.4}
-          arcDashAnimateTime={(d: any) => d.animateTime ?? 2500}
-          ringsData={pointsData}
-          ringColor={ringColorFn}
-          ringMaxRadius={locations ? 2.4 : 2}
-          ringPropagationSpeed={2.2}
-          // 700ms repeat with ~1100ms ring lifetime means each pin always has
-          // 1–2 rings expanding — never goes "quiet". Continuous outward shimmer.
-          ringRepeatPeriod={700}
-          labelsData={labelsData}
-          labelLat={labelLatFn}
-          labelLng={labelLngFn}
-          labelText={labelTextFn}
-          labelSize={labelSize}
-          labelDotRadius={labelDotRadius}
-          labelColor={labelColorFn}
-          labelResolution={2}
-          labelAltitude={0.02}
-          onZoom={handleZoom}
-        />
-      )}
-    </div>
+    <GlobeErrorBoundary>
+      <div ref={containerRef} className="w-full h-full">
+        {(!isLoaded || dimensions.width === 0) && (
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="w-48 h-48 rounded-full bg-gradient-to-br from-accent/60 to-accent/30 animate-pulse" />
+          </div>
+        )}
+        {dimensions.width > 0 && isLoaded && (
+          <Globe
+            ref={globeRef}
+            width={dimensions.width}
+            height={dimensions.height}
+            backgroundColor="rgba(0,0,0,0)"
+            showGlobe={false}
+            showAtmosphere={true}
+            atmosphereColor={atmosphereColor}
+            atmosphereAltitude={0.06}
+            polygonsData={countries.features}
+            polygonCapColor={polygonCapColorFn}
+            polygonSideColor={polygonSideColorFn}
+            polygonStrokeColor={polygonStrokeColorFn}
+            polygonAltitude={0.006}
+            htmlElementsData={pointsData}
+            htmlElement={htmlElementFn}
+            htmlAltitude={0.012}
+            arcsData={arcsData}
+            arcColor={arcColorFn}
+            arcAltitude={(d: any) => d.altitude ?? 0.25}
+            arcStroke={0.4}
+            arcDashLength={(d: any) => d.dashLength ?? 0.5}
+            arcDashGap={0.4}
+            arcDashAnimateTime={(d: any) => d.animateTime ?? 2500}
+            ringsData={pointsData}
+            ringColor={ringColorFn}
+            ringMaxRadius={locations ? 2.4 : 2}
+            ringPropagationSpeed={2.2}
+            ringRepeatPeriod={700}
+            labelsData={labelsData}
+            labelLat={labelLatFn}
+            labelLng={labelLngFn}
+            labelText={labelTextFn}
+            labelSize={labelSize}
+            labelDotRadius={labelDotRadius}
+            labelColor={labelColorFn}
+            labelResolution={2}
+            labelAltitude={0.02}
+            onZoom={handleZoom}
+          />
+        )}
+      </div>
+    </GlobeErrorBoundary>
   );
 });
 
-ImpactGlobe.displayName = 'ImpactGlobe';
+ImpactGlobe.displayName = "ImpactGlobe";
 
 export default ImpactGlobe;
 

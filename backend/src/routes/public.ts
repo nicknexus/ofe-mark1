@@ -16,6 +16,24 @@ async function sendPublic(res: Response, orgSlug: string, payload: any): Promise
 }
 
 // ============================================
+// SHOWCASE (landing page live feed)
+// ============================================
+
+// Global feed of real stories + aggregate stats across all public orgs
+router.get('/showcase', async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit as string) || 12, 24);
+        const showcase = await PublicService.getShowcase(limit);
+        // Cache at the edge/CDN for a few minutes — this data changes slowly.
+        res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+        res.json(showcase);
+    } catch (error) {
+        console.error('Showcase error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// ============================================
 // SEARCH
 // ============================================
 

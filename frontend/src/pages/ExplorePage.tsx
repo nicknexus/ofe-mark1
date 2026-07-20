@@ -246,7 +246,7 @@ function OrgCard({ org }: { org: PublicOrganization }) {
         <Link to={`/org/${org.slug}`}
             className="group bg-white/50 backdrop-blur-xl p-4 sm:p-5 rounded-xl sm:rounded-2xl transition-all duration-300 hover:-translate-y-1 border border-white/60 hover:bg-white/70 hover:shadow-lg shadow-xl shadow-black/5 active:scale-[0.98]">
             <div className="flex items-start gap-3 sm:gap-4">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-accent/20 to-accent/10 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 group-hover:from-accent/30 group-hover:to-accent/15 transition-colors border border-accent/20">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 border border-border/60 overflow-hidden">
                     {org.logo_url ? (
                         <img src={org.logo_url} alt={org.name} className="w-full h-full object-cover rounded-lg sm:rounded-xl" />
                     ) : (
@@ -268,7 +268,7 @@ function InitiativeCard({ initiative }: { initiative: PublicInitiative & { organ
         <Link to={`/org/${initiative.org_slug}/${initiative.slug}`}
             className="group bg-white/50 backdrop-blur-xl p-4 sm:p-5 rounded-xl sm:rounded-2xl transition-all duration-300 hover:-translate-y-1 border border-white/60 hover:bg-white/70 hover:shadow-lg shadow-xl shadow-black/5 active:scale-[0.98]">
             <div className="flex items-start gap-3 sm:gap-4">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-accent/20 to-accent/10 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 group-hover:from-accent/30 group-hover:to-accent/15 transition-colors border border-accent/20 overflow-hidden">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 border border-border/60 overflow-hidden">
                     {initiative.organization_logo_url ? (
                         <img src={initiative.organization_logo_url} alt={initiative.organization_name || 'Organization'} className="w-full h-full object-cover" />
                     ) : (
@@ -295,7 +295,7 @@ function LocationMatchCard({ match }: { match: SearchResult['locationMatches'][0
         <Link to={`/org/${match.organization.slug}/${match.initiative.slug}`}
             className="group bg-white/50 backdrop-blur-xl p-4 sm:p-5 rounded-xl sm:rounded-2xl transition-all duration-300 hover:-translate-y-1 border border-white/60 hover:bg-white/70 hover:shadow-lg shadow-xl shadow-black/5 active:scale-[0.98]">
             <div className="flex items-start gap-3 sm:gap-4">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-accent/20 to-accent/10 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 group-hover:from-accent/30 group-hover:to-accent/15 transition-colors border border-accent/20 overflow-hidden">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 border border-border/60 overflow-hidden">
                     {match.organization.logo_url ? (
                         <img src={match.organization.logo_url} alt={match.organization.name} className="w-full h-full object-cover" />
                     ) : (

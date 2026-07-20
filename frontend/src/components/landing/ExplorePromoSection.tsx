@@ -1,9 +1,12 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { motion, AnimatePresence, type PanInfo } from "framer-motion";
 import {
-  Search, ArrowRight, Globe, BarChart3, TrendingUp,
-  BookOpen, MapPin, Camera, Calendar, FileText, ChevronLeft, ChevronRight,
+  ArrowRight, TrendingUp,
+  BookOpen, MapPin, Camera, Calendar, ChevronLeft, ChevronRight,
 } from "lucide-react";
+import { Reveal } from "./Reveal";
+import { easeOut } from "./motion";
 import {
   AreaChart,
   Area,
@@ -264,34 +267,45 @@ function EvidenceSlide() {
 }
 
 const AUTOPLAY_INTERVAL = 5000;
+const SWIPE_THRESHOLD = 60;
+
+const slideComponents = [StorySlide, MetricsSlide, LocationsSlide, EvidenceSlide];
+
+// Directional slide transition — the incoming slide enters from the side the
+// user is heading toward, so paging left/right reads spatially.
+const slideVariants = {
+  enter: (dir: number) => ({ opacity: 0, x: dir > 0 ? 70 : -70, scale: 0.96 }),
+  center: { opacity: 1, x: 0, scale: 1, transition: { duration: 0.5, ease: easeOut } },
+  exit: (dir: number) => ({ opacity: 0, x: dir > 0 ? -70 : 70, scale: 0.96, transition: { duration: 0.35, ease: easeOut } }),
+};
 
 const ExplorePromoSection = () => {
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [[activeIndex, direction], setActive] = useState<[number, number]>([0, 0]);
   const [paused, setPaused] = useState(false);
+
+  const paginate = useCallback((next: number, dir: number) => {
+    const wrapped = (next + slides.length) % slides.length;
+    setActive([wrapped, dir]);
+  }, []);
+
+  const goTo = (idx: number) => paginate(idx, idx > activeIndex ? 1 : -1);
+  const goPrev = () => paginate(activeIndex - 1, -1);
+  const goNext = () => paginate(activeIndex + 1, 1);
 
   useEffect(() => {
     if (paused) return;
     const timer = setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % slides.length);
+      setActive(([prev]) => [(prev + 1) % slides.length, 1]);
     }, AUTOPLAY_INTERVAL);
     return () => clearInterval(timer);
   }, [paused]);
 
-  const goTo = (idx: number) => {
-    setActiveIndex(idx);
-    setPaused(true);
-    setTimeout(() => setPaused(false), 10000);
+  const handleDragEnd = (_e: unknown, info: PanInfo) => {
+    if (info.offset.x < -SWIPE_THRESHOLD) goNext();
+    else if (info.offset.x > SWIPE_THRESHOLD) goPrev();
   };
 
-  const goPrev = () => goTo((activeIndex - 1 + slides.length) % slides.length);
-  const goNext = () => goTo((activeIndex + 1) % slides.length);
-
-  const slideComponents = [
-    <StorySlide key="stories" />,
-    <MetricsSlide key="metrics" />,
-    <LocationsSlide key="locations" />,
-    <EvidenceSlide key="evidence" />,
-  ];
+  const ActiveSlide = slideComponents[activeIndex];
 
   return (
     <section className="py-16 md:py-24 relative overflow-hidden">
@@ -300,92 +314,95 @@ const ExplorePromoSection = () => {
       <div className="relative z-10 max-w-7xl mx-auto px-6">
         <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
           {/* Left — copy + CTA */}
-          <div>
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-newsreader font-light text-foreground mb-12 leading-tight">
-              The end of ineffective reporting.
+          <Reveal direction="left">
+            <p className="text-xs font-semibold text-accent uppercase tracking-[0.2em] mb-4">
+              Live on Nexus
+            </p>
+            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-fraunces font-light text-foreground mb-6 leading-tight">
+              Step into the room.
             </h2>
 
-            <div className="flex items-center gap-3 mb-14 -mt-2">
-              <p className="text-2xl sm:text-3xl font-newsreader font-light text-foreground leading-snug">
-                Actively Experience...
-              </p>
-              <svg
-                className="hidden lg:block w-64 h-10 flex-shrink-0"
-                viewBox="0 0 240 40"
-                fill="none"
-              >
-                <path
-                  d="M4 20Q110 38 216 20"
-                  stroke="#c0dfa1"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  className="animate-pulse-soft-landing"
-                />
-                <path
-                  d="M214 8L234 16L218 28"
-                  stroke="#c0dfa1"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="animate-pulse-soft-landing"
-                />
-              </svg>
-            </div>
+            <p className="text-xl sm:text-2xl font-fraunces font-light text-foreground/80 leading-snug mb-12">
+              Real organizations, real moments, real proof — slide through the stories and dashboards
+              already living on the platform.
+            </p>
 
             <Link
-              to="/login"
+              to="/explore"
               className="inline-flex items-center justify-center gap-2 px-8 h-14 rounded-2xl bg-accent text-accent-foreground text-lg font-medium hover:bg-accent/90 transition-all duration-300 border-2 border-accent/50 shadow-sage hover:shadow-md hover:-translate-y-0.5 group"
             >
-              Start for Free
+              Explore live impact
               <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
             </Link>
-          </div>
+          </Reveal>
 
           {/* Right — slide carousel */}
-          <div
+          <Reveal
+            direction="right"
             className="flex flex-col gap-4"
-            onMouseEnter={() => setPaused(true)}
-            onMouseLeave={() => setPaused(false)}
           >
+            <div
+              onMouseEnter={() => setPaused(true)}
+              onMouseLeave={() => setPaused(false)}
+              className="flex flex-col gap-4"
+            >
             {/* Slide label + arrows */}
             <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-2xl font-semibold text-foreground">
-                  {slides[activeIndex].subtitle}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {slides[activeIndex].label}
-                </p>
+              <div className="min-h-[52px]">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={slides[activeIndex].key}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.3, ease: easeOut }}
+                  >
+                    <h3 className="text-2xl font-semibold text-foreground">
+                      {slides[activeIndex].subtitle}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {slides[activeIndex].label}
+                    </p>
+                  </motion.div>
+                </AnimatePresence>
               </div>
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={goPrev}
-                  className="w-8 h-8 rounded-lg bg-accent/10 hover:bg-accent/20 flex items-center justify-center transition-colors"
+                  aria-label="Previous slide"
+                  className="w-8 h-8 rounded-lg bg-accent/10 hover:bg-accent/20 active:scale-95 flex items-center justify-center transition-all"
                 >
                   <ChevronLeft className="w-4 h-4 text-foreground" />
                 </button>
                 <button
                   onClick={goNext}
-                  className="w-8 h-8 rounded-lg bg-accent/10 hover:bg-accent/20 flex items-center justify-center transition-colors"
+                  aria-label="Next slide"
+                  className="w-8 h-8 rounded-lg bg-accent/10 hover:bg-accent/20 active:scale-95 flex items-center justify-center transition-all"
                 >
                   <ChevronRight className="w-4 h-4 text-foreground" />
                 </button>
               </div>
             </div>
 
-            {/* Slide content */}
-            <div className="relative min-h-[430px]">
-              {slideComponents.map((component, idx) => (
-                <div
-                  key={slides[idx].key}
-                  className={`transition-all duration-500 ${idx === activeIndex
-                      ? "opacity-100 translate-y-0 relative"
-                      : "opacity-0 translate-y-4 absolute inset-0 pointer-events-none"
-                    }`}
+            {/* Slide content — draggable / swipeable */}
+            <div className="relative min-h-[430px] overflow-hidden rounded-2xl">
+              <AnimatePresence initial={false} custom={direction} mode="popLayout">
+                <motion.div
+                  key={slides[activeIndex].key}
+                  custom={direction}
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  dragElastic={0.2}
+                  onDragEnd={handleDragEnd}
+                  className="absolute inset-0 cursor-grab active:cursor-grabbing"
                 >
-                  {component}
-                </div>
-              ))}
+                  <ActiveSlide />
+                </motion.div>
+              </AnimatePresence>
             </div>
 
             {/* Tab indicators */}
@@ -397,18 +414,36 @@ const ExplorePromoSection = () => {
                   <button
                     key={slide.key}
                     onClick={() => goTo(idx)}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-medium transition-all duration-300 ${isActive
-                        ? "bg-accent/20 text-foreground border border-accent/30 shadow-sm"
+                    className={`relative flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-medium transition-colors duration-300 overflow-hidden ${isActive
+                        ? "text-foreground"
                         : "bg-accent/5 text-muted-foreground hover:bg-accent/10 border border-transparent"
                       }`}
                   >
-                    <Icon className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">{slide.label}</span>
+                    {isActive && (
+                      <motion.span
+                        layoutId="explore-tab-pill"
+                        className="absolute inset-0 bg-accent/20 border border-accent/30 rounded-xl shadow-sm"
+                        transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                      />
+                    )}
+                    <Icon className="w-3.5 h-3.5 relative z-10" />
+                    <span className="hidden sm:inline relative z-10">{slide.label}</span>
+                    {/* Autoplay progress bar on the active tab */}
+                    {isActive && !paused && (
+                      <motion.span
+                        key={`${slide.key}-progress`}
+                        className="absolute bottom-0 left-0 h-0.5 bg-accent-foreground/50 rounded-full z-10"
+                        initial={{ width: "0%" }}
+                        animate={{ width: "100%" }}
+                        transition={{ duration: AUTOPLAY_INTERVAL / 1000, ease: "linear" }}
+                      />
+                    )}
                   </button>
                 );
               })}
             </div>
-          </div>
+            </div>
+          </Reveal>
         </div>
       </div>
     </section>

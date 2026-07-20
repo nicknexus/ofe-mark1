@@ -58,6 +58,9 @@ self.addEventListener('fetch', (event) => {
     const { request } = event
     const url = request.url
 
+    // Never cache/intercept local dev — Vite HMR and dynamic chunks must bypass SW.
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/.test(url)) return
+
     if (request.method !== 'GET') return
 
     if (isNetworkOnly(url)) return

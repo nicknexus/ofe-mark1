@@ -216,6 +216,60 @@ export interface LocationDetail {
  initiative: { id: string; title: string; slug: string; org_slug: string }
 }
 
+export interface ShowcaseStory {
+ id: string
+ title: string
+ description?: string
+ media_url?: string
+ media_type: 'photo' | 'video' | 'recording' | 'text'
+ date_represented: string
+ location_name?: string
+ country?: string
+ initiative_slug?: string
+ initiative_title?: string
+ org_slug?: string
+ org_name?: string
+ org_logo_url?: string
+ org_brand_color?: string
+}
+
+export interface ShowcaseImpactClaim {
+ id: string
+ value: number
+ label?: string
+ date_represented: string
+ date_range_start?: string
+ date_range_end?: string
+ metric_title?: string
+ unit_of_measurement?: string
+ metric_type?: 'number' | 'percentage'
+ lat: number
+ lng: number
+ location_name?: string
+ country?: string
+ initiative_slug?: string
+ initiative_title?: string
+ org_slug?: string
+ org_name?: string
+ org_logo_url?: string
+ org_brand_color?: string
+ evidence_image_url?: string
+}
+
+export interface ShowcaseStats {
+ organizations: number
+ initiatives: number
+ stories: number
+ locations: number
+ countries: number
+}
+
+export interface Showcase {
+ stats: ShowcaseStats
+ stories: ShowcaseStory[]
+ impact_claims: ShowcaseImpactClaim[]
+}
+
 export interface SearchResult {
  organizations: PublicOrganization[]
  initiatives: (PublicInitiative & { organization_name: string })[]
@@ -352,6 +406,14 @@ class PublicApiService {
  return { organizations: [], initiatives: [], locationMatches: [] }
  }
  return this.request<SearchResult>(`/search?q=${encodeURIComponent(query)}`)
+ }
+
+ // ============================================
+ // Showcase (landing page live feed)
+ // ============================================
+
+ async getShowcase(limit = 12): Promise<Showcase> {
+ return this.request<Showcase>(`/showcase?limit=${limit}`)
  }
 
  // ============================================
