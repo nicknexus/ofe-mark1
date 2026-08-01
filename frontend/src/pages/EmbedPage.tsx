@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { ArrowRight, ShieldCheck, Play } from 'lucide-react'
 import {
     publicApi,
@@ -7,6 +7,7 @@ import {
     PublicKPI,
     PublicStory,
 } from '../services/publicApi'
+import { apiService } from '../services/api'
 import { getVideoThumbnailUrl, parseVideoUrl } from '../utils/videoEmbed'
 
 // Compact format for big numbers: 1.2K, 3.4M, etc.
@@ -72,6 +73,13 @@ function PlayBadge({ brand }: { brand: string }) {
 
 export default function EmbedPage() {
     const { slug } = useParams<{ slug: string }>()
+    const [searchParams] = useSearchParams()
+    // ?preview=1 is only ever set by the Account → Embed Widget tab, which
+    // renders this page in a same-origin iframe. It reads an authenticated
+    // endpoint so the widget is visible before the public profile goes live.
+    // Donor sites never carry the flag, and it grants nothing on its own —
+    // the server still requires a session with access to the org.
+    const isPreview = searchParams.get('preview') === '1'
 
     const [org, setOrg] = useState<PublicOrganization | null>(null)
     const [metrics, setMetrics] = useState<PublicKPI[]>([])
@@ -104,18 +112,35 @@ export default function EmbedPage() {
         let cancelled = false
         if (!slug) return
 
+        async function loadPublic() {
+            const [orgRes, mets, sts] = await Promise.all([
+                publicApi.getOrganization(slug!),
+                publicApi.getOrganizationMetrics(slug!),
+                publicApi.getOrganizationStories(slug!, 6).catch(() => [] as PublicStory[]),
+            ])
+            return { organization: orgRes.organization, metrics: mets, stories: sts }
+        }
+
         async function load() {
             try {
                 setLoading(true)
-                const [orgRes, mets, sts] = await Promise.all([
-                    publicApi.getOrganization(slug!),
-                    publicApi.getOrganizationMetrics(slug!),
-                    publicApi.getOrganizationStories(slug!, 6).catch(() => [] as PublicStory[]),
-                ])
+                let data
+                if (isPreview) {
+                    // Fall back to the anonymous path if the preview call fails
+                    // (expired session, no access, stale ?preview=1 link) — a
+                    // live org still renders rather than showing an error.
+                    try {
+                        data = await apiService.getEmbedPreview(slug!)
+                    } catch {
+                        data = await loadPublic()
+                    }
+                } else {
+                    data = await loadPublic()
+                }
                 if (cancelled) return
-                setOrg(orgRes.organization)
-                setMetrics(mets)
-                setStories(sts)
+                setOrg(data.organization)
+                setMetrics(data.metrics)
+                setStories(data.stories)
             } catch (err: any) {
                 if (cancelled) return
                 setError(err?.message || 'Failed to load')
@@ -127,7 +152,7 @@ export default function EmbedPage() {
         return () => {
             cancelled = true
         }
-    }, [slug])
+    }, [slug, isPreview])
 
     // ── Strip the main app's Nexus-green radial backgrounds so only the
     //    org's brand colour shows through (otherwise green bleeds in around

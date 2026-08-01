@@ -23,8 +23,23 @@ import {
  ConnectEvidenceResult
 } from '../types'
 import { OnboardingChatResponse, ChatStage, ChatContext } from '../components/onboarding/planTypes'
+import type { PublicOrganization, PublicKPI, PublicStory } from './publicApi'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+
+/**
+ * Authenticated mirror of the anonymous widget payload, served by
+ * GET /api/organizations/embed-preview/:slug. Same shapes as publicApi so
+ * EmbedPage can render either source without branching on the data.
+ */
+export interface EmbedPreviewPayload {
+  organization: PublicOrganization
+  stats: { initiatives: number; locations: number; stories: number; kpis: number }
+  metrics: PublicKPI[]
+  stories: PublicStory[]
+  /** Whether the org's public profile is live — drives the preview disclaimer. */
+  is_public: boolean
+}
 
 // Toggle chatty per-request console logs. Off by default — they were a meaningful
 // source of dev-tools jank when the app fans out 20+ requests on navigation.
@@ -865,6 +880,19 @@ class ApiService {
 
  async getOrganization(id: string): Promise<Organization> {
  return this.request<Organization>(`/organizations/${id}`)
+ }
+
+ /**
+  * Embed-widget preview payload for an org the caller has access to.
+  *
+  * Mirrors the anonymous /api/public org endpoints the widget normally reads,
+  * but works before the org's public profile is live. Used by EmbedPage when
+  * loaded with ?preview=1. Always fetched fresh — the point of the preview is
+  * to reflect the current data (and the current state of the public toggle).
+  */
+ async getEmbedPreview(slug: string): Promise<EmbedPreviewPayload> {
+ this.clearCacheByPattern(`/organizations/embed-preview/${slug}`)
+ return this.request<EmbedPreviewPayload>(`/organizations/embed-preview/${slug}`)
  }
 
  async createOrganization(name: string): Promise<{ organization: Organization; message: string }> {

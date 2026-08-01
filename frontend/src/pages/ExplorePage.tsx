@@ -120,6 +120,11 @@ export default function ExplorePage({ embedded = false }: ExplorePageProps) {
     // Auto-cycle the spotlight through impact claims while the user is idle.
     // A hover override sticks — the globe stays on the last hovered charity —
     // and the ambient tour only resumes after a stretch of no interaction.
+    //
+    // Walking `claims` in order is deliberate: the server orders them
+    // newest-first with a per-charity cooldown, so stepping the index moves to
+    // a different org every time. Don't re-sort this array without preserving
+    // that — sorting by date alone brings back the same-charity ping-pong.
     useEffect(() => {
         if (claims.length < 2) return
         const timer = setInterval(() => {

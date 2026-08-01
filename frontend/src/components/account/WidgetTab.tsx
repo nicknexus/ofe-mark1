@@ -11,7 +11,10 @@ export function WidgetTab({ orgSlug, isPublic }: WidgetTabProps) {
  const [scale, setScale] = useState(1)
 
  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.nexusimpacts.ai'
- const previewSrc = orgSlug ? `${origin}/embed/${orgSlug}` : ''
+ // ?preview=1 makes the embed page read an authenticated endpoint instead of
+ // the anonymous public one, so the widget renders even before the org's
+ // public profile is live. The snippet donors paste never carries the flag.
+ const previewSrc = orgSlug ? `${origin}/embed/${orgSlug}?preview=1` : ''
 
  // Auto-grow the preview iframe in response to its postMessage events.
  // Track the natural (pre-scale) height so we can resize the visible wrapper.
@@ -100,8 +103,9 @@ export function WidgetTab({ orgSlug, isPublic }: WidgetTabProps) {
  <div className="flex items-start gap-2 px-3 py-2.5 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-900">
  <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
  <div>
- Your organization isn't public yet. The widget can only render when your public profile is enabled.
- Toggle it on under the <span className="font-medium">Account</span> tab.
+ <span className="font-medium">Preview only.</span> This is exactly what donors will see, but the
+ widget won't render on their sites until your public profile is live. Turn it on under the{' '}
+ <span className="font-medium">Account</span> tab.
  </div>
  </div>
  )}
@@ -110,7 +114,15 @@ export function WidgetTab({ orgSlug, isPublic }: WidgetTabProps) {
  {/* Live preview */}
  <div className="app-card p-6">
  <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
- <h3 className="text-sm font-semibold text-gray-800">Live preview</h3>
+ <div className="flex items-center gap-2 min-w-0">
+ <h3 className="text-sm font-semibold text-gray-800">{isPublic ? 'Live preview' : 'Preview'}</h3>
+ {!isPublic && (
+ <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-semibold whitespace-nowrap">
+ <AlertTriangle className="w-3 h-3" />
+ Not live yet
+ </span>
+ )}
+ </div>
  <div className="flex items-center gap-2">
  <div className="inline-flex items-center bg-gray-100 rounded-lg p-0.5">
  <button
@@ -181,6 +193,7 @@ export function WidgetTab({ orgSlug, isPublic }: WidgetTabProps) {
  {previewMode === 'desktop'
  ? `Shown at ${Math.round(scale * 100)}% of desktop size — donors see it full-size on their site.`
  : 'Mobile preview at native width.'}
+ {!isPublic && ' Visible to your team only until your public profile is live.'}
  </p>
  </div>
 
@@ -204,6 +217,14 @@ export function WidgetTab({ orgSlug, isPublic }: WidgetTabProps) {
  <pre className="bg-gray-900 text-gray-100 text-xs leading-relaxed font-mono rounded-xl p-4 overflow-x-auto whitespace-pre-wrap break-all">
 {snippet}
  </pre>
+ {!isPublic && (
+ <p className="mt-2.5 flex items-start gap-1.5 text-xs text-amber-700">
+ <AlertTriangle className="w-3.5 h-3.5 mt-px flex-shrink-0" />
+ <span>
+ This snippet is ready to share, but it will render an empty widget until your public profile is live.
+ </span>
+ </p>
+ )}
  </div>
  </div>
  )

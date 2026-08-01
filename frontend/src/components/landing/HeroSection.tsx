@@ -239,10 +239,16 @@ const HeroSection = ({ onGetStarted }: HeroSectionProps) => {
   }, []);
 
   const hasRealClaims = claims.length > 0;
-  // Prefer showing 5+ *different* charities on the globe — one card per org
-  // (claims arrive pre-sorted: evidence-image first, then most recent). If we
-  // can't muster 5 distinct orgs, fall back to the raw recent list so the
-  // globe isn't sparse (the rotation still varies org-to-org where it can).
+  // One card per charity. Claims arrive newest-first with a per-charity
+  // cooldown (see PublicService.getShowcase), so taking the first claim per
+  // org keeps each charity's most recent work and preserves that ordering —
+  // the busiest charities lead, dormant ones trail.
+  //
+  // This used to fall back to the raw claim list when fewer than 5 distinct
+  // orgs came back — which fired constantly, because the server was only
+  // sending 2. That made the cards ping-pong between the same two charities.
+  // The dedupe is now unconditional: fewer orgs means a shorter cycle, never
+  // a repeat of the same org.
   const claimPool = useMemo(() => {
     if (!hasRealClaims) return FALLBACK_CLAIMS;
     const seen = new Set<string>();
@@ -253,7 +259,7 @@ const HeroSection = ({ onGetStarted }: HeroSectionProps) => {
       seen.add(key);
       distinctByOrg.push(claim);
     }
-    return distinctByOrg.length >= 5 ? distinctByOrg : claims;
+    return distinctByOrg.length > 0 ? distinctByOrg : claims;
   }, [hasRealClaims, claims]);
 
   useEffect(() => {

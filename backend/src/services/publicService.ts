@@ -5,6 +5,20 @@ import { MetricTagService } from './metricTagService';
 import { EntitlementService } from './entitlementService';
 import { aggregateKpiUpdates } from '../utils/kpiAggregation';
 
+/**
+ * Options for the org-level public reads.
+ *
+ * `allowPrivate` drops the `is_public = true` filter so an authenticated
+ * caller who already has access to the org (see the embed-preview route in
+ * routes/organizations.ts) can render exactly what donors WOULD see before
+ * the public profile goes live. It is never set from an anonymous route —
+ * plan gating (EntitlementService) still applies either way, so a preview
+ * shows the real public payload, not a privileged superset.
+ */
+export interface PublicReadOptions {
+    allowPrivate?: boolean;
+}
+
 // Types for public responses (stripped of sensitive fields)
 export interface PublicOrganization {
     id: string;
@@ -261,16 +275,17 @@ export class PublicService {
         return data || [];
     }
 
-    static async getOrganizationBySlug(slug: string): Promise<{
+    static async getOrganizationBySlug(slug: string, opts?: PublicReadOptions): Promise<{
         organization: PublicOrganization;
         stats: { initiatives: number; locations: number; stories: number; kpis: number };
     } | null> {
-        const { data: org, error } = await supabase
+        let orgQuery = supabase
             .from('organizations')
             .select('id, name, slug, description, statement, logo_url, brand_color, donation_url, website_url, created_at, is_demo')
-            .eq('slug', slug)
-            .eq('is_public', true)
-            .single();
+            .eq('slug', slug);
+        if (!opts?.allowPrivate) orgQuery = orgQuery.eq('is_public', true);
+
+        const { data: org, error } = await orgQuery.single();
 
         if (error || !org) return null;
 
@@ -373,9 +388,9 @@ export class PublicService {
     // ORG-LEVEL AGGREGATES (for Public Dashboard)
     // ============================================
 
-    static async getOrganizationMetrics(orgSlug: string): Promise<any[]> {
+    static async getOrganizationMetrics(orgSlug: string, opts?: PublicReadOptions): Promise<any[]> {
         // Get all KPIs from all initiatives in this public org, including updates for totals
-        const { data, error } = await supabase
+        let metricsQuery = supabase
             .from('kpis')
             .select(`
                 id, title, description, metric_type, unit_of_measurement, category, display_order, initiative_id,
@@ -384,9 +399,12 @@ export class PublicService {
                 ),
                 kpi_updates(id, value, date_represented, location_id)
             `)
-            .eq('initiatives.organizations.slug', orgSlug)
-            .eq('initiatives.organizations.is_public', true)
-            .order('display_order');
+            .eq('initiatives.organizations.slug', orgSlug);
+        if (!opts?.allowPrivate) {
+            metricsQuery = metricsQuery.eq('initiatives.organizations.is_public', true);
+        }
+
+        const { data, error } = await metricsQuery.order('display_order');
 
         if (error) throw new Error(`Failed to fetch metrics: ${error.message}`);
 
@@ -443,7 +461,7 @@ export class PublicService {
         });
     }
 
-    static async getOrganizationStories(orgSlug: string, limit?: number): Promise<any[]> {
+    static async getOrganizationStories(orgSlug: string, limit?: number, opts?: PublicReadOptions): Promise<any[]> {
         let query = supabase
             .from('stories')
             .select(`
@@ -453,9 +471,13 @@ export class PublicService {
                     organizations!inner(slug, is_public)
                 )
             `)
-            .eq('initiatives.organizations.slug', orgSlug)
-            .eq('initiatives.organizations.is_public', true)
-            .order('date_represented', { ascending: false });
+            .eq('initiatives.organizations.slug', orgSlug);
+
+        if (!opts?.allowPrivate) {
+            query = query.eq('initiatives.organizations.is_public', true);
+        }
+
+        query = query.order('date_represented', { ascending: false });
 
         if (limit) {
             query = query.limit(limit);
@@ -1958,16 +1980,46 @@ export class PublicService {
             const kpiIds = kpiList.map((k: any) => k.id);
 
             if (kpiIds.length) {
-                const { data: updates } = await supabase
-                    .from('kpi_updates')
-                    .select(`
-                        id, value, label, date_represented, date_range_start, date_range_end, kpi_id,
-                        locations!inner(id, name, country, latitude, longitude)
-                    `)
-                    .in('kpi_id', kpiIds)
-                    .not('location_id', 'is', null)
-                    .order('date_represented', { ascending: false })
-                    .limit(36);
+                // Per-charity selection, NOT a single global "most recent N".
+                //
+                // A global window lets one busy org fill every slot: with 8 orgs
+                // holding located claims, the old `.limit(36)` returned only 4 of
+                // them, and the sort below narrowed that to 2 — so the homepage
+                // cards and the explore spotlight cycled the same pair forever.
+                // Taking each org's most recent claims and interleaving them
+                // (see the round-robin after the mapping) keeps the showcase
+                // representative no matter how lopsided posting volume is.
+                const CLAIMS_PER_ORG = 8;
+                // Bounds the fan-out — one query per org. The showcase only
+                // surfaces ~24 claims, so featuring more orgs than this buys
+                // nothing and would just cost round-trips on a cold cache.
+                const MAX_SHOWCASE_ORGS = 40;
+
+                const kpiIdsByOrg = new Map<string, string[]>();
+                for (const k of kpiList) {
+                    const init = initById.get((k as any).initiative_id) as any;
+                    if (!init) continue;
+                    const list = kpiIdsByOrg.get(init.organization_id) || [];
+                    list.push((k as any).id);
+                    kpiIdsByOrg.set(init.organization_id, list);
+                }
+
+                const perOrgRows = await Promise.all(
+                    [...kpiIdsByOrg.values()].slice(0, MAX_SHOWCASE_ORGS).map(async (orgKpiIds) => {
+                        const { data } = await supabase
+                            .from('kpi_updates')
+                            .select(`
+                                id, value, label, date_represented, date_range_start, date_range_end, kpi_id,
+                                locations!inner(id, name, country, latitude, longitude)
+                            `)
+                            .in('kpi_id', orgKpiIds)
+                            .not('location_id', 'is', null)
+                            .order('date_represented', { ascending: false })
+                            .limit(CLAIMS_PER_ORG);
+                        return data || [];
+                    })
+                );
+                const updates = perOrgRows.flat();
 
                 const updateRows = (updates || []).filter((u: any) => {
                     const loc = u.locations;
@@ -2039,14 +2091,61 @@ export class PublicService {
                     };
                 });
 
-                // Prefer claims that have evidence imagery, then newest first.
-                impactClaims.sort((a, b) => {
-                    const aImg = a.evidence_image_url ? 1 : 0;
-                    const bImg = b.evidence_image_url ? 1 : 0;
-                    if (bImg !== aImg) return bImg - aImg;
-                    return String(b.date_represented).localeCompare(String(a.date_represented));
+                // Ordering: newest work first, but never the same charity twice
+                // until every other charity has had a turn.
+                //
+                // Recency is the primary signal — the showcase should read as
+                // "here's what's happened lately", so an org posting this week
+                // legitimately appears more often than one dormant since 2023,
+                // and dormant orgs sink to the end on their own because their
+                // claims are simply older. The cooldown below is what stops an
+                // active org from monopolising the rotation on the way there.
+                const orgKeyOf = (claim: any) => claim.org_slug || claim.org_name || claim.id;
+
+                // Evidence imagery only breaks ties between claims sharing a
+                // date. Applied as a primary sort it outranked recency entirely
+                // and was the second funnel that cut the showcase to two orgs.
+                const byRecency = [...impactClaims].sort((a, b) => {
+                    const byDate = String(b.date_represented).localeCompare(String(a.date_represented));
+                    if (byDate !== 0) return byDate;
+                    return (b.evidence_image_url ? 1 : 0) - (a.evidence_image_url ? 1 : 0);
                 });
-                impactClaims = impactClaims.slice(0, 24);
+
+                const SHOWCASE_CLAIM_LIMIT = 24;
+                const ordered: any[] = [];
+                // Position in `ordered` where each charity last appeared.
+                const lastShownAt = new Map<string, number>();
+
+                while (ordered.length < SHOWCASE_CLAIM_LIMIT && byRecency.length > 0) {
+                    // Always take from whichever charity has waited longest,
+                    // and within that, its newest claim (byRecency is already
+                    // newest-first, and the strict > keeps the first/newest hit
+                    // when scores tie). Charities not yet shown score highest,
+                    // so the opening pass runs through every one of them in
+                    // order of how recently they posted.
+                    //
+                    // A "longest wait" rule rather than a fixed cooldown window
+                    // matters at the tail: once the smaller charities run out of
+                    // claims, a fixed window has to be abandoned wholesale and
+                    // the busiest org clumps up several slots in a row. This
+                    // degrades one slot at a time instead, so repeats only ever
+                    // happen when genuinely nothing else is left to show.
+                    let bestIdx = 0;
+                    let bestWait = -Infinity;
+                    for (let i = 0; i < byRecency.length; i++) {
+                        const last = lastShownAt.get(orgKeyOf(byRecency[i]));
+                        const wait = ordered.length - (last ?? -1);
+                        if (wait > bestWait) {
+                            bestWait = wait;
+                            bestIdx = i;
+                        }
+                    }
+
+                    const [claim] = byRecency.splice(bestIdx, 1);
+                    lastShownAt.set(orgKeyOf(claim), ordered.length);
+                    ordered.push(claim);
+                }
+                impactClaims = ordered;
             }
         }
 

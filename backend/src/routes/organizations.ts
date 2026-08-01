@@ -3,6 +3,8 @@ import { OrganizationService } from '../services/organizationService';
 import { OrganizationContextService } from '../services/organizationContextService';
 import { SubscriptionService } from '../services/subscriptionService';
 import { TeamService } from '../services/teamService';
+import { PublicService } from '../services/publicService';
+import { EntitlementService, stripGatedFields } from '../services/entitlementService';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { supabase } from '../utils/supabase';
 import { KPIService } from '../services/kpiService';
@@ -76,6 +78,68 @@ router.get('/public/:slug', async (req, res) => {
 });
 
 // ===== AUTHENTICATED ROUTES =====
+
+// Embed-widget preview data.
+//
+// The widget iframe (/embed/:slug) normally reads the anonymous /api/public
+// endpoints, which all require is_public = true. That leaves an org with no
+// way to see its own widget before going live. This route serves the SAME
+// payload for a caller who already has access to the org, so the Account →
+// Embed Widget tab can render a true-to-life preview while the public page
+// is still off.
+//
+// Access is org membership (owner or team member), not admin — the Account
+// tab decides who gets to *see* the tab, so that gate can be relaxed without
+// touching the server.
+//
+// Two path segments, so this never collides with the /:id route below.
+router.get('/embed-preview/:slug', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const { slug } = req.params;
+
+        const { data: org } = await supabase
+            .from('organizations')
+            .select('id, is_public')
+            .eq('slug', slug)
+            .maybeSingle();
+
+        if (!org) {
+            res.status(404).json({ error: 'Organization not found' });
+            return;
+        }
+
+        const hasAccess = await TeamService.hasOrgAccess(req.user!.id, org.id);
+        if (!hasAccess) {
+            res.status(403).json({ error: 'You do not have access to this organization' });
+            return;
+        }
+
+        const [result, metrics, stories] = await Promise.all([
+            PublicService.getOrganizationBySlug(slug, { allowPrivate: true }),
+            PublicService.getOrganizationMetrics(slug, { allowPrivate: true }),
+            PublicService.getOrganizationStories(slug, 6, { allowPrivate: true }),
+        ]);
+
+        if (!result) {
+            res.status(404).json({ error: 'Organization not found' });
+            return;
+        }
+
+        // Apply the same plan-gated field stripping the anonymous routes do,
+        // so the preview matches what donors would actually be served.
+        const ent = await EntitlementService.getForOrg(org.id);
+        res.json({
+            organization: result.organization,
+            stats: result.stats,
+            metrics: stripGatedFields(metrics, ent.features),
+            stories: stripGatedFields(stories, ent.features),
+            is_public: !!org.is_public,
+        });
+    } catch (error) {
+        console.error('Embed preview error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
 
 // Get user's organizations
 router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {

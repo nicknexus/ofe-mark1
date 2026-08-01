@@ -45,10 +45,21 @@ import { WidgetTab } from '../components/account/WidgetTab'
 export default function AccountPage({ subscriptionStatus }: AccountPageOuterProps) {
  const navigate = useNavigate()
  const [searchParams, setSearchParams] = useSearchParams()
- const { isOwner, isSharedMember, canManageTeam, organizationName, hasOwnOrganization, ownedOrganization: realOwnedOrganization, editableOrganization, activeOrganization, loading: teamLoading, refreshPermissions } = useTeam()
+ const { isOwner, isAdmin, isSharedMember, canManageTeam, organizationName, hasOwnOrganization, ownedOrganization: realOwnedOrganization, editableOrganization, activeOrganization, loading: teamLoading, refreshPermissions } = useTeam()
  // `ownedOrganization` throughout this page refers to whichever org the user
  // is currently editing — their real org, or a demo if they're inside one.
  const ownedOrganization = editableOrganization || realOwnedOrganization
+
+ // The embed widget belongs to the org you're CURRENTLY in, not the one you
+ // happen to own — a team member switched into someone else's org needs to
+ // see that org's widget. `ownedOrganization` falls back to your own org for
+ // non-owners, so this deliberately reads activeOrganization instead.
+ const widgetOrganization = activeOrganization
+ // Who may see the Embed Widget tab. Owners and org admins for now; change
+ // this to `!!widgetOrganization` to open it to every team member. `isOwner`
+ // and `isAdmin` are both scoped to the active org, so switching orgs
+ // re-evaluates this correctly.
+ const canSeeWidgetTab = !!widgetOrganization && (isOwner || isAdmin)
 
  // Get initial tab from URL or default to 'account'
  const initialTab = (searchParams.get('tab') as TabType) || 'account'
@@ -417,7 +428,9 @@ export default function AccountPage({ subscriptionStatus }: AccountPageOuterProp
  { id: 'organization' as TabType, label: 'Organization', icon: Building2, requiresOrg: true },
  { id: 'teams' as TabType, label: 'Teams', icon: Users, requiresOrg: true },
  { id: 'branding' as TabType, label: 'Branding', icon: Palette, requiresOrg: true },
- { id: 'widget' as TabType, label: 'Embed Widget', icon: Code2, requiresOrg: true },
+ // No `requiresOrg`: gated by canSeeWidgetTab instead, so a team member
+ // with no organization of their own still sees their team's widget.
+ { id: 'widget' as TabType, label: 'Embed Widget', icon: Code2 },
  { id: 'storage' as TabType, label: 'Storage', icon: HardDrive },
  { id: 'billing' as TabType, label: 'Billing', icon: CreditCard },
  { id: 'danger' as TabType, label: 'Delete Account', icon: Trash2, danger: true },
@@ -435,6 +448,7 @@ export default function AccountPage({ subscriptionStatus }: AccountPageOuterProp
  <nav className="space-y-1">
  {tabs.map((tab) => {
  if (tab.id === 'teams' && !canManageTeam) return null
+ if (tab.id === 'widget' && !canSeeWidgetTab) return null
  if (isSupportMode && (tab.id === 'billing' || tab.id === 'danger')) return null
  if (tab.requiresOrg && !hasOwnOrganization) return null
  const showNotPublicIndicator = tab.id === 'account' && hasOwnOrganization && !ownedOrganization?.is_public
@@ -561,10 +575,10 @@ export default function AccountPage({ subscriptionStatus }: AccountPageOuterProp
  />
  )}
 
- {activeTab === 'widget' && hasOwnOrganization && (
+ {activeTab === 'widget' && canSeeWidgetTab && (
  <WidgetTab
- orgSlug={ownedOrganization?.slug}
- isPublic={ownedOrganization?.is_public}
+ orgSlug={widgetOrganization?.slug}
+ isPublic={widgetOrganization?.is_public}
  />
  )}
 
