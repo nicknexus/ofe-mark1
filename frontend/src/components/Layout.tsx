@@ -25,6 +25,7 @@ import { useOnboarding } from '../context/OnboardingContext'
 import { User, Organization } from '../types'
 import { notify } from '../lib/notify'
 import { UserProfileMenu } from './ui/UserProfileMenu'
+import { getSupportContext } from '../admin/support'
 
 interface LayoutProps {
  user: User
@@ -52,6 +53,9 @@ export default function Layout({ user, children }: LayoutProps) {
  const { startTutorial } = useTutorial()
  const { startOnboarding } = useOnboarding()
  const isDemoOrg = !!activeOrganization?.is_demo
+ // Platform admin working inside a customer org: nothing belonging to the
+ // admin's own account may appear anywhere on screen.
+ const supportContext = getSupportContext()
 
  useEffect(() => {
  const loadOrganization = async () => {
@@ -435,7 +439,7 @@ export default function Layout({ user, children }: LayoutProps) {
  <div className="pt-4 mt-4 border-t border-gray-100 px-4 pb-4">
  <div className="flex flex-col space-y-2">
  <div className="text-sm font-medium text-gray-900">
- {user.name || user.email}
+ {supportContext ? 'Support session' : (user.name || user.email)}
  </div>
  {(activeOrganization || organization) && (
  <div className="text-xs text-gray-500">

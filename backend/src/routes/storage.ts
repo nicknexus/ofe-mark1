@@ -49,7 +49,16 @@ router.get('/usage', authenticateUser, async (req: AuthenticatedRequest, res: Re
             return;
         }
 
-        const usage = await StorageService.getUsageForUser(req.user.id);
+        // Resolve the ACTIVE org rather than "the org this user owns".
+        // getUsageForUser() matches on organizations.owner_id, so in support
+        // mode it returned the admin's own org — the admin saw their own
+        // storage bar while sitting inside a customer's account.
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const activeOrgId = await OrgAccessService.resolveActiveOrganizationId(req.user.id, requestedOrgId);
+
+        const usage = activeOrgId
+            ? await StorageService.getUsage(activeOrgId)
+            : await StorageService.getUsageForUser(req.user.id);
 
         if (!usage) {
             res.status(404).json({ error: 'No organization found for user' });
@@ -59,7 +68,6 @@ router.get('/usage', authenticateUser, async (req: AuthenticatedRequest, res: Re
         // Real plan storage limit (falls back to the tier default if the column
         // isn't set yet). Unlimited → show the used amount as the "limit" so the
         // bar never exceeds 100%.
-        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
         const { effectiveLimitBytes } = await SubscriptionService.getStorageLimit(req.user.id, requestedOrgId);
         const limitBytes = effectiveLimitBytes ?? Math.max(usage.storage_used_bytes, GB);
         const usedPercentage = limitBytes > 0 ? (usage.storage_used_bytes / limitBytes) * 100 : 0;

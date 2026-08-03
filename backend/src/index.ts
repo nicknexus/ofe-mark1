@@ -28,6 +28,7 @@ import metricTagRoutes from './routes/metricTags';
 import onboardingRoutes from './routes/onboarding';
 import { processStorageCleanupQueue } from './services/storageCleanupService';
 import { authenticateUser, AuthenticatedRequest } from './middleware/auth';
+import { auditSupportWrites } from './middleware/supportMode';
 
 // Load environment variables
 dotenv.config();
@@ -176,6 +177,11 @@ app.post('/api/admin/cleanup-storage', authenticateUser, async (req: Authenticat
         });
     }
 });
+
+// Audit every write a platform admin makes inside a customer org. Mounted
+// ahead of the routers so it sees all of them; the actual logging runs after
+// the response, once route auth has populated req.user.
+app.use('/api', auditSupportWrites);
 
 // Routes - Enable one by one to find the problem
 app.use('/api/auth', authRoutes);

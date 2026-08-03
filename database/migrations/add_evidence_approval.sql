@@ -24,7 +24,7 @@
 ALTER TABLE evidence
     ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'approved'
         CHECK (approval_status IN ('approved', 'pending'));
-
+    
 ALTER TABLE evidence
     ADD COLUMN IF NOT EXISTS reviewed_by UUID;
 

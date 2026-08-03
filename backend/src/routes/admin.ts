@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { supabase } from '../utils/supabase';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
-import { requireAdmin, requireSuperAdmin } from '../middleware/requireAdmin';
+import { requireAdmin, requireSuperAdmin, requireOrgAccess } from '../middleware/requireAdmin';
 import { PlatformAdminService } from '../services/platformAdminService';
+import { AdminAccountService, bustUserDirectory } from '../services/adminAccountService';
+import { SubscriptionService } from '../services/subscriptionService';
+import { PlanTier } from '../config/planCatalog';
 import { OrganizationService } from '../services/organizationService';
 import { DemoSeedService } from '../services/demoSeedService';
 import { DemoGenerationError, DemoGenerationService } from '../services/demoGenerationService';
@@ -806,80 +809,12 @@ router.get('/orgs', async (req: AuthenticatedRequest, res) => {
     try {
         const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
 
-        let query = supabase
-            .from('organizations')
-            .select('id, name, slug, is_public, owner_id, created_at')
-            .eq('is_demo', false)
-            .order('created_at', { ascending: false })
-            .limit(500);
-
-        if (search) {
-            query = query.or(`name.ilike.%${search}%,slug.ilike.%${search}%`);
-        }
-
         // Support agents only see the orgs assigned to them; super admins see all.
         const role = await PlatformAdminService.getRole(req.user!.id);
-        if (role === 'support') {
-            const assigned = await PlatformAdminService.getAssignedOrgIds(req.user!.id);
-            if (assigned.length === 0) {
-                res.json([]);
-                return;
-            }
-            query = query.in('id', assigned);
-        }
+        const restrictToOrgIds =
+            role === 'support' ? await PlatformAdminService.getAssignedOrgIds(req.user!.id) : null;
 
-        const { data: orgs, error } = await query;
-        if (error) throw error;
-
-        const rows = await Promise.all(
-            (orgs || []).map(async (org) => {
-                // Owner identity
-                let owner: { id: string; email?: string; name?: string } = { id: org.owner_id };
-                if (org.owner_id) {
-                    const { data: u } = await supabase.auth.admin.getUserById(org.owner_id);
-                    owner = {
-                        id: org.owner_id,
-                        email: u?.user?.email,
-                        name: u?.user?.user_metadata?.name,
-                    };
-                }
-
-                // Owner's subscription (limits live here)
-                const { data: sub } = await supabase
-                    .from('subscriptions')
-                    .select('status, plan_tier, team_members_limit, initiatives_limit, trial_ends_at')
-                    .eq('user_id', org.owner_id)
-                    .maybeSingle();
-
-                // Usage counts
-                const [{ count: memberCount }, { count: initiativeCount }] = await Promise.all([
-                    supabase
-                        .from('team_members')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('organization_id', org.id),
-                    supabase
-                        .from('initiatives')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('organization_id', org.id),
-                ]);
-
-                return {
-                    id: org.id,
-                    name: org.name,
-                    slug: org.slug,
-                    is_public: org.is_public,
-                    created_at: org.created_at,
-                    owner,
-                    subscription: sub || null,
-                    usage: {
-                        team_members: memberCount || 0,
-                        initiatives: initiativeCount || 0,
-                    },
-                };
-            })
-        );
-
-        res.json(rows);
+        res.json(await AdminAccountService.listOrgs({ search, restrictToOrgIds }));
     } catch (error) {
         console.error('[admin] list orgs error:', error);
         res.status(500).json({ error: (error as Error).message });
@@ -887,51 +822,130 @@ router.get('/orgs', async (req: AuthenticatedRequest, res) => {
 });
 
 /**
+ * GET /api/admin/orgs/:id/account
+ * Full support view of one account: owner, plan, live Stripe billing +
+ * discount, usage against every limit, team, and recent admin activity.
+ */
+router.get('/orgs/:id/account', requireOrgAccess(), async (req: AuthenticatedRequest, res) => {
+    try {
+        const isSuper = await PlatformAdminService.isSuperAdmin(req.user!.id);
+        const account = await AdminAccountService.getAccount(req.params.id, {
+            includeStripeIds: isSuper,
+        });
+        if (!account) {
+            res.status(404).json({ error: 'Organization not found' });
+            return;
+        }
+        res.json(account);
+    } catch (error) {
+        console.error('[admin] get account error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * POST /api/admin/orgs/:id/plan   Body: { tier: 'free'|'growth'|'pro', reason? }
+ * Move an org onto a plan without payment, applying that tier's full limit set.
+ *
+ * Refuses outright when the customer has a live paying Stripe subscription —
+ * their plan is Stripe's to own, and overwriting it here would desync billing
+ * from entitlements. Super admins only: this is a money decision.
+ */
+router.post('/orgs/:id/plan', requireSuperAdmin, requireOrgAccess(), async (req: AuthenticatedRequest, res) => {
+    try {
+        const tier = req.body?.tier;
+        const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+        if (!['free', 'growth', 'pro'].includes(tier)) {
+            res.status(400).json({ error: 'tier must be one of: free, growth, pro' });
+            return;
+        }
+
+        const { data: org } = await supabase
+            .from('organizations')
+            .select('owner_id, is_demo')
+            .eq('id', req.params.id)
+            .maybeSingle();
+        if (!org || org.is_demo) {
+            res.status(404).json({ error: 'Organization not found' });
+            return;
+        }
+        if (!org.owner_id) {
+            res.status(400).json({ error: 'This organization has no owner to assign a plan to' });
+            return;
+        }
+
+        const before = await SubscriptionService.getByUserId(org.owner_id);
+        if (await AdminAccountService.isActivelyPaying(before)) {
+            res.status(409).json({
+                error: 'This customer has an active paying subscription. Change their plan in Stripe so billing and access stay in sync.',
+                code: 'paying_customer',
+            });
+            return;
+        }
+
+        const after = await AdminAccountService.changePlan(req.params.id, tier as PlanTier);
+
+        await recordAdminAction({
+            adminUserId: req.user!.id,
+            adminEmail: req.user!.email,
+            organizationId: req.params.id,
+            action: 'plan.change',
+            detail: {
+                tier,
+                reason: reason || null,
+                from: { status: before?.status ?? 'none', plan_tier: before?.plan_tier ?? null },
+                to: { status: after.status, plan_tier: after.plan_tier },
+                // Recorded because the grant clears it — keeps the trail complete.
+                cleared_stripe_subscription_id: before?.stripe_subscription_id ?? null,
+            },
+        });
+
+        res.json(after);
+    } catch (error) {
+        const status = (error as any).status || 500;
+        console.error('[admin] change plan error:', error);
+        res.status(status).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * POST /api/admin/orgs/:id/limits/reset
+ * Discard hand-edited limits and snap back to the tier's catalog defaults.
+ */
+router.post('/orgs/:id/limits/reset', requireOrgAccess(), async (req: AuthenticatedRequest, res) => {
+    try {
+        const after = await AdminAccountService.resetLimits(req.params.id);
+        await recordAdminAction({
+            adminUserId: req.user!.id,
+            adminEmail: req.user!.email,
+            organizationId: req.params.id,
+            action: 'limits.reset',
+            detail: { plan_tier: after.plan_tier },
+        });
+        res.json(after);
+    } catch (error) {
+        const status = (error as any).status || 500;
+        console.error('[admin] reset limits error:', error);
+        res.status(status).json({ error: (error as Error).message });
+    }
+});
+
+/**
  * GET /api/admin/orgs/:id
  * Single org detail (owner + plan + usage). Used by the support-mode account
  * view so an agent sees the customer owner's details, not their own.
+ * Scoped by requireOrgAccess — support agents only see orgs assigned to them.
  */
-router.get('/orgs/:id', async (req: AuthenticatedRequest, res) => {
+router.get('/orgs/:id', requireOrgAccess(), async (req: AuthenticatedRequest, res) => {
     try {
-        const { id } = req.params;
-        const { data: org, error } = await supabase
-            .from('organizations')
-            .select('id, name, slug, is_public, owner_id, created_at')
-            .eq('id', id)
-            .maybeSingle();
-        if (error) throw error;
+        // Reuses the list builder so a single row here is shaped exactly like a
+        // row in the list — one AdminOrg contract, not two that can drift.
+        const [org] = await AdminAccountService.listOrgs({ restrictToOrgIds: [req.params.id] });
         if (!org) {
             res.status(404).json({ error: 'Organization not found' });
             return;
         }
-
-        let owner: { id: string; email?: string; name?: string } = { id: org.owner_id };
-        if (org.owner_id) {
-            const { data: u } = await supabase.auth.admin.getUserById(org.owner_id);
-            owner = { id: org.owner_id, email: u?.user?.email, name: u?.user?.user_metadata?.name };
-        }
-
-        const { data: sub } = await supabase
-            .from('subscriptions')
-            .select('status, plan_tier, team_members_limit, initiatives_limit, trial_ends_at')
-            .eq('user_id', org.owner_id)
-            .maybeSingle();
-
-        const [{ count: memberCount }, { count: initiativeCount }] = await Promise.all([
-            supabase.from('team_members').select('*', { count: 'exact', head: true }).eq('organization_id', org.id),
-            supabase.from('initiatives').select('*', { count: 'exact', head: true }).eq('organization_id', org.id),
-        ]);
-
-        res.json({
-            id: org.id,
-            name: org.name,
-            slug: org.slug,
-            is_public: org.is_public,
-            created_at: org.created_at,
-            owner,
-            subscription: sub || null,
-            usage: { team_members: memberCount || 0, initiatives: initiativeCount || 0 },
-        });
+        res.json(org);
     } catch (error) {
         console.error('[admin] get org error:', error);
         res.status(500).json({ error: (error as Error).message });
@@ -943,11 +957,12 @@ router.get('/orgs/:id', async (req: AuthenticatedRequest, res) => {
  * Adjust an org's quota/date columns on the OWNER's subscription row.
  * Body (all optional): { team_members_limit, initiatives_limit, trial_ends_at }
  * Never touches Stripe / payment data.
+ * Scoped by requireOrgAccess — support agents only touch orgs assigned to them.
  */
-router.patch('/orgs/:id/limits', async (req: AuthenticatedRequest, res) => {
+router.patch('/orgs/:id/limits', requireOrgAccess(), async (req: AuthenticatedRequest, res) => {
     try {
         const { id } = req.params;
-        const { team_members_limit, initiatives_limit, trial_ends_at } = req.body || {};
+        const { team_members_limit, initiatives_limit, locations_limit, trial_ends_at } = req.body || {};
 
         const { data: org, error: orgErr } = await supabase
             .from('organizations')
@@ -979,6 +994,13 @@ router.patch('/orgs/:id/limits', async (req: AuthenticatedRequest, res) => {
             }
             updates.initiatives_limit = initiatives_limit;
         }
+        if (locations_limit !== undefined) {
+            if (locations_limit !== null && (typeof locations_limit !== 'number' || locations_limit < 0)) {
+                res.status(400).json({ error: 'locations_limit must be a non-negative number or null' });
+                return;
+            }
+            updates.locations_limit = locations_limit;
+        }
         if (trial_ends_at !== undefined) {
             updates.trial_ends_at = trial_ends_at; // ISO string or null
         }
@@ -992,7 +1014,7 @@ router.patch('/orgs/:id/limits', async (req: AuthenticatedRequest, res) => {
             .from('subscriptions')
             .update(updates)
             .eq('user_id', org.owner_id)
-            .select('status, plan_tier, team_members_limit, initiatives_limit, trial_ends_at')
+            .select('status, plan_tier, team_members_limit, initiatives_limit, locations_limit, trial_ends_at')
             .maybeSingle();
         if (error) throw error;
 
@@ -1117,6 +1139,9 @@ router.post('/agents', requireSuperAdmin, async (req: AuthenticatedRequest, res)
             .from('platform_admins')
             .upsert({ user_id: userId, role: 'support' }, { onConflict: 'user_id' });
         if (upsertErr) throw upsertErr;
+
+        // A brand-new account won't be in the cached auth directory yet.
+        bustUserDirectory();
 
         await recordAdminAction({
             adminUserId: req.user!.id,

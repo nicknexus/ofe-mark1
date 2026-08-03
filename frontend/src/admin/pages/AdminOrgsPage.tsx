@@ -1,158 +1,57 @@
-import { useEffect, useState } from 'react'
-import { Search, Loader2, Building2, SlidersHorizontal, X, LogIn } from 'lucide-react'
-import { AdminApi, AdminOrg, PatchOrgLimitsInput } from '../../services/adminApi'
-import { notify } from '../../lib/notify'
-import { enterSupportMode } from '../support'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Search, Loader2, X, ArrowUpDown, RefreshCw } from 'lucide-react'
+import { AdminApi, AdminOrg } from '../../services/adminApi'
+import { PlanBadge, StatCard, UsageMeter, Button, OrgAvatar, formatBytes, formatRelative } from '../components/ui'
 
-function planLabel(org: AdminOrg): string {
-    const s = org.subscription
-    if (!s || !s.status || s.status === 'none') return 'No plan'
-    if (s.status === 'trial') return 'Trial'
-    return s.plan_tier ? `${s.plan_tier}` : s.status
-}
+type SortKey = 'created_at' | 'name' | 'plan' | 'initiatives' | 'storage' | 'last_seen'
+type Filter = 'all' | 'paying' | 'comped' | 'free' | 'attention'
 
-function usageCell(used: number, limit?: number | null): string {
-    if (limit === null || limit === undefined) return `${used} / ∞`
-    return `${used} / ${limit}`
-}
-
-/** ISO timestamp → YYYY-MM-DD for a date input. */
-function toDateInput(iso?: string | null): string {
-    if (!iso) return ''
-    const d = new Date(iso)
-    if (isNaN(d.getTime())) return ''
-    return d.toISOString().slice(0, 10)
-}
-
-function LimitsModal({
-    org,
-    onClose,
-    onSaved,
-}: {
-    org: AdminOrg
-    onClose: () => void
-    onSaved: () => void
-}) {
-    const [teamLimit, setTeamLimit] = useState<string>(
-        org.subscription?.team_members_limit != null ? String(org.subscription.team_members_limit) : ''
-    )
-    const [initiativesLimit, setInitiativesLimit] = useState<string>(
-        org.subscription?.initiatives_limit != null ? String(org.subscription.initiatives_limit) : ''
-    )
-    const [trialEnds, setTrialEnds] = useState<string>(toDateInput(org.subscription?.trial_ends_at))
-    const [saving, setSaving] = useState(false)
-
-    const parseLimit = (v: string): number | null => {
-        const t = v.trim()
-        if (t === '') return null // blank = unlimited
-        const n = Number(t)
-        return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null
-    }
-
-    const handleSave = async () => {
-        const updates: PatchOrgLimitsInput = {
-            team_members_limit: parseLimit(teamLimit),
-            initiatives_limit: parseLimit(initiativesLimit),
-        }
-        // Only touch trial date if a value is present (avoids clearing it accidentally).
-        if (trialEnds.trim()) {
-            updates.trial_ends_at = new Date(`${trialEnds}T23:59:59Z`).toISOString()
-        }
-
-        setSaving(true)
-        try {
-            await AdminApi.patchOrgLimits(org.id, updates)
-            notify.success(`Limits updated for ${org.name}`)
-            onSaved()
-        } catch (err) {
-            notify.error((err as Error).message || 'Failed to update limits')
-        } finally {
-            setSaving(false)
-        }
-    }
-
+/** Accounts needing a human look: payment problems, or pressed against a limit. */
+function needsAttention(org: AdminOrg): boolean {
+    const status = org.subscription?.status
+    if (status === 'past_due' || status === 'expired') return true
+    const atLimit = (used: number, limit?: number | null) =>
+        limit !== null && limit !== undefined && limit > 0 && used >= limit
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-200">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-                    <div>
-                        <h2 className="text-base font-semibold text-slate-900">Edit limits</h2>
-                        <p className="text-xs text-slate-500">{org.name}</p>
-                    </div>
-                    <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
-
-                <div className="p-5 space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Team member limit</label>
-                        <input
-                            type="number"
-                            min={0}
-                            value={teamLimit}
-                            onChange={e => setTeamLimit(e.target.value)}
-                            placeholder="Blank = unlimited"
-                            className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
-                        />
-                        <p className="text-xs text-slate-400 mt-1">Currently using {org.usage.team_members}. Leave blank for unlimited.</p>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Initiative limit</label>
-                        <input
-                            type="number"
-                            min={0}
-                            value={initiativesLimit}
-                            onChange={e => setInitiativesLimit(e.target.value)}
-                            placeholder="Blank = unlimited"
-                            className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
-                        />
-                        <p className="text-xs text-slate-400 mt-1">Currently using {org.usage.initiatives}. Leave blank for unlimited.</p>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Trial end date</label>
-                        <input
-                            type="date"
-                            value={trialEnds}
-                            onChange={e => setTrialEnds(e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
-                        />
-                        <p className="text-xs text-slate-400 mt-1">Extend or set a trial. Leave unchanged to keep the current date.</p>
-                    </div>
-
-                    <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-500">
-                        Quota changes only — never touches payment or billing.
-                    </div>
-                </div>
-
-                <div className="flex justify-end gap-2 px-5 py-4 border-t border-slate-100">
-                    <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100">
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-900 text-sm font-semibold disabled:opacity-50 flex items-center gap-2"
-                    >
-                        {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : 'Save limits'}
-                    </button>
-                </div>
-            </div>
-        </div>
+        atLimit(org.usage.initiatives, org.subscription?.initiatives_limit) ||
+        atLimit(org.usage.team_members, org.subscription?.team_members_limit) ||
+        atLimit(org.usage.locations, org.subscription?.locations_limit)
     )
 }
+
+function matchesFilter(org: AdminOrg, filter: Filter): boolean {
+    switch (filter) {
+        case 'paying':
+            return org.plan_source === 'stripe'
+        case 'comped':
+            return org.plan_source === 'admin' || org.plan_source === 'code'
+        case 'free':
+            return org.plan_source === 'free' || org.plan_source === 'none'
+        case 'attention':
+            return needsAttention(org)
+        default:
+            return true
+    }
+}
+
+const TIER_RANK: Record<string, number> = { pro: 3, growth: 2, free: 1 }
 
 export default function AdminOrgsPage() {
+    const navigate = useNavigate()
     const [orgs, setOrgs] = useState<AdminOrg[]>([])
     const [loading, setLoading] = useState(true)
+    const [refreshing, setRefreshing] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [search, setSearch] = useState('')
-    const [editing, setEditing] = useState<AdminOrg | null>(null)
+    const [filter, setFilter] = useState<Filter>('all')
+    const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({
+        key: 'created_at',
+        dir: 'desc',
+    })
 
-    const load = async (q?: string) => {
-        setLoading(true)
+    const load = async (q?: string, isRefresh = false) => {
+        isRefresh ? setRefreshing(true) : setLoading(true)
         setError(null)
         try {
             setOrgs(await AdminApi.listOrgs(q))
@@ -160,6 +59,7 @@ export default function AdminOrgsPage() {
             setError((err as Error).message)
         } finally {
             setLoading(false)
+            setRefreshing(false)
         }
     }
 
@@ -167,108 +67,227 @@ export default function AdminOrgsPage() {
         load()
     }, [])
 
-    const onSearch = (e: React.FormEvent) => {
-        e.preventDefault()
-        load(search.trim() || undefined)
-    }
+    // Server-side search covers name, slug and owner email — debounced so
+    // typing an email doesn't fire a request per keystroke. Skips the first run
+    // so landing on the page doesn't immediately repeat the initial load.
+    const firstSearchRun = useRef(true)
+    useEffect(() => {
+        if (firstSearchRun.current) {
+            firstSearchRun.current = false
+            return
+        }
+        const t = setTimeout(() => load(search.trim() || undefined, true), 300)
+        return () => clearTimeout(t)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search])
+
+    const stats = useMemo(
+        () => ({
+            total: orgs.length,
+            paying: orgs.filter(o => o.plan_source === 'stripe').length,
+            comped: orgs.filter(o => o.plan_source === 'admin' || o.plan_source === 'code').length,
+            attention: orgs.filter(needsAttention).length,
+        }),
+        [orgs]
+    )
+
+    const visible = useMemo(() => {
+        const rows = orgs.filter(o => matchesFilter(o, filter))
+        const dir = sort.dir === 'asc' ? 1 : -1
+        return [...rows].sort((a, b) => {
+            switch (sort.key) {
+                case 'name':
+                    return a.name.localeCompare(b.name) * dir
+                case 'plan':
+                    return ((TIER_RANK[a.subscription?.plan_tier || 'free'] || 0) -
+                        (TIER_RANK[b.subscription?.plan_tier || 'free'] || 0)) * dir
+                case 'initiatives':
+                    return (a.usage.initiatives - b.usage.initiatives) * dir
+                case 'storage':
+                    return (a.usage.storage_used_bytes - b.usage.storage_used_bytes) * dir
+                case 'last_seen':
+                    return (
+                        (new Date(a.owner.last_sign_in_at || 0).getTime() -
+                            new Date(b.owner.last_sign_in_at || 0).getTime()) * dir
+                    )
+                default:
+                    return (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * dir
+            }
+        })
+    }, [orgs, filter, sort])
+
+    const toggleSort = (key: SortKey) =>
+        setSort(s => ({ key, dir: s.key === key && s.dir === 'desc' ? 'asc' : 'desc' }))
+
+    const SortHeader = ({ label, sortKey, align = 'left' }: { label: string; sortKey: SortKey; align?: 'left' | 'right' }) => (
+        <th className={`px-4 py-2.5 font-medium ${align === 'right' ? 'text-right' : 'text-left'}`}>
+            <button
+                onClick={() => toggleSort(sortKey)}
+                className={`inline-flex items-center gap-1 hover:text-slate-900 transition-colors ${
+                    sort.key === sortKey ? 'text-slate-900' : ''
+                }`}
+            >
+                {label}
+                <ArrowUpDown className={`w-3 h-3 ${sort.key === sortKey ? 'opacity-100' : 'opacity-30'}`} />
+            </button>
+        </th>
+    )
 
     return (
-        <div className="p-8 max-w-6xl mx-auto">
-            <div className="flex items-center gap-3 mb-1">
-                <Building2 className="w-6 h-6 text-slate-700" />
-                <h1 className="text-2xl font-semibold text-slate-900">Organizations</h1>
+        <div className="p-6 lg:p-8 max-w-[1400px] mx-auto">
+            <div className="flex items-end justify-between gap-4 mb-5">
+                <div>
+                    <h1 className="text-xl font-semibold text-slate-900">Organizations</h1>
+                    <p className="text-sm text-slate-500 mt-0.5">
+                        Every customer account. Click a row to open its full record.
+                    </p>
+                </div>
+                <Button onClick={() => load(search.trim() || undefined, true)} disabled={refreshing}>
+                    <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                    Refresh
+                </Button>
             </div>
-            <p className="text-sm text-slate-500 mb-6">Every customer organization on the platform.</p>
 
-            <form onSubmit={onSearch} className="mb-5 flex gap-2 max-w-md">
-                <div className="relative flex-1">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            {/* Stat tiles double as filters — the fastest path to "who needs me". */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+                <StatCard label="Organizations" value={stats.total} onClick={() => setFilter('all')} active={filter === 'all'} />
+                <StatCard label="Paying" value={stats.paying} tone="positive" hint="Active Stripe subscription" onClick={() => setFilter('paying')} active={filter === 'paying'} />
+                <StatCard label="Comped" value={stats.comped} tone="warning" hint="Granted without payment" onClick={() => setFilter('comped')} active={filter === 'comped'} />
+                <StatCard label="Needs attention" value={stats.attention} tone={stats.attention ? 'danger' : 'default'} hint="Past due or at a limit" onClick={() => setFilter('attention')} active={filter === 'attention'} />
+            </div>
+
+            <div className="flex items-center gap-2 mb-4">
+                <div className="relative flex-1 max-w-md">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        placeholder="Search by name or slug…"
-                        className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
+                        placeholder="Search name, slug, or owner email…"
+                        className="w-full pl-9 pr-9 py-2 rounded-lg border border-slate-200 bg-white text-sm placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-shadow"
                     />
+                    {search && (
+                        <button
+                            onClick={() => setSearch('')}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    )}
                 </div>
-                <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-700">
-                    Search
-                </button>
-            </form>
+                {filter !== 'all' && (
+                    <Button variant="ghost" size="sm" onClick={() => setFilter('all')}>
+                        Clear filter <X className="w-3 h-3" />
+                    </Button>
+                )}
+                {refreshing && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
+                <span className="ml-auto text-xs tabular-nums text-slate-400">
+                    {visible.length} {visible.length === 1 ? 'result' : 'results'}
+                </span>
+            </div>
 
             {loading ? (
-                <div className="flex items-center gap-2 text-slate-500 py-12 justify-center">
+                <div className="flex items-center justify-center gap-2 py-16 text-slate-500">
                     <Loader2 className="w-5 h-5 animate-spin" /> Loading organizations…
                 </div>
             ) : error ? (
-                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{error}</div>
-            ) : orgs.length === 0 ? (
-                <div className="text-center py-12 text-slate-500">No organizations found.</div>
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+            ) : visible.length === 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-white py-16 text-center">
+                    <p className="text-sm text-slate-500">No organizations match.</p>
+                    {(search || filter !== 'all') && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="mt-2"
+                            onClick={() => {
+                                setSearch('')
+                                setFilter('all')
+                            }}
+                        >
+                            Reset search and filters
+                        </Button>
+                    )}
+                </div>
             ) : (
-                <div className="overflow-x-auto bg-white rounded-xl border border-slate-200">
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="text-left text-slate-500 border-b border-slate-200">
-                                <th className="px-4 py-3 font-medium">Organization</th>
-                                <th className="px-4 py-3 font-medium">Owner</th>
-                                <th className="px-4 py-3 font-medium">Plan</th>
-                                <th className="px-4 py-3 font-medium">Team</th>
-                                <th className="px-4 py-3 font-medium">Initiatives</th>
-                                <th className="px-4 py-3 font-medium text-right">Actions</th>
+                <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                    <table className="w-full text-sm min-w-[900px]">
+                        <thead className="text-xs text-slate-500 border-b border-slate-200 bg-slate-50/60">
+                            <tr>
+                                <SortHeader label="Organization" sortKey="name" />
+                                <th className="px-4 py-2.5 font-medium text-left">Owner</th>
+                                <SortHeader label="Plan" sortKey="plan" />
+                                <SortHeader label="Initiatives" sortKey="initiatives" />
+                                <th className="px-4 py-2.5 font-medium text-left">Team</th>
+                                <SortHeader label="Storage" sortKey="storage" />
+                                <SortHeader label="Last seen" sortKey="last_seen" align="right" />
                             </tr>
                         </thead>
                         <tbody>
-                            {orgs.map(org => (
-                                <tr key={org.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                            {visible.map(org => (
+                                <tr
+                                    key={org.id}
+                                    onClick={() => navigate(`/admin/orgs/${org.id}`)}
+                                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50 cursor-pointer transition-colors"
+                                >
                                     <td className="px-4 py-3">
-                                        <div className="font-medium text-slate-900">{org.name}</div>
-                                        <div className="text-xs text-slate-400">{org.slug}</div>
+                                        <div className="flex items-center gap-2.5">
+                                            <OrgAvatar
+                                                name={org.name}
+                                                logoUrl={org.logo_url}
+                                                brandColor={org.brand_color}
+                                            />
+                                            <div className="min-w-0">
+                                                <div className="font-medium text-slate-900 truncate max-w-[200px]">
+                                                    {org.name}
+                                                </div>
+                                                <div className="text-xs text-slate-400 truncate max-w-[200px]">
+                                                    /{org.slug}
+                                                    {!org.is_public && (
+                                                        <span className="ml-1.5 text-slate-300">· private</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </td>
-                                    <td className="px-4 py-3 text-slate-700">{org.owner.email || '—'}</td>
                                     <td className="px-4 py-3">
-                                        <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs capitalize">
-                                            {planLabel(org)}
-                                        </span>
+                                        <div className="text-slate-700 truncate max-w-[200px]">{org.owner.email || '—'}</div>
+                                        {org.owner.name && (
+                                            <div className="text-xs text-slate-400 truncate max-w-[200px]">{org.owner.name}</div>
+                                        )}
                                     </td>
-                                    <td className="px-4 py-3 text-slate-700">
-                                        {usageCell(org.usage.team_members, org.subscription?.team_members_limit)}
+                                    <td className="px-4 py-3">
+                                        <PlanBadge
+                                            tier={org.subscription?.plan_tier}
+                                            source={org.plan_source}
+                                            status={org.subscription?.status}
+                                            size="sm"
+                                        />
+                                        {org.limits_overridden && (
+                                            <div className="mt-1 text-[11px] text-amber-600">Custom limits</div>
+                                        )}
                                     </td>
-                                    <td className="px-4 py-3 text-slate-700">
-                                        {usageCell(org.usage.initiatives, org.subscription?.initiatives_limit)}
+                                    <td className="px-4 py-3 w-[130px]">
+                                        <UsageMeter used={org.usage.initiatives} limit={org.subscription?.initiatives_limit} compact />
                                     </td>
-                                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                                        <button
-                                            onClick={() => setEditing(org)}
-                                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-700 border border-slate-200 hover:bg-slate-100"
-                                        >
-                                            <SlidersHorizontal className="w-3.5 h-3.5" /> Edit limits
-                                        </button>
-                                        <button
-                                            onClick={async () => {
-                                                try { await AdminApi.logSupportSession(org.id) } catch { /* non-blocking */ }
-                                                enterSupportMode({ id: org.id, name: org.name })
-                                            }}
-                                            className="ml-2 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-slate-900 hover:bg-slate-700"
-                                            title="Open this org in support mode"
-                                        >
-                                            <LogIn className="w-3.5 h-3.5" /> Open
-                                        </button>
+                                    <td className="px-4 py-3 w-[130px]">
+                                        <UsageMeter used={org.usage.team_members} limit={org.subscription?.team_members_limit} compact />
+                                    </td>
+                                    <td className="px-4 py-3 w-[140px]">
+                                        <UsageMeter
+                                            used={org.usage.storage_used_bytes}
+                                            limit={org.subscription?.storage_limit_bytes}
+                                            format={formatBytes}
+                                            compact
+                                        />
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-xs text-slate-500 whitespace-nowrap">
+                                        {formatRelative(org.owner.last_sign_in_at)}
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
-            )}
-
-            {editing && (
-                <LimitsModal
-                    org={editing}
-                    onClose={() => setEditing(null)}
-                    onSaved={() => {
-                        setEditing(null)
-                        load(search.trim() || undefined)
-                    }}
-                />
             )}
         </div>
     )

@@ -1,5 +1,6 @@
 import { supabase } from '../utils/supabase';
 import { TeamService } from './teamService';
+import { PlatformAdminService } from './platformAdminService';
 import { stripe } from '../utils/stripe';
 import { EntitlementService } from './entitlementService';
 import { PLAN_CATALOG, PlanTier, getPlan, normaliseTier, planLimitColumns } from '../config/planCatalog';
@@ -223,6 +224,12 @@ export class SubscriptionService {
                 break;
 
             case 'active':
+                // Admin-granted plan: 'active' with no Stripe subscription behind
+                // it. There's no billing period to check, so access holds until an
+                // admin changes it back — never expires it out from under them.
+                if (!subscription.stripe_subscription_id) {
+                    return { hasAccess: true, reason: 'admin_granted_plan', subscription };
+                }
                 if (subscription.current_period_end && new Date(subscription.current_period_end) > new Date()) {
                     return { hasAccess: true, reason: 'subscription_active', subscription };
                 }
@@ -296,6 +303,40 @@ export class SubscriptionService {
             default:
                 return { hasAccess: false, reason: 'no_subscription', subscription };
         }
+    }
+
+    /**
+     * Access + subscription for the account the caller is actually LOOKING AT.
+     *
+     * Normal sessions: identical to hasAccess(userId).
+     *
+     * Support mode (platform admin inside a customer org): returns the CUSTOMER
+     * OWNER's subscription, so every plan badge, limit and usage figure in the
+     * UI describes the customer rather than the admin. Access is forced true —
+     * an admin must be able to get into an expired or lapsed account, since
+     * those are exactly the ones needing support. `isSupportMode` lets the
+     * frontend label the plan as someone else's.
+     */
+    static async getAccessForContext(userId: string, requestedOrgId?: string): Promise<
+        SubscriptionAccessResult & { isSupportMode: boolean }
+    > {
+        // Fast path. /subscription/status runs on every app load, and only a
+        // platform admin can ever be in support mode — so gate the extra
+        // ownership/membership lookups behind one small indexed check that
+        // returns false immediately for every normal user.
+        if (requestedOrgId && (await PlatformAdminService.isAdmin(userId))) {
+            const { subscription, isSupportMode } = await this.resolveActiveOrg(userId, requestedOrgId);
+            if (isSupportMode) {
+                return {
+                    hasAccess: true,
+                    reason: 'support_mode',
+                    subscription,
+                    isSupportMode: true,
+                };
+            }
+        }
+
+        return { ...(await this.hasAccess(userId)), isSupportMode: false };
     }
 
     /**
@@ -470,14 +511,29 @@ export class SubscriptionService {
         activeOrgId: string | null;
         ownerId: string;
         subscription: Subscription;
+        /** True when a platform admin is acting inside a customer org (support mode). */
+        isSupportMode: boolean;
     }> {
         let activeOrgId: string | null = null;
+        let isSupportMode = false;
         if (requestedOrgId) {
             const ownsRequested = await TeamService.isUserOwnerOfOrganization(userId, requestedOrgId);
             const membership = ownsRequested
                 ? null
                 : await TeamService.getUserTeamMembership(userId, requestedOrgId);
-            if (ownsRequested || membership) activeOrgId = requestedOrgId;
+            if (ownsRequested || membership) {
+                activeOrgId = requestedOrgId;
+            } else if (await PlatformAdminService.canAccessOrg(userId, requestedOrgId)) {
+                // Support mode: a platform admin working inside an org they
+                // neither own nor belong to. Without this branch we fall through
+                // to "their own org" below and every limit, feature flag, usage
+                // count and storage cap would be resolved from the ADMIN's plan
+                // instead of the customer's — enforcing the wrong plan on the
+                // customer's data and leaking the admin's own account state into
+                // the customer-facing UI.
+                activeOrgId = requestedOrgId;
+                isSupportMode = true;
+            }
         }
         if (!activeOrgId) {
             const owned = await TeamService.getUserOwnedOrganization(userId);
@@ -490,12 +546,33 @@ export class SubscriptionService {
 
         // Subscription is owned by the org owner; fall back to the current user
         // if no org context yet (first-org flow).
-        const ownerId = activeOrgId
-            ? (await TeamService.getOrganizationOwnerId(activeOrgId)) || userId
-            : userId;
+        //
+        // In support mode we must NEVER fall back to the admin: an org with no
+        // owner_id would otherwise resolve to the admin's own subscription. Fail
+        // closed to Free instead, so a data gap can't hand out the admin's plan.
+        const resolvedOwnerId = activeOrgId
+            ? await TeamService.getOrganizationOwnerId(activeOrgId)
+            : null;
+        if (isSupportMode && !resolvedOwnerId) {
+            console.warn(`[resolveActiveOrg] support mode on ownerless org ${activeOrgId} — defaulting to Free limits`);
+            return {
+                activeOrgId,
+                ownerId: '',
+                subscription: {
+                    id: '',
+                    user_id: '',
+                    status: 'free',
+                    ...planLimitColumns('free'),
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                } as Subscription,
+                isSupportMode,
+            };
+        }
 
+        const ownerId = resolvedOwnerId || userId;
         const subscription = await this.getOrCreate(ownerId);
-        return { activeOrgId, ownerId, subscription };
+        return { activeOrgId, ownerId, subscription, isSupportMode };
     }
 
     /**

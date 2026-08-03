@@ -59,8 +59,18 @@ export interface AdminOrgSubscription {
  plan_tier?: string | null
  team_members_limit?: number | null
  initiatives_limit?: number | null
+ locations_limit?: number | null
+ storage_limit_bytes?: number | null
+ ai_reports_per_day?: number | null
  trial_ends_at?: string | null
+ stripe_customer_id?: string | null
+ stripe_subscription_id?: string | null
 }
+
+/** Where a customer's plan came from — paid, comped by us, or neither. */
+export type PlanSource = 'stripe' | 'admin' | 'code' | 'free' | 'none'
+
+export type PlanTier = 'free' | 'growth' | 'pro'
 
 export interface AdminOrg {
  id: string
@@ -68,14 +78,115 @@ export interface AdminOrg {
  slug: string
  is_public: boolean
  created_at: string
- owner: { id: string; email?: string; name?: string }
+ logo_url: string | null
+ brand_color: string | null
+ owner: { id: string | null; email?: string; name?: string; last_sign_in_at?: string | null }
  subscription: AdminOrgSubscription | null
- usage: { team_members: number; initiatives: number }
+ plan_source: PlanSource
+ limits_overridden: boolean
+ usage: {
+ team_members: number
+ initiatives: number
+ locations: number
+ storage_used_bytes: number
+ }
+}
+
+export interface PlanLimits {
+ initiatives_limit: number | null
+ team_members_limit: number | null
+ locations_limit: number | null
+ storage_limit_bytes: number | null
+ ai_reports_per_day: number | null
+}
+
+export interface AdminBilling {
+ available: boolean
+ reason?: string
+ message?: string
+ status?: string | null
+ cancel_at_period_end?: boolean
+ current_period_end?: string | null
+ price?: { nickname: string | null; amount: number | null; currency: string | null; interval: string | null } | null
+ card?: { brand: string; last4: string; exp_month: number; exp_year: number } | null
+ discount?: {
+ code: string | null
+ name: string | null
+ percent_off: number | null
+ amount_off: number | null
+ currency: string | null
+ duration: string | null
+ duration_in_months: number | null
+ ends_at: string | null
+ } | null
+ stripe_customer_id?: string | null
+ stripe_subscription_id?: string | null
+}
+
+export interface AdminAccount {
+ org: {
+ id: string
+ name: string
+ slug: string
+ description?: string | null
+ is_public: boolean
+ is_demo: boolean
+ created_at: string
+ logo_url?: string | null
+ brand_color?: string | null
+ website_url?: string | null
+ donation_url?: string | null
+ }
+ owner: {
+ id: string | null
+ email: string | null
+ name: string | null
+ created_at: string | null
+ last_sign_in_at: string | null
+ email_confirmed: boolean
+ }
+ plan: {
+ tier: PlanTier
+ name: string
+ status: string
+ source: PlanSource
+ trial_ends_at: string | null
+ catalog_limits: PlanLimits
+ effective_limits: PlanLimits
+ overridden_fields: string[]
+ features: { tags: boolean; beneficiaryGroups: boolean }
+ }
+ billing: AdminBilling | null
+ access_code: { code: string | null; days_granted: number | null; description: string | null; redeemed_at: string } | null
+ usage: {
+ initiatives: number
+ team_members: number
+ locations: number
+ storage_used_bytes: number
+ ai_reports_today: number
+ pending_invites: number
+ }
+ team: {
+ id: string
+ user_id: string
+ email: string | null
+ name: string | null
+ member_type: string | null
+ joined_at: string | null
+ }[]
+ activity: {
+ id: string
+ admin_email?: string | null
+ action: string
+ detail?: Record<string, unknown> | null
+ created_at: string
+ }[]
 }
 
 export interface PatchOrgLimitsInput {
  team_members_limit?: number | null
  initiatives_limit?: number | null
+ locations_limit?: number | null
  trial_ends_at?: string | null
 }
 
@@ -180,6 +291,46 @@ export class AdminApi {
  const headers = await getAuthHeaders()
  const resp = await fetch(`${API_BASE_URL}/api/admin/orgs/${id}`, { headers })
  if (!resp.ok) throw new Error((await resp.json()).error || 'Failed to load organization')
+ return resp.json()
+ }
+
+ /** Full support view of one account (owner, plan, billing, usage, team, activity). */
+ static async getOrgAccount(id: string): Promise<AdminAccount> {
+ const headers = await getAuthHeaders()
+ const resp = await fetch(`${API_BASE_URL}/api/admin/orgs/${id}/account`, { headers })
+ if (!resp.ok) throw new Error((await resp.json()).error || 'Failed to load account')
+ return resp.json()
+ }
+
+ /**
+ * Move an org onto a plan without payment. Throws with code 'paying_customer'
+ * when the customer has a live Stripe subscription — that must be changed in
+ * Stripe so billing and access stay in sync.
+ */
+ static async changePlan(id: string, tier: PlanTier, reason?: string): Promise<AdminOrgSubscription> {
+ const headers = await getAuthHeaders()
+ const resp = await fetch(`${API_BASE_URL}/api/admin/orgs/${id}/plan`, {
+ method: 'POST',
+ headers,
+ body: JSON.stringify({ tier, reason }),
+ })
+ if (!resp.ok) {
+ const body = await resp.json().catch(() => ({}))
+ const err = new Error(body.error || 'Failed to change plan')
+ ;(err as Error & { code?: string }).code = body.code
+ throw err
+ }
+ return resp.json()
+ }
+
+ /** Discard custom limits, returning the org to its tier's defaults. */
+ static async resetLimits(id: string): Promise<AdminOrgSubscription> {
+ const headers = await getAuthHeaders()
+ const resp = await fetch(`${API_BASE_URL}/api/admin/orgs/${id}/limits/reset`, {
+ method: 'POST',
+ headers,
+ })
+ if (!resp.ok) throw new Error((await resp.json()).error || 'Failed to reset limits')
  return resp.json()
  }
 

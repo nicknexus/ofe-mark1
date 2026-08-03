@@ -409,7 +409,12 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
  </span>
  </div>
  )}
- {subscriptionStatus.subscription.status === 'active' && subscriptionStatus.subscription.current_period_end && (
+ {/* Only a real Stripe subscription has a next billing date. Admin-granted
+ plans carry a placeholder far-future period end that must never be shown
+ to the customer as if they were being billed then. */}
+ {subscriptionStatus.subscription.status === 'active' &&
+ subscriptionStatus.subscription.stripe_subscription_id &&
+ subscriptionStatus.subscription.current_period_end && (
  <div className="flex items-center justify-between">
  <span className="text-sm text-gray-500">Next Billing</span>
  <span className="text-sm font-medium text-gray-900">{formatDate(subscriptionStatus.subscription.current_period_end)}</span>

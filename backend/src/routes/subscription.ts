@@ -1,10 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
-import { SubscriptionService } from '../services/subscriptionService';
+import { SubscriptionService, Subscription } from '../services/subscriptionService';
 import { stripe, STRIPE_CONFIG, priceIdForTier, tierFromPriceId, BillingInterval } from '../utils/stripe';
 import { normaliseTier, getPlan, PlanTier } from '../config/planCatalog';
 import { EntitlementService } from '../services/entitlementService';
 import { supabase } from '../utils/supabase';
+import { blockInSupportMode } from '../middleware/supportMode';
 
 const router = Router();
 
@@ -22,23 +23,64 @@ function resolvePaidTier(priceId: string | undefined, metadataPlanTier: string |
 }
 
 /**
+ * Explicit whitelist of the subscription fields the customer app is allowed to
+ * see. A whitelist (not a blacklist) so any column added to `subscriptions`
+ * later — internal notes, support flags, comp reasons — cannot reach a browser
+ * by being forgotten. Add a field here only after checking it's safe for the
+ * account holder AND for a support admin viewing someone else's account.
+ */
+function toClientSubscription(sub: Subscription | null | undefined) {
+    if (!sub) return sub;
+    return {
+        id: sub.id,
+        user_id: sub.user_id,
+        organization_id: sub.organization_id,
+        status: sub.status,
+        plan_tier: sub.plan_tier,
+        billing_interval: sub.billing_interval,
+        trial_started_at: sub.trial_started_at,
+        trial_ends_at: sub.trial_ends_at,
+        stripe_customer_id: sub.stripe_customer_id,
+        stripe_subscription_id: sub.stripe_subscription_id,
+        current_period_start: sub.current_period_start,
+        current_period_end: sub.current_period_end,
+        cancel_at_period_end: sub.cancel_at_period_end,
+        initiatives_limit: sub.initiatives_limit,
+        team_members_limit: sub.team_members_limit,
+        locations_limit: sub.locations_limit,
+        storage_limit_bytes: sub.storage_limit_bytes,
+        ai_reports_per_day: sub.ai_reports_per_day,
+        created_at: sub.created_at,
+        updated_at: sub.updated_at,
+    };
+}
+
+/**
  * GET /api/subscription/status
- * Get current subscription status and access rights
+ * Get current subscription status and access rights.
+ *
+ * In support mode this describes the CUSTOMER's plan, not the admin's — see
+ * SubscriptionService.getAccessForContext.
  */
 router.get('/status', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
         const sub = await SubscriptionService.getOrCreate(req.user!.id);
+        // Only ever self-heal the caller's OWN Stripe record. An admin viewing a
+        // customer must not trigger writes to that customer's billing row.
         if (sub.stripe_subscription_id) {
             await syncSubscriptionFromStripe(req.user!.id, sub.stripe_subscription_id);
         }
-        const { hasAccess, reason, subscription } = await SubscriptionService.hasAccess(req.user!.id);
+        const { hasAccess, reason, subscription, isSupportMode } =
+            await SubscriptionService.getAccessForContext(req.user!.id, requestedOrgId);
         const remainingTrialDays = SubscriptionService.getRemainingTrialDays(subscription);
 
         res.json({
             hasAccess,
             reason,
-            subscription,
-            remainingTrialDays
+            subscription: toClientSubscription(subscription),
+            remainingTrialDays,
+            isSupportMode,
         });
     } catch (error) {
         console.error('Error fetching subscription status:', error);
@@ -80,14 +122,14 @@ const activateFreeHandler = async (req: AuthenticatedRequest, res: Response) => 
     }
 };
 
-router.post('/activate-free', authenticateUser, activateFreeHandler);
-router.post('/start-trial', authenticateUser, activateFreeHandler);
+router.post('/activate-free', authenticateUser, blockInSupportMode, activateFreeHandler);
+router.post('/start-trial', authenticateUser, blockInSupportMode, activateFreeHandler);
 
 /**
  * POST /api/subscription/redeem-code
  * Redeem an access code for extended trial
  */
-router.post('/redeem-code', authenticateUser, async (req: AuthenticatedRequest, res) => {
+router.post('/redeem-code', authenticateUser, blockInSupportMode, async (req: AuthenticatedRequest, res) => {
     try {
         const { code } = req.body;
         console.log('[redeem-code] body:', JSON.stringify(req.body), 'code:', code);
@@ -160,17 +202,26 @@ async function syncSubscriptionFromStripe(userId: string, stripeSubscriptionId: 
  */
 router.get('/details', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
-        let subscription = await SubscriptionService.getOrCreate(req.user!.id);
-        if (subscription.stripe_subscription_id) {
-            await syncSubscriptionFromStripe(req.user!.id, subscription.stripe_subscription_id);
-            subscription = (await SubscriptionService.getByUserId(req.user!.id)) ?? subscription;
+        const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
+        const { subscription: contextSub, isSupportMode } =
+            await SubscriptionService.getAccessForContext(req.user!.id, requestedOrgId);
+
+        // Support mode: report the customer's plan and never write to their row.
+        let subscription = contextSub;
+        if (!isSupportMode) {
+            subscription = await SubscriptionService.getOrCreate(req.user!.id);
+            if (subscription.stripe_subscription_id) {
+                await syncSubscriptionFromStripe(req.user!.id, subscription.stripe_subscription_id);
+                subscription = (await SubscriptionService.getByUserId(req.user!.id)) ?? subscription;
+            }
         }
         const remainingTrialDays = SubscriptionService.getRemainingTrialDays(subscription);
 
         res.json({
-            subscription,
+            subscription: toClientSubscription(subscription),
             remainingTrialDays,
-            features: getFeaturesByPlan(subscription.plan_tier, subscription.status)
+            features: getFeaturesByPlan(subscription.plan_tier, subscription.status),
+            isSupportMode,
         });
     } catch (error) {
         console.error('Error fetching subscription details:', error);
@@ -204,7 +255,7 @@ function getFeaturesByPlan(
  * POST /api/subscription/create-checkout-session
  * Create a Stripe checkout session for the starter plan
  */
-router.post('/create-checkout-session', authenticateUser, async (req: AuthenticatedRequest, res) => {
+router.post('/create-checkout-session', authenticateUser, blockInSupportMode, async (req: AuthenticatedRequest, res) => {
     try {
         if (!stripe) {
             res.status(503).json({ error: 'Payment system not configured' });
@@ -265,6 +316,11 @@ router.post('/create-checkout-session', authenticateUser, async (req: Authentica
                     { price: finalPriceId, quantity: 1 },
                 ],
                 mode: 'subscription',
+                // Shows the "Add promotion code" field on the Stripe-hosted
+                // checkout page. Codes themselves are created in the Stripe
+                // dashboard (coupon → promotion code); nothing to configure here.
+                // Cannot be combined with a `discounts` param — we don't pass one.
+                allow_promotion_codes: true,
                 success_url: `${STRIPE_CONFIG.SUCCESS_URL}?checkout=success`,
                 cancel_url: `${STRIPE_CONFIG.CANCEL_URL}?checkout=cancelled`,
                 metadata: { user_id: userId, plan_tier: planTier },
@@ -537,7 +593,7 @@ router.get('/features', authenticateUser, async (req: AuthenticatedRequest, res)
  * POST /api/subscription/create-portal-session
  * Create Stripe customer portal session for managing subscription
  */
-router.post('/create-portal-session', authenticateUser, async (req: AuthenticatedRequest, res) => {
+router.post('/create-portal-session', authenticateUser, blockInSupportMode, async (req: AuthenticatedRequest, res) => {
     try {
         if (!stripe) {
             res.status(503).json({ error: 'Payment system not configured' });

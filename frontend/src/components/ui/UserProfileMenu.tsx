@@ -5,6 +5,7 @@ import { User } from '../../types'
 import { AuthService } from '../../services/auth'
 import { notify } from '../../lib/notify'
 import { cn } from '../../lib/utils'
+import { getSupportContext } from '../../admin/support'
 
 export interface UserProfileMenuProps {
     user: User
@@ -16,6 +17,12 @@ export interface UserProfileMenuProps {
 export function UserProfileMenu({ user, organizationName, className }: UserProfileMenuProps) {
     const [open, setOpen] = useState(false)
     const menuRef = useRef<HTMLDivElement>(null)
+
+    // Support mode: a platform admin inside a customer org. The check lives in
+    // this shared component rather than in each call site so no future usage
+    // can accidentally render the admin's own name over a customer's account.
+    const supportContext = getSupportContext()
+    const displayName = supportContext ? 'Support session' : (user.name || user.email)
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -48,7 +55,7 @@ export function UserProfileMenu({ user, organizationName, className }: UserProfi
             >
                 <div className="flex flex-col items-start flex-1 min-w-0 justify-center">
                     <span className="text-xs font-medium text-secondary-900 truncate w-full leading-tight">
-                        {user.name || user.email}
+                        {displayName}
                     </span>
                     {organizationName && (
                         <span className="text-xs text-gray-500 truncate w-full leading-tight">

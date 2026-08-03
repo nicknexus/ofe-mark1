@@ -6,6 +6,7 @@ import { AdminApi } from '../services/adminApi'
 import AdminLogin from './AdminLogin'
 import AdminLayout from './AdminLayout'
 import AdminOrgsPage from './pages/AdminOrgsPage'
+import AdminOrgAccountPage from './pages/AdminOrgAccountPage'
 import AdminAgentsPage from './pages/AdminAgentsPage'
 import AdminAuditPage from './pages/AdminAuditPage'
 import AdminDemosPage from '../pages/admin/AdminDemosPage'
@@ -75,6 +76,7 @@ export default function AdminApp() {
                     <Route path="/admin" element={<AdminLayout email={email} role={role} />}>
                         <Route index element={<Navigate to="/admin/orgs" replace />} />
                         <Route path="orgs" element={<AdminOrgsPage />} />
+                        <Route path="orgs/:id" element={<AdminOrgAccountPage />} />
                         <Route path="demos" element={<AdminDemosPage />} />
                         {role === 'super' && <Route path="agents" element={<AdminAgentsPage />} />}
                         <Route path="audit" element={<AdminAuditPage />} />
