@@ -129,7 +129,7 @@ const ladder = [
   {
     step: 1,
     title: "Invisible",
-    points: ["Nothing is tracked", "Impact goes unrecorded", "No proof exists"],
+    points: ["Nothing is tracked.", "Impact goes unrecorded.", "No proof exists."],
   },
   {
     step: 2,
@@ -137,27 +137,27 @@ const ladder = [
     badge: "Where most are",
     tone: "warning" as const,
     points: [
-      "Tracking is inconsistent",
-      "Proof can't be trusted",
-      "The org doesn't know its own details",
+      "Tracking is inconsistent.",
+      "Proof cannot be trusted.",
+      "The organization does not know its own details.",
     ],
   },
   {
     step: 3,
     title: "Organized",
     points: [
-      "Tracked and recorded, but scattered across systems",
-      "Shares Impact reports and limited media postings",
-      "Most life-changing moments slip through",
+      "Impact is tracked and recorded but scattered across systems.",
+      "The organization shares impact reports and limited media postings.",
+      "Most life-changing moments slip through.",
     ],
   },
   {
     step: 4,
     title: "Broadcasting",
     points: [
-      "Data is tracked and well managed",
-      "People only see what gets broadcast",
-      "Anything deeper means asking the org directly",
+      "Data is tracked and well managed.",
+      "People only see what gets broadcast.",
+      "Anything deeper means asking the organization directly.",
     ],
   },
   {
@@ -166,9 +166,9 @@ const ladder = [
     badge: "This is us",
     tone: "accent" as const,
     points: [
-      "Every stakeholder can explore it themselves",
-      "Every impact backed by story and evidence",
-      "All in one place, open to everyone",
+      "Every stakeholder can explore impact themselves.",
+      "Every impact is backed by a story and evidence.",
+      "Consolidated and open to everyone.",
     ],
   },
 ];
@@ -623,10 +623,10 @@ const ProblemsSection = ({ onGetStarted }: ProblemsSectionProps) => {
         <div className="rounded-3xl bg-gradient-to-b from-sage-light/30 to-background border border-border/50 p-8 sm:p-12 overflow-hidden">
           <Reveal>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-fraunces font-light mb-2 leading-tight">
-              <span className="text-foreground">Where impact tracking actually stands</span>
+              <span className="text-foreground">What is the gap costing your mission?</span>
             </h2>
             <p className="text-muted-foreground max-w-2xl mb-10">
-              Five stages. Most orgs stall at two.
+            When people can’t experience your impact, connection and support gets lost.
             </p>
           </Reveal>
 
@@ -715,7 +715,7 @@ const ProblemsSection = ({ onGetStarted }: ProblemsSectionProps) => {
         {onGetStarted && (
           <Reveal className="flex justify-center">
             <Button variant="hero" size="xl" className="group" onClick={onGetStarted}>
-              Move up the ladder
+              Close the gap
               <ArrowRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
             </Button>
           </Reveal>

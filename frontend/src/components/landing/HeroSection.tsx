@@ -8,12 +8,9 @@ import { formatDate } from "../../utils";
 import { publicApi, type ShowcaseImpactClaim } from "../../services/publicApi";
 import type { GlobeLocation } from "./ImpactGlobe";
 import { OrganizationGlobeErrorBoundary } from "../public/organization/OrganizationGlobeErrorBoundary";
+import { DEMO_BOOKING_URL } from "./constants";
 
 const ImpactGlobe = lazy(() => import("./ImpactGlobe"));
-
-interface HeroSectionProps {
-  onGetStarted: () => void;
-}
 
 const container = {
   hidden: {},
@@ -211,7 +208,7 @@ const FloatingCard = ({
   );
 };
 
-const HeroSection = ({ onGetStarted }: HeroSectionProps) => {
+const HeroSection = () => {
   const reduceMotion = useReducedMotion();
   const heroRef = useRef<HTMLElement>(null);
   const [claims, setClaims] = useState<ShowcaseImpactClaim[]>([]);
@@ -322,7 +319,7 @@ const HeroSection = ({ onGetStarted }: HeroSectionProps) => {
             <motion.p variants={item} className="mb-6">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/15 border border-accent/30 text-sm">
                 <Sparkles className="w-3.5 h-3.5 text-accent-foreground" />
-                <span className="text-accent-foreground font-medium">plug-and-play impact experiences</span>
+                <span className="text-accent-foreground font-medium">Plug & play impact experience engine</span>
               </span>
             </motion.p>
 
@@ -361,9 +358,21 @@ const HeroSection = ({ onGetStarted }: HeroSectionProps) => {
             </motion.p>
 
             <motion.div variants={item} className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-              <Button variant="hero" size="xl" className="group" onClick={onGetStarted}>
-                Share your impact
+              <Button
+                variant="hero"
+                size="xl"
+                className="group"
+                onClick={() =>
+                  document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })
+                }
+              >
+                Start sharing impact
                 <ArrowRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+              </Button>
+              <Button variant="hero-outline" size="xl" asChild>
+                <a href={DEMO_BOOKING_URL} target="_blank" rel="noopener noreferrer">
+                  Book a demo
+                </a>
               </Button>
             </motion.div>
           </motion.div>

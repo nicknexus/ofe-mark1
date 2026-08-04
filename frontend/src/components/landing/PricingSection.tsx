@@ -5,6 +5,7 @@ import { Button } from "../ui/button";
 import { Reveal, StaggerGroup, StaggerItem } from "./Reveal";
 import { AnimatedNumber } from "./AnimatedNumber";
 import { spring } from "./motion";
+import { DEMO_BOOKING_URL } from "./constants";
 
 interface PricingSectionProps {
   onGetStarted?: () => void;
@@ -198,8 +199,10 @@ const PricingSection = ({ onGetStarted }: PricingSectionProps) => {
         {/* Book a demo */}
         <Reveal className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-12">
           <span className="text-muted-foreground">Want a guided tour?</span>
-          <Button variant="hero" size="lg" onClick={onGetStarted}>
-            Book a demo
+          <Button variant="hero" size="lg" asChild>
+            <a href={DEMO_BOOKING_URL} target="_blank" rel="noopener noreferrer">
+              Book a demo
+            </a>
           </Button>
         </Reveal>
       </div>

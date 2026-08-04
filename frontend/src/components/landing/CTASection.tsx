@@ -4,6 +4,7 @@ import { Button } from "../ui/button";
 import { ArrowRight } from "lucide-react";
 import { Reveal } from "./Reveal";
 import { easeOut } from "./motion";
+import { DEMO_BOOKING_URL } from "./constants";
 
 interface CTASectionProps {
   onGetStarted: () => void;
@@ -109,10 +110,12 @@ const CTASection = ({ onGetStarted }: CTASectionProps) => {
               <Button
                 variant="hero-outline"
                 size="xl"
-                onClick={onGetStarted}
+                asChild
                 className="!border-white/40 !text-white hover:!bg-white/10"
               >
-                Book a demo
+                <a href={DEMO_BOOKING_URL} target="_blank" rel="noopener noreferrer">
+                  Book a demo
+                </a>
               </Button>
             </motion.div>
           </div>
