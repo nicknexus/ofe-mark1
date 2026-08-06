@@ -5,6 +5,7 @@ import { CreateKPIForm, MetricDefinitionWithUsage } from '../types'
 import TagPicker from './MetricTags/TagPicker'
 import { apiService } from '../services/api'
 import { notify } from '../lib/notify'
+import { useTeam } from '../context/TeamContext'
 
 interface CreateKPIModalProps {
   isOpen: boolean
@@ -33,6 +34,8 @@ export default function CreateKPIModal({
   onDelete,
   onAttached,
 }: CreateKPIModalProps) {
+  const { activeOrganization } = useTeam()
+  const orgLogoUrl = activeOrganization?.logo_url
   // Metrics are org-global, so an initiative can either define a new one or
   // pick up one the org already tracks. Editing skips the choice entirely.
   const [mode, setMode] = useState<'new' | 'existing'>('new')
@@ -200,26 +203,28 @@ export default function CreateKPIModal({
                       : 'Every metric your organization tracks is already on this initiative.'}
                 </p>
               ) : (
-                <div className="divide-y divide-gray-100 rounded-xl border border-gray-200 overflow-hidden">
+                <div className="space-y-1.5">
                   {availableDefinitions.map(definition => (
                     <button
                       key={definition.id}
                       type="button"
                       onClick={() => attachExisting(definition)}
                       disabled={attaching !== null}
-                      className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-primary-50/50 transition-colors disabled:opacity-50"
+                      className="group w-full flex items-center gap-2.5 p-2 bg-white rounded-xl border border-gray-200/70 shadow-card hover:border-primary-300/70 hover:shadow-card-hover transition-all text-left disabled:opacity-50"
                     >
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium text-gray-800 truncate">
-                          {definition.title}
-                        </div>
-                        <div className="text-xs text-gray-500 truncate">
-                          {definition.metric_type === 'percentage' ? 'Percentage' : definition.unit_of_measurement}
-                          {definition.initiative_count > 0 && (
-                            <> · in {definition.initiative_count} initiative{definition.initiative_count === 1 ? '' : 's'}</>
-                          )}
-                        </div>
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-white ring-1 ring-gray-100 overflow-hidden">
+                        <img
+                          src={orgLogoUrl || '/Nexuslogo.png'}
+                          alt=""
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            ;(e.currentTarget as HTMLImageElement).src = '/Nexuslogo.png'
+                          }}
+                        />
                       </div>
+                      <span className="text-xs font-semibold text-gray-900 leading-snug line-clamp-1 min-w-0 flex-1">
+                        {definition.title}
+                      </span>
                       <span className="text-xs font-medium text-primary-600 flex-shrink-0">
                         {attaching === definition.id ? 'Adding…' : 'Add'}
                       </span>
