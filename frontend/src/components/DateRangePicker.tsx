@@ -466,7 +466,7 @@ const DateRangePicker = forwardRef<DateRangePickerHandle, DateRangePickerProps>(
           ref={buttonRef}
           type="button"
           onClick={handleToggle}
-          className={`inline-flex items-center gap-2 h-9 pl-3 pr-2.5 rounded-full border text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 ${hasValue
+          className={`inline-flex items-center gap-2 h-9 pl-3 pr-2.5 rounded-full border text-sm font-medium transition-colors focus:outline-none ${hasValue
             ? 'border-primary-300 bg-primary-50 text-primary-800 hover:bg-primary-100'
             : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
             } ${className}`}

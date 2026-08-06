@@ -41,6 +41,25 @@ export class KPIService {
         // Strip tag_ids before insert; persist via junction after.
         const { tag_ids, ...kpiData } = (kpi as any)
 
+        // Metrics are org-global. A metric created inside an initiative still
+        // gets a definition so it's immediately available to every other one —
+        // unless the caller already resolved which definition this instantiates.
+        if (!kpiData.definition_id && kpi.initiative_id) {
+            const { MetricDefinitionService } = await import('./metricDefinitionService');
+            const definition = await MetricDefinitionService.create(
+                {
+                    title: kpi.title,
+                    description: kpi.description,
+                    metric_type: kpi.metric_type,
+                    unit_of_measurement: kpi.unit_of_measurement,
+                    category: kpi.category,
+                },
+                userId,
+                requestedOrgId
+            );
+            kpiData.definition_id = definition.id;
+        }
+
         const { data, error } = await supabase
             .from('kpis')
             .insert([{ ...kpiData, user_id: userId, display_order: maxOrder }])
@@ -67,6 +86,7 @@ export class KPIService {
                 .from('kpis')
                 .select('*')
                 .eq('initiative_id', initiativeId)
+                .is('archived_at', null)
                 .order('display_order', { ascending: true })
                 .order('created_at', { ascending: false });
 
@@ -83,6 +103,7 @@ export class KPIService {
                 .from('kpis')
                 .select('*')
                 .in('initiative_id', initiativeIds)
+                .is('archived_at', null)
                 .order('display_order', { ascending: true })
                 .order('created_at', { ascending: false });
 
@@ -112,7 +133,8 @@ export class KPIService {
                         evidence(id, type, date_represented, date_range_start, date_range_end)
                     )
                 `)
-                .eq('initiative_id', initiativeId);
+                .eq('initiative_id', initiativeId)
+                .is('archived_at', null);
         } else {
             // No initiative specified - get all for user's accessible initiatives
             const initiatives = await InitiativeService.getAll(userId, requestedOrgId);
@@ -130,7 +152,8 @@ export class KPIService {
                         evidence(id, type, date_represented, date_range_start, date_range_end)
                     )
                 `)
-                .in('initiative_id', initiativeIds);
+                .in('initiative_id', initiativeIds)
+                .is('archived_at', null);
         }
 
         const { data, error } = await query.order('display_order', { ascending: true }).order('created_at', { ascending: false });
@@ -267,19 +290,50 @@ export class KPIService {
 
         const { tag_ids, ...rest } = (updates as any)
 
-        const { data, error } = await supabase
-            .from('kpis')
-            .update(rest)
-            .eq('id', id)
-            .select()
-            .single();
+        // Identity lives on the org-global definition — editing it from inside
+        // an initiative renames the metric everywhere it's used. The DB trigger
+        // mirrors the change back down onto every instance, so we deliberately
+        // do NOT write these columns here.
+        const IDENTITY_FIELDS = ['title', 'description', 'metric_type', 'unit_of_measurement', 'category'] as const;
+        const definitionId = (kpi as any).definition_id;
+        const identityPatch: any = {};
+        const instancePatch: any = { ...rest };
 
-        if (error) throw new Error(`Failed to update KPI: ${error.message}`);
+        if (definitionId) {
+            for (const field of IDENTITY_FIELDS) {
+                if (field in instancePatch) {
+                    identityPatch[field] = instancePatch[field];
+                    delete instancePatch[field];
+                }
+            }
+        }
+
+        if (Object.keys(identityPatch).length > 0) {
+            const { MetricDefinitionService } = await import('./metricDefinitionService');
+            await MetricDefinitionService.update(definitionId, identityPatch, userId, requestedOrgId);
+        }
+
+        if (Object.keys(instancePatch).length > 0) {
+            const { error } = await supabase
+                .from('kpis')
+                .update(instancePatch)
+                .eq('id', id);
+            if (error) throw new Error(`Failed to update KPI: ${error.message}`);
+        }
 
         if (Array.isArray(tag_ids)) {
-            // Cascades: drops orphaned claim->tag links for this KPI.
+            // Cascades: drops orphaned claim->tag links across every instance.
             await MetricTagService.replaceTagsForKpi(id, tag_ids, userId, requestedOrgId)
         }
+
+        // Re-read so the caller sees the definition's mirrored values.
+        const { data, error: readError } = await supabase
+            .from('kpis')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (readError) throw new Error(`Failed to update KPI: ${readError.message}`);
 
         return data;
     }

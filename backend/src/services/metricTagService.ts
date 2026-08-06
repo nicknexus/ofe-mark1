@@ -232,25 +232,134 @@ export class MetricTagService {
         return false
     }
 
+    /**
+     * Tags belong to the org-global metric, so a write against one instance is
+     * a write against all of them. Delegates to the definition; the direct
+     * per-kpi path below is only reached for rows that pre-date definitions.
+     */
     static async replaceTagsForKpi(kpiId: string, tagIds: string[], userId: string, requestedOrgId?: string): Promise<void> {
+        const { data: kpi } = await supabase
+            .from('kpis')
+            .select('definition_id')
+            .eq('id', kpiId)
+            .maybeSingle()
+
+        if ((kpi as any)?.definition_id) {
+            return this.replaceTagsForDefinition((kpi as any).definition_id, tagIds, userId, requestedOrgId)
+        }
+
         const orgId = await this.getOrgId(userId, requestedOrgId)
         if (!orgId) throw new Error('No organization context')
         if (tagIds.length > 0 && await this.tagLinksLocked(orgId)) return
+        await this.assertTagsInOrg(tagIds, orgId)
+        await this.applyTagsToKpi(kpiId, tagIds, userId)
+    }
 
-        // Validate every tag belongs to the caller's org.
+    /**
+     * Set the tags on an org-global metric. Writes the source of truth, then
+     * mirrors down onto every instance (archived ones included, so restoring
+     * an instance doesn't resurrect a stale tag set).
+     *
+     * Consequence worth knowing: dropping a tag here un-tags matching claims in
+     * EVERY initiative using the metric, not just one.
+     */
+    static async replaceTagsForDefinition(
+        definitionId: string,
+        tagIds: string[],
+        userId: string,
+        requestedOrgId?: string
+    ): Promise<void> {
+        const orgId = await this.getOrgId(userId, requestedOrgId)
+        if (!orgId) throw new Error('No organization context')
+        if (tagIds.length > 0 && await this.tagLinksLocked(orgId)) return
+        await this.assertTagsInOrg(tagIds, orgId)
+
+        const { data: existingLinks } = await supabase
+            .from('metric_definition_tags')
+            .select('tag_id, display_order')
+            .eq('definition_id', definitionId)
+
+        const existingOrderByTag = new Map<string, number>(
+            (existingLinks || []).map((l: any) => [l.tag_id, l.display_order ?? 0])
+        )
+        const maxExistingOrder = (existingLinks || []).reduce(
+            (max: number, l: any) => Math.max(max, l.display_order ?? 0),
+            0
+        )
+
+        await supabase.from('metric_definition_tags').delete().eq('definition_id', definitionId)
+
         if (tagIds.length > 0) {
-            const { data: validTags } = await supabase
-                .from('metric_tags')
-                .select('id')
-                .eq('organization_id', orgId)
-                .in('id', tagIds)
-            const validIds = new Set((validTags || []).map((t: any) => t.id))
-            const invalid = tagIds.filter(id => !validIds.has(id))
-            if (invalid.length > 0) {
-                throw new Error(`Invalid metric tag IDs: ${invalid.join(', ')}`)
-            }
+            let nextOrder = maxExistingOrder
+            const links = tagIds.map(tag_id => {
+                if (existingOrderByTag.has(tag_id)) {
+                    return { definition_id: definitionId, tag_id, display_order: existingOrderByTag.get(tag_id)! }
+                }
+                nextOrder += 1
+                return { definition_id: definitionId, tag_id, display_order: nextOrder }
+            })
+            const { error } = await supabase.from('metric_definition_tags').insert(links)
+            if (error) throw new Error(`Failed to attach tags to metric: ${error.message}`)
         }
 
+        // Mirror into kpi_metric_tags for every instance. Keeps claim-tag
+        // validation, the public payloads and already-deployed code correct.
+        const { data: instances } = await supabase
+            .from('kpis')
+            .select('id')
+            .eq('definition_id', definitionId)
+
+        for (const instance of (instances || [])) {
+            await this.applyTagsToKpi((instance as any).id, tagIds, userId)
+        }
+    }
+
+    static async getTagIdsForDefinition(definitionId: string): Promise<string[]> {
+        const { data, error } = await supabase
+            .from('metric_definition_tags')
+            .select('tag_id, display_order')
+            .eq('definition_id', definitionId)
+            .order('display_order', { ascending: true })
+        if (error) throw new Error(`Failed to fetch metric tags: ${error.message}`)
+        return (data || []).map((r: any) => r.tag_id)
+    }
+
+    static async getTagIdsForDefinitions(definitionIds: string[]): Promise<Record<string, string[]>> {
+        const map: Record<string, string[]> = {}
+        for (const id of definitionIds) map[id] = []
+        if (definitionIds.length === 0) return map
+        const { data } = await supabase
+            .from('metric_definition_tags')
+            .select('definition_id, tag_id, display_order')
+            .in('definition_id', definitionIds)
+            .order('display_order', { ascending: true })
+        for (const row of (data || [])) {
+            if (!map[row.definition_id]) map[row.definition_id] = []
+            map[row.definition_id].push(row.tag_id)
+        }
+        return map
+    }
+
+    /** Every tag id must belong to the caller's org. */
+    private static async assertTagsInOrg(tagIds: string[], orgId: string): Promise<void> {
+        if (tagIds.length === 0) return
+        const { data: validTags } = await supabase
+            .from('metric_tags')
+            .select('id')
+            .eq('organization_id', orgId)
+            .in('id', tagIds)
+        const validIds = new Set((validTags || []).map((t: any) => t.id))
+        const invalid = tagIds.filter(id => !validIds.has(id))
+        if (invalid.length > 0) {
+            throw new Error(`Invalid metric tag IDs: ${invalid.join(', ')}`)
+        }
+    }
+
+    /**
+     * Write one instance's tag links and cascade to its claims. Assumes the
+     * caller has already validated the tags and checked the plan gate.
+     */
+    private static async applyTagsToKpi(kpiId: string, tagIds: string[], userId: string): Promise<void> {
         // Preserve existing per-metric order for tags that survive the replace,
         // and append newly-added tags at the bottom of the metric strip.
         const { data: existingLinks } = await supabase

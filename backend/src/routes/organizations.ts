@@ -8,6 +8,7 @@ import { EntitlementService, stripGatedFields } from '../services/entitlementSer
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { supabase } from '../utils/supabase';
 import { KPIService } from '../services/kpiService';
+import { MetricDefinitionService } from '../services/metricDefinitionService';
 import { upload } from '../utils/fileUpload';
 import { compressImage, isCompressibleImage } from '../utils/imageCompression';
 import path from 'path';
@@ -137,6 +138,44 @@ router.get('/embed-preview/:slug', authenticateUser, async (req: AuthenticatedRe
         });
     } catch (error) {
         console.error('Embed preview error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// Preview of the org-global metric page for a member of the org. Mirrors the
+// anonymous /public route with the is_public gate lifted, so the whole public
+// surface stays testable inside a private org.
+router.get('/metric-preview/:slug/:metricSlug', authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+        const { slug, metricSlug } = req.params;
+
+        const { data: org } = await supabase
+            .from('organizations')
+            .select('id')
+            .eq('slug', slug)
+            .maybeSingle();
+
+        if (!org) {
+            res.status(404).json({ error: 'Organization not found' });
+            return;
+        }
+
+        const hasAccess = await TeamService.hasOrgAccess(req.user!.id, org.id);
+        if (!hasAccess) {
+            res.status(403).json({ error: 'You do not have access to this organization' });
+            return;
+        }
+
+        const metric = await MetricDefinitionService.getPublicBySlug(slug, metricSlug, true);
+        if (!metric) {
+            res.status(404).json({ error: 'Metric not found' });
+            return;
+        }
+
+        const ent = await EntitlementService.getForOrg(org.id);
+        res.json(stripGatedFields(metric, ent.features));
+    } catch (error) {
+        console.error('Metric preview error:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });

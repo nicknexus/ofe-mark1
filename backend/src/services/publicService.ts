@@ -327,7 +327,8 @@ export class PublicService {
             const { count: kCount } = await supabase
                 .from('kpis')
                 .select('id', { count: 'exact', head: true })
-                .in('initiative_id', initiativeIds);
+                .in('initiative_id', initiativeIds)
+                .is('archived_at', null);
             kpiCount = kCount || 0;
         }
 
@@ -393,13 +394,15 @@ export class PublicService {
         let metricsQuery = supabase
             .from('kpis')
             .select(`
-                id, title, description, metric_type, unit_of_measurement, category, display_order, initiative_id,
+                id, title, description, metric_type, unit_of_measurement, category, display_order, initiative_id, definition_id,
                 initiatives!inner(id, slug, title, organization_id,
                     organizations!inner(slug, is_public)
                 ),
+                metric_definitions(slug),
                 kpi_updates(id, value, date_represented, location_id)
             `)
-            .eq('initiatives.organizations.slug', orgSlug);
+            .eq('initiatives.organizations.slug', orgSlug)
+            .is('archived_at', null);
         if (!opts?.allowPrivate) {
             metricsQuery = metricsQuery.eq('initiatives.organizations.is_public', true);
         }
@@ -446,6 +449,10 @@ export class PublicService {
                 initiative_id: k.initiative_id,
                 initiative_slug: k.initiatives?.slug,
                 initiative_title: k.initiatives?.title,
+                // Lets the org page collapse the same global metric used in
+                // several initiatives into one card.
+                definition_id: k.definition_id,
+                definition_slug: k.metric_definitions?.slug,
                 org_slug: k.initiatives?.organizations?.slug,
                 total_value: totalValue,
                 update_count: updates.length,
@@ -731,6 +738,7 @@ export class PublicService {
                 kpi_updates(id, value, date_represented, date_range_start, date_range_end, location_id, note)
             `)
             .eq('initiative_id', initiative.id)
+            .is('archived_at', null)
             .order('display_order');
 
         if (kpisError) {
@@ -1166,6 +1174,7 @@ export class PublicService {
                 )
             `)
             .eq('initiative_id', initiative.id)
+            .is('archived_at', null)
             .order('display_order');
 
         if (error) throw new Error(`Failed to fetch KPIs: ${error.message}`);
@@ -1234,6 +1243,7 @@ export class PublicService {
                 kpi_updates(id, value, date_represented, date_range_start, date_range_end, location_id, note, locations(id, name), kpi_update_beneficiary_groups(beneficiary_groups(id, name)))
             `)
             .eq('initiative_id', initiative.id)
+            .is('archived_at', null)
             .order('display_order');
 
         if (kpisError) {
@@ -1974,7 +1984,8 @@ export class PublicService {
             const { data: kpis } = await supabase
                 .from('kpis')
                 .select('id, title, unit_of_measurement, metric_type, initiative_id')
-                .in('initiative_id', initIds);
+                .in('initiative_id', initIds)
+                .is('archived_at', null);
             const kpiList = kpis || [];
             const kpiById = new Map(kpiList.map((k: any) => [k.id, k]));
             const kpiIds = kpiList.map((k: any) => k.id);

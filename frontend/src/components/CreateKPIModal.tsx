@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react'
-import { BarChart3, Trash2 } from 'lucide-react'
+import React, { useState, useEffect, useMemo } from 'react'
+import { BarChart3, Trash2, Search, Globe2, Plus } from 'lucide-react'
 import ModalFrame, { ModalHeader, ModalBody, ModalFooter } from './ModalFrame'
-import { CreateKPIForm } from '../types'
+import { CreateKPIForm, MetricDefinitionWithUsage } from '../types'
 import TagPicker from './MetricTags/TagPicker'
+import { apiService } from '../services/api'
+import { notify } from '../lib/notify'
 
 interface CreateKPIModalProps {
   isOpen: boolean
@@ -12,6 +14,8 @@ interface CreateKPIModalProps {
   editData?: any // Optional prop for editing existing KPI
   /** Edit mode only: opens the typed-confirmation delete flow. */
   onDelete?: () => void
+  /** Called after an existing org-global metric is attached to this initiative. */
+  onAttached?: () => void
 }
 
 const CATEGORIES = [
@@ -27,7 +31,15 @@ export default function CreateKPIModal({
   initiativeId,
   editData,
   onDelete,
+  onAttached,
 }: CreateKPIModalProps) {
+  // Metrics are org-global, so an initiative can either define a new one or
+  // pick up one the org already tracks. Editing skips the choice entirely.
+  const [mode, setMode] = useState<'new' | 'existing'>('new')
+  const [definitions, setDefinitions] = useState<MetricDefinitionWithUsage[]>([])
+  const [definitionsLoading, setDefinitionsLoading] = useState(false)
+  const [search, setSearch] = useState('')
+  const [attaching, setAttaching] = useState<string | null>(null)
   const [formData, setFormData] = useState<CreateKPIForm>({
     title: editData?.title || '',
     description: editData?.description || '',
@@ -45,6 +57,47 @@ export default function CreateKPIModal({
       setTagIds(Array.isArray(editData?.tag_ids) ? editData.tag_ids : [])
     }
   }, [editData])
+
+  useEffect(() => {
+    if (!isOpen) {
+      setMode('new')
+      setSearch('')
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen || mode !== 'existing' || editData) return
+    let cancelled = false
+    setDefinitionsLoading(true)
+    apiService.getMetricDefinitions()
+      .then(defs => { if (!cancelled) setDefinitions(defs) })
+      .catch(err => { if (!cancelled) notify.error((err as Error).message || 'Failed to load metrics') })
+      .finally(() => { if (!cancelled) setDefinitionsLoading(false) })
+    return () => { cancelled = true }
+  }, [isOpen, mode, editData])
+
+  // Anything not already on this initiative is fair game — including metrics
+  // that were archived here before, which come back with their claims intact.
+  const availableDefinitions = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return definitions
+      .filter(d => !d.initiatives.some(u => u.initiative_id === initiativeId))
+      .filter(d => !q || d.title.toLowerCase().includes(q) || (d.description || '').toLowerCase().includes(q))
+  }, [definitions, initiativeId, search])
+
+  const attachExisting = async (definition: MetricDefinitionWithUsage) => {
+    setAttaching(definition.id)
+    try {
+      await apiService.addMetricToInitiative(definition.id, initiativeId)
+      notify.success(`"${definition.title}" added to this initiative`)
+      onAttached?.()
+      onClose()
+    } catch (err) {
+      notify.error((err as Error).message || 'Failed to add metric')
+    } finally {
+      setAttaching(null)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -85,10 +138,104 @@ export default function CreateKPIModal({
         <ModalHeader
           icon={BarChart3}
           title={editData ? 'Edit metric' : 'Add metric'}
-          subtitle={editData ? 'Update how this metric is defined' : 'Define what you want to measure for this initiative'}
+          subtitle={
+            editData
+              ? 'Changes apply everywhere this metric is used'
+              : 'Create a new metric, or reuse one your organization already tracks'
+          }
           onClose={onClose}
         />
 
+        {!editData && (
+          <div className="px-5 pt-3 flex items-center gap-1 border-b border-gray-100">
+            <button
+              type="button"
+              onClick={() => setMode('new')}
+              className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                mode === 'new'
+                  ? 'border-primary-500 text-primary-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Plus className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
+              Create new
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('existing')}
+              className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                mode === 'existing'
+                  ? 'border-primary-500 text-primary-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Globe2 className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
+              Add existing
+            </button>
+          </div>
+        )}
+
+        {mode === 'existing' && !editData ? (
+          <>
+            <ModalBody rail>
+              <div className="relative mb-3">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search your organization's metrics…"
+                  className="w-full h-9 pl-10 pr-3 bg-gray-50 border border-gray-200 rounded-full text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+
+              {definitionsLoading ? (
+                <p className="text-sm text-gray-400 py-8 text-center">Loading metrics…</p>
+              ) : availableDefinitions.length === 0 ? (
+                <p className="text-sm text-gray-400 py-8 text-center">
+                  {definitions.length === 0
+                    ? 'Your organization has no other metrics yet.'
+                    : search.trim()
+                      ? `No metrics match "${search}".`
+                      : 'Every metric your organization tracks is already on this initiative.'}
+                </p>
+              ) : (
+                <div className="divide-y divide-gray-100 rounded-xl border border-gray-200 overflow-hidden">
+                  {availableDefinitions.map(definition => (
+                    <button
+                      key={definition.id}
+                      type="button"
+                      onClick={() => attachExisting(definition)}
+                      disabled={attaching !== null}
+                      className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-primary-50/50 transition-colors disabled:opacity-50"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-800 truncate">
+                          {definition.title}
+                        </div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {definition.metric_type === 'percentage' ? 'Percentage' : definition.unit_of_measurement}
+                          {definition.initiative_count > 0 && (
+                            <> · in {definition.initiative_count} initiative{definition.initiative_count === 1 ? '' : 's'}</>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-xs font-medium text-primary-600 flex-shrink-0">
+                        {attaching === definition.id ? 'Adding…' : 'Add'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </ModalBody>
+            <ModalFooter>
+              <button type="button" onClick={onClose} className="app-btn app-btn-ghost">
+                Cancel
+              </button>
+            </ModalFooter>
+          </>
+        ) : (
+        <>
         <ModalBody rail>
           <div className="flex flex-col gap-8">
           <div>
@@ -216,6 +363,8 @@ export default function CreateKPIModal({
             {loading ? (editData ? 'Updating…' : 'Creating…') : (editData ? 'Update metric' : 'Add metric')}
           </button>
         </ModalFooter>
+        </>
+        )}
       </form>
     </ModalFrame>
   )

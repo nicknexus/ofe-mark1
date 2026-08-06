@@ -35,7 +35,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { apiService } from '../services/api'
-import { Initiative, LoadingState, CreateInitiativeForm, KPI, Location, OrganizationContext } from '../types'
+import { Initiative, LoadingState, CreateInitiativeForm, CreateMetricDefinitionForm, KPI, Location, MetricDefinitionWithUsage, OrganizationContext } from '../types'
 import { formatDate, truncateText } from '../utils'
 import { notify } from '../lib/notify'
 import CreateInitiativeModal from '../components/CreateInitiativeModal'
@@ -44,7 +44,8 @@ import AllLocationsModal from '../components/AllLocationsModal'
 import ModalFrame from '../components/ModalFrame'
 import UpgradeModal from '../components/UpgradeModal'
 import { SubscriptionService } from '../services/subscription'
-import TagsWidget from '../components/MetricTags/TagsWidget'
+import GlobalMetricsStrip from '../components/overview/GlobalMetricsStrip'
+import MetricDefinitionModal from '../components/MetricDefinitionModal'
 import { ExternalLink, Lock } from 'lucide-react'
 import { useTutorial } from '../context/TutorialContext'
 import { useOnboarding } from '../context/OnboardingContext'
@@ -307,6 +308,10 @@ function PublicScoreCard({
  )
 }
 
+// NOTE: ContextScoreCard / NextStepsCard are currently unmounted — the
+// dashboard row they lived in now shows the org's global metrics. Kept here
+// (rather than deleted) because Next Steps is the onboarding nudge engine and
+// still needs a home; re-mount either one with a single line.
 function ContextScoreCard({
  score,
  checks,
@@ -423,16 +428,21 @@ export default function Dashboard() {
  canEditInitiatives,
  canDelete,
  canEditLocations,
+ canAddMetrics,
  } = useTeam()
- // Team members see the full dashboard, including the right rail (Context Score /
- // Next Steps / Tags). Those read from activeOrganization so a team member sees the
- // org they're scoped into, not a missing ownedOrganization.
+ // Team members see the full dashboard. Widgets read from activeOrganization
+ // so a team member sees the org they're scoped into, not a missing
+ // ownedOrganization.
  const dashboardOrg = activeOrganization || ownedOrganization
  // Granular gating: create / edit / delete are independent grants.
  // Account-level widgets (logo, branding, public toggle) remain owner-only.
  const canManageInitiatives = canEditInitiatives || canDelete || canCreateInitiatives
  const [initiatives, setInitiatives] = useState<Initiative[]>([])
  const [allKPIs, setAllKPIs] = useState<KPI[]>([])
+ // Org-global metrics — the dashboard's headline numbers.
+ const [metricDefinitions, setMetricDefinitions] = useState<MetricDefinitionWithUsage[]>([])
+ const [metricsLoading, setMetricsLoading] = useState(true)
+ const [showMetricModal, setShowMetricModal] = useState(false)
  const [allLocations, setAllLocations] = useState<Location[]>([])
  const [totalEvidence, setTotalEvidence] = useState<number>(0)
  const [orgContext, setOrgContext] = useState<OrganizationContext | null>(null)
@@ -468,6 +478,26 @@ export default function Dashboard() {
  return () => { cancelled = true }
  }, [dashboardOrg?.id])
 
+ // Org-global metrics for the dashboard strip. Scoped to the active org, so
+ // it reloads on org switch alongside everything else.
+ const loadMetricDefinitions = React.useCallback(async () => {
+ setMetricsLoading(true)
+ try {
+ const defs = await apiService.getMetricDefinitions()
+ setMetricDefinitions(defs)
+ } catch (err) {
+ console.warn('Failed to load org metrics:', err)
+ setMetricDefinitions([])
+ } finally {
+ setMetricsLoading(false)
+ }
+ }, [])
+
+ useEffect(() => {
+ if (!dashboardOrg?.id) return
+ loadMetricDefinitions()
+ }, [dashboardOrg?.id, loadMetricDefinitions])
+
  // Trigger initial load AND re-trigger on org switch. dashboardOrg?.id
  // is the active org (or owner fallback) — switching orgs flips this and we
  // want a fresh data fetch under the new scope.
@@ -482,6 +512,8 @@ export default function Dashboard() {
  setOrgContext(null)
  setContextLoaded(false)
  setIsLoadingStats(true)
+ setMetricDefinitions([])
+ setMetricsLoading(true)
  // Drop any in-flight promise from the previous org so loadAllData's
  // dedupe guard doesn't return the old promise to the new effect.
  loadingPromise.current = null
@@ -850,9 +882,6 @@ export default function Dashboard() {
  return steps.slice(0, 4)
  }, [dashboardOrg, initiatives, allKPIs, allLocations, totalEvidence, contextScore])
 
- // Right rail is shown whenever there's an active org context — owner or team member.
- const showOwnerWidgets = !!dashboardOrg
-
  if (loadingState.isLoading) {
  return <PageLoader />
  }
@@ -887,24 +916,19 @@ export default function Dashboard() {
  <div className="max-w-[1600px] mx-auto w-full flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-x-4 gap-y-2 lg:grid-rows-[auto_minmax(0,1fr)]">
           {/* Command-center header — title, at-a-glance stats, primary action */}
           <div className="lg:col-start-1 lg:row-start-1 lg:col-span-5 xl:col-span-4 min-w-0 flex flex-wrap items-center gap-x-4 gap-y-2">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 leading-tight tracking-tight">
-                  {isSharedMember ? 'Team Initiatives' : 'Your Initiatives'}
-                </h1>
-                {isSharedMember && organizationName && (
-                  <span
-                    className="inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-purple-50 border border-purple-100 text-xs font-medium text-purple-700"
-                    title={`You're viewing ${organizationName}'s initiatives as a team member`}
-                  >
-                    <Users className="w-3.5 h-3.5" />
-                    Team · {organizationName}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {organizationName ? `Everything ${organizationName} is tracking, in one place` : 'Everything you’re tracking, in one place'}
-              </p>
+            <div className="min-w-0 flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 leading-tight tracking-tight">
+                {isSharedMember ? 'Team Initiatives' : 'Your Initiatives'}
+              </h1>
+              {isSharedMember && organizationName && (
+                <span
+                  className="inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-purple-50 border border-purple-100 text-xs font-medium text-purple-700"
+                  title={`You're viewing ${organizationName}'s initiatives as a team member`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  Team · {organizationName}
+                </span>
+              )}
             </div>
           </div>
 
@@ -995,29 +1019,40 @@ export default function Dashboard() {
             </div>
           </section>
 
- {/* Everything else — progress widgets in a row, map filling the rest */}
- <section className="lg:col-start-6 xl:col-start-5 lg:row-start-1 lg:row-span-2 lg:col-span-7 xl:col-span-8 flex flex-col min-h-0">
- <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2.5 flex-shrink-0">Progress & locations</h2>
+ {/* Everything else — metrics aligned with All initiatives, then map */}
+ <section className="lg:col-start-6 xl:col-start-5 lg:row-start-2 lg:col-span-7 xl:col-span-8 flex flex-col min-h-0">
  <div className="flex-1 min-h-0 flex flex-col gap-4">
- {showOwnerWidgets ? (
- <div className="flex-shrink-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
- <ContextScoreCard score={contextScore} checks={contextChecks} />
- <NextStepsCard steps={nextSteps} loading={isLoadingStats || !contextLoaded} />
- <div className="min-h-0 h-full">
- <TagsWidget />
- </div>
- </div>
- ) : (
- <div className="flex-shrink-0 max-w-md max-h-56 lg:overflow-y-auto">
- <TagsWidget compact />
- </div>
- )}
+ {/* Org-global metrics lead the dashboard: these totals span every
+ initiative, which is the whole point of metrics being global. */}
+ <GlobalMetricsStrip
+ definitions={metricDefinitions}
+ loading={metricsLoading}
+ canAddMetrics={canAddMetrics}
+ onCreate={() => setShowMetricModal(true)}
+ />
 
  {/* Locations map — chrome-less rounded frame with overlay actions,
  same treatment as the Metrics Overview map. `isolate` keeps the
  map's z-indexes (Leaflet panes + pills) inside this frame so they
  never bleed through modals or full-screen overlays. */}
- <div className="hidden md:block relative isolate h-64 lg:h-auto lg:flex-1 lg:min-h-[180px] rounded-3xl overflow-hidden border border-gray-200/60 shadow-card">
+ <div className="hidden md:flex flex-col flex-1 min-h-0">
+ <div className="flex items-center gap-2 mb-2.5 min-h-8 flex-shrink-0">
+ <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+ Locations
+ </h2>
+ {canEditLocations && (
+ <button
+ type="button"
+ onClick={() => setShowAllLocationsModal(true)}
+ className="ml-auto app-btn app-btn-primary app-btn-sm shadow-sm"
+ title="Add location"
+ >
+ <Plus className="w-4 h-4" />
+ Add location
+ </button>
+ )}
+ </div>
+ <div className="relative isolate h-64 lg:h-auto lg:flex-1 lg:min-h-[180px] rounded-3xl overflow-hidden border border-gray-200/60 shadow-card">
  <LocationMap
  locations={allLocations}
  onLocationClick={handleLocationClick}
@@ -1033,16 +1068,7 @@ export default function Dashboard() {
  <ExternalLink className="w-3.5 h-3.5 text-primary-600" />
  View all · {allLocations.length}
  </button>
- {canEditLocations && (
- <button
- onClick={() => setShowAllLocationsModal(true)}
- className="inline-flex items-center gap-1 h-8 px-3 rounded-full bg-white/90 backdrop-blur border border-gray-200 shadow-sm text-xs font-medium text-gray-700 hover:bg-white transition-colors"
- title="Add location"
- >
- <Plus className="w-3.5 h-3.5 text-primary-600" />
- Add
- </button>
- )}
+ </div>
  </div>
  </div>
  </div>
@@ -1135,6 +1161,17 @@ export default function Dashboard() {
  )}
 
  {/* Upgrade Modal - Initiative Limit Reached */}
+ <MetricDefinitionModal
+ isOpen={showMetricModal}
+ onClose={() => setShowMetricModal(false)}
+ onSubmit={async (data) => {
+ await apiService.createMetricDefinition(data)
+ notify.success('Metric created')
+ await loadMetricDefinitions()
+ }}
+ initiatives={initiatives}
+ />
+
  <UpgradeModal
  isOpen={showUpgradeModal}
  onClose={() => setShowUpgradeModal(false)}

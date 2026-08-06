@@ -97,10 +97,58 @@ export interface KPI {
  initiative_id?: string;
  umbrella_kpi_id?: string;
  display_order?: number;
+ /** The org-global metric this row instantiates. */
+ definition_id?: string;
+ archived_at?: string | null;
  tag_ids?: string[];
  created_at?: string;
  updated_at?: string;
  user_id?: string;
+}
+
+/**
+ * An org-global metric — the thing users think of as "the metric". A KPI is
+ * that metric in use inside one initiative, and owns the impact claims.
+ */
+export interface MetricDefinition {
+ id: string;
+ organization_id?: string;
+ title: string;
+ slug?: string;
+ description?: string;
+ metric_type: 'number' | 'percentage';
+ unit_of_measurement: string;
+ category: 'input' | 'output' | 'impact';
+ tag_ids?: string[];
+ created_at?: string;
+ updated_at?: string;
+}
+
+export interface MetricDefinitionUsage {
+ kpi_id: string;
+ initiative_id: string;
+ initiative_title: string;
+ initiative_slug?: string;
+ total_value: number;
+ update_count: number;
+}
+
+export interface MetricDefinitionWithUsage extends MetricDefinition {
+ /** Pooled across every initiative using it — not a sum of the subtotals. */
+ total_value: number;
+ update_count: number;
+ initiative_count: number;
+ initiatives: MetricDefinitionUsage[];
+}
+
+export interface CreateMetricDefinitionForm {
+ title: string;
+ description: string;
+ metric_type: 'number' | 'percentage';
+ unit_of_measurement: string;
+ category: 'input' | 'output' | 'impact';
+ tag_ids?: string[];
+ initiative_ids?: string[];
 }
 
 export interface MetricTag {

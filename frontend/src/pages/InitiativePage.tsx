@@ -646,6 +646,12 @@ export default function InitiativePage() {
  onClose={() => setIsKPIModalOpen(false)}
  onSubmit={handleCreateKPI}
  initiativeId={id!}
+ onAttached={async () => {
+ // An existing org-global metric was attached (or an archived one
+ // restored, bringing its claims back) — reload to pick it up.
+ apiService.clearCache(`/initiatives/${id}/dashboard`)
+ if (!isLoadingDashboard) await loadDashboard()
+ }}
  />
 
  {/* Unified impact claim modal — covers both single-KPI and multi-KPI flows */}

@@ -59,6 +59,9 @@ export interface PublicKPI {
  initiative_id: string
  initiative_slug?: string
  initiative_title?: string
+ /** The org-global metric. Same value on every initiative using it. */
+ definition_id?: string
+ definition_slug?: string
  org_slug?: string
  updates?: PublicKPIUpdate[]
  total_value?: number
@@ -439,6 +442,10 @@ class PublicApiService {
  return this.request<PublicKPI[]>(`/organizations/${orgSlug}/metrics`)
  }
 
+ async getOrganizationMetric(orgSlug: string, metricSlug: string): Promise<PublicGlobalMetric> {
+ return this.request<PublicGlobalMetric>(`/organizations/${orgSlug}/metric/${metricSlug}`)
+ }
+
  async getOrganizationStories(orgSlug: string, limit?: number): Promise<PublicStory[]> {
  const params = limit ? `?limit=${limit}` : ''
  return this.request<PublicStory[]>(`/organizations/${orgSlug}/stories${params}`)
@@ -519,6 +526,39 @@ class PublicApiService {
 }
 
 // Metric Detail types
+/**
+ * An org-global metric on the public side: the pooled total plus the
+ * per-initiative breakdown a visitor uses to choose which initiative to view
+ * it from.
+ */
+export interface PublicGlobalMetric {
+ id: string
+ title: string
+ slug: string
+ description?: string
+ metric_type: 'number' | 'percentage'
+ unit_of_measurement: string
+ category: 'input' | 'output' | 'impact'
+ org_slug: string
+ organization_name: string
+ organization_logo_url?: string
+ organization_brand_color?: string
+ total_value: number
+ update_count: number
+ initiatives: Array<{
+ initiative_id: string
+ initiative_slug: string
+ initiative_title: string
+ total_value: number
+ update_count: number
+ }>
+ updates: Array<PublicKPIUpdate & {
+ initiative_id?: string
+ initiative_slug?: string
+ initiative_title?: string
+ }>
+}
+
 export interface PublicMetricDetail {
  id: string
  title: string

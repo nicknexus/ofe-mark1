@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useOrgLinkBase } from '../../../hooks/useOrgLinkBase'
-import { Activity, BarChart3, ChevronDown, Globe, Layers, MapPin, TrendingUp } from 'lucide-react'
+import { Activity, BarChart3, ChevronDown, ChevronRight, Globe, Layers, MapPin, TrendingUp } from 'lucide-react'
+import PublicTagChip from '../PublicTagChip'
+import { getKPIColor } from '../../metricsDashboard/metricColorPalette'
 import { MapContainer } from 'react-leaflet'
 import {
     Area,
@@ -20,7 +22,7 @@ import {
 } from 'recharts'
 import { PublicInitiative, InitiativeDashboard, PublicMetricTag } from '../../../services/publicApi'
 import { formatDate, formatAbbreviatedMetricTotal, parseLocalDate } from '../../../utils'
-import { LocationMarker, TileLayerWithFallback } from './PublicInitiativeMap'
+import { LocationMarker, MapResizeHandler, TileLayerWithFallback } from './PublicInitiativeMap'
 import { CATEGORY_COLORS, generateMetricSlug, getMetricColor } from './metricColors'
 import { brandIconStyle, PUBLIC_SECTION_CHIP_STYLE } from '../publicStyles'
 
@@ -416,39 +418,68 @@ export function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiati
 
             {/* Metric Cards Row - Links to metric detail pages */}
             {dashboard.kpis.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {dashboard.kpis.slice(0, 12).map((kpi, index) => {
-                        const metricColor = getMetricColor(index)
+                        const color = getKPIColor(kpi.category, index)
+                        const isPct = kpi.metric_type === 'percentage'
                         const metricSlug = generateMetricSlug(kpi.title)
+                        const valueLabel = `${formatAbbreviatedMetricTotal(kpi.total_value ?? 0, { isPercentage: isPct })}${isPct ? '%' : ''}`
+                        const tags = tagsById && kpi.tag_ids
+                            ? kpi.tag_ids.map(id => tagsById.get(id)).filter(Boolean) as PublicMetricTag[]
+                            : []
                         return (
                             <Link
                                 key={kpi.id}
                                 to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/metric/${metricSlug}${dateQS}`}
-                                className="rounded-xl bg-white border border-gray-200/80 shadow-public hover:shadow-public-hover hover:border-gray-300 overflow-hidden flex flex-col h-full min-h-[7rem] transition-all group"
+                                className="bg-white rounded-2xl border border-gray-200/70 shadow-card hover:shadow-card-hover hover:border-primary-300/70 hover:-translate-y-0.5 transition-all duration-200 p-5 cursor-pointer group relative flex flex-col h-full"
                             >
-                                <div className="flex-1 min-h-0 overflow-hidden flex flex-col items-center justify-center px-2 pt-3 pb-2">
-                                    <div
-                                        className="text-2xl sm:text-3xl font-bold tabular-nums tracking-tight text-center max-w-full min-w-0 shrink truncate px-1"
-                                        style={{ color: metricColor }}
+                                <ChevronRight className="absolute top-4 right-4 w-5 h-5 text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all" />
+
+                                <div className="flex items-start gap-2.5 pr-7 mb-3">
+                                    <span
+                                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-2"
+                                        style={{ backgroundColor: color }}
+                                    />
+                                    <p
+                                        className="text-sm font-semibold text-gray-900 leading-snug line-clamp-2"
+                                        title={kpi.title}
                                     >
-                                        {formatAbbreviatedMetricTotal(kpi.total_value ?? 0, { isPercentage: kpi.metric_type === 'percentage' })}
-                                        {kpi.metric_type === 'percentage' ? '%' : ''}
+                                        {kpi.title}
+                                    </p>
+                                </div>
+
+                                <div className="flex items-baseline gap-2 mt-auto">
+                                    <span
+                                        className="text-3xl font-semibold tabular-nums tracking-tight"
+                                        style={{ color }}
+                                    >
+                                        {valueLabel}
+                                    </span>
+                                    <span className="text-sm text-gray-400 truncate">
+                                        {isPct ? 'average' : kpi.unit_of_measurement}
+                                    </span>
+                                </div>
+
+                                {tags.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-3" onClick={(e) => e.preventDefault()}>
+                                        {tags.slice(0, 4).map(t => (
+                                            <PublicTagChip
+                                                key={t.id}
+                                                name={t.name}
+                                                size="xs"
+                                                iconless
+                                                nameMaxWidthClass="max-w-[72px]"
+                                                selected={selectedTagIds?.includes(t.id)}
+                                                onClick={onTagClick ? () => onTagClick(t.id) : undefined}
+                                            />
+                                        ))}
+                                        {tags.length > 4 && (
+                                            <span className="text-[10px] text-gray-400 px-1 self-center">
+                                                +{tags.length - 4}
+                                            </span>
+                                        )}
                                     </div>
-                                    {(kpi.metric_type === 'percentage' || kpi.unit_of_measurement) && (
-                                        <span className="text-[10px] text-muted-foreground mt-1 text-center line-clamp-1">
-                                            {kpi.metric_type === 'percentage' ? 'average' : kpi.unit_of_measurement}
-                                        </span>
-                                    )}
-                                </div>
-                                <div
-                                    className="shrink-0 h-[3.75rem] border-t px-2 py-0 flex items-center justify-center overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]"
-                                    style={{
-                                        background: `linear-gradient(180deg, ${brandColor}14 0%, ${brandColor}26 100%)`,
-                                        borderColor: `${brandColor}38`,
-                                    }}
-                                >
-                                    <p className="text-[11px] sm:text-xs font-semibold text-foreground/90 text-center leading-snug line-clamp-3 w-full px-0.5 min-h-0 group-hover:text-accent transition-colors">{kpi.title}</p>
-                                </div>
+                                )}
                             </Link>
                         )
                     })}
@@ -767,8 +798,38 @@ export function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiati
                 )}
             </div>
 
-            {/* Bottom Row: Stats + Category Breakdown + Locations */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Locations — full width under the graph, interactive like the dashboard map */}
+            <div className="flex flex-col">
+                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2.5 flex-shrink-0">
+                    Locations
+                </h2>
+                {dashboard.locations && dashboard.locations.length > 0 ? (
+                    <div className="relative isolate h-[320px] rounded-3xl overflow-hidden border border-gray-200/60 shadow-card">
+                        <MapContainer
+                            center={[
+                                dashboard.locations.reduce((s, l) => s + l.latitude, 0) / dashboard.locations.length,
+                                dashboard.locations.reduce((s, l) => s + l.longitude, 0) / dashboard.locations.length
+                            ]}
+                            zoom={dashboard.locations.length === 1 ? 8 : 3}
+                            className="w-full h-full"
+                            scrollWheelZoom
+                        >
+                            <MapResizeHandler />
+                            <TileLayerWithFallback />
+                            {dashboard.locations.map((loc) => (
+                                <LocationMarker key={loc.id} location={loc} />
+                            ))}
+                        </MapContainer>
+                    </div>
+                ) : (
+                    <div className="relative isolate h-[320px] rounded-3xl overflow-hidden border border-gray-200/60 shadow-card bg-white flex items-center justify-center text-muted-foreground">
+                        <p className="text-sm">No locations yet</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Bottom Row: Stats + Category Breakdown */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 {/* Stats */}
                 <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-5">
                     <div className="flex items-center gap-2 mb-4">
@@ -839,56 +900,6 @@ export function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiati
                     ) : (
                         <div className="h-[200px] flex items-center justify-center text-muted-foreground">
                             <p className="text-sm">No metrics yet</p>
-                        </div>
-                    )}
-                </div>
-
-                {/* Locations Preview */}
-                <div className="rounded-2xl bg-white border border-gray-200/80 shadow-public p-5">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-amber-100">
-                                <MapPin className="w-4 h-4 text-amber-600" />
-                            </div>
-                            <h2 className="font-semibold text-foreground">Locations</h2>
-                        </div>
-                        <span className="text-xs text-muted-foreground">{dashboard.locations?.length || 0}</span>
-                    </div>
-
-                    {dashboard.locations && dashboard.locations.length > 0 ? (
-                        <>
-                            <div className="h-[120px] rounded-xl overflow-hidden border border-gray-200 mb-3">
-                                <MapContainer
-                                    center={[
-                                        dashboard.locations.reduce((s, l) => s + l.latitude, 0) / dashboard.locations.length,
-                                        dashboard.locations.reduce((s, l) => s + l.longitude, 0) / dashboard.locations.length
-                                    ]}
-                                    zoom={dashboard.locations.length === 1 ? 8 : 3}
-                                    className="w-full h-full"
-                                    zoomControl={false}
-                                    scrollWheelZoom={false}
-                                    dragging={false}
-                                >
-                                    <TileLayerWithFallback />
-                                    {dashboard.locations.map((loc) => (
-                                        <LocationMarker key={loc.id} location={loc} />
-                                    ))}
-                                </MapContainer>
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                                {dashboard.locations.slice(0, 5).map((loc) => (
-                                    <span key={loc.id} className="px-2 py-1 bg-gray-100 text-foreground rounded text-xs font-medium border border-gray-200">
-                                        {loc.name}
-                                    </span>
-                                ))}
-                                {dashboard.locations.length > 5 && (
-                                    <span className="px-2 py-1 text-muted-foreground text-xs">+{dashboard.locations.length - 5} more</span>
-                                )}
-                            </div>
-                        </>
-                    ) : (
-                        <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-                            <p className="text-sm">No locations yet</p>
                         </div>
                     )}
                 </div>

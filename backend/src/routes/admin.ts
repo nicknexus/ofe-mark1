@@ -513,6 +513,62 @@ router.post('/demos/:id/clone', async (req: AuthenticatedRequest, res) => {
         const kpiIdMap = new Map<string, string>();
         const kpiUpdateIdMap = new Map<string, string>();
         const benIdMap = new Map<string, string>();
+        const definitionIdMap = new Map<string, string>();
+
+        /**
+         * Metric definitions are org-scoped, so a cloned metric needs its own
+         * definition in the target org. Carrying the source id across would tie
+         * the two orgs together — renaming the source would rename the clone.
+         * Cloned once per source definition, so a metric shared by several of
+         * the source's initiatives stays shared in the clone.
+         */
+        const cloneDefinition = async (sourceDefinitionId: string | null): Promise<string | null> => {
+            if (!sourceDefinitionId) return null;
+            const existing = definitionIdMap.get(sourceDefinitionId);
+            if (existing) return existing;
+
+            const { data: def } = await supabase
+                .from('metric_definitions')
+                .select('*')
+                .eq('id', sourceDefinitionId)
+                .maybeSingle();
+            if (!def) return null;
+
+            const {
+                id: _did,
+                organization_id: _do,
+                created_at: _dc,
+                updated_at: _du,
+                ...defFields
+            } = def;
+
+            const { data: newDef, error: defErr } = await supabase
+                .from('metric_definitions')
+                .insert([{ ...defFields, organization_id: newOrg.id, created_by: userId }])
+                .select()
+                .single();
+            if (defErr || !newDef) {
+                console.warn('[clone] metric definition failed:', defErr?.message);
+                return null;
+            }
+
+            const { data: defTags } = await supabase
+                .from('metric_definition_tags')
+                .select('tag_id, display_order')
+                .eq('definition_id', sourceDefinitionId);
+            if (defTags && defTags.length > 0) {
+                await supabase.from('metric_definition_tags').insert(
+                    defTags.map((t: any) => ({
+                        definition_id: newDef.id,
+                        tag_id: t.tag_id,
+                        display_order: t.display_order,
+                    }))
+                );
+            }
+
+            definitionIdMap.set(sourceDefinitionId, newDef.id);
+            return newDef.id;
+        };
 
         const linkLocationToInitiative = async (locationId: string, initiativeId: string) => {
             const { error } = await supabase
@@ -622,10 +678,23 @@ router.post('/demos/:id/clone', async (req: AuthenticatedRequest, res) => {
                 .select('*')
                 .eq('initiative_id', srcInit.id);
             for (const kpi of srcKpis || []) {
-                const { id: _kid, initiative_id: _ki, created_at: _kc, updated_at: _ku, ...kpiFields } = kpi;
+                const {
+                    id: _kid,
+                    initiative_id: _ki,
+                    created_at: _kc,
+                    updated_at: _ku,
+                    definition_id: srcDefinitionId,
+                    ...kpiFields
+                } = kpi;
+                const newDefinitionId = await cloneDefinition(srcDefinitionId ?? null);
                 const { data: newKpi, error: kpiErr } = await supabase
                     .from('kpis')
-                    .insert([{ ...kpiFields, initiative_id: newInit.id, user_id: userId }])
+                    .insert([{
+                        ...kpiFields,
+                        initiative_id: newInit.id,
+                        user_id: userId,
+                        definition_id: newDefinitionId,
+                    }])
                     .select()
                     .single();
                 if (kpiErr || !newKpi) continue;

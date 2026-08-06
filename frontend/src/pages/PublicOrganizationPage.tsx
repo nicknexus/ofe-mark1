@@ -5,6 +5,7 @@ import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
 import {
     ArrowLeft,
     Building2,
+    Check,
     ChevronDown,
     ChevronRight,
     MapPin,
@@ -12,6 +13,7 @@ import {
     X,
 } from 'lucide-react'
 import PublicDonateButton from '../components/public/PublicDonateButton'
+import FilterPill from '../components/shared/FilterPill'
 import {
     publicApi,
     PublicOrganization,
@@ -27,9 +29,10 @@ import {
 import PublicLoader from '../components/public/PublicLoader'
 import PublicTagFilter from '../components/public/PublicTagFilter'
 import DateRangePicker from '../components/DateRangePicker'
-import { PublicPageBackground, PUBLIC_HEADER_CLASS, PUBLIC_PANEL_STATIC_CLASS } from '../components/public/publicStyles'
+import { PublicPageBackground, PUBLIC_HEADER_CLASS, PUBLIC_PANEL_STATIC_CLASS, publicFilterPillClass } from '../components/public/publicStyles'
 import { compareClaimsByEffectiveDateDesc } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
+import { groupMetricsByDefinition } from '../utils/groupMetricsByDefinition'
 import type { FeatureView } from '../components/public/organization/organizationTypes'
 import { PublicOrganizationHero } from '../components/public/organization/PublicOrganizationHero'
 import { PublicOrganizationViewToggles } from '../components/public/organization/PublicOrganizationViewToggles'
@@ -75,10 +78,8 @@ export default function PublicOrganizationPage() {
     const [endDate, setEndDate] = useState<string>('')
     const [showInitiativeDropdown, setShowInitiativeDropdown] = useState(false)
     const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([])
-    const [showLocationDropdown, setShowLocationDropdown] = useState(false)
     const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
     const initiativeBtnRef = useRef<HTMLButtonElement>(null)
-    const locationBtnRef = useRef<HTMLButtonElement>(null)
     const keyMetricsScrollRef = useRef<HTMLDivElement>(null)
 
     // Location popups state. `rightAnchored` flips CSS to use `right` instead of
@@ -275,13 +276,21 @@ export default function PublicOrganizationPage() {
                 return { ...m, total_value: newTotal, update_count: filteredUpdates.length }
             })
         }
+        // Collapse to one card per org-global metric. Done last so the filters
+        // above still apply per-initiative before the claims are pooled — and
+        // skipped when a single initiative is selected, where the per-initiative
+        // number is exactly what the visitor asked for.
+        const grouped = selectedInitiative === 'all'
+            ? groupMetricsByDefinition(filtered)
+            : filtered.map(m => ({ ...m, initiative_count: 1 }))
+
         // Highest total first — top-left has the biggest number, fills the
         // grid row-by-row in descending order. Percentage metrics use their
         // average value (already in total_value), so the comparison is
         // apples-to-apples per metric type, but mixing types in one grid will
         // surface the biggest absolute number regardless. That matches what
         // donors visually expect ("the impact you're proudest of, first").
-        return [...filtered].sort((a, b) => (b.total_value ?? 0) - (a.total_value ?? 0))
+        return [...grouped].sort((a, b) => (b.total_value ?? 0) - (a.total_value ?? 0))
     }, [metrics, selectedInitiative, selectedLocationIds, startDate, endDate, selectedTagIds])
 
     const [keyMetricsRowPx] = useState<number | null>(null)
@@ -860,29 +869,27 @@ export default function PublicOrganizationPage() {
                             />
                         </div>
 
-                        {/* Center: Filters */}
+                        {/* Center: Filters — same modern pills as private Logs/Metrics */}
                         <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto scrollbar-none">
                             <button
                                 ref={initiativeBtnRef}
-                                onClick={() => { setShowInitiativeDropdown(!showInitiativeDropdown); setShowLocationDropdown(false) }}
-                                className="flex items-center pl-0 pr-2.5 sm:pr-3 h-8 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-xs font-medium transition-all shadow-sm flex-shrink-0"
-                                style={{
-                                    border: selectedInitiative !== 'all' ? `1.5px solid ${brandColor}` : '1px solid #e5e7eb',
-                                    boxShadow: selectedInitiative !== 'all'
-                                        ? `0 1px 2px rgba(15,23,42,0.06), 0 0 0 3px ${brandColor}20`
-                                        : '0 1px 2px rgba(15,23,42,0.06)',
-                                }}
+                                type="button"
+                                onClick={() => setShowInitiativeDropdown(!showInitiativeDropdown)}
+                                className={publicFilterPillClass(selectedInitiative !== 'all')}
                             >
-                                <div className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
-                                    <Target className="w-4 h-4 text-gray-600" />
-                                </div>
-                                <span className={`ml-1.5 sm:ml-2 max-w-[60px] sm:max-w-[90px] md:max-w-[120px] truncate ${selectedInitiative !== 'all' ? 'text-gray-900' : 'text-gray-500'}`}>
-                                    {selectedInitiative === 'all' ? 'Initiative' : initiatives.find(i => i.id === selectedInitiative)?.title || 'Select'}
+                                <Target className={`w-4 h-4 flex-shrink-0 ${selectedInitiative !== 'all' ? 'text-primary-600' : 'text-gray-400'}`} />
+                                <span className="truncate max-w-[140px]">
+                                    {selectedInitiative === 'all'
+                                        ? 'Initiative'
+                                        : initiatives.find(i => i.id === selectedInitiative)?.title || 'Select'}
                                 </span>
                                 {selectedInitiative !== 'all' ? (
-                                    <X className="w-3 h-3 text-gray-400 hover:text-gray-600 ml-0.5 sm:ml-1" onClick={(e) => { e.stopPropagation(); setSelectedInitiative('all') }} />
+                                    <X
+                                        className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600"
+                                        onClick={(e) => { e.stopPropagation(); setSelectedInitiative('all') }}
+                                    />
                                 ) : (
-                                    <ChevronDown className="w-3 h-3 text-gray-400 ml-0.5" />
+                                    <ChevronDown className={`w-3.5 h-3.5 -mr-0.5 text-gray-400 transition-transform ${showInitiativeDropdown ? 'rotate-180' : ''}`} />
                                 )}
                             </button>
 
@@ -891,51 +898,40 @@ export default function PublicOrganizationPage() {
                                     value={datePickerValue.singleDate || datePickerValue.startDate ? datePickerValue : undefined}
                                     onChange={handleDateChange}
                                     placeholder="Date"
-                                    activeColor={brandColor}
-                                    className="[&>button]:!h-8 [&>button]:!text-xs [&>button]:!pr-2.5 sm:[&>button]:!pr-3 [&>button]:!font-medium [&>button>div]:!w-8 [&>button>div]:!h-8 [&>button>div>svg]:!w-4 [&>button>div>svg]:!h-4 [&>button>span]:!ml-1.5 sm:[&>button>span]:!ml-2"
+                                    variant="pill"
                                 />
                             </div>
 
-                            {locations.length > 0 && (
-                                <button
-                                    ref={locationBtnRef}
-                                    onClick={() => { setShowLocationDropdown(!showLocationDropdown); setShowInitiativeDropdown(false) }}
-                                    className="flex items-center pl-0 pr-2.5 sm:pr-3 h-8 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-xs font-medium transition-all shadow-sm flex-shrink-0"
-                                    style={{
-                                        border: selectedLocationIds.length > 0 ? `1.5px solid ${brandColor}` : '1px solid #e5e7eb',
-                                        boxShadow: selectedLocationIds.length > 0
-                                            ? `0 1px 2px rgba(15,23,42,0.06), 0 0 0 3px ${brandColor}20`
-                                            : '0 1px 2px rgba(15,23,42,0.06)',
-                                    }}
-                                >
-                                    <div className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
-                                        <MapPin className="w-4 h-4 text-gray-600" />
-                                    </div>
-                                    <span className={`ml-1.5 sm:ml-2 max-w-[60px] sm:max-w-[90px] md:max-w-[120px] truncate ${selectedLocationIds.length > 0 ? 'text-gray-900' : 'text-gray-500'}`}>
-                                        {selectedLocationIds.length > 0
-                                            ? `${selectedLocationIds.length} loc.`
-                                            : 'Location'
-                                        }
-                                    </span>
-                                    {selectedLocationIds.length > 0 ? (
-                                        <X className="w-3 h-3 text-gray-400 hover:text-gray-600 ml-0.5 sm:ml-1" onClick={(e) => { e.stopPropagation(); setSelectedLocationIds([]) }} />
-                                    ) : (
-                                        <ChevronDown className="w-3 h-3 text-gray-400 ml-0.5" />
-                                    )}
-                                </button>
+                            {dropdownLocations.length > 0 && (
+                                <div className="flex-shrink-0">
+                                    <FilterPill
+                                        icon={MapPin}
+                                        label="Location"
+                                        pluralLabel="locations"
+                                        options={dropdownLocations
+                                            .filter((loc): loc is typeof loc & { id: string } => !!loc.id)
+                                            .map(loc => ({
+                                                id: loc.id,
+                                                name: loc.country ? `${loc.name} · ${loc.country}` : loc.name,
+                                            }))}
+                                        selected={selectedLocationIds}
+                                        onChange={setSelectedLocationIds}
+                                        emptyText="No locations available"
+                                        onOpenChange={(open) => { if (open) setShowInitiativeDropdown(false) }}
+                                    />
+                                </div>
                             )}
 
                             <PublicTagFilter
                                 tags={tags}
                                 selectedTagIds={selectedTagIds}
                                 onChange={setSelectedTagIds}
-                                activeColor={brandColor}
-                                onOpenChange={(open) => { if (open) { setShowInitiativeDropdown(false); setShowLocationDropdown(false) } }}
-                                className="!h-8 !text-xs !pr-2.5 sm:!pr-3 [&>div]:!w-8 [&>div]:!h-8 [&>div>svg]:!w-4 [&>div>svg]:!h-4 [&>span]:!ml-1.5 sm:[&>span]:!ml-2"
+                                onOpenChange={(open) => { if (open) setShowInitiativeDropdown(false) }}
                             />
 
                             {hasActiveFilters && (
                                 <button
+                                    type="button"
                                     onClick={clearFilters}
                                     className="flex items-center gap-0.5 px-1.5 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
                                 >
@@ -960,88 +956,63 @@ export default function PublicOrganizationPage() {
                 <>
                     <div className="fixed inset-0 z-[9998]" onClick={() => setShowInitiativeDropdown(false)} />
                     <div
-                        className="fixed w-64 bg-white rounded-xl shadow-modal border border-gray-100 z-[9999] py-1 max-h-64 overflow-y-auto"
+                        className="fixed bg-white border border-gray-200 rounded-xl shadow-modal z-[9999] p-2 min-w-[220px] max-h-72 overflow-y-auto"
                         style={(() => {
                             const rect = initiativeBtnRef.current?.getBoundingClientRect()
                             if (!rect) return {}
-                            return { top: rect.bottom + 4, left: Math.max(8, Math.min(rect.left, window.innerWidth - 272)) }
+                            return { top: rect.bottom + 4, left: Math.max(8, Math.min(rect.left, window.innerWidth - 240)) }
                         })()}
                     >
+                        <div className="flex items-center justify-between px-2 pb-1.5 mb-1 border-b border-gray-100">
+                            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Initiatives</span>
+                            {selectedInitiative !== 'all' && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setSelectedInitiative('all'); setShowInitiativeDropdown(false) }}
+                                    className="text-xs font-medium text-primary-700 hover:text-primary-800"
+                                >
+                                    Clear
+                                </button>
+                            )}
+                        </div>
                         <button
+                            type="button"
                             onClick={() => { setSelectedInitiative('all'); setShowInitiativeDropdown(false) }}
-                            className={`w-full px-3 py-2 text-left text-sm hover:bg-accent/10 ${selectedInitiative === 'all' ? 'bg-accent/10 text-accent font-medium' : 'text-foreground'
-                                }`}
+                            className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left transition-colors ${
+                                selectedInitiative === 'all' ? 'bg-primary-50' : 'hover:bg-gray-50'
+                            }`}
                         >
-                            All Initiatives
+                            <span className={`w-4 h-4 rounded flex items-center justify-center border flex-shrink-0 ${
+                                selectedInitiative === 'all' ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-300'
+                            }`}>
+                                {selectedInitiative === 'all' && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                            </span>
+                            <span className={`text-sm truncate ${selectedInitiative === 'all' ? 'text-primary-800 font-medium' : 'text-gray-700'}`}>
+                                All Initiatives
+                            </span>
                         </button>
-                        {initiatives.map(init => (
-                            <button
-                                key={init.id}
-                                onClick={() => { setSelectedInitiative(init.id); setShowInitiativeDropdown(false) }}
-                                className={`w-full px-3 py-2 text-left text-sm hover:bg-accent/10 truncate ${selectedInitiative === init.id ? 'bg-accent/10 text-accent font-medium' : 'text-foreground'
-                                    }`}
-                            >
-                                {init.title}
-                            </button>
-                        ))}
-                    </div>
-                </>,
-                document.body
-            )}
-
-            {/* Location Dropdown Portal */}
-            {showLocationDropdown && createPortal(
-                <>
-                    <div className="fixed inset-0 z-[9998]" onClick={() => setShowLocationDropdown(false)} />
-                    <div
-                        className="fixed w-64 bg-white rounded-xl shadow-modal border border-gray-100 z-[9999] py-1 max-h-64 overflow-y-auto"
-                        style={(() => {
-                            const rect = locationBtnRef.current?.getBoundingClientRect()
-                            if (!rect) return {}
-                            return { top: rect.bottom + 4, left: Math.max(8, Math.min(rect.left, window.innerWidth - 272)) }
-                        })()}
-                    >
-                        {selectedLocationIds.length > 0 && (
-                            <button
-                                onClick={() => setSelectedLocationIds([])}
-                                className="w-full px-3 py-2 text-left text-xs text-muted-foreground hover:bg-gray-50 border-b border-gray-100"
-                            >
-                                Clear location filter
-                            </button>
-                        )}
-                        {dropdownLocations.map(loc => {
-                            const isSelected = selectedLocationIds.includes(loc.id)
+                        {initiatives.map(init => {
+                            const checked = selectedInitiative === init.id
                             return (
                                 <button
-                                    key={loc.id}
-                                    onClick={() => {
-                                        setSelectedLocationIds(prev =>
-                                            isSelected
-                                                ? prev.filter(id => id !== loc.id)
-                                                : [...prev, loc.id]
-                                        )
-                                    }}
-                                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${isSelected ? 'bg-accent/10 font-medium' : 'hover:bg-gray-50'
-                                        }`}
+                                    key={init.id}
+                                    type="button"
+                                    onClick={() => { setSelectedInitiative(init.id); setShowInitiativeDropdown(false) }}
+                                    className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left transition-colors ${
+                                        checked ? 'bg-primary-50' : 'hover:bg-gray-50'
+                                    }`}
                                 >
-                                    <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-accent border-2 border-accent' : 'border-2 border-gray-300 bg-white'
-                                        }`}>
-                                        {isSelected && (
-                                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                        )}
-                                    </div>
-                                    <div className="min-w-0">
-                                        <span className={`truncate block ${isSelected ? 'text-accent' : 'text-gray-900'}`}>{loc.name}</span>
-                                        {loc.country && <span className="text-xs text-gray-500">{loc.country}</span>}
-                                    </div>
+                                    <span className={`w-4 h-4 rounded flex items-center justify-center border flex-shrink-0 ${
+                                        checked ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-300'
+                                    }`}>
+                                        {checked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                                    </span>
+                                    <span className={`text-sm truncate ${checked ? 'text-primary-800 font-medium' : 'text-gray-700'}`}>
+                                        {init.title}
+                                    </span>
                                 </button>
                             )
                         })}
-                        {dropdownLocations.length === 0 && (
-                            <div className="px-3 py-4 text-center text-xs text-muted-foreground">No locations available</div>
-                        )}
                     </div>
                 </>,
                 document.body

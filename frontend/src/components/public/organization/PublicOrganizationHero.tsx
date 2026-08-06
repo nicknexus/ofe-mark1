@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, ChevronLeft, ChevronRight, Compass, MapPin, Target } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Compass, Target } from 'lucide-react'
 import type { PublicInitiative, PublicOrganization } from '../../../services/publicApi'
 
 type Props = {
@@ -115,14 +115,22 @@ export function PublicOrganizationHero({
                                 <Link
                                     key={init.id}
                                     to={`${orgLinkBase}/${slug}/${init.slug}`}
-                                    className="px-3 py-2 bg-white rounded-xl border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group flex flex-col justify-center"
+                                    className="group flex items-center gap-2 px-2.5 py-2 bg-white rounded-xl border border-gray-200/70 shadow-card hover:shadow-card-hover hover:border-primary-300/70 hover:-translate-y-0.5 transition-all duration-200"
+                                    title={init.title}
                                 >
-                                    <h4 className="font-medium text-foreground text-sm line-clamp-2 group-hover:text-accent transition-colors leading-snug">{init.title}</h4>
-                                    {init.region && (
-                                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                                            <MapPin className="w-2.5 h-2.5" />{init.region}
-                                        </p>
-                                    )}
+                                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-white ring-1 ring-gray-100 overflow-hidden">
+                                        <img
+                                            src={organization.logo_url || '/Nexuslogo.png'}
+                                            alt=""
+                                            className="w-full h-full object-contain"
+                                            onError={(e) => {
+                                                ;(e.currentTarget as HTMLImageElement).src = '/Nexuslogo.png'
+                                            }}
+                                        />
+                                    </div>
+                                    <h4 className="text-xs font-semibold text-gray-900 leading-snug line-clamp-2 min-w-0">
+                                        {init.title}
+                                    </h4>
                                 </Link>
                             ))}
                         </div>

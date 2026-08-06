@@ -30,12 +30,14 @@ import Dashboard from './pages/Dashboard'
 import InitiativePage from './pages/InitiativePage'
 import TagDetailPage from './pages/TagDetailPage'
 import AllTagsPage from './pages/AllTagsPage'
+import AllMetricsPage from './pages/AllMetricsPage'
 import AccountPage from './pages/AccountPage'
 import PublicOrganizationPage from './pages/PublicOrganizationPage'
 import PublicOrgContextPage from './pages/PublicOrgContextPage'
 import OrgContextPage from './pages/OrgContextPage'
 import PublicInitiativePage from './pages/PublicInitiativePage'
 import PublicMetricPage from './pages/PublicMetricPage'
+import PublicGlobalMetricPage from './pages/PublicGlobalMetricPage'
 import PublicStoryPage from './pages/PublicStoryPage'
 import PublicEvidencePage from './pages/PublicEvidencePage'
 import PublicImpactClaimPage from './pages/PublicImpactClaimPage'
@@ -203,6 +205,7 @@ function App() {
  <Route path="/offer/:slug" element={<OfferCheckoutPage />} />
  <Route path="/org/:slug" element={<PublicOrganizationPage />} />
  <Route path="/org/:slug/context" element={<PublicOrgContextPage />} />
+ <Route path="/org/:orgSlug/metric/:metricSlug" element={<PublicGlobalMetricPage />} />
  <Route path="/org/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
  <Route path="/org/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
  <Route path="/org/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
@@ -212,6 +215,7 @@ function App() {
  {/* Demo / mockup organizations — same components, separate URL namespace. */}
  <Route path="/demo/:slug" element={<PublicOrganizationPage />} />
  <Route path="/demo/:slug/context" element={<PublicOrgContextPage />} />
+ <Route path="/demo/:orgSlug/metric/:metricSlug" element={<PublicGlobalMetricPage />} />
  <Route path="/demo/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
  <Route path="/demo/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
  <Route path="/demo/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
@@ -394,6 +398,7 @@ function App() {
  <Route path="/embed/:slug" element={<EmbedPage />} />
  <Route path="/org/:slug" element={<PublicOrganizationPage />} />
  <Route path="/org/:slug/context" element={<PublicOrgContextPage />} />
+ <Route path="/org/:orgSlug/metric/:metricSlug" element={<PublicGlobalMetricPage />} />
  <Route path="/org/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
  <Route path="/org/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
  <Route path="/org/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
@@ -402,6 +407,7 @@ function App() {
  <Route path="/org/:orgSlug/:initiativeSlug/beneficiary/:groupId" element={<PublicBeneficiaryGroupPage />} />
  <Route path="/demo/:slug" element={<PublicOrganizationPage />} />
  <Route path="/demo/:slug/context" element={<PublicOrgContextPage />} />
+ <Route path="/demo/:orgSlug/metric/:metricSlug" element={<PublicGlobalMetricPage />} />
  <Route path="/demo/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
  <Route path="/demo/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
  <Route path="/demo/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
@@ -665,6 +671,7 @@ function App() {
  <Route path="/offer/:slug" element={<OfferCheckoutPage />} />
  <Route path="/org/:slug" element={<PublicOrganizationPage />} />
  <Route path="/org/:slug/context" element={<PublicOrgContextPage />} />
+ <Route path="/org/:orgSlug/metric/:metricSlug" element={<PublicGlobalMetricPage />} />
  <Route path="/org/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
  <Route path="/org/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
  <Route path="/org/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
@@ -673,6 +680,7 @@ function App() {
  <Route path="/org/:orgSlug/:initiativeSlug/beneficiary/:groupId" element={<PublicBeneficiaryGroupPage />} />
  <Route path="/demo/:slug" element={<PublicOrganizationPage />} />
  <Route path="/demo/:slug/context" element={<PublicOrgContextPage />} />
+ <Route path="/demo/:orgSlug/metric/:metricSlug" element={<PublicGlobalMetricPage />} />
  <Route path="/demo/:orgSlug/:initiativeSlug" element={<PublicInitiativePage />} />
  <Route path="/demo/:orgSlug/:initiativeSlug/metric/:metricSlug" element={<PublicMetricPage />} />
  <Route path="/demo/:orgSlug/:initiativeSlug/claim/:claimId" element={<PublicImpactClaimPage />} />
@@ -720,6 +728,7 @@ function App() {
  <Route index element={<Dashboard />} />
  <Route path="initiatives/:id" element={<InitiativePage />} />
  <Route path="initiatives/:id/metrics/:kpiId" element={<InitiativePage />} />
+ <Route path="metrics" element={<AllMetricsPage />} />
  <Route path="tags" element={<AllTagsPage />} />
  <Route path="tags/:id" element={<TagDetailPage />} />
  <Route path="account" element={<AccountPage subscriptionStatus={subscriptionStatus} />} />

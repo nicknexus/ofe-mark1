@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { PublicService } from '../services/publicService';
 import { OrganizationContextService } from '../services/organizationContextService';
 import { EntitlementService, stripGatedFields } from '../services/entitlementService';
+import { MetricDefinitionService } from '../services/metricDefinitionService';
 
 const router = Router();
 
@@ -97,6 +98,25 @@ router.get('/organizations/:slug/metrics', async (req, res) => {
         await sendPublic(res, req.params.slug, metrics);
     } catch (error) {
         console.error('Get org metrics error:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+// Org-global metric: pooled total plus the per-initiative breakdown a visitor
+// uses to pick which initiative to view it from.
+router.get('/organizations/:slug/metric/:metricSlug', async (req, res) => {
+    try {
+        const metric = await MetricDefinitionService.getPublicBySlug(
+            req.params.slug,
+            req.params.metricSlug
+        );
+        if (!metric) {
+            res.status(404).json({ error: 'Metric not found' });
+            return;
+        }
+        await sendPublic(res, req.params.slug, metric);
+    } catch (error) {
+        console.error('Get org metric error:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });

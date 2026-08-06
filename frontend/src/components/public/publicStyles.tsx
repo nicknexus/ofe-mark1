@@ -12,7 +12,8 @@ import React from 'react'
 //     two-layer slate shadow that "pops" without lifting on hover.
 //   • White section icon chips with a subtle inset border so the brand-tinted
 //     icon inside reads as the focal point.
-//   • Count badges + active filter rings derived from the org's brand color.
+//   • Count badges tinted from the org's brand color; filter pills use the
+//     same primary fill language as the private app (no brand outline rings).
 //
 // Importing pages should NOT redeclare these classes — keeping everything in
 // one place is what makes "restyle every page like the widget" actually
@@ -37,10 +38,10 @@ export function PublicPageBackground({ brandColor }: { brandColor?: string | nul
             className="fixed inset-0 pointer-events-none"
             style={{
                 background: `
-                    radial-gradient(ellipse 80% 50% at 20% 40%, ${brand}90, transparent 60%),
-                    radial-gradient(ellipse 60% 80% at 80% 20%, ${brand}70, transparent 55%),
-                    radial-gradient(ellipse 50% 60% at 60% 80%, ${brand}60, transparent 55%),
-                    radial-gradient(ellipse 70% 40% at 10% 90%, ${brand}50, transparent 50%),
+                    radial-gradient(ellipse 80% 50% at 20% 40%, ${brand}45, transparent 60%),
+                    radial-gradient(ellipse 60% 80% at 80% 20%, ${brand}32, transparent 55%),
+                    radial-gradient(ellipse 50% 60% at 60% 80%, ${brand}28, transparent 55%),
+                    radial-gradient(ellipse 70% 40% at 10% 90%, ${brand}22, transparent 50%),
                     linear-gradient(180deg, white 0%, #fafafa 100%)
                 `,
             }}
@@ -121,21 +122,21 @@ export function publicCountBadgeStyle(brandColor: string): React.CSSProperties {
 }
 
 /**
- * Filter pill border + ring.
- * Pass `active = true` while the filter has a value to switch to a brand
- * border + soft brand ring; otherwise renders the neutral default.
+ * Modern filter pill — matches private `FilterPill` / DateRangePicker `pill`.
+ * Flat icon + primary fill when active (no brand outline ring).
  */
+export function publicFilterPillClass(active: boolean): string {
+    return `inline-flex items-center gap-2 h-9 px-3 rounded-full border text-sm font-medium transition-colors focus:outline-none flex-shrink-0 ${
+        active
+            ? 'border-primary-300 bg-primary-50 text-primary-800 hover:bg-primary-100'
+            : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+    }`
+}
+
+/** @deprecated Use `publicFilterPillClass` — brand outline rings were retired. */
 export function publicActiveFilterStyle(
-    brandColor: string,
-    active: boolean
+    _brandColor: string,
+    _active: boolean
 ): React.CSSProperties {
-    return active
-        ? {
-              border: `1.5px solid ${brandColor}`,
-              boxShadow: `0 1px 2px rgba(15,23,42,0.06), 0 0 0 3px ${brandColor}20`,
-          }
-        : {
-              border: '1px solid #e5e7eb',
-              boxShadow: '0 1px 2px rgba(15,23,42,0.06)',
-          }
+    return {}
 }

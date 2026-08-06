@@ -260,7 +260,6 @@ export default function PublicBeneficiaryGroupPage() {
                             tags={groupTags}
                             selectedTagIds={selectedTagIds}
                             onChange={setSelectedTagIds}
-                            activeColor={brandColor}
                         />
                         <Link to="/" className="flex items-center gap-2">
                             <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center overflow-hidden">

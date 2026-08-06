@@ -94,12 +94,55 @@ export interface KPI {
     initiative_id?: string;
     umbrella_kpi_id?: string;
     display_order?: number;
+    // The org-global metric this row instantiates. Identity fields above are
+    // mirrored from the definition by a DB trigger — write them there, not here.
+    definition_id?: string;
+    // Set when the metric was removed from the initiative. Archived rows keep
+    // their claims and evidence links so re-adding restores the history.
+    archived_at?: string | null;
     // Optional list of org-global metric tag IDs attached to this KPI.
     // Only present when explicitly fetched (not in default selects).
     tag_ids?: string[];
     created_at?: string;
     updated_at?: string;
     user_id?: string;
+}
+
+/**
+ * An org-global metric. `kpis` rows are its per-initiative instances; this is
+ * the entity users think of as "the metric".
+ */
+export interface MetricDefinition {
+    id?: string;
+    organization_id?: string;
+    title: string;
+    slug?: string;
+    description?: string;
+    metric_type: 'number' | 'percentage';
+    unit_of_measurement: string;
+    category: 'input' | 'output' | 'impact';
+    tag_ids?: string[];
+    created_by?: string | null;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface MetricDefinitionUsage {
+    kpi_id: string;
+    initiative_id: string;
+    initiative_title: string;
+    initiative_slug?: string;
+    total_value: number;
+    update_count: number;
+}
+
+export interface MetricDefinitionWithUsage extends MetricDefinition {
+    id: string;
+    /** Pooled across every initiative using it — never a sum of the subtotals. */
+    total_value: number;
+    update_count: number;
+    initiative_count: number;
+    initiatives: MetricDefinitionUsage[];
 }
 
 export interface MetricTag {

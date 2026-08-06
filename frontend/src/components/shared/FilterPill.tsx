@@ -21,6 +21,8 @@ export interface FilterPillProps {
   emptyText: string
   /** When set, pill acts as visibility toggle (active when some are hidden). */
   total?: number
+  /** Fired when the dropdown opens/closes — useful to close sibling menus. */
+  onOpenChange?: (open: boolean) => void
 }
 
 /** Portal-dropdown multi-select pill — same visual pattern as Logs + Metrics filter bars. */
@@ -33,6 +35,7 @@ export default function FilterPill({
   onChange,
   emptyText,
   total,
+  onOpenChange,
 }: FilterPillProps) {
   const [open, setOpen] = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -40,6 +43,11 @@ export default function FilterPill({
   const isVisibility = typeof total === 'number'
   const active = isVisibility ? selected.length < total! : selected.length > 0
   const displayPlural = pluralLabel || `${label.toLowerCase()}s`
+
+  const setOpenAnnounced = (next: boolean) => {
+    setOpen(next)
+    onOpenChange?.(next)
+  }
 
   useEffect(() => {
     if (open && buttonRef.current) {
@@ -58,8 +66,8 @@ export default function FilterPill({
       <button
         ref={buttonRef}
         type="button"
-        onClick={() => setOpen(!open)}
-        className={`inline-flex items-center gap-2 h-9 px-3 rounded-full border text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 ${active
+        onClick={() => setOpenAnnounced(!open)}
+        className={`inline-flex items-center gap-2 h-9 px-3 rounded-full border text-sm font-medium transition-colors focus:outline-none ${active
           ? 'border-primary-300 bg-primary-50 text-primary-800 hover:bg-primary-100'
           : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
           }`}
@@ -84,7 +92,7 @@ export default function FilterPill({
         <AnimatePresence>
           {open && (
             <>
-              <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
+              <div className="fixed inset-0 z-[9998]" onClick={() => setOpenAnnounced(false)} />
               <motion.div
                 initial={dropdownPop.initial}
                 animate={dropdownPop.animate}

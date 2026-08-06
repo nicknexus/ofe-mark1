@@ -184,10 +184,41 @@ export class DemoSeedService {
         let createdKpis = 0;
         for (let i = 0; i < BASE_KPIS.length; i++) {
             const k = BASE_KPIS[i];
+
+            // Metrics are org-global: seed the definition, then instantiate it
+            // into the demo initiative. Demo orgs are fresh, so no slug clash.
+            const { data: definition, error: defErr } = await supabase
+                .from('metric_definitions')
+                .insert([
+                    {
+                        organization_id: organizationId,
+                        title: k.title,
+                        slug: k.title
+                            .toLowerCase()
+                            .replace(/[^a-z0-9\s-]/g, '')
+                            .replace(/\s+/g, '-')
+                            .replace(/-+/g, '-')
+                            .replace(/^-+|-+$/g, ''),
+                        description: k.description,
+                        metric_type: k.metric_type,
+                        unit_of_measurement: k.unit_of_measurement,
+                        category: k.category,
+                        created_by: userId,
+                    },
+                ])
+                .select()
+                .single();
+
+            if (defErr || !definition) {
+                console.error(`[DemoSeed] metric definition "${k.title}" failed:`, defErr?.message);
+                continue;
+            }
+
             const { data: kpi, error: kpiErr } = await supabase
                 .from('kpis')
                 .insert([
                     {
+                        definition_id: definition.id,
                         title: k.title,
                         description: k.description,
                         metric_type: k.metric_type,

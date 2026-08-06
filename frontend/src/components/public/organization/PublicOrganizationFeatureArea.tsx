@@ -565,28 +565,31 @@ export function PublicOrganizationFeatureArea(props: Props) {
                                                 <Link
                                                     key={init.id}
                                                     to={`${orgLinkBase}/${slug}/${init.slug}`}
-                                                    className="block p-4 bg-white rounded-xl border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group"
+                                                    className="block p-4 bg-white rounded-xl border border-gray-200/70 shadow-card hover:shadow-card-hover hover:border-primary-300/70 hover:-translate-y-0.5 transition-all duration-200 group"
                                                 >
-                                                    <div className="flex items-start gap-3">
-                                                        <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-gray-50 border border-gray-100">
-                                                            {organization.logo_url ? (
-                                                                <img src={organization.logo_url} alt="" className="w-full h-full object-cover" />
-                                                            ) : (
-                                                                <Target className="w-5 h-5 text-gray-500" />
-                                                            )}
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-white ring-1 ring-gray-100 overflow-hidden">
+                                                            <img
+                                                                src={organization.logo_url || '/Nexuslogo.png'}
+                                                                alt=""
+                                                                className="w-full h-full object-contain"
+                                                                onError={(e) => {
+                                                                    ;(e.currentTarget as HTMLImageElement).src = '/Nexuslogo.png'
+                                                                }}
+                                                            />
                                                         </div>
                                                         <div className="flex-1 min-w-0">
-                                                            <h3 className="font-semibold text-foreground text-sm group-hover:text-accent transition-colors">{init.title}</h3>
+                                                            <h3 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2">{init.title}</h3>
                                                             {init.region && (
                                                                 <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                                                                     <MapPin className="w-3 h-3" />{init.region}
                                                                 </p>
                                                             )}
                                                             {init.description && (
-                                                                <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{init.description}</p>
+                                                                <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{init.description}</p>
                                                             )}
                                                         </div>
-                                                        <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
+                                                        <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
                                                     </div>
                                                 </Link>
                                             ))}

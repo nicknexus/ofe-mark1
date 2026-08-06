@@ -137,8 +137,7 @@ export default function PublicImpactClaimPage() {
                             onChange={setDateFilter}
                             maxDate={getLocalDateString(new Date())}
                             placeholder="Date"
-                            activeColor={brandColor}
-                            className="w-auto"
+                            variant="pill"
                         />
                         <Link to="/" className="flex items-center gap-2">
                             <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center overflow-hidden">

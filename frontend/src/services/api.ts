@@ -19,6 +19,8 @@ import {
  Donor,
  DonorCredit,
  MetricTag,
+ MetricDefinitionWithUsage,
+ CreateMetricDefinitionForm,
  TimelineResponse,
  ConnectEvidenceResult
 } from '../types'
@@ -287,6 +289,20 @@ class ApiService {
  // KPI mutations may attach/detach tags or claim->tag links,
  // so widget counts and tag detail pages must refresh.
  this.clearCacheByPattern('/metric-tags')
+ // Creating a metric also creates its org-global definition, and claims
+ // change the pooled totals on the Metrics page / dashboard strip.
+ this.clearCacheByPattern('/metric-definitions')
+ }
+ // Metric definition mutations: create, rename, attach to an initiative,
+ // archive, delete. All of them change what the Metrics page and the
+ // dashboard strip show, and attaching/archiving changes the initiative's
+ // metric list too. Without this the 60s GET cache serves stale usage
+ // counts and a freshly attached metric still reads "Not in use yet".
+ if (endpoint.includes('/metric-definitions')) {
+ this.clearCacheByPattern('/metric-definitions')
+ this.clearCacheByPattern('/kpis')
+ this.clearCacheByPattern('/initiatives')
+ this.clearCacheByPattern('/metric-tags')
  }
  if (endpoint.includes('/evidence')) {
  this.clearCacheByPattern('/evidence')
@@ -523,6 +539,64 @@ class ApiService {
 
  async deleteKPIUpdate(updateId: string): Promise<void> {
  return this.request<void>(`/kpis/updates/${updateId}`, {
+ method: 'DELETE'
+ })
+ }
+
+ // Metric Definitions — the org-global metrics.
+ // A KPI is one of these in use inside a single initiative.
+ async getMetricDefinitions(): Promise<MetricDefinitionWithUsage[]> {
+ const result = await this.request<MetricDefinitionWithUsage[]>('/metric-definitions')
+ return result || []
+ }
+
+ async getMetricDefinition(id: string): Promise<MetricDefinitionWithUsage> {
+ return this.request<MetricDefinitionWithUsage>(`/metric-definitions/${id}`)
+ }
+
+ async createMetricDefinition(data: CreateMetricDefinitionForm): Promise<MetricDefinitionWithUsage> {
+ return this.request<MetricDefinitionWithUsage>('/metric-definitions', {
+ method: 'POST',
+ body: JSON.stringify(data)
+ })
+ }
+
+ async updateMetricDefinition(
+ id: string,
+ data: Partial<CreateMetricDefinitionForm>
+ ): Promise<MetricDefinitionWithUsage> {
+ return this.request<MetricDefinitionWithUsage>(`/metric-definitions/${id}`, {
+ method: 'PUT',
+ body: JSON.stringify(data)
+ })
+ }
+
+ /** Permanent org-wide delete — takes every instance and claim with it. */
+ async deleteMetricDefinition(id: string): Promise<void> {
+ return this.request<void>(`/metric-definitions/${id}`, {
+ method: 'DELETE'
+ })
+ }
+
+ /** Add to an initiative, or restore a previously archived instance. */
+ async addMetricToInitiative(definitionId: string, initiativeId: string): Promise<KPI> {
+ return this.request<KPI>(`/metric-definitions/${definitionId}/initiatives`, {
+ method: 'POST',
+ body: JSON.stringify({ initiative_id: initiativeId })
+ })
+ }
+
+ /** What a removal would hide — drives the confirmation copy. */
+ async getMetricDetachImpact(
+ definitionId: string,
+ initiativeId: string
+ ): Promise<{ claim_count: number; evidence_count: number }> {
+ return this.request(`/metric-definitions/${definitionId}/initiatives/${initiativeId}/impact`)
+ }
+
+ /** Archives the instance: claims and evidence links are preserved. */
+ async removeMetricFromInitiative(definitionId: string, initiativeId: string): Promise<void> {
+ return this.request<void>(`/metric-definitions/${definitionId}/initiatives/${initiativeId}`, {
  method: 'DELETE'
  })
  }

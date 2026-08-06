@@ -7,6 +7,7 @@ import {
     PublicKPI,
     PublicStory,
 } from '../services/publicApi'
+import { groupMetricsByDefinition } from '../utils/groupMetricsByDefinition'
 import { apiService } from '../services/api'
 import { getVideoThumbnailUrl, parseVideoUrl } from '../utils/videoEmbed'
 
@@ -207,8 +208,10 @@ export default function EmbedPage() {
     }, [slug, loading, metrics.length, stories.length])
 
     // ── Hero stat cards: real metrics only, top 4 by value. No filler stats. ──
+    // Grouped first, so a metric used in several initiatives shows one card
+    // with the org-wide number instead of near-duplicate tiles.
     const heroCards = useMemo<StatCard[]>(() => {
-        return [...metrics]
+        return groupMetricsByDefinition(metrics)
             .filter(m => (m.total_value || 0) > 0)
             .sort((a, b) => (b.total_value || 0) - (a.total_value || 0))
             .slice(0, 4)

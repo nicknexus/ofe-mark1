@@ -6,10 +6,8 @@ import {
     ChevronRight,
     FileText,
     Image,
-    MapPin,
     Target,
     TrendingUp,
-    ArrowUpRight,
 } from 'lucide-react'
 import type {
     PublicEvidence,
@@ -21,6 +19,7 @@ import type {
 import PublicTagChip from '../PublicTagChip'
 import { formatAbbreviatedMetricTotal, formatDate } from '../../../utils'
 import { generateMetricSlug } from '../initiative/metricColors'
+import { metricCardHref, type GroupedPublicMetric } from '../../../utils/groupMetricsByDefinition'
 
 /** Flattened claim row assembled on the org page — keep loose for parity. */
 export type OrgImpactClaimCard = Record<string, any>
@@ -121,14 +120,22 @@ export function PublicOrganizationRightPanel(props: Props) {
                                     <Link
                                         key={init.id}
                                         to={`${orgLinkBase}/${slug}/${init.slug}`}
-                                        className="p-3 bg-white rounded-xl border border-gray-200/80 shadow-surface hover:shadow-surface-hover hover:border-gray-300 hover:-translate-y-px transition-all duration-200 group flex flex-col justify-center min-h-[64px]"
+                                        className="group flex items-center gap-2 px-2.5 py-2 min-h-[64px] bg-white rounded-xl border border-gray-200/70 shadow-card hover:shadow-card-hover hover:border-primary-300/70 hover:-translate-y-0.5 transition-all duration-200"
+                                        title={init.title}
                                     >
-                                        <h4 className="font-medium text-foreground text-sm line-clamp-2 group-hover:text-accent transition-colors">{init.title}</h4>
-                                        {init.region && (
-                                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                                                <MapPin className="w-2.5 h-2.5" />{init.region}
-                                            </p>
-                                        )}
+                                        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-white ring-1 ring-gray-100 overflow-hidden">
+                                            <img
+                                                src={organization.logo_url || '/Nexuslogo.png'}
+                                                alt=""
+                                                className="w-full h-full object-contain"
+                                                onError={(e) => {
+                                                    ;(e.currentTarget as HTMLImageElement).src = '/Nexuslogo.png'
+                                                }}
+                                            />
+                                        </div>
+                                        <h4 className="text-xs font-semibold text-gray-900 leading-snug line-clamp-2 min-w-0">
+                                            {init.title}
+                                        </h4>
                                     </Link>
                                 ))}
                             </div>
@@ -172,70 +179,47 @@ export function PublicOrganizationRightPanel(props: Props) {
                                         </div>
                                     </div>
                                 ) : (
-                                    // Mobile: fixed `auto-rows: minmax(160px, 1fr)`
-                                    // so cards never stretch into elongated
-                                    // rectangles when fewer than 4 metrics
-                                    // exist. Desktop (`md:`) keeps the original
-                                    // 50%-of-height behaviour to fill the panel.
-                                    <div
-                                        className="grid grid-cols-2 gap-2 h-full [grid-auto-rows:minmax(160px,1fr)] md:[grid-auto-rows:calc(50%-4px)]"
-                                    >
+                                    // 2×2 viewport — only 4 cards show before scroll
+                                    <div className="grid grid-cols-2 gap-2.5 h-full [grid-auto-rows:minmax(140px,1fr)] md:[grid-auto-rows:calc(50%-5px)]">
                                         {filteredMetrics.map((metric) => {
                                             const isPct = metric.metric_type === 'percentage'
-                                            const unit = metric.unit_of_measurement?.trim()
-                                            const hasTarget = metric.target_value != null && metric.total_value != null
-                                            const subLabel = isPct ? 'average' : unit
+                                            const unit = isPct
+                                                ? 'avg'
+                                                : metric.unit_of_measurement?.trim()
                                             return (
                                                 <Link
                                                     key={metric.id}
-                                                    to={`${orgLinkBase}/${slug}/${metric.initiative_slug}/metric/${generateMetricSlug(metric.title)}`}
-                                                    className="group relative h-full min-h-0 rounded-xl border border-gray-200/80 bg-white shadow-surface hover:shadow-surface-hover hover:border-gray-300/90 hover:-translate-y-px transition-all duration-200 flex flex-col overflow-hidden"
+                                                    to={metricCardHref(
+                                                        metric as GroupedPublicMetric,
+                                                        orgLinkBase,
+                                                        slug,
+                                                        generateMetricSlug(metric.title)
+                                                    )}
+                                                    className="group relative h-full min-h-0 bg-white rounded-2xl border border-gray-200/70 shadow-card hover:shadow-card-hover hover:-translate-y-0.5 transition-all duration-200 flex flex-col overflow-hidden"
                                                 >
                                                     <span
-                                                        className="absolute top-0 left-0 right-0 h-[3px] pointer-events-none z-[1]"
-                                                        style={{ backgroundColor: brandColor, opacity: 0.85 }}
-                                                        aria-hidden
+                                                        className="absolute top-3 left-3 w-2 h-2 rounded-full z-[1]"
+                                                        style={{ backgroundColor: brandColor }}
                                                     />
-                                                    <ArrowUpRight
-                                                        className="absolute top-2.5 right-2.5 w-3.5 h-3.5 z-[1] text-gray-300 group-hover:text-gray-500 transition-colors"
-                                                        aria-hidden
-                                                    />
-
-                                                    <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center px-2 pt-5 pb-2 gap-1 overflow-hidden">
-                                                        <span
-                                                            className="font-bold leading-none tabular-nums tracking-tight text-3xl sm:text-4xl md:text-2xl lg:text-3xl xl:text-4xl 2xl:text-6xl"
+                                                    <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center px-3 pt-4 pb-2">
+                                                        <div
+                                                            className="text-4xl md:text-5xl font-semibold tabular-nums tracking-tight leading-none"
                                                             style={{ color: brandColor, filter: 'saturate(1.1) brightness(0.78)' }}
                                                         >
-                                                            {formatAbbreviatedMetricTotal(metric.total_value, { isPercentage: isPct })}{isPct ? '%' : ''}
-                                                        </span>
-                                                        {subLabel && (
-                                                            <span className="text-[10px] md:text-[11px] font-semibold text-gray-400 line-clamp-1">{subLabel}</span>
+                                                            {formatAbbreviatedMetricTotal(metric.total_value, { isPercentage: isPct })}
+                                                            {isPct ? '%' : ''}
+                                                        </div>
+                                                        {unit && (
+                                                            <span className="text-sm font-semibold text-gray-400 mt-2 truncate max-w-full">
+                                                                {unit}
+                                                            </span>
                                                         )}
                                                     </div>
-
-                                                    {hasTarget && (
-                                                        <div className="px-3 pb-2">
-                                                            <div className="h-1 rounded-full bg-black/5 overflow-hidden">
-                                                                <div
-                                                                    className="h-full rounded-full"
-                                                                    style={{
-                                                                        width: `${Math.min(100, ((metric.total_value as number) / (metric.target_value as number)) * 100).toFixed(1)}%`,
-                                                                        backgroundColor: brandColor,
-                                                                        opacity: 0.55,
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    <div
-                                                        className="border-t px-2 h-10 flex items-center justify-center text-center shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]"
-                                                        style={{
-                                                            background: `linear-gradient(180deg, ${brandColor}14 0%, ${brandColor}26 100%)`,
-                                                            borderColor: `${brandColor}38`,
-                                                        }}
-                                                    >
-                                                        <p className="text-xs md:text-sm font-semibold text-foreground/90 leading-snug line-clamp-2">
+                                                    <div className="border-t border-gray-100 px-3 h-[2.75rem] flex items-center justify-center text-center shrink-0 overflow-hidden">
+                                                        <p
+                                                            className="text-sm font-semibold text-gray-800 leading-snug line-clamp-2 w-full"
+                                                            title={metric.title}
+                                                        >
                                                             {metric.title}
                                                         </p>
                                                     </div>

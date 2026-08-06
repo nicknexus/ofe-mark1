@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { createPortal } from 'react-dom'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
 import {
     ArrowLeft, BarChart3, TrendingUp, FileText, Calendar,
     ExternalLink, MapPin, Target, Sparkles, CheckCircle2,
-    ChevronLeft, ChevronRight, ChevronDown, X, Users
+    ChevronLeft, ChevronRight, X, Users
 } from 'lucide-react'
+import FilterPill from '../components/shared/FilterPill'
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, ReferenceLine } from 'recharts'
 import { publicApi, PublicMetricDetail, PublicMetricTag } from '../services/publicApi'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
@@ -20,7 +20,6 @@ import {
     PUBLIC_PANEL_STATIC_CLASS,
     PUBLIC_SECTION_CHIP_STYLE,
     brandIconStyle,
-    publicActiveFilterStyle,
 } from '../components/public/publicStyles'
 import { getLocalDateString, formatDate, formatAbbreviatedMetricTotal, parseLocalDate, getClaimEffectiveDate, compareClaimsByEffectiveDateDesc } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
@@ -43,10 +42,6 @@ export default function PublicMetricPage() {
     const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
     const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([])
     const [selectedBenGroupIds, setSelectedBenGroupIds] = useState<string[]>([])
-    const [showLocationDropdown, setShowLocationDropdown] = useState(false)
-    const [showBenDropdown, setShowBenDropdown] = useState(false)
-    const locationBtnRef = useRef<HTMLButtonElement>(null)
-    const benBtnRef = useRef<HTMLButtonElement>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
@@ -324,74 +319,58 @@ export default function PublicMetricPage() {
                             </Link>
                             <PublicDonateButton orgSlug={orgSlug} />
                         </div>
-                        <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0 justify-center overflow-x-auto scrollbar-none px-2">
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0 justify-center overflow-x-auto scrollbar-none px-2">
                             <div className="flex-shrink-0">
                                 <DateRangePicker
                                     value={dateFilter}
                                     onChange={setDateFilter}
                                     maxDate={getLocalDateString(new Date())}
                                     placeholder="Date"
-                                    activeColor={brandColor}
-                                    className="[&>button]:h-7 [&>button]:text-xs [&>button]:pr-1.5 sm:[&>button]:pr-2.5 [&>button>div]:w-7 [&>button>div]:h-7 [&>button>div>svg]:w-3.5 [&>button>div>svg]:h-3.5 [&>button>span]:ml-1 sm:[&>button>span]:ml-1.5"
+                                    variant="pill"
                                 />
                             </div>
 
                             {availableLocations.length > 0 && (
-                                <button
-                                    ref={locationBtnRef}
-                                    onClick={() => { setShowLocationDropdown(!showLocationDropdown); setShowBenDropdown(false) }}
-                                    className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-xs font-medium transition-all flex-shrink-0"
-                                    style={publicActiveFilterStyle(brandColor, selectedLocationIds.length > 0)}
-                                >
-                                    <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
-                                        <MapPin className="w-3.5 h-3.5 text-gray-600" />
-                                    </div>
-                                    <span className={`ml-1 sm:ml-1.5 max-w-[60px] sm:max-w-[90px] md:max-w-[120px] truncate ${selectedLocationIds.length > 0 ? 'text-gray-900' : 'text-gray-500'}`}>
-                                        {selectedLocationIds.length > 0 ? `${selectedLocationIds.length} loc.` : 'Location'}
-                                    </span>
-                                    {selectedLocationIds.length > 0 ? (
-                                        <X className="w-3 h-3 text-gray-400 hover:text-gray-600 ml-0.5 sm:ml-1" onClick={(e) => { e.stopPropagation(); setSelectedLocationIds([]) }} />
-                                    ) : (
-                                        <ChevronDown className="w-3 h-3 text-gray-400 ml-0.5" />
-                                    )}
-                                </button>
+                                <div className="flex-shrink-0">
+                                    <FilterPill
+                                        icon={MapPin}
+                                        label="Location"
+                                        pluralLabel="locations"
+                                        options={availableLocations.map(l => ({ id: l.id, name: l.name }))}
+                                        selected={selectedLocationIds}
+                                        onChange={setSelectedLocationIds}
+                                        emptyText="No locations available"
+                                    />
+                                </div>
                             )}
 
                             <PublicTagFilter
                                 tags={metricTags}
                                 selectedTagIds={selectedTagIds}
                                 onChange={setSelectedTagIds}
-                                activeColor={brandColor}
-                                onOpenChange={(open) => { if (open) { setShowLocationDropdown(false); setShowBenDropdown(false) } }}
                             />
 
                             {availableBenGroups.length > 0 && (
-                                <button
-                                    ref={benBtnRef}
-                                    onClick={() => { setShowBenDropdown(!showBenDropdown); setShowLocationDropdown(false) }}
-                                    className="flex items-center pl-0 pr-1.5 sm:pr-2.5 h-7 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-xs font-medium transition-all flex-shrink-0"
-                                    style={publicActiveFilterStyle(brandColor, selectedBenGroupIds.length > 0)}
-                                >
-                                    <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
-                                        <Users className="w-3.5 h-3.5 text-gray-600" />
-                                    </div>
-                                    <span className={`ml-1 sm:ml-1.5 max-w-[60px] sm:max-w-[90px] md:max-w-[120px] truncate ${selectedBenGroupIds.length > 0 ? 'text-gray-900' : 'text-gray-500'}`}>
-                                        {selectedBenGroupIds.length > 0 ? `${selectedBenGroupIds.length} group${selectedBenGroupIds.length === 1 ? '' : 's'}` : 'Beneficiary'}
-                                    </span>
-                                    {selectedBenGroupIds.length > 0 ? (
-                                        <X className="w-3 h-3 text-gray-400 hover:text-gray-600 ml-0.5 sm:ml-1" onClick={(e) => { e.stopPropagation(); setSelectedBenGroupIds([]) }} />
-                                    ) : (
-                                        <ChevronDown className="w-3 h-3 text-gray-400 ml-0.5" />
-                                    )}
-                                </button>
+                                <div className="flex-shrink-0">
+                                    <FilterPill
+                                        icon={Users}
+                                        label="Beneficiary"
+                                        pluralLabel="groups"
+                                        options={availableBenGroups.map(g => ({ id: g.id, name: g.name }))}
+                                        selected={selectedBenGroupIds}
+                                        onChange={setSelectedBenGroupIds}
+                                        emptyText="No groups available"
+                                    />
+                                </div>
                             )}
 
                             {hasActiveFilters && (
                                 <button
+                                    type="button"
                                     onClick={clearAllFilters}
                                     className="flex items-center gap-0.5 px-1.5 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
                                 >
-                                    <X className="w-2.5 h-2.5" /> Clear
+                                    <X className="w-3 h-3" /> Clear
                                 </button>
                             )}
                         </div>
@@ -663,94 +642,6 @@ export default function PublicMetricPage() {
                     onToggleTag={(id) => setSelectedTagIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
                 />
             </div>
-
-            {/* Location Dropdown Portal */}
-            {showLocationDropdown && createPortal(
-                <>
-                    <div className="fixed inset-0 z-[9998]" onClick={() => setShowLocationDropdown(false)} />
-                    <div
-                        className="fixed w-64 bg-white rounded-xl shadow-modal border border-gray-100 z-[9999] py-1 max-h-72 overflow-y-auto"
-                        style={(() => {
-                            const rect = locationBtnRef.current?.getBoundingClientRect()
-                            if (!rect) return {}
-                            return { top: rect.bottom + 4, left: Math.max(8, Math.min(rect.left, window.innerWidth - 272)) }
-                        })()}
-                    >
-                        {selectedLocationIds.length > 0 && (
-                            <button
-                                onClick={() => setSelectedLocationIds([])}
-                                className="w-full px-3 py-2 text-left text-xs text-muted-foreground hover:bg-gray-50 border-b border-gray-100"
-                            >
-                                Clear location filter
-                            </button>
-                        )}
-                        {availableLocations.map(l => {
-                            const isSelected = selectedLocationIds.includes(l.id)
-                            return (
-                                <button
-                                    key={l.id}
-                                    onClick={() => setSelectedLocationIds(prev => isSelected ? prev.filter(x => x !== l.id) : [...prev, l.id])}
-                                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${isSelected ? 'bg-gray-50 font-medium' : 'hover:bg-gray-50'}`}
-                                >
-                                    <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-gray-900 border-2 border-gray-900' : 'border-2 border-gray-300 bg-white'}`}>
-                                        {isSelected && (
-                                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                        )}
-                                    </div>
-                                    <span className={`truncate block ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>{l.name}</span>
-                                </button>
-                            )
-                        })}
-                    </div>
-                </>,
-                document.body
-            )}
-
-            {/* Beneficiary Group Dropdown Portal */}
-            {showBenDropdown && createPortal(
-                <>
-                    <div className="fixed inset-0 z-[9998]" onClick={() => setShowBenDropdown(false)} />
-                    <div
-                        className="fixed w-64 bg-white rounded-xl shadow-modal border border-gray-100 z-[9999] py-1 max-h-72 overflow-y-auto"
-                        style={(() => {
-                            const rect = benBtnRef.current?.getBoundingClientRect()
-                            if (!rect) return {}
-                            return { top: rect.bottom + 4, left: Math.max(8, Math.min(rect.left, window.innerWidth - 272)) }
-                        })()}
-                    >
-                        {selectedBenGroupIds.length > 0 && (
-                            <button
-                                onClick={() => setSelectedBenGroupIds([])}
-                                className="w-full px-3 py-2 text-left text-xs text-muted-foreground hover:bg-gray-50 border-b border-gray-100"
-                            >
-                                Clear beneficiary filter
-                            </button>
-                        )}
-                        {availableBenGroups.map(g => {
-                            const isSelected = selectedBenGroupIds.includes(g.id)
-                            return (
-                                <button
-                                    key={g.id}
-                                    onClick={() => setSelectedBenGroupIds(prev => isSelected ? prev.filter(x => x !== g.id) : [...prev, g.id])}
-                                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${isSelected ? 'bg-gray-50 font-medium' : 'hover:bg-gray-50'}`}
-                                >
-                                    <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-gray-900 border-2 border-gray-900' : 'border-2 border-gray-300 bg-white'}`}>
-                                        {isSelected && (
-                                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                        )}
-                                    </div>
-                                    <span className={`truncate block ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>{g.name}</span>
-                                </button>
-                            )
-                        })}
-                    </div>
-                </>,
-                document.body
-            )}
 
             {/* Footer */}
             <div className="relative z-10 border-t border-gray-100 bg-white mt-8 sm:mt-12">
