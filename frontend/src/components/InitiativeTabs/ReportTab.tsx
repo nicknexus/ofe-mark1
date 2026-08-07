@@ -1,15 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { FileText, Calendar, BarChart3, MapPin, Users, Sparkles, Download, X, ChevronLeft, ChevronRight, Check, BookOpen, Plus, Pencil, Save, Tag } from 'lucide-react'
-import { SectionLoader, EmptyState, Spinner } from '../ui'
+import React, { useState, useEffect, useRef, Suspense, useMemo } from 'react'
+import { FileText, Calendar, BarChart3, MapPin, Users, Sparkles, X, ChevronLeft, ChevronRight, Check, BookOpen, Plus, Pencil, Save, Tag } from 'lucide-react'
+import { SectionLoader, EmptyState, Spinner, InlineAlert } from '../ui'
 import { apiService } from '../../services/api'
-import { KPI, Location, BeneficiaryGroup, Story, InitiativeDashboard, MetricTag } from '../../types'
+import { KPI, Location, BeneficiaryGroup, InitiativeDashboard, MetricTag } from '../../types'
 import DateRangePicker from '../DateRangePicker'
+import FilterPill from '../shared/FilterPill'
 import { notify } from '../../lib/notify'
-import L from 'leaflet'
-import html2canvas from 'html2canvas'
-import ReportDashboard from '../ReportDashboard'
-import { convertReportToPDF } from '../../utils/reportToPDF'
 import { useTeam } from '../../context/TeamContext'
+import { narrativeBudget } from '../../utils/reportLayout'
+import { getKPIColor } from '../metricsDashboard/metricColorPalette'
+
+// @react-pdf/renderer is heavy; keep it out of the main bundle until a user
+// actually opens a report.
+const ReportPdfPanel = React.lazy(() => import('../reports/ReportPdfPanel'))
 
 interface ReportTabProps {
  initiativeId: string
@@ -65,6 +68,28 @@ interface ReportData {
  name: string
  type: 'location' | 'story'
  }>
+ beneficiaryGroups?: Array<{
+ id: string
+ name: string
+ description?: string
+ total_number?: number | null
+ }>
+ branding?: {
+ organization_name: string
+ logo_url?: string | null
+ brand_color?: string | null
+ }
+}
+
+/** Human-readable label for the report header, e.g. "Jan 2025 – Dec 2025". */
+function formatDateRangeLabel(range: { singleDate?: string; startDate?: string; endDate?: string }): string {
+ const fmt = (iso?: string) =>
+ iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''
+ if (range.singleDate) return fmt(range.singleDate)
+ const start = fmt(range.startDate)
+ const end = fmt(range.endDate)
+ if (start && end) return start === end ? start : `${start} – ${end}`
+ return start || end || 'All time'
 }
 
 export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
@@ -97,15 +122,10 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  const [loadingMessage, setLoadingMessage] = useState('')
 
  // Loading states
- const [loadingFilters, setLoadingFilters] = useState(false)
  const [loadingReport, setLoadingReport] = useState(false)
  const [loadingData, setLoadingData] = useState(false)
 
  // UI state
- const [showKPIPicker, setShowKPIPicker] = useState(false)
- const [showLocationPicker, setShowLocationPicker] = useState(false)
- const [showBeneficiaryPicker, setShowBeneficiaryPicker] = useState(false)
- const [showTagPicker, setShowTagPicker] = useState(false)
  const [showDashboard, setShowDashboard] = useState(true)
  const [isEditingReport, setIsEditingReport] = useState(false)
  
@@ -121,14 +141,16 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  const containerRef = useRef<HTMLDivElement>(null)
  const formContentRef = useRef<HTMLDivElement>(null)
 
- // Refs for click outside detection
- const kpiPickerRef = useRef<HTMLDivElement>(null)
- const locationPickerRef = useRef<HTMLDivElement>(null)
- const beneficiaryPickerRef = useRef<HTMLDivElement>(null)
- const tagPickerRef = useRef<HTMLDivElement>(null)
-
  // Storage key for this initiative's report
  const storageKey = `report-${initiativeId}`
+
+ const colorByKpiId = useMemo(() => {
+ const map: Record<string, string> = {}
+ kpis.forEach((kpi, index) => {
+ if (kpi.id) map[kpi.id] = getKPIColor(kpi.category || 'output', index)
+ })
+ return map
+ }, [kpis])
 
  // Steps definition
  const steps = [
@@ -228,29 +250,6 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  }
  }, [initiativeId])
 
- // Close dropdowns when clicking outside
- useEffect(() => {
- const handleClickOutside = (event: MouseEvent) => {
- if (kpiPickerRef.current && !kpiPickerRef.current.contains(event.target as Node)) {
- setShowKPIPicker(false)
- }
- if (locationPickerRef.current && !locationPickerRef.current.contains(event.target as Node)) {
- setShowLocationPicker(false)
- }
- if (beneficiaryPickerRef.current && !beneficiaryPickerRef.current.contains(event.target as Node)) {
- setShowBeneficiaryPicker(false)
- }
- if (tagPickerRef.current && !tagPickerRef.current.contains(event.target as Node)) {
- setShowTagPicker(false)
- }
- }
-
- document.addEventListener('mousedown', handleClickOutside)
- return () => {
- document.removeEventListener('mousedown', handleClickOutside)
- }
- }, [])
-
  // Scroll to top when step changes
  useEffect(() => {
  if (formContentRef.current) {
@@ -333,7 +332,18 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  tags: reportData.tags,
  beneficiaryGroups: beneficiaryGroups.filter(bg =>
  selectedBeneficiaryGroupIds.length === 0 || selectedBeneficiaryGroupIds.includes(bg.id!)
- )
+ ),
+ // Tell the model how much room the one-page layout leaves it, so the
+ // prose fits instead of being truncated with an ellipsis on render.
+ lengthBudget: narrativeBudget({
+ hasStory: Boolean(selectedStory),
+ hasMap: reportData.mapPoints.length > 0,
+ hasContext:
+ reportData.locations.length > 0 ||
+ (reportData.beneficiaryGroups || []).length > 0 ||
+ (reportData.tags || []).length > 0,
+ metricCount: reportData.totals.length,
+ })
  })
  } finally {
  clearInterval(messageInterval)
@@ -376,205 +386,12 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  .trim()
  }
 
- // Helper function to export Leaflet map as image using html2canvas
- const exportLeafletMapAsImage = async (mapDiv: HTMLElement): Promise<string> => {
- return new Promise((resolve, reject) => {
- html2canvas(mapDiv, {
- useCORS: true,
- allowTaint: true,
- backgroundColor: '#f0f0f0',
- width: 400,
- height: 400,
- scale: 1
- })
- .then((canvas: HTMLCanvasElement) => {
- const dataUrl = canvas.toDataURL('image/png')
- resolve(dataUrl)
- })
- .catch((error: Error) => {
- reject(error)
- })
- })
- }
-
- // Helper function to render Leaflet map as image using canvas renderer
- const renderMapImage = async (locations: Array<{ latitude: number; longitude: number; name: string }>): Promise<string> => {
- return new Promise((resolve, reject) => {
- console.log('Rendering map with locations:', locations.length)
-
- if (locations.length === 0) {
- reject(new Error('No locations provided'))
- return
- }
-
- // Create hidden div for map - square shape
- const mapDiv = document.createElement('div')
- mapDiv.id = 'pdf-map-temp'
- mapDiv.style.width = '400px'
- mapDiv.style.height = '400px'
- mapDiv.style.position = 'absolute'
- mapDiv.style.top = '-9999px'
- mapDiv.style.left = '-9999px'
- mapDiv.style.zIndex = '-9999'
- mapDiv.style.backgroundColor = '#f0f0f0'
- document.body.appendChild(mapDiv)
-
- setTimeout(() => {
- try {
- // Calculate bounds and spread to determine appropriate zoom
- const bounds = L.latLngBounds(locations.map(loc => [loc.latitude, loc.longitude]))
- const center = bounds.getCenter()
-
- // Calculate spread (distance in degrees)
- const latDiff = bounds.getNorth() - bounds.getSouth()
- const lngDiff = bounds.getEast() - bounds.getWest()
- const maxSpread = Math.max(latDiff, lngDiff)
-
- // Determine zoom strategy based on spread
- // Small spread (< 5 degrees) = close together (city/region level) - zoom in more
- // Medium spread (5-30 degrees) = moderate distance (country level) - moderate zoom
- // Large spread (> 30 degrees) = far apart (continent/global) - zoom out
- let padding: [number, number]
- let maxZoom: number
-
- if (maxSpread < 5) {
- // Very close together - zoom in significantly
- padding = [20, 20]
- maxZoom = 12
- } else if (maxSpread < 15) {
- // Moderately close - zoom in moderately
- padding = [30, 30]
- maxZoom = 8
- } else if (maxSpread < 30) {
- // Moderate distance - country level
- padding = [40, 40]
- maxZoom = 5
- } else {
- // Far apart - continent/global level
- padding = [50, 50]
- maxZoom = 3
- }
-
- // Initialize map with canvas renderer - top-down view (no tilt)
- const map = L.map('pdf-map-temp', {
- renderer: L.canvas(),
- center: [center.lat, center.lng],
- zoom: 2, // Initial zoom, will be adjusted by fitBounds
- zoomControl: false,
- attributionControl: false,
- maxBoundsViscosity: 1.0,
- worldCopyJump: false,
- maxZoom: maxZoom
- })
-
- // Ensure top-down view (disable any tilt/rotation)
- map.dragging.disable()
- map.touchZoom.disable()
- map.doubleClickZoom.disable()
- map.scrollWheelZoom.disable()
- map.boxZoom.disable()
- map.keyboard.disable()
-
- // Add Carto Voyager tile layer - modern with blue water and colors
- const cartoTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
- attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
- subdomains: 'abcd',
- maxZoom: 20
- })
-
- // Fallback to OpenStreetMap if Carto fails
- cartoTileLayer.on('tileerror', () => {
- console.warn('Carto tiles failed in PDF export, using OSM fallback')
- cartoTileLayer.setUrl('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
- })
-
- cartoTileLayer.addTo(map)
-
- // Add modern markers - green pins with modern styling
- locations.forEach(loc => {
- // Modern pin style - using main site green color
- L.circleMarker([loc.latitude, loc.longitude], {
- radius: 12,
- color: '#ffffff',
- fillColor: '#c0dfa1', // Main site green (primary-500)
- fillOpacity: 1,
- weight: 3,
- className: 'modern-pin'
- })
- .bindPopup(loc.name)
- .addTo(map)
-
- // Add outer glow effect for modern look
- L.circleMarker([loc.latitude, loc.longitude], {
- radius: 18,
- color: 'transparent',
- fillColor: '#c0dfa1', // Main site green (primary-500)
- fillOpacity: 0.2,
- weight: 0,
- className: 'modern-pin-glow'
- })
- .addTo(map)
- })
-
- // Fit bounds with appropriate padding and max zoom
- if (locations.length > 1) {
- map.fitBounds(bounds, {
- padding: padding,
- maxZoom: maxZoom
- })
- } else {
- // Single location - zoom in closer
- map.setView([locations[0].latitude, locations[0].longitude], 10)
- }
-
- // Wait for map to be ready, then export using html2canvas
- map.whenReady(() => {
- console.log('Map ready, exporting with html2canvas...')
- setTimeout(() => {
- exportLeafletMapAsImage(mapDiv)
- .then((dataUrl: string) => {
- console.log('Map exported to image, length:', dataUrl.length)
- document.body.removeChild(mapDiv)
- map.remove()
- resolve(dataUrl)
- })
- .catch((error: Error) => {
- console.error('Failed to export map:', error)
- document.body.removeChild(mapDiv)
- map.remove()
- reject(error)
- })
- }, 2000) // Give tiles time to load
- })
- } catch (error) {
- console.error('Error creating map:', error)
- if (document.body.contains(mapDiv)) {
- document.body.removeChild(mapDiv)
- }
- reject(error)
- }
- }, 100)
- })
- }
-
- // Generate map image if locations exist
- let mapImage: string | null = null
- if (reportData.locations.length > 0) {
- try {
- console.log('Rendering map...')
- mapImage = await renderMapImage(reportData.locations)
- console.log('Map rendered successfully')
- } catch (error) {
- console.error('Failed to render map image:', error)
- notify.error('Could not render map. Report will be generated without map.')
- }
- }
-
- // Store dashboard data for rendering
+ // Locations are drawn as vectors inside the PDF now, so there is no
+ // map image to pre-render here.
  setReportDashboardData({
  overviewSummary: overviewSummary || 'No overview available',
  beneficiaryText: beneficiaryText || 'No beneficiary information available',
- mapImage,
+ mapImage: null,
  hasBeneficiaryGroups: selectedBeneficiaryGroupIds.length > 0
  })
  
@@ -596,7 +413,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  reportDashboardData: {
  overviewSummary: overviewSummary || 'No overview available',
  beneficiaryText: beneficiaryText || 'No beneficiary information available',
- mapImage,
+ mapImage: null,
  hasBeneficiaryGroups: selectedBeneficiaryGroupIds.length > 0
  },
  reportData,
@@ -641,38 +458,6 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  setLoadingReport(false)
  setLoadingMessage('')
  }
- }
-
- const toggleKPI = (kpiId: string) => {
- setSelectedKPIIds(prev =>
- prev.includes(kpiId)
- ? prev.filter(id => id !== kpiId)
- : [...prev, kpiId]
- )
- }
-
- const toggleLocation = (locationId: string) => {
- setSelectedLocationIds(prev =>
- prev.includes(locationId)
- ? prev.filter(id => id !== locationId)
- : [...prev, locationId]
- )
- }
-
- const toggleBeneficiaryGroup = (groupId: string) => {
- setSelectedBeneficiaryGroupIds(prev =>
- prev.includes(groupId)
- ? prev.filter(id => id !== groupId)
- : [...prev, groupId]
- )
- }
-
- const toggleTag = (tagId: string) => {
- setSelectedTagIds(prev =>
- prev.includes(tagId)
- ? prev.filter(id => id !== tagId)
- : [...prev, tagId]
- )
  }
 
  const canProceedToNextStep = () => {
@@ -761,21 +546,22 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
  return (
  <div className="h-screen overflow-hidden flex flex-col mobile-content-padding relative">
- {/* Full-screen loading overlay */}
  {loadingReport && (
  <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
  <div className="text-center max-w-md mx-auto px-6">
- <Sparkles className="w-10 h-10 text-primary-500 mx-auto mb-4" />
- <h2 className="text-2xl font-semibold text-secondary-900 mb-2">Generating Impact Report</h2>
- <SectionLoader label={loadingMessage || 'Processing...'} className="py-6" />
+ <div className="w-14 h-14 rounded-2xl bg-primary-50 border border-primary-100 flex items-center justify-center mx-auto mb-4">
+ <Sparkles className="w-7 h-7 text-primary-600" />
+ </div>
+ <h2 className="text-2xl font-semibold text-gray-900 mb-1">Generating impact report</h2>
+ <SectionLoader label={loadingMessage || 'Processing…'} className="py-6" />
  </div>
  </div>
  )}
 
- <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-gray-100 bg-white flex-shrink-0">
- <div className="min-w-0">
+ <div className="px-4 sm:px-6 lg:px-8 xl:px-10 pt-4 sm:pt-5 pb-3 border-b border-gray-100 bg-white flex-shrink-0">
+ <div className="min-w-0 max-w-[1800px] mx-auto w-full">
  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">AI Report</h2>
- <p className="text-sm text-gray-500 mt-1 hidden sm:block">Generate professional impact reports powered by AI</p>
+ <p className="text-sm text-gray-500 mt-1 hidden sm:block">Filter your data, preview what will be included, then generate a one-page PDF</p>
  </div>
  </div>
 
@@ -789,9 +575,9 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  <NewReportButton />
  </div>
 
- <div className="rounded-2xl border border-gray-200/70 bg-white shadow-card p-6">
- <div className="flex items-center justify-between mb-4">
- <h2 className="text-base font-semibold text-gray-800">Report Dashboard</h2>
+ <div className="app-card p-5 sm:p-6">
+ <div className="flex items-center justify-between mb-4 gap-3">
+ <h2 className="text-base font-semibold text-gray-800">Report preview</h2>
  <div className="flex items-center gap-2">
  {canExportReports && (isEditingReport ? (
  <button
@@ -812,36 +598,6 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  <span>Edit Text</span>
  </button>
  ))}
- {canExportReports && (
- <button
- onClick={async () => {
- try {
- notify.loading('Generating PDF...', { id: 'pdf-download' })
- const filename = `${dashboard?.initiative.title.replace(/[^a-z0-9]/gi, '_')}_Report_${new Date().toISOString().split('T')[0]}.pdf`
- const pdfBlob = await convertReportToPDF('report-dashboard', filename)
-
- const url = URL.createObjectURL(pdfBlob)
- const link = document.createElement('a')
- link.href = url
- link.download = filename
- document.body.appendChild(link)
- link.click()
- document.body.removeChild(link)
- URL.revokeObjectURL(url)
-
- notify.success('PDF downloaded successfully!', { id: 'pdf-download' })
- } catch (error) {
- console.error('Error downloading PDF:', error)
- notify.error('Failed to download PDF', { id: 'pdf-download' })
- }
- }}
- disabled={isEditingReport}
- className={`app-btn app-btn-sm ${isEditingReport ? 'app-btn-secondary opacity-50' : 'app-btn-primary'}`}
- >
- <Download className="w-4 h-4" />
- <span>Download as PDF</span>
- </button>
- )}
  <button
  onClick={() => {
  setShowDashboard(false)
@@ -864,33 +620,47 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  </button>
  </div>
  </div>
- <div className="border border-gray-100 rounded-xl overflow-auto bg-gray-50/50" style={{ maxHeight: '900px' }}>
- {dashboard && (
- <ReportDashboard
- dashboard={dashboard}
- organization={activeOrganization}
- tags={reportData.tags}
- overviewSummary={editableOverview || reportDashboardData.overviewSummary}
- totals={reportData.totals}
- beneficiaryText={editableBeneficiaryText || reportDashboardData.beneficiaryText}
- hasBeneficiaryGroups={reportDashboardData.hasBeneficiaryGroups}
- selectedStory={selectedStory ? {
- ...selectedStory,
- title: editableStoryTitle || selectedStory.title,
- description: editableStoryDescription || selectedStory.description
- } : undefined}
- locations={reportData.locations}
- dateStart={dateRange.startDate || dateRange.singleDate}
- dateEnd={dateRange.endDate || dateRange.singleDate}
- mapImage={reportDashboardData.mapImage}
- isEditing={isEditingReport}
- onOverviewChange={setEditableOverview}
- onBeneficiaryTextChange={setEditableBeneficiaryText}
- onStoryTitleChange={setEditableStoryTitle}
- onStoryDescriptionChange={setEditableStoryDescription}
- />
- )}
+ <Suspense
+ fallback={
+ <div className="h-[840px] flex items-center justify-center text-sm text-gray-500">
+ Loading report…
  </div>
+ }
+ >
+ <ReportPdfPanel
+ canDownload={canExportReports}
+ fileName={`${(dashboard?.initiative.title || 'Impact').replace(/[^a-z0-9]/gi, '_')}_Report_${new Date().toISOString().split('T')[0]}.pdf`}
+ initiativeTitle={dashboard?.initiative.title || 'Impact report'}
+ dateRangeLabel={formatDateRangeLabel(dateRange)}
+ organizationName={reportData.branding?.organization_name || activeOrganization?.name || ''}
+ orgLogoUrl={reportData.branding?.logo_url ?? activeOrganization?.logo_url ?? null}
+ brandColor={reportData.branding?.brand_color ?? activeOrganization?.brand_color ?? null}
+ overview={editableOverview || reportDashboardData.overviewSummary}
+ beneficiaryText={editableBeneficiaryText || reportDashboardData.beneficiaryText}
+ metrics={reportData.totals.map(t => ({
+ kpi_id: t.kpi_id,
+ kpi_title: t.kpi_title,
+ unit_of_measurement: t.unit_of_measurement,
+ metric_type: (t as any).metric_type,
+ total_value: t.total_value,
+ }))}
+ story={selectedStory ? {
+ title: editableStoryTitle || selectedStory.title,
+ description: editableStoryDescription || selectedStory.description || '',
+ date: selectedStory.date_represented,
+ locationName: selectedStory.location_name,
+ // Anything that isn't explicitly video/audio is treated as an image;
+ // media_type is often absent on older stories that do have a photo.
+ imageUrl: selectedStory.media_type === 'video' || selectedStory.media_type === 'recording'
+ ? null
+ : selectedStory.media_url || null,
+ } : null}
+ locations={reportData.locations.map(l => ({ id: l.id, name: l.name }))}
+ beneficiaryGroups={reportData.beneficiaryGroups || []}
+ tags={(reportData.tags || []).map(t => ({ id: t.id, name: t.name }))}
+ mapPoints={reportData.mapPoints}
+ />
+ </Suspense>
  </div>
 
  {/* Make New Report Button - Below Dashboard */}
@@ -902,17 +672,17 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
  {/* Step Wizard - Only show if no report generated OR dashboard is hidden */}
  {(!reportText || !reportDashboardData || !showDashboard) && (
- <div className="rounded-2xl border border-gray-200/70 bg-white shadow-card overflow-hidden">
+ <div className="app-card overflow-hidden p-0">
  {/* Progress Steps Indicator */}
- <div className="px-5 py-3 border-b border-gray-100 bg-white">
- <div className="flex items-center justify-center">
+ <div className="px-5 py-4 border-b border-gray-100 bg-white">
+ <div className="flex items-center justify-center gap-1 sm:gap-0">
  {steps.map((step, index) => (
  <React.Fragment key={step.number}>
- <div className="flex flex-col items-center">
- <div className={`flex items-center justify-center w-8 h-8 rounded-lg border-2 transition-all duration-200 ${currentStep > step.number
- ? 'bg-primary-500 border-primary-500 text-secondary-900'
+ <div className="flex flex-col items-center min-w-[4.5rem] sm:min-w-[5.5rem]">
+ <div className={`flex items-center justify-center w-9 h-9 rounded-xl border transition-all duration-200 ${currentStep > step.number
+ ? 'bg-primary-500 border-primary-500 text-white'
  : currentStep === step.number
- ? 'bg-primary-500 border-primary-500 text-secondary-900 ring-2 ring-primary-200'
+ ? 'bg-primary-50 border-primary-400 text-primary-700 ring-2 ring-primary-100'
  : 'bg-white border-gray-200 text-gray-400'
  }`}>
  {currentStep > step.number ? (
@@ -921,16 +691,12 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  <step.icon className="w-4 h-4" />
  )}
  </div>
- <div className="mt-1 text-center">
- <div className={`text-xs font-medium whitespace-nowrap ${currentStep >= step.number ? 'text-gray-700' : 'text-gray-400'
- }`}>
+ <div className={`mt-1.5 text-[11px] sm:text-xs font-medium whitespace-nowrap ${currentStep >= step.number ? 'text-gray-700' : 'text-gray-400'}`}>
  {step.title}
  </div>
  </div>
- </div>
  {index < steps.length - 1 && (
- <div className={`flex-1 h-0.5 mx-3 rounded-full transition-all duration-200 ${currentStep > step.number ? 'bg-primary-500' : 'bg-gray-200/60'
- }`} style={{ maxWidth: '80px' }} />
+ <div className={`hidden sm:block flex-1 h-0.5 mx-2 rounded-full transition-all duration-200 ${currentStep > step.number ? 'bg-primary-400' : 'bg-gray-200/70'}`} style={{ maxWidth: '72px' }} />
  )}
  </React.Fragment>
  ))}
@@ -938,256 +704,137 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  </div>
 
  {/* Step Content */}
- <div ref={formContentRef} className="p-5 min-h-[440px] max-h-[70vh] overflow-y-auto">
+ <div ref={formContentRef} className="p-5 sm:p-6 min-h-[440px] max-h-[70vh] overflow-y-auto">
  {/* Step 1: Filters */}
  {currentStep === 1 && (
- <div className="space-y-4 animate-fade-in max-w-3xl mx-auto">
- <div className="text-center mb-4">
- <h3 className="text-lg font-semibold text-gray-900 mb-1">Select Report Filters</h3>
- <p className="text-sm text-gray-600">Choose the data you want to include in your report</p>
+ <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
+ <div className="text-center mb-2">
+ <h3 className="text-lg font-semibold text-gray-900 mb-1">Select report filters</h3>
+ <p className="text-sm text-gray-500">Leave a filter empty to include everything in that category</p>
  </div>
 
- <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
- {/* Date Range */}
- <div>
- <label className="app-label mb-2 block">
- <Calendar className="w-4 h-4 inline mr-1.5 text-primary-600" />
- Date Range
- </label>
+ <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start">
  <DateRangePicker
  value={dateRange}
  onChange={setDateRange}
+ placeholder="Date"
+ variant="pill"
  />
- </div>
-
- {/* KPI Multi-Select */}
- <div className="relative" ref={kpiPickerRef}>
- <label className="app-label mb-2 block">
- <BarChart3 className="w-4 h-4 inline mr-1.5 text-primary-600" />
- Metrics ({selectedKPIIds.length} selected)
- </label>
- <button
- type="button"
- onClick={() => setShowKPIPicker(!showKPIPicker)}
- className="app-input w-full text-left cursor-pointer"
- >
- {selectedKPIIds.length === 0
- ? 'All metrics (default)'
- : `${selectedKPIIds.length} metric${selectedKPIIds.length > 1 ? 's' : ''} selected`
- }
- </button>
- {showKPIPicker && (
- <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-200 rounded-xl shadow-card max-h-60 overflow-y-auto">
- {kpis.length === 0 ? (
- <div className="p-4 text-sm text-gray-500">No metrics available</div>
- ) : (
- kpis.map(kpi => (
- <label
- key={kpi.id}
- className={`flex items-center px-4 py-3 cursor-pointer transition-all ${selectedKPIIds.includes(kpi.id!) ? 'bg-primary-50' : 'hover:bg-gray-50'
- }`}
- >
- <input
- type="checkbox"
- checked={selectedKPIIds.includes(kpi.id!)}
- onChange={() => toggleKPI(kpi.id!)}
- className="mr-3 w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+ <FilterPill
+ icon={BarChart3}
+ label="Metrics"
+ pluralLabel="metrics"
+ options={kpis.filter(k => k.id).map(k => ({ id: k.id!, name: k.title }))}
+ selected={selectedKPIIds}
+ onChange={setSelectedKPIIds}
+ emptyText="No metrics available"
  />
- <span className="text-sm font-medium">{kpi.title}</span>
- </label>
- ))
- )}
- </div>
- )}
- </div>
-
- {/* Location Multi-Select */}
- <div className="relative" ref={locationPickerRef}>
- <label className="app-label mb-2 block">
- <MapPin className="w-4 h-4 inline mr-1.5 text-primary-600" />
- Locations ({selectedLocationIds.length} selected)
- </label>
- <button
- type="button"
- onClick={() => setShowLocationPicker(!showLocationPicker)}
- className="app-input w-full text-left cursor-pointer"
- >
- {selectedLocationIds.length === 0
- ? 'All locations (default)'
- : `${selectedLocationIds.length} location${selectedLocationIds.length > 1 ? 's' : ''} selected`
- }
- </button>
- {showLocationPicker && (
- <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-200 rounded-xl shadow-card max-h-60 overflow-y-auto">
- {locations.length === 0 ? (
- <div className="p-4 text-sm text-gray-500">No locations available</div>
- ) : (
- locations.map(location => (
- <label
- key={location.id}
- className={`flex items-center px-4 py-3 cursor-pointer transition-all ${selectedLocationIds.includes(location.id!) ? 'bg-primary-50' : 'hover:bg-gray-50'
- }`}
- >
- <input
- type="checkbox"
- checked={selectedLocationIds.includes(location.id!)}
- onChange={() => toggleLocation(location.id!)}
- className="mr-3 w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+ <FilterPill
+ icon={MapPin}
+ label="Location"
+ pluralLabel="locations"
+ options={locations.filter(l => l.id).map(l => ({ id: l.id!, name: l.name }))}
+ selected={selectedLocationIds}
+ onChange={setSelectedLocationIds}
+ emptyText="No locations available"
  />
- <span className="text-sm font-medium">{location.name}</span>
- </label>
- ))
+ {metricTags.length > 0 && (
+ <FilterPill
+ icon={Tag}
+ label="Tag"
+ pluralLabel="tags"
+ options={metricTags.map(t => ({ id: t.id, name: t.name, color: t.color || undefined }))}
+ selected={selectedTagIds}
+ onChange={setSelectedTagIds}
+ emptyText="No tags available"
+ />
  )}
- </div>
+ {beneficiaryGroups.length > 0 && (
+ <FilterPill
+ icon={Users}
+ label="Groups"
+ pluralLabel="groups"
+ options={beneficiaryGroups.filter(g => g.id).map(g => ({ id: g.id!, name: g.name }))}
+ selected={selectedBeneficiaryGroupIds}
+ onChange={setSelectedBeneficiaryGroupIds}
+ emptyText="No beneficiary groups available"
+ />
  )}
  </div>
 
- {/* Beneficiary Group Multi-Select */}
- <div className="relative" ref={beneficiaryPickerRef}>
- <label className="app-label mb-2 block">
- <Users className="w-4 h-4 inline mr-1.5 text-primary-600" />
- Beneficiary Groups ({selectedBeneficiaryGroupIds.length} selected)
- </label>
- <button
- type="button"
- onClick={() => setShowBeneficiaryPicker(!showBeneficiaryPicker)}
- className="app-input w-full text-left cursor-pointer"
- >
- {selectedBeneficiaryGroupIds.length === 0
- ? 'All groups (default)'
- : `${selectedBeneficiaryGroupIds.length} group${selectedBeneficiaryGroupIds.length > 1 ? 's' : ''} selected`
- }
- </button>
- {showBeneficiaryPicker && (
- <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-200 rounded-xl shadow-card max-h-60 overflow-y-auto">
- {beneficiaryGroups.length === 0 ? (
- <div className="p-4 text-sm text-gray-500">No beneficiary groups available</div>
- ) : (
- beneficiaryGroups.map(group => (
- <label
- key={group.id}
- className={`flex items-center px-4 py-3 cursor-pointer transition-all ${selectedBeneficiaryGroupIds.includes(group.id!) ? 'bg-primary-50' : 'hover:bg-gray-50'
- }`}
- >
- <input
- type="checkbox"
- checked={selectedBeneficiaryGroupIds.includes(group.id!)}
- onChange={() => toggleBeneficiaryGroup(group.id!)}
- className="mr-3 w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
- />
- <span className="text-sm font-medium">{group.name}</span>
- </label>
- ))
- )}
- </div>
- )}
- </div>
-
- {/* Tag Multi-Select */}
- <div className="relative" ref={tagPickerRef}>
- <label className="app-label mb-2 block">
- <Tag className="w-4 h-4 inline mr-1.5 text-primary-600" />
- Tags ({selectedTagIds.length} selected)
- </label>
- <button
- type="button"
- onClick={() => setShowTagPicker(!showTagPicker)}
- className="app-input w-full text-left cursor-pointer"
- >
- {selectedTagIds.length === 0
- ? 'All tags (default)'
- : `${selectedTagIds.length} tag${selectedTagIds.length > 1 ? 's' : ''} selected`
- }
- </button>
- {showTagPicker && (
- <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-200 rounded-xl shadow-card max-h-60 overflow-y-auto">
- {metricTags.length === 0 ? (
- <div className="p-4 text-sm text-gray-500">No tags available</div>
- ) : (
- metricTags.map(tag => (
- <label
- key={tag.id}
- className={`flex items-center px-4 py-3 cursor-pointer transition-all ${selectedTagIds.includes(tag.id) ? 'bg-primary-50' : 'hover:bg-gray-50'
- }`}
- >
- <input
- type="checkbox"
- checked={selectedTagIds.includes(tag.id)}
- onChange={() => toggleTag(tag.id)}
- className="mr-3 w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
- />
- <span
- className="inline-block w-2.5 h-2.5 rounded-full mr-2 flex-shrink-0"
- style={{ background: tag.color || '#608341' }}
- />
- <span className="text-sm font-medium">{tag.name}</span>
- </label>
- ))
- )}
- </div>
- )}
- </div>
- </div>
-
- {/* Beneficiary Group Scoping Disclaimer */}
  {selectedBeneficiaryGroupIds.length > 0 ? (
- <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-1">
- <p className="text-xs text-amber-800">
- <strong>Scoped Report:</strong> Only includes data for selected beneficiary group{selectedBeneficiaryGroupIds.length > 1 ? 's' : ''}.
- </p>
- </div>
- ) : beneficiaryGroups.length > 0 && (
- <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mt-1">
- <p className="text-xs text-gray-600">
- <strong>Full Report:</strong> Includes all metrics across your initiative.
- </p>
- </div>
- )}
+ <InlineAlert tone="warning" title="Scoped report">
+ Only includes data for the selected beneficiary group{selectedBeneficiaryGroupIds.length > 1 ? 's' : ''}.
+ </InlineAlert>
+ ) : beneficiaryGroups.length > 0 ? (
+ <InlineAlert tone="info" title="Full report">
+ Includes all metrics across your initiative unless you narrow the filters above.
+ </InlineAlert>
+ ) : null}
  </div>
  )}
 
  {/* Step 2: Review Data */}
  {currentStep === 2 && (
- <div className="space-y-4 animate-fade-in max-w-4xl mx-auto">
- <div className="text-center mb-4">
- <h3 className="text-lg font-semibold text-gray-900 mb-1">Review Your Data</h3>
- <p className="text-sm text-gray-600">Summary of data included in your report</p>
+ <div className="space-y-5 animate-fade-in max-w-4xl mx-auto">
+ <div className="text-center mb-2">
+ <h3 className="text-lg font-semibold text-gray-900 mb-1">Review your data</h3>
+ <p className="text-sm text-gray-500">This is what will feed the report</p>
  </div>
 
  {loadingData ? (
- <SectionLoader label="Loading data..." />
+ <SectionLoader label="Loading data…" />
  ) : reportData ? (
- <div className="space-y-4">
- {/* Metrics Summary */}
+ <div className="space-y-5">
  {reportData.totals.length > 0 && (
- <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
- <h4 className="font-semibold text-gray-800 mb-3 flex items-center text-sm">
- <BarChart3 className="w-4 h-4 mr-1.5 text-primary-600" />
+ <div>
+ <div className="flex items-center gap-2 mb-3">
+ <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
  Metrics ({reportData.totals.length})
  </h4>
- <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
- {reportData.totals.map(total => (
- <div key={total.kpi_id} className="p-2.5 bg-white rounded-lg border border-gray-100 shadow-sm">
- <h5 className="font-medium text-gray-700 text-xs truncate">{total.kpi_title}</h5>
- <p className="text-lg font-bold text-evidence-500 mt-1">
- {total.total_value} <span className="text-xs font-normal text-gray-500">{total.unit_of_measurement}</span>
+ </div>
+ {/* 2 rows of 112px cards + 12px gap, then scroll */}
+ <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[calc(2*112px+12px)] overflow-y-auto pr-1">
+ {reportData.totals.map((total, index) => {
+ const isPercentage = (total as any).metric_type === 'percentage'
+ const color = colorByKpiId[total.kpi_id] || getKPIColor('output', index)
+ return (
+ <div
+ key={total.kpi_id}
+ className="h-[112px] bg-white rounded-2xl border border-gray-200/70 shadow-card p-4 flex flex-col overflow-hidden"
+ >
+ <div className="flex items-start gap-2 min-h-0 overflow-hidden">
+ <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: color }} />
+ <p className="text-sm font-medium text-gray-800 leading-snug line-clamp-2" title={total.kpi_title}>
+ {total.kpi_title}
  </p>
  </div>
- ))}
+ <div className="flex items-baseline gap-1.5 mt-auto flex-shrink-0 pt-2">
+ <span className="text-2xl font-semibold text-gray-900 tabular-nums leading-none">
+ {isPercentage ? `${Math.round(total.total_value)}%` : total.total_value.toLocaleString()}
+ </span>
+ {!isPercentage && total.unit_of_measurement && (
+ <span className="text-xs text-gray-400 truncate">{total.unit_of_measurement}</span>
+ )}
+ </div>
+ </div>
+ )
+ })}
  </div>
  </div>
  )}
 
- {/* Locations */}
  {reportData.locations.length > 0 && (
- <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
- <h4 className="font-semibold text-gray-800 mb-2 flex items-center text-sm">
- <MapPin className="w-4 h-4 mr-1.5 text-primary-600" />
+ <div>
+ <div className="flex items-center gap-2 mb-3">
+ <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
  Locations ({reportData.locations.length})
  </h4>
+ </div>
  <div className="flex flex-wrap gap-1.5">
  {reportData.locations.map(location => (
- <span key={location.id} className="px-2.5 py-1 bg-white rounded-full border border-gray-200 text-xs font-medium text-gray-700">
+ <span key={location.id} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white rounded-full border border-gray-200/70 shadow-card text-xs font-medium text-gray-700">
+ <MapPin className="w-3 h-3 text-gray-400" />
  {location.name}
  </span>
  ))}
@@ -1195,13 +842,11 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  </div>
  )}
 
- {/* No data warning */}
  {reportData.totals.length === 0 && reportData.locations.length === 0 && (
  <EmptyState
  icon={FileText}
  title="No data found for the selected filters"
- description="Try adjusting your filter selections."
- className="bg-amber-50 rounded-xl border border-amber-200"
+ description="Go back and adjust your filter selections."
  />
  )}
  </div>
@@ -1216,116 +861,134 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
 
  {/* Step 3: Add Story */}
  {currentStep === 3 && (
- <div className="space-y-4 animate-fade-in max-w-3xl mx-auto">
- <div className="text-center mb-4">
- <h3 className="text-lg font-semibold text-gray-900 mb-1">Add a Story (Optional)</h3>
- <p className="text-sm text-gray-600">Select a story to anchor your report, or skip</p>
+ <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
+ <div className="text-center mb-2">
+ <h3 className="text-lg font-semibold text-gray-900 mb-1">Add a story (optional)</h3>
+ <p className="text-sm text-gray-500">Pick one story to anchor the narrative, or skip</p>
  </div>
 
  {reportData?.stories && reportData.stories.length > 0 ? (
- <div className="space-y-2 max-h-[250px] overflow-y-auto">
- {reportData.stories.map(story => (
- <div
+ <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[420px] overflow-y-auto pr-1">
+ {reportData.stories.map(story => {
+ const isSelected = selectedStory?.id === story.id
+ const thumb = story.media_type === 'video' || story.media_type === 'recording'
+ ? null
+ : story.media_url
+ return (
+ <button
  key={story.id}
- onClick={() => setSelectedStory(selectedStory?.id === story.id ? null : story)}
- className={`p-3 border-2 rounded-lg cursor-pointer transition-all duration-200 ${selectedStory?.id === story.id
- ? 'border-primary-400 bg-primary-50 shadow-md shadow-primary-500/10'
- : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
+ type="button"
+ onClick={() => setSelectedStory(isSelected ? null : story)}
+ className={`group relative text-left rounded-2xl border overflow-hidden bg-white shadow-card transition-all duration-200 flex flex-col ${isSelected
+ ? 'border-primary-400 ring-2 ring-primary-100'
+ : 'border-gray-200/70 hover:border-primary-300/70 hover:shadow-card-hover'
  }`}
  >
- <div className="flex items-start justify-between">
- <div className="flex-1">
- <h4 className="font-semibold text-gray-800 text-sm">{story.title}</h4>
- {story.description && (
- <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{story.description}</p>
+ <div className="relative aspect-[16/10] bg-gray-50 overflow-hidden flex-shrink-0">
+ {thumb ? (
+ <img
+ src={thumb}
+ alt=""
+ loading="lazy"
+ className="w-full h-full object-cover"
+ onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+ />
+ ) : (
+ <div className="w-full h-full flex items-center justify-center">
+ <BookOpen className="w-7 h-7 text-gray-300" />
+ </div>
  )}
- <div className="flex items-center space-x-3 mt-1.5 text-xs text-gray-400">
+ {isSelected && (
+ <div className="absolute top-2 right-2 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center shadow-card ring-2 ring-white">
+ <Check className="w-3.5 h-3.5 text-white" />
+ </div>
+ )}
+ </div>
+
+ <div className="p-3 flex flex-col gap-1 flex-1 min-h-0">
+ <h4 className="font-semibold text-gray-800 text-sm leading-snug line-clamp-2">
+ {story.title}
+ </h4>
+ {story.description && (
+ <p className="text-xs text-gray-500 line-clamp-2">{story.description}</p>
+ )}
+ <div className="flex items-center gap-3 mt-auto pt-1.5 text-[11px] text-gray-400">
  {story.location_name && (
- <span className="flex items-center">
- <MapPin className="w-3 h-3 mr-0.5" />
- {story.location_name}
+ <span className="flex items-center truncate">
+ <MapPin className="w-3 h-3 mr-0.5 flex-shrink-0" />
+ <span className="truncate">{story.location_name}</span>
  </span>
  )}
- <span className="flex items-center">
+ <span className="flex items-center flex-shrink-0">
  <Calendar className="w-3 h-3 mr-0.5" />
  {story.date_represented}
  </span>
  </div>
  </div>
- {selectedStory?.id === story.id && (
- <div className="w-5 h-5 bg-primary-500 rounded-full flex items-center justify-center ml-2">
- <Check className="w-3 h-3 text-white" />
- </div>
- )}
- </div>
- </div>
- ))}
+ </button>
+ )
+ })}
  </div>
  ) : (
  <EmptyState
  icon={BookOpen}
- title="No stories available for the selected filters"
+ title="No stories for these filters"
  description="You can proceed without a story."
  />
  )}
 
  {selectedStory && (
- <div className="bg-primary-50 border-2 border-primary-200 rounded-xl p-4">
- <p className="text-sm text-primary-800">
- <strong>Selected:</strong> {selectedStory.title}
- </p>
+ <InlineAlert tone="success" title="Story selected">
+ <div className="flex items-center justify-between gap-3">
+ <span className="truncate">{selectedStory.title}</span>
  <button
+ type="button"
  onClick={() => setSelectedStory(null)}
- className="text-xs text-primary-600 hover:text-primary-700 underline mt-1"
+ className="text-xs font-medium text-impact-700 hover:text-impact-800 flex-shrink-0"
  >
- Clear selection
+ Clear
  </button>
  </div>
+ </InlineAlert>
  )}
  </div>
  )}
 
  {/* Step 4: Generate */}
  {currentStep === 4 && (
- <div className="space-y-4 animate-fade-in max-w-2xl mx-auto">
- <div className="text-center mb-4">
- <h3 className="text-lg font-semibold text-gray-900 mb-1">Ready to Generate</h3>
- <p className="text-sm text-gray-600">Review and generate your AI-powered report</p>
+ <div className="space-y-5 animate-fade-in max-w-2xl mx-auto">
+ <div className="text-center mb-2">
+ <h3 className="text-lg font-semibold text-gray-900 mb-1">Ready to generate</h3>
+ <p className="text-sm text-gray-500">Confirm the scope, then generate your one-page PDF</p>
  </div>
 
- {/* Summary */}
- <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-3">
- <h4 className="font-semibold text-gray-800 text-sm">Report Summary</h4>
-
- <div className="grid grid-cols-2 gap-2 text-sm">
- <div className="bg-white rounded-lg p-2.5 border border-gray-100">
- <span className="text-xs text-gray-500">Metrics</span>
- <p className="font-semibold text-gray-800">{reportData?.totals.length || 0}</p>
+ <div className="grid grid-cols-2 gap-3">
+ {[
+ { label: 'Metrics', value: String(reportData?.totals.length || 0) },
+ { label: 'Locations', value: String(reportData?.locations.length || 0) },
+ {
+ label: 'Date range',
+ value: dateRange.startDate && dateRange.endDate
+ ? formatDateRangeLabel(dateRange)
+ : dateRange.singleDate
+ ? formatDateRangeLabel(dateRange)
+ : 'All dates',
+ },
+ { label: 'Story', value: selectedStory?.title || 'None' },
+ ].map(item => (
+ <div key={item.label} className="rounded-2xl bg-white border border-gray-200/70 shadow-card p-4">
+ <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">{item.label}</span>
+ <p className="mt-1 text-sm font-semibold text-gray-800 truncate" title={item.value}>{item.value}</p>
  </div>
- <div className="bg-white rounded-lg p-2.5 border border-gray-100">
- <span className="text-xs text-gray-500">Locations</span>
- <p className="font-semibold text-gray-800">{reportData?.locations.length || 0}</p>
- </div>
- <div className="bg-white rounded-lg p-2.5 border border-gray-100">
- <span className="text-xs text-gray-500">Date Range</span>
- <p className="font-semibold text-gray-800 text-xs">
- {dateRange.startDate && dateRange.endDate
- ? `${dateRange.startDate} - ${dateRange.endDate}`
- : dateRange.singleDate || 'All dates'
- }
- </p>
- </div>
- <div className="bg-white rounded-lg p-2.5 border border-gray-100">
- <span className="text-xs text-gray-500">Story</span>
- <p className="font-semibold text-gray-800 text-xs truncate">{selectedStory?.title || 'None'}</p>
- </div>
- </div>
+ ))}
  </div>
 
- <div className="bg-primary-50 border border-primary-200 rounded-xl p-4 text-center">
- <Sparkles className="w-8 h-8 text-primary-500 mx-auto mb-2" />
- <p className="text-xs text-primary-800 leading-relaxed">
- AI will analyze your data and generate a professional impact report.
+ <div className="rounded-2xl border border-primary-200 bg-primary-50/60 p-5 text-center">
+ <div className="w-10 h-10 rounded-xl bg-white border border-primary-100 flex items-center justify-center mx-auto mb-3 shadow-card">
+ <Sparkles className="w-5 h-5 text-primary-600" />
+ </div>
+ <p className="text-sm text-primary-800 leading-relaxed">
+ AI will analyze your filtered data and write a professional impact narrative that fits the one-page layout.
  </p>
  </div>
  </div>
@@ -1333,7 +996,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  </div>
 
  {/* Navigation Footer */}
- <div className="app-divider px-5 py-3 bg-gray-50/50">
+ <div className="border-t border-gray-100 px-5 py-3 bg-gray-50/80">
  <div className="flex items-center justify-between max-w-3xl mx-auto">
  <button
  type="button"
@@ -1345,7 +1008,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  <span>Back</span>
  </button>
 
- <div className="flex items-center space-x-2">
+ <div className="flex items-center gap-2">
  {currentStep < totalSteps ? (
  <button
  type="button"
@@ -1356,11 +1019,11 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  {loadingData ? (
  <>
  <Spinner className="w-4 h-4" />
- <span>Loading...</span>
+ <span>Loading…</span>
  </>
  ) : (
  <>
- <span>{currentStep === 1 ? 'Apply & Continue' : 'Next'}</span>
+ <span>{currentStep === 1 ? 'Apply & continue' : 'Next'}</span>
  <ChevronRight className="w-4 h-4" />
  </>
  )}
@@ -1375,12 +1038,12 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  {loadingReport ? (
  <>
  <Spinner className="w-4 h-4" />
- <span>Generating...</span>
+ <span>Generating…</span>
  </>
  ) : (
  <>
  <Sparkles className="w-4 h-4" />
- <span>Generate Report</span>
+ <span>Generate report</span>
  </>
  )}
  </button>

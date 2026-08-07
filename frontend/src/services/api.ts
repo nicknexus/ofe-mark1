@@ -1282,6 +1282,7 @@ class ApiService {
  kpi_title: string
  kpi_description: string
  unit_of_measurement: string
+ metric_type: 'number' | 'percentage' | string
  total_value: number
  count: number
  tag_ids: string[]
@@ -1305,6 +1306,8 @@ class ApiService {
  date_represented: string
  location_id?: string
  location_name?: string
+ media_url?: string
+ media_type?: 'photo' | 'video' | 'recording'
  }>
  mapPoints: Array<{
  lat: number
@@ -1312,6 +1315,17 @@ class ApiService {
  name: string
  type: 'location' | 'story'
  }>
+ beneficiaryGroups: Array<{
+ id: string
+ name: string
+ description?: string
+ total_number?: number | null
+ }>
+ branding: {
+ organization_name: string
+ logo_url?: string | null
+ brand_color?: string | null
+ }
  }> {
  return this.request('/reports/report-data', {
  method: 'POST',
@@ -1331,6 +1345,8 @@ class ApiService {
  tags?: any[]
  donor?: Donor
  deepLink?: string
+ /** Character budgets from the one-page layout, so the model writes to fit. */
+ lengthBudget?: { overview: number; beneficiary: number }
  }): Promise<{ reportText: string }> {
  return this.request<{ reportText: string }>('/reports/generate-report', {
  method: 'POST',

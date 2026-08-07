@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Play, Fingerprint } from "lucide-react";
+import { Play } from "lucide-react";
 import { motion } from "framer-motion";
 import { Reveal } from "./Reveal";
-import { easeOut } from "./motion";
 
-// Drop a Loom (or other) embed URL here to swap the placeholder for the real walkthrough.
-// e.g. "https://www.loom.com/embed/xxxxxxxxxxxx"
-const WALKTHROUGH_EMBED_URL = "";
+const YT_ID = "izHXfWKcSNI";
+// Hosted locally — YT maxres 404s for this video and returns a 120×90 grey stub.
+const YT_THUMB = "/walkthrough-thumb.jpg";
+const YT_EMBED = `https://www.youtube.com/embed/${YT_ID}?autoplay=1&rel=0&modestbranding=1`;
 
 const WalkthroughSection = () => {
   const [playing, setPlaying] = useState(false);
@@ -20,85 +20,56 @@ const WalkthroughSection = () => {
             <span className="text-sm font-medium text-muted-foreground">Visual and visceral</span>
           </div>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-fraunces font-extralight text-foreground mb-4">
-            See it before you{" "}
-            <span className="relative inline-block">
-              <span className="bg-gradient-to-r from-foreground via-slate-light to-foreground bg-clip-text text-transparent">
-                believe it
-              </span>
-              <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 12" fill="none">
-                <motion.path
-                  d="M2 8C50 2 150 2 198 8"
-                  stroke="#c0dfa1"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  initial={{ pathLength: 0 }}
-                  whileInView={{ pathLength: 1 }}
-                  viewport={{ once: true, amount: 0.6 }}
-                  transition={{ duration: 1, ease: easeOut, delay: 0.3 }}
-                />
-              </svg>
-            </span>
+            What Is Nexus?
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            A two-minute walkthrough of the platform — what you plug in, how it connects, and what the world gets to experience.
+            Watch this 2-minute video with our founder Liam to understand what Nexus can do for your organization.
           </p>
         </Reveal>
 
         {/* Video / walkthrough frame */}
         <Reveal direction="scale" delay={0.15}>
           <div className="relative rounded-3xl overflow-hidden glass-card p-2 shadow-glass-lg">
-            <div className="relative w-full rounded-2xl overflow-hidden bg-gradient-to-br from-sage-light/40 via-background to-sage-light/20" style={{ aspectRatio: "16 / 9" }}>
-              {playing && WALKTHROUGH_EMBED_URL ? (
+            <div
+              className="relative w-full rounded-2xl overflow-hidden bg-ink"
+              style={{ aspectRatio: "16 / 9" }}
+            >
+              {playing ? (
                 <iframe
-                  src={WALKTHROUGH_EMBED_URL}
+                  src={YT_EMBED}
                   title="Nexus platform walkthrough"
                   className="absolute inset-0 w-full h-full"
                   frameBorder={0}
-                  allow="autoplay; fullscreen; picture-in-picture"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
+                  referrerPolicy="strict-origin-when-cross-origin"
                 />
               ) : (
                 <button
                   type="button"
                   onClick={() => setPlaying(true)}
                   className="absolute inset-0 w-full h-full flex flex-col items-center justify-center group"
+                  aria-label="Play walkthrough video"
                 >
-                  {/* Ambient glow blobs — gentle drift */}
-                  <motion.div
-                    className="absolute top-[15%] left-[12%] w-40 h-40 bg-accent/25 rounded-full blur-3xl"
-                    animate={{ x: [0, 18, 0], y: [0, -14, 0], opacity: [0.7, 1, 0.7] }}
-                    transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
-                  />
-                  <motion.div
-                    className="absolute bottom-[12%] right-[15%] w-52 h-52 bg-accent/20 rounded-full blur-3xl"
-                    animate={{ x: [0, -22, 0], y: [0, 16, 0], opacity: [0.6, 0.9, 0.6] }}
-                    transition={{ duration: 11, repeat: Infinity, ease: "easeInOut" }}
+                  <img
+                    src={YT_THUMB}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                    loading="lazy"
                   />
 
                   <div className="relative z-10 flex flex-col items-center">
                     <motion.div
-                      className="relative w-20 h-20 mb-5"
-                      whileHover={{ scale: 1.12 }}
-                      whileTap={{ scale: 0.95 }}
+                      className="mb-5"
+                      whileHover={{ scale: 1.08 }}
+                      whileTap={{ scale: 0.96 }}
                       transition={{ type: "spring", stiffness: 300, damping: 18 }}
                     >
-                      {/* Pulse rings emanating from behind the play circle */}
-                      {[0, 0.8].map((delay) => (
-                        <motion.span
-                          key={delay}
-                          className="absolute inset-0 rounded-full border-2"
-                          style={{ borderColor: "#c0dfa1" }}
-                          initial={{ scale: 1, opacity: 0.5 }}
-                          animate={{ scale: 1.8, opacity: 0 }}
-                          transition={{ duration: 2, repeat: Infinity, ease: "easeOut", delay }}
-                        />
-                      ))}
-                      <div className="relative w-20 h-20 rounded-full bg-white/80 backdrop-blur-xl border-2 border-white shadow-glass-lg flex items-center justify-center">
+                      <div className="w-20 h-20 rounded-full bg-white/90 backdrop-blur-xl border-2 border-white shadow-glass-lg flex items-center justify-center">
                         <Play className="w-8 h-8 text-foreground translate-x-0.5" fill="currentColor" />
                       </div>
                     </motion.div>
-                    <div className="flex items-center gap-2 text-foreground/70">
-                      <Fingerprint className="w-5 h-5 text-accent" />
+                    <div className="rounded-full bg-ink/55 backdrop-blur-md px-3.5 py-1.5 text-white shadow-glass">
                       <span className="text-sm font-medium">Watch the walkthrough</span>
                     </div>
                   </div>

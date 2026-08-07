@@ -6,8 +6,8 @@ import { hoverSpring } from "./motion";
 const primaryStats = [
   {
     value: "60%",
-    headline: "See impact, give again",
-    description: "of donors say seeing the impact of their gift motivates them to give again.",
+    headline: "Give again after seeing the impact",
+    description: "Donors say seeing the impact of their gift motivates them to give again.",
     source: "BetterWorld, 2025",
   },
   {
@@ -21,7 +21,7 @@ const primaryStats = [
     value: "91%",
     headline: "More likely to give",
     description:
-      "of donors are more likely to support a charity when confident in its transparency and accountability.",
+      "Donors are more likely to support a charity when confident in its transparency and accountability.",
     source: "Charity Navigator",
   },
 ];

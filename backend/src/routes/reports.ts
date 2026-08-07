@@ -57,8 +57,21 @@ router.post('/generate-report', authenticateUser, async (req: AuthenticatedReque
             beneficiaryGroups,
             tags,
             donor,
-            deepLink
+            deepLink,
+            lengthBudget
         } = req.body;
+
+        // The report renders on a single fixed A4 page, so the layout — not the
+        // model — decides how much prose there is room for. Without these limits
+        // the generator writes ~1500 characters into a ~530 character box and
+        // the renderer truncates the remainder with an ellipsis.
+        const overviewChars = Number(lengthBudget?.overview) > 0
+            ? Math.round(Number(lengthBudget.overview))
+            : 520;
+        const beneficiaryChars = Number(lengthBudget?.beneficiary) > 0
+            ? Math.round(Number(lengthBudget.beneficiary))
+            : 340;
+        const approxWords = (chars: number) => Math.max(20, Math.round(chars / 6));
 
         if (!initiativeId || !initiativeTitle) {
             console.error('Missing required fields:', {
@@ -254,9 +267,9 @@ ${deepLink ? `**Deep Link:** ${deepLink}` : ''}
 
 Please structure the report with the following sections. Use EXACT section headers as shown:
 
-1. **## Overview Summary** - A single paragraph (4-5 sentences) highlighting key achievements and impact
+1. **## Overview Summary** - A single paragraph highlighting key achievements and impact. HARD LIMIT: at most ${overviewChars} characters (about ${approxWords(overviewChars)} words). Stay under it.
 2. **## Total Metrics with Descriptions** - Present the totals in a clear, narrative format explaining what each metric means (2-3 paragraphs). This section will appear right after the date range.
-3. **## Beneficiary Breakdown** - Explain who was served and how (1-2 paragraphs)
+3. **## Beneficiary Breakdown** - Explain who was served and how. HARD LIMIT: at most ${beneficiaryChars} characters (about ${approxWords(beneficiaryChars)} words). Stay under it.
 4. **## Visual Metrics Description** - ONE SENTENCE describing what the bar chart shows (e.g., "The bar chart below illustrates the total values for each metric tracked during this reporting period.")
 5. **## Location Information** - ONE SENTENCE describing the geographic reach (e.g., "The map below shows the geographic distribution of impact across [X] locations.")
 6. **## Map Section Text** - ONE SENTENCE describing the geographic distribution (e.g., "Impact was delivered across [X] locations, with activities concentrated in [region/area].")
@@ -267,7 +280,9 @@ IMPORTANT:
 ${selectedStory ? '- DO NOT include a Story Section - the actual story will be inserted separately' : '- Since no story was selected, focus the report on metrics, impact data, and achievements without a narrative story section'}
 - Use EXACTLY the section headers shown above (e.g., "## Visual Metrics Description", "## Location Information")
 - Sections 4, 5, 6, and 7 must be EXACTLY ONE SENTENCE each
-- The Overview Summary must be exactly ONE paragraph (4-5 sentences)
+- The Overview Summary must be exactly ONE paragraph and MUST fit within ${overviewChars} characters
+- The Beneficiary Breakdown MUST fit within ${beneficiaryChars} characters
+- These limits are a fixed page layout, not a style preference. Text over the limit is cut off mid-sentence in the final PDF. Prefer fewer, denser sentences over trailing detail.
 - When themes/tags are provided, reference them naturally in the Total Metrics section to frame the areas of impact (do not add a separate themes section)
 - Make the report professional, engaging, and data-driven
 - Use specific numbers throughout`;

@@ -2,6 +2,7 @@ import { supabase } from '../utils/supabase';
 import { InitiativeService } from './initiativeService';
 import { aggregateKpiUpdates } from '../utils/kpiAggregation';
 import { MetricTagService } from './metricTagService';
+import { OrgAccessService } from './orgAccessService';
 
 export interface ReportDataFilters {
     initiativeId: string;
@@ -51,6 +52,20 @@ export interface ReportDataResponse {
         latitude: number;
         longitude: number;
     }>;
+    // Beneficiary groups covered by the report. Previously these could only be
+    // filtered on; the one-page report needs to name them too.
+    beneficiaryGroups: Array<{
+        id: string;
+        name: string;
+        description?: string;
+        total_number?: number | null;
+    }>;
+    // Organization branding for the report header/footer.
+    branding: {
+        organization_name: string;
+        logo_url?: string | null;
+        brand_color?: string | null;
+    };
     stories: Array<{
         id: string;
         title: string;
@@ -78,6 +93,13 @@ export class ReportService {
         if (!initiative) {
             throw new Error('Initiative not found or access denied');
         }
+
+        // Resolve the owning org so the report can carry its branding.
+        const { organizationId } = await OrgAccessService.assertInitiativeAccess(
+            initiativeId,
+            userId,
+            requestedOrgId
+        );
 
         // Build query for metrics_with_context view
         let metricsQuery = supabase
@@ -311,6 +333,44 @@ export class ReportService {
             );
         }
 
+        // Beneficiary groups covered by this report. When the caller filtered to
+        // specific groups we honour that list; otherwise we return every group on
+        // the initiative so the report can name who was served.
+        let bgQuery = supabase
+            .from('beneficiary_groups')
+            .select('id, name, description, total_number, display_order')
+            .eq('initiative_id', initiativeId);
+        if (beneficiaryGroupIds && beneficiaryGroupIds.length > 0) {
+            bgQuery = bgQuery.in('id', beneficiaryGroupIds);
+        }
+        const { data: bgData, error: bgError } = await bgQuery;
+        if (bgError) {
+            throw new Error(`Failed to fetch beneficiary groups: ${bgError.message}`);
+        }
+        const beneficiaryGroups = (bgData || [])
+            .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
+            .map((g: any) => ({
+                id: g.id,
+                name: g.name,
+                description: g.description || undefined,
+                total_number: g.total_number ?? null
+            }));
+
+        // Organization branding for the report header/footer.
+        const { data: orgData, error: orgError } = await supabase
+            .from('organizations')
+            .select('name, logo_url, brand_color')
+            .eq('id', organizationId)
+            .single();
+        if (orgError) {
+            throw new Error(`Failed to fetch organization branding: ${orgError.message}`);
+        }
+        const branding = {
+            organization_name: orgData?.name || '',
+            logo_url: orgData?.logo_url ?? null,
+            brand_color: orgData?.brand_color ?? null
+        };
+
         // Build map points from locations and stories
         const mapPoints: Array<{ lat: number; lng: number; name: string; type: 'location' | 'story' }> = [];
 
@@ -355,6 +415,8 @@ export class ReportService {
             totals,
             tags,
             locations,
+            beneficiaryGroups,
+            branding,
             stories,
             mapPoints
         };

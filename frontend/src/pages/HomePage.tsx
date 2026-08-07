@@ -55,11 +55,9 @@ export default function HomePage() {
       </div>
       <LandingNavbar onSignIn={handleSignIn} onGetStarted={handleSignUp} />
       <HeroSection />
-      {/* Video walkthrough hidden for now — restore when the walkthrough is ready.
       <Suspense fallback={<SectionLoader />}>
         <WalkthroughSection />
       </Suspense>
-      */}
       <Suspense fallback={<SectionLoader />}>
         <ProblemsSection onGetStarted={handleSignUp} />
       </Suspense>
