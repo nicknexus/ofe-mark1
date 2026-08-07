@@ -49,6 +49,7 @@ import TeamSettingsPage from './pages/TeamSettingsPage'
 import InviteAcceptPage from './pages/InviteAcceptPage'
 import AdminDemosPage from './pages/admin/AdminDemosPage'
 import TermsOfServicePage from './pages/TermsOfServicePage'
+import PublicTermsPage from './pages/PublicTermsPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import OfferCheckoutPage from './pages/OfferCheckoutPage'
 import EmbedPage from './pages/EmbedPage'
@@ -200,6 +201,10 @@ function App() {
  const publicRoutes = (
  <>
  <Route path="/explore" element={<ExplorePage />} />
+ {/* Public read-only Terms. /terms-of-service is kept as an alias for
+     links that already point there. */}
+ <Route path="/tos" element={<PublicTermsPage />} />
+ <Route path="/terms-of-service" element={<PublicTermsPage />} />
  <Route path="/reset-password" element={<ResetPasswordPage />} />
  <Route path="/embed/:slug" element={<EmbedPage />} />
  <Route path="/offer/:slug" element={<OfferCheckoutPage />} />

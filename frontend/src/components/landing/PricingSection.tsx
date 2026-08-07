@@ -6,6 +6,7 @@ import { Reveal, StaggerGroup, StaggerItem } from "./Reveal";
 import { AnimatedNumber } from "./AnimatedNumber";
 import { spring } from "./motion";
 import { DEMO_BOOKING_URL } from "./constants";
+import { writePendingPlan, clearPendingPlan, type PendingTier } from "../../utils/pendingPlan";
 
 interface PricingSectionProps {
   onGetStarted?: () => void;
@@ -13,9 +14,21 @@ interface PricingSectionProps {
 
 type Billing = "monthly" | "annual";
 
-const tiers = [
+interface Tier {
+  name: string;
+  /** Plan id carried through signup to Stripe; null for the free tier. */
+  tierKey: PendingTier | null;
+  monthly: number;
+  priceSuffix: string;
+  cta: string;
+  highlighted: boolean;
+  features: string[];
+}
+
+const tiers: Tier[] = [
   {
     name: "Free",
+    tierKey: null,
     monthly: 0,
     priceSuffix: "forever",
     cta: "Start free",
@@ -31,6 +44,7 @@ const tiers = [
   },
   {
     name: "Growth",
+    tierKey: "growth",
     monthly: 75,
     priceSuffix: "per month",
     cta: "Get started",
@@ -48,6 +62,7 @@ const tiers = [
   },
   {
     name: "Pro",
+    tierKey: "pro",
     monthly: 240,
     priceSuffix: "per month",
     cta: "Get started",
@@ -71,6 +86,18 @@ const annualMonthly = (monthly: number) => Math.round((monthly * 10) / 12);
 
 const PricingSection = ({ onGetStarted }: PricingSectionProps) => {
   const [billing, setBilling] = useState<Billing>("monthly");
+
+  // Stash the picked plan before handing off to signup — TrialActivationPage
+  // reads it back afterwards and offers checkout for exactly this tier and
+  // billing interval. Picking Free clears any earlier choice.
+  const handleTierClick = (tier: Tier) => {
+    if (tier.tierKey) {
+      writePendingPlan({ tier: tier.tierKey, interval: billing });
+    } else {
+      clearPendingPlan();
+    }
+    onGetStarted?.();
+  };
 
   return (
     <section id="pricing" className="py-16 md:py-24 relative overflow-hidden">
@@ -186,7 +213,7 @@ const PricingSection = ({ onGetStarted }: PricingSectionProps) => {
                     variant={tier.highlighted ? "sage" : "hero-outline"}
                     size="lg"
                     className="w-full"
-                    onClick={onGetStarted}
+                    onClick={() => handleTierClick(tier)}
                   >
                     {tier.cta}
                   </Button>

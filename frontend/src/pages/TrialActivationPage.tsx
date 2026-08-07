@@ -4,14 +4,12 @@ import { SubscriptionService } from '../services/subscription'
 import { AuthService } from '../services/auth'
 import MarketingPageShell, { MarketingLogoHeader } from '../components/MarketingPageShell'
 import toast from 'react-hot-toast'
+import { readPendingPlan, clearPendingPlan, type PendingTier } from '../utils/pendingPlan'
 
 interface Props {
     // Kept name for App.tsx compatibility — fires after the free plan is active.
     onTrialStarted: () => void
 }
-
-type PendingInterval = 'monthly' | 'annual'
-type PendingTier = 'growth' | 'pro'
 
 const PLAN_INFO: Record<PendingTier, { name: string; monthly: string; annual: string; features: string[] }> = {
     growth: {
@@ -26,19 +24,6 @@ const PLAN_INFO: Record<PendingTier, { name: string; monthly: string; annual: st
         annual: '$2,400 / year',
         features: ['25 initiatives', '20 team members', '30 locations', '1 TB storage', 'Unlimited AI reports', 'Advanced / white-label widgets'],
     },
-}
-
-// Read the plan the user picked on the landing page (if any), stored pre-signup.
-function readPendingPlan(): { tier: PendingTier; interval: PendingInterval } | null {
-    try {
-        const raw = localStorage.getItem('pendingPlan')
-        if (!raw) return null
-        const parsed = JSON.parse(raw)
-        if (parsed?.tier === 'growth' || parsed?.tier === 'pro') {
-            return { tier: parsed.tier, interval: parsed.interval === 'annual' ? 'annual' : 'monthly' }
-        }
-    } catch { /* ignore malformed */ }
-    return null
 }
 
 export default function TrialActivationPage({ onTrialStarted }: Props) {
@@ -69,7 +54,7 @@ export default function TrialActivationPage({ onTrialStarted }: Props) {
         setLoading(true)
         try {
             const result = await SubscriptionService.activateFree()
-            localStorage.removeItem('pendingPlan')
+            clearPendingPlan()
             toast.success(result.message || 'Your free plan is active. Welcome aboard!')
             onTrialStarted()
         } catch (error) {
@@ -169,7 +154,7 @@ export default function TrialActivationPage({ onTrialStarted }: Props) {
                         disabled={loading || subscribing}
                         className="mt-3 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                     >
-                        {loading ? 'Setting up...' : 'Not now — start with the free plan instead'}
+                        {loading ? 'Setting up...' : 'Not Ready? Start with the free plan instead'}
                     </button>
                 </div>
 

@@ -58,7 +58,7 @@ const Footer = () => {
           </p>
           <div className="flex gap-6 text-sm">
             <a href="/privacy" className="text-white/50 hover:text-white transition-colors">Privacy</a>
-            <a href="/terms-of-service" className="text-white/50 hover:text-white transition-colors">Terms</a>
+            <a href="/tos" className="text-white/50 hover:text-white transition-colors">Terms of Service</a>
           </div>
         </div>
       </motion.div>
