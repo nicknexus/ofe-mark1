@@ -1,5 +1,6 @@
 import { Heart } from "lucide-react";
 import { motion } from "framer-motion";
+import { DEMO_BOOKING_URL } from "./constants";
 
 const Footer = () => {
   return (
@@ -37,7 +38,16 @@ const Footer = () => {
             <ul className="space-y-3">
               <li><a href="#why-it-matters" className="text-white/60 hover:text-white transition-colors">Benefits</a></li>
               <li><a href="#pricing" className="text-white/60 hover:text-white transition-colors">Pricing</a></li>
-              <li><a href="#contact" className="text-white/60 hover:text-white transition-colors">Contact</a></li>
+              <li>
+                <a
+                  href={DEMO_BOOKING_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-white/60 hover:text-white transition-colors"
+                >
+                  Contact
+                </a>
+              </li>
             </ul>
           </div>
         </div>

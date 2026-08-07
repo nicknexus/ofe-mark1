@@ -4,6 +4,7 @@ import { Button } from "../ui/button";
 import { ArrowRight } from "lucide-react";
 import { Reveal } from "./Reveal";
 import { easeOut } from "./motion";
+import { DEMO_BOOKING_URL } from "./constants";
 
 interface CTASectionProps {
   onGetStarted: () => void;
@@ -71,15 +72,15 @@ const CTASection = ({ onGetStarted }: CTASectionProps) => {
                 </svg>
               </span>{" "}
               to{" "}
-              <span className="relative inline-block align-baseline text-left">
-                <span className="invisible" aria-hidden>
+              <span className="relative inline-block align-baseline text-left leading-none">
+                <span className="invisible whitespace-nowrap" aria-hidden>
                   Experience
                 </span>
-                <span className="absolute inset-0 overflow-hidden text-left">
+                <span className="absolute left-0 right-[-0.2em] top-[-0.15em] bottom-[-0.45em] overflow-hidden text-left">
                   <AnimatePresence mode="wait" initial={false}>
                     <motion.span
                       key={word}
-                      className="absolute left-0 top-0"
+                      className="absolute left-0 top-[0.15em] whitespace-nowrap"
                       initial={reduceMotion ? false : { opacity: 0, y: "40%" }}
                       animate={{ opacity: 1, y: "0%" }}
                       exit={reduceMotion ? undefined : { opacity: 0, y: "-40%" }}
@@ -109,10 +110,12 @@ const CTASection = ({ onGetStarted }: CTASectionProps) => {
               <Button
                 variant="hero-outline"
                 size="xl"
-                onClick={onGetStarted}
+                asChild
                 className="!border-white/40 !text-white hover:!bg-white/10"
               >
-                Book a demo
+                <a href={DEMO_BOOKING_URL} target="_blank" rel="noopener noreferrer">
+                  Book a demo
+                </a>
               </Button>
             </motion.div>
           </div>

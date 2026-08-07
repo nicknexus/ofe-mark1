@@ -5,8 +5,10 @@ import {
   ArrowRight, TrendingUp,
   BookOpen, MapPin, Camera, Calendar, ChevronLeft, ChevronRight,
 } from "lucide-react";
+import { Button } from "../ui/button";
 import { Reveal } from "./Reveal";
 import { easeOut } from "./motion";
+import { DEMO_BOOKING_URL } from "./constants";
 import {
   AreaChart,
   Area,
@@ -327,13 +329,14 @@ const ExplorePromoSection = () => {
               already living on the platform.
             </p>
 
-            <Link
-              to="/explore"
-              className="inline-flex items-center justify-center gap-2 px-8 h-14 rounded-2xl bg-accent text-accent-foreground text-lg font-medium hover:bg-accent/90 transition-all duration-300 border-2 border-accent/50 shadow-sage hover:shadow-md hover:-translate-y-0.5 group"
-            >
-              Explore live impact
-              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-4">
+  
+              <Button variant="hero" size="xl" asChild>
+                <a href={DEMO_BOOKING_URL} target="_blank" rel="noopener noreferrer">
+                  Book a demo
+                </a>
+              </Button>
+            </div>
           </Reveal>
 
           {/* Right — slide carousel */}

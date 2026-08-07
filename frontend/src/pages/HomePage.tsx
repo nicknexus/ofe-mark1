@@ -38,7 +38,8 @@ const SectionLoader = () => (
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const handleGetStarted = () => navigate('/login');
+  const handleSignIn = () => navigate('/login');
+  const handleSignUp = () => navigate('/login?signup=true');
 
   useEffect(() => {
     warmLiveStories();
@@ -52,15 +53,15 @@ export default function HomePage() {
         <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(210,220,230,0.3)_1px,transparent_1px),linear-gradient(to_bottom,rgba(210,220,230,0.2)_1px,transparent_1px)] bg-[size:60px_60px]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_50%,transparent_0%,white_70%)]" />
       </div>
-      <LandingNavbar onGetStarted={handleGetStarted} />
-      <HeroSection onGetStarted={handleGetStarted} />
+      <LandingNavbar onSignIn={handleSignIn} onGetStarted={handleSignUp} />
+      <HeroSection />
       {/* Video walkthrough hidden for now — restore when the walkthrough is ready.
       <Suspense fallback={<SectionLoader />}>
         <WalkthroughSection />
       </Suspense>
       */}
       <Suspense fallback={<SectionLoader />}>
-        <ProblemsSection onGetStarted={handleGetStarted} />
+        <ProblemsSection onGetStarted={handleSignUp} />
       </Suspense>
       <Suspense fallback={<SectionLoader />}>
         <ExplorePromoSection />
@@ -75,10 +76,10 @@ export default function HomePage() {
         <TestimonialsSection />
       </Suspense> */}
       <Suspense fallback={<SectionLoader />}>
-        <PricingSection onGetStarted={handleGetStarted} />
+        <PricingSection onGetStarted={handleSignUp} />
       </Suspense>
       <Suspense fallback={<SectionLoader />}>
-        <CTASection onGetStarted={handleGetStarted} />
+        <CTASection onGetStarted={handleSignUp} />
       </Suspense>
       <Suspense fallback={<SectionLoader />}>
         <Footer />

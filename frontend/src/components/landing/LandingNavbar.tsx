@@ -5,6 +5,7 @@ import { Search, Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface LandingNavbarProps {
+  onSignIn: () => void;
   onGetStarted: () => void;
 }
 
@@ -13,7 +14,7 @@ const navLinks = [
   { href: "#pricing", label: "Pricing" },
 ];
 
-const LandingNavbar = ({ onGetStarted }: LandingNavbarProps) => {
+const LandingNavbar = ({ onSignIn, onGetStarted }: LandingNavbarProps) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -108,7 +109,7 @@ const LandingNavbar = ({ onGetStarted }: LandingNavbarProps) => {
 
             {/* Desktop buttons */}
             <div className="hidden lg:flex items-center gap-3">
-              <Button variant="ghost" onClick={onGetStarted}>Sign In</Button>
+              <Button variant="ghost" onClick={onSignIn}>Sign In</Button>
               <Button variant="sage" onClick={onGetStarted}>Get Started</Button>
             </div>
 
@@ -171,7 +172,7 @@ const LandingNavbar = ({ onGetStarted }: LandingNavbarProps) => {
             <div className="p-4 pt-2 border-t border-gray-100 space-y-2">
               <button 
                 className="w-full px-4 py-3 text-foreground font-medium rounded-xl hover:bg-black/5 transition-colors text-center"
-                onClick={() => { setMobileMenuOpen(false); onGetStarted(); }}
+                onClick={() => { setMobileMenuOpen(false); onSignIn(); }}
               >
                 Sign In
               </button>
