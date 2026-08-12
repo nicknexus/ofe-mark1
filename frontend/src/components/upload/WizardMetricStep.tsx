@@ -77,7 +77,7 @@ export default function WizardMetricStep({ state, update, kpis, kpiTotals = {}, 
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
         {kpis.map((kpi, index) => (
           <WizardMetricPickerCard
             key={kpi.id}
@@ -86,6 +86,7 @@ export default function WizardMetricStep({ state, update, kpis, kpiTotals = {}, 
             total={kpiTotals[kpi.id!] ?? 0}
             selected={selected.includes(kpi.id!)}
             onClick={() => handleSelect(kpi.id!)}
+            titlesOnlyOnMobile
           />
         ))}
       </div>

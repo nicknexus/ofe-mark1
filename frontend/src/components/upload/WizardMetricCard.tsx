@@ -64,17 +64,23 @@ interface WizardMetricPickerCardProps {
   total?: number
   selected: boolean
   onClick: () => void
+  /** Evidence-only mobile: title chips, no totals. Desktop layout unchanged. */
+  titlesOnlyOnMobile?: boolean
 }
 
 /** Selectable metric card for the metric-picker step. */
-export function WizardMetricPickerCard({ kpi, color, total, selected, onClick }: WizardMetricPickerCardProps) {
+export function WizardMetricPickerCard({ kpi, color, total, selected, onClick, titlesOnlyOnMobile }: WizardMetricPickerCardProps) {
   const isPct = kpi.metric_type === 'percentage'
   const unit = isPct ? '' : (kpi.unit_of_measurement || '')
   const displayTotal = total ?? 0
 
   return (
-    <button type="button" onClick={onClick} className={`${WIZARD_METRIC_CARD_H} w-full text-left group`}>
-      <div className={`h-full rounded-2xl border shadow-card transition-all duration-200 p-4 flex flex-col relative ${selected
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${titlesOnlyOnMobile ? 'h-auto md:h-[112px]' : WIZARD_METRIC_CARD_H} w-full text-left group`}
+    >
+      <div className={`${titlesOnlyOnMobile ? 'min-h-0 md:h-full' : 'h-full'} rounded-2xl border shadow-card transition-all duration-200 p-4 flex flex-col relative ${selected
         ? 'border-primary-500 bg-primary-50'
         : 'border-gray-200/70 bg-white hover:shadow-card-hover hover:border-primary-300/70 hover:-translate-y-0.5'
       }`}>
@@ -83,13 +89,16 @@ export function WizardMetricPickerCard({ kpi, color, total, selected, onClick }:
             <Check className="w-3 h-3 text-white" strokeWidth={3} />
           </span>
         )}
-        <div className="flex items-start gap-2 pr-8 mb-3">
+        <div className={`flex items-start gap-2 pr-8 ${titlesOnlyOnMobile ? 'mb-0 md:mb-3' : 'mb-3'}`}>
           <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: color }} />
-          <p className="text-sm font-medium text-gray-800 leading-snug line-clamp-2" title={kpi.title}>
+          <p
+            className={`text-sm font-medium text-gray-800 leading-snug ${titlesOnlyOnMobile ? 'md:line-clamp-2' : 'line-clamp-2'}`}
+            title={kpi.title}
+          >
             {kpi.title}
           </p>
         </div>
-        <div className="flex items-baseline gap-1.5 mt-auto">
+        <div className={`items-baseline gap-1.5 mt-auto ${titlesOnlyOnMobile ? 'hidden md:flex' : 'flex'}`}>
           <span className="text-2xl font-semibold text-gray-900 tabular-nums">
             {isPct ? `${Math.round(displayTotal)}%` : displayTotal.toLocaleString()}
           </span>

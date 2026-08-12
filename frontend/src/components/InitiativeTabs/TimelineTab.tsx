@@ -263,10 +263,10 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
  }
 
  return (
-    <div className={embedded ? 'flex flex-col' : 'h-screen overflow-hidden flex flex-col mobile-content-padding'}>
+    <div className={embedded ? 'flex flex-col' : 'h-screen max-md:h-full overflow-hidden flex flex-col'}>
       {/* Header + toolbar (kept compact so the list below is the focus) */}
-      <div className={`px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-gray-100 space-y-3 ${embedded ? 'bg-gray-50' : 'bg-white'}`}>
-        {/* Title row */}
+      <div className={`px-4 sm:px-6 pt-3 sm:pt-5 pb-2.5 sm:pb-3 border-b border-gray-100 space-y-2 md:space-y-3 flex-shrink-0 ${embedded ? 'bg-gray-50' : 'bg-white'}`}>
+        {/* Title row — Add is hidden on phone (center FAB owns that action) */}
         <div className="flex items-center justify-between gap-3">
           {embedded ? (
             <div className="min-w-0">
@@ -275,7 +275,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
             </div>
           ) : (
             <div className="min-w-0">
-              <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Logs</h2>
+              <h2 className="text-xl md:text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Logs</h2>
               <p className="text-sm text-gray-500 mt-1 hidden sm:block">
                 Every logged claim, piece of evidence, and connection for this initiative
               </p>
@@ -287,7 +287,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
               className={`app-btn app-btn-primary shadow-sm flex-shrink-0 ${
                 embedded
                   ? 'app-btn-sm'
-                  : 'app-btn-sm md:h-12 md:px-6 md:text-base lg:h-14 lg:px-8 lg:text-[17px]'
+                  : 'app-btn-sm max-md:hidden md:h-12 md:px-6 md:text-base lg:h-14 lg:px-8 lg:text-[17px]'
               }`}
             >
               <Plus className={embedded ? 'w-4 h-4' : 'w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6'} />
@@ -311,15 +311,15 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
         />
 
         {/* Search (left) · status filters + evidence view mode (right) */}
-        <div className="flex flex-wrap items-center gap-3 justify-between">
-          <div className="relative flex-1 min-w-[200px] max-w-md">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <div className="flex flex-wrap items-center gap-2 md:gap-3 justify-between">
+          <div className="relative flex-1 min-w-[160px] md:min-w-[200px] max-w-md">
+            <Search className="absolute left-3 md:left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 md:w-4 md:h-4 text-gray-400" />
             <input
               type="text"
               value={filters.q}
               onChange={(e) => setFilters({ ...filters, q: e.target.value })}
               placeholder="Search claims and evidence…"
-              className="w-full h-9 pl-10 pr-3 bg-white border border-gray-200 rounded-full text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full h-8 md:h-9 pl-9 md:pl-10 pr-3 bg-white border border-gray-200 rounded-full text-xs md:text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
 
@@ -346,8 +346,8 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
       </div>
 
       {/* View switcher — full-width, equal, squared buttons above the rows */}
-      <div className="px-4 sm:px-6 pt-4 pb-1 bg-gray-50 flex-shrink-0">
-        <div className="grid grid-cols-3 gap-2">
+      <div className="px-4 sm:px-6 pt-2.5 md:pt-4 pb-1 bg-gray-50 flex-shrink-0">
+        <div className="grid grid-cols-3 gap-1.5 md:gap-2">
           {VIEWS.map(v => {
             const isActive = view === v.id
             return (
@@ -355,7 +355,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
                 key={v.id}
                 type="button"
                 onClick={() => setView(v.id)}
-                className={`inline-flex items-center justify-center h-10 rounded-lg border text-sm font-medium transition-colors ${isActive ? v.activeClass : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
+                className={`inline-flex items-center justify-center h-8 md:h-10 rounded-lg border text-xs md:text-sm font-medium transition-colors ${isActive ? v.activeClass : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
               >
                 {v.label}
               </button>
@@ -364,8 +364,8 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
         </div>
       </div>
 
-      {/* Active view — primary focus of the page */}
-      <div className={`px-4 sm:px-6 pb-4 sm:pb-6 pt-2 bg-gray-50 ${embedded ? '' : 'flex-1 overflow-y-auto'}`}>
+      {/* Active view — fills remaining height down to the phone nav / desktop chrome */}
+      <div className={`px-4 sm:px-6 pb-2 md:pb-6 pt-2 bg-gray-50 min-h-0 ${embedded ? '' : 'flex-1 overflow-y-auto'}`}>
         {loading ? (
           <SectionLoader className="h-64" />
         ) : !data ? (

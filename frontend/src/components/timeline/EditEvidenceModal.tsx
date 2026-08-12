@@ -150,7 +150,11 @@ export default function EditEvidenceModal({
   }
 
   return (
-    <ModalFrame size="sm">
+    <ModalFrame
+      size="sm"
+      paddingClassName="p-0 md:p-4"
+      panelClassName="bg-white w-full h-full max-h-[100dvh] overflow-hidden flex flex-col rounded-none border-0 shadow-none md:rounded-xl md:border md:border-gray-200 md:shadow-app-modal md:h-auto md:max-h-[90vh] md:max-w-md"
+    >
       <ModalHeader
         icon={Pencil}
         title="Edit evidence"

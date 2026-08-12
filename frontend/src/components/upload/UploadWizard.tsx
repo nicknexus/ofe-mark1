@@ -337,7 +337,20 @@ export default function UploadWizard({
  // Safety net for any teardown path that doesn't route through handleClose.
  useEffect(() => () => discardOrphanUploads(), [discardOrphanUploads])
 
- const hasModeChoice = (state.kind === 'claim' && !!onAdvancedClaim) || (state.kind === 'evidence' && !!onAdvancedEvidence)
+ // Phone: skip Simple/Advanced — always the guided wizard. Desktop unchanged.
+ const [isPhone, setIsPhone] = useState(
+   () => typeof window !== 'undefined' && window.innerWidth < 768,
+ )
+ useEffect(() => {
+   const onResize = () => setIsPhone(window.innerWidth < 768)
+   window.addEventListener('resize', onResize)
+   return () => window.removeEventListener('resize', onResize)
+ }, [])
+
+ const hasModeChoice =
+   !isPhone &&
+   ((state.kind === 'claim' && !!onAdvancedClaim) ||
+     (state.kind === 'evidence' && !!onAdvancedEvidence))
 
   const steps: WizardStepId[] = useMemo(() => {
     // Edit mode: same steps as adding, minus the choices that are already

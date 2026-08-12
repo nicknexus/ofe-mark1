@@ -85,17 +85,16 @@ export default function MobileLocationsTab({ initiativeId, autoAdd }: MobileLoca
  }
 
  return (
- <div className="p-4">
- {/* Header */}
- <div className="flex items-center justify-between mb-4">
+ <div className="px-4 pt-5 pb-2">
+ <div className="flex items-center justify-between mb-5">
  <div>
- <h1 className="text-xl font-bold text-gray-900">Locations</h1>
- <p className="text-sm text-gray-500">{locations.length} location{locations.length !== 1 ? 's' : ''}</p>
+ <h1 className="text-xl font-bold tracking-tight text-gray-900">Locations</h1>
+ <p className="text-sm text-gray-500 mt-0.5">{locations.length} location{locations.length !== 1 ? 's' : ''}</p>
  </div>
  {canEditLocations && (
  <button
  onClick={() => setShowAddFlow(true)}
- className="app-btn app-btn-primary app-btn-sm active:scale-[0.98]"
+ className="app-btn app-btn-primary app-btn-sm shadow-card"
  >
  <Plus className="w-4 h-4" />
  Add
@@ -121,34 +120,34 @@ export default function MobileLocationsTab({ initiativeId, autoAdd }: MobileLoca
  }
  />
  ) : (
- <div className="space-y-3">
+ <div className="space-y-2.5">
  {locations.map((location) => (
  <div
  key={location.id}
- className="app-card overflow-hidden relative"
+ className="rounded-2xl border border-gray-200/70 bg-white shadow-card overflow-hidden relative"
  >
  <div className="p-4 flex items-start gap-3">
- <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center flex-shrink-0">
- <MapPin className="w-5 h-5 text-primary-500" />
+ <div className="w-10 h-10 bg-white ring-1 ring-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
+ <MapPin className="w-5 h-5 text-primary-600" />
  </div>
  <div className="flex-1 min-w-0">
- <h3 className="font-semibold text-gray-800">{location.name}</h3>
+ <h3 className="text-sm font-semibold text-gray-900">{location.name}</h3>
  {location.description && (
  <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">
  {location.description}
  </p>
  )}
- <p className="text-xs text-gray-400 mt-1">
+ <p className="text-xs text-gray-400 mt-1 tabular-nums">
  {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
  </p>
  </div>
  {(canEditLocations || canDelete) && (
  <button
  onClick={() => setOpenMenuId(openMenuId === location.id ? null : location.id!)}
- className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors flex-shrink-0"
+ className="p-2 rounded-xl text-gray-300 active:bg-gray-50 active:text-gray-600 flex-shrink-0"
  aria-label="Options"
  >
- <Settings className="w-5 h-5" />
+ <Settings className="w-4 h-4" />
  </button>
  )}
  </div>

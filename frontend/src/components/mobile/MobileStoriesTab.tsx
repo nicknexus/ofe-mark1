@@ -80,17 +80,16 @@ export default function MobileStoriesTab({ initiativeId, autoAdd }: MobileStorie
  }
 
  return (
- <div className="p-4">
- {/* Header */}
- <div className="flex items-center justify-between mb-4">
+ <div className="px-4 pt-5 pb-2">
+ <div className="flex items-center justify-between mb-5">
  <div>
- <h1 className="text-xl font-bold text-gray-900">Stories</h1>
- <p className="text-sm text-gray-500">{stories.length} stor{stories.length !== 1 ? 'ies' : 'y'}</p>
+ <h1 className="text-xl font-bold tracking-tight text-gray-900">Stories</h1>
+ <p className="text-sm text-gray-500 mt-0.5">{stories.length} stor{stories.length !== 1 ? 'ies' : 'y'}</p>
  </div>
  {canAddStories && (
  <button
  onClick={() => setShowCreateFlow(true)}
- className="app-btn app-btn-primary app-btn-sm active:scale-[0.98]"
+ className="app-btn app-btn-primary app-btn-sm shadow-card"
  >
  <Plus className="w-4 h-4" />
  Add
@@ -131,7 +130,7 @@ export default function MobileStoriesTab({ initiativeId, autoAdd }: MobileStorie
  setSelectedStory(story)
  setIsDetailOpen(true)
  }}
- className="app-card-interactive overflow-hidden text-left active:scale-[0.98] transition-transform"
+ className="rounded-2xl border border-gray-200/70 bg-white shadow-card overflow-hidden text-left active:scale-[0.98] transition-transform"
  >
  {/* Media Preview */}
  <div className="aspect-square bg-gray-100 relative overflow-hidden">

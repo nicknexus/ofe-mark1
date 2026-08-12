@@ -85,10 +85,11 @@ export default function ClaimDetailModal({
  return (
  <ModalFrame
  size="md"
- panelClassName="bg-white rounded-xl border-2 border-claim-300 w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-app-modal flex flex-col"
+ paddingClassName="p-0 md:p-4"
+ panelClassName="bg-white w-full h-full max-h-[100dvh] overflow-hidden flex flex-col rounded-none border-0 shadow-none md:rounded-xl md:border-2 md:border-claim-300 md:shadow-app-modal md:h-auto md:max-h-[90vh] md:max-w-2xl"
  >
  {/* Claim-branded header */}
- <div className="flex-shrink-0 px-4 py-3 bg-gradient-to-r from-claim-50 via-claim-50 to-claim-100/90 border-b border-claim-200">
+ <div className="flex-shrink-0 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] bg-gradient-to-r from-claim-50 via-claim-50 to-claim-100/90 border-b border-claim-200">
  <div className="flex items-start justify-between gap-3">
  <div className="min-w-0 flex-1">
  <p className="text-[11px] font-semibold uppercase tracking-wider text-claim-700 mb-1.5">
@@ -215,11 +216,12 @@ export default function ClaimDetailModal({
  </div>
  </ModalBody>
  {(onEdit || onAddEvidence || onConnectExisting || onDelete) && (
- <ModalFooter>
+ <ModalFooter className="flex-wrap gap-2 justify-start sm:justify-end safe-area-pb">
  {onEdit && (
  <button onClick={onEdit} className="app-btn app-btn-ghost app-btn-sm">
  <Pencil className="w-4 h-4" />
- Edit claim
+ <span className="sm:hidden">Edit</span>
+ <span className="hidden sm:inline">Edit claim</span>
  </button>
  )}
  {onDelete && (
@@ -228,11 +230,12 @@ export default function ClaimDetailModal({
  Delete
  </button>
  )}
- <div className="flex-1" />
+ <div className="hidden sm:block flex-1" />
  {onConnectExisting && (
  <button onClick={onConnectExisting} className="app-btn app-btn-secondary app-btn-sm">
  <Link2 className="w-4 h-4" />
- Connect existing evidence
+ <span className="sm:hidden">Connect</span>
+ <span className="hidden sm:inline">Connect existing evidence</span>
  </button>
  )}
  {onAddEvidence && (

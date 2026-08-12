@@ -112,10 +112,11 @@ export default function EvidenceDetailModal({
  return (
  <ModalFrame
  size="md"
- panelClassName="bg-white rounded-xl border-2 border-primary-300 w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-app-modal flex flex-col"
+ paddingClassName="p-0 md:p-4"
+ panelClassName="bg-white w-full h-full max-h-[100dvh] overflow-hidden flex flex-col rounded-none border-0 shadow-none md:rounded-xl md:border-2 md:border-primary-300 md:shadow-app-modal md:h-auto md:max-h-[90vh] md:max-w-2xl"
  >
  {/* Evidence-branded header */}
- <div className="flex-shrink-0 px-4 py-3 bg-gradient-to-r from-primary-50 via-primary-50 to-primary-100/90 border-b border-primary-200">
+ <div className="flex-shrink-0 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] bg-gradient-to-r from-primary-50 via-primary-50 to-primary-100/90 border-b border-primary-200">
  <div className="flex items-start justify-between gap-3">
  <div className="min-w-0 flex-1">
  <p className="text-[11px] font-semibold uppercase tracking-wider text-primary-800 mb-1.5">
@@ -292,16 +293,17 @@ export default function EvidenceDetailModal({
  </div>
  </ModalBody>
  {(onEdit || onDelete || (canReview && onSetApproval)) && (
- <ModalFooter>
+ <ModalFooter className="flex-wrap gap-2 justify-start sm:justify-end safe-area-pb">
  {isPending && canReview && onSetApproval ? (
  <>
  {onDelete && (
  <button onClick={onDelete} className="app-btn app-btn-ghost app-btn-sm text-red-600 hover:bg-red-50">
  <Trash2 className="w-4 h-4" />
- Reject &amp; delete
+ <span className="sm:hidden">Reject</span>
+ <span className="hidden sm:inline">Reject &amp; delete</span>
  </button>
  )}
- <div className="flex-1" />
+ <div className="hidden sm:block flex-1" />
  {onEdit && (
  <button onClick={onEdit} className="app-btn app-btn-secondary app-btn-sm">
  <Edit className="w-4 h-4" />
@@ -328,10 +330,11 @@ export default function EvidenceDetailModal({
  title="Send back to the approval queue — disconnects it and removes it from all totals until re-approved"
  >
  <Clock className="w-4 h-4" />
- Mark as pending
+ <span className="sm:hidden">Pending</span>
+ <span className="hidden sm:inline">Mark as pending</span>
  </button>
  )}
- <div className="flex-1" />
+ <div className="hidden sm:block flex-1" />
  {onEdit && (
  <button onClick={onEdit} className="app-btn app-btn-secondary app-btn-sm">
  <Edit className="w-4 h-4" />

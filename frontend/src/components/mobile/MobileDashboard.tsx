@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, ChevronRight, Edit, Trash2, X, Zap, ArrowRight, Users, Settings, Lock } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Plus, ChevronRight, Edit, Trash2, Users, Settings, Lock, Sparkles } from 'lucide-react'
 import { Initiative, CreateInitiativeForm } from '../../types'
 import { apiService } from '../../services/api'
 import { SubscriptionService } from '../../services/subscription'
@@ -9,6 +10,7 @@ import CreateInitiativeModal from '../CreateInitiativeModal'
 import UpgradeModal from '../UpgradeModal'
 import { notify } from '../../lib/notify'
 import { EmptyState, SectionLoader } from '../ui'
+import { fadeUp, staggerContainer, tapScaleSoft } from './motion'
 
 interface MobileDashboardProps {
  initiatives: Initiative[]
@@ -25,7 +27,8 @@ export default function MobileDashboard({
  loading,
  onNavigateToAccount
 }: MobileDashboardProps) {
- const { isSharedMember, organizationName, canCreateInitiatives, canEditInitiatives, canDelete } = useTeam()
+ const { isSharedMember, organizationName, canCreateInitiatives, canEditInitiatives, canDelete, activeOrganization } = useTeam()
+ const orgLogoUrl = activeOrganization?.logo_url
  const [showCreateModal, setShowCreateModal] = useState(false)
  const [showEditModal, setShowEditModal] = useState(false)
  const [editingInitiative, setEditingInitiative] = useState<Initiative | null>(null)
@@ -117,25 +120,27 @@ export default function MobileDashboard({
  }
 
  return (
- <div className="p-4">
- {/* Team Member Banner */}
+ <div className="px-4 pt-5 pb-2">
  {isSharedMember && (
- <div className="mb-4 p-3 bg-purple-50 border border-purple-100 rounded-xl flex items-center gap-3">
- <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
- <Users className="w-4 h-4 text-purple-600" />
+ <div className="mb-4 p-3 bg-evidence-50 border border-evidence-100 rounded-2xl flex items-center gap-3">
+ <div className="w-9 h-9 bg-evidence-100 rounded-xl flex items-center justify-center flex-shrink-0">
+ <Users className="w-4 h-4 text-evidence-700" />
  </div>
  <div className="min-w-0">
- <p className="text-sm font-medium text-purple-800 truncate">
+ <p className="text-sm font-semibold text-evidence-800 truncate">
  Viewing {organizationName}'s initiatives
  </p>
- <p className="text-xs text-purple-600">Team member</p>
+ <p className="text-xs text-evidence-600">Team member</p>
  </div>
  </div>
  )}
 
- {/* Header */}
- <div className="mb-6">
- <h1 className="text-2xl font-bold text-gray-900">
+ <div className="mb-5">
+ <div className="flex items-center gap-2 mb-1">
+ <Sparkles className="w-4 h-4 text-primary-600" />
+ <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Workspace</p>
+ </div>
+ <h1 className="text-2xl font-bold tracking-tight text-gray-900">
  {isSharedMember ? 'Initiatives' : 'Your Initiatives'}
  </h1>
  <p className="text-sm text-gray-500 mt-1">
@@ -143,21 +148,21 @@ export default function MobileDashboard({
  </p>
  </div>
 
- {/* Create Button */}
  {canCreateInitiatives && (
- <button
+ <motion.button
+ type="button"
  onClick={() => setShowCreateModal(true)}
- className="app-btn app-btn-primary app-btn-lg w-full mb-6 py-4 text-base active:scale-[0.98]"
+ whileTap={tapScaleSoft}
+ className="app-btn app-btn-primary app-btn-lg w-full mb-5 py-3.5 text-base shadow-card"
  >
  <Plus className="w-5 h-5" />
  {initiatives.length === 0 ? 'Create Your First Initiative' : 'New Initiative'}
- </button>
+ </motion.button>
  )}
 
- {/* Initiatives List */}
  {initiatives.length === 0 ? (
  <EmptyState
- className="app-card"
+ className="rounded-2xl border border-gray-200/70 bg-white shadow-card"
  title={isSharedMember ? 'No Initiatives Yet' : 'Welcome to Nexus Impacts AI'}
  description={
  isSharedMember
@@ -166,56 +171,72 @@ export default function MobileDashboard({
  }
  />
  ) : (
- <div className="space-y-3">
+ <motion.div
+ className="space-y-2.5"
+ variants={staggerContainer}
+ initial="hidden"
+ animate="visible"
+ >
  {initiatives.map((initiative) => {
  const locked = !!initiative.id && lockedIds.has(initiative.id)
+ const showMenu = !locked && (canEditInitiatives || canDelete)
  return (
- <div
+ <motion.div
  key={initiative.id}
- className={`app-card border-2 overflow-hidden transition-all relative ${locked ? 'border-gray-100 opacity-80' : 'border-gray-100 active:border-primary-300'}`}
+ variants={fadeUp}
+ className={`flex items-stretch bg-white rounded-2xl border shadow-card ${
+ locked
+ ? 'border-gray-200/70 opacity-90'
+ : 'border-gray-200/70'
+ }`}
  >
- <div className="p-4 flex items-center gap-3">
- {/* Tappable area to enter initiative (locked → upgrade) */}
- <button
+ <motion.button
+ type="button"
+ whileTap={tapScaleSoft}
  onClick={() => locked ? setShowUpgradeModal(true) : onEnterInitiative(initiative)}
- className="flex-1 flex items-center gap-3 min-w-0 text-left active:bg-gray-50 -m-2 p-2 rounded-xl"
+ className="flex-1 min-w-0 text-left p-4 flex items-center gap-3"
  >
- <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${locked ? 'bg-amber-50' : 'bg-primary-100'}`}>
- {locked
- ? <Lock className="w-4 h-4 text-amber-500" />
- : <img src="/Nexuslogo.png" alt="" className="w-5 h-5 object-contain" />}
+ {locked ? (
+ <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ring-1 bg-amber-50 text-amber-600 ring-amber-100">
+ <Lock className="w-4 h-4" />
  </div>
- <div className="flex-1 min-w-0">
- <h3 className={`font-semibold truncate ${locked ? 'text-gray-500' : 'text-gray-800'}`}>
+ ) : (
+ <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-white ring-1 ring-gray-100 overflow-hidden">
+ <img
+ src={orgLogoUrl || '/Nexuslogo.png'}
+ alt=""
+ className="w-full h-full object-contain"
+ onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/Nexuslogo.png' }}
+ />
+ </div>
+ )}
+ <h3
+ className={`flex-1 min-w-0 text-sm font-semibold leading-snug line-clamp-2 ${
+ locked ? 'text-gray-500' : 'text-gray-900'
+ }`}
+ title={initiative.title}
+ >
  {initiative.title}
  </h3>
- <p className="text-xs text-gray-500 truncate mt-0.5">
- {locked ? 'Locked — upgrade to unlock' : initiative.description}
- </p>
- </div>
  {locked
  ? <Lock className="w-4 h-4 text-amber-500 flex-shrink-0" />
- : <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />}
- </button>
+ : <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />}
+ </motion.button>
 
- {/* Settings menu */}
- {(canEditInitiatives || canDelete) && (
+ {showMenu && (
  <button
- onClick={(e) => {
- e.stopPropagation()
- setOpenMenuId(openMenuId === initiative.id ? null : initiative.id!)
- }}
- className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors flex-shrink-0"
+ type="button"
+ onClick={() => setOpenMenuId(openMenuId === initiative.id ? null : initiative.id!)}
+ className="px-3 flex items-center text-gray-300 active:bg-gray-50 active:text-gray-600 rounded-r-2xl"
  aria-label="Options"
  >
- <Settings className="w-5 h-5" />
+ <Settings className="w-4 h-4" />
  </button>
  )}
- </div>
- </div>
+ </motion.div>
  )
  })}
- </div>
+ </motion.div>
  )}
 
  {/* Settings popup - compact centered bubble */}

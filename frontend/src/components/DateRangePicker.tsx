@@ -466,16 +466,16 @@ const DateRangePicker = forwardRef<DateRangePickerHandle, DateRangePickerProps>(
           ref={buttonRef}
           type="button"
           onClick={handleToggle}
-          className={`inline-flex items-center gap-2 h-9 pl-3 pr-2.5 rounded-full border text-sm font-medium transition-colors focus:outline-none ${hasValue
+          className={`inline-flex items-center gap-1.5 md:gap-2 h-7 md:h-9 pl-2 md:pl-3 pr-2 md:pr-2.5 rounded-full border text-xs md:text-sm font-medium transition-colors focus:outline-none ${hasValue
             ? 'border-primary-300 bg-primary-50 text-primary-800 hover:bg-primary-100'
             : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
             } ${className}`}
         >
-          <Calendar className={`w-4 h-4 flex-shrink-0 ${hasValue ? 'text-primary-600' : 'text-gray-400'}`} />
+          <Calendar className={`w-3.5 h-3.5 md:w-4 md:h-4 flex-shrink-0 ${hasValue ? 'text-primary-600' : 'text-gray-400'}`} />
           <span className={hasValue ? '' : 'text-gray-500'}>{getDisplayText()}</span>
           {hasValue && (
             <X
-              className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600 ml-0.5"
+              className="w-3 h-3 md:w-3.5 md:h-3.5 text-gray-400 hover:text-gray-600 ml-0.5"
               onClick={(e) => {
                 e.stopPropagation()
                 handleClear()

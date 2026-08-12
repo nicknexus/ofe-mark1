@@ -9,6 +9,8 @@ interface MobileOverviewProps {
  /** Switch to the Timeline tab filtered to this metric (mobile has no URL tabs). */
  onOpenTimelineForMetric: (kpiId: string) => void
  onAddKPI?: () => void
+ /** Bump to reload KPIs after add / attach. */
+ refreshKey?: number
 }
 
 /**
@@ -16,7 +18,7 @@ interface MobileOverviewProps {
  * KPIs and all claims (same batch endpoint InitiativePage uses), computes
  * totals, and renders the same MetricsOverview the desktop tab uses.
  */
-export default function MobileOverview({ initiativeId, onOpenTimelineForMetric, onAddKPI }: MobileOverviewProps) {
+export default function MobileOverview({ initiativeId, onOpenTimelineForMetric, onAddKPI, refreshKey = 0 }: MobileOverviewProps) {
  const [kpis, setKpis] = useState<any[]>([])
  const [kpiTotals, setKpiTotals] = useState<Record<string, number>>({})
  const [kpiUpdates, setKpiUpdates] = useState<any[]>([])
@@ -24,6 +26,7 @@ export default function MobileOverview({ initiativeId, onOpenTimelineForMetric, 
 
  useEffect(() => {
  let cancelled = false
+ setLoading(true)
  Promise.all([
  apiService.getInitiativeDashboard(initiativeId),
  apiService.getKPIUpdatesForInitiative(initiativeId),
@@ -48,7 +51,7 @@ export default function MobileOverview({ initiativeId, onOpenTimelineForMetric, 
  if (!cancelled) setLoading(false)
  })
  return () => { cancelled = true }
- }, [initiativeId])
+ }, [initiativeId, refreshKey])
 
  if (loading) {
  return <SectionLoader className="h-64" />

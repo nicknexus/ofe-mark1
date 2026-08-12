@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import {
  User as UserIcon,
  Mail,
@@ -19,6 +20,7 @@ import {
  AlertTriangle,
  Copy
 } from 'lucide-react'
+import { tapScaleSoft } from './motion'
 import { AuthService } from '../../services/auth'
 import { formatDate } from '../../utils'
 import { apiService } from '../../services/api'
@@ -306,11 +308,11 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
  }
 
  const ViewHeader = ({ title, onBack }: { title: string; onBack: () => void }) => (
- <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3">
- <button onClick={onBack} className="p-1 -ml-1 text-gray-500">
+ <div className="sticky top-0 z-10 bg-white border-b border-gray-100/80 px-4 py-3 flex items-center gap-3">
+ <motion.button type="button" onClick={onBack} whileTap={tapScaleSoft} className="p-1.5 -ml-1 rounded-xl text-gray-500 active:bg-gray-50">
  <ChevronRight className="w-5 h-5 rotate-180" />
- </button>
- <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+ </motion.button>
+ <h2 className="text-lg font-semibold tracking-tight text-gray-900">{title}</h2>
  </div>
  )
 
@@ -318,11 +320,13 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
  icon: any; label: string; subtitle?: string; onClick: () => void; badge?: string; danger?: boolean
  iconBg?: string; iconColor?: string
  }) => (
- <button
+ <motion.button
+ type="button"
  onClick={onClick}
- className="w-full flex items-center gap-3.5 px-4 py-3.5 active:bg-gray-50 transition-colors"
+ whileTap={tapScaleSoft}
+ className="w-full flex items-center gap-3.5 px-4 py-3.5 active:bg-gray-50/80 transition-colors"
  >
- <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg || (danger ? 'bg-red-50' : 'bg-gray-100')}`}>
+ <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ring-1 ring-black/[0.03] ${iconBg || (danger ? 'bg-red-50' : 'bg-gray-100')}`}>
  <Icon className={`w-[18px] h-[18px] ${iconColor || (danger ? 'text-red-500' : 'text-gray-600')}`} />
  </div>
  <div className="flex-1 text-left min-w-0">
@@ -330,17 +334,17 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
  {subtitle && <div className="text-xs text-gray-400 mt-0.5">{subtitle}</div>}
  </div>
  {badge && (
- <span className="text-xs font-medium bg-primary-50 text-primary-600 px-2 py-0.5 rounded-full">{badge}</span>
+ <span className="text-xs font-medium bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full">{badge}</span>
  )}
  <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
- </button>
+ </motion.button>
  )
 
  // ── Sub-views ──
 
  if (activeView === 'profile') {
  return (
- <div className="min-h-full app-canvas">
+ <div className="min-h-full bg-white">
  <ViewHeader title="Profile" onBack={() => setActiveView('menu')} />
  <div className="p-4 space-y-4">
  <div className="app-card p-4 space-y-4">
@@ -370,7 +374,7 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
 
  if (activeView === 'subscription') {
  return (
- <div className="min-h-full app-canvas">
+ <div className="min-h-full bg-white">
  <ViewHeader title="Subscription & Billing" onBack={() => setActiveView('menu')} />
  <div className="p-4 space-y-4">
  {subscriptionStatus && (
@@ -448,7 +452,7 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
 
  if (activeView === 'organization') {
  return (
- <div className="min-h-full app-canvas">
+ <div className="min-h-full bg-white">
  <ViewHeader title="Organization" onBack={() => setActiveView('menu')} />
  <div className="p-4 space-y-4">
  {/* Public Visibility */}
@@ -507,7 +511,7 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
  loadTeamData()
  }
  return (
- <div className="min-h-full app-canvas">
+ <div className="min-h-full bg-white">
  <TeamMemberEditModal
  target={editTarget}
  onClose={() => setEditTarget(null)}
@@ -614,7 +618,7 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
  if (activeView === 'branding') {
  const presetColors = ['#c0dfa1', '#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#14b8a6', '#ef4444', '#6366f1']
  return (
- <div className="min-h-full app-canvas">
+ <div className="min-h-full bg-white">
  <ViewHeader title="Branding" onBack={() => setActiveView('menu')} />
  <div className="p-4 space-y-4">
  {/* Logo */}
@@ -661,7 +665,7 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
 
  if (activeView === 'storage') {
  return (
- <div className="min-h-full app-canvas">
+ <div className="min-h-full bg-white">
  <ViewHeader title="Storage" onBack={() => setActiveView('menu')} />
  <div className="p-4">
  <div className="app-card p-4">
@@ -700,7 +704,7 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
 
  if (activeView === 'danger') {
  return (
- <div className="min-h-full app-canvas">
+ <div className="min-h-full bg-white">
  <ViewHeader title="Delete Account" onBack={() => setActiveView('menu')} />
  <div className="p-4 space-y-4">
  <div className="bg-red-50 rounded-xl border border-red-200 p-4 space-y-3">
@@ -731,17 +735,16 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
  const subBadge = subStatus === 'trial' ? 'Trial' : subStatus === 'active' ? 'Active' : undefined
 
  return (
- <div className="min-h-full" style={{ backgroundColor: '#F9FAFB' }}>
- {/* Profile Header */}
- <div className="bg-white px-4 pt-6 pb-5 border-b border-gray-100">
+ <div className="min-h-full bg-white">
+ <div className="px-4 pt-6 pb-5">
  <div className="flex items-center gap-3.5">
- <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
+ <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20 ring-4 ring-primary-50">
  <span className="text-xl font-bold text-white">
  {(user.name || user.email).charAt(0).toUpperCase()}
  </span>
  </div>
  <div className="flex-1 min-w-0">
- <h1 className="text-lg font-bold text-gray-900 truncate">{user.name || 'User'}</h1>
+ <h1 className="text-lg font-bold tracking-tight text-gray-900 truncate">{user.name || 'User'}</h1>
  <p className="text-sm text-gray-500 truncate">{user.email}</p>
  {organizationName && (
  <p className="text-xs text-gray-400 truncate mt-0.5">{organizationName}</p>
@@ -750,46 +753,43 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
  </div>
  </div>
 
- {/* Menu Sections */}
- <div className="py-3 space-y-2">
- {/* General */}
- <div className="bg-white border-y border-gray-100">
- <MenuItem icon={UserIcon} label="Profile" subtitle="Name, email, organization" onClick={() => setActiveView('profile')} iconBg="bg-gray-100" iconColor="text-gray-600" />
+ <div className="px-4 pb-6 space-y-3">
+ <div className="rounded-2xl border border-gray-200/70 bg-white shadow-card overflow-hidden">
+ <MenuItem icon={UserIcon} label="Profile" subtitle="Name, email, organization" onClick={() => setActiveView('profile')} iconBg="bg-gray-50" iconColor="text-gray-600" />
  <div className="h-px bg-gray-100 mx-4" />
  <MenuItem icon={CreditCard} label="Subscription & Billing" subtitle={subBadge ? `Plan: ${subBadge}` : 'Manage your plan'} onClick={() => setActiveView('subscription')} badge={subBadge} iconBg="bg-impact-50" iconColor="text-impact-600" />
  </div>
 
- {/* Organization (owners only) */}
  {hasOwnOrganization && (
- <div className="bg-white border-y border-gray-100">
- <MenuItem icon={Building2} label="Organization" subtitle="Mission, website, visibility" onClick={() => setActiveView('organization')} iconBg="bg-evidence-50" iconColor="text-primary-700" />
+ <div className="rounded-2xl border border-gray-200/70 bg-white shadow-card overflow-hidden">
+ <MenuItem icon={Building2} label="Organization" subtitle="Mission, website, visibility" onClick={() => setActiveView('organization')} iconBg="bg-evidence-50" iconColor="text-evidence-700" />
  <div className="h-px bg-gray-100 mx-4" />
- <MenuItem icon={Palette} label="Branding" subtitle="Logo and brand color" onClick={() => setActiveView('branding')} iconBg="bg-pink-50" iconColor="text-pink-600" />
+ <MenuItem icon={Palette} label="Branding" subtitle="Logo and brand color" onClick={() => setActiveView('branding')} iconBg="bg-primary-50" iconColor="text-primary-700" />
  </div>
  )}
  {canManageTeam && (
- <div className="bg-white border-y border-gray-100">
- <MenuItem icon={Users} label="Team" subtitle="Invite and manage members" onClick={() => { setActiveView('teams'); loadTeamData() }} iconBg="bg-purple-50" iconColor="text-purple-600" />
+ <div className="rounded-2xl border border-gray-200/70 bg-white shadow-card overflow-hidden">
+ <MenuItem icon={Users} label="Team" subtitle="Invite and manage members" onClick={() => { setActiveView('teams'); loadTeamData() }} iconBg="bg-evidence-50" iconColor="text-evidence-700" />
  </div>
  )}
 
- {/* Data */}
- <div className="bg-white border-y border-gray-100">
+ <div className="rounded-2xl border border-gray-200/70 bg-white shadow-card overflow-hidden">
  <MenuItem icon={HardDrive} label="Storage" subtitle={storageUsage ? `${storageUsage.used_gb.toFixed(2)} GB of ${storageUsage.placeholder_max_gb} GB` : 'View usage'} onClick={() => setActiveView('storage')} iconBg="bg-evidence-50" iconColor="text-evidence-600" />
  </div>
 
- {/* Danger */}
- <div className="bg-white border-y border-gray-100">
+ <div className="rounded-2xl border border-gray-200/70 bg-white shadow-card overflow-hidden">
  <MenuItem icon={Trash2} label="Delete Account" onClick={() => setActiveView('danger')} danger />
  </div>
 
- {/* Sign Out */}
- <div className="px-4 pt-2">
- <button onClick={handleSignOut} className="app-btn app-btn-secondary w-full py-3.5">
+ <motion.button
+ type="button"
+ onClick={handleSignOut}
+ whileTap={tapScaleSoft}
+ className="app-btn app-btn-secondary w-full py-3.5 rounded-2xl"
+ >
  <LogOut className="w-4 h-4" />
  Sign Out
- </button>
- </div>
+ </motion.button>
  </div>
  </div>
  )

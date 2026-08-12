@@ -128,16 +128,16 @@ export default function MetricsOverview({
  {/* Header */}
  <div className="flex items-center justify-between gap-3">
  <div className="min-w-0">
- <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Overview</h2>
+ <h2 className="text-xl md:text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Metrics</h2>
  <p className="text-sm text-gray-500 mt-1 hidden sm:block">
  Your metrics and how they're trending
  </p>
  </div>
  <div className="flex items-center gap-2 flex-shrink-0">
  {onAddKPI && (
- <button onClick={onAddKPI} className="app-btn app-btn-primary app-btn-sm">
+ <button onClick={onAddKPI} className="app-btn app-btn-primary app-btn-sm shadow-card">
  <Plus className="w-4 h-4" />
- <span className="hidden sm:inline">Add metric</span>
+ Add metric
  </button>
  )}
  {user && (
