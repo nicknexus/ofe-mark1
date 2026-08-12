@@ -31,8 +31,17 @@ import {
 import PublicLoader from '../components/public/PublicLoader'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicTagFilter from '../components/public/PublicTagFilter'
-import PublicDonateButton from '../components/public/PublicDonateButton'
+import PublicHeaderActions from '../components/public/PublicHeaderActions'
 import DateRangePicker from '../components/DateRangePicker'
+import {
+    PublicMobileFilterButton,
+    PublicMobileFilterChecks,
+    PublicMobileFilterRadio,
+    PublicMobileFilterSection,
+    PublicMobileFilterSheet,
+    mobileDateSummary,
+    mobileMultiSummary,
+} from '../components/public/PublicMobileFilters'
 import {
     PublicPageBackground,
     PUBLIC_HEADER_CLASS,
@@ -208,12 +217,41 @@ export default function PublicInitiativePage() {
     }
 
     // Filter helpers
-    const hasActiveFilters = startDate || endDate || selectedLocationIds.length > 0 || selectedTagIds.length > 0
+    const hasActiveFilters = !!(startDate || endDate || selectedLocationIds.length > 0 || selectedTagIds.length > 0)
+    const activeFilterCount =
+        (startDate || endDate ? 1 : 0) +
+        (selectedLocationIds.length > 0 ? 1 : 0) +
+        (selectedTagIds.length > 0 ? 1 : 0)
 
     const clearFilters = () => {
         setDateFilter({})
         setSelectedLocationIds([])
         setSelectedTagIds([])
+    }
+
+    // Mobile filter sheet (draft → Apply)
+    const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+    const [draftDate, setDraftDate] = useState(dateFilter)
+    const [draftLocations, setDraftLocations] = useState<string[]>([])
+    const [draftTags, setDraftTags] = useState<string[]>([])
+    const [draftInitiativeSlug, setDraftInitiativeSlug] = useState('')
+
+    const openMobileFilters = () => {
+        setDraftDate(dateFilter)
+        setDraftLocations(selectedLocationIds)
+        setDraftTags(selectedTagIds)
+        setDraftInitiativeSlug(initiative?.slug || initiativeSlug || '')
+        setMobileFiltersOpen(true)
+    }
+
+    const applyMobileFilters = () => {
+        setDateFilter(draftDate)
+        setSelectedLocationIds(draftLocations)
+        setSelectedTagIds(draftTags)
+        setMobileFiltersOpen(false)
+        if (draftInitiativeSlug && draftInitiativeSlug !== initiativeSlug) {
+            navigate(`${orgLinkBase}/${orgSlug}/${draftInitiativeSlug}`)
+        }
     }
 
     const tagMatchesAny = (ids: string[] | undefined | null) => {
@@ -428,20 +466,23 @@ export default function PublicInitiativePage() {
                                 is identified by the switcher pill below + the main page
                                 content, so duplicating it here is just noise. */}
                             <h1 className="text-sm font-semibold text-foreground truncate max-w-[100px] md:max-w-[180px] hidden sm:block">{initiative.organization_name}</h1>
-                            <PublicDonateButton orgSlug={orgSlug} />
+                            <PublicHeaderActions
+                                orgSlug={orgSlug}
+                                shareTitle={initiative.title}
+                            />
                         </div>
 
-                        {/* Center: Filters — same modern pills as private Logs/Metrics */}
-                        <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0 overflow-x-auto scrollbar-none">
+                        {/* Center: Filters — desktop only */}
+                        <div className="hidden md:flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0 overflow-x-auto scrollbar-none">
                             <button
                                 ref={initiativeBtnRef}
                                 type="button"
                                 onClick={() => setShowInitiativeDropdown(!showInitiativeDropdown)}
                                 className={publicFilterPillClass(true)}
                             >
-                                <Target className="w-4 h-4 flex-shrink-0 text-primary-600" />
-                                <span className="truncate max-w-[140px]">{initiative.title}</span>
-                                <ChevronDown className={`w-3.5 h-3.5 -mr-0.5 text-primary-500 transition-transform ${showInitiativeDropdown ? 'rotate-180' : ''}`} />
+                                <Target className="w-3.5 h-3.5 md:w-4 md:h-4 flex-shrink-0 text-primary-600" />
+                                <span className="truncate max-w-[100px] md:max-w-[140px]">{initiative.title}</span>
+                                <ChevronDown className={`w-3 h-3 md:w-3.5 md:h-3.5 -mr-0.5 text-primary-500 transition-transform ${showInitiativeDropdown ? 'rotate-180' : ''}`} />
                             </button>
 
                             <div className="flex-shrink-0">
@@ -490,16 +531,94 @@ export default function PublicInitiativePage() {
                             )}
                         </div>
 
-                        {/* Right: Nexus Logo */}
-                        <Link to="/" className="hidden sm:flex items-center gap-2 flex-shrink-0">
-                            <div className="w-6 h-6 rounded-lg overflow-hidden">
-                                <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
-                            </div>
-                            <span className="text-sm font-newsreader font-extralight text-foreground hidden lg:block">Nexus Impacts</span>
-                        </Link>
+                        <div className="flex-1 md:hidden" />
+
+                        {/* Right: mobile filter icon + desktop Nexus mark */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <PublicMobileFilterButton
+                                activeCount={activeFilterCount}
+                                onClick={openMobileFilters}
+                            />
+                            <Link to="/" className="hidden md:flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-lg overflow-hidden">
+                                    <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                                </div>
+                                <span className="text-sm font-newsreader font-extralight text-foreground hidden lg:block">Nexus Impacts</span>
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </header>
+
+            <PublicMobileFilterSheet
+                open={mobileFiltersOpen}
+                onClose={() => setMobileFiltersOpen(false)}
+                onApply={applyMobileFilters}
+                onClear={() => {
+                    setDraftDate({})
+                    setDraftLocations([])
+                    setDraftTags([])
+                }}
+            >
+                {allInitiatives.length > 1 && (
+                    <PublicMobileFilterSection
+                        title="Initiative"
+                        active={!!draftInitiativeSlug}
+                        summary={allInitiatives.find((i) => i.slug === draftInitiativeSlug)?.title}
+                    >
+                        <PublicMobileFilterRadio
+                            options={allInitiatives
+                                .filter((i): i is typeof i & { slug: string } => !!i.slug)
+                                .map((i) => ({ id: i.slug, name: i.title }))}
+                            selected={draftInitiativeSlug}
+                            onChange={(id) => setDraftInitiativeSlug(id === 'all' ? '' : id)}
+                        />
+                    </PublicMobileFilterSection>
+                )}
+                <PublicMobileFilterSection
+                    title="Date"
+                    active={!!mobileDateSummary(draftDate)}
+                    summary={mobileDateSummary(draftDate)}
+                >
+                    <DateRangePicker
+                        value={draftDate}
+                        onChange={setDraftDate}
+                        maxDate={getLocalDateString(new Date())}
+                        placeholder="Date"
+                        variant="inline"
+                        compact
+                    />
+                </PublicMobileFilterSection>
+                {availableLocations.length > 0 && (
+                    <PublicMobileFilterSection
+                        title="Location"
+                        active={draftLocations.length > 0}
+                        summary={mobileMultiSummary(draftLocations.length, 'location')}
+                    >
+                        <PublicMobileFilterChecks
+                            options={availableLocations.map((loc: any) => ({
+                                id: loc.id,
+                                name: loc.name,
+                            }))}
+                            selected={draftLocations}
+                            onChange={setDraftLocations}
+                        />
+                    </PublicMobileFilterSection>
+                )}
+                {initiativeTags.length > 0 && (
+                    <PublicMobileFilterSection
+                        title="Tags"
+                        active={draftTags.length > 0}
+                        summary={mobileMultiSummary(draftTags.length, 'tag')}
+                    >
+                        <PublicMobileFilterChecks
+                            options={initiativeTags.map((t) => ({ id: t.id, name: t.name }))}
+                            selected={draftTags}
+                            onChange={setDraftTags}
+                        />
+                    </PublicMobileFilterSection>
+                )}
+            </PublicMobileFilterSheet>
 
             {/* Initiative Dropdown Portal */}
             {showInitiativeDropdown && createPortal(

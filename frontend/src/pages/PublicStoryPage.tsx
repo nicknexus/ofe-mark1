@@ -8,8 +8,14 @@ import { publicApi, PublicStoryDetail, PublicStory, PublicMetricTag } from '../s
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
 import PublicTagChip from '../components/public/PublicTagChip'
-import PublicDonateButton from '../components/public/PublicDonateButton'
+import PublicHeaderActions from '../components/public/PublicHeaderActions'
 import DateRangePicker from '../components/DateRangePicker'
+import {
+    PublicMobileFilterButton,
+    PublicMobileFilterSection,
+    PublicMobileFilterSheet,
+    mobileDateSummary,
+} from '../components/public/PublicMobileFilters'
 import { PublicPageBackground, PUBLIC_HEADER_CLASS, PUBLIC_PANEL_STATIC_CLASS } from '../components/public/publicStyles'
 import { getLocalDateString, formatDate } from '../utils'
 
@@ -30,6 +36,8 @@ export default function PublicStoryPage() {
         if (s) return { singleDate: s }
         return {}
     })
+    const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+    const [draftDate, setDraftDate] = useState(dateFilter)
 
     const [story, setStory] = useState<PublicStoryDetail | null>(null)
     const [tags, setTags] = useState<PublicMetricTag[]>([])
@@ -132,23 +140,62 @@ export default function PublicStoryPage() {
                                 <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
                                 <span className="text-sm sm:text-base font-medium">Back</span>
                             </Link>
-                            <PublicDonateButton orgSlug={orgSlug} />
+                            <PublicHeaderActions
+                                orgSlug={orgSlug}
+                                shareTitle={story.title}
+                            />
                         </div>
-                        <DateRangePicker
-                            value={dateFilter}
-                            onChange={setDateFilter}
-                            maxDate={getLocalDateString(new Date())}
-                            placeholder="Date"
-                            variant="pill"
-                        />
-                        <Link to="/" className="flex items-center gap-2">
-                            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg overflow-hidden">
-                                <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
-                            </div>
-                        </Link>
+                        <div className="hidden md:block">
+                            <DateRangePicker
+                                value={dateFilter}
+                                onChange={setDateFilter}
+                                maxDate={getLocalDateString(new Date())}
+                                placeholder="Date"
+                                variant="pill"
+                            />
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <PublicMobileFilterButton
+                                activeCount={dateFilter.singleDate || dateFilter.startDate ? 1 : 0}
+                                onClick={() => {
+                                    setDraftDate(dateFilter)
+                                    setMobileFiltersOpen(true)
+                                }}
+                            />
+                            <Link to="/" className="hidden md:flex items-center gap-2">
+                                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg overflow-hidden">
+                                    <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                                </div>
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <PublicMobileFilterSheet
+                open={mobileFiltersOpen}
+                onClose={() => setMobileFiltersOpen(false)}
+                onApply={() => {
+                    setDateFilter(draftDate)
+                    setMobileFiltersOpen(false)
+                }}
+                onClear={() => setDraftDate({})}
+            >
+                <PublicMobileFilterSection
+                    title="Date"
+                    active={!!mobileDateSummary(draftDate)}
+                    summary={mobileDateSummary(draftDate)}
+                >
+                    <DateRangePicker
+                        value={draftDate}
+                        onChange={setDraftDate}
+                        maxDate={getLocalDateString(new Date())}
+                        placeholder="Date"
+                        variant="inline"
+                        compact
+                    />
+                </PublicMobileFilterSection>
+            </PublicMobileFilterSheet>
 
             {/* Main Content */}
             <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-8">

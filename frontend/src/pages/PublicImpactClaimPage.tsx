@@ -9,8 +9,14 @@ import { publicApi, PublicImpactClaimDetail, PublicMetricTag } from '../services
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
 import PublicTagChip from '../components/public/PublicTagChip'
-import PublicDonateButton from '../components/public/PublicDonateButton'
+import PublicHeaderActions from '../components/public/PublicHeaderActions'
 import DateRangePicker from '../components/DateRangePicker'
+import {
+    PublicMobileFilterButton,
+    PublicMobileFilterSection,
+    PublicMobileFilterSheet,
+    mobileDateSummary,
+} from '../components/public/PublicMobileFilters'
 import {
     PublicPageBackground,
 } from '../components/public/publicStyles'
@@ -35,6 +41,8 @@ export default function PublicImpactClaimPage() {
         if (s) return { singleDate: s }
         return {}
     })
+    const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+    const [draftDate, setDraftDate] = useState(dateFilter)
 
     const [claim, setClaim] = useState<PublicImpactClaimDetail | null>(null)
     const [tags, setTags] = useState<PublicMetricTag[]>([])
@@ -130,24 +138,63 @@ export default function PublicImpactClaimPage() {
                                     {from === 'org' ? `Back to ${claim.initiative.org_name || 'Organization'}` : `Back to ${claim.metric.title}`}
                                 </span>
                             </Link>
-                            <PublicDonateButton orgSlug={orgSlug} />
+                            <PublicHeaderActions
+                                orgSlug={orgSlug}
+                                shareTitle={claim.metric.title}
+                            />
                         </div>
-                        <DateRangePicker
-                            value={dateFilter}
-                            onChange={setDateFilter}
-                            maxDate={getLocalDateString(new Date())}
-                            placeholder="Date"
-                            variant="pill"
-                        />
-                        <Link to="/" className="flex items-center gap-2">
-                            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center overflow-hidden">
-                                <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
-                            </div>
-                            <span className="text-sm sm:text-base font-newsreader font-extralight text-gray-800 hidden sm:block">Nexus Impacts</span>
-                        </Link>
+                        <div className="hidden md:block">
+                            <DateRangePicker
+                                value={dateFilter}
+                                onChange={setDateFilter}
+                                maxDate={getLocalDateString(new Date())}
+                                placeholder="Date"
+                                variant="pill"
+                            />
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <PublicMobileFilterButton
+                                activeCount={dateFilter.singleDate || dateFilter.startDate ? 1 : 0}
+                                onClick={() => {
+                                    setDraftDate(dateFilter)
+                                    setMobileFiltersOpen(true)
+                                }}
+                            />
+                            <Link to="/" className="hidden md:flex items-center gap-2">
+                                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center overflow-hidden">
+                                    <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                                </div>
+                                <span className="text-sm sm:text-base font-newsreader font-extralight text-gray-800 hidden lg:block">Nexus Impacts</span>
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <PublicMobileFilterSheet
+                open={mobileFiltersOpen}
+                onClose={() => setMobileFiltersOpen(false)}
+                onApply={() => {
+                    setDateFilter(draftDate)
+                    setMobileFiltersOpen(false)
+                }}
+                onClear={() => setDraftDate({})}
+            >
+                <PublicMobileFilterSection
+                    title="Date"
+                    active={!!mobileDateSummary(draftDate)}
+                    summary={mobileDateSummary(draftDate)}
+                >
+                    <DateRangePicker
+                        value={draftDate}
+                        onChange={setDraftDate}
+                        maxDate={getLocalDateString(new Date())}
+                        placeholder="Date"
+                        variant="inline"
+                        compact
+                    />
+                </PublicMobileFilterSection>
+            </PublicMobileFilterSheet>
 
             <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
                 <div className="hidden sm:block">

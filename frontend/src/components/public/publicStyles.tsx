@@ -126,7 +126,8 @@ export function publicCountBadgeStyle(brandColor: string): React.CSSProperties {
  * Flat icon + primary fill when active (no brand outline ring).
  */
 export function publicFilterPillClass(active: boolean): string {
-    return `inline-flex items-center gap-2 h-9 px-3 rounded-full border text-sm font-medium transition-colors focus:outline-none flex-shrink-0 ${
+    // Match DateRangePicker `variant="pill"` sizing (compact on phone, full on md+).
+    return `inline-flex items-center gap-1.5 md:gap-2 h-7 md:h-9 px-2 md:px-3 rounded-full border text-xs md:text-sm font-medium transition-colors focus:outline-none flex-shrink-0 ${
         active
             ? 'border-primary-300 bg-primary-50 text-primary-800 hover:bg-primary-100'
             : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'

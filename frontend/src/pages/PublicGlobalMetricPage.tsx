@@ -1,14 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { BarChart3, ChevronRight, Layers, TrendingUp } from 'lucide-react'
+import { ArrowLeft, BarChart3, ChevronRight, Layers, TrendingUp } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
 import { useOrgLinkBase } from '../hooks/useOrgLinkBase'
 import { publicApi, PublicGlobalMetric } from '../services/publicApi'
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
+import PublicHeaderActions from '../components/public/PublicHeaderActions'
 import PublicLoader from '../components/public/PublicLoader'
 import {
     DEFAULT_PUBLIC_BRAND,
     PublicPageBackground,
+    PUBLIC_HEADER_CLASS,
     PUBLIC_PANEL_STATIC_CLASS,
     brandIconStyle,
 } from '../components/public/publicStyles'
@@ -97,6 +99,34 @@ export default function PublicGlobalMetricPage() {
     return (
         <div className="min-h-screen font-figtree relative animate-fadeIn">
             <PublicPageBackground brandColor={brandColor} />
+
+            <div className={`sticky top-0 ${PUBLIC_HEADER_CLASS}`}>
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2 sm:py-3">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                            <Link
+                                to={`${orgLinkBase}/${orgSlug}`}
+                                className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-gray-800 transition-colors flex-shrink-0"
+                            >
+                                <ArrowLeft className="w-4 h-4" />
+                                <span className="text-xs sm:text-sm font-medium truncate max-w-[160px] sm:max-w-none">
+                                    {metric.organization_name || 'Back'}
+                                </span>
+                            </Link>
+                            <PublicHeaderActions
+                                orgSlug={orgSlug}
+                                shareTitle={metric.title}
+                            />
+                        </div>
+                        <Link to="/" className="flex items-center gap-2 flex-shrink-0">
+                            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg overflow-hidden">
+                                <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                            </div>
+                        </Link>
+                    </div>
+                </div>
+            </div>
+
             <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
                 <PublicBreadcrumb
                     items={[{ label: metric.title }]}

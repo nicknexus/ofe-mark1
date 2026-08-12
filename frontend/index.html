@@ -12,7 +12,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Nexus Impacts" />
-    <meta name="theme-color" content="#c0dfa1" />
+    <!-- Status bar / camera cutout: match the white PWA chrome (not brand green) -->
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#ffffff" />
     <link rel="apple-touch-icon" href="/Nexuslogo.png" />
 
     <!-- Conditional manifest + install prompt capture (mobile only) -->

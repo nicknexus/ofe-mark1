@@ -12,9 +12,17 @@ import { publicApi, PublicMetricDetail, PublicMetricTag } from '../services/publ
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
 import PublicTagFilter from '../components/public/PublicTagFilter'
-import PublicDonateButton from '../components/public/PublicDonateButton'
+import PublicHeaderActions from '../components/public/PublicHeaderActions'
 import PublicTagChip from '../components/public/PublicTagChip'
 import DateRangePicker from '../components/DateRangePicker'
+import {
+    PublicMobileFilterButton,
+    PublicMobileFilterChecks,
+    PublicMobileFilterSection,
+    PublicMobileFilterSheet,
+    mobileDateSummary,
+    mobileMultiSummary,
+} from '../components/public/PublicMobileFilters'
 import {
     PublicPageBackground,
     PUBLIC_PANEL_STATIC_CLASS,
@@ -58,6 +66,35 @@ export default function PublicMetricPage() {
     // Evidence gallery state
     const [galleryIndex, setGalleryIndex] = useState<number | null>(null)
     const [currentFileIndex, setCurrentFileIndex] = useState(0)
+
+    // Mobile filter sheet (draft → Apply)
+    const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+    const [draftDate, setDraftDate] = useState(dateFilter)
+    const [draftLocations, setDraftLocations] = useState<string[]>([])
+    const [draftTags, setDraftTags] = useState<string[]>([])
+    const [draftBenGroups, setDraftBenGroups] = useState<string[]>([])
+
+    const activeFilterCount =
+        (filterStart || filterEnd ? 1 : 0) +
+        (selectedTagIds.length > 0 ? 1 : 0) +
+        (selectedLocationIds.length > 0 ? 1 : 0) +
+        (selectedBenGroupIds.length > 0 ? 1 : 0)
+
+    const openMobileFilters = () => {
+        setDraftDate(dateFilter)
+        setDraftLocations(selectedLocationIds)
+        setDraftTags(selectedTagIds)
+        setDraftBenGroups(selectedBenGroupIds)
+        setMobileFiltersOpen(true)
+    }
+
+    const applyMobileFilters = () => {
+        setDateFilter(draftDate)
+        setSelectedLocationIds(draftLocations)
+        setSelectedTagIds(draftTags)
+        setSelectedBenGroupIds(draftBenGroups)
+        setMobileFiltersOpen(false)
+    }
 
     useEffect(() => {
         const loadMetric = async () => {
@@ -317,9 +354,12 @@ export default function PublicMetricPage() {
                                 <ArrowLeft className="w-4 h-4" />
                                 <span className="text-xs sm:text-sm font-medium">Back</span>
                             </Link>
-                            <PublicDonateButton orgSlug={orgSlug} />
+                            <PublicHeaderActions
+                                orgSlug={orgSlug}
+                                shareTitle={metric.title}
+                            />
                         </div>
-                        <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0 justify-center overflow-x-auto scrollbar-none px-2">
+                        <div className="hidden md:flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0 justify-center overflow-x-auto scrollbar-none px-2">
                             <div className="flex-shrink-0">
                                 <DateRangePicker
                                     value={dateFilter}
@@ -374,15 +414,90 @@ export default function PublicMetricPage() {
                                 </button>
                             )}
                         </div>
-                        <Link to="/" className="flex items-center gap-2">
-                            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center overflow-hidden">
-                                <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
-                            </div>
-                            <span className="text-sm sm:text-base font-newsreader font-extralight text-gray-800 hidden sm:block">Nexus Impacts</span>
-                        </Link>
+
+                        <div className="flex-1 md:hidden" />
+
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <PublicMobileFilterButton
+                                activeCount={activeFilterCount}
+                                onClick={openMobileFilters}
+                            />
+                            <Link to="/" className="hidden md:flex items-center gap-2">
+                                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center overflow-hidden">
+                                    <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                                </div>
+                                <span className="text-sm sm:text-base font-newsreader font-extralight text-gray-800 hidden lg:block">Nexus Impacts</span>
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <PublicMobileFilterSheet
+                open={mobileFiltersOpen}
+                onClose={() => setMobileFiltersOpen(false)}
+                onApply={applyMobileFilters}
+                onClear={() => {
+                    setDraftDate({})
+                    setDraftLocations([])
+                    setDraftTags([])
+                    setDraftBenGroups([])
+                }}
+            >
+                <PublicMobileFilterSection
+                    title="Date"
+                    active={!!mobileDateSummary(draftDate)}
+                    summary={mobileDateSummary(draftDate)}
+                >
+                    <DateRangePicker
+                        value={draftDate}
+                        onChange={setDraftDate}
+                        maxDate={getLocalDateString(new Date())}
+                        placeholder="Date"
+                        variant="inline"
+                        compact
+                    />
+                </PublicMobileFilterSection>
+                {availableLocations.length > 0 && (
+                    <PublicMobileFilterSection
+                        title="Location"
+                        active={draftLocations.length > 0}
+                        summary={mobileMultiSummary(draftLocations.length, 'location')}
+                    >
+                        <PublicMobileFilterChecks
+                            options={availableLocations.map((l) => ({ id: l.id, name: l.name }))}
+                            selected={draftLocations}
+                            onChange={setDraftLocations}
+                        />
+                    </PublicMobileFilterSection>
+                )}
+                {metricTags.length > 0 && (
+                    <PublicMobileFilterSection
+                        title="Tags"
+                        active={draftTags.length > 0}
+                        summary={mobileMultiSummary(draftTags.length, 'tag')}
+                    >
+                        <PublicMobileFilterChecks
+                            options={metricTags.map((t) => ({ id: t.id, name: t.name }))}
+                            selected={draftTags}
+                            onChange={setDraftTags}
+                        />
+                    </PublicMobileFilterSection>
+                )}
+                {availableBenGroups.length > 0 && (
+                    <PublicMobileFilterSection
+                        title="Beneficiary"
+                        active={draftBenGroups.length > 0}
+                        summary={mobileMultiSummary(draftBenGroups.length, 'group')}
+                    >
+                        <PublicMobileFilterChecks
+                            options={availableBenGroups.map((g) => ({ id: g.id, name: g.name }))}
+                            selected={draftBenGroups}
+                            onChange={setDraftBenGroups}
+                        />
+                    </PublicMobileFilterSection>
+                )}
+            </PublicMobileFilterSheet>
 
             {/* Main Content */}
             <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">

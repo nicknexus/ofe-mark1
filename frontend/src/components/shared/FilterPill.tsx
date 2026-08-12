@@ -67,13 +67,13 @@ export default function FilterPill({
         ref={buttonRef}
         type="button"
         onClick={() => setOpenAnnounced(!open)}
-        className={`inline-flex items-center gap-2 h-9 px-3 rounded-full border text-sm font-medium transition-colors focus:outline-none ${active
+        className={`inline-flex items-center gap-1.5 md:gap-2 h-7 md:h-9 px-2 md:px-3 rounded-full border text-xs md:text-sm font-medium transition-colors focus:outline-none ${active
           ? 'border-primary-300 bg-primary-50 text-primary-800 hover:bg-primary-100'
           : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
           }`}
       >
-        <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-primary-600' : 'text-gray-400'}`} />
-        <span className="truncate max-w-[140px]">
+        <Icon className={`w-3.5 h-3.5 md:w-4 md:h-4 flex-shrink-0 ${active ? 'text-primary-600' : 'text-gray-400'}`} />
+        <span className="truncate max-w-[100px] md:max-w-[140px]">
           {selected.length === 0
             ? label
             : selected.length === 1
@@ -81,11 +81,11 @@ export default function FilterPill({
               : `${selected.length} ${displayPlural}`}
         </span>
         {active && selected.length > 1 && (
-          <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-primary-600 text-white text-[11px] font-semibold">
+          <span className="inline-flex items-center justify-center min-w-[16px] md:min-w-[18px] h-4 md:h-[18px] px-1 rounded-full bg-primary-600 text-white text-[10px] md:text-[11px] font-semibold">
             {selected.length}
           </span>
         )}
-        <ChevronDown className={`w-3.5 h-3.5 -mr-0.5 transition-transform ${active ? 'text-primary-500' : 'text-gray-400'} ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-3 h-3 md:w-3.5 md:h-3.5 -mr-0.5 transition-transform ${active ? 'text-primary-500' : 'text-gray-400'} ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {buttonRef.current && createPortal(

@@ -12,7 +12,14 @@ import { publicApi, PublicBeneficiaryGroupDetail, PublicMetricTag } from '../ser
 import PublicBreadcrumb from '../components/public/PublicBreadcrumb'
 import PublicLoader from '../components/public/PublicLoader'
 import PublicTagFilter from '../components/public/PublicTagFilter'
-import PublicDonateButton from '../components/public/PublicDonateButton'
+import {
+    PublicMobileFilterButton,
+    PublicMobileFilterChecks,
+    PublicMobileFilterSection,
+    PublicMobileFilterSheet,
+    mobileMultiSummary,
+} from '../components/public/PublicMobileFilters'
+import PublicHeaderActions from '../components/public/PublicHeaderActions'
 import {
     PublicPageBackground,
     PUBLIC_SECTION_CHIP_STYLE,
@@ -136,6 +143,9 @@ export default function PublicBeneficiaryGroupPage() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
+    const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+    const [draftTags, setDraftTags] = useState<string[]>([])
+
     useEffect(() => {
         if (!orgSlug || !initiativeSlug || !groupId) return
         setLoading(true)
@@ -165,6 +175,15 @@ export default function PublicBeneficiaryGroupPage() {
     }, [data])
 
     const groupTags = useMemo(() => tags.filter(t => groupTagIds.has(t.id)), [tags, groupTagIds])
+
+    const openMobileFilters = () => {
+        setDraftTags(selectedTagIds)
+        setMobileFiltersOpen(true)
+    }
+    const applyMobileFilters = () => {
+        setSelectedTagIds(draftTags)
+        setMobileFiltersOpen(false)
+    }
 
     const tagMatchSingle = (id?: string | null) => {
         if (selectedTagIds.length === 0) return true
@@ -254,22 +273,53 @@ export default function PublicBeneficiaryGroupPage() {
                                 <ArrowLeft className="w-4 h-4" />
                                 <span className="text-xs sm:text-sm font-medium">Back</span>
                             </Link>
-                            <PublicDonateButton orgSlug={orgSlug} />
+                            <PublicHeaderActions
+                                orgSlug={orgSlug}
+                                shareTitle={data.name}
+                            />
                         </div>
-                        <PublicTagFilter
-                            tags={groupTags}
-                            selectedTagIds={selectedTagIds}
-                            onChange={setSelectedTagIds}
-                        />
-                        <Link to="/" className="flex items-center gap-2">
-                            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center overflow-hidden">
-                                <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
-                            </div>
-                            <span className="text-sm sm:text-base font-newsreader font-extralight text-gray-800 hidden sm:block">Nexus Impacts</span>
-                        </Link>
+                        <div className="hidden md:block">
+                            <PublicTagFilter
+                                tags={groupTags}
+                                selectedTagIds={selectedTagIds}
+                                onChange={setSelectedTagIds}
+                            />
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <PublicMobileFilterButton
+                                activeCount={selectedTagIds.length > 0 ? 1 : 0}
+                                onClick={openMobileFilters}
+                            />
+                            <Link to="/" className="hidden md:flex items-center gap-2">
+                                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center overflow-hidden">
+                                    <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                                </div>
+                                <span className="text-sm sm:text-base font-newsreader font-extralight text-gray-800 hidden lg:block">Nexus Impacts</span>
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <PublicMobileFilterSheet
+                open={mobileFiltersOpen}
+                onClose={() => setMobileFiltersOpen(false)}
+                onApply={applyMobileFilters}
+                onClear={() => setDraftTags([])}
+            >
+                <PublicMobileFilterSection
+                    title="Tags"
+                    active={draftTags.length > 0}
+                    summary={mobileMultiSummary(draftTags.length, 'tag')}
+                >
+                    <PublicMobileFilterChecks
+                        options={groupTags.map((t) => ({ id: t.id, name: t.name }))}
+                        selected={draftTags}
+                        onChange={setDraftTags}
+                    />
+                </PublicMobileFilterSection>
+            </PublicMobileFilterSheet>
 
             {/* Main content */}
             <div className="relative z-10 flex-1 flex flex-col overflow-hidden px-4 sm:px-6 py-4 sm:py-5">

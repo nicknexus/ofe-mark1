@@ -10,7 +10,7 @@ import {
     PublicStatCard, PublicTheoryStage, PublicStrategy,
 } from '../services/publicApi'
 import PublicLoader from '../components/public/PublicLoader'
-import PublicDonateButton from '../components/public/PublicDonateButton'
+import PublicHeaderActions from '../components/public/PublicHeaderActions'
 import ContextDetailModal, { formatAddedDate } from '../components/public/ContextDetailModal'
 import {
     PublicPageBackground,
@@ -153,10 +153,11 @@ export default function PublicOrgContextPage() {
                         </div>
                         <span className="font-semibold text-sm text-gray-900 truncate max-w-[200px]">{organization.name}</span>
                     </div>
-                    <PublicDonateButton
+                    <PublicHeaderActions
                         donationUrl={organization.donation_url || null}
                         brandColor={organization.brand_color}
                         orgName={organization.name}
+                        shareTitle={`${organization.name} — Context`}
                     />
                     <div className="ml-auto">
                         <Link to="/" className="hidden sm:flex items-center gap-2 flex-shrink-0">

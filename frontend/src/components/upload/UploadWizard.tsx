@@ -308,7 +308,15 @@ export default function UploadWizard({
  const [submitting, setSubmitting] = useState(false)
  const stateRef = useRef(state)
  const scopeDatePickerRef = useRef<DateRangePickerHandle>(null)
+ const bodyScrollRef = useRef<HTMLDivElement>(null)
  stateRef.current = state
+
+ // Next/Back (and kind-card advance) always land at the top of the step body.
+ useEffect(() => {
+   const el = bodyScrollRef.current
+   if (!el) return
+   el.scrollTop = 0
+ }, [stepIndex])
 
  // Files upload to storage the moment they're picked, but the evidence row is
  // only written on Save. If the user bails out, delete those orphaned uploads
@@ -720,7 +728,7 @@ export default function UploadWizard({
  </div>
 
  {/* Body */}
- <div className="relative z-10 flex-1 min-h-0 overflow-y-auto">
+ <div ref={bodyScrollRef} className="relative z-10 flex-1 min-h-0 overflow-y-auto">
  <div className={`${wideStep ? 'w-full px-4 sm:px-6 lg:px-10 py-4 md:py-5' : 'max-w-3xl mx-auto px-5 md:px-8 py-8'}`}>
  <AnimatePresence mode="wait">
  <motion.div

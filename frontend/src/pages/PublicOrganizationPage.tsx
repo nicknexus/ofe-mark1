@@ -12,7 +12,7 @@ import {
     Target,
     X,
 } from 'lucide-react'
-import PublicDonateButton from '../components/public/PublicDonateButton'
+import PublicHeaderActions from '../components/public/PublicHeaderActions'
 import FilterPill from '../components/shared/FilterPill'
 import {
     publicApi,
@@ -29,6 +29,15 @@ import {
 import PublicLoader from '../components/public/PublicLoader'
 import PublicTagFilter from '../components/public/PublicTagFilter'
 import DateRangePicker from '../components/DateRangePicker'
+import {
+    PublicMobileFilterButton,
+    PublicMobileFilterChecks,
+    PublicMobileFilterRadio,
+    PublicMobileFilterSection,
+    PublicMobileFilterSheet,
+    mobileDateSummary,
+    mobileMultiSummary,
+} from '../components/public/PublicMobileFilters'
 import { PublicPageBackground, PUBLIC_HEADER_CLASS, PUBLIC_PANEL_STATIC_CLASS, publicFilterPillClass } from '../components/public/publicStyles'
 import { compareClaimsByEffectiveDateDesc } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
@@ -81,6 +90,14 @@ export default function PublicOrganizationPage() {
     const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
     const initiativeBtnRef = useRef<HTMLButtonElement>(null)
     const keyMetricsScrollRef = useRef<HTMLDivElement>(null)
+
+    // Mobile filter sheet drafts
+    const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+    const [draftInitiative, setDraftInitiative] = useState<string>('all')
+    const [draftStartDate, setDraftStartDate] = useState('')
+    const [draftEndDate, setDraftEndDate] = useState('')
+    const [draftLocations, setDraftLocations] = useState<string[]>([])
+    const [draftTags, setDraftTags] = useState<string[]>([])
 
     // Location popups state. `rightAnchored` flips CSS to use `right` instead of
     // `left`, so popups in the right band hug the right edge cleanly without
@@ -498,6 +515,11 @@ export default function PublicOrganizationPage() {
     }
 
     const hasActiveFilters = selectedInitiative !== 'all' || startDate || endDate || selectedLocationIds.length > 0 || selectedTagIds.length > 0
+    const activeFilterCount =
+        (selectedInitiative !== 'all' ? 1 : 0) +
+        (startDate || endDate ? 1 : 0) +
+        (selectedLocationIds.length > 0 ? 1 : 0) +
+        (selectedTagIds.length > 0 ? 1 : 0)
     const clearFilters = () => {
         setSelectedInitiative('all')
         setStartDate('')
@@ -505,6 +527,31 @@ export default function PublicOrganizationPage() {
         setSelectedLocationIds([])
         setSelectedTagIds([])
     }
+
+    const openMobileFilters = () => {
+        setDraftInitiative(selectedInitiative)
+        setDraftStartDate(startDate)
+        setDraftEndDate(endDate)
+        setDraftLocations(selectedLocationIds)
+        setDraftTags(selectedTagIds)
+        setMobileFiltersOpen(true)
+    }
+
+    const applyMobileFilters = () => {
+        setSelectedInitiative(draftInitiative)
+        setStartDate(draftStartDate)
+        setEndDate(draftEndDate)
+        setSelectedLocationIds(draftLocations)
+        setSelectedTagIds(draftTags)
+        setMobileFiltersOpen(false)
+    }
+
+    const draftDateValue = useMemo(() => {
+        if (draftStartDate && draftEndDate && draftStartDate === draftEndDate) return { singleDate: draftStartDate }
+        if (draftStartDate && draftEndDate) return { startDate: draftStartDate, endDate: draftEndDate }
+        if (draftStartDate) return { singleDate: draftStartDate }
+        return undefined
+    }, [draftStartDate, draftEndDate])
 
     // Current story for carousel
     const currentStory = filteredStories[storyIndex]
@@ -861,35 +908,35 @@ export default function PublicOrganizationPage() {
                                     <Building2 className="w-4 h-4 text-gray-400" />
                                 )}
                             </div>
-                            {/* Branded Donate button — only when org has set a donation_url */}
-                            <PublicDonateButton
+                            <PublicHeaderActions
                                 donationUrl={organization.donation_url || null}
                                 brandColor={brandColor}
                                 orgName={organization.name}
+                                shareTitle={organization.name}
                             />
                         </div>
 
-                        {/* Center: Filters — same modern pills as private Logs/Metrics */}
-                        <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto scrollbar-none">
+                        {/* Center: Filters — desktop only (hidden on phone / PWA) */}
+                        <div className="hidden md:flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto scrollbar-none">
                             <button
                                 ref={initiativeBtnRef}
                                 type="button"
                                 onClick={() => setShowInitiativeDropdown(!showInitiativeDropdown)}
                                 className={publicFilterPillClass(selectedInitiative !== 'all')}
                             >
-                                <Target className={`w-4 h-4 flex-shrink-0 ${selectedInitiative !== 'all' ? 'text-primary-600' : 'text-gray-400'}`} />
-                                <span className="truncate max-w-[140px]">
+                                <Target className={`w-3.5 h-3.5 md:w-4 md:h-4 flex-shrink-0 ${selectedInitiative !== 'all' ? 'text-primary-600' : 'text-gray-400'}`} />
+                                <span className="truncate max-w-[100px] md:max-w-[140px]">
                                     {selectedInitiative === 'all'
                                         ? 'Initiative'
                                         : initiatives.find(i => i.id === selectedInitiative)?.title || 'Select'}
                                 </span>
                                 {selectedInitiative !== 'all' ? (
                                     <X
-                                        className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600"
+                                        className="w-3 h-3 md:w-3.5 md:h-3.5 text-gray-400 hover:text-gray-600"
                                         onClick={(e) => { e.stopPropagation(); setSelectedInitiative('all') }}
                                     />
                                 ) : (
-                                    <ChevronDown className={`w-3.5 h-3.5 -mr-0.5 text-gray-400 transition-transform ${showInitiativeDropdown ? 'rotate-180' : ''}`} />
+                                    <ChevronDown className={`w-3 h-3 md:w-3.5 md:h-3.5 -mr-0.5 text-gray-400 transition-transform ${showInitiativeDropdown ? 'rotate-180' : ''}`} />
                                 )}
                             </button>
 
@@ -940,16 +987,113 @@ export default function PublicOrganizationPage() {
                             )}
                         </div>
 
-                        {/* Right: Nexus Logo */}
-                        <Link to="/" className="hidden sm:flex items-center gap-2 flex-shrink-0">
-                            <div className="w-7 h-7 rounded-lg overflow-hidden">
-                                <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
-                            </div>
-                            <span className="text-sm font-newsreader font-extralight text-foreground hidden lg:block">Nexus Impacts</span>
-                        </Link>
+                        <div className="flex-1 md:hidden" />
+
+                        {/* Right: mobile filter + desktop Nexus mark */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <PublicMobileFilterButton
+                                activeCount={activeFilterCount}
+                                onClick={openMobileFilters}
+                            />
+                            <Link to="/" className="hidden md:flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-lg overflow-hidden">
+                                    <img src="/Nexuslogo.png" alt="Nexus" className="w-full h-full object-contain" />
+                                </div>
+                                <span className="text-sm font-newsreader font-extralight text-foreground hidden lg:block">Nexus Impacts</span>
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </header>
+
+            <PublicMobileFilterSheet
+                open={mobileFiltersOpen}
+                onClose={() => setMobileFiltersOpen(false)}
+                onApply={applyMobileFilters}
+                onClear={() => {
+                    setDraftInitiative('all')
+                    setDraftStartDate('')
+                    setDraftEndDate('')
+                    setDraftLocations([])
+                    setDraftTags([])
+                }}
+            >
+                {initiatives.length > 0 && (
+                    <PublicMobileFilterSection
+                        title="Initiative"
+                        active={draftInitiative !== 'all'}
+                        summary={
+                            draftInitiative === 'all'
+                                ? undefined
+                                : initiatives.find((i) => i.id === draftInitiative)?.title
+                        }
+                    >
+                        <PublicMobileFilterRadio
+                            allLabel="All Initiatives"
+                            options={initiatives
+                                .filter((i): i is typeof i & { id: string } => !!i.id)
+                                .map((i) => ({ id: i.id, name: i.title }))}
+                            selected={draftInitiative}
+                            onChange={setDraftInitiative}
+                        />
+                    </PublicMobileFilterSection>
+                )}
+                <PublicMobileFilterSection
+                    title="Date"
+                    active={!!mobileDateSummary(draftDateValue)}
+                    summary={mobileDateSummary(draftDateValue)}
+                >
+                    <DateRangePicker
+                        value={draftDateValue}
+                        onChange={(value) => {
+                            if (value.singleDate) {
+                                setDraftStartDate(value.singleDate)
+                                setDraftEndDate(value.singleDate)
+                            } else if (value.startDate && value.endDate) {
+                                setDraftStartDate(value.startDate)
+                                setDraftEndDate(value.endDate)
+                            } else {
+                                setDraftStartDate('')
+                                setDraftEndDate('')
+                            }
+                        }}
+                        placeholder="Date"
+                        variant="inline"
+                        compact
+                    />
+                </PublicMobileFilterSection>
+                {dropdownLocations.length > 0 && (
+                    <PublicMobileFilterSection
+                        title="Location"
+                        active={draftLocations.length > 0}
+                        summary={mobileMultiSummary(draftLocations.length, 'location')}
+                    >
+                        <PublicMobileFilterChecks
+                            options={dropdownLocations
+                                .filter((loc): loc is typeof loc & { id: string } => !!loc.id)
+                                .map((loc) => ({
+                                    id: loc.id,
+                                    name: loc.country ? `${loc.name} · ${loc.country}` : loc.name,
+                                }))}
+                            selected={draftLocations}
+                            onChange={setDraftLocations}
+                        />
+                    </PublicMobileFilterSection>
+                )}
+                {tags.length > 0 && (
+                    <PublicMobileFilterSection
+                        title="Tags"
+                        active={draftTags.length > 0}
+                        summary={mobileMultiSummary(draftTags.length, 'tag')}
+                    >
+                        <PublicMobileFilterChecks
+                            options={tags.map((t) => ({ id: t.id, name: t.name }))}
+                            selected={draftTags}
+                            onChange={setDraftTags}
+                        />
+                    </PublicMobileFilterSection>
+                )}
+            </PublicMobileFilterSheet>
 
             {/* Initiative Dropdown Portal */}
             {showInitiativeDropdown && createPortal(

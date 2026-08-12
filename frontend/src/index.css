@@ -2079,6 +2079,7 @@ body.location-modal-open .leaflet-pane:not(.leaflet-map-in-modal .leaflet-pane) 
 @media all and (display-mode: standalone) {
     html {
         overscroll-behavior-y: none;
+        background: #ffffff;
     }
 
     body {
@@ -2086,6 +2087,7 @@ body.location-modal-open .leaflet-pane:not(.leaflet-map-in-modal .leaflet-pane) 
         padding-bottom: env(safe-area-inset-bottom);
         padding-left: env(safe-area-inset-left);
         padding-right: env(safe-area-inset-right);
+        background: #ffffff;
         -webkit-user-select: none;
         user-select: none;
     }
