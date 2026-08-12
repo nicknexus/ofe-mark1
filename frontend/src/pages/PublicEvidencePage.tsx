@@ -192,6 +192,7 @@ export default function PublicEvidencePage() {
                             <PublicHeaderActions
                                 orgSlug={orgSlug}
                                 shareTitle={evidence.title}
+                                shareUrl={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/evidence/${evidenceId}`}
                             />
                         </div>
                         <div className="hidden md:block">

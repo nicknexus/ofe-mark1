@@ -32,6 +32,7 @@ import {
     brandIconStyle,
     DEFAULT_PUBLIC_BRAND,
 } from '../publicStyles'
+import PublicShareButton from '../PublicShareButton'
 
 export function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById, onTagClick, selectedTagIds, brandColor: brandColorProp }: {
     evidence: PublicEvidence[] | null
@@ -455,29 +456,35 @@ export function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', ta
                     {/* Gallery Content */}
                     <div className="relative z-10 w-full h-full max-w-6xl mx-auto flex flex-col p-3 sm:p-6">
                         {/* Top bar */}
-                        <div className="flex items-center justify-between mb-3 sm:mb-4 flex-shrink-0">
-                            <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-between mb-3 sm:mb-4 flex-shrink-0 gap-2">
+                            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                                 <button
                                     onClick={closeGallery}
-                                    className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                                    className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
                                 >
                                     <ArrowLeft className="w-4 h-4" />
-                                    <span className="text-sm font-medium">Back to Evidence</span>
+                                    <span className="text-sm font-medium hidden sm:inline">Back to Evidence</span>
                                 </button>
-                                <div className="h-5 w-px bg-gray-200" />
-                                <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${typeConfig[galleryItem.type]?.bg || 'bg-gray-100 text-gray-600'}`}>
+                                <div className="h-5 w-px bg-gray-200 flex-shrink-0" />
+                                <span className={`px-2.5 py-1 text-xs font-medium rounded-full flex-shrink-0 ${typeConfig[galleryItem.type]?.bg || 'bg-gray-100 text-gray-600'}`}>
                                     {typeConfig[galleryItem.type]?.label || galleryItem.type}
                                 </span>
-                                <span className="text-muted-foreground text-sm">
+                                <span className="text-muted-foreground text-sm hidden sm:inline flex-shrink-0">
                                     {galleryIndex + 1} of {filteredEvidence.length}
                                 </span>
                             </div>
-                            <button
-                                onClick={closeGallery}
-                                className="w-9 h-9 rounded-full bg-white hover:bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors shadow-sm"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                                <PublicShareButton
+                                    title={galleryItem.title}
+                                    url={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/evidence/${galleryItem.id}`}
+                                />
+                                <button
+                                    onClick={closeGallery}
+                                    className="w-9 h-9 rounded-full bg-white hover:bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors shadow-sm"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Main area */}

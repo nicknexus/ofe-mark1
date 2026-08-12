@@ -1,7 +1,8 @@
 /**
  * Open Graph meta resolution for public /org and /demo URLs.
- * Used by Vercel edge middleware — keep deps-free (no React, no Vite imports).
+ * Used by Vercel edge middleware — keep deps-free (no React).
  */
+import { getVideoThumbnailUrl } from '../utils/videoEmbed'
 
 export type OgMeta = {
     title: string
@@ -259,18 +260,21 @@ export async function resolveOgMeta(
                 apiBase,
                 `/organizations/${encodeURIComponent(route.orgSlug)}`,
             )
+            // Photo → YouTube/Vimeo poster → org logo
             const photo =
                 story.media_type === 'photo' && story.media_url ? story.media_url : null
+            const videoThumb = getVideoThumbnailUrl(story.media_url)
+            const preview = photo || videoThumb
             const orgName = story.initiative?.org_name || orgData?.organization?.name
             return {
                 title: orgName ? `${story.title} | ${orgName}` : story.title,
                 description: cleanText(story.description) || DEFAULT_DESCRIPTION,
                 image: absoluteUrl(
-                    photo || orgData?.organization?.logo_url,
+                    preview || orgData?.organization?.logo_url,
                     siteOrigin,
                     '/Nexuslogo.png',
                 ),
-                card: photo ? 'summary_large_image' : 'summary',
+                card: preview ? 'summary_large_image' : 'summary',
             }
         }
 
@@ -294,16 +298,22 @@ export async function resolveOgMeta(
                 evidence.files?.find(f => isImageUrl(f.file_url) || (f.file_type || '').startsWith('image/'))
                     ?.file_url ||
                 (isImageUrl(evidence.file_url) ? evidence.file_url : null)
+            // YouTube/Vimeo embeds stored as file URLs — use their poster frames.
+            const videoThumb =
+                evidence.files?.map(f => getVideoThumbnailUrl(f.file_url)).find(Boolean) ||
+                getVideoThumbnailUrl(evidence.file_url) ||
+                null
+            const preview = imageFile || videoThumb
             const orgName = evidence.initiative?.org_name || orgData?.organization?.name
             return {
                 title: orgName ? `${evidence.title} | ${orgName}` : evidence.title,
                 description: cleanText(evidence.description) || DEFAULT_DESCRIPTION,
                 image: absoluteUrl(
-                    imageFile || orgData?.organization?.logo_url,
+                    preview || orgData?.organization?.logo_url,
                     siteOrigin,
                     '/Nexuslogo.png',
                 ),
-                card: imageFile ? 'summary_large_image' : 'summary',
+                card: preview ? 'summary_large_image' : 'summary',
             }
         }
 

@@ -10,6 +10,8 @@ interface PublicHeaderActionsProps {
     orgName?: string | null
     /** Caption for share intents; falls back to org name / document.title. */
     shareTitle?: string | null
+    /** Override shared URL (defaults to current page). */
+    shareUrl?: string | null
     className?: string
 }
 
@@ -23,6 +25,7 @@ export default function PublicHeaderActions({
     brandColor,
     orgName,
     shareTitle,
+    shareUrl,
     className = '',
 }: PublicHeaderActionsProps) {
     return (
@@ -33,7 +36,7 @@ export default function PublicHeaderActions({
                 brandColor={brandColor}
                 orgName={orgName}
             />
-            <PublicShareButton title={shareTitle || orgName} />
+            <PublicShareButton title={shareTitle || orgName} url={shareUrl} />
         </div>
     )
 }

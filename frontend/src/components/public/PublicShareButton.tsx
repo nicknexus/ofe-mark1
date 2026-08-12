@@ -8,6 +8,12 @@ import { dropdownPop } from '../timeline/motion'
 interface PublicShareButtonProps {
     /** Optional caption used in share intents (defaults to document.title). */
     title?: string | null
+    /**
+     * Absolute or path URL to share. Defaults to the current page.
+     * Use this for in-gallery / card shares that should point at a detail route
+     * while the browser is still on a list URL.
+     */
+    url?: string | null
     className?: string
 }
 
@@ -46,7 +52,14 @@ function measureDesktopPosition(button: HTMLElement) {
  * Desktop: anchored popover (position measured before paint — no flash).
  * Mobile: bottom sheet + native share when available.
  */
-export default function PublicShareButton({ title, className = '' }: PublicShareButtonProps) {
+function resolveShareUrl(url?: string | null): string {
+    if (typeof window === 'undefined') return url || ''
+    if (!url) return window.location.href
+    if (/^https?:\/\//i.test(url)) return url
+    return `${window.location.origin}${url.startsWith('/') ? url : `/${url}`}`
+}
+
+export default function PublicShareButton({ title, url, className = '' }: PublicShareButtonProps) {
     const [open, setOpen] = useState(false)
     const [isMobile, setIsMobile] = useState(false)
     const [copied, setCopied] = useState(false)
@@ -114,7 +127,7 @@ export default function PublicShareButton({ title, className = '' }: PublicShare
         else openMenu()
     }
 
-    const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
+    const shareUrl = resolveShareUrl(url)
     const shareTitle = title || (typeof document !== 'undefined' ? document.title : 'Nexus Impacts')
 
     const openIntent = (href: string) => {
