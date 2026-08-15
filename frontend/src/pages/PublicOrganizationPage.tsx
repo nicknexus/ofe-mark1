@@ -129,7 +129,7 @@ export default function PublicOrganizationPage() {
             const [inits, mets, stors, locs, evid, ctx, tgs] = await Promise.all([
                 publicApi.getOrganizationInitiatives(slug!),
                 publicApi.getOrganizationMetrics(slug!),
-                publicApi.getOrganizationStories(slug!, 20),
+                publicApi.getOrganizationStories(slug!), // unscoped — page filters client-side
                 publicApi.getOrganizationLocations(slug!),
                 publicApi.getOrganizationEvidence(slug!, 100),
                 publicApi.getOrganizationContext(slug!).catch(() => null),
