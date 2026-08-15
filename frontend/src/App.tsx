@@ -54,6 +54,16 @@ import ResetPasswordPage from './pages/ResetPasswordPage'
 import OfferCheckoutPage from './pages/OfferCheckoutPage'
 import EmbedPage from './pages/EmbedPage'
 import Layout from './components/Layout'
+import PublicScrollToTop from './components/public/PublicScrollToTop'
+
+function AppRouter({ children }: { children: React.ReactNode }) {
+ return (
+ <Router>
+ <PublicScrollToTop />
+ {children}
+ </Router>
+ )
+}
 
 // Hook to detect mobile
 function useIsMobile() {
@@ -236,12 +246,12 @@ function App() {
  // other branch so it loads instantly regardless of session state.
  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/embed/')) {
  return (
- <Router>
+ <AppRouter>
  <Routes>
  <Route path="/embed/:slug" element={<EmbedPage />} />
  <Route path="*" element={<EmbedPage />} />
  </Routes>
- </Router>
+ </AppRouter>
  )
  }
 
@@ -251,7 +261,7 @@ function App() {
 
  if (!user) {
  return (
- <Router>
+ <AppRouter>
  <Routes>
  {publicRoutes}
  <Route path="/invite/:token" element={<InviteAcceptPage />} />
@@ -260,7 +270,7 @@ function App() {
  } />
  </Routes>
  <AppToaster />
- </Router>
+ </AppRouter>
  )
  }
 
@@ -281,13 +291,13 @@ function App() {
  // Allow offer pages to bypass subscription gates in PWA mode
  if (window.location.pathname.startsWith('/offer/')) {
  return (
- <Router>
+ <AppRouter>
  <Routes>
  <Route path="/offer/:slug" element={<OfferCheckoutPage />} />
  <Route path="*" element={<Navigate to="/" replace />} />
  </Routes>
  <AppToaster />
- </Router>
+ </AppRouter>
  )
  }
 
@@ -352,13 +362,13 @@ function App() {
 
  if (pendingInvite?.hasPendingInvite && pendingInvite.inviteToken) {
  return (
- <Router>
+ <AppRouter>
  <Routes>
  <Route path="/invite/:token" element={<InviteAcceptPage onInviteAccepted={() => { window.location.href = '/' }} />} />
  <Route path="*" element={<Navigate to={`/invite/${pendingInvite.inviteToken}`} replace />} />
  </Routes>
  <AppToaster />
- </Router>
+ </AppRouter>
  )
  }
 
@@ -389,7 +399,7 @@ function App() {
  const showTrialBanner = isOnTrial && !bannerDismissed
 
  return (
- <Router>
+ <AppRouter>
  <div className="min-h-screen" style={{ backgroundColor: '#F9FAFB' }}>
  <UploadProvider>
  <StorageProvider>
@@ -430,7 +440,7 @@ function App() {
  </UploadProvider>
  <AppToaster />
  </div>
- </Router>
+ </AppRouter>
  )
  }
 
@@ -469,13 +479,13 @@ function App() {
  const isOnOfferPage = window.location.pathname.startsWith('/offer/')
  if (isOnOfferPage) {
  return (
- <Router>
+ <AppRouter>
  <Routes>
  <Route path="/offer/:slug" element={<OfferCheckoutPage />} />
  <Route path="*" element={<Navigate to="/" replace />} />
  </Routes>
  <AppToaster />
- </Router>
+ </AppRouter>
  )
  }
 
@@ -497,7 +507,7 @@ function App() {
  // If on invite page, let them through immediately to accept the invite
  if (isOnInvitePage) {
  return (
- <Router>
+ <AppRouter>
  <Routes>
  <Route
  path="/invite/:token"
@@ -508,7 +518,7 @@ function App() {
  <Route path="*" element={<Navigate to="/" replace />} />
  </Routes>
  <AppToaster />
- </Router>
+ </AppRouter>
  )
  }
 
@@ -605,7 +615,7 @@ function App() {
 
  if (pendingInvite?.hasPendingInvite && pendingInvite.inviteToken) {
  return (
- <Router>
+ <AppRouter>
  <Routes>
  <Route
  path="/invite/:token"
@@ -619,7 +629,7 @@ function App() {
  />
  </Routes>
  <AppToaster />
- </Router>
+ </AppRouter>
  )
  }
 
@@ -661,7 +671,7 @@ function App() {
  // Mobile in dev mode: bypass install gate for testing
  if (isMobile) {
  return (
- <Router>
+ <AppRouter>
  <div className="min-h-screen" style={{ backgroundColor: '#F9FAFB' }}>
  <UploadProvider>
  <StorageProvider>
@@ -702,13 +712,13 @@ function App() {
  </UploadProvider>
  <AppToaster />
  </div>
- </Router>
+ </AppRouter>
  )
  }
 
  // Desktop app
  return (
- <Router>
+ <AppRouter>
  <UploadProvider>
  <StorageProvider>
  <TeamProvider key={user.id}>
@@ -757,13 +767,13 @@ function App() {
  <FloatingUploadPanel />
  </UploadProvider>
  <AppToaster />
- </Router>
+ </AppRouter>
  )
  }
 
  // Not logged in - show public routes and homepage
  return (
- <Router>
+ <AppRouter>
  <Routes>
  {publicRoutes}
 
@@ -777,7 +787,7 @@ function App() {
  <Route path="/*" element={<HomePage />} />
  </Routes>
  <AppToaster />
- </Router>
+ </AppRouter>
  )
 }
 
