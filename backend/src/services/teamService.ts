@@ -689,6 +689,14 @@ export class TeamService {
         if (membership && resolveMemberType(membership.member_type) === 'admin') {
             return ctx.organizationId;
         }
+
+        // Support mode: platform admin inside a customer org they don't own
+        // or belong to. resolveOrgContext grants access with isOwner=false and
+        // no team_members row — still allow invite/manage.
+        const { PlatformAdminService } = await import('./platformAdminService');
+        if (await PlatformAdminService.canAccessOrg(userId, ctx.organizationId)) {
+            return ctx.organizationId;
+        }
         return null;
     }
 

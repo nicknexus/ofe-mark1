@@ -426,7 +426,7 @@ export default function AccountPage({ subscriptionStatus }: AccountPageOuterProp
  const tabs = [
  { id: 'account' as TabType, label: 'Account', icon: UserIcon },
  { id: 'organization' as TabType, label: 'Organization', icon: Building2, requiresOrg: true },
- { id: 'teams' as TabType, label: 'Teams', icon: Users, requiresOrg: true },
+ { id: 'teams' as TabType, label: 'Teams', icon: Users },
  { id: 'branding' as TabType, label: 'Branding', icon: Palette, requiresOrg: true },
  // No `requiresOrg`: gated by canSeeWidgetTab instead, so a team member
  // with no organization of their own still sees their team's widget.
@@ -450,6 +450,8 @@ export default function AccountPage({ subscriptionStatus }: AccountPageOuterProp
  if (tab.id === 'teams' && !canManageTeam) return null
  if (tab.id === 'widget' && !canSeeWidgetTab) return null
  if (isSupportMode && (tab.id === 'billing' || tab.id === 'danger')) return null
+ // Owner-only surfaces (org profile, branding). Teams is gated by
+ // canManageTeam above so org admins and support mode still see it.
  if (tab.requiresOrg && !hasOwnOrganization) return null
  const showNotPublicIndicator = tab.id === 'account' && hasOwnOrganization && !ownedOrganization?.is_public
  return (

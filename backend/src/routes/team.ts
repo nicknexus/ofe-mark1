@@ -91,7 +91,7 @@ router.get('/my-pending-invite', authenticateUser, async (req: AuthenticatedRequ
 
 /**
  * POST /api/team/invite
- * Send a team invitation (owner only)
+ * Send a team invitation (owner, org admin, or support-mode platform admin)
  */
 router.post('/invite', authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
