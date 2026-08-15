@@ -42,7 +42,7 @@ export default function AddEvidenceToClaimDialog({
  onClose,
  onCreated,
 }: AddEvidenceToClaimDialogProps) {
- const { files, addFiles, removeFile, releasePreviews, markSaved } = useFileUploads()
+ const { files, addFiles, retryFile, removeFile, releasePreviews, markSaved } = useFileUploads()
  const [title, setTitle] = useState('')
  const [type, setType] = useState<Evidence['type']>('visual_proof')
  const [submitting, setSubmitting] = useState(false)
@@ -137,7 +137,7 @@ export default function AddEvidenceToClaimDialog({
  />
  <ModalBody>
  <div className="space-y-4">
- <FileDropList files={files} onAddFiles={addFiles} onRemoveFile={removeFile} compact />
+ <FileDropList files={files} onAddFiles={addFiles} onRemoveFile={removeFile} onRetryFile={retryFile} compact />
 
  <div>
  <label className="block text-xs font-medium text-gray-600 mb-1.5">Title</label>

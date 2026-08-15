@@ -17,6 +17,7 @@ interface WizardEvidenceStepProps {
  update: (patch: Partial<WizardState>) => void
  onAddFiles: (files: File[]) => void
  onRemoveFile: (fileId: string) => void
+ onRetryFile?: (fileId: string) => void
  onSetFileType: (fileId: string, type: Evidence['type']) => void
  onSetAllTypes: (type: Evidence['type']) => void
 }
@@ -25,7 +26,7 @@ interface WizardEvidenceStepProps {
  * Step — add the proof: drop the files, say what kind of evidence they are,
  * and give the record a recognisable title.
  */
-export default function WizardEvidenceStep({ state, update, onAddFiles, onRemoveFile, onSetFileType, onSetAllTypes }: WizardEvidenceStepProps) {
+export default function WizardEvidenceStep({ state, update, onAddFiles, onRemoveFile, onRetryFile, onSetFileType, onSetAllTypes }: WizardEvidenceStepProps) {
  // Create flow tags each file individually and splits into one record per type;
  // edit mode keeps the single existing record and its one type.
  const buckets = state.editing ? [] : evidenceBuckets(state.files)
@@ -40,13 +41,14 @@ export default function WizardEvidenceStep({ state, update, onAddFiles, onRemove
  files={state.files}
  onAddFiles={onAddFiles}
  onRemoveFile={onRemoveFile}
+ onRetryFile={onRetryFile}
  showTypePicker={!state.editing}
  onSetFileType={onSetFileType}
  onSetAllTypes={onSetAllTypes}
  />
  {state.editing ? (
  <p className="text-[11px] text-gray-400 mt-1.5">
- Files already attached stay as they are — you can add more, but removing existing files isn't possible here.
+ Add more files or remove ones you no longer need. Changes are saved with the rest of the record.
  </p>
  ) : (
  <p className="text-[11px] text-gray-400 mt-1.5">

@@ -16,8 +16,11 @@ export interface WizardFile {
  error?: string
  /** Local object URL for image thumbnails while uploading. */
  previewUrl?: string
- /** Edit mode: a file already attached to the record — shown but not removable. */
+ /** Edit mode: a file already attached to the record. Removable; storage
+  *  cleanup happens on save, not on cancel. */
  existing?: boolean
+ /** Local File kept so a failed tile can be retried without re-picking. */
+ raw?: File
  /** Per-file evidence type. Files are grouped by this on save so each type
   *  becomes its own evidence record (max one per type). */
  type?: Evidence['type']
@@ -27,6 +30,7 @@ export interface WizardFile {
 export interface ClaimEntry {
  value: string
  label: string
+ note: string
 }
 
 export interface WizardState {
@@ -38,6 +42,8 @@ export interface WizardState {
  claimKpiId: string | null
  claimValue: string
  claimLabel: string
+ /** Maps to kpi_updates.note — the claim's description. */
+ claimNote: string
  /** "Both" flow: optional claim per metric, keyed by kpi id. */
  claimEntries: Record<string, ClaimEntry>
 
@@ -64,6 +70,7 @@ export const INITIAL_WIZARD_STATE: WizardState = {
  claimKpiId: null,
  claimValue: '',
  claimLabel: '',
+ claimNote: '',
  claimEntries: {},
  evidenceTitle: '',
  evidenceType: 'visual_proof',
@@ -154,12 +161,9 @@ export function validateClaimStep(state: WizardState): string | null {
 }
 
 export function validateEvidenceStep(state: WizardState): string | null {
- // Editing keeps the existing files untouched, so none are required.
- if (!state.editing) {
  if (state.files.length === 0) return 'Add at least one file'
  if (state.files.some(f => f.status === 'uploading')) return 'Wait for uploads to finish'
  if (state.files.some(f => f.status === 'error')) return 'Remove or retry failed uploads'
- }
  if (!state.evidenceTitle.trim()) return 'Give the evidence a short title'
  return null
 }

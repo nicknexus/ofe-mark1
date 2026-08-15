@@ -27,7 +27,7 @@ export default function WizardClaimsStep({ state, update, kpis, lockedMetricId }
   )
 
   const setEntry = (kpiId: string, patch: Partial<ClaimEntry>) => {
-    const existing = state.claimEntries[kpiId] || { value: '', label: '' }
+    const existing = state.claimEntries[kpiId] || { value: '', label: '', note: '' }
     update({ claimEntries: { ...state.claimEntries, [kpiId]: { ...existing, ...patch } } })
   }
 
@@ -35,7 +35,7 @@ export default function WizardClaimsStep({ state, update, kpis, lockedMetricId }
     <div className="space-y-3 w-full">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
         {list.map((kpi, index) => {
-          const entry = state.claimEntries[kpi.id!] || { value: '', label: '' }
+          const entry = state.claimEntries[kpi.id!] || { value: '', label: '', note: '' }
           return (
             <WizardMetricClaimCard
               key={kpi.id}
@@ -43,8 +43,10 @@ export default function WizardClaimsStep({ state, update, kpis, lockedMetricId }
               color={colorByKpi[kpi.id!] ?? getKPIColor(kpi.category, index)}
               value={entry.value}
               label={entry.label}
+              note={entry.note}
               onValueChange={(v) => setEntry(kpi.id!, { value: v })}
               onLabelChange={(l) => setEntry(kpi.id!, { label: l })}
+              onNoteChange={(n) => setEntry(kpi.id!, { note: n })}
             />
           )
         })}

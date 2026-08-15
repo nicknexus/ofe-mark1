@@ -32,8 +32,10 @@ export default function WizardClaimStep({ state, update, kpis }: WizardClaimStep
       color={color}
       value={state.claimValue}
       label={state.claimLabel}
+      note={state.claimNote}
       onValueChange={(v) => update({ claimValue: v })}
       onLabelChange={(l) => update({ claimLabel: l })}
+      onNoteChange={(n) => update({ claimNote: n })}
     />
   )
 }

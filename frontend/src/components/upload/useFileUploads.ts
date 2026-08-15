@@ -40,9 +40,19 @@ export function useFileUploads() {
  status: 'uploading',
  progress: 0,
  previewUrl,
+ raw: file,
  }])
  }
  }, [queueUpload])
+
+ const retryFile = useCallback((fileId: string) => {
+ const current = filesRef.current.find(f => f.id === fileId)
+ if (!current?.raw) return
+ const file = current.raw
+ if (current.previewUrl) URL.revokeObjectURL(current.previewUrl)
+ setFiles(prev => prev.filter(f => f.id !== fileId))
+ addFiles([file])
+ }, [addFiles])
 
  const removeFile = useCallback((fileId: string) => {
  const file = filesRef.current.find(f => f.id === fileId)
@@ -74,5 +84,5 @@ export function useFileUploads() {
 
  useEffect(() => () => discardOrphans(), [discardOrphans])
 
- return { files, addFiles, removeFile, releasePreviews, markSaved, discardOrphans }
+ return { files, addFiles, retryFile, removeFile, releasePreviews, markSaved, discardOrphans }
 }

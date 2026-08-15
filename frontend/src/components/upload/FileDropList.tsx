@@ -18,6 +18,7 @@ interface FileDropListProps {
  files: WizardFile[]
  onAddFiles: (files: File[]) => void
  onRemoveFile: (fileId: string) => void
+ onRetryFile?: (fileId: string) => void
  /** Tighter padding for dialogs. */
  compact?: boolean
  /** Show the per-file evidence-type picker (create flow only). */
@@ -28,7 +29,7 @@ interface FileDropListProps {
 }
 
 /** Drop zone + uploading file tiles, shared by the wizard and quick-add dialogs. */
-export default function FileDropList({ files, onAddFiles, onRemoveFile, compact = false, showTypePicker = false, onSetFileType, onSetAllTypes }: FileDropListProps) {
+export default function FileDropList({ files, onAddFiles, onRemoveFile, onRetryFile, compact = false, showTypePicker = false, onSetFileType, onSetAllTypes }: FileDropListProps) {
  const fileInputRef = useRef<HTMLInputElement>(null)
  // Per-row type dropdown, positioned via portal so it never clips inside the
  // scrollable modal body.
@@ -81,16 +82,24 @@ export default function FileDropList({ files, onAddFiles, onRemoveFile, compact 
       <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${menu?.fileId === file.id ? 'rotate-180' : ''}`} />
      </button>
     )}
-    {!file.existing && (
+    {file.status === 'error' && onRetryFile && file.raw && (
      <button
       type="button"
-      onClick={() => onRemoveFile(file.id)}
-      className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors flex-shrink-0"
-      title="Remove"
+      onClick={() => onRetryFile(file.id)}
+      className="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-primary-50 transition-colors flex-shrink-0"
+      title="Retry upload"
      >
-      <X className="w-3.5 h-3.5" />
+      <RefreshCw className="w-3.5 h-3.5" />
      </button>
     )}
+    <button
+     type="button"
+     onClick={() => onRemoveFile(file.id)}
+     className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors flex-shrink-0"
+     title="Remove"
+    >
+     <X className="w-3.5 h-3.5" />
+    </button>
    </div>
   )
  }
@@ -110,7 +119,7 @@ export default function FileDropList({ files, onAddFiles, onRemoveFile, compact 
    >
     <UploadCloud className={`text-gray-300 mx-auto mb-2 ${compact ? 'w-7 h-7' : 'w-9 h-9'}`} />
     <p className="text-sm font-medium text-gray-700">Drop files here, or click to browse</p>
-    <p className="text-xs text-gray-400 mt-1">Photos, documents, receipts, recordings — as many as you need</p>
+    <p className="text-xs text-gray-400 mt-1">Photos, documents, receipts, recordings — up to 5 GB each</p>
     <input
      ref={fileInputRef}
      type="file"

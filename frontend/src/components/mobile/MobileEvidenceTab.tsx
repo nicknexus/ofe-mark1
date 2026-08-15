@@ -31,6 +31,7 @@ import DateRangePicker from '../DateRangePicker'
 import TagPicker from '../MetricTags/TagPicker'
 import EvidenceTagsList from '../MetricTags/EvidenceTagsList'
 import { notify } from '../../lib/notify'
+import { existingEvidenceFileUrls } from '../../utils/fileType'
 import { EmptyState, SectionLoader, Spinner } from '../ui'
 
 interface MobileEvidenceTabProps {
@@ -1447,11 +1448,18 @@ function MobileEvidenceEditFlow({ initiativeId, evidence, onClose, onSuccess }: 
 
  onClose()
 
- queueUpload({
+    const existingUrls = existingEvidenceFileUrls(evidence)
+    queueUpload({
  file: capturedFile,
  onComplete: async (result) => {
  try {
- await apiService.updateEvidence(capturedEvidenceId, { ...capturedSubmitData, file_url: result.file_url })
+ const allUrls = [...existingUrls, result.file_url]
+ await apiService.updateEvidence(capturedEvidenceId, {
+  ...capturedSubmitData,
+  file_url: allUrls[0],
+  file_urls: allUrls,
+  file_sizes: [...existingUrls.map(() => 0), result.size],
+ })
  notify.success('Evidence updated!')
  capturedOnSuccess()
  } catch (err) {

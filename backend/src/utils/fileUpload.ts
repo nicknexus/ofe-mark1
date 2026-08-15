@@ -26,7 +26,7 @@ export const upload = multer({
     storage: multer.memoryStorage(),
     fileFilter,
     limits: {
-        fileSize: 25 * 1024 * 1024 // 25MB limit
+        fileSize: 50 * 1024 * 1024 // fallback path only; direct-to-storage is the real limit
     }
 })
 

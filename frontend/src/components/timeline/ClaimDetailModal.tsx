@@ -133,7 +133,7 @@ export default function ClaimDetailModal({
  </ModalField>
  {tagName && <ModalField label="Tag">{tagName}</ModalField>}
  {groupNames.length > 0 && <ModalField label="Beneficiary groups">{groupNames.join(', ')}</ModalField>}
- {claim.note && <ModalField label="Note" className="col-span-2">{claim.note}</ModalField>}
+ {claim.note && <ModalField label="Description" className="col-span-2">{claim.note}</ModalField>}
  </ModalFieldGrid>
 
  {/* Evidence */}

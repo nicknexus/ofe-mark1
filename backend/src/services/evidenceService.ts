@@ -7,6 +7,31 @@ import { MetricTagService } from './metricTagService'
 import { InitiativeService } from './initiativeService'
 import { OrgAccessService } from './orgAccessService'
 
+/** Columns that actually exist on `public.evidence`. Client payloads also
+ *  carry junction/file-set fields (`file_urls`, `file_sizes`, `kpi_ids`, …)
+ *  that must never be spread into insert/update — PostgREST 400s on unknown
+ *  keys (`file_sizes` was the edit-and-add-files crash). */
+const EVIDENCE_ROW_COLUMNS = [
+    'title',
+    'description',
+    'type',
+    'file_url',
+    'file_type',
+    'date_represented',
+    'date_range_start',
+    'date_range_end',
+    'location_id',
+    'initiative_id',
+] as const
+
+function pickEvidenceRow(input: Record<string, any>): Record<string, any> {
+    const row: Record<string, any> = {}
+    for (const key of EVIDENCE_ROW_COLUMNS) {
+        if (input[key] !== undefined) row[key] = input[key]
+    }
+    return row
+}
+
 export class EvidenceService {
     /**
      * Best-effort cleanup of a half-written evidence row + its junction inserts.
@@ -29,9 +54,89 @@ export class EvidenceService {
         }
     }
 
+    private static fileRowFromUrl(evidenceId: string, fileUrl: string, index: number, fileSize: number) {
+        const fileName = fileUrl.split('/').pop() || `file-${index + 1}`
+        const extension = fileName.split('.').pop()?.toLowerCase() || ''
+        return {
+            evidence_id: evidenceId,
+            file_url: fileUrl,
+            file_name: fileName,
+            file_type: extension || 'unknown',
+            file_size: fileSize,
+            display_order: index,
+        }
+    }
+
+    /**
+     * Make `evidence_files` match `fileUrls` exactly: insert newly uploaded
+     * URLs, drop (and delete from storage) anything the editor removed, and
+     * restamp display_order. Existing rows keep their stored file_size so we
+     * don't double-count storage on a no-op edit.
+     */
+    private static async syncEvidenceFiles(
+        evidenceId: string,
+        fileUrls: string[],
+        fileSizes: number[] | undefined,
+        organizationId: string | null,
+    ): Promise<void> {
+        const { data: existing, error: existingError } = await supabase
+            .from('evidence_files')
+            .select('id, file_url, file_size, display_order')
+            .eq('evidence_id', evidenceId)
+
+        if (existingError) {
+            throw new Error(`Failed to load evidence files: ${existingError.message}`)
+        }
+
+        const existingByUrl = new Map((existing || []).map((f: any) => [f.file_url as string, f]))
+        const keep = new Set(fileUrls)
+
+        const removed = (existing || []).filter((f: any) => !keep.has(f.file_url))
+        if (removed.length > 0) {
+            const { error: deleteError } = await supabase
+                .from('evidence_files')
+                .delete()
+                .in('id', removed.map((f: any) => f.id))
+            if (deleteError) {
+                throw new Error(`Failed to remove evidence files: ${deleteError.message}`)
+            }
+            for (const f of removed) {
+                await deleteFromSupabase(f.file_url)
+                if (organizationId && (f.file_size || 0) > 0) {
+                    await StorageService.decrementStorage(organizationId, f.file_size)
+                }
+            }
+        }
+
+        const toInsert = fileUrls
+            .map((url, index) => ({ url, index, size: fileSizes?.[index] || 0 }))
+            .filter(({ url }) => !existingByUrl.has(url))
+            .map(({ url, index, size }) => this.fileRowFromUrl(evidenceId, url, index, size))
+
+        if (toInsert.length > 0) {
+            const { error: insertError } = await supabase
+                .from('evidence_files')
+                .insert(toInsert)
+            if (insertError) {
+                throw new Error(`Failed to attach files to evidence: ${insertError.message}`)
+            }
+        }
+
+        await Promise.all(
+            fileUrls.map((url, index) => {
+                const row = existingByUrl.get(url)
+                if (!row || row.display_order === index) return Promise.resolve()
+                return supabase.from('evidence_files').update({ display_order: index }).eq('id', row.id)
+            })
+        )
+    }
+
     static async create(evidence: Evidence, userId: string, requestedOrgId?: string): Promise<Evidence> {
-        // Extract linkage fields and file_urls/file_sizes before inserting into evidence table
-        const { kpi_ids, kpi_update_ids, file_urls, file_sizes, location_ids, beneficiary_group_ids, tag_ids, ...evidenceData } = evidence as any;
+        const {
+            kpi_ids, kpi_update_ids, file_urls, file_sizes,
+            location_ids, beneficiary_group_ids, tag_ids,
+        } = evidence as any
+        const evidenceData = pickEvidenceRow(evidence as any)
 
         if (!evidenceData.initiative_id) {
             throw new Error('initiative_id is required');
@@ -103,21 +208,9 @@ export class EvidenceService {
         // silently dropping the inserts would leave a titled evidence row with zero
         // files visible in the UI. Roll back on failure so the caller can retry.
         if (file_urls && file_urls.length > 0) {
-            const evidenceFiles = (file_urls as string[]).map((fileUrl: string, index: number) => {
-                const fileName = fileUrl.split('/').pop() || `file-${index + 1}`
-                const extension = fileName.split('.').pop()?.toLowerCase() || ''
-                const fileType = extension || 'unknown'
-                const fileSize = (file_sizes as number[] | undefined)?.[index] || 0
-
-                return {
-                    evidence_id: data.id,
-                    file_url: fileUrl,
-                    file_name: fileName,
-                    file_type: fileType,
-                    file_size: fileSize,
-                    display_order: index
-                }
-            })
+            const evidenceFiles = (file_urls as string[]).map((fileUrl: string, index: number) =>
+                this.fileRowFromUrl(data.id, fileUrl, index, (file_sizes as number[] | undefined)?.[index] || 0)
+            )
 
             const { error: filesError } = await supabase
                 .from('evidence_files')
@@ -338,6 +431,7 @@ export class EvidenceService {
                 evidence_kpi_updates(kpi_update_id),
                 evidence_locations(location_id),
                 evidence_beneficiary_groups(beneficiary_group_id),
+                evidence_files(id, file_url, file_name, file_type, file_size, display_order),
                 initiatives(title)
             `)
             .eq('id', id)
@@ -355,7 +449,10 @@ export class EvidenceService {
             const location_ids = data.evidence_locations?.map((link: any) => link.location_id).filter(Boolean) || [];
             const beneficiary_group_ids = data.evidence_beneficiary_groups?.map((link: any) => link.beneficiary_group_id).filter(Boolean) || [];
             const tag_ids = await MetricTagService.getTagIdsForEvidence(data.id)
-            return { ...data, kpi_ids, kpi_update_ids, location_ids, beneficiary_group_ids, tag_ids };
+            const files = (data.evidence_files || [])
+                .slice()
+                .sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0));
+            return { ...data, kpi_ids, kpi_update_ids, location_ids, beneficiary_group_ids, tag_ids, files };
         }
         return data;
     }
@@ -363,8 +460,11 @@ export class EvidenceService {
     static async update(id: string, evidence: Partial<Evidence>, userId: string, requestedOrgId?: string): Promise<Evidence> {
         const { initiativeId } = await OrgAccessService.assertEvidenceAccess(id, userId, requestedOrgId);
 
-        // Extract linkage fields for separate handling
-        const { kpi_ids, kpi_update_ids, location_ids, beneficiary_group_ids, tag_ids, ...evidenceData } = evidence as any;
+        const {
+            kpi_ids, kpi_update_ids, location_ids, beneficiary_group_ids, tag_ids,
+            file_urls, file_sizes,
+        } = evidence as any
+        const evidenceData = pickEvidenceRow(evidence as any)
 
         const targetInitiativeId = evidenceData.initiative_id ?? initiativeId;
         if (evidenceData.initiative_id && evidenceData.initiative_id !== initiativeId) {
@@ -405,10 +505,38 @@ export class EvidenceService {
 
         if (error) throw new Error(`Failed to update evidence: ${error.message}`);
 
-        // Delete old file if file_url changed and old file exists
-        if (evidenceData.file_url && existingEvidence?.file_url && 
-            evidenceData.file_url !== existingEvidence.file_url) {
-            await deleteFromSupabase(existingEvidence.file_url);
+        // Authoritative file-set sync. `file_urls` is the complete list after
+        // the edit (existing kept + newly uploaded − removed). Storage cleanup
+        // and the evidence_files rows all go through here so we never delete a
+        // file that's still attached, and never leave new uploads orphaned.
+        if (Array.isArray(file_urls)) {
+            const organizationId = await StorageService.getOrganizationIdForUser(userId);
+            await this.syncEvidenceFiles(id, file_urls as string[], file_sizes as number[] | undefined, organizationId);
+            const nextPrimary = (file_urls as string[])[0] || null;
+            if (nextPrimary !== (data.file_url || null)) {
+                const { data: refreshed, error: fileUrlError } = await supabase
+                    .from('evidence')
+                    .update({ file_url: nextPrimary, updated_at: new Date().toISOString() })
+                    .eq('id', id)
+                    .select()
+                    .single();
+                if (fileUrlError) throw new Error(`Failed to update evidence file: ${fileUrlError.message}`);
+                Object.assign(data, refreshed);
+            }
+        } else if (typeof evidenceData.file_url === 'string' && evidenceData.file_url) {
+            // Legacy callers send only file_url (mobile / old modal). Append
+            // the new file; never wipe the rest of the set.
+            const { data: currentFiles } = await supabase
+                .from('evidence_files')
+                .select('file_url')
+                .eq('evidence_id', id);
+            const currentUrls = (currentFiles || []).map((f: any) => f.file_url as string);
+            if (existingEvidence?.file_url && !currentUrls.includes(existingEvidence.file_url)) {
+                currentUrls.unshift(existingEvidence.file_url);
+            }
+            if (!currentUrls.includes(evidenceData.file_url)) {
+                await this.syncEvidenceFiles(id, [...currentUrls, evidenceData.file_url], undefined, null);
+            }
         }
 
         // Update legacy KPI links if provided

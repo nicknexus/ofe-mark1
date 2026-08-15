@@ -114,8 +114,10 @@ interface WizardMetricClaimCardProps {
   color: string
   value: string
   label: string
+  note: string
   onValueChange: (value: string) => void
   onLabelChange: (label: string) => void
+  onNoteChange: (note: string) => void
 }
 
 /** Metric card with claim value + label inputs — used in the claim+both flow. */
@@ -124,8 +126,10 @@ export function WizardMetricClaimCard({
   color,
   value,
   label,
+  note,
   onValueChange,
   onLabelChange,
+  onNoteChange,
 }: WizardMetricClaimCardProps) {
   const isFilled = value.trim() !== ''
   const unit = kpi.metric_type === 'percentage' ? '%' : (kpi.unit_of_measurement || '')
@@ -151,6 +155,13 @@ export function WizardMetricClaimCard({
             placeholder="Title (optional)"
             className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-claim-500 focus:border-transparent"
           />
+          <textarea
+            value={note}
+            onChange={(e) => onNoteChange(e.target.value)}
+            placeholder="Description (optional)"
+            rows={2}
+            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-claim-500 focus:border-transparent resize-none"
+          />
         </div>
       </MetricCardChrome>
     </div>
@@ -163,8 +174,10 @@ export function WizardMetricClaimEntryPanel({
   color,
   value,
   label,
+  note,
   onValueChange,
   onLabelChange,
+  onNoteChange,
 }: WizardMetricClaimCardProps) {
   const isPct = kpi.metric_type === 'percentage'
   const unit = isPct ? '%' : (kpi.unit_of_measurement || '')
@@ -210,6 +223,18 @@ export function WizardMetricClaimEntryPanel({
             onChange={(e) => onLabelChange(e.target.value)}
             placeholder="e.g. July training cohort"
             className="app-input"
+          />
+        </div>
+        <div>
+          <label className="app-label">
+            Description <span className="text-gray-400 font-normal">(optional)</span>
+          </label>
+          <textarea
+            value={note}
+            onChange={(e) => onNoteChange(e.target.value)}
+            placeholder="What does this result represent?"
+            rows={3}
+            className="app-input resize-none"
           />
         </div>
       </div>

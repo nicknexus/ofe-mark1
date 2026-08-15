@@ -1,4 +1,6 @@
 import { supabase } from './supabase'
+import { inferContentType } from '../utils/fileType'
+import { tusUploadToSupabase } from './tusUpload'
 import {
  Initiative,
  KPI,
@@ -695,29 +697,32 @@ class ApiService {
  throw new Error('No authenticated session')
  }
 
+ const contentType = inferContentType(file)
+ const authHeaders = await this.getAuthHeaders()
+ // Standard PUT is reliable under ~6MB; above that use TUS so a 29MB video
+ // doesn't fail the signed URL and get misreported as "file too large".
+ const TUS_THRESHOLD = 6 * 1024 * 1024
+ const VERCEL_LIMIT = 4 * 1024 * 1024
+
  try {
- // Step 1: Get signed upload URL from backend
  const signedUrlResponse = await fetch(`${API_BASE_URL}/api/upload/signed-url`, {
  method: 'POST',
- headers: {
- 'Authorization': `Bearer ${session.access_token}`,
- 'Content-Type': 'application/json'
- },
+ headers: authHeaders,
  body: JSON.stringify({
  filename: file.name,
- contentType: file.type
+ contentType,
+ fileSize: file.size,
  })
  })
 
  if (!signedUrlResponse.ok) {
- const errorData = await signedUrlResponse.json()
+ const errorData = await signedUrlResponse.json().catch(() => ({}))
  throw new Error(errorData.error || 'Failed to get upload URL')
  }
 
- const { signedUrl, filePath, publicUrl } = await signedUrlResponse.json()
+ const { signedUrl, token, filePath, publicUrl } = await signedUrlResponse.json()
 
- // Step 2: Upload directly to Supabase Storage via XHR for progress tracking
- await new Promise<void>((resolve, reject) => {
+ const putToSignedUrl = () => new Promise<void>((resolve, reject) => {
  const xhr = new XMLHttpRequest()
 
  if (options?.onProgress) {
@@ -732,7 +737,8 @@ class ApiService {
  if (xhr.status >= 200 && xhr.status < 300) {
  resolve()
  } else {
- reject(new Error('Direct upload to storage failed'))
+ const detail = (xhr.responseText || xhr.statusText || '').slice(0, 180)
+ reject(new Error(`Storage upload failed (${xhr.status})${detail ? `: ${detail}` : ''}`))
  }
  })
 
@@ -744,24 +750,41 @@ class ApiService {
  }
 
  xhr.open('PUT', signedUrl)
- xhr.setRequestHeader('Content-Type', file.type)
+ xhr.setRequestHeader('Content-Type', contentType)
  xhr.send(file)
  })
 
- // Step 3: Confirm upload with backend (for storage tracking)
+ if (file.size > TUS_THRESHOLD) {
+ try {
+ await tusUploadToSupabase({
+ file,
+ filePath,
+ contentType,
+ supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+ accessToken: session.access_token,
+ anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+ signedToken: token,
+ onProgress: options?.onProgress,
+ abortSignal: options?.abortSignal,
+ })
+ } catch (tusError) {
+ if ((tusError as Error).message === 'Upload cancelled') throw tusError
+ console.warn('Resumable upload failed, trying signed PUT:', tusError)
+ await putToSignedUrl()
+ }
+ } else {
+ await putToSignedUrl()
+ }
+
  await fetch(`${API_BASE_URL}/api/upload/confirm`, {
  method: 'POST',
- headers: {
- 'Authorization': `Bearer ${session.access_token}`,
- 'Content-Type': 'application/json'
- },
+ headers: authHeaders,
  body: JSON.stringify({
  filePath,
  fileSize: file.size
  })
  })
 
- // Trigger storage refresh after successful upload
  window.dispatchEvent(new Event('storage-updated'))
 
  return { file_url: publicUrl, size: file.size }
@@ -772,13 +795,9 @@ class ApiService {
 
  console.warn('Direct upload failed, trying fallback:', error)
 
- // Vercel has a 4.5MB body limit — only attempt fallback for small files
- const VERCEL_LIMIT = 4 * 1024 * 1024 // 4MB safe threshold
+ // Vercel body limit is ~4.5MB — only small files can go through the API.
  if (file.size > VERCEL_LIMIT) {
- throw new Error(
- `File is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). ` +
- 'Direct upload to storage failed. Please try a smaller file or contact support.'
- )
+ throw error instanceof Error ? error : new Error('File upload failed')
  }
 
  const formData = new FormData()
@@ -793,7 +812,7 @@ class ApiService {
  })
 
  if (!response.ok) {
- const errorData = await response.json()
+ const errorData = await response.json().catch(() => ({}))
  throw new Error(errorData.error || 'File upload failed')
  }
 

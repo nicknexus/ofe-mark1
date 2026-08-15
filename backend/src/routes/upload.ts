@@ -19,11 +19,14 @@ router.post('/signed-url', authenticateUser, async (req: AuthenticatedRequest, r
             return
         }
 
-        const { filename, contentType, fileSize } = req.body
-        if (!filename || !contentType) {
-            res.status(400).json({ error: 'filename and contentType are required' })
+        const { filename, fileSize } = req.body
+        if (!filename) {
+            res.status(400).json({ error: 'filename is required' })
             return
         }
+        // contentType is optional — browsers often send an empty type for
+        // .mov / Office / unknown extensions. The client infers a MIME before
+        // the PUT; we only need a filename to mint the path.
 
         // Enforce plan storage limit before issuing an upload URL.
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined

@@ -12,6 +12,7 @@ import { Spinner } from './ui'
 import DateRangePicker from './DateRangePicker'
 import TagPicker from './MetricTags/TagPicker'
 import { notify } from '../lib/notify'
+import { existingEvidenceFileUrls } from '../utils/fileType'
 
 interface AddEvidenceModalProps {
  isOpen: boolean
@@ -445,11 +446,13 @@ export default function AddEvidenceModal({
  completedCount++
 
  if (completedCount === filesToUpload.length) {
+ const existingUrls = editData ? existingEvidenceFileUrls(editData) : []
+ const allUrls = [...existingUrls, ...fileUrls]
  const finalData = {
  ...capturedSubmitData,
- file_url: fileUrls[0],
- file_urls: fileUrls,
- file_sizes: fileSizes
+ file_url: allUrls[0],
+ file_urls: allUrls,
+ file_sizes: [...existingUrls.map(() => 0), ...fileSizes]
  }
  capturedOnSubmit(finalData).then(() => {
  notify.success('Evidence created successfully!')

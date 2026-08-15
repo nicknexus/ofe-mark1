@@ -40,9 +40,9 @@ export default function WizardReviewStep({
  // Claims to be created: per-metric entries in the "both" flow, or the
  // single claim-only record, normalised to one shape for rendering.
  const newClaims = state.kind === 'both'
- ? filledClaimEntries(state).map(([kpiId, entry]) => ({ kpiId, value: entry.value, label: entry.label }))
+ ? filledClaimEntries(state).map(([kpiId, entry]) => ({ kpiId, value: entry.value, label: entry.label, note: entry.note }))
  : claim && state.claimKpiId
- ? [{ kpiId: state.claimKpiId, value: state.claimValue, label: state.claimLabel }]
+ ? [{ kpiId: state.claimKpiId, value: state.claimValue, label: state.claimLabel, note: state.claimNote }]
  : []
 
  const dateLabel = start === end ? formatDate(start) : `${formatDate(start)} – ${formatDate(end)}`
@@ -111,6 +111,7 @@ export default function WizardReviewStep({
  {kpiById.get(c.kpiId)?.title || 'Impact claim'}
  </p>
  {c.label && <p className="text-xs text-gray-500 truncate">{c.label}</p>}
+ {c.note && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{c.note}</p>}
  </div>
  </div>
  </div>

@@ -153,6 +153,7 @@ function stateFromEdit(editClaim?: TimelineClaim, editEvidence?: Evidence): Part
       claimKpiId: editClaim.kpi_id,
       claimValue: String(editClaim.value ?? ''),
       claimLabel: (editClaim as any).label || '',
+      claimNote: editClaim.note || '',
       locationIds: editClaim.location_id ? [editClaim.location_id] : [],
       tagIds: (editClaim as any).tag_id ? [(editClaim as any).tag_id] : [],
     }
@@ -451,10 +452,20 @@ export default function UploadWizard({
  progress: 0,
  previewUrl,
  type: inferEvidenceType(file.name, file.type),
+ raw: file,
  }],
  }))
  }
  setStepError(null)
+ }
+
+ const handleRetryFile = (fileId: string) => {
+ const current = stateRef.current.files.find(f => f.id === fileId)
+ if (!current?.raw) return
+ const file = current.raw
+ if (current.previewUrl) URL.revokeObjectURL(current.previewUrl)
+ setState(prev => ({ ...prev, files: prev.files.filter(f => f.id !== fileId) }))
+ handleAddFiles([file])
  }
 
  const handleSetFileType = (fileId: string, type: Evidence['type']) => {
@@ -469,12 +480,11 @@ export default function UploadWizard({
 
  const handleRemoveFile = (fileId: string) => {
  const file = stateRef.current.files.find(f => f.id === fileId)
- // Files already attached to the edited record can't be removed here.
- if (file?.existing) return
  if (file?.status === 'uploading') cancelUpload(fileId)
  if (file?.previewUrl) URL.revokeObjectURL(file.previewUrl)
- // Already landed in storage — drop it so it doesn't orphan.
- if (file?.url) void apiService.deleteUploadedFile(file.url, file.uploadedSize)
+ // Existing attachments stay in storage until Save syncs the file set.
+ // Newly picked files are orphans the moment they're removed.
+ if (file?.url && !file.existing) void apiService.deleteUploadedFile(file.url, file.uploadedSize)
  setState(prev => ({ ...prev, files: prev.files.filter(f => f.id !== fileId) }))
  }
 
@@ -538,6 +548,7 @@ export default function UploadWizard({
  await apiService.updateKPIUpdate(editClaim.id, {
  value: Number(state.claimValue),
  label: state.claimLabel.trim() || undefined,
+ note: state.claimNote.trim() || undefined,
  ...dateFields,
  location_id: state.locationIds[0],
  tag_id: state.tagIds[0] || null,
@@ -551,7 +562,13 @@ export default function UploadWizard({
  return
  }
  if (editEvidence?.id) {
- const newFiles = state.files.filter(f => !f.existing && f.url)
+ const originalUrls = editEvidence.files?.length
+  ? editEvidence.files.map(f => f.file_url)
+  : editEvidence.file_url ? [editEvidence.file_url] : []
+ const currentFiles = state.files.filter(f => f.url)
+ const currentUrls = currentFiles.map(f => f.url!)
+ const filesChanged = originalUrls.length !== currentUrls.length
+  || originalUrls.some((u, i) => u !== currentUrls[i])
  const evidenceUpdate: Partial<CreateEvidenceForm> = {
  title: state.evidenceTitle.trim(),
  description: state.evidenceDescription.trim() || undefined,
@@ -562,13 +579,10 @@ export default function UploadWizard({
  tag_ids: state.tagIds,
  beneficiary_group_ids: state.beneficiaryGroupIds,
  }
- // Only touch the file set when files were actually added — otherwise
- // the existing attachments stay exactly as they are.
- if (newFiles.length > 0) {
- const allUrls = state.files.filter(f => f.url).map(f => f.url!)
- evidenceUpdate.file_url = allUrls[0]
- evidenceUpdate.file_urls = allUrls
- evidenceUpdate.file_sizes = state.files.filter(f => f.url).map(f => f.existing ? 0 : (f.uploadedSize ?? 0))
+ if (filesChanged) {
+ evidenceUpdate.file_url = currentUrls[0]
+ evidenceUpdate.file_urls = currentUrls
+ evidenceUpdate.file_sizes = currentFiles.map(f => f.existing ? 0 : (f.uploadedSize ?? 0))
  }
  await apiService.updateEvidence(editEvidence.id, evidenceUpdate)
  notify.success('Evidence updated')
@@ -594,6 +608,7 @@ export default function UploadWizard({
  const claimPayload: CreateKPIUpdateForm = {
  value: Number(entry.value),
  label: entry.label.trim() || undefined,
+ note: (entry.note || '').trim() || undefined,
  ...sharedClaimFields,
  }
  const created = await apiService.createKPIUpdate(kpiId, claimPayload)
@@ -604,6 +619,7 @@ export default function UploadWizard({
  const claimPayload: CreateKPIUpdateForm = {
  value: Number(state.claimValue),
  label: state.claimLabel.trim() || undefined,
+ note: state.claimNote.trim() || undefined,
  ...sharedClaimFields,
  }
  const created = await apiService.createKPIUpdate(state.claimKpiId!, claimPayload)
@@ -882,6 +898,7 @@ export default function UploadWizard({
  update={update}
  onAddFiles={handleAddFiles}
  onRemoveFile={handleRemoveFile}
+ onRetryFile={handleRetryFile}
  onSetFileType={handleSetFileType}
  onSetAllTypes={handleSetAllFileTypes}
  />
