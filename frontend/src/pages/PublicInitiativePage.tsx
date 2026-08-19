@@ -784,7 +784,7 @@ export default function PublicInitiativePage() {
                             </div>
                         ) : (
                             <>
-                                {activeTab === 'overview' && filteredDashboard && <InitiativeOverviewTab initiative={initiative} dashboard={filteredDashboard} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} tagsById={tagsById} onTagClick={(id) => setSelectedTagIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])} selectedTagIds={selectedTagIds} />}
+                                {activeTab === 'overview' && filteredDashboard && <InitiativeOverviewTab initiative={initiative} dashboard={filteredDashboard} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} />}
                                 {activeTab === 'metrics' && filteredDashboard && <MetricsTab dashboard={filteredDashboard} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} />}
                                 {activeTab === 'stories' && <StoriesTab stories={filteredStories} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} tagsById={tagsById} onTagClick={(id) => setSelectedTagIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])} selectedTagIds={selectedTagIds} />}
                                 {activeTab === 'locations' && <LocationsTab locations={locations || dashboard.locations} orgSlug={orgSlug!} initiativeSlug={initiativeSlug!} dateQS={dateQS} />}

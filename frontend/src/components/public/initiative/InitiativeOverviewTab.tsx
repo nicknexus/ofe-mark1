@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useOrgLinkBase } from '../../../hooks/useOrgLinkBase'
 import { Activity, BarChart3, ChevronDown, ChevronRight, Globe, Layers, MapPin, TrendingUp } from 'lucide-react'
-import PublicTagChip from '../PublicTagChip'
 import { getKPIColor } from '../../metricsDashboard/metricColorPalette'
 import { MapContainer } from 'react-leaflet'
 import {
@@ -20,21 +19,18 @@ import {
     XAxis,
     YAxis,
 } from 'recharts'
-import { PublicInitiative, InitiativeDashboard, PublicMetricTag } from '../../../services/publicApi'
+import { PublicInitiative, InitiativeDashboard } from '../../../services/publicApi'
 import { formatDate, formatAbbreviatedMetricTotal, parseLocalDate } from '../../../utils'
 import { LocationMarker, MapResizeHandler, TileLayerWithFallback } from './PublicInitiativeMap'
 import { CATEGORY_COLORS, generateMetricSlug, getMetricColor } from './metricColors'
 import { brandIconStyle, PUBLIC_SECTION_CHIP_STYLE } from '../publicStyles'
 
-export function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug, dateQS = '', tagsById, onTagClick, selectedTagIds }: {
+export function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiativeSlug, dateQS = '' }: {
     initiative: PublicInitiative;
     dashboard: InitiativeDashboard;
     orgSlug: string;
     initiativeSlug: string;
     dateQS?: string;
-    tagsById?: Map<string, PublicMetricTag>;
-    onTagClick?: (id: string) => void;
-    selectedTagIds?: string[];
 }) {
     const orgLinkBase = useOrgLinkBase()
     const brandColor = initiative.organization_brand_color || '#c0dfa1'
@@ -424,9 +420,6 @@ export function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiati
                         const isPct = kpi.metric_type === 'percentage'
                         const metricSlug = generateMetricSlug(kpi.title)
                         const valueLabel = `${formatAbbreviatedMetricTotal(kpi.total_value ?? 0, { isPercentage: isPct })}${isPct ? '%' : ''}`
-                        const tags = tagsById && kpi.tag_ids
-                            ? kpi.tag_ids.map(id => tagsById.get(id)).filter(Boolean) as PublicMetricTag[]
-                            : []
                         return (
                             <Link
                                 key={kpi.id}
@@ -459,27 +452,6 @@ export function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiati
                                         {isPct ? 'average' : kpi.unit_of_measurement}
                                     </span>
                                 </div>
-
-                                {tags.length > 0 && (
-                                    <div className="flex flex-wrap gap-1 mt-3" onClick={(e) => e.preventDefault()}>
-                                        {tags.slice(0, 4).map(t => (
-                                            <PublicTagChip
-                                                key={t.id}
-                                                name={t.name}
-                                                size="xs"
-                                                iconless
-                                                nameMaxWidthClass="max-w-[72px]"
-                                                selected={selectedTagIds?.includes(t.id)}
-                                                onClick={onTagClick ? () => onTagClick(t.id) : undefined}
-                                            />
-                                        ))}
-                                        {tags.length > 4 && (
-                                            <span className="text-[10px] text-gray-400 px-1 self-center">
-                                                +{tags.length - 4}
-                                            </span>
-                                        )}
-                                    </div>
-                                )}
                             </Link>
                         )
                     })}
