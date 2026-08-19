@@ -106,7 +106,7 @@ export default function LocationsPage() {
         />
 
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <div className="lg:col-span-8 relative isolate min-h-[280px] rounded-xl overflow-hidden border border-gray-200/80 shadow-card">
+          <div className="lg:col-span-8 relative z-0 min-h-[280px] rounded-xl overflow-hidden border border-gray-200/80 shadow-card">
             <LocationMap
               locations={filtered}
               selectedLocationId={selectedId}

@@ -804,7 +804,7 @@ export function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiati
                     Locations
                 </h2>
                 {dashboard.locations && dashboard.locations.length > 0 ? (
-                    <div className="relative isolate h-[320px] rounded-3xl overflow-hidden border border-gray-200/60 shadow-card">
+                    <div className="relative z-0 h-[320px] rounded-3xl overflow-hidden border border-gray-200/60 shadow-card">
                         <MapContainer
                             center={[
                                 dashboard.locations.reduce((s, l) => s + l.latitude, 0) / dashboard.locations.length,
@@ -822,7 +822,7 @@ export function InitiativeOverviewTab({ initiative, dashboard, orgSlug, initiati
                         </MapContainer>
                     </div>
                 ) : (
-                    <div className="relative isolate h-[320px] rounded-3xl overflow-hidden border border-gray-200/60 shadow-card bg-white flex items-center justify-center text-muted-foreground">
+                    <div className="relative z-0 h-[320px] rounded-3xl overflow-hidden border border-gray-200/60 shadow-card bg-white flex items-center justify-center text-muted-foreground">
                         <p className="text-sm">No locations yet</p>
                     </div>
                 )}

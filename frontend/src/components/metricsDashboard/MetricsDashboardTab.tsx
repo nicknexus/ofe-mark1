@@ -545,9 +545,8 @@ export default function MetricsDashboardTab({
   )
 
   const renderMapPanel = () => (
-    // `isolate` keeps the map's internal z-indexes (Leaflet panes + the overlay
-    // pills) inside this frame so they never bleed through modals/overlays.
-    <motion.div variants={fadeUp} className="h-full relative isolate min-h-[240px] rounded-3xl overflow-hidden border border-gray-200/60 shadow-card">
+    // `z-0` contains Leaflet pane z-indexes so they don't bleed through modals.
+    <motion.div variants={fadeUp} className="h-full relative z-0 min-h-[240px] rounded-3xl overflow-hidden border border-gray-200/60 shadow-card">
       <LocationMap
         locations={mapLocations}
         autoFit

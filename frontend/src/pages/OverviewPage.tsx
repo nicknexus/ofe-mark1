@@ -450,7 +450,7 @@ export default function OverviewPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: easeOut, delay: 0.12 }}
           >
-            <div className="relative isolate flex-1 min-h-[220px] rounded-xl overflow-hidden border border-gray-200/80 shadow-card">
+            <div className="relative z-0 flex-1 min-h-[220px] rounded-xl overflow-hidden border border-gray-200/80 shadow-card">
               <LocationMap
                 locations={locations}
                 onLocationClick={(loc) => {

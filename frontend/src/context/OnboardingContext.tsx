@@ -37,11 +37,19 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
       if (!user) return
 
       const completed = user.user_metadata?.has_completed_onboarding === true
-      setHasCompletedOnboarding(completed)
+      const accountAgeMs = Date.now() - new Date(user.created_at).getTime()
+      const established =
+        completed ||
+        user.user_metadata?.has_completed_tutorial === true ||
+        Number(user.user_metadata?.tutorial_version_seen ?? 0) > 0 ||
+        accountAgeMs > 2 * 24 * 60 * 60 * 1000
 
-      if (!completed) {
-        // Small delay so the dashboard paints behind the overlay first,
-        // matching the old tutorial's entrance timing.
+      setHasCompletedOnboarding(completed || established)
+
+      // Only auto-launch for brand-new accounts. Live orgs from before this
+      // flag existed were getting the setup wizard on every login, which also
+      // hid What's New (and stamped it seen if they clicked through).
+      if (!established) {
         const timer = setTimeout(() => setIsActive(true), 1200)
         return () => clearTimeout(timer)
       }

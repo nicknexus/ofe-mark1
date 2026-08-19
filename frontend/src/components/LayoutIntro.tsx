@@ -5,9 +5,10 @@ import { useOnboarding } from '../context/OnboardingContext'
 import { useTutorial } from '../context/TutorialContext'
 import { supabase } from '../services/supabase'
 import {
-  LAYOUT_INTRO_SESSION,
   LAYOUT_INTRO_VERSION,
-  hasSeenLayoutIntro,
+  beginLayoutIntroCheck,
+  endLayoutIntroCheck,
+  introStorageKey,
   markLayoutIntroSeenLocal,
 } from '../lib/layoutIntro'
 
@@ -22,30 +23,38 @@ export default function LayoutIntro() {
   const [page, setPage] = useState<1 | 2>(1)
 
   useEffect(() => {
-    if (hasSeenLayoutIntro()) return
+    beginLayoutIntroCheck()
     if (onboardingActive || tutorialActive) return
 
     let cancelled = false
     const run = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-        const seen = Number(user.user_metadata?.layout_intro_seen ?? 0)
-        if (seen >= LAYOUT_INTRO_VERSION) {
-          markLayoutIntroSeenLocal()
+        if (cancelled) return
+        if (!user) {
+          endLayoutIntroCheck(false)
           return
         }
-        if (user.user_metadata?.has_completed_onboarding === false) return
+        const seen = Number(user.user_metadata?.layout_intro_seen ?? 0)
+        let localSeen = 0
+        try {
+          localSeen = Number(localStorage.getItem(introStorageKey(user.id)) || 0)
+        } catch {
+          localSeen = 0
+        }
+        if (seen >= LAYOUT_INTRO_VERSION || localSeen >= LAYOUT_INTRO_VERSION) {
+          markLayoutIntroSeenLocal(user.id)
+          endLayoutIntroCheck(false)
+          return
+        }
+        endLayoutIntroCheck(true)
+        if (!cancelled) setOpen(true)
       } catch {
-        return
-      }
-      if (!cancelled) {
-        try { sessionStorage.setItem(LAYOUT_INTRO_SESSION, '1') } catch { /* ignore */ }
-        setOpen(true)
+        endLayoutIntroCheck(false)
       }
     }
 
-    const t = window.setTimeout(run, 700)
+    const t = window.setTimeout(run, 500)
     return () => {
       cancelled = true
       window.clearTimeout(t)
@@ -54,7 +63,12 @@ export default function LayoutIntro() {
 
   const dismiss = async () => {
     setOpen(false)
-    markLayoutIntroSeenLocal()
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      markLayoutIntroSeenLocal(user?.id)
+    } catch {
+      markLayoutIntroSeenLocal()
+    }
     try {
       await supabase.auth.updateUser({ data: { layout_intro_seen: LAYOUT_INTRO_VERSION } })
     } catch (error) {
