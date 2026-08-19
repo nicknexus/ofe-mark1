@@ -271,6 +271,15 @@ class ApiService {
 
  // Cache the promise with timestamp
  this.requestCache.set(cacheKey, { promise: requestPromise, timestamp: now })
+ // Don't keep rejected GETs around. Login races (session not restored
+ // yet) would otherwise replay the failure for the full cache window
+ // and flash the connection page.
+ requestPromise.catch(() => {
+ const current = this.requestCache.get(cacheKey)
+ if (current?.promise === requestPromise) {
+ this.requestCache.delete(cacheKey)
+ }
+ })
 
  // For mutating operations, clear related cache entries after completion
  requestPromise.finally(() => {

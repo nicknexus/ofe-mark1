@@ -225,7 +225,7 @@ export default function AppSidebar({ user }: AppSidebarProps) {
         </Link>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-2">
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-2 scrollbar-thin">
       <div className="pb-3 border-b border-gray-100" ref={orgMenuRef}>
         {teamLoading ? (
           <div className="h-9 rounded-xl bg-gray-100 animate-pulse" />

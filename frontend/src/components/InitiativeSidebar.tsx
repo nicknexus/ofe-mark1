@@ -99,7 +99,7 @@ export default function InitiativeSidebar({
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 px-3 py-4 overflow-y-auto">
+      <div className="flex-1 px-3 py-4 overflow-y-auto scrollbar-thin">
         <p className="px-3 pb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
           Workspace
         </p>

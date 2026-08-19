@@ -420,7 +420,7 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  <p className="text-xs text-gray-400 sm:hidden">Tap a location for details</p>
  </div>
 
- <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
+ <div className="flex-1 overflow-y-auto space-y-2 min-h-0 scrollbar-thin">
  {orderedLocations.length === 0 ? (
  <div className="text-center py-8">
  <div className="app-icon-tile mx-auto mb-3">

@@ -120,6 +120,7 @@ function App() {
  const standalone = checkStandalone()
  const { updateAvailable, dismiss: dismissUpdate, refresh: refreshApp } = useVersionCheck()
  const checkedUserIdRef = useRef<string | null>(null)
+ const subCheckGenRef = useRef(0)
 
  useEffect(() => {
  // Get initial user
@@ -144,7 +145,9 @@ function App() {
  return nextUser
  })
  if (!nextUser) {
- // User logged out - clear subscription status
+ // User logged out - drop in-flight checks so a late failure
+ // can't flash the connection page on the next login.
+ subCheckGenRef.current += 1
  setSubscriptionStatus(null)
  }
  })
@@ -163,6 +166,7 @@ function App() {
  checkSubscription(true) // blocking check
  }
  } else {
+ subCheckGenRef.current += 1
  setSubscriptionStatus(null)
  checkedUserIdRef.current = null
  }
@@ -194,24 +198,42 @@ function App() {
 
  const checkSubscription = async (showLoader = false) => {
  if (!user) return
+ const currentUser = user
+ const gen = ++subCheckGenRef.current
 
  // Only show blocking loader on initial check
  if (showLoader) {
  setCheckingSubscription(true)
  }
+
+ try {
+ // Login / Safari session restore / backend wake often fail the first
+ // hit. Keep the loader up and retry instead of flashing Connection Issue.
+ const attempts = 3
+ let lastError: unknown
+ for (let i = 0; i < attempts; i++) {
+ if (gen !== subCheckGenRef.current) return
  try {
  const status = await SubscriptionService.getStatus()
+ if (gen !== subCheckGenRef.current) return
  setSubscriptionStatus(status)
+ return
  } catch (error) {
- console.error('Error checking subscription:', error)
- // On error, create a default status that allows access
- // This prevents locking users out if the subscription check fails
+ lastError = error
+ if (i < attempts - 1) {
+ await new Promise(r => setTimeout(r, 400 * (i + 1)))
+ }
+ }
+ }
+
+ if (gen !== subCheckGenRef.current) return
+ console.error('Error checking subscription:', lastError)
  setSubscriptionStatus({
  hasAccess: false,
  reason: 'error',
  subscription: {
  id: '',
- user_id: user.id,
+ user_id: currentUser.id,
  status: 'none',
  created_at: '',
  updated_at: ''
@@ -219,7 +241,7 @@ function App() {
  remainingTrialDays: null
  })
  } finally {
- if (showLoader) {
+ if (showLoader && gen === subCheckGenRef.current) {
  setCheckingSubscription(false)
  }
  }
@@ -325,11 +347,7 @@ function App() {
  }
 
  // Gate: Subscription check loading
- if (checkingSubscription && subscriptionStatus === null) {
- return <PWALoadingScreen />
- }
- if (subscriptionStatus === null) {
- checkSubscription(true)
+ if (checkingSubscription || subscriptionStatus === null) {
  return <PWALoadingScreen />
  }
 
@@ -516,7 +534,7 @@ function App() {
  const isOnInvitePage = window.location.pathname.startsWith('/invite/')
 
  // Only show blocking loader on initial subscription check (unless on invite page)
- if (checkingSubscription && subscriptionStatus === null && !isOnInvitePage) {
+ if ((checkingSubscription || subscriptionStatus === null) && !isOnInvitePage) {
  return (
  <div className="min-h-screen flex items-center justify-center bg-gray-50">
  <div className="text-center">
@@ -542,19 +560,6 @@ function App() {
  </Routes>
  <AppToaster />
  </AppRouter>
- )
- }
-
- // If we have no subscription status yet and not checking, something's wrong - trigger check
- if (subscriptionStatus === null) {
- checkSubscription(true)
- return (
- <div className="min-h-screen flex items-center justify-center bg-gray-50">
- <div className="text-center">
- <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
- <p className="mt-4 text-gray-600">Checking subscription...</p>
- </div>
- </div>
  )
  }
 

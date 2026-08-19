@@ -128,7 +128,7 @@ export default function LocationsPage() {
               />
             </div>
             <p className="app-section-title px-1 mb-2">{locations.length} location{locations.length === 1 ? '' : 's'}</p>
-            <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
+            <div className="flex-1 overflow-y-auto space-y-1 min-h-0 scrollbar-thin">
               {loading ? (
                 <SectionLoader />
               ) : filtered.length === 0 ? (
