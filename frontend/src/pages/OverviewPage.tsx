@@ -7,7 +7,7 @@ import { Initiative, Location, MetricDefinitionWithUsage, OrganizationContext } 
 import { useTeam } from '../context/TeamContext'
 import { useTutorial } from '../context/TutorialContext'
 import { useOnboarding } from '../context/OnboardingContext'
-import { AppCard, PageLoader, InlineAlert } from '../components/ui'
+import { AppCard, PageLoader, InlineAlert, Skeleton } from '../components/ui'
 import LocationMap from '../components/LocationMap'
 import { getKPIColor } from '../components/metricsDashboard/metricColorPalette'
 import { fadeUp, staggerContainer, easeOut } from '../components/timeline/motion'
@@ -128,8 +128,10 @@ export default function OverviewPage() {
     organizationName,
     ownedOrganization,
     activeOrganization,
+    loading: teamLoading,
   } = useTeam()
   const dashboardOrg = activeOrganization || ownedOrganization
+  const orgId = dashboardOrg?.id || (typeof window !== 'undefined' ? localStorage.getItem('nexus-active-org-id') : null)
 
   const [initiatives, setInitiatives] = useState<Initiative[]>([])
   const [metrics, setMetrics] = useState<MetricDefinitionWithUsage[]>([])
@@ -150,12 +152,13 @@ export default function OverviewPage() {
   }, [])
 
   useEffect(() => {
-    if (!dashboardOrg?.id) {
-      setLoading(false)
-      return
-    }
+    if (orgId) return
+    if (!teamLoading) setLoading(false)
+  }, [orgId, teamLoading])
+
+  useEffect(() => {
+    if (!orgId) return
     let cancelled = false
-    setLoading(true)
     setError(null)
 
     Promise.all([
@@ -163,7 +166,7 @@ export default function OverviewPage() {
       apiService.getMetricDefinitions(),
       apiService.getLocations(),
       apiService.getEvidence(),
-      apiService.getOrgContext(dashboardOrg.id).catch(() => null),
+      apiService.getOrgContext(orgId).catch(() => null),
     ])
       .then(([inits, defs, locs, evidence, ctx]) => {
         if (cancelled) return
@@ -181,7 +184,7 @@ export default function OverviewPage() {
       })
 
     return () => { cancelled = true }
-  }, [dashboardOrg?.id, reloadTick])
+  }, [orgId, reloadTick])
 
   useEffect(() => {
     if (!needsTutorial || tutorialActive) return
@@ -347,24 +350,36 @@ export default function OverviewPage() {
 
           <motion.div variants={fadeUp}>
             <Link to="/share/public" className="app-card-interactive p-4 h-full flex gap-3">
-              <div className={`app-icon-tile ${o?.is_public ? 'bg-impact-50 text-impact-700' : 'bg-amber-50 text-amber-700'}`}>
+              <div className={`app-icon-tile ${
+                !o ? 'bg-gray-100 text-secondary-400'
+                  : o.is_public ? 'bg-impact-50 text-impact-700' : 'bg-amber-50 text-amber-700'
+              }`}>
                 <Globe className="w-4 h-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
-                    {o?.is_public && (
-                      <span className="absolute inset-0 rounded-full bg-impact-400 animate-ping opacity-50" />
-                    )}
-                    <span className={`relative h-1.5 w-1.5 rounded-full ${o?.is_public ? 'bg-impact-500' : 'bg-amber-400'}`} />
-                  </span>
-                  <p className="text-sm font-semibold text-secondary-900">
-                    {o?.is_public ? 'Public page live' : 'Public page not live'}
-                  </p>
-                </div>
-                <p className="text-xs text-secondary-500 mt-2 leading-relaxed">
-                  {o?.is_public ? 'Visitors can see the work you tracked.' : 'Publish when there is something to show.'}
-                </p>
+                {!o ? (
+                  <>
+                    <Skeleton className="h-4 w-36" />
+                    <Skeleton className="h-3 w-48 mt-2.5" />
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
+                        {o.is_public && (
+                          <span className="absolute inset-0 rounded-full bg-impact-400 animate-ping opacity-50" />
+                        )}
+                        <span className={`relative h-1.5 w-1.5 rounded-full ${o.is_public ? 'bg-impact-500' : 'bg-amber-400'}`} />
+                      </span>
+                      <p className="text-sm font-semibold text-secondary-900">
+                        {o.is_public ? 'Public page live' : 'Public page not live'}
+                      </p>
+                    </div>
+                    <p className="text-xs text-secondary-500 mt-2 leading-relaxed">
+                      {o.is_public ? 'Visitors can see the work you tracked.' : 'Publish when there is something to show.'}
+                    </p>
+                  </>
+                )}
               </div>
             </Link>
           </motion.div>
