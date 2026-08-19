@@ -530,22 +530,9 @@ function App() {
  )
  }
 
- // Check if user is trying to access an invite page - always allow this
+ // Invite pages skip the subscription gate so the token can be accepted
+ // before billing state is known.
  const isOnInvitePage = window.location.pathname.startsWith('/invite/')
-
- // Only show blocking loader on initial subscription check (unless on invite page)
- if ((checkingSubscription || subscriptionStatus === null) && !isOnInvitePage) {
- return (
- <div className="min-h-screen flex items-center justify-center bg-gray-50">
- <div className="text-center">
- <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
- <p className="mt-4 text-gray-600">Checking subscription...</p>
- </div>
- </div>
- )
- }
-
- // If on invite page, let them through immediately to accept the invite
  if (isOnInvitePage) {
  return (
  <AppRouter>
@@ -560,6 +547,17 @@ function App() {
  </Routes>
  <AppToaster />
  </AppRouter>
+ )
+ }
+
+ if (checkingSubscription || !subscriptionStatus) {
+ return (
+ <div className="min-h-screen flex items-center justify-center bg-gray-50">
+ <div className="text-center">
+ <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+ <p className="mt-4 text-gray-600">Checking subscription...</p>
+ </div>
+ </div>
  )
  }
 
