@@ -309,6 +309,14 @@ export class TeamService {
         return !!data;
     }
 
+    /** Owner or org admin (not team_member). Used for branding / public / org profile writes. */
+    static async canEditOrgSettings(userId: string, organizationId: string): Promise<boolean> {
+        if (await this.isUserOwnerOfOrganization(userId, organizationId)) return true;
+        const membership = await this.getUserTeamMembership(userId, organizationId);
+        if (membership && resolveMemberType(membership.member_type) === 'admin') return true;
+        return await PlatformAdminService.canAccessOrg(userId, organizationId);
+    }
+
     /**
      * Return all organizations owned by a user (including demo / sandbox orgs).
      * Platform admins can own many demos alongside their real org.

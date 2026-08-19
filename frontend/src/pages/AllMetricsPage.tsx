@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, BarChart3, Plus, Search, Layers, Edit2, X, AlertTriangle, ChevronRight } from 'lucide-react'
+import { BarChart3, Plus, Search, Layers, Edit2, X, AlertTriangle, ChevronRight } from 'lucide-react'
 import { notify } from '../lib/notify'
 import { apiService } from '../services/api'
 import { CreateMetricDefinitionForm, Initiative, MetricDefinitionWithUsage } from '../types'
@@ -9,7 +9,8 @@ import MetricDefinitionModal from '../components/MetricDefinitionModal'
 import AddMetricToInitiativeModal from '../components/AddMetricToInitiativeModal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ModalFrame from '../components/ModalFrame'
-import { SectionLoader, EmptyState } from '../components/ui'
+import { SectionLoader, EmptyState, PageHeader } from '../components/ui'
+import { MetricsHelp } from '../components/tracking/TrackingHelp'
 import { useTeam } from '../context/TeamContext'
 
 /**
@@ -19,6 +20,27 @@ import { useTeam } from '../context/TeamContext'
  * aggregates the underlying claims rather than summing subtotals, so
  * percentage metrics stay correct.
  */
+function scoreMetricSearch(d: MetricDefinitionWithUsage, q: string): number {
+  const title = d.title.toLowerCase()
+  const desc = (d.description || '').toLowerCase()
+  const inits = d.initiatives.map(i => i.initiative_title.toLowerCase())
+  const tokens = q.split(/\s+/).filter(Boolean)
+  const hay = `${title} ${desc} ${inits.join(' ')}`
+  if (!tokens.every(t => hay.includes(t))) return 0
+
+  if (title === q) return 100
+  if (title.startsWith(q)) return 90
+
+  const titleWords = title.split(/[^a-z0-9]+/).filter(Boolean)
+  if (tokens.every(t => titleWords.some(w => w.startsWith(t)))) return 85
+  if (tokens.every(t => title.includes(t))) return 70
+  if (titleWords.some(w => w.startsWith(q)) || title.includes(q)) return 55
+
+  if (inits.some(t => t === q || t.startsWith(q) || t.split(/[^a-z0-9]+/).some(w => w.startsWith(q)))) return 35
+  if (desc.includes(q) || tokens.every(t => desc.includes(t))) return 20
+  return 15
+}
+
 export default function AllMetricsPage() {
   const { canAddMetrics, canEditMetrics, canDelete, activeOrganization } = useTeam()
   const orgLogoUrl = activeOrganization?.logo_url
@@ -61,11 +83,11 @@ export default function AllMetricsPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return definitions
-    return definitions.filter(d =>
-      d.title.toLowerCase().includes(q) ||
-      (d.description || '').toLowerCase().includes(q) ||
-      d.initiatives.some(i => i.initiative_title.toLowerCase().includes(q))
-    )
+    return definitions
+      .map(d => ({ d, score: scoreMetricSearch(d, q) }))
+      .filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(x => x.d)
   }, [definitions, search])
 
   const inUseCount = definitions.filter(d => d.initiative_count > 0).length
@@ -144,39 +166,23 @@ export default function AllMetricsPage() {
   }
 
   return (
-    <div className="min-h-screen app-canvas pt-24 pb-12 px-4 sm:px-6">
+    <div className="min-h-screen app-canvas pt-8 pb-12 px-4 sm:px-6">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-6">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 px-2 py-1.5 -ml-2 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors mb-3"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Dashboard
-          </Link>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">
-                Metrics
-              </h1>
-              <p className="text-sm text-gray-500 mt-1">
-                {definitions.length} metric{definitions.length !== 1 ? 's' : ''}
-                {definitions.length > 0 && ` · ${inUseCount} in use`}
-                {' · shared across every initiative'}
-              </p>
-            </div>
-            {canAddMetrics && (
-              <button
-                type="button"
-                onClick={() => { setEditing(undefined); setShowModal(true) }}
-                className="app-btn app-btn-primary shadow-sm flex-shrink-0"
-              >
-                <Plus className="w-4 h-4" />
-                New metric
-              </button>
-            )}
-          </div>
-        </div>
+        <PageHeader
+          title="Metrics"
+          subtitle={`${definitions.length} metric${definitions.length !== 1 ? 's' : ''}${definitions.length > 0 ? ` · ${inUseCount} in use` : ''} · shared across every initiative`}
+          help={<MetricsHelp />}
+          actions={canAddMetrics ? (
+            <button
+              type="button"
+              onClick={() => { setEditing(undefined); setShowModal(true) }}
+              className="app-btn app-btn-primary app-btn-sm"
+            >
+              <Plus className="w-4 h-4" />
+              New metric
+            </button>
+          ) : undefined}
+        />
 
         <div className="relative max-w-sm mb-5">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />

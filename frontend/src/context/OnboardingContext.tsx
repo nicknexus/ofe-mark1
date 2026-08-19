@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react'
 import { supabase } from '../services/supabase'
+import { LAYOUT_INTRO_VERSION, markLayoutIntroSeenLocal } from '../lib/layoutIntro'
 
 interface OnboardingContextType {
   /** Whether the full-screen wizard is currently mounted/visible. */
@@ -63,12 +64,18 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
   const completeOnboarding = useCallback(async () => {
     setIsActive(false)
     setHasCompletedOnboarding(true)
+    markLayoutIntroSeenLocal()
     window.dispatchEvent(new Event('onboarding-updated'))
     try {
       // Also flip the legacy tutorial flag so the old slide tour never
-      // auto-fires for users who came through onboarding.
+      // auto-fires for users who came through onboarding. Stamp the layout
+      // intro so they don't get a "welcome back" after first-time setup.
       const { error } = await supabase.auth.updateUser({
-        data: { has_completed_onboarding: true, has_completed_tutorial: true },
+        data: {
+          has_completed_onboarding: true,
+          has_completed_tutorial: true,
+          layout_intro_seen: LAYOUT_INTRO_VERSION,
+        },
       })
       if (error) throw error
     } catch (error) {

@@ -1,629 +1,301 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import React, { useEffect, useState } from 'react'
+import { Navigate, useSearchParams } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
- ArrowLeft,
- User as UserIcon,
- Building2,
- HardDrive,
- CreditCard,
- Users,
- Trash2,
- Palette,
- Code2,
+  User as UserIcon,
+  HardDrive,
+  CreditCard,
+  Trash2,
 } from 'lucide-react'
 import { AuthService } from '../services/auth'
-import { formatDate } from '../utils'
 import { apiService } from '../services/api'
-import { SubscriptionService } from '../services/subscription'
-import { TeamService, TeamMember, TeamInvitation, TeamCapacity } from '../services/team'
 import { useTeam } from '../context/TeamContext'
-import {
- defaultTeamMemberToggles,
- fullScope,
- togglesToGrants,
- validateTeamMemberInvite,
- type MemberType,
- type TeamMemberPermissionToggles,
- type TeamMemberScope,
-} from '../types/teamPermissions'
-import { User } from '../types'
-import ConfirmDialog from '../components/ConfirmDialog'
 import { PageHeader, PageLoader } from '../components/ui'
 import { notify } from '../lib/notify'
-import type { AccountPageOuterProps, ConfirmState, StorageUsage, TabType } from '../components/account/accountTypes'
+import type { AccountPageOuterProps, StorageUsage, TabType } from '../components/account/accountTypes'
 import { AccountTab } from '../components/account/AccountTab'
 import { BillingTab } from '../components/account/BillingTab'
-import { BrandingTab } from '../components/account/BrandingTab'
 import { DangerTab } from '../components/account/DangerTab'
-import { OrganizationTab } from '../components/account/OrganizationTab'
 import { getSupportContext } from '../admin/support'
 import SupportAccountView from '../components/account/SupportAccountView'
 import { StorageTab } from '../components/account/StorageTab'
-import { TeamsTab } from '../components/account/TeamsTab'
-import { WidgetTab } from '../components/account/WidgetTab'
+import { easeOut, viewSwap } from '../components/timeline/motion'
+
+const LEGACY_TABS: Record<string, string> = {
+  branding: '/share/org?tab=brand',
+  widget: '/share/embed',
+  organization: '/share/org?tab=about',
+  teams: '/share/team',
+}
+
+const SETTINGS_TABS: TabType[] = ['account', 'storage', 'billing', 'danger']
 
 export default function AccountPage({ subscriptionStatus }: AccountPageOuterProps) {
- const navigate = useNavigate()
- const [searchParams, setSearchParams] = useSearchParams()
- const { isOwner, isAdmin, isSharedMember, canManageTeam, organizationName, hasOwnOrganization, ownedOrganization: realOwnedOrganization, editableOrganization, activeOrganization, loading: teamLoading, refreshPermissions } = useTeam()
- // `ownedOrganization` throughout this page refers to whichever org the user
- // is currently editing — their real org, or a demo if they're inside one.
- const ownedOrganization = editableOrganization || realOwnedOrganization
+  const [searchParams, setSearchParams] = useSearchParams()
+  const {
+    hasOwnOrganization,
+    activeOrganization,
+    loading: teamLoading,
+    refreshPermissions,
+    isOwner,
+  } = useTeam()
 
- // The embed widget belongs to the org you're CURRENTLY in, not the one you
- // happen to own — a team member switched into someone else's org needs to
- // see that org's widget. `ownedOrganization` falls back to your own org for
- // non-owners, so this deliberately reads activeOrganization instead.
- const widgetOrganization = activeOrganization
- // Who may see the Embed Widget tab. Owners and org admins for now; change
- // this to `!!widgetOrganization` to open it to every team member. `isOwner`
- // and `isAdmin` are both scoped to the active org, so switching orgs
- // re-evaluates this correctly.
- const canSeeWidgetTab = !!widgetOrganization && (isOwner || isAdmin)
+  const tabParam = searchParams.get('tab')
+  const initialTab = SETTINGS_TABS.includes(tabParam as TabType) ? (tabParam as TabType) : 'account'
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab)
 
- // Get initial tab from URL or default to 'account'
- const initialTab = (searchParams.get('tab') as TabType) || 'account'
- const [activeTab, setActiveTab] = useState<TabType>(initialTab)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null)
+  const [storageLoading, setStorageLoading] = useState(true)
+  const [formData, setFormData] = useState({ name: '', email: '' })
 
- const [user, setUser] = useState<User | null>(null)
- const [loading, setLoading] = useState(true)
- const [saving, setSaving] = useState(false)
- const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null)
- const [storageLoading, setStorageLoading] = useState(true)
- const [formData, setFormData] = useState({ name: '', email: '' })
- const [initiativesUsage, setInitiativesUsage] = useState<{ current: number; limit: number | null } | null>(null)
- const [managingSubscription, setManagingSubscription] = useState(false)
- const [upgrading, setUpgrading] = useState(false)
+  const [showCreateOrg, setShowCreateOrg] = useState(false)
+  const [newOrgName, setNewOrgName] = useState('')
+  const [creatingOrg, setCreatingOrg] = useState(false)
 
- // Create org state
- const [showCreateOrg, setShowCreateOrg] = useState(false)
- const [newOrgName, setNewOrgName] = useState('')
- const [creatingOrg, setCreatingOrg] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirmation, setDeleteConfirmation] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
- // Delete account state
- const [showDeleteModal, setShowDeleteModal] = useState(false)
- const [deleteConfirmation, setDeleteConfirmation] = useState('')
- const [deleting, setDeleting] = useState(false)
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab)
+    setSearchParams({ tab })
+  }
 
- // Team state
- const [members, setMembers] = useState<TeamMember[]>([])
- const [invitations, setInvitations] = useState<TeamInvitation[]>([])
- const [capacity, setCapacity] = useState<TeamCapacity | null>(null)
- const [teamLoading2, setTeamLoading2] = useState(true)
- const [inviteEmail, setInviteEmail] = useState('')
- const [inviteMemberType, setInviteMemberType] = useState<MemberType>('admin')
- const [invitePermissionToggles, setInvitePermissionToggles] = useState<TeamMemberPermissionToggles>(defaultTeamMemberToggles)
- const [inviteScope, setInviteScope] = useState<TeamMemberScope>(fullScope)
- const [inviteRequiresApproval, setInviteRequiresApproval] = useState(false)
- const [sending, setSending] = useState(false)
- const [removingMember, setRemovingMember] = useState<string | null>(null)
- const [resendingInvite, setResendingInvite] = useState<string | null>(null)
- const [revokingInvite, setRevokingInvite] = useState<string | null>(null)
- const [confirmDialog, setConfirmDialog] = useState<ConfirmState | null>(null)
+  const isSupportMode = !!getSupportContext()
 
- // Logo state
- const [uploadingLogo, setUploadingLogo] = useState(false)
- const [deletingLogo, setDeletingLogo] = useState(false)
- const logoInputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (isSupportMode && (activeTab === 'billing' || activeTab === 'danger')) {
+      setActiveTab('account')
+      setSearchParams({ tab: 'account' }, { replace: true })
+    }
+    if (!isOwner && activeTab === 'billing') {
+      setActiveTab('account')
+      setSearchParams({ tab: 'account' }, { replace: true })
+    }
+  }, [activeTab, teamLoading, isSupportMode, isOwner, setSearchParams])
 
- // Brand color state
- const [brandColor, setBrandColor] = useState<string>(ownedOrganization?.brand_color || '#c0dfa1')
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const currentUser = await AuthService.getCurrentUser()
+        if (currentUser) {
+          setFormData({ name: currentUser.name || '', email: currentUser.email || '' })
+        }
+      } catch (error) {
+        console.error('Error loading user:', error)
+        notify.error('Failed to load account information')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadUser()
+  }, [])
 
- // Public visibility state
- const [updatingPublic, setUpdatingPublic] = useState(false)
+  useEffect(() => {
+    const loadStorageUsage = async () => {
+      setStorageLoading(true)
+      try {
+        const usage = await apiService.getStorageUsage()
+        setStorageUsage(usage)
+      } catch (error) {
+        console.error('Error loading storage usage:', error)
+      } finally {
+        setStorageLoading(false)
+      }
+    }
+    loadStorageUsage()
+  }, [activeOrganization?.id])
 
- // Sync brand color when organization loads
- useEffect(() => {
- if (ownedOrganization?.brand_color) {
- setBrandColor(ownedOrganization.brand_color)
- }
- }, [ownedOrganization?.brand_color])
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      await AuthService.updateProfile({ name: formData.name })
+      notify.success('Profile updated successfully')
+      const updatedUser = await AuthService.getCurrentUser()
+      if (updatedUser) {
+        setFormData({ name: updatedUser.name || '', email: updatedUser.email || '' })
+      }
+    } catch (error) {
+      notify.error('Failed to update profile')
+    } finally {
+      setSaving(false)
+    }
+  }
 
- // Update URL when tab changes
- const handleTabChange = (tab: TabType) => {
- setActiveTab(tab)
- setSearchParams({ tab })
- }
+  const handleCreateOrganization = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newOrgName.trim()) { notify.error('Organization name is required'); return }
+    setCreatingOrg(true)
+    try {
+      await apiService.createOrganization(newOrgName.trim())
+      notify.success('Organization created! You can now start a free trial.')
+      setShowCreateOrg(false)
+      setNewOrgName('')
+      await refreshPermissions()
+      window.location.reload()
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : 'Failed to create organization')
+    } finally {
+      setCreatingOrg(false)
+    }
+  }
 
- useEffect(() => {
- const loadUser = async () => {
- try {
- const currentUser = await AuthService.getCurrentUser()
- setUser(currentUser)
- if (currentUser) {
- setFormData({ name: currentUser.name || '', email: currentUser.email || '' })
- }
- } catch (error) {
- console.error('Error loading user:', error)
- notify.error('Failed to load account information')
- } finally {
- setLoading(false)
- }
- }
- loadUser()
- }, [])
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== 'DELETE MY ACCOUNT') {
+      notify.error('Please type "DELETE MY ACCOUNT" exactly to confirm')
+      return
+    }
+    setDeleting(true)
+    try {
+      await AuthService.deleteAccount(deleteConfirmation)
+      notify.success('Your account has been deleted')
+      window.location.href = '/'
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : 'Failed to delete account')
+      setDeleting(false)
+    }
+  }
 
- useEffect(() => {
- const loadStorageUsage = async () => {
- try {
- const usage = await apiService.getStorageUsage()
- setStorageUsage(usage)
- } catch (error) {
- console.error('Error loading storage usage:', error)
- } finally {
- setStorageLoading(false)
- }
- }
- loadStorageUsage()
- }, [])
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
 
- useEffect(() => {
- const loadInitiativesUsage = async () => {
- try {
- const usage = await SubscriptionService.getInitiativesUsage()
- setInitiativesUsage(usage)
- } catch (error) {
- console.error('Error loading initiatives usage:', error)
- }
- }
- loadInitiativesUsage()
- }, [])
+  if (tabParam && LEGACY_TABS[tabParam]) {
+    return <Navigate to={LEGACY_TABS[tabParam]} replace />
+  }
 
- useEffect(() => {
- if (canManageTeam && activeTab === 'teams') {
- loadTeamData()
- }
- }, [canManageTeam, activeTab])
+  if (loading) {
+    return <PageLoader />
+  }
 
- const loadTeamData = async () => {
- try {
- setTeamLoading2(true)
- const [membersData, invitationsData, capacityData] = await Promise.all([
- TeamService.getMembers(),
- TeamService.getPendingInvitations(),
- TeamService.getCapacity()
- ])
- setMembers(membersData)
- setInvitations(invitationsData)
- setCapacity(capacityData)
- } catch (error) {
- notify.error('Failed to load team data')
- } finally {
- setTeamLoading2(false)
- }
- }
+  const tabs = [
+    { id: 'account' as TabType, label: 'Your account', icon: UserIcon },
+    { id: 'billing' as TabType, label: 'Billing', icon: CreditCard, hideSupport: true, ownerOnly: true },
+    { id: 'storage' as TabType, label: 'Storage', icon: HardDrive },
+    { id: 'danger' as TabType, label: 'Delete', icon: Trash2, danger: true, hideSupport: true },
+  ]
 
- const handleManageSubscription = async () => {
- setManagingSubscription(true)
- try {
- const { url } = await SubscriptionService.createPortalSession()
- if (url) window.location.href = url
- else notify.error('Failed to open subscription management')
- } catch (error) {
- notify.error(error instanceof Error ? error.message : 'Failed to open subscription management')
- } finally {
- setManagingSubscription(false)
- }
- }
+  return (
+    <motion.div
+      className="min-h-screen pt-8 pb-10 px-4 sm:px-6 lg:px-8"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: easeOut }}
+    >
+      <div className="max-w-5xl mx-auto">
+        <PageHeader
+          title="Settings"
+          subtitle={activeOrganization?.name
+            ? `Your login for ${activeOrganization.name}`
+            : 'Your login. Organization and public page live in Share.'}
+        />
+        <div className="flex gap-8">
+          <nav className="w-44 flex-shrink-0 sticky top-8 self-start space-y-0.5">
+            {tabs.map((tab) => {
+              if (tab.hideSupport && isSupportMode) return null
+              if (tab.ownerOnly && !isOwner) return null
+              const active = activeTab === tab.id
+              return (
+                <React.Fragment key={tab.id}>
+                  {tab.danger && <div className="h-px bg-gray-100 my-2 mx-3" />}
+                  <button
+                  type="button"
+                  onClick={() => handleTabChange(tab.id)}
+                  className={`relative w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium ${
+                    active ? '' : 'hover:bg-gray-50'
+                  }`}
+                >
+                  {active && (
+                    <>
+                      <motion.span
+                        layoutId="settingsNavActive"
+                        className={`absolute inset-0 rounded-xl ${tab.danger ? 'bg-red-50' : 'bg-primary-50'}`}
+                        transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                      />
+                      <motion.span
+                        layoutId="settingsNavBar"
+                        className={`absolute left-0 top-1.5 bottom-1.5 w-1 rounded-full ${tab.danger ? 'bg-red-500' : 'bg-primary-600'}`}
+                        transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                      />
+                    </>
+                  )}
+                  <tab.icon className={`relative z-10 w-4 h-4 ${
+                    active
+                      ? tab.danger ? 'text-red-700' : 'text-primary-800'
+                      : tab.danger ? 'text-red-400' : 'text-gray-400'
+                  }`} />
+                  <span className={`relative z-10 ${
+                    active
+                      ? tab.danger ? 'text-red-800' : 'text-gray-900'
+                      : tab.danger ? 'text-red-600' : 'text-gray-600'
+                  }`}>
+                    {tab.label}
+                  </span>
+                </button>
+                </React.Fragment>
+              )
+            })}
+          </nav>
 
- const handleUpgrade = async () => {
- setUpgrading(true)
- try {
- const { url } = await SubscriptionService.createCheckoutSession()
- if (url) window.location.href = url
- else notify.error('Failed to start checkout')
- } catch (error) {
- notify.error(error instanceof Error ? error.message : 'Failed to start checkout')
- } finally {
- setUpgrading(false)
- }
- }
+          <div className="flex-1 min-w-0">
+            <AnimatePresence mode="wait">
+              <motion.div key={activeTab} {...viewSwap}>
+                {activeTab === 'account' && isSupportMode && activeOrganization && (
+                  <SupportAccountView orgId={activeOrganization.id} />
+                )}
 
- const handleSubmit = async (e: React.FormEvent) => {
- e.preventDefault()
- setSaving(true)
- try {
- await AuthService.updateProfile({ name: formData.name })
- notify.success('Profile updated successfully')
- const updatedUser = await AuthService.getCurrentUser()
- setUser(updatedUser)
- } catch (error) {
- notify.error('Failed to update profile')
- } finally {
- setSaving(false)
- }
- }
+                {activeTab === 'account' && !isSupportMode && (
+                  <AccountTab
+                    formData={formData}
+                    setFormData={setFormData}
+                    saving={saving}
+                    handleSubmit={handleSubmit}
+                    hasOwnOrganization={hasOwnOrganization}
+                    teamLoading={teamLoading}
+                    showCreateOrg={showCreateOrg}
+                    setShowCreateOrg={setShowCreateOrg}
+                    newOrgName={newOrgName}
+                    setNewOrgName={setNewOrgName}
+                    creatingOrg={creatingOrg}
+                    handleCreateOrganization={handleCreateOrganization}
+                  />
+                )}
 
- const handleCreateOrganization = async (e: React.FormEvent) => {
- e.preventDefault()
- if (!newOrgName.trim()) { notify.error('Organization name is required'); return }
- setCreatingOrg(true)
- try {
- await apiService.createOrganization(newOrgName.trim())
- notify.success('Organization created! You can now start a free trial.')
- setShowCreateOrg(false)
- setNewOrgName('')
- await refreshPermissions()
- window.location.reload()
- } catch (error) {
- notify.error(error instanceof Error ? error.message : 'Failed to create organization')
- } finally {
- setCreatingOrg(false)
- }
- }
+                {activeTab === 'storage' && (
+                  <StorageTab
+                    storageUsage={storageUsage}
+                    storageLoading={storageLoading}
+                    formatBytes={formatBytes}
+                  />
+                )}
 
- const handleDeleteAccount = async () => {
- if (deleteConfirmation !== 'DELETE MY ACCOUNT') {
- notify.error('Please type "DELETE MY ACCOUNT" exactly to confirm')
- return
- }
- setDeleting(true)
- try {
- await AuthService.deleteAccount(deleteConfirmation)
- notify.success('Your account has been deleted')
- window.location.href = '/'
- } catch (error) {
- notify.error(error instanceof Error ? error.message : 'Failed to delete account')
- setDeleting(false)
- }
- }
+                {activeTab === 'billing' && isOwner && (
+                  <BillingTab subscriptionStatus={subscriptionStatus} />
+                )}
 
- // Team handlers
- const handleSendInvite = async (e: React.FormEvent) => {
- e.preventDefault()
- if (!inviteEmail.trim()) { notify.error('Please enter an email address'); return }
-
- if (inviteMemberType === 'team_member') {
- const validationError = validateTeamMemberInvite(inviteMemberType, invitePermissionToggles, inviteScope)
- if (validationError) {
- notify.error(validationError)
- return
- }
- }
-
- setSending(true)
- try {
- const result = await TeamService.sendInvite({
- email: inviteEmail.trim(),
- memberType: inviteMemberType,
- canAddImpactClaims: invitePermissionToggles.addClaims,
- permissions:
- inviteMemberType === 'team_member'
- ? togglesToGrants(invitePermissionToggles)
- : undefined,
- scope: inviteMemberType === 'team_member' ? inviteScope : undefined,
- requiresEvidenceApproval: inviteMemberType === 'team_member' ? inviteRequiresApproval : false,
- })
- if (result.emailSent) notify.success(`Invitation sent to ${inviteEmail}`)
- else notify.success('Invitation created, but email could not be sent.')
- setInviteEmail('')
- setInviteMemberType('admin')
- setInvitePermissionToggles(defaultTeamMemberToggles)
- setInviteScope(fullScope)
- setInviteRequiresApproval(false)
- loadTeamData()
- } catch (error) {
- notify.error((error as Error).message)
- } finally {
- setSending(false)
- }
- }
-
- const handleRemoveMember = async (member: TeamMember) => {
- setRemovingMember(member.id)
- try {
- await TeamService.removeMember(member.id)
- notify.success('Member removed')
- loadTeamData()
- } catch (error) {
- notify.error((error as Error).message)
- } finally {
- setRemovingMember(null)
- }
- }
-
- const handleResendInvite = async (invitation: TeamInvitation) => {
- setResendingInvite(invitation.id)
- try {
- const result = await TeamService.resendInvite(invitation.id)
- if (result.emailSent) notify.success('Invitation resent')
- else notify.error('Failed to send email')
- loadTeamData()
- } catch (error) {
- notify.error((error as Error).message)
- } finally {
- setResendingInvite(null)
- }
- }
-
- const handleRevokeInvite = async (invitation: TeamInvitation) => {
- setRevokingInvite(invitation.id)
- try {
- await TeamService.revokeInvite(invitation.id)
- notify.success('Invitation revoked')
- loadTeamData()
- } catch (error) {
- notify.error((error as Error).message)
- } finally {
- setRevokingInvite(null)
- }
- }
-
- // Logo handlers
- const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
- const file = e.target.files?.[0]
- if (!file || !ownedOrganization?.id) return
- if (!file.type.startsWith('image/')) { notify.error('Please select an image file'); return }
- if (file.size > 5 * 1024 * 1024) { notify.error('Image must be less than 5MB'); return }
- setUploadingLogo(true)
- try {
- await apiService.uploadOrganizationLogo(ownedOrganization.id, file)
- notify.success('Logo uploaded successfully')
- await refreshPermissions()
- } catch (error) {
- notify.error((error as Error).message || 'Failed to upload logo')
- } finally {
- setUploadingLogo(false)
- if (logoInputRef.current) logoInputRef.current.value = ''
- }
- }
-
- const handleDeleteLogo = async () => {
- if (!ownedOrganization?.id || !ownedOrganization?.logo_url) return
- setDeletingLogo(true)
- try {
- await apiService.deleteOrganizationLogo(ownedOrganization.id)
- notify.success('Logo removed')
- await refreshPermissions()
- } catch (error) {
- notify.error((error as Error).message || 'Failed to remove logo')
- } finally {
- setDeletingLogo(false)
- }
- }
-
- const handleBrandColorChange = async (color: string) => {
- if (!ownedOrganization?.id) return
- try {
- await apiService.updateOrganization(ownedOrganization.id, { brand_color: color })
- setBrandColor(color)
- notify.success('Brand color updated!')
- await refreshPermissions()
- } catch (error) {
- notify.error((error as Error).message || 'Failed to update brand color')
- throw error
- }
- }
-
- const handleTogglePublic = async (makePublic: boolean) => {
- if (!ownedOrganization?.id) return
- setUpdatingPublic(true)
- try {
- await apiService.updateOrganization(ownedOrganization.id, { is_public: makePublic })
- notify.success(makePublic ? 'Your organization is now public!' : 'Your organization is now private')
- await refreshPermissions()
- } catch (error) {
- notify.error((error as Error).message || 'Failed to update visibility')
- } finally {
- setUpdatingPublic(false)
- }
- }
-
- const formatBytes = (bytes: number): string => {
- if (bytes === 0) return '0 B'
- const k = 1024
- const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
- const i = Math.floor(Math.log(bytes) / Math.log(k))
- return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
- }
-
-
- if (loading) {
- return <PageLoader />
- }
-
- const isSupportMode = !!getSupportContext()
- const tabs = [
- { id: 'account' as TabType, label: 'Account', icon: UserIcon },
- { id: 'organization' as TabType, label: 'Organization', icon: Building2, requiresOrg: true },
- { id: 'teams' as TabType, label: 'Teams', icon: Users },
- { id: 'branding' as TabType, label: 'Branding', icon: Palette, requiresOrg: true },
- // No `requiresOrg`: gated by canSeeWidgetTab instead, so a team member
- // with no organization of their own still sees their team's widget.
- { id: 'widget' as TabType, label: 'Embed Widget', icon: Code2 },
- { id: 'storage' as TabType, label: 'Storage', icon: HardDrive },
- { id: 'billing' as TabType, label: 'Billing', icon: CreditCard },
- { id: 'danger' as TabType, label: 'Delete Account', icon: Trash2, danger: true },
- ]
-
- return (
- <div className="min-h-screen app-canvas pt-24 pb-6">
- <div className="max-w-6xl mx-auto px-4 sm:px-6">
- <PageHeader title="Account Settings" backTo="/" />
-
- <div className="flex gap-6">
- {/* Sidebar */}
- <div className="w-56 flex-shrink-0">
- <div className="app-card p-2 sticky top-28">
- <nav className="space-y-1">
- {tabs.map((tab) => {
- if (tab.id === 'teams' && !canManageTeam) return null
- if (tab.id === 'widget' && !canSeeWidgetTab) return null
- if (isSupportMode && (tab.id === 'billing' || tab.id === 'danger')) return null
- // Owner-only surfaces (org profile, branding). Teams is gated by
- // canManageTeam above so org admins and support mode still see it.
- if (tab.requiresOrg && !hasOwnOrganization) return null
- const showNotPublicIndicator = tab.id === 'account' && hasOwnOrganization && !ownedOrganization?.is_public
- return (
- <button
- key={tab.id}
- onClick={() => handleTabChange(tab.id)}
- className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${activeTab === tab.id
- ? tab.danger ? 'bg-red-50 text-red-700' : 'bg-primary-50 text-primary-700'
- : tab.danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-600 hover:bg-gray-50'
- }`}
- >
- <tab.icon className="w-4 h-4" />
- {tab.label}
- {showNotPublicIndicator && (
- <span className="ml-auto w-5 h-5 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center">!</span>
- )}
- </button>
- )
- })}
- </nav>
- </div>
- </div>
-
- {/* Content */}
- <div className="flex-1 min-w-0">
- {activeTab === 'account' && isSupportMode && activeOrganization && (
- <SupportAccountView orgId={activeOrganization.id} />
- )}
-
- {activeTab === 'account' && !isSupportMode && (
- <AccountTab
- subscriptionStatus={subscriptionStatus}
- user={user}
- formData={formData}
- setFormData={setFormData}
- saving={saving}
- handleSubmit={handleSubmit}
- initiativesUsage={initiativesUsage}
- managingSubscription={managingSubscription}
- handleManageSubscription={handleManageSubscription}
- upgrading={upgrading}
- handleUpgrade={handleUpgrade}
- isOwner={isOwner}
- isSharedMember={isSharedMember}
- hasOwnOrganization={hasOwnOrganization}
- ownedOrganization={ownedOrganization}
- teamLoading={teamLoading}
- showCreateOrg={showCreateOrg}
- setShowCreateOrg={setShowCreateOrg}
- newOrgName={newOrgName}
- setNewOrgName={setNewOrgName}
- creatingOrg={creatingOrg}
- handleCreateOrganization={handleCreateOrganization}
- updatingPublic={updatingPublic}
- handleTogglePublic={handleTogglePublic}
- />
- )}
-
- {activeTab === 'organization' && hasOwnOrganization && (
- <OrganizationTab
- organization={ownedOrganization}
- refreshPermissions={refreshPermissions}
- />
- )}
-
- {activeTab === 'teams' && canManageTeam && (
- <TeamsTab
- organizationName={activeOrganization?.name || organizationName}
- members={members}
- invitations={invitations}
- capacity={capacity}
- loading={teamLoading2}
- inviteEmail={inviteEmail}
- setInviteEmail={setInviteEmail}
- memberType={inviteMemberType}
- setMemberType={setInviteMemberType}
- permissionToggles={invitePermissionToggles}
- setPermissionToggles={setInvitePermissionToggles}
- inviteScope={inviteScope}
- setInviteScope={setInviteScope}
- inviteRequiresApproval={inviteRequiresApproval}
- setInviteRequiresApproval={setInviteRequiresApproval}
- sending={sending}
- handleSendInvite={handleSendInvite}
- removingMember={removingMember}
- resendingInvite={resendingInvite}
- revokingInvite={revokingInvite}
- handleRemoveMember={(member: TeamMember) => setConfirmDialog({
- title: 'Remove team member',
- message: `Remove ${member.user_email || member.user_name || 'this member'} from the team?`,
- confirmLabel: 'Remove member',
- onConfirm: () => handleRemoveMember(member),
- })}
- handleResendInvite={handleResendInvite}
- handleRevokeInvite={(invitation: TeamInvitation) => setConfirmDialog({
- title: 'Revoke invitation',
- message: `Revoke invitation for ${invitation.email}?`,
- confirmLabel: 'Revoke invitation',
- onConfirm: () => handleRevokeInvite(invitation),
- })}
- formatDate={formatDate}
- onTeamDataChanged={loadTeamData}
- />
- )}
-
- {activeTab === 'branding' && hasOwnOrganization && (
- <BrandingTab
- organizationName={organizationName}
- organizationId={ownedOrganization?.id}
- organizationLogo={ownedOrganization?.logo_url}
- brandColor={brandColor}
- uploadingLogo={uploadingLogo}
- deletingLogo={deletingLogo}
- logoInputRef={logoInputRef}
- handleLogoUpload={handleLogoUpload}
- handleDeleteLogo={() => setConfirmDialog({
- title: 'Remove logo',
- message: 'Remove the organization logo?',
- confirmLabel: 'Remove logo',
- onConfirm: handleDeleteLogo,
- })}
- onBrandColorChange={handleBrandColorChange}
- />
- )}
-
- {activeTab === 'widget' && canSeeWidgetTab && (
- <WidgetTab
- orgSlug={widgetOrganization?.slug}
- isPublic={widgetOrganization?.is_public}
- />
- )}
-
- {activeTab === 'storage' && (
- <StorageTab
- storageUsage={storageUsage}
- storageLoading={storageLoading}
- formatBytes={formatBytes}
- />
- )}
-
- {activeTab === 'billing' && (
- <BillingTab subscriptionStatus={subscriptionStatus} />
- )}
-
- {activeTab === 'danger' && (
- <DangerTab
- hasOwnOrganization={hasOwnOrganization}
- showDeleteModal={showDeleteModal}
- setShowDeleteModal={setShowDeleteModal}
- deleteConfirmation={deleteConfirmation}
- setDeleteConfirmation={setDeleteConfirmation}
- deleting={deleting}
- handleDeleteAccount={handleDeleteAccount}
- />
- )}
- </div>
- </div>
- </div>
- {confirmDialog && (
- <ConfirmDialog
- title={confirmDialog.title}
- message={confirmDialog.message}
- confirmLabel={confirmDialog.confirmLabel}
- tone="danger"
- onConfirm={() => {
- const action = confirmDialog.onConfirm
- setConfirmDialog(null)
- action()
- }}
- onCancel={() => setConfirmDialog(null)}
- />
- )}
- </div>
- )
+                {activeTab === 'danger' && (
+                  <DangerTab
+                    hasOwnOrganization={hasOwnOrganization}
+                    showDeleteModal={showDeleteModal}
+                    setShowDeleteModal={setShowDeleteModal}
+                    deleteConfirmation={deleteConfirmation}
+                    setDeleteConfirmation={setDeleteConfirmation}
+                    deleting={deleting}
+                    handleDeleteAccount={handleDeleteAccount}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  )
 }

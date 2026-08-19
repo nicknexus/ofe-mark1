@@ -263,7 +263,7 @@ function PublicPagePreview({ color, logoUrl, orgName }: { color: string; logoUrl
               </div>
             </div>
             <span className="px-3 py-1.5 rounded-full text-[10px] font-semibold text-white shadow-sm flex-shrink-0" style={{ backgroundColor: color }}>
-              Donate
+              Support
             </span>
           </div>
 

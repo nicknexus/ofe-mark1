@@ -2,10 +2,13 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, type LucideIcon } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { PageHelpTip } from './PageHelpTip'
 
 export interface PageHeaderProps {
  title: string
  subtitle?: string
+ /** Short explainer shown from a ? next to the title. */
+ help?: React.ReactNode
  /** Optional leading icon (shown only when there is no back affordance). */
  icon?: LucideIcon
  /** Render a back button linking to this route. */
@@ -21,7 +24,7 @@ export interface PageHeaderProps {
  * Master page header for the authenticated tier. Standardizes the
  * back-link + icon + title + subtitle + actions row across every page.
  */
-export function PageHeader({ title, subtitle, icon: Icon, backTo, onBack, actions, className }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, help, icon: Icon, backTo, onBack, actions, className }: PageHeaderProps) {
  const back = onBack ? (
  <button type="button" onClick={onBack} aria-label="Back" className="app-icon-tile mt-0.5 hover:bg-gray-200 transition-colors">
  <ArrowLeft className="w-5 h-5" />
@@ -42,7 +45,10 @@ export function PageHeader({ title, subtitle, icon: Icon, backTo, onBack, action
  </div>
  )}
  <div className="min-w-0">
+ <div className="flex items-center gap-1.5 min-w-0">
  <h1 className="app-page-title truncate">{title}</h1>
+ {help && <PageHelpTip label={title}>{help}</PageHelpTip>}
+ </div>
  {subtitle && <p className="app-page-subtitle">{subtitle}</p>}
  </div>
  </div>

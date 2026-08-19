@@ -51,7 +51,7 @@ export default function InitiativeSidebar({
   const navigate = useNavigate()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const settingsRef = useRef<HTMLDivElement>(null)
-  const { ownedOrganization, hasOwnOrganization } = useTeam()
+  const { activeOrganization, isOwner, isAdmin } = useTeam()
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -75,18 +75,18 @@ export default function InitiativeSidebar({
     .map(part => part[0])
     .join('')
     .toUpperCase()
-  const needsPublicNudge = hasOwnOrganization && !ownedOrganization?.is_public
+  const needsPublicNudge = (isOwner || isAdmin) && !!activeOrganization && !activeOrganization.is_public && !activeOrganization.is_demo
 
   return (
     <div className="fixed left-0 top-0 w-56 h-screen bg-white border-r border-gray-200/70 flex flex-col z-30 desktop-sidebar">
       {/* Back link */}
       <div className="px-3 pt-3">
         <Link
-          to="/"
+          to="/tracking/initiatives"
           className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Dashboard</span>
+          <span>All initiatives</span>
         </Link>
       </div>
 

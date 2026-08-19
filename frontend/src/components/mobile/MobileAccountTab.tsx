@@ -493,8 +493,9 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
  <input type="url" value={orgWebsite} onChange={e => setOrgWebsite(e.target.value)} placeholder="https://yourorg.com" className="app-input" />
  </div>
  <div>
- <label className="app-label text-xs uppercase tracking-wider mb-1.5">Donation Link</label>
- <input type="url" value={orgDonationLink} onChange={e => setOrgDonationLink(e.target.value)} placeholder="https://donate.yourorg.com" className="app-input" />
+ <label className="app-label text-xs uppercase tracking-wider mb-1.5">Support link</label>
+ <input type="url" value={orgDonationLink} onChange={e => setOrgDonationLink(e.target.value)} placeholder="https://yourorg.com/support" className="app-input" />
+ <p className="app-help mt-1">The page where donors can best support you — a donation form, campaign, or your website.</p>
  </div>
  <button onClick={handleSaveOrg} disabled={savingOrg} className="app-btn app-btn-primary w-full py-3">
  <Save className="w-4 h-4" />

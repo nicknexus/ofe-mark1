@@ -258,7 +258,8 @@ router.put('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
         const organization = await OrganizationService.update(req.params.id, req.body, req.user!.id);
         res.json(organization);
     } catch (error) {
-        res.status(500).json({ error: (error as Error).message });
+        const status = (error as any).status || 500;
+        res.status(status).json({ error: (error as Error).message });
     }
 });
 
@@ -277,10 +278,9 @@ router.post('/:id/logo', authenticateUser, upload.single('logo'), async (req: Au
         const userId = req.user!.id;
         const orgId = req.params.id;
 
-        // Verify user owns this specific organization (supports multi-org owners, e.g. admins with demo orgs)
-        const isOwner = await TeamService.isUserOwnerOfOrganization(userId, orgId);
-        if (!isOwner) {
-            res.status(403).json({ error: 'Only the organization owner can update the logo' });
+        const canEdit = await TeamService.canEditOrgSettings(userId, orgId);
+        if (!canEdit) {
+            res.status(403).json({ error: 'Only the organization owner or admin can update the logo' });
             return;
         }
 
@@ -378,10 +378,9 @@ router.delete('/:id/logo', authenticateUser, async (req: AuthenticatedRequest, r
         const userId = req.user!.id;
         const orgId = req.params.id;
 
-        // Verify user owns this specific organization (supports multi-org owners)
-        const isOwner = await TeamService.isUserOwnerOfOrganization(userId, orgId);
-        if (!isOwner) {
-            res.status(403).json({ error: 'Only the organization owner can delete the logo' });
+        const canEdit = await TeamService.canEditOrgSettings(userId, orgId);
+        if (!canEdit) {
+            res.status(403).json({ error: 'Only the organization owner or admin can delete the logo' });
             return;
         }
 

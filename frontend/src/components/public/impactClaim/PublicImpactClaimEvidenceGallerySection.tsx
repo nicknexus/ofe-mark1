@@ -18,7 +18,7 @@ import {
 import { useOrgLinkBase } from '../../../hooks/useOrgLinkBase'
 import { PublicEvidence, PublicMetricTag } from '../../../services/publicApi'
 import PublicTagChip from '../PublicTagChip'
-import PublicShareButton from '../PublicShareButton'
+import PublicHeaderActions from '../PublicHeaderActions'
 import { formatDate } from '../../../utils'
 import { generateMetricSlug } from '../initiative/metricColors'
 import type { ImpactClaimCategoryVisual } from './impactClaimCategoryConfig'
@@ -346,9 +346,10 @@ export function PublicImpactClaimEvidenceGallerySection({ evidence, evidenceCoun
                                 <span className="text-muted-foreground text-sm hidden sm:inline flex-shrink-0">{galleryIndex + 1} of {filteredEvidence.length}</span>
                             </div>
                             <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                                <PublicShareButton
-                                    title={galleryItem.title}
-                                    url={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/evidence/${galleryItem.id}`}
+                                <PublicHeaderActions
+                                    orgSlug={orgSlug}
+                                    shareTitle={galleryItem.title}
+                                    shareUrl={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/evidence/${galleryItem.id}`}
                                 />
                                 <button onClick={closeGallery} className="w-9 h-9 rounded-full bg-white hover:bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors shadow-sm">
                                     <X className="w-4 h-4" />

@@ -18,7 +18,7 @@ function normalizeUrl(value: string): string {
 
 /**
  * Account-setup step: website + donation links. These are the same fields shown
- * on Account → Settings; the donation URL powers the "Donate" button on your
+ * on Account → Settings; the donation URL powers the "Support" button on your
  * public page. Optional — persists directly to the organization.
  */
 export default function LinksStep({ orgId }: Props) {
@@ -66,9 +66,9 @@ export default function LinksStep({ orgId }: Props) {
       <StepHeader
         icon={Link2}
         title="Add your links"
-        subtitle="Website & donations"
+        subtitle="Website & support"
         pill="Optional"
-        description="Link out to your website and donation page — the donation link becomes the “Donate” button on your public page. You can also manage these anytime in Account settings."
+        description="Link out to your website and a page where donors can support you — that URL becomes the “Support” button on your public page. You can also manage these anytime in Organization → Links."
       />
 
       <div className="app-card p-6 space-y-5 max-w-2xl">
@@ -85,16 +85,16 @@ export default function LinksStep({ orgId }: Props) {
         </div>
 
         <div>
-          <label className="app-label flex items-center gap-1.5"><Heart className="w-4 h-4 text-primary-600" /> Donation URL</label>
+          <label className="app-label flex items-center gap-1.5"><Heart className="w-4 h-4 text-primary-600" /> Support link</label>
           <input
             type="url"
             value={donation}
             onChange={(e) => setDonation(e.target.value)}
             className="app-input"
-            placeholder="https://yourcharity.org/donate"
+            placeholder="https://yourcharity.org/support"
             inputMode="url"
           />
-          <p className="app-help">Where supporters go when they click “Donate” on your public page.</p>
+          <p className="app-help">The page where donors can best support you — a donation form, campaign, or your website. Powers the Support button on your public page.</p>
         </div>
 
         <div className="flex items-center justify-between pt-4 border-t border-gray-100">

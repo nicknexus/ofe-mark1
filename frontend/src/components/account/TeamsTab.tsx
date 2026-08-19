@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import {
- AlertTriangle,
  Clock,
  Mail,
  Pencil,
@@ -8,13 +7,12 @@ import {
  Trash2,
  UserPlus,
  Users,
- X,
 } from 'lucide-react'
 import type { FormEvent } from 'react'
 import type { TeamMember, TeamInvitation } from '../../services/team'
 import type { TeamsTabProps } from './accountTypes'
-import ModalFrame from '../ModalFrame'
-import { SectionLoader, Spinner } from '../ui'
+import ModalFrame, { ModalHeader, ModalBody } from '../ModalFrame'
+import { Badge, EmptyState, InlineAlert, SectionLoader, Spinner } from '../ui'
 import { TeamInviteForm } from './TeamInviteForm'
 import { TeamMemberEditModal } from './TeamMemberEditModal'
 
@@ -24,8 +22,13 @@ function memberRoleLabel(member: TeamMember): string {
  return 'Admin'
 }
 
+function initials(name?: string | null, email?: string | null) {
+ const src = (name || email || '?').trim()
+ return src[0]?.toUpperCase() || '?'
+}
+
 export function TeamsTab({
- organizationName, members, invitations, capacity, loading,
+ organizationName, organizationLogo, organizationStatement, members, invitations, capacity, loading,
  inviteEmail, setInviteEmail, memberType, setMemberType,
  permissionToggles, setPermissionToggles,
  inviteScope, setInviteScope,
@@ -47,9 +50,11 @@ export function TeamsTab({
 
  if (loading) {
  return (
- <div className="app-card"><SectionLoader label="Loading team data..." /></div>
+ <div className="app-card"><SectionLoader label="Loading team…" /></div>
  )
  }
+
+ const canInvite = !capacity || capacity.canAdd
 
  return (
  <>
@@ -58,62 +63,181 @@ export function TeamsTab({
  onClose={() => setEditTarget(null)}
  onSaved={onTeamDataChanged}
  />
- <div className="space-y-6">
- <div className="app-card p-6">
- <div className="flex items-center justify-between mb-4">
- <div className="flex items-center gap-3">
- <div className="p-2 bg-primary-50 rounded-xl"><UserPlus className="w-5 h-5 text-primary-600" /></div>
- <div>
- <h2 className="text-lg font-semibold text-gray-800">Invite Team Member</h2>
- {organizationName && (
- <p className="text-xs text-gray-500">{organizationName}</p>
- )}
- </div>
- </div>
- {capacity && (
- <div className={`text-sm px-3 py-1 rounded-full ${capacity.canAdd ? 'bg-impact-100 text-impact-700' : 'bg-amber-100 text-amber-700'}`}>
- {capacity.current} / {capacity.limit} seats used
- </div>
- )}
- </div>
 
- {capacity && !capacity.canAdd ? (
- <div className="p-4 bg-amber-50 rounded-xl text-amber-800">
- <div className="flex items-center gap-2 mb-2"><AlertTriangle className="w-5 h-5" /><span className="font-medium">Team Limit Reached</span></div>
- <p className="text-sm">Remove a member or revoke an invitation to add more.</p>
- </div>
+ <div className="app-card overflow-hidden">
+ <div className="px-6 py-5 flex items-center justify-between gap-4">
+ <div className="flex items-center gap-3 min-w-0">
+ <div className="w-11 h-11 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex items-center justify-center flex-shrink-0">
+ {organizationLogo ? (
+ <img src={organizationLogo} alt="" className="w-full h-full object-cover" />
  ) : (
+ <span className="text-sm font-semibold text-secondary-400">
+ {(organizationName || '?').slice(0, 1).toUpperCase()}
+ </span>
+ )}
+ </div>
+ <div className="min-w-0">
+ <p className="text-sm font-semibold text-secondary-900 truncate">{organizationName || 'Organization'}</p>
+ <p className="text-xs text-secondary-500 truncate mt-0.5">
+ {organizationStatement?.trim() || 'This organization’s team'}
+ </p>
+ </div>
+ </div>
+ <div className="flex items-center gap-2 flex-shrink-0">
+ {capacity && (
+ <span className="text-[12px] tabular-nums text-secondary-400">
+ {capacity.current}/{capacity.limit} seats
+ </span>
+ )}
+ {canInvite && (
  <button
  type="button"
  onClick={() => setShowInvite(true)}
- className="app-btn app-btn-primary w-full flex items-center justify-center gap-2"
+ className="app-btn app-btn-primary app-btn-sm"
  >
- <UserPlus className="w-4 h-4" /> Invite team member
+ <UserPlus className="w-3.5 h-3.5" />
+ Invite
  </button>
+ )}
+ </div>
+ </div>
+
+ {capacity && !capacity.canAdd && (
+ <div className="px-6 pb-4">
+ <InlineAlert tone="warning" title="Seat limit reached">
+ Remove a member or revoke an invitation to add more.
+ </InlineAlert>
+ </div>
+ )}
+
+ <div className="px-6 pt-1 pb-2 flex items-baseline justify-between gap-2 border-t border-gray-100">
+ <h2 className="app-card-title">Members</h2>
+ <span className="text-[11px] tabular-nums text-secondary-400">{members.length}</span>
+ </div>
+
+ {members.length === 0 ? (
+ <EmptyState icon={Users} title="No members yet" description="Invite someone to this organization." />
+ ) : (
+ <ul className="divide-y divide-gray-100">
+ {members.map((member: TeamMember) => (
+ <li key={member.id} className="px-6 py-3.5 flex items-center gap-3 hover:bg-gray-50/70 transition-colors">
+ <div className="w-9 h-9 rounded-xl bg-primary-50 text-primary-800 text-[13px] font-semibold flex items-center justify-center flex-shrink-0">
+ {initials(member.user_name, member.user_email)}
+ </div>
+ <div className="min-w-0 flex-1">
+ <div className="flex items-center gap-2 min-w-0">
+ <p className="text-sm font-medium text-secondary-900 truncate">{member.user_name || member.user_email}</p>
+ <Badge tone={member.member_type === 'team_member' ? 'neutral' : 'accent'}>
+ {memberRoleLabel(member)}
+ </Badge>
+ </div>
+ <p className="text-[12px] text-secondary-400 truncate mt-0.5">
+ {member.user_name && member.user_email ? `${member.user_email} · ` : ''}
+ Joined {formatDate(member.joined_at)}
+ </p>
+ </div>
+ <div className="flex items-center gap-0.5 flex-shrink-0">
+ <button
+ type="button"
+ onClick={() => setEditTarget({ kind: 'member', record: member })}
+ className="app-btn app-btn-icon app-btn-ghost"
+ title="Edit role and permissions"
+ >
+ <Pencil className="w-4 h-4" />
+ </button>
+ <button
+ type="button"
+ onClick={() => handleRemoveMember(member)}
+ disabled={removingMember === member.id}
+ className="app-btn app-btn-icon app-btn-ghost text-gray-400 hover:text-red-600"
+ title="Remove member"
+ >
+ {removingMember === member.id ? <Spinner className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
+ </button>
+ </div>
+ </li>
+ ))}
+ </ul>
+ )}
+
+ <div className="px-6 pt-5 pb-2 flex items-baseline justify-between gap-2 border-t border-gray-100">
+ <h2 className="app-card-title">Pending</h2>
+ <span className="text-[11px] tabular-nums text-secondary-400">{invitations.length}</span>
+ </div>
+
+ {invitations.length === 0 ? (
+ <div className="pb-2">
+ <EmptyState icon={Mail} title="No pending invitations" />
+ </div>
+ ) : (
+ <ul className="divide-y divide-gray-100">
+ {invitations.map((invitation: TeamInvitation) => {
+ const isExpired = new Date(invitation.expires_at) < new Date()
+ const roleLabel = invitation.member_type === 'admin' ? 'Admin' : 'Team member'
+ return (
+ <li key={invitation.id} className="px-6 py-3.5 flex items-center gap-3 hover:bg-gray-50/70 transition-colors">
+ <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+ isExpired ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-700'
+ }`}>
+ <Clock className="w-4 h-4" />
+ </div>
+ <div className="min-w-0 flex-1">
+ <div className="flex items-center gap-2 min-w-0">
+ <p className="text-sm font-medium text-secondary-900 truncate">{invitation.email}</p>
+ <Badge tone={invitation.member_type === 'admin' ? 'accent' : 'neutral'}>{roleLabel}</Badge>
+ {isExpired && <Badge tone="danger">Expired</Badge>}
+ </div>
+ <p className="text-[12px] text-secondary-400 truncate mt-0.5">
+ Sent {formatDate(invitation.created_at)}
+ {!isExpired && ` · expires ${formatDate(invitation.expires_at)}`}
+ </p>
+ </div>
+ <div className="flex items-center gap-0.5 flex-shrink-0">
+ {!isExpired && (
+ <button
+ type="button"
+ onClick={() => setEditTarget({ kind: 'invitation', record: invitation })}
+ className="app-btn app-btn-icon app-btn-ghost"
+ title="Edit role and permissions"
+ >
+ <Pencil className="w-4 h-4" />
+ </button>
+ )}
+ <button
+ type="button"
+ onClick={() => handleResendInvite(invitation)}
+ disabled={resendingInvite === invitation.id}
+ className="app-btn app-btn-icon app-btn-ghost"
+ title="Resend"
+ >
+ {resendingInvite === invitation.id ? <Spinner className="w-4 h-4" /> : <RefreshCw className="w-4 h-4" />}
+ </button>
+ <button
+ type="button"
+ onClick={() => handleRevokeInvite(invitation)}
+ disabled={revokingInvite === invitation.id}
+ className="app-btn app-btn-icon app-btn-ghost text-gray-400 hover:text-red-600"
+ title="Revoke"
+ >
+ {revokingInvite === invitation.id ? <Spinner className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
+ </button>
+ </div>
+ </li>
+ )
+ })}
+ </ul>
  )}
  </div>
 
  {showInvite && (
- <ModalFrame
- zIndexClass="z-[1000]"
- size="2xl"
- panelClassName="bg-white rounded-xl border border-gray-200 max-w-6xl w-full max-h-[92vh] overflow-hidden shadow-app-modal flex flex-col"
- >
- <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-shrink-0">
- <div className="flex items-center gap-3 min-w-0">
- <div className="w-10 h-10 rounded-xl bg-primary-50 text-primary-700 flex items-center justify-center flex-shrink-0">
- <UserPlus className="w-5 h-5" />
- </div>
- <div className="min-w-0">
- <h2 className="text-base font-semibold text-gray-900 truncate">Invite team member</h2>
- {organizationName && <p className="text-xs text-gray-500 truncate">{organizationName}</p>}
- </div>
- </div>
- <button type="button" onClick={() => setShowInvite(false)} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg">
- <X className="w-5 h-5" />
- </button>
- </div>
- <div className="p-5 overflow-y-auto flex-1">
+ <ModalFrame zIndexClass="z-[1000]" size="2xl" onClose={() => setShowInvite(false)}>
+ <ModalHeader
+ icon={UserPlus}
+ title="Invite team member"
+ subtitle={organizationName}
+ onClose={() => setShowInvite(false)}
+ />
+ <ModalBody>
  <TeamInviteForm
  inviteEmail={inviteEmail}
  setInviteEmail={setInviteEmail}
@@ -128,106 +252,9 @@ export function TeamsTab({
  sending={sending}
  onSubmit={onInviteSubmit}
  />
- </div>
+ </ModalBody>
  </ModalFrame>
  )}
-
- <div className="app-card p-6">
- <div className="flex items-center gap-3 mb-4">
- <div className="p-2 bg-impact-50 rounded-xl"><Users className="w-5 h-5 text-impact-600" /></div>
- <h2 className="text-lg font-semibold text-gray-800">Team Members ({members.length})</h2>
- </div>
- {members.length === 0 ? (
- <div className="text-center py-8 text-gray-500"><Users className="w-12 h-12 mx-auto mb-3 opacity-30" /><p className="text-sm">No team members yet</p></div>
- ) : (
- <div className="space-y-3">
- {members.map((member: TeamMember) => (
- <div key={member.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
- <div className="flex items-center gap-3">
- <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
- <span className="text-primary-700 font-medium">{(member.user_name || member.user_email || '?')[0].toUpperCase()}</span>
- </div>
- <div>
- <div className="flex items-center gap-2">
- <p className="font-medium text-gray-900">{member.user_name || member.user_email}</p>
- <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
- {memberRoleLabel(member)}
- </span>
- </div>
- {member.user_name && member.user_email && <p className="text-xs text-gray-500">{member.user_email}</p>}
- <p className="text-xs text-gray-400">Joined {formatDate(member.joined_at)}</p>
- </div>
- </div>
- <div className="flex items-center gap-1">
- <button
- type="button"
- onClick={() => setEditTarget({ kind: 'member', record: member })}
- className="p-2 text-gray-400 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-colors"
- title="Edit role & permissions"
- >
- <Pencil className="w-4 h-4" />
- </button>
- <button onClick={() => handleRemoveMember(member)} disabled={removingMember === member.id} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
- {removingMember === member.id ? <Spinner className="w-4 h-4 border-red-500 border-t-transparent" /> : <Trash2 className="w-4 h-4" />}
- </button>
- </div>
- </div>
- ))}
- </div>
- )}
- </div>
-
- <div className="app-card p-6">
- <div className="flex items-center gap-3 mb-4">
- <div className="p-2 bg-amber-50 rounded-xl"><Mail className="w-5 h-5 text-amber-600" /></div>
- <h2 className="text-lg font-semibold text-gray-800">Pending Invitations ({invitations.length})</h2>
- </div>
- {invitations.length === 0 ? (
- <div className="text-center py-8 text-gray-500"><Mail className="w-12 h-12 mx-auto mb-3 opacity-30" /><p className="text-sm">No pending invitations</p></div>
- ) : (
- <div className="space-y-3">
- {invitations.map((invitation: TeamInvitation) => {
- const isExpired = new Date(invitation.expires_at) < new Date()
- const roleLabel = invitation.member_type === 'admin' ? 'Admin' : 'Team member'
- return (
- <div key={invitation.id} className={`flex items-center justify-between p-4 rounded-xl ${isExpired ? 'bg-red-50' : 'bg-gray-50'}`}>
- <div className="flex items-center gap-3">
- <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isExpired ? 'bg-red-100' : 'bg-amber-100'}`}>
- {isExpired ? <X className="w-5 h-5 text-red-500" /> : <Clock className="w-5 h-5 text-amber-500" />}
- </div>
- <div>
- <div className="flex items-center gap-2">
- <p className="font-medium text-gray-900">{invitation.email}</p>
- <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">{roleLabel}</span>
- </div>
- <p className="text-xs text-gray-500">Sent {formatDate(invitation.created_at)} • <span className={isExpired ? 'text-red-500' : ''}>{isExpired ? 'Expired' : `Expires ${formatDate(invitation.expires_at)}`}</span></p>
- </div>
- </div>
- <div className="flex items-center gap-1">
- {!isExpired && (
- <button
- type="button"
- onClick={() => setEditTarget({ kind: 'invitation', record: invitation })}
- className="p-2 text-gray-400 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-colors"
- title="Edit role & permissions"
- >
- <Pencil className="w-4 h-4" />
- </button>
- )}
- <button onClick={() => handleResendInvite(invitation)} disabled={resendingInvite === invitation.id} className="p-2 text-gray-400 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-colors">
- {resendingInvite === invitation.id ? <Spinner className="w-4 h-4" /> : <RefreshCw className="w-4 h-4" />}
- </button>
- <button onClick={() => handleRevokeInvite(invitation)} disabled={revokingInvite === invitation.id} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
- {revokingInvite === invitation.id ? <Spinner className="w-4 h-4 border-red-500 border-t-transparent" /> : <Trash2 className="w-4 h-4" />}
- </button>
- </div>
- </div>
- )
- })}
- </div>
- )}
- </div>
- </div>
  </>
  )
 }

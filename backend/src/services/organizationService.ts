@@ -150,17 +150,13 @@ export class OrganizationService {
         return data || [];
     }
 
-    // Update organization (must be owner)
+    // Update organization (owner or org admin)
     static async update(id: string, updates: Partial<Organization>, userId: string): Promise<Organization> {
-        // Check if user is the owner
-        const { data: existingOrg } = await supabase
-            .from('organizations')
-            .select('owner_id')
-            .eq('id', id)
-            .single();
-
-        if (!existingOrg || existingOrg.owner_id !== userId) {
-            throw new Error('Permission denied - must be owner');
+        const { TeamService } = await import('./teamService');
+        if (!(await TeamService.canEditOrgSettings(userId, id))) {
+            const err = new Error('Permission denied — must be owner or admin');
+            (err as any).status = 403;
+            throw err;
         }
 
         // Generate slug if name is being updated, with collision detection

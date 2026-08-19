@@ -1,21 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
  Plus,
  MapPin,
  Edit,
  Trash2,
- Users,
- Check,
- AlertCircle,
- ArrowRight,
- Globe,
- Compass,
- Sparkles,
  BarChart3,
- Palette,
- Image as ImageIcon,
-  FileText,
   GripVertical,
   ChevronRight
 } from 'lucide-react'
@@ -31,26 +21,26 @@ import {
  arrayMove,
  SortableContext,
  useSortable,
- verticalListSortingStrategy,
+ rectSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { motion } from 'framer-motion'
 import { apiService } from '../services/api'
-import { Initiative, LoadingState, CreateInitiativeForm, CreateMetricDefinitionForm, KPI, Location, MetricDefinitionWithUsage, OrganizationContext } from '../types'
+import { Initiative, LoadingState, CreateInitiativeForm, KPI, Location } from '../types'
 import { formatDate, truncateText } from '../utils'
 import { notify } from '../lib/notify'
 import CreateInitiativeModal from '../components/CreateInitiativeModal'
-import LocationMap from '../components/LocationMap'
-import AllLocationsModal from '../components/AllLocationsModal'
 import ModalFrame from '../components/ModalFrame'
 import UpgradeModal from '../components/UpgradeModal'
 import { SubscriptionService } from '../services/subscription'
-import GlobalMetricsStrip from '../components/overview/GlobalMetricsStrip'
-import MetricDefinitionModal from '../components/MetricDefinitionModal'
-import { ExternalLink, Lock } from 'lucide-react'
+import { Lock } from 'lucide-react'
 import { useTutorial } from '../context/TutorialContext'
 import { useOnboarding } from '../context/OnboardingContext'
 import { useTeam } from '../context/TeamContext'
-import { Button, PageLoader, InlineAlert, EmptyState } from '../components/ui'
+import { Button, PageLoader, InlineAlert, EmptyState, PageHeader } from '../components/ui'
+import { InitiativesHelp } from '../components/tracking/TrackingHelp'
+import { easeOut } from '../components/timeline/motion'
+import { shouldHoldTutorialAutostart } from '../lib/layoutIntro'
 
 // ============ Sortable initiative card ============
 // Owner/team can drag-reorder initiatives on the dashboard. Order is persisted
@@ -219,207 +209,11 @@ function SortableInitiativeCard({
  )
 }
 
-// ============ Small widgets ============
-function scoreColor(pct: number): string {
- if (pct >= 80) return '#22c55e'
- if (pct >= 50) return '#f59e0b'
- return '#ef4444'
-}
-
-function CompletionRing({ pct, size = 56 }: { pct: number; size?: number }) {
- const stroke = 6
- const r = (size - stroke) / 2
- const c = 2 * Math.PI * r
- const dash = (pct / 100) * c
- const color = scoreColor(pct)
- return (
- <svg width={size} height={size} className="flex-shrink-0">
- <circle cx={size / 2} cy={size / 2} r={r} stroke="#f1f5f9" strokeWidth={stroke} fill="none" />
- <circle
- cx={size / 2}
- cy={size / 2}
- r={r}
- stroke={color}
- strokeWidth={stroke}
- fill="none"
- strokeDasharray={`${dash} ${c}`}
- strokeLinecap="round"
- transform={`rotate(-90 ${size / 2} ${size / 2})`}
- style={{ transition: 'stroke-dasharray 500ms ease' }}
- />
- <text
- x="50%"
- y="50%"
- textAnchor="middle"
- dominantBaseline="central"
- fontSize={size * 0.28}
- fontWeight={700}
- fill="#374151"
- >{pct}%</text>
- </svg>
- )
-}
-
-function PublicScoreCard({
- score,
- checks,
-}: {
- score: { done: number; total: number; pct: number }
- checks: { id: string; label: string; done: boolean; to: string }[]
-}) {
- const [open, setOpen] = useState(false)
- return (
- <div className="app-card p-4 flex flex-col min-h-0">
- <div className="flex items-center gap-3">
- <CompletionRing pct={score.pct} size={48} />
- <div className="flex-1 min-w-0">
- <div className="flex items-center gap-1.5">
- <Globe className="w-3.5 h-3.5 text-gray-500" />
- <h3 className="text-sm font-semibold text-gray-800">Public Page</h3>
- </div>
- <p className="text-xs text-gray-500 mt-0.5">{score.done} of {score.total} complete</p>
- </div>
- <button
- onClick={() => setOpen(v => !v)}
- className="text-xs font-medium text-gray-500 hover:text-gray-800"
- >
- {open ? 'Hide' : 'View'}
- </button>
- </div>
- {open && (
- <div className="mt-3 space-y-1 overflow-y-auto min-h-0 flex-1">
- {checks.map(c => (
- <Link
- key={c.id}
- to={c.to}
- className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors ${c.done ? 'text-gray-400 line-through' : 'text-gray-700 hover:bg-gray-50'
- }`}
- >
- {c.done
- ? <Check className="w-3.5 h-3.5 text-impact-600 flex-shrink-0" />
- : <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />}
- <span className="truncate flex-1">{c.label}</span>
- {!c.done && <ArrowRight className="w-3 h-3 text-gray-400" />}
- </Link>
- ))}
- </div>
- )}
- </div>
- )
-}
-
-// NOTE: ContextScoreCard / NextStepsCard are currently unmounted — the
-// dashboard row they lived in now shows the org's global metrics. Kept here
-// (rather than deleted) because Next Steps is the onboarding nudge engine and
-// still needs a home; re-mount either one with a single line.
-function ContextScoreCard({
- score,
- checks,
-}: {
- score: { done: number; total: number; pct: number }
- checks: { id: string; label: string; done: boolean }[]
-}) {
- const color = scoreColor(score.pct)
- return (
- <Link
- to="/context"
- className="group bg-white rounded-2xl border border-gray-200/70 shadow-card hover:shadow-card-hover hover:border-primary-300/70 hover:-translate-y-0.5 p-4 flex flex-col gap-2.5 transition-all duration-200 min-h-0"
- >
- <div className="flex items-center gap-2.5">
- <div className="w-8 h-8 rounded-xl bg-primary-50 ring-1 ring-primary-100/50 flex items-center justify-center">
- <Compass className="w-4 h-4 text-primary-600" />
- </div>
- <h3 className="text-[13px] font-semibold text-gray-900 tracking-tight flex-1">Context Page</h3>
- <span className="text-xs font-semibold text-gray-500">{score.done}/{score.total}</span>
- <ArrowRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all" />
- </div>
- <div className="w-full h-1.5 bg-gray-100/80 rounded-full overflow-hidden">
- <div
- className="h-full rounded-full transition-all duration-500 "
- style={{ width: `${score.pct}%`, backgroundColor: color }}
- />
- </div>
- <div className="flex flex-wrap gap-1">
- {checks.map(c => (
- <span
- key={c.id}
- className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${c.done
- ? 'bg-impact-50 text-impact-700 ring-1 ring-impact-100'
- : 'bg-gray-50 text-gray-500 ring-1 ring-gray-100'
- }`}
- title={c.label}
- >
- {c.done ? <Check className="w-2.5 h-2.5" /> : <span className="w-1 h-1 rounded-full bg-current" />}
- {c.label}
- </span>
- ))}
- </div>
- </Link>
- )
-}
-
-function NextStepsCard({
- steps,
- loading,
-}: {
- steps: { id: string; label: string; icon: React.ReactNode; to?: string; onClick?: () => void }[]
- loading?: boolean
-}) {
- const rowClass = "group w-full text-left flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-gradient-to-br from-white to-gray-50/40 hover:from-primary-50/40 hover:to-primary-50/10 border border-gray-100 hover:border-primary-200/70 transition-all"
- return (
- <div className="bg-white rounded-2xl border border-gray-200/70 shadow-card p-4 flex flex-col min-h-0 flex-1">
- <div className="flex items-center gap-2.5 mb-3 flex-shrink-0">
- <div className="w-8 h-8 rounded-xl bg-primary-50 ring-1 ring-primary-100/50 flex items-center justify-center">
- <Sparkles className="w-4 h-4 text-primary-600" />
- </div>
- <h3 className="text-[13px] font-semibold text-gray-900 tracking-tight">Next Steps</h3>
- </div>
- <div className="flex-1 min-h-[6rem] overflow-y-auto space-y-1.5">
- {loading ? (
- <>
- <div className="h-[38px] rounded-xl bg-gray-100/70 animate-pulse" />
- <div className="h-[38px] rounded-xl bg-gray-100/70 animate-pulse" />
- <div className="h-[38px] rounded-xl bg-gray-100/60 animate-pulse" />
- </>
- ) : steps.length === 0 ? (
- <div className="h-full flex flex-col items-center justify-center text-center py-2">
- <div className="w-10 h-10 rounded-full bg-gradient-to-br from-impact-50 to-impact-100 ring-1 ring-impact-200/50 flex items-center justify-center mb-2">
- <Check className="w-5 h-5 text-impact-600" />
- </div>
- <p className="text-xs font-medium text-gray-700">All caught up!</p>
- <p className="text-xs text-gray-500 mt-0.5">Your dashboard is in great shape.</p>
- </div>
- ) : (
- steps.map(s => {
- const inner = (
- <>
- <div className="w-7 h-7 rounded-lg bg-white ring-1 ring-gray-200/70 shadow-sm flex items-center justify-center text-gray-500 group-hover:text-primary-600 group-hover:ring-primary-200/70 flex-shrink-0 transition-colors">
- {s.icon}
- </div>
- <span className="text-xs font-medium text-gray-700 group-hover:text-primary-700 flex-1 truncate">
- {s.label}
- </span>
- <ArrowRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
- </>
- )
- return s.onClick ? (
- <button key={s.id} type="button" onClick={s.onClick} className={rowClass}>{inner}</button>
- ) : (
- <Link key={s.id} to={s.to || '#'} className={rowClass}>{inner}</Link>
- )
- })
- )}
- </div>
- </div>
- )
-}
-
 export default function Dashboard() {
- const navigate = useNavigate()
+ const [searchParams, setSearchParams] = useSearchParams()
  const { startTutorial, needsTutorial, isActive: tutorialActive } = useTutorial()
  const { hasCompletedOnboarding, isActive: onboardingActive } = useOnboarding()
  const {
- isOwner,
  isSharedMember,
  organizationName,
  ownedOrganization,
@@ -427,8 +221,6 @@ export default function Dashboard() {
  canCreateInitiatives,
  canEditInitiatives,
  canDelete,
- canEditLocations,
- canAddMetrics,
  } = useTeam()
  // Team members see the full dashboard. Widgets read from activeOrganization
  // so a team member sees the org they're scoped into, not a missing
@@ -439,19 +231,11 @@ export default function Dashboard() {
  const canManageInitiatives = canEditInitiatives || canDelete || canCreateInitiatives
  const [initiatives, setInitiatives] = useState<Initiative[]>([])
  const [allKPIs, setAllKPIs] = useState<KPI[]>([])
- // Org-global metrics — the dashboard's headline numbers.
- const [metricDefinitions, setMetricDefinitions] = useState<MetricDefinitionWithUsage[]>([])
- const [metricsLoading, setMetricsLoading] = useState(true)
- const [showMetricModal, setShowMetricModal] = useState(false)
  const [allLocations, setAllLocations] = useState<Location[]>([])
- const [totalEvidence, setTotalEvidence] = useState<number>(0)
- const [orgContext, setOrgContext] = useState<OrganizationContext | null>(null)
- const [contextLoaded, setContextLoaded] = useState(false)
  // Organization info now comes from TeamContext
  const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: true })
  const [isLoadingStats, setIsLoadingStats] = useState(true)
  const [showCreateModal, setShowCreateModal] = useState(false)
- const [showAllLocationsModal, setShowAllLocationsModal] = useState(false)
  const [showEditModal, setShowEditModal] = useState(false)
  const [deleteConfirmInitiative, setDeleteConfirmInitiative] = useState<Initiative | null>(null)
  const [deleteConfirmText, setDeleteConfirmText] = useState('')
@@ -469,34 +253,12 @@ export default function Dashboard() {
  const loadTokenRef = useRef(0)
 
  useEffect(() => {
- if (!dashboardOrg?.id) return
- let cancelled = false
- setContextLoaded(false)
- apiService.getOrgContext(dashboardOrg.id)
- .then(ctx => { if (!cancelled) { setOrgContext(ctx); setContextLoaded(true) } })
- .catch(() => { if (!cancelled) { setOrgContext(null); setContextLoaded(true) } })
- return () => { cancelled = true }
- }, [dashboardOrg?.id])
-
- // Org-global metrics for the dashboard strip. Scoped to the active org, so
- // it reloads on org switch alongside everything else.
- const loadMetricDefinitions = React.useCallback(async () => {
- setMetricsLoading(true)
- try {
- const defs = await apiService.getMetricDefinitions()
- setMetricDefinitions(defs)
- } catch (err) {
- console.warn('Failed to load org metrics:', err)
- setMetricDefinitions([])
- } finally {
- setMetricsLoading(false)
- }
- }, [])
-
- useEffect(() => {
- if (!dashboardOrg?.id) return
- loadMetricDefinitions()
- }, [dashboardOrg?.id, loadMetricDefinitions])
+   if (searchParams.get('new') !== '1') return
+   setShowCreateModal(true)
+   const next = new URLSearchParams(searchParams)
+   next.delete('new')
+   setSearchParams(next, { replace: true })
+ }, [searchParams, setSearchParams])
 
  // Trigger initial load AND re-trigger on org switch. dashboardOrg?.id
  // is the active org (or owner fallback) — switching orgs flips this and we
@@ -508,12 +270,7 @@ export default function Dashboard() {
  setInitiatives([])
  setAllKPIs([])
  setAllLocations([])
- setTotalEvidence(0)
- setOrgContext(null)
- setContextLoaded(false)
  setIsLoadingStats(true)
- setMetricDefinitions([])
- setMetricsLoading(true)
  // Drop any in-flight promise from the previous org so loadAllData's
  // dedupe guard doesn't return the old promise to the new effect.
  loadingPromise.current = null
@@ -568,6 +325,7 @@ export default function Dashboard() {
  useEffect(() => {
  if (!needsTutorial || tutorialActive) return
  if (!hasCompletedOnboarding || onboardingActive) return
+ if (shouldHoldTutorialAutostart()) return
  const t = setTimeout(() => startTutorial(), 900)
  return () => clearTimeout(t)
  }, [needsTutorial, tutorialActive, hasCompletedOnboarding, onboardingActive, startTutorial])
@@ -633,13 +391,12 @@ export default function Dashboard() {
  .catch(() => { /* non-fatal */ })
 
  // Load KPIs, evidence, and locations in background
- const [{ kpis, evidence }, locations] = await Promise.all([
+ const [{ kpis }, locations] = await Promise.all([
  apiService.loadKPIsAndEvidence(),
  apiService.getLocations() // Get all locations across all initiatives
  ])
  if (isStale()) return
  setAllKPIs(kpis)
- setTotalEvidence(evidence.length)
  setAllLocations(locations)
  setIsLoadingStats(false)
 
@@ -674,13 +431,11 @@ export default function Dashboard() {
  const refreshKPIsAndEvidence = async () => {
  try {
  setIsLoadingStats(true)
- const [kpis, evidence, locations] = await Promise.all([
+ const [kpis, locations] = await Promise.all([
  apiService.getKPIs(),
- apiService.getEvidence(),
  apiService.getLocations()
  ])
  setAllKPIs(kpis)
- setTotalEvidence(evidence.length)
  setAllLocations(locations)
  setIsLoadingStats(false)
  } catch (error) {
@@ -787,7 +542,6 @@ export default function Dashboard() {
  }
 
 
- // ============ Completeness + Next Steps (owner only) ============
  // IMPORTANT: these hooks MUST run before any early return to preserve hook order.
  // Over-limit initiatives are locked: keep the oldest `limit`, lock the rest.
  // Matches the backend's downgrade rule (enforcePlanLimits keeps the oldest).
@@ -818,69 +572,6 @@ export default function Dashboard() {
  return map
  }, [initiatives, allKPIs, allLocations])
 
- const publicChecks = useMemo(() => {
- const o = ownedOrganization
- const firstInit = initiatives[0]?.id
- return [
- { id: 'logo', label: 'Upload organization logo', done: !!o?.logo_url, to: '/account?tab=organization' },
- { id: 'brand', label: 'Set brand color', done: !!o?.brand_color && o.brand_color !== '#c0dfa1', to: '/account?tab=branding' },
- { id: 'statement', label: 'Write mission statement', done: !!(o?.statement && o.statement.trim().length > 0), to: '/account?tab=organization' },
- { id: 'public', label: 'Make organization public', done: !!o?.is_public, to: '/account?tab=organization' },
- { id: 'initiative', label: 'Create an initiative', done: initiatives.length > 0, to: '/' },
-    { id: 'metric', label: 'Add at least one metric', done: allKPIs.length > 0, to: firstInit ? `/initiatives/${firstInit}?tab=metrics` : '/' },
- { id: 'location', label: 'Add at least one location', done: allLocations.length > 0, to: firstInit ? `/initiatives/${firstInit}?tab=location` : '/' },
- { id: 'evidence', label: 'Add at least one evidence', done: totalEvidence > 0, to: firstInit ? `/initiatives/${firstInit}?tab=logs&view=evidence` : '/' },
- ]
- }, [ownedOrganization, initiatives, allKPIs, allLocations, totalEvidence])
-
- const publicScore = useMemo(() => {
- const done = publicChecks.filter(c => c.done).length
- return { done, total: publicChecks.length, pct: Math.round((done / publicChecks.length) * 100) }
- }, [publicChecks])
-
- const contextChecks = useMemo(() => {
- const c = orgContext
- const hasText = (v?: string | null) => !!(v && v.trim().length > 0)
- const hasList = (v?: any[] | null) => Array.isArray(v) && v.length > 0
- return [
- { id: 'problem', label: 'Problem Statement', done: hasText(c?.problem_statement) },
- { id: 'stats', label: 'Stats & Statements', done: hasList(c?.stats_and_statements) },
- { id: 'theory', label: 'Theory of Change', done: hasText(c?.theory_of_change) || hasList(c?.theory_of_change_stages) },
- { id: 'strategies', label: 'Strategies', done: hasList(c?.strategies) },
- { id: 'more', label: 'More Context', done: hasText(c?.additional_info) },
- ]
- }, [orgContext])
-
- const contextScore = useMemo(() => {
- const done = contextChecks.filter(c => c.done).length
- return { done, total: contextChecks.length, pct: Math.round((done / contextChecks.length) * 100) }
- }, [contextChecks])
-
- const nextSteps = useMemo(() => {
- type Step = { id: string; label: string; icon: React.ReactNode; to?: string; onClick?: () => void }
- const steps: Step[] = []
- const o = dashboardOrg
- const firstInit = initiatives[0]?.id
- if (!o?.logo_url) steps.push({ id: 'logo', label: 'Upload your logo', to: '/account?tab=branding', icon: <ImageIcon className="w-4 h-4" /> })
- if (!o?.brand_color) steps.push({ id: 'brand', label: 'Pick a brand color', to: '/account?tab=branding', icon: <Palette className="w-4 h-4" /> })
- if (!o?.statement) steps.push({ id: 'statement', label: 'Add a mission statement', to: '/account?tab=organization', icon: <FileText className="w-4 h-4" /> })
- if (!o?.is_public) steps.push({ id: 'public', label: 'Publish your organization', to: '/account?tab=account', icon: <Globe className="w-4 h-4" /> })
- if (initiatives.length === 0) steps.push({ id: 'initiative', label: 'Create your first initiative', onClick: () => setShowCreateModal(true), icon: <Plus className="w-4 h-4" /> })
- initiatives.forEach((init) => {
- const initKpis = allKPIs.filter(k => k.initiative_id === init.id)
-    if (initKpis.length === 0) steps.push({ id: `metrics-${init.id}`, label: `Add metrics to "${init.title}"`, to: `/initiatives/${init.id}?tab=metrics`, icon: <BarChart3 className="w-4 h-4" /> })
- })
- if (allLocations.length === 0 && firstInit) {
- steps.push({ id: 'locations', label: 'Add locations to an initiative', to: `/initiatives/${firstInit}?tab=location`, icon: <MapPin className="w-4 h-4" /> })
- }
- if (totalEvidence === 0 && firstInit) {
- steps.push({ id: 'evidence', label: 'Add evidence to an initiative', to: `/initiatives/${firstInit}?tab=logs&view=evidence`, icon: <FileText className="w-4 h-4" /> })
- }
- if (contextScore.done < contextScore.total) {
- steps.push({ id: 'context', label: `Finish context page (${contextScore.done}/${contextScore.total})`, to: '/context', icon: <Compass className="w-4 h-4" /> })
- }
- return steps.slice(0, 4)
- }, [dashboardOrg, initiatives, allKPIs, allLocations, totalEvidence, contextScore])
 
  if (loadingState.isLoading) {
  return <PageLoader />
@@ -904,78 +595,40 @@ export default function Dashboard() {
  )
  }
 
- const handleLocationClick = (location: Location) => {
- if (location.initiative_id) {
-    navigate(`/initiatives/${location.initiative_id}?tab=location`)
- }
- }
-
  return (
  <>
- <div className="min-h-screen lg:h-screen lg:overflow-hidden pt-24 pb-6 px-4 sm:px-6 lg:px-8 xl:px-10 flex flex-col">
- <div className="max-w-[1600px] mx-auto w-full flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-x-4 gap-y-2 lg:grid-rows-[auto_minmax(0,1fr)]">
-          {/* Command-center header — title, at-a-glance stats, primary action */}
-          <div className="lg:col-start-1 lg:row-start-1 lg:col-span-5 xl:col-span-4 min-w-0 flex flex-wrap items-center gap-x-4 gap-y-2">
-            <div className="min-w-0 flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 leading-tight tracking-tight">
-                {isSharedMember ? 'Team Initiatives' : 'Your Initiatives'}
-              </h1>
-              {isSharedMember && organizationName && (
-                <span
-                  className="inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-purple-50 border border-purple-100 text-xs font-medium text-purple-700"
-                  title={`You're viewing ${organizationName}'s initiatives as a team member`}
-                >
-                  <Users className="w-3.5 h-3.5" />
-                  Team · {organizationName}
-                </span>
-              )}
-            </div>
-          </div>
-
- {/* Two-pane workspace: initiatives on the left (scrollable list, so
- every initiative stays reachable and reorderable), everything else
- stacked on the right — locked to the viewport on desktop. */}
- <div className="contents">
- {/* Initiatives — the heart of the page (narrower column) */}
- <section className="lg:col-start-1 lg:row-start-2 lg:col-span-5 xl:col-span-4 flex flex-col min-h-0">
-              <div className="flex items-center gap-2 mb-2.5 flex-shrink-0">
-                {canCreateInitiatives && (
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateModal(true)}
-                    className="app-btn app-btn-primary app-btn-sm shadow-sm"
-                    title="New initiative"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span className="hidden sm:inline">New initiative</span>
-                    <span className="sm:hidden">Add</span>
-                  </button>
-                )}
-                <h2 className="ml-auto text-xs font-semibold text-gray-400 uppercase tracking-wider">All initiatives</h2>
-                <span className="app-chip text-[11px] px-1.5 py-0 tabular-nums">{initiatives.length}</span>
-              </div>
- <div className="flex-1 min-h-0 lg:overflow-y-auto lg:pr-1.5 lg:pt-1.5">
- {initiatives.length === 0 ? (
- <div className="app-card p-10 text-center">
- <div className="app-icon-tile mx-auto mb-4">
- <img src="/Nexuslogo.png" alt="Nexus Logo" className="w-6 h-6 object-contain" />
- </div>
- <h3 className="text-lg font-semibold text-gray-800 mb-2">
- {isSharedMember ? 'No Initiatives Yet' : 'Welcome to Nexus Impacts AI'}
- </h3>
- <p className="text-gray-500 mb-6 max-w-md mx-auto text-sm">
- {isSharedMember
- ? `Your organization doesn't have any initiatives yet. Create the first one to start tracking impact.`
- : 'Create your first initiative to start tracking impact.'}
- </p>
- {canCreateInitiatives && (
- <button
- onClick={() => setShowCreateModal(true)}
- className="app-btn app-btn-primary"
+ <motion.div
+ className="min-h-screen pt-8 pb-10 px-4 sm:px-6 lg:px-8"
+ initial={{ opacity: 0, y: 8 }}
+ animate={{ opacity: 1, y: 0 }}
+ transition={{ duration: 0.35, ease: easeOut }}
  >
- Create Your First Initiative
+ <div className="max-w-6xl mx-auto">
+ <PageHeader
+ title={isSharedMember ? 'Team initiatives' : 'Initiatives'}
+ subtitle={isSharedMember && organizationName
+ ? `Team · ${organizationName}`
+ : 'Each initiative is a program you track. Open one to add metrics, locations, and evidence.'}
+ help={<InitiativesHelp />}
+ actions={canCreateInitiatives ? (
+ <button type="button" onClick={() => setShowCreateModal(true)} className="app-btn app-btn-primary app-btn-sm">
+ <Plus className="w-4 h-4" />
+ New initiative
  </button>
- )}
+ ) : undefined}
+ />
+
+ {initiatives.length === 0 ? (
+ <div className="app-card p-10">
+ <EmptyState
+ title="No initiatives yet"
+ description="Create one to start tracking metrics, locations, and evidence."
+ action={canCreateInitiatives ? (
+ <button type="button" onClick={() => setShowCreateModal(true)} className="app-btn app-btn-primary">
+ Create initiative
+ </button>
+ ) : undefined}
+ />
  </div>
  ) : (
  <DndContext
@@ -985,9 +638,9 @@ export default function Dashboard() {
  >
  <SortableContext
  items={initiatives.map(i => i.id!).filter(Boolean)}
- strategy={verticalListSortingStrategy}
+ strategy={rectSortingStrategy}
  >
- <div className="space-y-3">
+ <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
  {initiatives.map((initiative) => (
  <SortableInitiativeCard
  key={initiative.id}
@@ -997,97 +650,27 @@ export default function Dashboard() {
  canDeleteInitiatives={canDelete}
  openEditModal={openEditModal}
  openDeleteConfirm={openDeleteConfirm}
-                        locked={!!initiative.id && lockedInitiativeIds.has(initiative.id)}
-                        onLockedClick={() => setShowUpgradeModal(true)}
-                        orgLogoUrl={dashboardOrg?.logo_url}
-                      />
- ))}
-                    </div>
-                  </SortableContext>
-                  {canCreateInitiatives && (
-                    <button
-                      type="button"
-                      onClick={() => setShowCreateModal(true)}
-                      className="mt-3 w-full flex items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-300 text-gray-500 hover:text-primary-700 hover:border-primary-300 hover:bg-primary-50/40 py-3.5 text-sm font-medium transition-colors"
-                    >
-                      <Plus className="w-4 h-4" />
-                      New initiative
-                    </button>
-                  )}
-                </DndContext>
-              )}
-            </div>
-          </section>
-
- {/* Everything else — metrics aligned with All initiatives, then map */}
- <section className="lg:col-start-6 xl:col-start-5 lg:row-start-2 lg:col-span-7 xl:col-span-8 flex flex-col min-h-0">
- <div className="flex-1 min-h-0 flex flex-col gap-4">
- {/* Org-global metrics lead the dashboard: these totals span every
- initiative, which is the whole point of metrics being global. */}
- <GlobalMetricsStrip
- definitions={metricDefinitions}
- loading={metricsLoading}
- canAddMetrics={canAddMetrics}
- onCreate={() => setShowMetricModal(true)}
+ locked={!!initiative.id && lockedInitiativeIds.has(initiative.id)}
+ onLockedClick={() => setShowUpgradeModal(true)}
+ orgLogoUrl={dashboardOrg?.logo_url}
  />
-
- {/* Locations map — chrome-less rounded frame with overlay actions,
- same treatment as the Metrics Overview map. `isolate` keeps the
- map's z-indexes (Leaflet panes + pills) inside this frame so they
- never bleed through modals or full-screen overlays. */}
- <div className="hidden md:flex flex-col flex-1 min-h-0">
- <div className="flex items-center gap-2 mb-2.5 min-h-8 flex-shrink-0">
- <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
- Locations
- </h2>
- {canEditLocations && (
+ ))}
+ {canCreateInitiatives && (
  <button
  type="button"
- onClick={() => setShowAllLocationsModal(true)}
- className="ml-auto app-btn app-btn-primary app-btn-sm shadow-sm"
- title="Add location"
+ onClick={() => setShowCreateModal(true)}
+ className="min-h-[9.5rem] flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 text-gray-500 hover:text-primary-700 hover:border-primary-300 hover:bg-primary-50/40 text-sm font-medium transition-colors"
  >
  <Plus className="w-4 h-4" />
- Add location
+ New initiative
  </button>
  )}
  </div>
- <div className="relative isolate h-64 lg:h-auto lg:flex-1 lg:min-h-[180px] rounded-3xl overflow-hidden border border-gray-200/60 shadow-card">
- <LocationMap
- locations={allLocations}
- onLocationClick={handleLocationClick}
- hideEmptyBanner
- autoFit
- />
- <div className="absolute top-3 right-3 z-[400] flex items-center gap-1.5">
- <button
- onClick={() => setShowAllLocationsModal(true)}
- className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-white/90 backdrop-blur border border-gray-200 shadow-sm text-xs font-medium text-gray-700 hover:bg-white transition-colors"
- title="View all org locations"
- >
- <ExternalLink className="w-3.5 h-3.5 text-primary-600" />
- View all · {allLocations.length}
- </button>
+ </SortableContext>
+ </DndContext>
+ )}
  </div>
- </div>
- </div>
- </div>
- </section>
- </div>
- </div>
- </div>
-
- {/* Modals */}
- <AllLocationsModal
- isOpen={showAllLocationsModal}
- onClose={async () => {
- setShowAllLocationsModal(false)
- try {
- const fresh = await apiService.getOrgLocations()
- setAllLocations(fresh)
- } catch { /* noop */ }
- }}
- />
+ </motion.div>
 
  {showCreateModal && (
  <CreateInitiativeModal
@@ -1159,18 +742,6 @@ export default function Dashboard() {
  </div>
  </ModalFrame>
  )}
-
- {/* Upgrade Modal - Initiative Limit Reached */}
- <MetricDefinitionModal
- isOpen={showMetricModal}
- onClose={() => setShowMetricModal(false)}
- onSubmit={async (data) => {
- await apiService.createMetricDefinition(data)
- notify.success('Metric created')
- await loadMetricDefinitions()
- }}
- initiatives={initiatives}
- />
 
  <UpgradeModal
  isOpen={showUpgradeModal}

@@ -4,6 +4,7 @@
 export { Button, buttonVariants, type ButtonProps } from './button'
 export { AppCard, type AppCardProps, type AppCardVariant } from './AppCard'
 export { PageHeader, type PageHeaderProps } from './PageHeader'
+export { PageHelpTip } from './PageHelpTip'
 export { SectionHeader, type SectionHeaderProps } from './SectionHeader'
 export { EmptyState, type EmptyStateProps } from './EmptyState'
 export { Skeleton, SkeletonText, SkeletonCard } from './Skeleton'

@@ -91,7 +91,7 @@ export function WidgetTab({ orgSlug, isPublic }: WidgetTabProps) {
  <div className="flex items-start gap-3 mb-4">
  <div className="p-2 bg-primary-50 rounded-xl"><Code2 className="w-5 h-5 text-primary-600" /></div>
  <div className="flex-1">
- <h2 className="text-lg font-semibold text-gray-800">Embed Widget</h2>
+ <h2 className="text-lg font-semibold text-gray-800">Embed this widget on your website</h2>
  <p className="text-sm text-gray-500 mt-0.5">
  Give donors a live, branded snapshot of your impact to drop into their websites,
  newsletters, or fundraising pages. Updates automatically as your data changes.
@@ -104,8 +104,8 @@ export function WidgetTab({ orgSlug, isPublic }: WidgetTabProps) {
  <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
  <div>
  <span className="font-medium">Preview only.</span> This is exactly what donors will see, but the
- widget won't render on their sites until your public profile is live. Turn it on under the{' '}
- <span className="font-medium">Account</span> tab.
+ widget won't render on their sites until your public page is live. Turn it on under{' '}
+ <span className="font-medium">Public page</span>.
  </div>
  </div>
  )}
@@ -193,7 +193,7 @@ export function WidgetTab({ orgSlug, isPublic }: WidgetTabProps) {
  {previewMode === 'desktop'
  ? `Shown at ${Math.round(scale * 100)}% of desktop size — donors see it full-size on their site.`
  : 'Mobile preview at native width.'}
- {!isPublic && ' Visible to your team only until your public profile is live.'}
+ {!isPublic && ' Visible to your team only until your public page is live.'}
  </p>
  </div>
 
@@ -221,7 +221,7 @@ export function WidgetTab({ orgSlug, isPublic }: WidgetTabProps) {
  <p className="mt-2.5 flex items-start gap-1.5 text-xs text-amber-700">
  <AlertTriangle className="w-3.5 h-3.5 mt-px flex-shrink-0" />
  <span>
- This snippet is ready to share, but it will render an empty widget until your public profile is live.
+ This snippet is ready to share, but it will render an empty widget until your public page is live.
  </span>
  </p>
  )}

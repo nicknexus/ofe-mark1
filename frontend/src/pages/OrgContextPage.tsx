@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import {
  Compass, Save, AlertTriangle, Lightbulb, BarChart3, FileText,
  ExternalLink, Lock, Plus, Trash2, ArrowUp, ArrowDown, Hash, Quote, Workflow, Target,
- ChevronDown, Check, ArrowLeft, Video,
+ ChevronDown, Check, Video,
 } from 'lucide-react'
 import { notify } from '../lib/notify'
 import { apiService } from '../services/api'
@@ -375,17 +375,10 @@ export default function OrgContextPage() {
  const strategiesAtCap = strategies.length >= MAX_STRATEGIES
 
  return (
- <div className="min-h-screen pt-28 pb-16 px-4 sm:px-6">
+ <div className="min-h-screen pt-8 pb-16 px-4 sm:px-6">
  <div className="max-w-4xl mx-auto">
 
  <div className="mb-6">
- <Link
- to="/"
- className="inline-flex items-center gap-1.5 px-2 py-1.5 -ml-2 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors mb-3"
- >
- <ArrowLeft className="w-3.5 h-3.5" />
- Dashboard
- </Link>
  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
  <div className="min-w-0">
  <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Context &amp; Challenges</h1>

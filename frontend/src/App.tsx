@@ -1,6 +1,6 @@
 // v2 – desktop update banner
 import React, { useState, useEffect, useRef } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AppToaster } from './components/ui'
 import { AuthService } from './services/auth'
 import { SubscriptionService } from './services/subscription'
@@ -13,6 +13,7 @@ import { TeamProvider } from './context/TeamContext'
 import { UploadProvider } from './context/UploadContext'
 import InteractiveTutorial from './components/InteractiveTutorial'
 import OnboardingWizard from './components/onboarding/OnboardingWizard'
+import LayoutIntro from './components/LayoutIntro'
 import FloatingUploadPanel from './components/FloatingUploadPanel'
 import TrialBanner from './components/TrialBanner'
 import MobileApp from './components/MobileApp'
@@ -27,6 +28,13 @@ import UpdateBanner from './components/pwa/UpdateBanner'
 import HomePage from './pages/HomePage'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
+import OverviewPage from './pages/OverviewPage'
+import ContentOrgPage from './pages/ContentOrgPage'
+import ContentPublicPage from './pages/ContentPublicPage'
+import ContentEmbedPage from './pages/ContentEmbedPage'
+import ShareTeamPage from './pages/ShareTeamPage'
+import ContentCreatePage from './pages/ContentCreatePage'
+import LocationsPage from './pages/LocationsPage'
 import InitiativePage from './pages/InitiativePage'
 import TagDetailPage from './pages/TagDetailPage'
 import AllTagsPage from './pages/AllTagsPage'
@@ -55,6 +63,11 @@ import OfferCheckoutPage from './pages/OfferCheckoutPage'
 import EmbedPage from './pages/EmbedPage'
 import Layout from './components/Layout'
 import PublicScrollToTop from './components/public/PublicScrollToTop'
+
+function RedirectKeepSearch({ to }: { to: string }) {
+ const { search } = useLocation()
+ return <Navigate to={`${to}${search}`} replace />
+}
 
 function AppRouter({ children }: { children: React.ReactNode }) {
  return (
@@ -740,14 +753,31 @@ function App() {
  <Route path="/*" element={
  <Layout user={user}>
  <Routes>
- <Route index element={<Dashboard />} />
+ <Route index element={<OverviewPage />} />
+ <Route path="tracking" element={<RedirectKeepSearch to="/tracking/initiatives" />} />
+ <Route path="tracking/initiatives" element={<Dashboard />} />
  <Route path="initiatives/:id" element={<InitiativePage />} />
  <Route path="initiatives/:id/metrics/:kpiId" element={<InitiativePage />} />
  <Route path="metrics" element={<AllMetricsPage />} />
+ <Route path="locations" element={<LocationsPage />} />
  <Route path="tags" element={<AllTagsPage />} />
  <Route path="tags/:id" element={<TagDetailPage />} />
  <Route path="account" element={<AccountPage subscriptionStatus={subscriptionStatus} />} />
- <Route path="context" element={<OrgContextPage />} />
+ <Route path="share" element={<RedirectKeepSearch to="/share/public" />} />
+ <Route path="share/public" element={<ContentPublicPage />} />
+ <Route path="share/org" element={<ContentOrgPage />} />
+ <Route path="share/brand" element={<Navigate to="/share/org?tab=brand" replace />} />
+ <Route path="share/embed" element={<ContentEmbedPage />} />
+ <Route path="share/create" element={<ContentCreatePage />} />
+ <Route path="share/team" element={<ShareTeamPage />} />
+ <Route path="share/context" element={<OrgContextPage />} />
+ <Route path="context" element={<RedirectKeepSearch to="/share/context" />} />
+ <Route path="content" element={<RedirectKeepSearch to="/share/public" />} />
+ <Route path="content/org" element={<RedirectKeepSearch to="/share/org" />} />
+ <Route path="content/brand" element={<Navigate to="/share/org?tab=brand" replace />} />
+ <Route path="content/public" element={<RedirectKeepSearch to="/share/public" />} />
+ <Route path="content/embed" element={<RedirectKeepSearch to="/share/embed" />} />
+ <Route path="content/create" element={<RedirectKeepSearch to="/share/create" />} />
  <Route path="settings/team" element={<TeamSettingsPage />} />
  {user.is_admin && (
  <Route path="admin/demos" element={<AdminDemosPage />} />
@@ -759,6 +789,7 @@ function App() {
  </Routes>
  <InteractiveTutorial />
  <OnboardingWizard />
+ <LayoutIntro />
  {updateAvailable && <UpdateBanner onRefresh={refreshApp} onDismiss={dismissUpdate} />}
  </OnboardingProvider>
  </TutorialProvider>

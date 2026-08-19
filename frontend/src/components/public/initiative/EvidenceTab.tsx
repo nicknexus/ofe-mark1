@@ -32,7 +32,7 @@ import {
     brandIconStyle,
     DEFAULT_PUBLIC_BRAND,
 } from '../publicStyles'
-import PublicShareButton from '../PublicShareButton'
+import PublicHeaderActions from '../PublicHeaderActions'
 
 export function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', tagsById, onTagClick, selectedTagIds, brandColor: brandColorProp }: {
     evidence: PublicEvidence[] | null
@@ -474,9 +474,10 @@ export function EvidenceTab({ evidence, orgSlug, initiativeSlug, dateQS = '', ta
                                 </span>
                             </div>
                             <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                                <PublicShareButton
-                                    title={galleryItem.title}
-                                    url={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/evidence/${galleryItem.id}`}
+                                <PublicHeaderActions
+                                    orgSlug={orgSlug}
+                                    shareTitle={galleryItem.title}
+                                    shareUrl={`${orgLinkBase}/${orgSlug}/${initiativeSlug}/evidence/${galleryItem.id}`}
                                 />
                                 <button
                                     onClick={closeGallery}

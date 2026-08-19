@@ -7,6 +7,12 @@
 - Icons: **`lucide-react` only** (do not add `phosphor-react` or mixed icon libraries)
 - Toasts: use **`notify`** (`src/lib/notify.ts`) + mount **`<AppToaster />`** once per route branch in `App.tsx` (not raw `react-hot-toast` in app-tier code)
 
+## Copy
+
+Never use em dashes (`—`) in user-facing strings. Period, comma, colon, or hyphen. See root `AGENTS.md`.
+
+## UI “tiers” (do not flatten without thought)
+
 ## UI “tiers” (do not flatten without thought)
 
 The product mixes several visual contexts. When adding screens, **place them in the right tier** so tokens and wrappers stay correct:

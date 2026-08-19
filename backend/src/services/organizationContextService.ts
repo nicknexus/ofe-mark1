@@ -226,10 +226,8 @@ export class OrganizationContextService {
     }
 
     /**
-     * Phase 1 (full-access baseline): editing organization-context content
-     * (problem statement, theory of change, etc.) is content-level, not
-     * account-level, so team members are allowed. Org-account fields like
-     * name/branding/billing remain owner-only via OrganizationService.update.
+     * Context content is gated by membership. Branding / public / org profile
+     * writes go through OrganizationService.update (owner or org admin).
      */
     private static async assertOwner(orgId: string, userId: string): Promise<void> {
         const { data: org, error } = await supabase

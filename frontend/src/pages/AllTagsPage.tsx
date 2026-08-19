@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Tag as TagIcon, Plus, Search, Trash2, Edit2, Check, X, GripVertical } from 'lucide-react'
+import { Tag as TagIcon, Plus, Search, Trash2, Edit2, Check, X, GripVertical } from 'lucide-react'
 import { notify } from '../lib/notify'
 import {
  DndContext,
@@ -26,6 +26,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import UpgradeModal from '../components/UpgradeModal'
 import { SubscriptionService } from '../services/subscription'
 import { PageHeader, SectionLoader, EmptyState } from '../components/ui'
+import { TagsHelp } from '../components/tracking/TrackingHelp'
 import { useTeam } from '../context/TeamContext'
 
 interface SortableTagRowProps {
@@ -280,35 +281,23 @@ export default function AllTagsPage() {
  }
 
  return (
- <div className="min-h-screen app-canvas pt-24 pb-12 px-4 sm:px-6">
+ <div className="min-h-screen app-canvas pt-8 pb-12 px-4 sm:px-6">
  <div className="max-w-5xl mx-auto">
- <div className="mb-6">
- <Link
- to="/"
- className="inline-flex items-center gap-1.5 px-2 py-1.5 -ml-2 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors mb-3"
- >
- <ArrowLeft className="w-3.5 h-3.5" />
- Dashboard
- </Link>
- <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
- <div className="min-w-0">
- <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Tags</h1>
- <p className="text-sm text-gray-500 mt-1">
- {tags.length} tag{tags.length !== 1 ? 's' : ''} · drag the handles to reorder
- </p>
- </div>
- {canAddTags && (
+ <PageHeader
+ title="Tags"
+ subtitle={`${tags.length} tag${tags.length !== 1 ? 's' : ''} · drag the handles to reorder`}
+ help={<TagsHelp />}
+ actions={canAddTags ? (
  <button
  type="button"
  onClick={() => tagsLocked ? setShowUpgrade(true) : setShowInput(s => !s)}
- className="app-btn app-btn-primary shadow-sm flex-shrink-0"
+ className="app-btn app-btn-primary app-btn-sm"
  >
  <Plus className="w-4 h-4" />
  New tag
  </button>
- )}
- </div>
- </div>
+ ) : undefined}
+ />
 
  {/* Free-plan lock banner: tags are preserved but read-only until upgrade */}
  {tagsLocked && tags.length > 0 && (

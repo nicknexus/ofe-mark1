@@ -100,7 +100,7 @@ export default function TagDetailPage() {
 
  if (loading) {
  return (
- <div className="min-h-screen app-canvas pt-24 px-4 sm:px-6">
+ <div className="min-h-screen app-canvas pt-8 px-4 sm:px-6">
  <div className="max-w-5xl mx-auto"><SectionLoader /></div>
  </div>
  )
@@ -108,7 +108,7 @@ export default function TagDetailPage() {
 
  if (!data) {
  return (
- <div className="min-h-screen app-canvas pt-24 px-4 sm:px-6">
+ <div className="min-h-screen app-canvas pt-8 px-4 sm:px-6">
  <div className="max-w-5xl mx-auto">
  <PageHeader title="Tag not found" onBack={() => navigate(-1)} />
  </div>
@@ -168,10 +168,10 @@ export default function TagDetailPage() {
  }
 
  return (
- <div className="min-h-screen app-canvas pt-24 pb-12 px-4 sm:px-6">
+ <div className="min-h-screen app-canvas pt-8 pb-12 px-4 sm:px-6">
  <div className="max-w-5xl mx-auto">
  <button
- onClick={() => navigate(-1)}
+ onClick={() => navigate('/tags')}
  className="flex items-center gap-2 text-sm text-secondary-500 hover:text-secondary-700 mb-6"
  >
  <ArrowLeft className="w-4 h-4" /> Back

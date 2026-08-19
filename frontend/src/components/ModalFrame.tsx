@@ -15,6 +15,8 @@ interface ModalFrameProps {
  /** Padding on overlay (e.g. p-0 md:p-4 for full-bleed mobile) */
  paddingClassName?: string
  animate?: boolean
+ /** Close on backdrop click and Escape. */
+ onClose?: () => void
 }
 
 // Roomier scale so modals breathe (SaaS standard).
@@ -39,6 +41,7 @@ export default function ModalFrame({
  size = 'md',
  paddingClassName = 'p-4',
  animate = true,
+ onClose,
 }: ModalFrameProps) {
  useEffect(() => {
  const prev = document.body.style.overflow
@@ -46,11 +49,23 @@ export default function ModalFrame({
  return () => { document.body.style.overflow = prev }
  }, [])
 
+ useEffect(() => {
+ if (!onClose) return
+ const onKey = (e: KeyboardEvent) => {
+ if (e.key === 'Escape') onClose()
+ }
+ document.addEventListener('keydown', onKey)
+ return () => document.removeEventListener('keydown', onKey)
+ }, [onClose])
+
  const panel = panelClassName ?? cn(PANEL_BASE, sizeMaxW[size])
 
  return (
- <div className={cn('fixed inset-0 flex items-center justify-center', paddingClassName, zIndexClass, backdropClassName, animate && 'animate-fade-in')}>
- <div className={cn(panel, animate && 'animate-slide-up-fast')}>
+ <div
+ className={cn('fixed inset-0 flex items-center justify-center', paddingClassName, zIndexClass, backdropClassName, animate && 'animate-fade-in')}
+ onClick={onClose ? (e) => { if (e.target === e.currentTarget) onClose() } : undefined}
+ >
+ <div className={cn(panel, animate && 'animate-slide-up-fast')} onClick={(e) => e.stopPropagation()}>
  {children}
  </div>
  </div>

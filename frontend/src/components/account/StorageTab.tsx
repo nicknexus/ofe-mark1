@@ -1,13 +1,15 @@
 import { HardDrive, Info } from 'lucide-react'
+import { motion } from 'framer-motion'
 import type { StorageTabProps } from './accountTypes'
 import { SectionLoader } from '../ui'
+import { easeOut } from '../timeline/motion'
 
 export function StorageTab({ storageUsage, storageLoading, formatBytes }: StorageTabProps) {
  return (
  <div className="app-card p-6">
- <div className="flex items-center gap-3 mb-5">
- <div className="p-2 bg-evidence-50 rounded-xl"><HardDrive className="w-5 h-5 text-primary-700" /></div>
- <h2 className="text-lg font-semibold text-gray-800">Storage Usage</h2>
+ <div className="mb-5">
+ <h2 className="text-base font-semibold text-gray-800">Storage</h2>
+ <p className="text-sm text-secondary-500">Media uploaded as evidence and stories.</p>
  </div>
 
  {storageLoading ? (
@@ -19,8 +21,13 @@ export function StorageTab({ storageUsage, storageLoading, formatBytes }: Storag
  <span className="text-base text-gray-500">GB used</span>
  </div>
  <div className="space-y-2">
- <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
- <div className="h-full bg-gradient-to-r from-evidence-500 to-evidence-600 rounded-full transition-all duration-500" style={{ width: `${Math.min(storageUsage.used_percentage, 100)}%` }} />
+ <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+ <motion.div
+ className="h-full bg-evidence-500 rounded-full"
+ initial={{ width: 0 }}
+ animate={{ width: `${Math.min(storageUsage.used_percentage, 100)}%` }}
+ transition={{ duration: 0.5, ease: easeOut, delay: 0.15 }}
+ />
  </div>
  <div className="flex justify-between text-sm text-gray-500">
  <span>{formatBytes(storageUsage.storage_used_bytes)}</span>

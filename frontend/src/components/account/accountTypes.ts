@@ -1,5 +1,5 @@
 import type { ChangeEvent, Dispatch, FormEvent, MutableRefObject, SetStateAction } from 'react'
-import type { SubscriptionStatus, User } from '../../types'
+import type { SubscriptionStatus } from '../../types'
 import type {
     AccessibleOrganization,
     TeamMember,
@@ -39,21 +39,11 @@ export type AccountPageOuterProps = {
 }
 
 export type AccountTabProps = {
-    subscriptionStatus?: SubscriptionStatus | null
-    user: User | null
     formData: { name: string; email: string }
     setFormData: Dispatch<SetStateAction<{ name: string; email: string }>>
     saving: boolean
     handleSubmit: (e: FormEvent) => Promise<void>
-    initiativesUsage: { current: number; limit: number | null } | null
-    managingSubscription: boolean
-    handleManageSubscription: () => Promise<void>
-    upgrading: boolean
-    handleUpgrade: () => Promise<void>
-    isOwner: boolean
-    isSharedMember: boolean
     hasOwnOrganization: boolean
-    ownedOrganization: AccessibleOrganization | null
     teamLoading: boolean
     showCreateOrg: boolean
     setShowCreateOrg: Dispatch<SetStateAction<boolean>>
@@ -61,17 +51,19 @@ export type AccountTabProps = {
     setNewOrgName: Dispatch<SetStateAction<string>>
     creatingOrg: boolean
     handleCreateOrganization: (e: FormEvent) => Promise<void>
-    updatingPublic: boolean
-    handleTogglePublic: (makePublic: boolean) => Promise<void>
 }
 
 export type OrganizationTabProps = {
     organization: AccessibleOrganization | null
     refreshPermissions: () => Promise<void>
+    section?: 'about' | 'links'
+    readOnly?: boolean
 }
 
 export type TeamsTabProps = {
     organizationName?: string
+    organizationLogo?: string | null
+    organizationStatement?: string | null
     members: TeamMember[]
     invitations: TeamInvitation[]
     capacity: TeamCapacity | null
@@ -109,6 +101,7 @@ export type BrandingTabProps = {
     handleLogoUpload: (e: ChangeEvent<HTMLInputElement>) => Promise<void>
     handleDeleteLogo: () => void
     onBrandColorChange: (color: string) => Promise<void>
+    readOnly?: boolean
 }
 
 export type StorageTabProps = {

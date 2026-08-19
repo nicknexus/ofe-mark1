@@ -20,7 +20,7 @@ import {
  DollarSign
 } from 'lucide-react'
 import { apiService } from '../services/api'
-import { InitiativeDashboard, LoadingState, CreateKPIForm, CreateKPIUpdateForm, CreateEvidenceForm, User, Organization } from '../types'
+import { InitiativeDashboard, LoadingState, CreateKPIForm, CreateKPIUpdateForm, CreateEvidenceForm, User } from '../types'
 import { formatDate, getEvidenceColor, getCategoryColor, getEvidenceTypeInfo, getEvidenceStatus } from '../utils'
 import { aggregateKpiUpdates } from '../utils/kpiAggregation'
 import { AuthService } from '../services/auth'
@@ -50,7 +50,6 @@ import { useTeam } from '../context/TeamContext'
 export default function InitiativePage() {
  const { canAddImpactClaims, canEditEvidence, canAddMetrics, canEditMetrics, canDelete } = useTeam()
  const [user, setUser] = useState<User | null>(null)
- const [organization, setOrganization] = useState<Organization | null>(null)
  const { id, kpiId } = useParams<{ id: string; kpiId?: string }>()
  const [searchParams, setSearchParams] = useSearchParams()
  const navigate = useNavigate()
@@ -116,13 +115,8 @@ export default function InitiativePage() {
  try {
  const currentUser = await AuthService.getCurrentUser()
  setUser(currentUser)
- 
- const orgs = await apiService.getOrganizations()
- if (orgs && orgs.length > 0) {
- setOrganization(orgs[0])
- }
  } catch (error) {
- console.error('Error loading user or organization:', error)
+ console.error('Error loading user:', error)
  }
  }
  loadUserAndOrg()
@@ -587,7 +581,7 @@ export default function InitiativePage() {
  <InlineAlert tone="error" className="mb-4 max-w-md mx-auto text-left">{loadingState.error || 'Initiative not found'}</InlineAlert>
  <div className="space-x-4">
  <Button asChild variant="secondary">
- <Link to="/">Back to Dashboard</Link>
+ <Link to="/tracking/initiatives">Back to Tracking</Link>
  </Button>
  <Button onClick={loadDashboard} disabled={isLoadingDashboard}>
  {isLoadingDashboard ? 'Loading...' : 'Try Again'}

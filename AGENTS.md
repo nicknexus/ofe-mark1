@@ -24,6 +24,7 @@ Deep styling history and known debt: **[frontend/FRONTEND_CONSISTENCY_AUDIT.md](
 3. **Verify** — After frontend changes: `cd frontend && npx tsc --noEmit` and/or `npm run build` when practical.
 4. **Secrets** — Never commit `.env` or keys; don paste real credentials into code or docs.
 5. **Generated / noisy files** — Avoid committing one-off churn in `frontend/public/version.json` unless it is an intentional release bump; dev should not dirty it (Vite only stamps on **`vite build`**, not dev—see frontend guide).
+6. **No em dashes in copy** — Never use an em dash (`—`, U+2014) in user-facing copy (UI strings, toasts, empty states, help text, public pages, marketing). Use a period, comma, colon, or hyphen instead.
 
 ## Cursor / tooling
 
