@@ -23,14 +23,14 @@ function intro(stage: ChatStage, initiativeTitle?: string): string {
   switch (stage) {
     case 'description': return "First, tell me about your organization — what do you do, and who do you help? Or hit “Suggest” and I'll draft something."
     case 'locations': return 'Where do you create impact? Where does your organization operate and deliver its work? Tell me the places (city, country), or hit “Suggest” and I\'ll propose some based on what you\'ve shared.'
-    case 'initiatives': return 'Now your programs. What are the main initiatives you run? I can propose a few too.'
+    case 'initiatives': return 'Now your programs — what are the main ones you run? I can propose a few too.'
     case 'metrics': return `Let's add metrics for “${initiativeTitle}”. What do you want to measure? I can suggest some strong ones.`
     case 'groups': return `Any specific groups “${initiativeTitle}” serves? This one's optional — tell me, suggest, or skip.`
   }
 }
 
 const STAGE_LABEL: Record<ChatStage, string> = {
-  description: 'About you', locations: 'Locations', initiatives: 'Initiatives', metrics: 'Metrics', groups: 'Groups',
+  description: 'About you', locations: 'Locations', initiatives: 'Programs', metrics: 'Metrics', groups: 'Groups',
 }
 
 export default function ChatStep({ orgId, orgName, draftApi, onPlanApplied, onBackToOptions, onSkip }: Props) {

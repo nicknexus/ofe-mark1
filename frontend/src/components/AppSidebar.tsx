@@ -54,7 +54,7 @@ function SoftHome({ className }: { className?: string }) {
 }
 
 const TRACKING_ITEMS = [
-  { to: '/tracking/initiatives', label: 'Initiatives', icon: LayoutDashboard },
+  { to: '/tracking/programs', label: 'Programs', icon: LayoutDashboard },
   { to: '/metrics', label: 'Metrics', icon: BarChart3 },
   { to: '/locations', label: 'Locations', icon: MapPin },
   { to: '/tags', label: 'Tags', icon: Tag },

@@ -230,7 +230,7 @@ export class OrgAccessService {
             .select('id, organization_id')
             .eq('id', initiativeId)
             .maybeSingle();
-        if (error) throw new Error(`Failed to resolve initiative: ${error.message}`);
+        if (error) throw new Error(`Failed to resolve program: ${error.message}`);
         if (!data?.organization_id) return null;
         return data as { id: string; organization_id: string };
     }
@@ -538,7 +538,7 @@ export class OrgAccessService {
             .from('initiatives')
             .select('id')
             .eq('organization_id', ctx.organizationId);
-        if (error) throw new Error(`Failed to list initiatives: ${error.message}`);
+        if (error) throw new Error(`Failed to list programs: ${error.message}`);
         const allIds = (data ?? []).map((r: { id: string }) => r.id).filter(Boolean);
 
         const sr = await this.resolveScope(userId, requestedOrgId);

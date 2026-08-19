@@ -241,7 +241,7 @@ function getFeaturesByPlan(
     const fmtLimit = (n: number | null, unit: string) => (n === null ? `Unlimited ${unit}` : `Up to ${n} ${unit}`);
     const gb = (bytes: number | null) => (bytes === null ? 'Unlimited storage' : `${Math.round(bytes / (1024 ** 3))} GB storage`);
     return [
-        { name: fmtLimit(plan.initiatives_limit, 'initiatives'), included: true },
+        { name: fmtLimit(plan.initiatives_limit, 'programs'), included: true },
         { name: fmtLimit(plan.team_members_limit, 'team members'), included: true },
         { name: fmtLimit(plan.locations_limit, 'locations'), included: true },
         { name: gb(plan.storage_limit_bytes), included: true },
@@ -553,7 +553,7 @@ router.get('/initiatives-usage', authenticateUser, async (req: AuthenticatedRequ
         const usage = await SubscriptionService.getInitiativesUsage(userId, requestedOrgId);
         res.json(usage);
     } catch (error) {
-        console.error('Error getting initiatives usage:', error);
+        console.error('Error getting programs usage:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });

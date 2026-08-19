@@ -108,7 +108,7 @@ function SortableInitiativeCard({
             {initiative.title}
           </h3>
           <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">
-            {locked ? 'Locked — upgrade to unlock this initiative' : truncateText(initiative.description, 110)}
+            {locked ? 'Locked — upgrade to unlock this program' : truncateText(initiative.description, 110)}
           </p>
         </div>
       </div>
@@ -154,7 +154,7 @@ function SortableInitiativeCard({
  {inner}
  </button>
  ) : (
- <Link to={`/initiatives/${initiative.id}`} className="block h-full">
+ <Link to={`/programs/${initiative.id}`} className="block h-full">
  {inner}
  </Link>
  )}
@@ -169,7 +169,7 @@ function SortableInitiativeCard({
  onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
  className="hidden md:flex p-1 rounded-lg text-gray-300 hover:text-gray-500 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-all cursor-grab active:cursor-grabbing"
  title="Drag to reorder"
- aria-label="Drag to reorder initiative"
+ aria-label="Drag to reorder program"
  >
  <GripVertical className="w-3.5 h-3.5" />
  </button>
@@ -182,7 +182,7 @@ function SortableInitiativeCard({
  openEditModal(initiative)
  }}
  className="p-1 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-all"
- title="Edit Initiative"
+ title="Edit Program"
  >
  <Edit className="w-3.5 h-3.5" />
  </button>
@@ -195,7 +195,7 @@ function SortableInitiativeCard({
  openDeleteConfirm(initiative)
  }}
  className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
- title="Delete Initiative"
+ title="Delete Program"
  >
  <Trash2 className="w-3.5 h-3.5" />
  </button>
@@ -242,7 +242,7 @@ export default function Dashboard() {
  const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null)
  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
  const [upgradeUsage, setUpgradeUsage] = useState<{ current: number; limit: number } | null>(null)
- // Plan initiative limit — used to lock over-limit initiatives after a downgrade.
+ // Plan program limit — used to lock over-limit programs after a downgrade.
  const [initiativesLimit, setInitiativesLimit] = useState<number | null>(null)
 
  // Add loading cache to prevent duplicate requests
@@ -424,7 +424,7 @@ export default function Dashboard() {
  const initiatives = await apiService.getInitiatives()
  setInitiatives(initiatives)
  } catch (error) {
- console.error('Failed to refresh initiatives:', error)
+ console.error('Failed to refresh programs:', error)
  }
  }
 
@@ -447,19 +447,19 @@ export default function Dashboard() {
  const handleCreateInitiative = async (formData: CreateInitiativeForm) => {
  try {
  const newInitiative = await apiService.createInitiative(formData)
- notify.success('Initiative created successfully!')
+ notify.success('Program created successfully!')
  // Only refresh initiatives, not all data
  await refreshInitiatives()
 
  } catch (error: any) {
  // Check if it's an initiative limit error
- if (error?.code === 'INITIATIVE_LIMIT_REACHED' || error?.message?.includes('Initiative limit reached')) {
+ if (error?.code === 'INITIATIVE_LIMIT_REACHED' || error?.message?.includes('Program limit reached')) {
  setUpgradeUsage(error.usage || { current: initiatives.length, limit: 2 })
  setShowUpgradeModal(true)
  setShowCreateModal(false)
  return // Don't throw, we're handling it with UI
  }
- const message = error instanceof Error ? error.message : 'Failed to create initiative'
+ const message = error instanceof Error ? error.message : 'Failed to create program'
  notify.error(message)
  throw error
  }
@@ -469,13 +469,13 @@ export default function Dashboard() {
  if (!selectedInitiative?.id) return
  try {
  await apiService.updateInitiative(selectedInitiative.id, formData)
- notify.success('Initiative updated successfully!')
+ notify.success('Program updated successfully!')
  // Only refresh initiatives, not all data
  await refreshInitiatives()
  setShowEditModal(false)
  setSelectedInitiative(null)
  } catch (error) {
- const message = error instanceof Error ? error.message : 'Failed to update initiative'
+ const message = error instanceof Error ? error.message : 'Failed to update program'
  notify.error(message)
  throw error
  }
@@ -489,14 +489,14 @@ export default function Dashboard() {
  }
  try {
  await apiService.deleteInitiative(initiative.id)
- notify.success('Initiative deleted successfully!')
+ notify.success('Program deleted successfully!')
  // Refresh all data since deleting initiative affects KPIs and evidence too
  setIsLoadingStats(true)
  await loadAllData()
  setDeleteConfirmInitiative(null)
  setDeleteConfirmText('')
  } catch (error) {
- const message = error instanceof Error ? error.message : 'Failed to delete initiative'
+ const message = error instanceof Error ? error.message : 'Failed to delete program'
  notify.error(message)
  }
  }
@@ -531,9 +531,9 @@ export default function Dashboard() {
  .map((i, idx) => ({ id: i.id!, display_order: idx }))
  )
  } catch (err) {
- console.error('Failed to save initiative order:', err)
+ console.error('Failed to save program order:', err)
  setInitiatives(previous)
- notify.error('Failed to save initiative order')
+ notify.error('Failed to save program order')
  }
  }
 
@@ -605,15 +605,15 @@ export default function Dashboard() {
  >
  <div className="max-w-6xl mx-auto">
  <PageHeader
- title={isSharedMember ? 'Team initiatives' : 'Initiatives'}
+ title={isSharedMember ? 'Team programs' : 'Programs'}
  subtitle={isSharedMember && organizationName
  ? `Team · ${organizationName}`
- : 'Each initiative is a program you track. Open one to add metrics, locations, and evidence.'}
+ : 'Open a program to add metrics, locations, and evidence.'}
  help={<InitiativesHelp />}
  actions={canCreateInitiatives ? (
  <button type="button" onClick={() => setShowCreateModal(true)} className="app-btn app-btn-primary app-btn-sm">
  <Plus className="w-4 h-4" />
- New initiative
+ New program
  </button>
  ) : undefined}
  />
@@ -621,11 +621,11 @@ export default function Dashboard() {
  {initiatives.length === 0 ? (
  <div className="app-card p-10">
  <EmptyState
- title="No initiatives yet"
+ title="No programs yet"
  description="Create one to start tracking metrics, locations, and evidence."
  action={canCreateInitiatives ? (
  <button type="button" onClick={() => setShowCreateModal(true)} className="app-btn app-btn-primary">
- Create initiative
+ Create program
  </button>
  ) : undefined}
  />
@@ -662,7 +662,7 @@ export default function Dashboard() {
  className="min-h-[9.5rem] flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 text-gray-500 hover:text-primary-700 hover:border-primary-300 hover:bg-primary-50/40 text-sm font-medium transition-colors"
  >
  <Plus className="w-4 h-4" />
- New initiative
+ New program
  </button>
  )}
  </div>
@@ -702,7 +702,7 @@ export default function Dashboard() {
  <Trash2 className="w-5 h-5 text-red-500" />
  </div>
  <div className="flex-1">
- <h3 className="text-lg font-semibold text-gray-800 mb-1">Delete Initiative</h3>
+ <h3 className="text-lg font-semibold text-gray-800 mb-1">Delete Program</h3>
  <p className="text-sm text-gray-500">This action cannot be undone</p>
  </div>
  </div>
@@ -737,7 +737,7 @@ export default function Dashboard() {
  disabled={deleteConfirmText !== 'DELETE MY INITIATIVE'}
  className="app-btn app-btn-danger flex-1"
  >
- Delete Initiative
+ Delete Program
  </button>
  </div>
  </ModalFrame>
@@ -746,8 +746,8 @@ export default function Dashboard() {
  <UpgradeModal
  isOpen={showUpgradeModal}
  onClose={() => setShowUpgradeModal(false)}
- title="You've hit your initiative limit"
- subtitle={`You're using ${upgradeUsage?.current ?? initiatives.length} of ${upgradeUsage?.limit ?? 1} initiatives. Upgrade for more.`}
+ title="You've hit your program limit"
+ subtitle={`You're using ${upgradeUsage?.current ?? initiatives.length} of ${upgradeUsage?.limit ?? 1} programs. Upgrade for more.`}
  />
 
  </>

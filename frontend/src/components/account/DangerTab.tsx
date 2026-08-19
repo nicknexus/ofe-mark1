@@ -11,7 +11,7 @@ export function DangerTab({ hasOwnOrganization, showDeleteModal, setShowDeleteMo
  <h2 className="text-base font-semibold text-red-800">Delete account</h2>
  <p className="text-sm text-secondary-500 mt-1">Permanently delete your account and all associated data. This cannot be undone.</p>
  {hasOwnOrganization && (
- <p className="text-sm text-red-600 mt-2">This also deletes the organization, initiatives, metrics, evidence, stories, and team members.</p>
+ <p className="text-sm text-red-600 mt-2">This also deletes the organization, programs, metrics, evidence, stories, and team members.</p>
  )}
  <button onClick={() => setShowDeleteModal(true)} className="app-btn app-btn-danger mt-5">
  <Trash2 className="w-4 h-4" />Delete my account
@@ -35,7 +35,7 @@ export function DangerTab({ hasOwnOrganization, showDeleteModal, setShowDeleteMo
  <p className="text-sm text-red-800 font-medium mb-2">This action is permanent and cannot be undone.</p>
  <ul className="text-sm text-red-700 list-disc list-inside space-y-1">
  <li>Your account and profile</li>
- {hasOwnOrganization && <><li>Your organization</li><li>All initiatives and metrics</li><li>All evidence and stories</li><li>All team members</li></>}
+ {hasOwnOrganization && <><li>Your organization</li><li>All programs and metrics</li><li>All evidence and stories</li><li>All team members</li></>}
  <li>Your subscription</li>
  </ul>
  </div>

@@ -61,7 +61,7 @@ export default function GlobalMetricsStrip({
           <h3 className="text-sm font-semibold text-gray-800 mb-1">No metrics yet</h3>
           <p className="text-xs text-gray-500 max-w-sm mx-auto mb-4">
             Metrics are shared across your whole organization — create one here and add it to any
-            initiative.
+            program.
           </p>
           {canAddMetrics && onCreate && (
             <button type="button" onClick={onCreate} className="app-btn app-btn-primary app-btn-sm">
@@ -104,7 +104,7 @@ export default function GlobalMetricsStrip({
                 <div className="text-[10px] text-gray-400 mt-0.5 truncate">
                   {definition.initiative_count === 0
                     ? 'Not in use'
-                    : `${definition.initiative_count} initiative${definition.initiative_count === 1 ? '' : 's'}`}
+                    : `${definition.initiative_count} program${definition.initiative_count === 1 ? '' : 's'}`}
                 </div>
               </Link>
             )

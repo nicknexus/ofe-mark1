@@ -216,7 +216,7 @@ export default function AdminOrgsPage() {
                                 <SortHeader label="Organization" sortKey="name" />
                                 <th className="px-4 py-2.5 font-medium text-left">Owner</th>
                                 <SortHeader label="Plan" sortKey="plan" />
-                                <SortHeader label="Initiatives" sortKey="initiatives" />
+                                <SortHeader label="Programs" sortKey="initiatives" />
                                 <th className="px-4 py-2.5 font-medium text-left">Team</th>
                                 <SortHeader label="Storage" sortKey="storage" />
                                 <SortHeader label="Last seen" sortKey="last_seen" align="right" />

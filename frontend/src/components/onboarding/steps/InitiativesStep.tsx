@@ -29,12 +29,12 @@ export default function InitiativesStep({ draftApi }: Props) {
         region: region.trim() || undefined,
       })
       addInitiative(created)
-      notify.success('Initiative created')
+      notify.success('Program created')
       setTitle(''); setDescription(''); setRegion('')
     } catch (e: any) {
       // Surface plan-limit errors clearly (createInitiative can 4xx with a usage payload).
-      notify.error(e?.message || 'Could not create initiative')
-      setError(e?.message || 'Could not create initiative')
+      notify.error(e?.message || 'Could not create program')
+      setError(e?.message || 'Could not create program')
     } finally {
       setSaving(false)
     }
@@ -45,7 +45,7 @@ export default function InitiativesStep({ draftApi }: Props) {
       await apiService.deleteInitiative(id)
       removeInitiative(id)
     } catch (e) {
-      notify.error((e as Error).message || 'Could not remove initiative')
+      notify.error((e as Error).message || 'Could not remove program')
     }
   }
 
@@ -53,19 +53,19 @@ export default function InitiativesStep({ draftApi }: Props) {
     <div>
       <StepHeader
         icon={Target}
-        headline="Create Initiatives"
-        description="Initiatives are how you organize your work — each one holds its own metrics, evidence, and reports. Create your first one here, then you'll add metrics in the next step. Create as many as you need."
+        headline="Create Programs"
+        description="Programs are how you organize your work — each one holds its own metrics, evidence, and reports. Create your first one here, then you'll add metrics in the next step. Create as many as you need."
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl">
         <div className="app-card p-5 sm:p-6 space-y-4">
           <div>
-            <label className="app-label">Initiative title <span className="text-red-500">*</span></label>
+            <label className="app-label">Program title <span className="text-red-500">*</span></label>
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="app-input" placeholder="e.g. Youth Training Program 2025" />
           </div>
           <div>
             <label className="app-label">Description <span className="text-red-500">*</span></label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="app-input resize-none" rows={3} placeholder="What does this initiative aim to achieve?" />
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="app-input resize-none" rows={3} placeholder="What does this program aim to achieve?" />
           </div>
           <div>
             <label className="app-label">Region</label>
@@ -73,16 +73,16 @@ export default function InitiativesStep({ draftApi }: Props) {
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button type="button" onClick={handleAdd} disabled={saving} className="app-btn app-btn-primary w-full">
-            {saving ? 'Creating…' : (<><Plus className="w-4 h-4" /> Create initiative</>)}
+            {saving ? 'Creating…' : (<><Plus className="w-4 h-4" /> Create program</>)}
           </button>
         </div>
 
         <div>
-          <h3 className="onboarding-list-label">Your initiatives <span className="onboarding-list-label-count">{draft.initiatives.length}</span></h3>
+          <h3 className="onboarding-list-label">Your programs <span className="onboarding-list-label-count">{draft.initiatives.length}</span></h3>
           {draft.initiatives.length === 0 ? (
             <div className="onboarding-empty">
               <span className="onboarding-empty-icon"><Target className="w-5 h-5" /></span>
-              <p className="onboarding-empty-text">No initiatives yet. Fill in the form to create your first one.</p>
+              <p className="onboarding-empty-text">No programs yet. Fill in the form to create your first one.</p>
             </div>
           ) : (
             <div className="space-y-2.5">

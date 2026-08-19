@@ -18,7 +18,7 @@ export default function SetupHubStep({ completed, onSelect, onFinish }: Props) {
         </motion.h1>
 
         <motion.p variants={fadeInUp} className="onboarding-hero-desc">
-          Two parts to get you going. Start with your account, then set up your initiatives —
+          Two parts to get you going. Start with your account, then set up your programs —
           do them in any order, and pick up where you left off anytime.
         </motion.p>
 
@@ -32,8 +32,8 @@ export default function SetupHubStep({ completed, onSelect, onFinish }: Props) {
           />
           <HubCard
             icon={Target}
-            title="Initiative setup"
-            desc="Locations, initiatives, metrics and groups."
+            title="Program setup"
+            desc="Locations, programs, metrics and groups."
             done={completed.initiative}
             onClick={() => onSelect('initiative')}
           />

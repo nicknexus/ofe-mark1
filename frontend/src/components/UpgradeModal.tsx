@@ -21,7 +21,7 @@ const TIERS = [
         annual: 750,
         popular: true,
         features: [
-            '10 initiatives',
+            '10 programs',
             '10 team members',
             '15 locations',
             '300 GB storage',
@@ -36,7 +36,7 @@ const TIERS = [
         annual: 2400,
         popular: false,
         features: [
-            '25 initiatives',
+            '25 programs',
             '20 team members',
             '30 locations',
             '1 TB storage',

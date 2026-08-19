@@ -520,7 +520,7 @@ router.post('/demos/:id/clone', async (req: AuthenticatedRequest, res) => {
          * definition in the target org. Carrying the source id across would tie
          * the two orgs together — renaming the source would rename the clone.
          * Cloned once per source definition, so a metric shared by several of
-         * the source's initiatives stays shared in the clone.
+         * the source's programs stays shared in the clone.
          */
         const cloneDefinition = async (sourceDefinitionId: string | null): Promise<string | null> => {
             if (!sourceDefinitionId) return null;
@@ -636,7 +636,7 @@ router.post('/demos/:id/clone', async (req: AuthenticatedRequest, res) => {
             // The legacy `unique_slug` constraint on initiatives is GLOBAL,
             // so we always generate a fresh suffix for the clone.
             const rand = Math.random().toString(36).slice(2, 8);
-            const cloneSlug = `${(srcSlug as string) || 'initiative'}-${rand}`;
+            const cloneSlug = `${(srcSlug as string) || 'program'}-${rand}`;
 
             const { data: newInit, error: initErr } = await supabase
                 .from('initiatives')
@@ -644,7 +644,7 @@ router.post('/demos/:id/clone', async (req: AuthenticatedRequest, res) => {
                 .select()
                 .single();
             if (initErr || !newInit) {
-                console.error('[clone] initiative failed:', initErr?.message);
+                console.error('[clone] program failed:', initErr?.message);
                 continue;
             }
             initiativeIdMap.set(srcInit.id, newInit.id);

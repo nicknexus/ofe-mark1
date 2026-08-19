@@ -277,7 +277,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
             <div className="min-w-0">
               <h2 className="text-xl md:text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Logs</h2>
               <p className="text-sm text-gray-500 mt-1 hidden sm:block">
-                Every logged claim, piece of evidence, and connection for this initiative
+                Every logged claim, piece of evidence, and connection for this program
               </p>
             </div>
           )}
@@ -373,7 +373,7 @@ export default function TimelineTab({ initiativeId, onRefresh, lockedMetricId, e
             <EmptyState
               icon={AlertCircle}
               title="Logs unavailable"
-              description="Something went wrong loading this initiative's activity. Try refreshing the page."
+              description="Something went wrong loading this program's activity. Try refreshing the page."
             />
           </div>
         ) : (

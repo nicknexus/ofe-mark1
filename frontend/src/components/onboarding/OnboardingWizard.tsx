@@ -37,12 +37,12 @@ const TRACK_STEPS: Record<Track, { railLabel: string; hideInRail?: boolean }[]> 
   initiative: [
     { railLabel: 'Overview', hideInRail: true },
     { railLabel: 'Locations' },
-    { railLabel: 'Initiatives' },
+    { railLabel: 'Programs' },
     { railLabel: 'Metrics & groups' },
     { railLabel: 'Review' },
   ],
 }
-const TRACK_TITLE: Record<Track, string> = { account: 'Account setup', initiative: 'Initiative setup' }
+const TRACK_TITLE: Record<Track, string> = { account: 'Account setup', initiative: 'Program setup' }
 
 export default function OnboardingWizard() {
   const { isActive, completeOnboarding, pauseOnboarding } = useOnboarding()

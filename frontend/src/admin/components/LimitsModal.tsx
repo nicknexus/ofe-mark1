@@ -15,7 +15,7 @@ function toDateInput(iso?: string | null): string {
  * Per-account limit overrides, on top of whatever the plan grants.
  *
  * Deliberately separate from "change plan": this is the escape hatch for a
- * one-off ("give this partner 3 extra initiatives"), while a plan change moves
+ * one-off ("give this partner 3 extra programs"), while a plan change moves
  * every limit at once. Blank means unlimited, which is why each field shows the
  * current usage — an unlimited team on a Free plan is easy to set by accident.
  */
@@ -114,7 +114,7 @@ export default function LimitsModal({
             }
         >
             <div className="space-y-4">
-                {field('Initiatives', initiatives, setInitiatives, account.usage.initiatives, account.plan.catalog_limits.initiatives_limit)}
+                {field('Programs', initiatives, setInitiatives, account.usage.initiatives, account.plan.catalog_limits.initiatives_limit)}
                 {field('Team members', team, setTeam, account.usage.team_members, account.plan.catalog_limits.team_members_limit)}
                 {field('Locations', locations, setLocations, account.usage.locations, account.plan.catalog_limits.locations_limit)}
 

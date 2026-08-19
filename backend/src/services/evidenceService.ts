@@ -1293,7 +1293,7 @@ export class EvidenceService {
             .maybeSingle()
         const claimKpi: any = (claim as any)?.kpis
         if (!claim || !claimKpi || claimKpi.initiative_id !== initiativeId) {
-            throw new Error('Impact claim not found in this initiative')
+            throw new Error('Impact claim not found in this program')
         }
 
         const [

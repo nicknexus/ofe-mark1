@@ -559,7 +559,7 @@ export default function PublicEvidencePage() {
 
                         {/* Initiative Link */}
                         <div className={`${PUBLIC_PANEL_STATIC_CLASS} rounded-xl sm:rounded-2xl p-3 sm:p-4 flex-shrink-0`}>
-                            <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">From Initiative</p>
+                            <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">From Program</p>
                             <Link
                                 to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}?tab=evidence`}
                                 className="flex items-center justify-between text-gray-800 hover:text-primary-600 font-medium transition-colors group"

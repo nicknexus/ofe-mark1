@@ -77,7 +77,7 @@ export default function LocationsPage() {
 
   const openInitiative = (loc: Location) => {
     const id = loc.initiative_id || loc.initiative_ids?.[0]
-    if (id) navigate(`/initiatives/${id}?tab=location`)
+    if (id) navigate(`/programs/${id}?tab=location`)
   }
 
   const target = locations.find(l => l.id === deleteConfirmId)
@@ -95,7 +95,7 @@ export default function LocationsPage() {
         <PageHeader
           className="mb-4 flex-shrink-0"
           title="Locations"
-          subtitle="Where the work happens, across every initiative."
+          subtitle="Where the work happens, across every program."
           help={<LocationsHelp />}
           actions={canEditLocations ? (
             <button type="button" onClick={() => setIsCreateOpen(true)} className="app-btn app-btn-primary app-btn-sm">
@@ -159,7 +159,7 @@ export default function LocationsPage() {
                         {loc.country && <p className="text-xs text-secondary-500 mt-0.5 truncate">{loc.country}</p>}
                         {(loc.initiative_ids?.length ?? 0) > 0 && (
                           <p className="text-[11px] text-secondary-400 mt-1">
-                            {loc.initiative_ids!.length} initiative{loc.initiative_ids!.length === 1 ? '' : 's'}
+                            {loc.initiative_ids!.length} program{loc.initiative_ids!.length === 1 ? '' : 's'}
                           </p>
                         )}
                       </div>
@@ -190,7 +190,7 @@ export default function LocationsPage() {
                 }}
                 className="app-btn app-btn-secondary app-btn-sm w-full mt-2 flex-shrink-0"
               >
-                Open in initiative
+                Open in program
               </button>
             )}
           </motion.div>
@@ -212,7 +212,7 @@ export default function LocationsPage() {
       {deleteConfirmId && target && (
         <ConfirmDialog
           title="Delete location"
-          message={`Permanently delete "${target.name}" from your organization? This removes it from every initiative that uses it.`}
+          message={`Permanently delete "${target.name}" from your organization? This removes it from every program that uses it.`}
           confirmLabel="Delete location"
           tone="danger"
           onConfirm={() => handleDelete(deleteConfirmId)}

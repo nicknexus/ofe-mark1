@@ -86,7 +86,7 @@ router.get('/organizations/:slug/initiatives', async (req, res) => {
         const initiatives = await PublicService.getOrganizationInitiatives(req.params.slug);
         res.json(initiatives);
     } catch (error) {
-        console.error('Get org initiatives error:', error);
+        console.error('Get org programs error:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });
@@ -187,12 +187,12 @@ router.get('/initiatives/:orgSlug/:slug', async (req, res) => {
     try {
         const initiative = await PublicService.getInitiativeBySlug(req.params.orgSlug, req.params.slug);
         if (!initiative) {
-            res.status(404).json({ error: 'Initiative not found' });
+            res.status(404).json({ error: 'Program not found' });
             return;
         }
         res.json(initiative);
     } catch (error) {
-        console.error('Get initiative error:', error);
+        console.error('Get program error:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });
@@ -202,12 +202,12 @@ router.get('/initiatives/:orgSlug/:slug/dashboard', async (req, res) => {
     try {
         const dashboard = await PublicService.getInitiativeDashboard(req.params.orgSlug, req.params.slug);
         if (!dashboard) {
-            res.status(404).json({ error: 'Initiative not found' });
+            res.status(404).json({ error: 'Program not found' });
             return;
         }
         await sendPublic(res, req.params.orgSlug, dashboard);
     } catch (error) {
-        console.error('Get initiative dashboard error:', error);
+        console.error('Get program dashboard error:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });
@@ -218,7 +218,7 @@ router.get('/initiatives/:orgSlug/:slug/kpis', async (req, res) => {
         const kpis = await PublicService.getInitiativeKPIs(req.params.orgSlug, req.params.slug);
         await sendPublic(res, req.params.orgSlug, kpis);
     } catch (error) {
-        console.error('Get initiative KPIs error:', error);
+        console.error('Get program KPIs error:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });
@@ -229,7 +229,7 @@ router.get('/initiatives/:orgSlug/:slug/stories', async (req, res) => {
         const stories = await PublicService.getInitiativeStories(req.params.orgSlug, req.params.slug);
         await sendPublic(res, req.params.orgSlug, stories);
     } catch (error) {
-        console.error('Get initiative stories error:', error);
+        console.error('Get program stories error:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });
@@ -240,7 +240,7 @@ router.get('/initiatives/:orgSlug/:slug/locations', async (req, res) => {
         const locations = await PublicService.getInitiativeLocations(req.params.orgSlug, req.params.slug);
         res.json(locations);
     } catch (error) {
-        console.error('Get initiative locations error:', error);
+        console.error('Get program locations error:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });
@@ -266,7 +266,7 @@ router.get('/initiatives/:orgSlug/:slug/evidence', async (req, res) => {
         const evidence = await PublicService.getInitiativeEvidence(req.params.orgSlug, req.params.slug);
         await sendPublic(res, req.params.orgSlug, evidence);
     } catch (error) {
-        console.error('Get initiative evidence error:', error);
+        console.error('Get program evidence error:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });
@@ -277,7 +277,7 @@ router.get('/initiatives/:orgSlug/:slug/beneficiaries', async (req, res) => {
         const beneficiaries = await PublicService.getInitiativeBeneficiaries(req.params.orgSlug, req.params.slug);
         res.json(beneficiaries);
     } catch (error) {
-        console.error('Get initiative beneficiaries error:', error);
+        console.error('Get program beneficiaries error:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });

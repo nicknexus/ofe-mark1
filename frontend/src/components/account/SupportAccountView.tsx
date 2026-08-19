@@ -79,7 +79,7 @@ export default function SupportAccountView({ orgId }: { orgId: string }) {
                 {org.subscription?.trial_ends_at &&
                     row('Trial ends', new Date(org.subscription.trial_ends_at).toLocaleDateString())}
                 {row('Team members', usage(org.usage.team_members, org.subscription?.team_members_limit))}
-                {row('Initiatives', usage(org.usage.initiatives, org.subscription?.initiatives_limit))}
+                {row('Programs', usage(org.usage.initiatives, org.subscription?.initiatives_limit))}
             </div>
         </div>
     )

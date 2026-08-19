@@ -382,7 +382,7 @@ export default function MetricsDashboardTab({
   }
 
   const openLogsForMetric = (kpiId: string) => {
-    navigate(`/initiatives/${initiativeId}?tab=logs&metric=${kpiId}`)
+    navigate(`/programs/${initiativeId}?tab=logs&metric=${kpiId}`)
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -581,7 +581,7 @@ export default function MetricsDashboardTab({
           <div className="min-w-0">
             <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Metrics</h2>
             <p className="text-sm text-gray-500 mt-1 hidden sm:block">
-              Add and track what this initiative measures
+              Add and track what this program measures
             </p>
           </div>
           {onAddKPI && (

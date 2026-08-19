@@ -37,7 +37,7 @@ export default function ModeChooserStep({ onChooseChat, onChooseManual }: Props)
               <span className="app-chip app-chip-accent text-[11px] font-semibold">Fastest</span>
             </div>
             <p className="text-sm text-secondary-500 leading-relaxed flex-1">
-              Tell it about your charity in plain words. It drafts your locations, initiatives and
+              Tell it about your charity in plain words. It drafts your locations, programs and
               metrics — you review and approve before anything is created.
             </p>
             <span className="onboarding-mode-card-cta">
@@ -52,7 +52,7 @@ export default function ModeChooserStep({ onChooseChat, onChooseManual }: Props)
             </div>
             <h2 className="text-base font-semibold text-secondary-900 mb-1.5">Set up manually</h2>
             <p className="text-sm text-secondary-500 leading-relaxed flex-1">
-              Go through it yourself, one section at a time — locations, initiatives, metrics, tags
+              Go through it yourself, one section at a time — locations, programs, metrics, tags
               and groups. Full control over every detail.
             </p>
             <span className="onboarding-mode-card-cta">

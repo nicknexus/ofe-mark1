@@ -397,7 +397,7 @@ export default function EvidenceTab({ initiativeId, onRefresh }: EvidenceTabProp
  <div className="flex items-center justify-between mb-4">
  <div>
  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Evidence</h2>
- <p className="text-sm text-gray-500 mt-1 hidden sm:block">View and manage all evidence uploaded for this initiative</p>
+ <p className="text-sm text-gray-500 mt-1 hidden sm:block">View and manage all evidence uploaded for this program</p>
  </div>
  {canAddEvidence && (
  <button

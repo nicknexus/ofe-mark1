@@ -14,7 +14,7 @@ export class KPIService {
         if (kpi.initiative_id) {
             const initiative = await InitiativeService.getById(kpi.initiative_id, userId, requestedOrgId);
             if (!initiative) {
-                throw new Error('Initiative not found or access denied');
+                throw new Error('Program not found or access denied');
             }
         }
 

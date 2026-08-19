@@ -60,7 +60,7 @@ export default function AddLocationPickerModal({
  try {
  setLinkingId(loc.id)
  await apiService.linkLocationToInitiative(loc.id, initiativeId)
- notify.success(`Added "${loc.name}" to this initiative`)
+ notify.success(`Added "${loc.name}" to this program`)
  onLinked()
  } catch (err) {
  console.error('Failed to link location', err)
@@ -132,7 +132,7 @@ className="app-input pl-10"
  {allLocations.length === 0
  ? 'No locations yet. Create your first one above.'
  : excludeIds.length === allLocations.length
- ? 'All your locations are already linked to this initiative.'
+ ? 'All your locations are already linked to this program.'
  : 'No matches'}
  </div>
  ) : (

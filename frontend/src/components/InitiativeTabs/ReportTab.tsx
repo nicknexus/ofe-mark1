@@ -768,7 +768,7 @@ export default function ReportTab({ initiativeId, dashboard }: ReportTabProps) {
  </InlineAlert>
  ) : beneficiaryGroups.length > 0 ? (
  <InlineAlert tone="info" title="Full report">
- Includes all metrics across your initiative unless you narrow the filters above.
+ Includes all metrics across your program unless you narrow the filters above.
  </InlineAlert>
  ) : null}
  </div>

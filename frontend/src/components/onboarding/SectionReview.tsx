@@ -19,7 +19,7 @@ interface Props {
 const STAGE_META: Record<ChatStage, { icon: React.ComponentType<any>; title: string; addLabel: string; confirm: string }> = {
   description: { icon: Building2, title: 'Your organization', addLabel: '', confirm: 'Save & continue' },
   locations: { icon: MapPin, title: 'Locations', addLabel: 'Add location', confirm: 'Add & continue' },
-  initiatives: { icon: Target, title: 'Initiatives', addLabel: 'Add initiative', confirm: 'Add & continue' },
+  initiatives: { icon: Target, title: 'Programs', addLabel: 'Add program', confirm: 'Add & continue' },
   metrics: { icon: BarChart3, title: 'Metrics', addLabel: 'Add metric', confirm: 'Add & continue' },
   groups: { icon: Users, title: 'Beneficiary groups', addLabel: 'Add group', confirm: 'Add & continue' },
 }

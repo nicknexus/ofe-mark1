@@ -314,6 +314,16 @@ export class MetricTagService {
         }
     }
 
+    /** Copy the definition's tags onto one KPI instance (e.g. after attach). */
+    static async mirrorDefinitionTagsToKpi(
+        kpiId: string,
+        definitionId: string,
+        userId: string,
+    ): Promise<void> {
+        const tagIds = await this.getTagIdsForDefinition(definitionId)
+        await this.applyTagsToKpi(kpiId, tagIds, userId)
+    }
+
     static async getTagIdsForDefinition(definitionId: string): Promise<string[]> {
         const { data, error } = await supabase
             .from('metric_definition_tags')

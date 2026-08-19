@@ -110,8 +110,8 @@ export default function MobileActionsTab({ initiatives, onAction }: MobileAction
  <EmptyState
  className="app-card py-16"
  icon={Zap}
- title="No Initiatives Yet"
- description="Create an initiative first to start adding data."
+ title="No Programs Yet"
+ description="Create a program first to start adding data."
  />
  ) : (
  <div className="grid grid-cols-1 gap-3">
@@ -144,7 +144,7 @@ export default function MobileActionsTab({ initiatives, onAction }: MobileAction
  <div className="flex items-center justify-around">
  <div className="text-center">
  <p className="text-2xl font-bold text-gray-900">{initiatives.length}</p>
- <p className="text-xs text-gray-500 mt-0.5">Initiative{initiatives.length !== 1 ? 's' : ''}</p>
+ <p className="text-xs text-gray-500 mt-0.5">Program{initiatives.length !== 1 ? 's' : ''}</p>
  </div>
  </div>
  </div>
@@ -162,7 +162,7 @@ export default function MobileActionsTab({ initiatives, onAction }: MobileAction
  <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mt-3" />
  <div className="flex items-center justify-between px-5 pt-4 pb-3">
  <div>
- <h2 className="text-lg font-bold text-gray-900">Select Initiative</h2>
+ <h2 className="text-lg font-bold text-gray-900">Select Program</h2>
  <p className="text-xs text-gray-500 mt-0.5">
  Choose where to {pendingActionMeta.label.toLowerCase()}
  </p>

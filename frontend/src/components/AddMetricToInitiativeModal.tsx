@@ -59,7 +59,7 @@ export default function AddMetricToInitiativeModal({
     >
       <ModalHeader
         icon={Layers}
-        title="Add to initiative"
+        title="Add to program"
         subtitle={`Choose where "${metricTitle}" should be tracked`}
         onClose={onClose}
       />
@@ -71,7 +71,7 @@ export default function AddMetricToInitiativeModal({
               <BarChart3 className="w-5 h-5" />
             </div>
             <p className="text-sm text-gray-500">
-              You don't have any initiatives yet.
+              You don't have any programs yet.
             </p>
           </div>
         ) : (

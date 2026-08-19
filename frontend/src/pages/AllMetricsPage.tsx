@@ -106,7 +106,7 @@ export default function AllMetricsPage() {
   const attach = async (definition: MetricDefinitionWithUsage, initiativeId: string) => {
     try {
       await apiService.addMetricToInitiative(definition.id, initiativeId)
-      notify.success('Metric added to initiative')
+      notify.success('Metric added to program')
       setAttachTarget(null)
       await load()
     } catch (err) {
@@ -170,7 +170,7 @@ export default function AllMetricsPage() {
       <div className="max-w-6xl mx-auto">
         <PageHeader
           title="Metrics"
-          subtitle={`${definitions.length} metric${definitions.length !== 1 ? 's' : ''}${definitions.length > 0 ? ` · ${inUseCount} in use` : ''} · shared across every initiative`}
+          subtitle={`${definitions.length} metric${definitions.length !== 1 ? 's' : ''}${definitions.length > 0 ? ` · ${inUseCount} in use` : ''} · shared across every program`}
           help={<MetricsHelp />}
           actions={canAddMetrics ? (
             <button
@@ -203,7 +203,7 @@ export default function AllMetricsPage() {
             title={definitions.length === 0 ? 'No metrics yet' : `No metrics match "${search}"`}
             description={
               definitions.length === 0
-                ? 'Create a metric here and it becomes available to every initiative in your organization.'
+                ? 'Create a metric here and it becomes available to every program in your organization.'
                 : undefined
             }
           />
@@ -252,13 +252,13 @@ export default function AllMetricsPage() {
                   {unused ? (
                     <div className="flex items-center gap-1.5 mb-3 px-2.5 py-2 rounded-lg bg-gray-50 border border-dashed border-gray-200 text-xs text-gray-400">
                       <Layers className="w-3.5 h-3.5 flex-shrink-0" />
-                      Not in any initiative yet
+                      Not in any program yet
                     </div>
                   ) : (
                     <div className="mb-3">
                       <div className="flex items-center gap-1.5 mb-1.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
                         <Layers className="w-3 h-3" />
-                        In {definition.initiative_count} initiative{definition.initiative_count === 1 ? '' : 's'}
+                        In {definition.initiative_count} program{definition.initiative_count === 1 ? '' : 's'}
                       </div>
                       <div className="space-y-1.5">
                         {definition.initiatives.map(usage => (
@@ -267,7 +267,7 @@ export default function AllMetricsPage() {
                             className="group relative bg-white rounded-xl border border-gray-200/70 shadow-card hover:border-primary-300/70 hover:shadow-card-hover transition-all"
                           >
                             <Link
-                              to={`/initiatives/${usage.initiative_id}?tab=metrics`}
+                              to={`/programs/${usage.initiative_id}?tab=metrics`}
                               className="flex items-center gap-2.5 p-2 pr-8"
                               title={usage.initiative_title}
                             >
@@ -318,7 +318,7 @@ export default function AllMetricsPage() {
                         className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-primary-700 transition-colors"
                       >
                         <Layers className="w-3.5 h-3.5" />
-                        Add to initiative
+                        Add to program
                       </button>
                     )}
                   </div>
@@ -370,7 +370,7 @@ export default function AllMetricsPage() {
 
           <p className="text-sm text-gray-600 mb-3">
             <strong className="text-gray-800">"{detachConfirm.definition.title}"</strong> will be
-            unlinked from this initiative and disappear from its dashboard, its totals and your
+            unlinked from this program and disappear from its dashboard, its totals and your
             public pages.
           </p>
 
@@ -394,8 +394,8 @@ export default function AllMetricsPage() {
           {/* Accurate, not scary-for-the-sake-of-it: this is a reversible
               archive by design, so we say so rather than claiming otherwise. */}
           <p className="text-xs text-gray-500 mb-5">
-            Nothing is permanently deleted — adding the metric back to this initiative restores its
-            claims and evidence. The metric itself stays in your other initiatives.
+            Nothing is permanently deleted — adding the metric back to this program restores its
+            claims and evidence. The metric itself stays in your other programs.
           </p>
 
           <div className="mb-5">
@@ -435,8 +435,8 @@ export default function AllMetricsPage() {
           title="Delete metric everywhere?"
           message={
             `"${deleteConfirm.title}" and all of its impact claims will be permanently deleted from ` +
-            `${deleteConfirm.initiative_count} initiative${deleteConfirm.initiative_count === 1 ? '' : 's'}. ` +
-            `This cannot be undone — to remove it from a single initiative, use the × next to that initiative instead.`
+            `${deleteConfirm.initiative_count} program${deleteConfirm.initiative_count === 1 ? '' : 's'}. ` +
+            `This cannot be undone — to remove it from a single program, use the × next to that program instead.`
           }
           confirmLabel="Delete permanently"
           tone="danger"

@@ -435,7 +435,7 @@ export default function AdminDemosPage() {
  {generating ? 'Generating...' : 'Generate demo'}
  </button>
  <p className="text-xs text-gray-500">
- Creates a normal editable demo with profile, context, initiative, metrics, locations, beneficiaries, and stories.
+ Creates a normal editable demo with profile, context, program, metrics, locations, beneficiaries, and stories.
  </p>
  </div>
  </div>
@@ -466,7 +466,7 @@ export default function AdminDemosPage() {
  <FolderField value={newFolder} onChange={setNewFolder} folders={folders} />
  </div>
  <p className="mt-2 text-xs text-gray-500">
- Auto-seeds with 1 initiative, 4 KPIs, 1 beneficiary group, 1 location, and 1 story.
+ Auto-seeds with 1 program, 4 KPIs, 1 beneficiary group, 1 location, and 1 story.
  </p>
  </div>
  )}
@@ -792,7 +792,7 @@ export default function AdminDemosPage() {
  />
  </div>
  <p className="mt-2 text-xs text-gray-500">
- Pulls profile, context, initiative, metrics, locations, beneficiaries, and stories from this site into the draft.
+ Pulls profile, context, program, metrics, locations, beneficiaries, and stories from this site into the draft.
  </p>
  <div className="flex justify-end gap-2 mt-5">
  <button

@@ -86,7 +86,7 @@ export function PublicOrganizationRightPanel(props: Props) {
                                         style={{ color: brandColor, filter: 'saturate(1.15) brightness(0.85)' }}
                                     />
                                 </div>
-                                <h2 className="font-semibold text-foreground text-sm">Initiatives</h2>
+                                <h2 className="font-semibold text-foreground text-sm">Programs</h2>
                                 <span
                                     className="px-2 py-0.5 text-xs font-semibold rounded-full text-gray-700"
                                     style={{ backgroundColor: `${brandColor}15`, border: `1px solid ${brandColor}25` }}

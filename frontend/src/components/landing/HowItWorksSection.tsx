@@ -4,7 +4,7 @@ import { LineChart, Sparkles, ArrowRight, Check, Image, FileText, Camera, PartyP
 const steps = [
   {
     number: "01",
-    title: "Setup Your Initiative",
+    title: "Setup Your Program",
     description: "Create the metrics you want the world to see.",
     icon: LineChart,
     color: "from-[#c0dea0] to-[#80b092]",

@@ -11,7 +11,7 @@ interface LayoutProps {
 export default function Layout({ user, children }: LayoutProps) {
   const location = useLocation()
   // Initiative workspace keeps its own sidebar. Org chrome disappears until they go back.
-  const isInitiativePage = location.pathname.startsWith('/initiatives')
+  const isInitiativePage = location.pathname.startsWith('/programs') || location.pathname.startsWith('/initiatives')
 
   return (
     <div className="min-h-screen">

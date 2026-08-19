@@ -97,7 +97,7 @@ export default function LocationsStep({ draftApi }: Props) {
         icon={MapPin}
         headline="Locations"
         title="Where are you creating impact?"
-        description="Add the places where you create impact. Locations are shared across your whole account — create each one once, then use it with any initiative, metric, impact claim, or evidence. Add as many as you'd like."
+        description="Add the places where you create impact. Locations are shared across your whole account — create each one once, then use it with any program, metric, impact claim, or evidence. Add as many as you'd like."
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl">

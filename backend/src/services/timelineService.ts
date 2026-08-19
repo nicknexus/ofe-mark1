@@ -53,7 +53,7 @@ export class TimelineService {
         const claimIdSet = new Set(updateIds);
 
         // Connections derived from the evidence rows' stored junction links,
-        // restricted to claims in this initiative.
+        // restricted to claims in this program.
         const connections: TimelineConnection[] = [];
         const evidenceCountByClaim: Record<string, number> = {};
         for (const item of evidenceRaw as any[]) {

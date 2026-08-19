@@ -333,7 +333,7 @@ export default function ExplorePage({ embedded = false }: ExplorePageProps) {
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Search organizations, initiatives, places…"
+                                placeholder="Search organizations, programs, places…"
                                 autoFocus={!embedded}
                                 className="w-full pl-11 pr-12 py-3.5 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 text-sm sm:text-base text-white placeholder-white/40 focus:border-seafoam/60 focus:ring-2 focus:ring-seafoam/30 focus:outline-none transition-all"
                             />
@@ -363,7 +363,7 @@ export default function ExplorePage({ embedded = false }: ExplorePageProps) {
                                     </ResultSection>
                                 )}
                                 {results.initiatives.length > 0 && (
-                                    <ResultSection title="Initiatives" icon={Target} count={results.initiatives.length}>
+                                    <ResultSection title="Programs" icon={Target} count={results.initiatives.length}>
                                         {results.initiatives.map((init) => (
                                             <Link
                                                 key={init.id}

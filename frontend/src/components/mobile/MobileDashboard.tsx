@@ -62,7 +62,7 @@ export default function MobileDashboard({
  const handleCreateInitiative = async (formData: CreateInitiativeForm) => {
  try {
  const newInitiative = await apiService.createInitiative(formData)
- notify.success('Initiative created!')
+ notify.success('Program created!')
  onRefresh()
  if (newInitiative?.id) {
  // Enter the newly created initiative
@@ -70,13 +70,13 @@ export default function MobileDashboard({
  }
  } catch (error: any) {
  // Check if it's an initiative limit error
- if (error?.code === 'INITIATIVE_LIMIT_REACHED' || error?.message?.includes('Initiative limit reached')) {
+ if (error?.code === 'INITIATIVE_LIMIT_REACHED' || error?.message?.includes('Program limit reached')) {
  setUpgradeUsage(error.usage || { current: initiatives.length, limit: 2 })
  setShowUpgradeModal(true)
  setShowCreateModal(false)
  return
  }
- const message = error instanceof Error ? error.message : 'Failed to create initiative'
+ const message = error instanceof Error ? error.message : 'Failed to create program'
  notify.error(message)
  throw error
  }
@@ -86,12 +86,12 @@ export default function MobileDashboard({
  if (!editingInitiative?.id) return
  try {
  await apiService.updateInitiative(editingInitiative.id, formData)
- notify.success('Initiative updated!')
+ notify.success('Program updated!')
  onRefresh()
  setShowEditModal(false)
  setEditingInitiative(null)
  } catch (error) {
- const message = error instanceof Error ? error.message : 'Failed to update initiative'
+ const message = error instanceof Error ? error.message : 'Failed to update program'
  notify.error(message)
  throw error
  }
@@ -105,12 +105,12 @@ export default function MobileDashboard({
  }
  try {
  await apiService.deleteInitiative(initiative.id)
- notify.success('Initiative deleted!')
+ notify.success('Program deleted!')
  onRefresh()
  setDeleteConfirmInitiative(null)
  setDeleteConfirmText('')
  } catch (error) {
- const message = error instanceof Error ? error.message : 'Failed to delete initiative'
+ const message = error instanceof Error ? error.message : 'Failed to delete program'
  notify.error(message)
  }
  }
@@ -128,7 +128,7 @@ export default function MobileDashboard({
  </div>
  <div className="min-w-0">
  <p className="text-sm font-semibold text-evidence-800 truncate">
- Viewing {organizationName}'s initiatives
+ Viewing {organizationName}'s programs
  </p>
  <p className="text-xs text-evidence-600">Team member</p>
  </div>
@@ -141,10 +141,10 @@ export default function MobileDashboard({
  <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Workspace</p>
  </div>
  <h1 className="text-2xl font-bold tracking-tight text-gray-900">
- {isSharedMember ? 'Initiatives' : 'Your Initiatives'}
+ {isSharedMember ? 'Programs' : 'Your Programs'}
  </h1>
  <p className="text-sm text-gray-500 mt-1">
- {initiatives.length} initiative{initiatives.length !== 1 ? 's' : ''}
+ {initiatives.length} program{initiatives.length !== 1 ? 's' : ''}
  </p>
  </div>
 
@@ -156,18 +156,18 @@ export default function MobileDashboard({
  className="app-btn app-btn-primary app-btn-lg w-full mb-5 py-3.5 text-base shadow-card"
  >
  <Plus className="w-5 h-5" />
- {initiatives.length === 0 ? 'Create Your First Initiative' : 'New Initiative'}
+ {initiatives.length === 0 ? 'Create Your First Program' : 'New Program'}
  </motion.button>
  )}
 
  {initiatives.length === 0 ? (
  <EmptyState
  className="rounded-2xl border border-gray-200/70 bg-white shadow-card"
- title={isSharedMember ? 'No Initiatives Yet' : 'Welcome to Nexus Impacts AI'}
+ title={isSharedMember ? 'No Programs Yet' : 'Welcome to Nexus Impacts AI'}
  description={
  isSharedMember
- ? `Your organization doesn't have any initiatives yet. Tap "New Initiative" above to add one.`
- : 'Create your first initiative to start tracking impact.'
+ ? `Your organization doesn't have any programs yet. Tap "New Program" above to add one.`
+ : 'Create your first program to start tracking impact.'
  }
  />
  ) : (
@@ -264,7 +264,7 @@ export default function MobileDashboard({
  className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors"
  >
  <Edit className="w-4 h-4 text-gray-400" />
- Edit Initiative
+ Edit Program
  </button>
  )}
  {canDelete && (
@@ -317,7 +317,7 @@ export default function MobileDashboard({
  <Trash2 className="w-5 h-5 text-red-600" />
  </div>
  <div>
- <h3 className="font-semibold text-gray-900">Delete Initiative</h3>
+ <h3 className="font-semibold text-gray-900">Delete Program</h3>
  <p className="text-xs text-gray-500">This cannot be undone</p>
  </div>
  </div>
@@ -359,8 +359,8 @@ export default function MobileDashboard({
  <UpgradeModal
  isOpen={showUpgradeModal}
  onClose={() => setShowUpgradeModal(false)}
- title="You've hit your initiative limit"
- subtitle={`You're using ${upgradeUsage?.current ?? initiatives.length} of ${upgradeUsage?.limit ?? 1} initiatives. Upgrade for more.`}
+ title="You've hit your program limit"
+ subtitle={`You're using ${upgradeUsage?.current ?? initiatives.length} of ${upgradeUsage?.limit ?? 1} programs. Upgrade for more.`}
  />
  </div>
  )

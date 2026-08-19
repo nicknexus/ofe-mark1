@@ -121,7 +121,7 @@ export default function ContentCreatePage() {
                     See plans
                   </button>
                 ) : (
-                  <Link to="/tracking/initiatives" className="app-btn app-btn-secondary app-btn-sm flex-shrink-0">
+                  <Link to="/tracking/programs" className="app-btn app-btn-secondary app-btn-sm flex-shrink-0">
                     Keep tracking
                   </Link>
                 )}
@@ -131,7 +131,7 @@ export default function ContentCreatePage() {
                 <p className="text-sm text-secondary-600 leading-relaxed flex-1">
                   You're on a paid plan. This is next. Keep tracking so the stories are ready when it drops.
                 </p>
-                <Link to="/tracking/initiatives" className="app-btn app-btn-primary app-btn-sm flex-shrink-0">
+                <Link to="/tracking/programs" className="app-btn app-btn-primary app-btn-sm flex-shrink-0">
                   Keep tracking
                 </Link>
               </>

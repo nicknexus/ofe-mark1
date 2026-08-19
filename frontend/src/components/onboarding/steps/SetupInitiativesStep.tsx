@@ -35,7 +35,7 @@ export default function SetupInitiativesStep({ draftApi }: Props) {
           icon={BarChart3}
           headline="Metrics"
           title="What are you tracking?"
-          description="Head back one step and create an initiative first — then you can add metrics here."
+          description="Head back one step and create a program first — then you can add metrics here."
         />
         <div className="onboarding-empty max-w-2xl">
           <span className="onboarding-empty-icon"><BarChart3 className="w-5 h-5" /></span>
@@ -52,7 +52,7 @@ export default function SetupInitiativesStep({ draftApi }: Props) {
         icon={BarChart3}
         headline="Metrics"
         title="What are you tracking?"
-        description="Choose the metrics you want to track in each initiative, add tags to break them into sub-metrics, and optionally define who benefits. You'll add your actual numbers and evidence once setup is done."
+        description="Choose the metrics you want to track in each program, add tags to break them into sub-metrics, and optionally define who benefits. You'll add your actual numbers and evidence once setup is done."
       />
 
       {/* Initiative tabs */}
@@ -284,7 +284,7 @@ function GroupsSection({ initiativeId, groups, onAdded, onRemoved, isLocked }: {
           <div className="app-icon-tile-sm app-icon-tile-accent"><Users className="w-4 h-4" /></div>
           <div>
             <p className="text-sm font-semibold text-secondary-900">Beneficiary groups</p>
-            <p className="text-xs text-secondary-500">Define who your initiative serves — {groups.length} added</p>
+            <p className="text-xs text-secondary-500">Define who your program serves — {groups.length} added</p>
           </div>
         </div>
         <ChevronDown className={`w-4 h-4 text-secondary-400 transition-transform ${open ? 'rotate-180' : ''}`} />

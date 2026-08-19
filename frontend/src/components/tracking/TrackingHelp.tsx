@@ -35,7 +35,7 @@ export function InitiativesHelp() {
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
       <div className="lg:col-span-5 space-y-5">
         <Callout label="What it is">
-          An initiative is one of your main programs. Everything you prove (claims, evidence, and stories) lives inside an initiative.
+          A program is one of the main things you run. Everything you prove (claims, evidence, and stories) lives inside it.
         </Callout>
         <Callout label="When to use it">
           Make one for each big program you run, like Youth Education or Community Health. Metrics like meals served or clinic visits then live inside that program.
@@ -90,7 +90,7 @@ export function InitiativesHelp() {
           </div>
         </div>
         <p className="text-xs text-secondary-400 mt-3">
-          Open an initiative to add these. This page is just the list of programs.
+          Open a program to add these. This page is just the list of programs.
         </p>
       </div>
     </div>
@@ -105,12 +105,12 @@ export function MetricsHelp() {
           A metric is a number you care about, like meals served, trees planted, or people trained. You write the number as a claim, then back it up with evidence.
         </Callout>
         <Callout label="They are global">
-          You make a metric once. Then you add that same metric to as many initiatives as you want. School Meals and After-School can both use “Meals served.” The total on this page adds them up.
+          You make a metric once. Then you add that same metric to as many programs as you want. School Meals and After-School can both use “Meals served.” The total on this page adds them up.
         </Callout>
         <div className="space-y-3 pt-1">
           <Step n="1" title="Create it here" body="Name it and pick a unit, like meals or %." />
-          <Step n="2" title="Add it to initiatives" body="One metric, many programs." />
-          <Step n="3" title="Log claims inside the initiative" body="That is where the number actually grows." />
+          <Step n="2" title="Add it to programs" body="One metric, many programs." />
+          <Step n="3" title="Log claims inside the program" body="That is where the number actually grows." />
         </div>
       </div>
 
@@ -127,10 +127,10 @@ export function MetricsHelp() {
             <span className="text-2xl font-semibold tabular-nums text-primary-700">12,400</span>
             <span className="text-xs text-secondary-400">meals</span>
           </div>
-          <p className="text-[11px] text-secondary-400 mb-4">Total across every initiative using this metric</p>
+          <p className="text-[11px] text-secondary-400 mb-4">Total across every program using this metric</p>
 
           <p className="text-[11px] font-semibold uppercase tracking-wider text-secondary-400 mb-2">
-            In 2 initiatives
+            In 2 programs
           </p>
           <div className="space-y-1.5">
             <div className="flex items-center gap-2.5 p-2 rounded-xl border border-gray-200/80 bg-white">
@@ -147,7 +147,7 @@ export function MetricsHelp() {
             </div>
           </div>
           <p className="text-[11px] text-secondary-400 mt-3">
-            Same metric, two programs. Click a row to open that initiative.
+            Same metric, two programs. Click a row to open that program.
           </p>
         </div>
       </div>
@@ -163,11 +163,11 @@ export function LocationsHelp() {
           A location is a place your work happens: a town, school, clinic, or site. It shows on the map so people can see where you work.
         </Callout>
         <Callout label="When to use it">
-          Add a location when a program has a real place. Attach it to an initiative so claims and evidence can sit on that pin.
+          Add a location when a program has a real place. Attach it to a program so claims and evidence can sit on that pin.
         </Callout>
         <div className="space-y-3 pt-1">
           <Step n="1" title="Drop a pin" body="Name the place and put it on the map." />
-          <Step n="2" title="Tie it to an initiative" body="That is the program that works there." />
+          <Step n="2" title="Tie it to a program" body="That is the program that works there." />
           <Step n="3" title="Use it in proof" body="Evidence and stories can point at this place." />
         </div>
       </div>
@@ -193,12 +193,12 @@ export function LocationsHelp() {
             </div>
             <div className="p-2.5 rounded-xl">
               <p className="text-sm font-medium text-secondary-900">Westlands Clinic</p>
-              <p className="text-xs text-secondary-500 mt-0.5">Kenya · 1 initiative</p>
+              <p className="text-xs text-secondary-500 mt-0.5">Kenya · 1 program</p>
             </div>
           </div>
         </div>
         <p className="text-xs text-secondary-400 mt-3">
-          Click a pin or a row to jump into the initiative that works there.
+          Click a pin or a row to jump into the program that works there.
         </p>
       </div>
     </div>

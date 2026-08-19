@@ -77,9 +77,9 @@ const SEED_LOCATION = {
 };
 
 const SEED_INITIATIVE = {
-    title: 'Demo Initiative',
+    title: 'Demo Program',
     description:
-        'A sample initiative pre-populated so you can see what a filled-out program looks like. Rename it, update the description, and tweak the metrics to match the charity you are demoing for.',
+        'A sample program pre-populated so you can see what a filled-out program looks like. Rename it, update the description, and tweak the metrics to match the charity you are demoing for.',
     region: 'Ontario, Canada',
     location: 'Toronto, ON',
     is_public: true,
@@ -90,12 +90,12 @@ const SEED_INITIATIVE = {
 // when Liam spins up several demos.
 function makeDemoInitiativeSlug(): string {
     const rand = Math.random().toString(36).slice(2, 8);
-    return `demo-initiative-${rand}`;
+    return `demo-program-${rand}`;
 }
 
 const SEED_BENEFICIARY_GROUP = {
     name: 'Youth Participants',
-    description: 'Primary beneficiaries served by this initiative.',
+    description: 'Primary beneficiaries served by this program.',
     age_range_start: 14,
     age_range_end: 24,
     total_number: 200,
@@ -149,7 +149,7 @@ export class DemoSeedService {
         }
 
         if (initErr || !initiative) {
-            throw new Error(`Seed failed (initiative): ${initErr?.message}`);
+            throw new Error(`Seed failed (program): ${initErr?.message}`);
         }
         const initiativeId = initiative.id as string;
 

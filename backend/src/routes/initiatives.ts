@@ -22,13 +22,13 @@ async function assertInitiativeUnlocked(req: AuthenticatedRequest, res: Response
         if (!activeOrgId) return true; // no org context — nothing to lock against
         if (await EntitlementService.isInitiativeAllowed(activeOrgId, initiativeId)) return true;
         res.status(403).json({
-            error: 'This initiative is locked on your current plan. Upgrade to unlock it.',
+            error: 'This program is locked on your current plan. Upgrade to unlock it.',
             code: 'INITIATIVE_LOCKED',
         });
         return false;
     } catch (e) {
         // Fail open — a gating hiccup must never block access to data.
-        console.error('[initiatives] lock check failed, allowing:', (e as Error).message);
+        console.error('[programs] lock check failed, allowing:', (e as Error).message);
         return true;
     }
 }
@@ -70,7 +70,7 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
         const usage = await SubscriptionService.getInitiativesUsage(req.user!.id, requestedOrgId);
         if (!usage.canCreate) {
             res.status(403).json({
-                error: `Initiative limit reached (${usage.current}/${usage.limit}). Upgrade your plan to create more initiatives.`,
+                error: `Program limit reached (${usage.current}/${usage.limit}). Upgrade your plan to create more programs.`,
                 code: 'INITIATIVE_LIMIT_REACHED',
                 usage
             });
@@ -90,7 +90,7 @@ router.get('/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
         const requestedOrgId = req.headers['x-organization-id'] as string | undefined;
         const initiative = await InitiativeService.getById(req.params.id, req.user!.id, requestedOrgId);
         if (!initiative) {
-            res.status(404).json({ error: 'Initiative not found' });
+            res.status(404).json({ error: 'Program not found' });
             return;
         }
         res.json(initiative);
@@ -136,7 +136,7 @@ router.get('/:id/dashboard', authenticateUser, async (req: AuthenticatedRequest,
         ]);
 
         if (!initiative) {
-            res.status(404).json({ error: 'Initiative not found' });
+            res.status(404).json({ error: 'Program not found' });
             return;
         }
 

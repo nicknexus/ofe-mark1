@@ -110,7 +110,7 @@ export default function MobileLocationsTab({ initiativeId, autoAdd }: MobileLoca
  className="app-card"
  icon={MapPin}
  title="No Locations Yet"
- description="Add locations where your initiative operates."
+ description="Add locations where your program operates."
  action={
  canEditLocations ? (
  <button type="button" onClick={() => setShowAddFlow(true)} className="app-btn app-btn-primary">

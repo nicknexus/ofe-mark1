@@ -60,7 +60,7 @@ export default function CreateInitiativeModal({
  {/* Header */}
  <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 bg-gradient-to-r from-evidence-50 to-evidence-50">
  <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
- {editData ? 'Edit Initiative' : 'Create New Initiative'}
+ {editData ? 'Edit Program' : 'Create New Program'}
  </h2>
  <button
  onClick={onClose}
@@ -74,7 +74,7 @@ export default function CreateInitiativeModal({
  <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
  <div>
  <label className="app-label">
- Initiative Title <span className="text-red-500">*</span>
+ Program Title <span className="text-red-500">*</span>
  </label>
  <input
  type="text"
@@ -97,7 +97,7 @@ export default function CreateInitiativeModal({
  onChange={handleInputChange}
  className="app-input resize-none"
  rows={3}
- placeholder="Brief description of what this initiative aims to achieve..."
+ placeholder="Brief description of what this program aims to achieve..."
  required
  />
  </div>
@@ -139,7 +139,7 @@ export default function CreateInitiativeModal({
  disabled={loading}
  className="app-btn app-btn-primary w-full sm:flex-1 order-1 sm:order-2"
  >
- {loading ? (editData ? 'Updating...' : 'Creating...') : (editData ? 'Update Initiative' : 'Create Initiative')}
+ {loading ? (editData ? 'Updating...' : 'Creating...') : (editData ? 'Update Program' : 'Create Program')}
  </button>
  </div>
  </form>

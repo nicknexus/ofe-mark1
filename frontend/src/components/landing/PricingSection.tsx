@@ -34,7 +34,7 @@ const tiers: Tier[] = [
     cta: "Start free",
     highlighted: false,
     features: [
-      "1 initiative",
+      "1 program",
       "2 team members",
       "3 locations",
       "25 GB storage",
@@ -50,7 +50,7 @@ const tiers: Tier[] = [
     cta: "Get started",
     highlighted: true,
     features: [
-      "10 initiatives",
+      "10 programs",
       "10 team members",
       "15 locations",
       "300 GB storage",
@@ -68,7 +68,7 @@ const tiers: Tier[] = [
     cta: "Get started",
     highlighted: false,
     features: [
-      "25 initiatives",
+      "25 programs",
       "20 team members",
       "30 locations",
       "1 TB storage",

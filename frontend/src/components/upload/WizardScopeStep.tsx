@@ -162,6 +162,8 @@ interface WizardScopeStepProps {
  locations: Location[]
  tags: MetricTag[]
  beneficiaryGroups: BeneficiaryGroup[]
+ /** Program metrics — used to limit claim tags to ones attached to the chosen metric(s). */
+ kpis?: Array<{ id?: string; tag_ids?: string[] }>
  datePickerRef?: React.Ref<DateRangePickerHandle>
 }
 
@@ -174,9 +176,25 @@ interface WizardScopeStepProps {
  * columns (date · location · tags · groups) so the whole scope can be set at
  * a glance. Claim-only and evidence-only use the same column layout.
  */
-export default function WizardScopeStep({ state, update, locations, tags, beneficiaryGroups, datePickerRef }: WizardScopeStepProps) {
+export default function WizardScopeStep({ state, update, locations, tags, beneficiaryGroups, kpis = [], datePickerRef }: WizardScopeStepProps) {
  const claim = includesClaim(state.kind)
  const today = getLocalDateString(new Date())
+
+ // Claims can only use tags on their parent metric. If a metric is already
+ // chosen, only offer its tags. In claim+evidence (scope-first), offer tags
+ // that exist on at least one metric in this program so the next step isn't empty.
+ const selectableTags = (() => {
+   if (!claim) return tags
+   const relevantKpis = state.claimKpiId
+     ? kpis.filter(k => k.id === state.claimKpiId)
+     : state.evidenceKpiIds.length > 0
+       ? kpis.filter(k => state.evidenceKpiIds.includes(k.id!))
+       : kpis
+   if (relevantKpis.length === 0) return tags
+   const allowed = new Set(relevantKpis.flatMap(k => k.tag_ids || []))
+   if (allowed.size === 0) return []
+   return tags.filter(t => allowed.has(t.id))
+ })()
 
  const dateValue = state.dateMode === 'single'
    ? { singleDate: state.dateSingle || undefined }
@@ -233,7 +251,7 @@ export default function WizardScopeStep({ state, update, locations, tags, benefi
  />
  ),
  },
- tags.length > 0 ? {
+ tags.length > 0 && (claim ? selectableTags.length > 0 : true) ? {
  key: 'tag',
  icon: TagIcon,
  title: 'Tag',
@@ -243,8 +261,8 @@ export default function WizardScopeStep({ state, update, locations, tags, benefi
  <ScopeChips
  icon={TagIcon}
  label="Tag"
- options={tags.map(t => ({ id: t.id, name: t.name }))}
- selected={state.tagIds}
+ options={selectableTags.map(t => ({ id: t.id, name: t.name }))}
+ selected={state.tagIds.filter(id => selectableTags.some(t => t.id === id))}
  onChange={(ids) => update({ tagIds: ids })}
  single={claim}
  hideHeader

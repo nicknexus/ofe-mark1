@@ -195,7 +195,7 @@ function EvidenceNode() {
 function HierarchyMock() {
  return (
  <div className="flex flex-col items-center w-full max-w-[400px] mx-auto">
- <TierLabel>Initiative</TierLabel>
+ <TierLabel>Program</TierLabel>
  <div className="w-56">
  <DashboardInitiativeCard compact active title="Youth Training 2025" desc="Skills program for local youth" metrics={2} locations={3} />
  </div>
@@ -269,7 +269,7 @@ const SLIDES: Slide[] = [
  title: 'Everything connects',
  body: 'Your work fits together in a simple order. This is the whole picture:',
  bullets: [
- 'Initiatives hold your metrics',
+ 'Programs hold your metrics',
  'Metrics are the things you measure',
  'Claims + evidence prove each metric',
  ],
@@ -280,8 +280,8 @@ const SLIDES: Slide[] = [
  layout: 'two-col',
  icon: Target,
  eyebrow: 'Part 1',
- title: 'Initiatives',
- body: 'An initiative is one project or program. Everything you track lives inside it.',
+ title: 'Programs',
+ body: 'A program is one project you track. Everything you measure lives inside it.',
  bullets: [
  'Examples: “Youth Training”, “Clean Water”',
  'Each one holds its own metrics and proof',
@@ -300,7 +300,7 @@ const SLIDES: Slide[] = [
  icon: BarChart3,
  eyebrow: 'Part 2',
  title: 'Metrics',
- body: 'Inside each initiative you add metrics — the things you count, like people trained or wells built.',
+ body: 'Inside each program you add metrics — the things you count, like people trained or wells built.',
  bullets: [
  'Give it a name and a unit (people, hours…)',
  'Watch each metric grow over time',
@@ -350,7 +350,7 @@ const SLIDES: Slide[] = [
 ]
 
 const GET_STARTED_STEPS = [
- { icon: Target, title: 'Create an initiative', desc: 'Start a project to track.' },
+ { icon: Target, title: 'Create a program', desc: 'Start a project to track.' },
  { icon: BarChart3, title: 'Add your metrics', desc: 'Choose what you measure.' },
  { icon: FileText, title: 'Open the Logs page', desc: 'Add claims and evidence.' },
 ]

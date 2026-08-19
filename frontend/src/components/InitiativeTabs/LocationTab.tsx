@@ -120,7 +120,7 @@ function SortableLocationCard({
  e.stopPropagation()
  onUnlinkClick(e)
  }}
- title="Remove from this initiative"
+ title="Remove from this program"
  className="p-1 text-gray-400 transition-colors rounded hover:text-[#d97706]"
  >
  <Link2Off className="w-3.5 h-3.5" />
@@ -303,7 +303,7 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  if (!initiativeId) return
  try {
  await apiService.unlinkLocationFromInitiative(id, initiativeId)
- notify.success('Removed from this initiative')
+ notify.success('Removed from this program')
  await loadLocations()
  setUnlinkConfirmId(null)
  } catch (error) {
@@ -360,7 +360,7 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  <div className="min-h-screen flex items-center justify-center">
  <div className="text-center">
  <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
- <p className="text-gray-600">Invalid initiative ID</p>
+ <p className="text-gray-600">Invalid program ID</p>
  </div>
  </div>
  )
@@ -373,7 +373,7 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  <div className="flex items-center justify-between gap-3">
  <div className="min-w-0">
  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 leading-tight tracking-tight">Locations</h2>
- <p className="text-sm text-gray-500 mt-1 hidden sm:block">Manage geographic locations for your initiative</p>
+ <p className="text-sm text-gray-500 mt-1 hidden sm:block">Manage geographic locations for your program</p>
  </div>
  {canEditLocations && (
  <button
@@ -527,8 +527,8 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
 
  {unlinkConfirmId && (
  <ConfirmDialog
- title="Remove from initiative"
- message={`Remove "${locations.find((l) => l.id === unlinkConfirmId)?.name}" from this initiative? The location stays in your organization. Existing claims, evidence, and stories stay linked — they won't be filtered via the locations tab.`}
+ title="Remove from program"
+ message={`Remove "${locations.find((l) => l.id === unlinkConfirmId)?.name}" from this program? The location stays in your organization. Existing claims, evidence, and stories stay linked — they won't be filtered via the locations tab.`}
  confirmLabel="Remove"
  tone="default"
  onConfirm={() => {
@@ -542,7 +542,7 @@ export default function LocationTab({ onStoryClick, onMetricClick }: LocationTab
  {deleteConfirmId && (
  <ConfirmDialog
  title="Delete location"
- message={`Permanently delete "${locations.find((l) => l.id === deleteConfirmId)?.name}" from your organization? This removes it from every initiative. Existing claims, evidence, and stories keep their data but lose the location reference.`}
+ message={`Permanently delete "${locations.find((l) => l.id === deleteConfirmId)?.name}" from your organization? This removes it from every program. Existing claims, evidence, and stories keep their data but lose the location reference.`}
  confirmLabel="Delete location"
  tone="danger"
  onConfirm={() => {

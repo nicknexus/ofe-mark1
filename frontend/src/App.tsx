@@ -1,6 +1,6 @@
 // v2 – desktop update banner
 import React, { useState, useEffect, useRef } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
 import { AppToaster } from './components/ui'
 import { AuthService } from './services/auth'
 import { SubscriptionService } from './services/subscription'
@@ -67,6 +67,16 @@ import PublicScrollToTop from './components/public/PublicScrollToTop'
 function RedirectKeepSearch({ to }: { to: string }) {
  const { search } = useLocation()
  return <Navigate to={`${to}${search}`} replace />
+}
+
+/** Legacy /initiatives/:id → /programs/:id (keeps search + optional metrics child). */
+function RedirectInitiativeToProgram() {
+ const { id, kpiId } = useParams()
+ const { search } = useLocation()
+ const to = kpiId
+  ? `/programs/${id}/metrics/${kpiId}${search}`
+  : `/programs/${id}${search}`
+ return <Navigate to={to} replace />
 }
 
 function AppRouter({ children }: { children: React.ReactNode }) {
@@ -754,10 +764,13 @@ function App() {
  <Layout user={user}>
  <Routes>
  <Route index element={<OverviewPage />} />
- <Route path="tracking" element={<RedirectKeepSearch to="/tracking/initiatives" />} />
- <Route path="tracking/initiatives" element={<Dashboard />} />
- <Route path="initiatives/:id" element={<InitiativePage />} />
- <Route path="initiatives/:id/metrics/:kpiId" element={<InitiativePage />} />
+ <Route path="tracking" element={<RedirectKeepSearch to="/tracking/programs" />} />
+ <Route path="tracking/programs" element={<Dashboard />} />
+ <Route path="tracking/initiatives" element={<RedirectKeepSearch to="/tracking/programs" />} />
+ <Route path="programs/:id" element={<InitiativePage />} />
+ <Route path="programs/:id/metrics/:kpiId" element={<InitiativePage />} />
+ <Route path="initiatives/:id" element={<RedirectInitiativeToProgram />} />
+ <Route path="initiatives/:id/metrics/:kpiId" element={<RedirectInitiativeToProgram />} />
  <Route path="metrics" element={<AllMetricsPage />} />
  <Route path="locations" element={<LocationsPage />} />
  <Route path="tags" element={<AllTagsPage />} />

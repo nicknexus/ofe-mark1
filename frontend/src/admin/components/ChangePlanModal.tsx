@@ -38,7 +38,7 @@ const CATALOG: Record<PlanTier, PlanLimits & { name: string }> = {
 }
 
 const ROWS: { key: keyof PlanLimits; label: string; format: (n: number | null) => string }[] = [
-    { key: 'initiatives_limit', label: 'Initiatives', format: n => (n === null ? 'Unlimited' : String(n)) },
+    { key: 'initiatives_limit', label: 'Programs', format: n => (n === null ? 'Unlimited' : String(n)) },
     { key: 'team_members_limit', label: 'Team members', format: n => (n === null ? 'Unlimited' : String(n)) },
     { key: 'locations_limit', label: 'Locations', format: n => (n === null ? 'Unlimited' : String(n)) },
     { key: 'storage_limit_bytes', label: 'Storage', format: n => (n === null ? 'Unlimited' : formatBytes(n)) },

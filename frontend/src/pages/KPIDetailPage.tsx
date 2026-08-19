@@ -602,7 +602,7 @@ export default function KPIDetailPage() {
  <div className="text-center py-12">
  <div className="text-red-600 mb-4">{loadingState.error || 'KPI not found'}</div>
  <Button asChild>
- <Link to={`/initiatives/${initiativeId}`}>Back to Initiative</Link>
+ <Link to={`/programs/${initiativeId}`}>Back to Program</Link>
  </Button>
  </div>
  )
@@ -617,7 +617,7 @@ export default function KPIDetailPage() {
  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
  <div className="flex items-center space-x-3 min-w-0">
  <Link
- to={`/initiatives/${initiativeId}`}
+ to={`/programs/${initiativeId}`}
  className="text-gray-400 hover:text-gray-600 transition-colors p-2 -ml-2 rounded-xl hover:bg-gray-100/50"
  >
  <ArrowLeft className="w-5 h-5" />

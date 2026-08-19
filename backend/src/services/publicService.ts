@@ -356,7 +356,7 @@ export class PublicService {
             .order('display_order', { ascending: true })
             .order('created_at', { ascending: true });
 
-        if (error) throw new Error(`Failed to fetch initiatives: ${error.message}`);
+        if (error) throw new Error(`Failed to fetch programs: ${error.message}`);
 
         // Plan gate: hide initiatives beyond the org's current allowance.
         let rows = data || [];
@@ -744,7 +744,7 @@ export class PublicService {
         if (kpisError) {
             console.error('[Dashboard] KPIs query error:', kpisError);
         }
-        console.log('[Dashboard] KPIs fetched:', kpis?.length || 0, 'for initiative:', initiative.id);
+        console.log('[Dashboard] KPIs fetched:', kpis?.length || 0, 'for program:', initiative.id);
 
         // Get evidence counts per KPI separately (to avoid RLS issues)
         const kpiIds = (kpis || []).map(k => k.id);

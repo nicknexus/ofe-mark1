@@ -79,7 +79,7 @@ export default function PublicInitiativePage() {
     const [evidence, setEvidence] = useState<PublicEvidence[] | null>(null)
     const [beneficiaries, setBeneficiaries] = useState<PublicBeneficiaryGroup[] | null>(null)
 
-    // All initiatives for switcher
+    // All programs for switcher
     const [allInitiatives, setAllInitiatives] = useState<PublicInitiative[]>([])
     const [showInitiativeDropdown, setShowInitiativeDropdown] = useState(false)
     const initiativeBtnRef = React.useRef<HTMLButtonElement>(null)
@@ -179,7 +179,7 @@ export default function PublicInitiativePage() {
             }
 
             const dashboardData = await publicApi.getInitiativeDashboard(orgSlug!, initiativeSlug!)
-            if (!dashboardData) { setError('Initiative not found'); return }
+            if (!dashboardData) { setError('Program not found'); return }
             setInitiative(dashboardData.initiative)
             setDashboard(dashboardData)
 
@@ -196,8 +196,8 @@ export default function PublicInitiativePage() {
                 } catch (err) { console.error('Error reloading tab data:', err) }
             }
         } catch (err) {
-            console.error('Error loading initiative:', err)
-            setError('Failed to load initiative')
+            console.error('Error loading program:', err)
+            setError('Failed to load program')
         } finally {
             setInitialLoading(false)
             setSwitching(false)
@@ -412,7 +412,7 @@ export default function PublicInitiativePage() {
 
     // Early returns for initial loading/error states must come before accessing dashboard
     if (initialLoading && !initiative) {
-        return <PublicLoader message="Loading initiative..." />
+        return <PublicLoader message="Loading program..." />
     }
 
     if (error || !initiative || !dashboard) {
@@ -420,8 +420,8 @@ export default function PublicInitiativePage() {
             <div className="min-h-screen bg-background flex items-center justify-center px-6">
                 <div className="rounded-3xl bg-white border border-gray-200/80 shadow-public p-12 text-center max-w-md">
                     <Globe className="w-16 h-16 text-muted-foreground/50 mx-auto mb-6" />
-                    <h1 className="text-2xl font-semibold text-foreground mb-3">Initiative Not Found</h1>
-                    <p className="text-muted-foreground mb-8">{error || 'This initiative does not exist.'}</p>
+                    <h1 className="text-2xl font-semibold text-foreground mb-3">Program Not Found</h1>
+                    <p className="text-muted-foreground mb-8">{error || 'This program does not exist.'}</p>
                     <Link to={`${orgLinkBase}/${orgSlug}`} className="inline-flex items-center gap-2 px-6 py-3 bg-accent text-white rounded-xl hover:bg-accent/90 transition-colors font-medium">
                         <ArrowLeft className="w-4 h-4" /> Back to Organization
                     </Link>
@@ -431,12 +431,12 @@ export default function PublicInitiativePage() {
     }
 
     const tabs: { id: TabType; label: string; icon: any; count?: number; tooltip: string }[] = [
-        { id: 'overview', label: 'Overview', icon: Globe, tooltip: 'A snapshot of this initiative\'s key stats, metrics, and recent activity' },
+        { id: 'overview', label: 'Overview', icon: Globe, tooltip: 'A snapshot of this program\'s key stats, metrics, and recent activity' },
         { id: 'metrics', label: 'Metrics', icon: BarChart3, count: filteredDashboard?.kpis.length || 0, tooltip: 'Measurable indicators tracking inputs, outputs, and impact over time' },
         { id: 'stories', label: 'Stories', icon: BookOpen, count: filteredStories?.length ?? dashboard.stats.stories, tooltip: 'First-hand accounts and narratives from the people and communities involved' },
-        { id: 'locations', label: 'Locations', icon: MapPin, count: dashboard.stats.locations, tooltip: 'Geographic areas where this initiative operates and collects data' },
+        { id: 'locations', label: 'Locations', icon: MapPin, count: dashboard.stats.locations, tooltip: 'Geographic areas where this program operates and collects data' },
         { id: 'evidence', label: 'Evidence', icon: FileText, count: filteredEvidence?.length ?? dashboard.stats.evidence, tooltip: 'Photos, documents, and files that verify and support reported outcomes' },
-        { id: 'beneficiaries', label: 'Beneficiaries', icon: Users, tooltip: 'The people and communities this initiative aims to serve' }
+        { id: 'beneficiaries', label: 'Beneficiaries', icon: Users, tooltip: 'The people and communities this program aims to serve' }
     ]
 
     // Brand color with fallback
@@ -562,7 +562,7 @@ export default function PublicInitiativePage() {
             >
                 {allInitiatives.length > 1 && (
                     <PublicMobileFilterSection
-                        title="Initiative"
+                        title="Program"
                         active={!!draftInitiativeSlug}
                         summary={allInitiatives.find((i) => i.slug === draftInitiativeSlug)?.title}
                     >
@@ -633,7 +633,7 @@ export default function PublicInitiativePage() {
                         })()}
                     >
                         <div className="px-2 pb-1.5 mb-1 border-b border-gray-100">
-                            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Initiatives</span>
+                            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Programs</span>
                         </div>
                         {allInitiatives.map(init => {
                             const checked = init.slug === initiativeSlug

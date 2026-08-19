@@ -89,6 +89,13 @@ export const INITIAL_WIZARD_STATE: WizardState = {
 export const includesClaim = (kind: WizardKind | null) => kind === 'claim' || kind === 'both'
 export const includesEvidence = (kind: WizardKind | null) => kind === 'evidence' || kind === 'both'
 
+/** True when the metric has every selected tag (claims require the tag on the parent metric). */
+export function kpiHasTags(kpi: { tag_ids?: string[] }, tagIds: string[]): boolean {
+  if (tagIds.length === 0) return true
+  const have = new Set(kpi.tag_ids || [])
+  return tagIds.every(id => have.has(id))
+}
+
 /** Canonical order for the four evidence types (drives the per-file picker
  *  and the deterministic order buckets are created in). */
 export const EVIDENCE_TYPE_ORDER: Evidence['type'][] = ['visual_proof', 'documentation', 'financials', 'testimony']
@@ -145,18 +152,41 @@ export function validateMetricStep(state: WizardState): string | null {
 }
 
 /** The metrics that actually got a claim in the "both" flow's stacked step. */
-export function filledClaimEntries(state: WizardState): Array<[string, ClaimEntry]> {
- return Object.entries(state.claimEntries).filter(([, entry]) => entry.value.trim() !== '')
+export function filledClaimEntries(
+  state: WizardState,
+  kpis?: Array<{ id?: string; tag_ids?: string[] }>,
+): Array<[string, ClaimEntry]> {
+  let entries = Object.entries(state.claimEntries).filter(([, entry]) => entry.value.trim() !== '')
+  if (kpis && state.tagIds.length > 0) {
+    const allowed = new Set(kpis.filter(k => kpiHasTags(k, state.tagIds)).map(k => k.id!).filter(Boolean))
+    entries = entries.filter(([id]) => allowed.has(id))
+  }
+  return entries
 }
 
-export function validateClaimStep(state: WizardState): string | null {
+export function validateClaimStep(
+  state: WizardState,
+  kpis?: Array<{ id?: string; tag_ids?: string[] }>,
+): string | null {
  if (state.kind === 'both') {
- const filled = filledClaimEntries(state)
- if (filled.length === 0) return 'Enter a result for at least one metric'
+ const filled = filledClaimEntries(state, kpis)
+ if (filled.length === 0) {
+   if (state.tagIds.length > 0 && kpis && !kpis.some(k => kpiHasTags(k, state.tagIds))) {
+     return 'No metrics have the tags you picked — go back and clear the tag, or add it to a metric'
+   }
+   return 'Enter a result for at least one metric'
+ }
  if (filled.some(([, entry]) => Number.isNaN(Number(entry.value)))) return 'Claim values must be numbers'
  return null
  }
  if (!state.claimValue.trim() || Number.isNaN(Number(state.claimValue))) return 'Enter the number you\'re claiming'
+ // Metric-first claim: selected tag must live on that metric.
+ if (state.claimKpiId && state.tagIds.length > 0 && kpis) {
+   const kpi = kpis.find(k => k.id === state.claimKpiId)
+   if (kpi && !kpiHasTags(kpi, state.tagIds)) {
+     return 'That tag isn’t on the chosen metric — pick a tag from the metric, or clear it'
+   }
+ }
  return null
 }
 
@@ -169,14 +199,17 @@ export function validateEvidenceStep(state: WizardState): string | null {
 }
 
 /** All record-level validation, used as the final gate before saving. */
-export function validateAll(state: WizardState): string | null {
+export function validateAll(
+  state: WizardState,
+  kpis?: Array<{ id?: string; tag_ids?: string[] }>,
+): string | null {
  // The "both" flow has no metric step — its metrics come from the claims list.
  if (state.kind !== 'both') {
  const metricError = validateMetricStep(state)
  if (metricError) return metricError
  }
  if (includesClaim(state.kind)) {
- const claimError = validateClaimStep(state)
+ const claimError = validateClaimStep(state, kpis)
  if (claimError) return claimError
  }
  if (includesEvidence(state.kind)) {

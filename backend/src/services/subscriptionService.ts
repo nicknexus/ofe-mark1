@@ -714,7 +714,7 @@ export class SubscriptionService {
         const { count, error } = await countQuery;
 
         if (error) {
-            throw new Error(`Failed to count initiatives: ${error.message}`);
+            throw new Error(`Failed to count programs: ${error.message}`);
         }
 
         const currentCount = count || 0;

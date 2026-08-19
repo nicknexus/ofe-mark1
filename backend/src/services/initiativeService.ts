@@ -117,10 +117,10 @@ export class InitiativeService {
                     .select()
                     .single();
 
-                if (retryError) throw new Error(`Failed to create initiative: ${retryError.message}`);
+                if (retryError) throw new Error(`Failed to create program: ${retryError.message}`);
                 return retryData;
             }
-            throw new Error(`Failed to create initiative: ${error.message}`);
+            throw new Error(`Failed to create program: ${error.message}`);
         }
         return data;
     }
@@ -143,7 +143,7 @@ export class InitiativeService {
             .order('display_order', { ascending: true })
             .order('created_at', { ascending: true });
 
-        if (error) throw new Error(`Failed to fetch initiatives: ${error.message}`);
+        if (error) throw new Error(`Failed to fetch programs: ${error.message}`);
         const initiatives = data || [];
 
         // team_member scope: hide initiatives outside their allow-list.
@@ -168,7 +168,7 @@ export class InitiativeService {
 
         if (error) {
             if (error.code === 'PGRST116') return null;
-            throw new Error(`Failed to fetch initiative: ${error.message}`);
+            throw new Error(`Failed to fetch program: ${error.message}`);
         }
         if (!data) return null;
 
@@ -228,7 +228,7 @@ export class InitiativeService {
             .select()
             .single();
 
-        if (error) throw new Error(`Failed to update initiative: ${error.message}`);
+        if (error) throw new Error(`Failed to update program: ${error.message}`);
         return data;
     }
 
@@ -251,7 +251,7 @@ export class InitiativeService {
             .eq('id', id)
             .eq('organization_id', organizationId);
 
-        if (error) throw new Error(`Failed to delete initiative: ${error.message}`);
+        if (error) throw new Error(`Failed to delete program: ${error.message}`);
     }
 
     /**
@@ -278,7 +278,7 @@ export class InitiativeService {
             .select('id')
             .eq('organization_id', organizationId)
             .in('id', ids);
-        if (fetchError) throw new Error(`Failed to validate initiatives: ${fetchError.message}`);
+        if (fetchError) throw new Error(`Failed to validate programs: ${fetchError.message}`);
 
         const allowedIds = new Set((owned || []).map((i: { id: string }) => i.id));
         const updates = order

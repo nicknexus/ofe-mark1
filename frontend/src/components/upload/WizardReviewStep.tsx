@@ -40,7 +40,7 @@ export default function WizardReviewStep({
  // Claims to be created: per-metric entries in the "both" flow, or the
  // single claim-only record, normalised to one shape for rendering.
  const newClaims = state.kind === 'both'
- ? filledClaimEntries(state).map(([kpiId, entry]) => ({ kpiId, value: entry.value, label: entry.label, note: entry.note }))
+ ? filledClaimEntries(state, kpis).map(([kpiId, entry]) => ({ kpiId, value: entry.value, label: entry.label, note: entry.note }))
  : claim && state.claimKpiId
  ? [{ kpiId: state.claimKpiId, value: state.claimValue, label: state.claimLabel, note: state.claimNote }]
  : []
@@ -58,7 +58,7 @@ export default function WizardReviewStep({
  const matchedClaims = useMemo(() => {
  if (!evidence) return []
  const kpiIds = state.kind === 'both'
- ? filledClaimEntries(state).map(([kpiId]) => kpiId)
+ ? filledClaimEntries(state, kpis).map(([kpiId]) => kpiId)
  : state.evidenceKpiIds
  return previewMatchingClaims(existingClaims, {
  kpiIds,

@@ -217,7 +217,7 @@ export default function MetricsTab({
  <EmptyState
  icon={BarChart3}
  title="No Metrics Yet"
- description="Create your first metric to start tracking your initiative's impact"
+ description="Create your first metric to start tracking your program's impact"
  action={onAddKPI ? (
  <button type="button" onClick={onAddKPI} className="app-btn app-btn-primary">
  <Plus className="w-4 h-4" />
@@ -237,7 +237,7 @@ export default function MetricsTab({
  <h2 className="text-xl font-semibold text-gray-800">
  Performance Metrics
  </h2>
- <p className="text-gray-500 text-sm">Track and measure your initiative's impact across all metrics</p>
+ <p className="text-gray-500 text-sm">Track and measure your program's impact across all metrics</p>
  </div>
 
  <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
@@ -301,7 +301,7 @@ export default function MetricsTab({
  title="No Metrics Found"
  description={
  categoryFilter === 'all'
- ? "Create your first metric to start tracking your initiative's performance and impact."
+ ? "Create your first metric to start tracking your program's performance and impact."
  : `No ${categoryFilter} metrics found. Try a different filter or create a new metric.`
  }
  />

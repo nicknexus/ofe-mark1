@@ -1,4 +1,5 @@
-export const LAYOUT_INTRO_VERSION = 1
+/** Bump to re-show What's New for everyone who already dismissed an older version. */
+export const LAYOUT_INTRO_VERSION = 2
 export const LAYOUT_INTRO_KEY = 'nexus-layout-intro-seen'
 export const LAYOUT_INTRO_SESSION = 'nexus-layout-intro-session'
 

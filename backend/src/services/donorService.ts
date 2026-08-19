@@ -54,7 +54,7 @@ export class DonorService {
     static async create(donor: Partial<Donor>, userId: string, requestedOrgId?: string): Promise<Donor> {
         if (donor.initiative_id) {
             const initiative = await InitiativeService.getById(donor.initiative_id, userId, requestedOrgId)
-            if (!initiative) throw new Error('Initiative not found or access denied')
+            if (!initiative) throw new Error('Program not found or access denied')
         }
 
         const { data, error } = await supabase

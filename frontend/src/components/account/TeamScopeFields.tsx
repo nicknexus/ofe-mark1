@@ -103,9 +103,9 @@ export function TeamScopeFields({ scope, setScope }: TeamScopeFieldsProps) {
  />
  <span>
  <span className="flex items-center gap-1.5 text-sm font-medium text-gray-800">
- <Globe className="w-3.5 h-3.5 text-primary-600" /> All initiatives
+ <Globe className="w-3.5 h-3.5 text-primary-600" /> All programs
  </span>
- <span className="block text-xs text-gray-500 mt-0.5">Full access to every initiative and location.</span>
+ <span className="block text-xs text-gray-500 mt-0.5">Full access to every program and location.</span>
  </span>
  </label>
 
@@ -118,17 +118,17 @@ export function TeamScopeFields({ scope, setScope }: TeamScopeFieldsProps) {
  className="mt-1 text-primary-600 focus:ring-primary-500"
  />
  <span>
- <span className="text-sm font-medium text-gray-800">Specific initiatives</span>
- <span className="block text-xs text-gray-500 mt-0.5">Pick the initiatives this member can access.</span>
+ <span className="text-sm font-medium text-gray-800">Specific programs</span>
+ <span className="block text-xs text-gray-500 mt-0.5">Pick the programs this member can access.</span>
  </span>
  </label>
 
  {!scope.allInitiatives && (
  <div className="space-y-1.5 pl-2">
  {loading ? (
- <p className="text-xs text-gray-400 px-1 py-2">Loading initiatives…</p>
+ <p className="text-xs text-gray-400 px-1 py-2">Loading programs…</p>
  ) : initiatives.length === 0 ? (
- <p className="text-xs text-gray-400 px-1 py-2">No initiatives yet.</p>
+ <p className="text-xs text-gray-400 px-1 py-2">No programs yet.</p>
  ) : (
  initiatives.map((init) => {
  const checked = scope.initiativeIds.includes(init.id!)

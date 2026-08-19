@@ -152,7 +152,7 @@ export class DemoPersistenceService {
     }
 
     static async makeUniqueInitiativeSlug(title: string): Promise<string> {
-        const baseSlug = `demo-${OrganizationService.generateSlug(title) || 'initiative'}`;
+        const baseSlug = `demo-${OrganizationService.generateSlug(title) || 'program'}`;
         for (let tries = 0; tries < 10; tries++) {
             const slug = `${baseSlug}-${Math.random().toString(36).slice(2, 8)}`;
             const { data, error } = await supabase
@@ -160,7 +160,7 @@ export class DemoPersistenceService {
                 .select('id')
                 .eq('slug', slug)
                 .maybeSingle();
-            if (error) throw new Error(`Failed to check initiative slug: ${error.message}`);
+            if (error) throw new Error(`Failed to check program slug: ${error.message}`);
             if (!data) return slug;
         }
         return `${baseSlug}-${Date.now().toString().slice(-6)}`;
@@ -285,7 +285,7 @@ export class DemoPersistenceService {
             .from('initiatives')
             .delete()
             .eq('organization_id', organizationId);
-        if (initErr) throw new Error(`Failed to clear existing initiatives: ${initErr.message}`);
+        if (initErr) throw new Error(`Failed to clear existing programs: ${initErr.message}`);
 
         const { error: locErr } = await supabase
             .from('locations')
@@ -318,7 +318,7 @@ export class DemoPersistenceService {
                 user_id: userId,
                 display_order: 0,
             },
-            'Failed to create generated initiative'
+            'Failed to create generated program'
         );
         const initiativeId = initiative.id as string;
 

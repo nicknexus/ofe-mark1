@@ -18,7 +18,7 @@ type MatrixRow = {
 }
 
 const MATRIX_ROWS: MatrixRow[] = [
- { addKey: 'addMetrics', editKey: 'editMetrics', label: 'Metrics', description: 'KPIs the initiative tracks' },
+ { addKey: 'addMetrics', editKey: 'editMetrics', label: 'Metrics', description: 'KPIs the program tracks' },
  { addKey: 'addClaims', editKey: 'editClaims', label: 'Impact claims', description: 'Results by location & date' },
  { addKey: 'addEvidence', editKey: 'editEvidence', label: 'Evidence', description: 'Files, photos, documents' },
  { addKey: 'addStories', editKey: 'editStories', label: 'Stories', description: 'Impact stories & testimonials' },
@@ -27,14 +27,14 @@ const MATRIX_ROWS: MatrixRow[] = [
 ]
 
 const STRUCTURE_ROWS: PermRow[] = [
- { key: 'editInitiatives', label: 'Edit initiatives' },
+ { key: 'editInitiatives', label: 'Edit programs' },
  { key: 'editLocations', label: 'Edit locations' },
 ]
 const REPORT_ROWS: PermRow[] = [
  { key: 'exportReports', label: 'Generate & export reports', description: 'Download PDFs and generate reports' },
 ]
 const DELETE_ROWS: PermRow[] = [
- { key: 'deleteContent', label: 'Delete content', description: 'Remove evidence, metrics & initiatives' },
+ { key: 'deleteContent', label: 'Delete content', description: 'Remove evidence, metrics & programs' },
 ]
 
 // All grantable keys (viewData is always-on baseline, excluded from "enable all")
@@ -146,7 +146,7 @@ export function TeamRolePermissionFields({ memberType, setMemberType, permission
  <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
  {/* Scope — narrower left column */}
  <div className="lg:col-span-2">
- <span className="block text-sm font-semibold text-gray-700 mb-2">1. Initiatives & locations</span>
+ <span className="block text-sm font-semibold text-gray-700 mb-2">1. Programs & locations</span>
  {scope && setScope
  ? <TeamScopeFields scope={scope} setScope={setScope} />
  : <p className="text-xs text-gray-400">Scope unavailable.</p>}

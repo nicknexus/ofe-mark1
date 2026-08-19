@@ -82,17 +82,17 @@ export default function InitiativeSidebar({
       {/* Back link */}
       <div className="px-3 pt-3">
         <Link
-          to="/tracking/initiatives"
+          to="/tracking/programs"
           className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          <span>All initiatives</span>
+          <span>All programs</span>
         </Link>
       </div>
 
       {/* Initiative identity — no logo, title wraps so long names stay readable */}
       <div className="px-4 pt-2.5 pb-4 border-b border-gray-100">
-        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Initiative</p>
+        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Program</p>
         <h2 className="text-base font-semibold text-gray-900 leading-snug break-words">
           {initiativeTitle}
         </h2>

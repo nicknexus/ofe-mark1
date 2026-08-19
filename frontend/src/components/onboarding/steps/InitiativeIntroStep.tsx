@@ -3,7 +3,7 @@ import { Target, MapPin, BarChart3, Users } from 'lucide-react'
 
 const POINTS = [
   { icon: MapPin, title: 'Locations' },
-  { icon: Target, title: 'Initiatives' },
+  { icon: Target, title: 'Programs' },
   { icon: BarChart3, title: 'Metrics' },
   { icon: Users, title: 'Groups' },
 ]
@@ -15,16 +15,16 @@ const POINTS = [
 export default function InitiativeIntroStep() {
   return (
     <div className="onboarding-section-intro">
-      <p className="onboarding-section-intro-eyebrow">Part 2 · Initiative setup</p>
+      <p className="onboarding-section-intro-eyebrow">Part 2 · Program setup</p>
 
       <h1 className="onboarding-section-intro-headline">
-        <span className="onboarding-gradient-text">Initiatives</span>
+        <span className="onboarding-gradient-text">Programs</span>
       </h1>
 
       <p className="onboarding-section-intro-desc">
-        An <strong>initiative</strong> is one of your programs or projects — like “Youth Training 2025” or
+        An <strong>program</strong> is one of your programs or projects — like “Youth Training 2025” or
         “Clean Water.” Each one holds its own metrics, evidence and reports. In this part you'll add the
-        places you work, create your initiatives, and define what you measure inside them.
+        places you work, create your programs, and define what you measure inside them.
       </p>
 
       <div className="onboarding-section-intro-cards">

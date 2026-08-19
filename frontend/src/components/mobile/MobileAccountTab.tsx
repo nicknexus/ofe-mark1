@@ -395,7 +395,7 @@ export default function MobileAccountTab({ user, subscriptionStatus }: MobileAcc
  </div>
  {initiativesUsage && (
  <div className="flex items-center justify-between">
- <span className="text-sm text-gray-500">Initiatives</span>
+ <span className="text-sm text-gray-500">Programs</span>
  <span className="text-sm font-medium text-gray-900">{initiativesUsage.limit === null ? `${initiativesUsage.current} (unlimited)` : `${initiativesUsage.current}/${initiativesUsage.limit}`}</span>
  </div>
  )}

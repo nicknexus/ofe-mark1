@@ -7,7 +7,7 @@ export class LocationService {
 
     private static async assertInitiativeAccess(initiativeId: string, userId: string, requestedOrgId?: string) {
         const initiative = await InitiativeService.getById(initiativeId, userId, requestedOrgId);
-        if (!initiative) throw new Error('Initiative not found or access denied');
+        if (!initiative) throw new Error('Program not found or access denied');
         return initiative;
     }
 
@@ -24,7 +24,7 @@ export class LocationService {
             .from('initiative_locations')
             .select('initiative_id, location_id')
             .in('location_id', ids);
-        if (error) throw new Error(`Failed to fetch initiative links: ${error.message}`);
+        if (error) throw new Error(`Failed to fetch program links: ${error.message}`);
 
         const byLoc = new Map<string, string[]>();
         (links || []).forEach((row: any) => {
@@ -107,7 +107,7 @@ export class LocationService {
                 .from('initiative_locations')
                 .select('location_id')
                 .eq('initiative_id', initiativeId);
-            if (linksError) throw new Error(`Failed to fetch initiative locations: ${linksError.message}`);
+            if (linksError) throw new Error(`Failed to fetch program locations: ${linksError.message}`);
 
             const locationIds = (links || []).map((l: any) => l.location_id);
             if (locationIds.length === 0) return [];
@@ -200,7 +200,7 @@ export class LocationService {
         const initiative = await this.assertInitiativeAccess(initiativeId, userId, requestedOrgId);
 
         if ((initiative as any).organization_id !== location.organization_id) {
-            throw new Error('Cannot link location to an initiative in a different organization');
+            throw new Error('Cannot link location to a program in a different organization');
         }
 
         const { error } = await supabase
@@ -210,7 +210,7 @@ export class LocationService {
                 { onConflict: 'initiative_id,location_id', ignoreDuplicates: true }
             );
 
-        if (error) throw new Error(`Failed to link location to initiative: ${error.message}`);
+        if (error) throw new Error(`Failed to link location to program: ${error.message}`);
     }
 
     static async unlinkFromInitiative(locationId: string, initiativeId: string, userId: string, requestedOrgId?: string): Promise<void> {
@@ -223,7 +223,7 @@ export class LocationService {
             .eq('initiative_id', initiativeId)
             .eq('location_id', locationId);
 
-        if (error) throw new Error(`Failed to unlink location from initiative: ${error.message}`);
+        if (error) throw new Error(`Failed to unlink location from program: ${error.message}`);
     }
 
     // ---------- Connected entities ----------

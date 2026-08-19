@@ -92,7 +92,7 @@ export default function CreateKPIModal({
     setAttaching(definition.id)
     try {
       await apiService.addMetricToInitiative(definition.id, initiativeId)
-      notify.success(`"${definition.title}" added to this initiative`)
+      notify.success(`"${definition.title}" added to this program`)
       onAttached?.()
       onClose()
     } catch (err) {
@@ -205,7 +205,7 @@ export default function CreateKPIModal({
                     ? 'Your organization has no other metrics yet.'
                     : search.trim()
                       ? `No metrics match "${search}".`
-                      : 'Every metric your organization tracks is already on this initiative.'}
+                      : 'Every metric your organization tracks is already on this program.'}
                 </p>
               ) : (
                 <div className="space-y-1.5">

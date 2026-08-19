@@ -200,10 +200,10 @@ export default function OverviewPage() {
   const brand = o?.brand_color || '#c0dfa1'
 
   const proveChecks = useMemo<CheckItem[]>(() => [
-    { id: 'initiative', label: 'Create an initiative', done: initiatives.length > 0, to: '/tracking/initiatives?new=1' },
-    { id: 'metric', label: 'Add a metric', done: metrics.length > 0, to: firstInit ? `/initiatives/${firstInit}?tab=metrics` : '/metrics' },
+    { id: 'initiative', label: 'Create a program', done: initiatives.length > 0, to: '/tracking/programs?new=1' },
+    { id: 'metric', label: 'Add a metric', done: metrics.length > 0, to: firstInit ? `/programs/${firstInit}?tab=metrics` : '/metrics' },
     { id: 'location', label: 'Add a location', done: locations.length > 0, to: '/locations' },
-    { id: 'evidence', label: 'Add evidence', done: evidenceCount > 0, to: firstInit ? `/initiatives/${firstInit}?tab=logs&view=evidence` : '/tracking/initiatives' },
+    { id: 'evidence', label: 'Add evidence', done: evidenceCount > 0, to: firstInit ? `/programs/${firstInit}?tab=logs&view=evidence` : '/tracking/programs' },
   ], [initiatives.length, metrics.length, locations.length, evidenceCount, firstInit])
 
   const shareChecks = useMemo<CheckItem[]>(() => {
@@ -298,7 +298,7 @@ export default function OverviewPage() {
           animate="visible"
         >
           <motion.div variants={fadeUp}>
-            <Link to="/tracking/initiatives" className="app-card-interactive p-4 h-full flex gap-3">
+            <Link to="/tracking/programs" className="app-card-interactive p-4 h-full flex gap-3">
               <div className="app-icon-tile app-icon-tile-accent">
                 <LayoutDashboard className="w-4 h-4" />
               </div>
@@ -306,7 +306,7 @@ export default function OverviewPage() {
                 <p className="text-2xl font-semibold text-secondary-900 tabular-nums leading-none">
                   <CountUp value={initiatives.length} />
                 </p>
-                <p className="text-xs text-secondary-500 mt-1">Initiative{initiatives.length === 1 ? '' : 's'}</p>
+                <p className="text-xs text-secondary-500 mt-1">Program{initiatives.length === 1 ? '' : 's'}</p>
                 {initiatives[0] && (
                   <p className="text-[11px] text-secondary-400 mt-1.5 truncate">{initiatives[0].title}{initiatives.length > 1 ? ` +${initiatives.length - 1}` : ''}</p>
                 )}
@@ -400,7 +400,7 @@ export default function OverviewPage() {
                 <div className="flex-1 flex flex-col justify-center py-6">
                   <p className="text-sm font-medium text-secondary-800">You are set</p>
                   <p className="text-xs text-secondary-500 mt-1 mb-4">Tracking and sharing look complete.</p>
-                  <Link to="/tracking/initiatives" className="app-btn app-btn-primary app-btn-sm w-fit">Open tracking</Link>
+                  <Link to="/tracking/programs" className="app-btn app-btn-primary app-btn-sm w-fit">Open tracking</Link>
                 </div>
               ) : (
                 <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
@@ -421,7 +421,7 @@ export default function OverviewPage() {
             </AppCard>
 
             <div className="grid grid-cols-2 gap-3 flex-shrink-0">
-              <Link to="/tracking/initiatives" className="app-card p-3 hover:border-primary-200 transition-colors">
+              <Link to="/tracking/programs" className="app-card p-3 hover:border-primary-200 transition-colors">
                 <div className="flex items-center gap-2.5 mb-2">
                   <ProgressRing pct={provePct} stroke="#789a59" />
                   <div className="min-w-0">
@@ -455,7 +455,7 @@ export default function OverviewPage() {
                 locations={locations}
                 onLocationClick={(loc) => {
                   const id = loc.initiative_id || loc.initiative_ids?.[0]
-                  if (id) navigate(`/initiatives/${id}?tab=location`)
+                  if (id) navigate(`/programs/${id}?tab=location`)
                 }}
                 hideEmptyBanner
                 autoFit

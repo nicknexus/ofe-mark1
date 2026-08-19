@@ -307,6 +307,7 @@ export class MetricDefinitionService {
                     .select()
                     .single();
                 if (error) throw new Error(`Failed to restore metric: ${error.message}`);
+                await MetricTagService.mirrorDefinitionTagsToKpi(data.id, definitionId, userId)
                 return data;
             }
             return existing;
@@ -337,7 +338,12 @@ export class MetricDefinitionService {
             .select()
             .single();
 
-        if (error) throw new Error(`Failed to add metric to initiative: ${error.message}`);
+        if (error) throw new Error(`Failed to add metric to program: ${error.message}`);
+
+        // Mirror definition tags onto the new instance so claim-tag validation
+        // (and the upload wizard filter) see the same tag set as the metric.
+        await MetricTagService.mirrorDefinitionTagsToKpi(data.id, definitionId, userId)
+
         return data;
     }
 
@@ -372,7 +378,7 @@ export class MetricDefinitionService {
             .eq('definition_id', definitionId)
             .eq('initiative_id', initiativeId);
 
-        if (error) throw new Error(`Failed to remove metric from initiative: ${error.message}`);
+        if (error) throw new Error(`Failed to remove metric from program: ${error.message}`);
     }
 
     /**

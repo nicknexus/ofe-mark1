@@ -217,7 +217,7 @@ export default function InitiativePage() {
  // Send them back to the dashboard where the locked card + upgrade
  // modal live.
  if (error?.code === 'INITIATIVE_LOCKED') {
- notify.error('This initiative is locked on your current plan. Upgrade to unlock it.')
+ notify.error('This program is locked on your current plan. Upgrade to unlock it.')
  navigate('/')
  return
  }
@@ -404,7 +404,7 @@ export default function InitiativePage() {
  const isExpanded = expandedKPIs.has(kpiIdToToggle)
  if (isExpanded) {
  // Closing the metric - navigate back to initiative
- navigate(`/initiatives/${id}`)
+ navigate(`/programs/${id}`)
       setExpandedKPIs(new Set())
       // Return to the previous tab; direct URL loads (or the removed evidence
       // tab) fall back to the Metrics dashboard.
@@ -415,7 +415,7 @@ export default function InitiativePage() {
  setPreviousTab(null)
  } else {
  // Opening a metric - navigate to metric URL
- navigate(`/initiatives/${id}/metrics/${kpiIdToToggle}`)
+ navigate(`/programs/${id}/metrics/${kpiIdToToggle}`)
  }
  }
 
@@ -423,7 +423,7 @@ export default function InitiativePage() {
  setActiveTab(tab)
  // Clear expanded KPIs and navigate to base initiative URL when switching tabs
  if ((tab === 'metrics' && kpiId) || expandedKPIs.size > 0) {
- navigate(`/initiatives/${id}?tab=${tab}`)
+ navigate(`/programs/${id}?tab=${tab}`)
  setExpandedKPIs(new Set())
  } else {
  // Keep the tab in the URL so Timeline sub-views/filters can deep-link;
@@ -434,7 +434,7 @@ export default function InitiativePage() {
 
  const handleMetricCardClick = (kpiIdToOpen: string) => {
  // Navigate to the metric URL - this will trigger the useEffect to expand it
- navigate(`/initiatives/${id}/metrics/${kpiIdToOpen}`)
+ navigate(`/programs/${id}/metrics/${kpiIdToOpen}`)
  }
 
   const renderMetricsContent = () => {
@@ -527,7 +527,7 @@ export default function InitiativePage() {
               kpiTotal={kpiTotals[detailKpi.id!] || 0}
               kpiUpdates={allKPIUpdates}
               onBack={() => {
-                navigate(`/initiatives/${id}`)
+                navigate(`/programs/${id}`)
                 setExpandedKPIs(new Set())
                 setActiveTab('metrics')
               }}
@@ -578,10 +578,10 @@ export default function InitiativePage() {
  if (loadingState.error || !dashboard) {
  return (
  <div className="text-center py-12 px-4 app-canvas min-h-screen">
- <InlineAlert tone="error" className="mb-4 max-w-md mx-auto text-left">{loadingState.error || 'Initiative not found'}</InlineAlert>
+ <InlineAlert tone="error" className="mb-4 max-w-md mx-auto text-left">{loadingState.error || 'Program not found'}</InlineAlert>
  <div className="space-x-4">
  <Button asChild variant="secondary">
- <Link to="/tracking/initiatives">Back to Tracking</Link>
+ <Link to="/tracking/programs">Back to Tracking</Link>
  </Button>
  <Button onClick={loadDashboard} disabled={isLoadingDashboard}>
  {isLoadingDashboard ? 'Loading...' : 'Try Again'}
@@ -618,7 +618,7 @@ export default function InitiativePage() {
  <h1 className="text-sm font-semibold text-gray-800 truncate">
  {dashboard.initiative.title}
  </h1>
- <p className="text-xs text-gray-400">Initiative</p>
+ <p className="text-xs text-gray-400">Program</p>
  </div>
  </div>
  </div>

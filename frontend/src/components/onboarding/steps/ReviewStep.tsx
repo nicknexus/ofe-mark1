@@ -31,7 +31,7 @@ export default function ReviewStep({ draftApi, onNavigate }: Props) {
       <StepHeader
         icon={CheckCircle2}
         title="You're all set up"
-        description="Here's everything you've configured. Open an initiative when you're ready to start adding impact claims and evidence."
+        description="Here's everything you've configured. Open a program when you're ready to start adding impact claims and evidence."
       />
 
       {hasOrgText && (
@@ -53,7 +53,7 @@ export default function ReviewStep({ draftApi, onNavigate }: Props) {
               <div className="w-8 h-8 rounded-xl bg-primary-50 ring-1 ring-primary-100/50 flex items-center justify-center shrink-0">
                 <Target className="w-4 h-4 text-primary-600" />
               </div>
-              <h2 className="text-[15px] font-semibold text-gray-900 tracking-tight">Initiatives</h2>
+              <h2 className="text-[15px] font-semibold text-gray-900 tracking-tight">Programs</h2>
               <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100/70 text-gray-600">
                 {draft.initiatives.length}
               </span>
@@ -62,7 +62,7 @@ export default function ReviewStep({ draftApi, onNavigate }: Props) {
 
           <div className="onboarding-review-panel-body flex-1 min-h-0">
           {draft.initiatives.length === 0 ? (
-            <div className="onboarding-review-empty">No initiatives yet</div>
+            <div className="onboarding-review-empty">No programs yet</div>
           ) : (
             <ul className="onboarding-review-init-list">
               {draft.initiatives.map(init => {
@@ -79,9 +79,9 @@ export default function ReviewStep({ draftApi, onNavigate }: Props) {
                       </div>
                       <button
                         type="button"
-                        onClick={() => go(`/initiatives/${init.id}`)}
+                        onClick={() => go(`/programs/${init.id}`)}
                         className="app-btn app-btn-ghost app-btn-sm shrink-0"
-                        title="Open initiative"
+                        title="Open program"
                       >
                         Open <ArrowRight className="w-3.5 h-3.5" />
                       </button>

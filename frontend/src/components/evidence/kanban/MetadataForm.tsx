@@ -188,7 +188,7 @@ export default function MetadataForm({
  required
  >
  {kpis.length === 0 ? (
- <EmptyHint text="No metrics on this initiative." />
+ <EmptyHint text="No metrics on this program." />
  ) : (
  <CheckboxGrid
  items={kpis.map(k => ({ id: k.id!, label: k.title }))}
@@ -217,7 +217,7 @@ export default function MetadataForm({
 
  <Section icon={<Users className="w-4 h-4 text-evidence-500" />} label={`Beneficiary groups (${metadata.beneficiary_group_ids.length})`}>
  {beneficiaryGroups.length === 0 ? (
- <EmptyHint text="No beneficiary groups on this initiative." />
+ <EmptyHint text="No beneficiary groups on this program." />
  ) : (
  <CheckboxGrid
  items={beneficiaryGroups.map(b => ({ id: b.id!, label: b.name }))}

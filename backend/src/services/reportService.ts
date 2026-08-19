@@ -91,7 +91,7 @@ export class ReportService {
         // Authorize via initiative org context (org-scoped, not user-scoped).
         const initiative = await InitiativeService.getById(initiativeId, userId, requestedOrgId);
         if (!initiative) {
-            throw new Error('Initiative not found or access denied');
+            throw new Error('Program not found or access denied');
         }
 
         // Resolve the owning org so the report can carry its branding.

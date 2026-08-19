@@ -377,7 +377,7 @@ export default function PublicStoryPage() {
 
                         {/* Initiative Link */}
                         <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-100">
-                            <p className="text-xs sm:text-sm text-gray-500 mb-1.5 sm:mb-2">From initiative:</p>
+                            <p className="text-xs sm:text-sm text-gray-500 mb-1.5 sm:mb-2">From program:</p>
                             <Link
                                 to={`${orgLinkBase}/${orgSlug}/${initiativeSlug}`}
                                 className="inline-flex items-center gap-1.5 sm:gap-2 text-gray-800 hover:text-primary-600 font-medium transition-colors text-sm sm:text-base"

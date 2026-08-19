@@ -134,7 +134,7 @@ export async function sendTeamInvitationEmail(params: {
                                             <strong>What you'll be able to do:</strong>
                                         </p>
                                         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 24px;">
-                                            <tr><td style="padding: 6px 0; font-size: 14px; color: #465360;"><span style="color: #c0dfa1; margin-right: 8px;">✓</span> View all initiatives, KPIs, and evidence</td></tr>
+                                            <tr><td style="padding: 6px 0; font-size: 14px; color: #465360;"><span style="color: #c0dfa1; margin-right: 8px;">✓</span> View all programs, KPIs, and evidence</td></tr>
                                             <tr><td style="padding: 6px 0; font-size: 14px; color: #465360;"><span style="color: #c0dfa1; margin-right: 8px;">✓</span> Create and edit data</td></tr>
                                             ${params.canAddImpactClaims ? '<tr><td style="padding: 6px 0; font-size: 14px; color: #465360;"><span style="color: #c0dfa1; margin-right: 8px;">✓</span> Create impact claims (stories)</td></tr>' : ''}
                                         </table>
@@ -180,7 +180,7 @@ You've been invited to join ${params.organizationName}!
 ${inviterDisplay} has invited you to collaborate on ${params.organizationName} in Nexus Impacts.
 
 What you'll be able to do:
-- View all initiatives, KPIs, and evidence
+- View all programs, KPIs, and evidence
 - Create and edit data
 ${params.canAddImpactClaims ? '- Create impact claims (stories)' : ''}
 

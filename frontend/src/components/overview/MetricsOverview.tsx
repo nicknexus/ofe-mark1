@@ -119,7 +119,7 @@ export default function MetricsOverview({
  onOpenTimelineForMetric(kpiId)
  return
  }
- navigate(`/initiatives/${initiativeId}?tab=logs&metric=${kpiId}`)
+ navigate(`/programs/${initiativeId}?tab=logs&metric=${kpiId}`)
  }
 
  return (

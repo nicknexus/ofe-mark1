@@ -43,7 +43,7 @@ export default function UploadWizardLauncher({ initiativeId, onClose, onCreated 
  }).catch(error => {
  if (cancelled) return
  console.error('Failed to prepare upload:', error)
- notify.error('Failed to load initiative data')
+ notify.error('Failed to load program data')
  onClose()
  })
  return () => { cancelled = true }

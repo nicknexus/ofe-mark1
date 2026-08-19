@@ -25,7 +25,7 @@ export const OFFERS: Record<string, OfferConfig> = {
  billingLabel: '$364 every 26 weeks',
  billingCycleNote: '$364 billed every 26 weeks',
  features: [
- 'Up to 3 initiatives',
+ 'Up to 3 programs',
  'Full KPI tracking & analytics',
  'Evidence management',
  'Public impact reports',

@@ -16,13 +16,13 @@ const PLAN_INFO: Record<PendingTier, { name: string; monthly: string; annual: st
         name: 'Growth',
         monthly: '$75 / month',
         annual: '$750 / year',
-        features: ['10 initiatives', '10 team members', '15 locations', '300 GB storage', 'Unlimited AI reports', 'Tags & beneficiary groups'],
+        features: ['10 programs', '10 team members', '15 locations', '300 GB storage', 'Unlimited AI reports', 'Tags & beneficiary groups'],
     },
     pro: {
         name: 'Pro',
         monthly: '$240 / month',
         annual: '$2,400 / year',
-        features: ['25 initiatives', '20 team members', '30 locations', '1 TB storage', 'Unlimited AI reports', 'Advanced / white-label widgets'],
+        features: ['25 programs', '20 team members', '30 locations', '1 TB storage', 'Unlimited AI reports', 'Advanced / white-label widgets'],
     },
 }
 
@@ -89,7 +89,7 @@ export default function TrialActivationPage({ onTrialStarted }: Props) {
     }
 
     const freeFeatures = [
-        '1 initiative',
+        '1 program',
         '2 team members',
         '3 locations',
         '25 GB storage',

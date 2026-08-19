@@ -166,7 +166,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
       const data = await apiService.getInitiatives()
       setInitiatives(data)
     } catch (error) {
-      console.error('Failed to load initiatives:', error)
+      console.error('Failed to load programs:', error)
       setInitiatives([])
     } finally {
       setLoading(false)
@@ -211,7 +211,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
 
   const handlePlusClick = () => {
     if (initiatives.length === 0) {
-      notify.error('Create an initiative first')
+      notify.error('Create a program first')
       setView('initiatives')
       return
     }
@@ -252,7 +252,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
             <div className="flex items-center justify-between px-5 pt-2 pb-3">
               <div className="min-w-0 pr-3">
                 <h2 className="text-base font-semibold text-gray-900">Add a log</h2>
-                <p className="text-xs text-gray-500 mt-0.5">Pick an initiative for this claim or evidence</p>
+                <p className="text-xs text-gray-500 mt-0.5">Pick a program for this claim or evidence</p>
               </div>
               <motion.button
                 type="button"
@@ -313,7 +313,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
               onClick={handleExitInitiative}
               whileTap={tapScale}
               className="p-2 rounded-xl text-gray-500 active:bg-gray-50"
-              aria-label="Back to initiatives"
+              aria-label="Back to programs"
             >
               <ChevronLeft className="w-5 h-5" />
             </motion.button>
@@ -536,7 +536,7 @@ export default function MobileApp({ user, subscriptionStatus }: MobileAppProps) 
               if (location.pathname !== '/') navigate('/', { replace: true })
             }}
             icon={Layers}
-            label="Initiatives"
+            label="Programs"
           />
           <MobileNavItem
             active={view === 'metrics'}

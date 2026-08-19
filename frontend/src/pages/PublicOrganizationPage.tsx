@@ -927,7 +927,7 @@ export default function PublicOrganizationPage() {
                                 <Target className={`w-3.5 h-3.5 md:w-4 md:h-4 flex-shrink-0 ${selectedInitiative !== 'all' ? 'text-primary-600' : 'text-gray-400'}`} />
                                 <span className="truncate max-w-[100px] md:max-w-[140px]">
                                     {selectedInitiative === 'all'
-                                        ? 'Initiative'
+                                        ? 'Program'
                                         : initiatives.find(i => i.id === selectedInitiative)?.title || 'Select'}
                                 </span>
                                 {selectedInitiative !== 'all' ? (
@@ -1020,7 +1020,7 @@ export default function PublicOrganizationPage() {
             >
                 {initiatives.length > 0 && (
                     <PublicMobileFilterSection
-                        title="Initiative"
+                        title="Program"
                         active={draftInitiative !== 'all'}
                         summary={
                             draftInitiative === 'all'
@@ -1029,7 +1029,7 @@ export default function PublicOrganizationPage() {
                         }
                     >
                         <PublicMobileFilterRadio
-                            allLabel="All Initiatives"
+                            allLabel="All Programs"
                             options={initiatives
                                 .filter((i): i is typeof i & { id: string } => !!i.id)
                                 .map((i) => ({ id: i.id, name: i.title }))}
@@ -1108,7 +1108,7 @@ export default function PublicOrganizationPage() {
                         })()}
                     >
                         <div className="flex items-center justify-between px-2 pb-1.5 mb-1 border-b border-gray-100">
-                            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Initiatives</span>
+                            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Programs</span>
                             {selectedInitiative !== 'all' && (
                                 <button
                                     type="button"
@@ -1132,7 +1132,7 @@ export default function PublicOrganizationPage() {
                                 {selectedInitiative === 'all' && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
                             </span>
                             <span className={`text-sm truncate ${selectedInitiative === 'all' ? 'text-primary-800 font-medium' : 'text-gray-700'}`}>
-                                All Initiatives
+                                All Programs
                             </span>
                         </button>
                         {initiatives.map(init => {

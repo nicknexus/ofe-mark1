@@ -180,7 +180,7 @@ router.delete('/account', authenticateUser, async (req: AuthenticatedRequest, re
 
             if (initiatives && initiatives.length > 0) {
                 const initiativeIds = initiatives.map(i => i.id);
-                console.log(`[Account Delete] Deleting ${initiativeIds.length} initiatives`);
+                console.log(`[Account Delete] Deleting ${initiativeIds.length} programs`);
 
                 // Delete KPIs and their related data
                 const { data: kpis } = await supabase

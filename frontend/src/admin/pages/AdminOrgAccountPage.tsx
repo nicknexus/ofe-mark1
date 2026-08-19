@@ -182,7 +182,7 @@ export default function AdminOrgAccountPage() {
                         }
                     >
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
-                            <UsageMeter label="Initiatives" used={usage.initiatives} limit={plan.effective_limits.initiatives_limit} />
+                            <UsageMeter label="Programs" used={usage.initiatives} limit={plan.effective_limits.initiatives_limit} />
                             <UsageMeter label="Team members" used={usage.team_members} limit={plan.effective_limits.team_members_limit} />
                             <UsageMeter label="Locations" used={usage.locations} limit={plan.effective_limits.locations_limit} />
                             <UsageMeter

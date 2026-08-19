@@ -201,7 +201,7 @@ export function validateTeamMemberInvite(
  }
  // Fail-closed scope: must grant access to at least one initiative.
  if (scope && !scope.allInitiatives && scope.initiativeIds.length === 0) {
- return 'Select at least one initiative the member can access'
+ return 'Select at least one program the member can access'
  }
  return null
 }

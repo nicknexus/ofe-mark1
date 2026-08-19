@@ -12,14 +12,14 @@ const UPGRADE_TIERS = [
  name: 'Growth',
  monthly: '$75/mo',
  annual: '$750/yr',
- blurb: '10 initiatives · 10 team · 15 locations · 300 GB · unlimited AI · tags & beneficiary groups',
+ blurb: '10 programs · 10 team · 15 locations · 300 GB · unlimited AI · tags & beneficiary groups',
  },
  {
  tier: 'pro' as const,
  name: 'Pro',
  monthly: '$240/mo',
  annual: '$2,400/yr',
- blurb: '25 initiatives · 20 team · 30 locations · 1 TB · unlimited AI · advanced widgets',
+ blurb: '25 programs · 20 team · 30 locations · 1 TB · unlimited AI · advanced widgets',
  },
 ]
 

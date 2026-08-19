@@ -118,7 +118,7 @@ export default function MetricDefinitionModal({
           subtitle={
             editData
               ? 'Changes apply everywhere this metric is used'
-              : 'Available to every initiative in your organization'
+              : 'Available to every program in your organization'
           }
           onClose={onClose}
         />
@@ -221,14 +221,14 @@ export default function MetricDefinitionModal({
                 selectedIds={tagIds}
                 onChange={setTagIds}
                 label="Tags (optional)"
-                helperText="Tags act as sub-metrics and follow the metric into every initiative that uses it."
+                helperText="Tags act as sub-metrics and follow the metric into every program that uses it."
               />
             </div>
 
             {/* Create only. Attaching later is a one-click action on the card. */}
             {!editData && initiatives.length > 0 && (
               <div>
-                <label className="app-label">Add to initiatives (optional)</label>
+                <label className="app-label">Add to programs (optional)</label>
                 <div className="max-h-44 overflow-y-auto space-y-1.5 pr-0.5">
                   {initiatives.map(init => {
                     const selected = (formData.initiative_ids || []).includes(init.id!)
@@ -270,7 +270,7 @@ export default function MetricDefinitionModal({
                   })}
                 </div>
                 <p className="text-[11px] text-gray-500 mt-1.5">
-                  You can leave this empty and add it to initiatives later.
+                  You can leave this empty and add it to programs later.
                 </p>
               </div>
             )}

@@ -120,7 +120,7 @@ export async function persistSection(
   }
 
   if (stage === 'metrics') {
-    if (!ctx.initiativeId) return { errors: ['No initiative selected'], createdInitiatives }
+    if (!ctx.initiativeId) return { errors: ['No program selected'], createdInitiatives }
     const metrics = items as MetricItem[]
     const tagMap = await ensureTags(metrics.flatMap(m => m.tags || []))
     for (const m of metrics) {
@@ -147,7 +147,7 @@ export async function persistSection(
   }
 
   if (stage === 'groups') {
-    if (!ctx.initiativeId) return { errors: ['No initiative selected'], createdInitiatives }
+    if (!ctx.initiativeId) return { errors: ['No program selected'], createdInitiatives }
     for (const g of items as GroupItem[]) {
       if (!g.name?.trim()) continue
       try {

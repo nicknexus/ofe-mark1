@@ -171,7 +171,7 @@ export default function ContentPublicPage() {
 
             {!live && (
               <p className="text-xs text-secondary-400 mt-4">
-                Going live makes initiatives, impact data, stories, and media viewable by anyone.
+                Going live makes programs, impact data, stories, and media viewable by anyone.
               </p>
             )}
 

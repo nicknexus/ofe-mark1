@@ -183,7 +183,7 @@ export default function AllLocationsModal({ isOpen, onClose }: AllLocationsModal
  )}
  {(loc.initiative_ids?.length ?? 0) > 0 && (
  <p className="text-xs text-gray-400 mt-1">
- Linked to {loc.initiative_ids!.length} initiative{loc.initiative_ids!.length === 1 ? '' : 's'}
+ Linked to {loc.initiative_ids!.length} program{loc.initiative_ids!.length === 1 ? '' : 's'}
  </p>
  )}
  </div>
@@ -227,7 +227,7 @@ export default function AllLocationsModal({ isOpen, onClose }: AllLocationsModal
  {deleteConfirmId && target && (
  <ConfirmDialog
  title="Delete Location"
- message={`Permanently delete "${target.name}" from your organization? This removes it from every initiative that uses it.`}
+ message={`Permanently delete "${target.name}" from your organization? This removes it from every program that uses it.`}
  confirmLabel="Delete Location"
  tone="danger"
  onConfirm={() => handleDelete(deleteConfirmId)}

@@ -1173,9 +1173,9 @@ class ApiService {
 
  // Load initiatives first for immediate display
  async loadInitiativesOnly(): Promise<Initiative[]> {
- console.log('Loading initiatives...')
+ console.log('Loading programs...')
  const initiatives = await this.getInitiatives()
- console.log('Loaded initiatives:', initiatives.length)
+ console.log('Loaded programs:', initiatives.length)
  return initiatives
  }
 

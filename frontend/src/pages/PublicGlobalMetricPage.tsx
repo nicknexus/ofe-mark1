@@ -139,7 +139,7 @@ export default function PublicGlobalMetricPage() {
                     <div className={`${PUBLIC_PANEL_STATIC_CLASS} p-6 sm:p-8`}>
                         <div className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
                             <Layers className="w-3.5 h-3.5" />
-                            Across {metric.initiatives.length} initiative{metric.initiatives.length === 1 ? '' : 's'}
+                            Across {metric.initiatives.length} program{metric.initiatives.length === 1 ? '' : 's'}
                         </div>
 
                         <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 tracking-tight mb-2">
@@ -170,7 +170,7 @@ export default function PublicGlobalMetricPage() {
                     <div className={`${PUBLIC_PANEL_STATIC_CLASS} p-5 sm:p-6 flex flex-col min-h-0`}>
                         <h2 className="text-sm font-semibold text-gray-700 mb-1">Where this comes from</h2>
                         <p className="text-xs text-gray-400 mb-4">
-                            Choose an initiative to see its claims and evidence.
+                            Choose a program to see its claims and evidence.
                         </p>
                         <div className="space-y-1.5 overflow-y-auto max-h-[280px] pr-0.5">
                             {metric.initiatives.map(usage => (
@@ -218,7 +218,7 @@ export default function PublicGlobalMetricPage() {
                                 All impact claims
                             </h2>
                             <span className="text-xs text-gray-500 bg-gray-100 px-2 sm:px-3 py-1 rounded-full">
-                                Across initiatives
+                                Across programs
                             </span>
                         </div>
                         {chartData.length > 0 ? (

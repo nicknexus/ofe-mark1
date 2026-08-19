@@ -37,8 +37,8 @@ export default function WelcomeStep({ orgName, onGetStarted, onSkip }: Props) {
         <div className="onboarding-welcome-part">
           <span className="onboarding-welcome-part-num"><Target className="w-4 h-4" /></span>
           <div>
-            <p className="onboarding-welcome-part-title">Initiative setup</p>
-            <p className="onboarding-welcome-part-desc">Locations, initiatives and metrics</p>
+            <p className="onboarding-welcome-part-title">Program setup</p>
+            <p className="onboarding-welcome-part-desc">Locations, programs and metrics</p>
           </div>
         </div>
       </div>

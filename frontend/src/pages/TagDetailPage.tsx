@@ -235,7 +235,7 @@ export default function TagDetailPage() {
  return (
  <Link
  key={kpi.id}
- to={`/initiatives/${kpi.initiative_id}/metrics/${kpi.id}`}
+ to={`/programs/${kpi.initiative_id}/metrics/${kpi.id}`}
  className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors"
  >
  <div className="min-w-0">

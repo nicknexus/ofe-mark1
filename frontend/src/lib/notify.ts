@@ -5,7 +5,7 @@ import toast, { type ToastOptions } from 'react-hot-toast'
  * importing `react-hot-toast` directly so copy + behavior stay consistent.
  *
  * Copy rules (keep messages short, sentence case, no trailing period):
- * notify.success('Initiative created')
+ * notify.success('Program created')
  * notify.error('Could not save changes')
  *
  * For async operations prefer `notify.promise` over manual loading/success/error.

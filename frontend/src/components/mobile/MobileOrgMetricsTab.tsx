@@ -85,7 +85,7 @@ export default function MobileOrgMetricsTab({ onEnterInitiative }: MobileOrgMetr
   const attach = async (definition: MetricDefinitionWithUsage, initiativeId: string) => {
     try {
       await apiService.addMetricToInitiative(definition.id, initiativeId)
-      notify.success('Metric added to initiative')
+      notify.success('Metric added to program')
       setAttachTarget(null)
       await load()
     } catch (err) {
@@ -145,7 +145,7 @@ export default function MobileOrgMetricsTab({ onEnterInitiative }: MobileOrgMetr
           title={definitions.length === 0 ? 'No metrics yet' : `No metrics match "${search}"`}
           description={
             definitions.length === 0
-              ? 'Create a metric here — it’s shared across every initiative in your organization.'
+              ? 'Create a metric here — it’s shared across every program in your organization.'
               : undefined
           }
           action={
@@ -219,7 +219,7 @@ export default function MobileOrgMetricsTab({ onEnterInitiative }: MobileOrgMetr
                 {definition.initiative_count === 0 ? (
                   <p className="text-xs text-gray-400 mb-3 flex items-center gap-1.5">
                     <Layers className="w-3.5 h-3.5" />
-                    Not in any initiative yet
+                    Not in any program yet
                   </p>
                 ) : (
                   <div className="mb-3 space-y-1.5">
@@ -259,7 +259,7 @@ export default function MobileOrgMetricsTab({ onEnterInitiative }: MobileOrgMetr
                     className="inline-flex items-center gap-1.5 text-xs font-medium text-primary-700 active:text-primary-800"
                   >
                     <Layers className="w-3.5 h-3.5" />
-                    Add to initiative
+                    Add to program
                   </button>
                 )}
               </motion.div>

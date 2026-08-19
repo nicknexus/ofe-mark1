@@ -495,7 +495,7 @@ export default function UploadWizard({
  case 'mode': return null
  case 'metric': return validateMetricStep(snapshot)
  case 'scope': return validateScopeStep(snapshot)
- case 'claim': return validateClaimStep(snapshot)
+ case 'claim': return validateClaimStep(snapshot, kpis)
  case 'evidence': return validateEvidenceStep(snapshot)
  default: return null
  }
@@ -528,7 +528,7 @@ export default function UploadWizard({
  }
 
  const handleSubmit = async () => {
- const error = validateAll(state)
+ const error = validateAll(state, kpis)
  if (error) {
  setStepError(error)
  return
@@ -604,7 +604,7 @@ export default function UploadWizard({
  beneficiary_group_ids: state.beneficiaryGroupIds,
  }
  if (state.kind === 'both') {
- for (const [kpiId, entry] of filledClaimEntries(state)) {
+ for (const [kpiId, entry] of filledClaimEntries(state, kpis)) {
  const claimPayload: CreateKPIUpdateForm = {
  value: Number(entry.value),
  label: entry.label.trim() || undefined,
@@ -874,6 +874,7 @@ export default function UploadWizard({
  update={update}
  locations={locations}
  tags={tags}
+ kpis={kpis}
  beneficiaryGroups={beneficiaryGroups}
  datePickerRef={scopeDatePickerRef}
  />
@@ -885,6 +886,7 @@ export default function UploadWizard({
  state={state}
  update={update}
  kpis={kpis}
+ tags={tags}
  lockedMetricId={lockedMetricId}
  />
  ) : (
