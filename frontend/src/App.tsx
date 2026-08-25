@@ -56,6 +56,16 @@ import EmbedPage from './pages/EmbedPage'
 import Layout from './components/Layout'
 import PublicScrollToTop from './components/public/PublicScrollToTop'
 
+const DataImportPage = React.lazy(() => import('./pages/DataImportPage'))
+
+function DataImportRoute() {
+ return (
+ <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center text-gray-500">Loading import editor…</div>}>
+ <DataImportPage />
+ </React.Suspense>
+ )
+}
+
 function AppRouter({ children }: { children: React.ReactNode }) {
  return (
  <Router>
@@ -736,6 +746,9 @@ function App() {
  {/* Invite acceptance page */}
  <Route path="/invite/:token" element={<InviteAcceptPage />} />
 
+ {/* Keep the importer outside the nested wildcard so /import always resolves directly. */}
+ <Route path="/import" element={<Layout user={user}><DataImportRoute /></Layout>} />
+
  {/* Authenticated routes */}
  <Route path="/*" element={
  <Layout user={user}>
@@ -782,6 +795,9 @@ function App() {
 
  {/* Login/Auth page */}
  <Route path="/login" element={<AuthPage />} />
+
+ {/* Protected pages should not silently fall through to the marketing homepage. */}
+ <Route path="/import" element={<Navigate to="/login" replace />} />
 
  {/* Homepage for non-authenticated users */}
  <Route path="/*" element={<HomePage />} />

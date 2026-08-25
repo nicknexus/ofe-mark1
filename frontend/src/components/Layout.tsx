@@ -16,6 +16,7 @@ import {
  GraduationCap,
  Globe,
  ArrowRight,
+ FileUp,
 } from 'lucide-react'
 import { AuthService } from '../services/auth'
 import { apiService } from '../services/api'
@@ -48,6 +49,7 @@ export default function Layout({ user, children }: LayoutProps) {
  ownedOrganization,
  hasOwnOrganization,
  canEditOrgContext,
+ canAddImpactClaims,
  loading: teamLoading
  } = useTeam()
  const { startTutorial } = useTutorial()
@@ -251,6 +253,16 @@ export default function Layout({ user, children }: LayoutProps) {
 
  {/* Right side: Explore, Tutorial, Settings, User Profile */}
  <div className="flex items-center gap-3">
+ {canAddImpactClaims && (
+ <Link
+ to="/import"
+ className="hidden lg:flex app-btn app-btn-secondary rounded-full !px-4 !py-2 gap-2"
+ title="Import impact data from CSV or Excel"
+ >
+ <FileUp className="w-4 h-4" />
+ <span>Import</span>
+ </Link>
+ )}
  {/* Context Button */}
  {activeOrganization && canEditOrgContext && (
  <Link
@@ -362,6 +374,16 @@ export default function Layout({ user, children }: LayoutProps) {
  {mobileMenuOpen && (
  <div className="lg:hidden border-t border-gray-200 pb-4 mt-2 app-card">
  <div className="pt-4 px-4 space-y-3">
+ {canAddImpactClaims && (
+ <Link
+ to="/import"
+ onClick={() => setMobileMenuOpen(false)}
+ className="flex items-center space-x-3 px-4 py-3 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-colors"
+ >
+ <FileUp className="w-5 h-5" />
+ <span>Import impact data</span>
+ </Link>
+ )}
  <Link
  to="/explore"
  onClick={() => setMobileMenuOpen(false)}
@@ -469,4 +491,4 @@ export default function Layout({ user, children }: LayoutProps) {
  </main>
  </div>
  )
-} 
+}

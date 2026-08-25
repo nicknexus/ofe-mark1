@@ -45,6 +45,39 @@ export interface EmbedPreviewPayload {
   is_public: boolean
 }
 
+export interface DataImportProposal {
+ source: {
+ sheet: string
+ row: number | null
+ cell: string | null
+ raw_metric: string | null
+ raw_location: string | null
+ raw_value: string | null
+ }
+ value_mode: 'cell' | 'row_count' | 'inferred'
+ kpi_id: string | null
+ initiative_id: string | null
+ location_id: string | null
+ value: number | null
+ date: string | null
+ date_range_start: string | null
+ date_range_end: string | null
+ label: string
+ note: string | null
+ confidence: number
+ rationale: string
+ issues: string[]
+}
+
+export interface DataImportAnalysis {
+ summary: string
+ sheets_analyzed: Array<{ sheet: string; interpretation: string; records_found: number }>
+ ignored_areas: string[]
+ warnings: string[]
+ proposals: DataImportProposal[]
+ model: string
+}
+
 // Toggle chatty per-request console logs. Off by default — they were a meaningful
 // source of dev-tools jank when the app fans out 20+ requests on navigation.
 // Enable in the browser console with: localStorage.setItem('DEBUG_API_LOG', '1')
@@ -379,6 +412,33 @@ class ApiService {
  // Clear all cache
  this.requestCache.clear()
  }
+ }
+
+ /**
+  * Send a spreadsheet to the authenticated AI analysis endpoint. This uses a
+  * direct multipart request because the normal API client serializes JSON.
+  */
+ async analyzeDataImport(file: File): Promise<DataImportAnalysis> {
+ const headers = await this.getAuthHeaders()
+ delete headers['Content-Type']
+ const body = new FormData()
+ body.append('file', file)
+
+ const response = await fetch(`${API_BASE_URL}/api/data-imports/analyze`, {
+ method: 'POST',
+ headers,
+ body,
+ })
+ const text = await response.text()
+ let payload: any = null
+ try { payload = text ? JSON.parse(text) : null } catch { payload = null }
+ if (!response.ok) {
+ const error = new Error(payload?.message || payload?.error || `AI analysis failed (HTTP ${response.status})`) as any
+ error.status = response.status
+ error.code = payload?.code
+ throw error
+ }
+ return payload as DataImportAnalysis
  }
 
  // Initiatives
@@ -1398,4 +1458,4 @@ class ApiService {
  }
 }
 
-export const apiService = new ApiService() 
+export const apiService = new ApiService()
