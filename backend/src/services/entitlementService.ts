@@ -28,7 +28,7 @@ export interface OrgEntitlements {
 
 const OPEN_ENTITLEMENTS: OrgEntitlements = {
     tier: 'pro',
-    features: { tags: true, beneficiaryGroups: true },
+    features: { tags: true, beneficiaryGroups: true, contentStudio: true },
     allowedInitiativeIds: null,
     allowedLocationIds: null,
 };

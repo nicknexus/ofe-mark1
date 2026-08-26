@@ -65,7 +65,7 @@ const CONTENT_ITEMS = [
   { to: '/share/org', label: 'Organization', icon: Building2 },
   { to: '/share/context', label: 'Context', icon: BookOpen },
   { to: '/share/embed', label: 'Embed', icon: Code2 },
-  { to: '/share/create', label: 'Content', icon: Sparkles, soon: true },
+  { to: '/share/create', label: 'Content', icon: Sparkles },
 ] as const
 
 function pathActive(pathname: string, to: string) {
@@ -355,7 +355,6 @@ export default function AppSidebar({ user }: AppSidebarProps) {
               icon={item.icon}
               active={pathActive(pathname, item.to)}
               nested
-              soon={'soon' in item && item.soon}
               nudge={item.to === '/share/public' && needsPublicNudge}
               accent="claim"
             />

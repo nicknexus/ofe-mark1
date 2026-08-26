@@ -154,7 +154,7 @@ export interface AdminAccount {
  catalog_limits: PlanLimits
  effective_limits: PlanLimits
  overridden_fields: string[]
- features: { tags: boolean; beneficiaryGroups: boolean }
+ features: { tags: boolean; beneficiaryGroups: boolean; contentStudio: boolean }
  }
  billing: AdminBilling | null
  access_code: { code: string | null; days_granted: number | null; description: string | null; redeemed_at: string } | null

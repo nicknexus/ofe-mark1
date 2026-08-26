@@ -49,7 +49,7 @@ export default function ContentHubPage() {
       <div className="max-w-5xl mx-auto">
         <PageHeader
           title="Share"
-          subtitle="Identity, then go live. Content comes later."
+          subtitle="Identity, go live, then turn tracking into posts."
           actions={
             <div className="flex items-center gap-2">
               <span className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-medium ${
@@ -89,15 +89,13 @@ export default function ContentHubPage() {
 
         <Link
           to="/share/create"
-          className="mt-3 app-card-muted px-5 py-4 flex items-center gap-3 hover:bg-gray-50 transition-colors rounded-xl"
+          className="mt-3 app-card-interactive p-5 flex items-center gap-3"
         >
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-secondary-900">Content</h2>
-              <span className="app-chip text-[10px] uppercase tracking-wide">Soon</span>
-            </div>
-            <p className="text-xs text-secondary-500 mt-0.5">
-              Impact content dashboard — branded posts from what you tracked.
+            <p className="app-section-title mb-2">Proof out</p>
+            <h2 className="text-[15px] font-semibold text-secondary-900">Content</h2>
+            <p className="text-sm text-secondary-500 mt-1.5 leading-relaxed">
+              Branded social posts and email copy from the photos and stories you already logged.
             </p>
           </div>
         </Link>

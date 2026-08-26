@@ -5,10 +5,9 @@
  * Checkout, the Stripe webhook, limit enforcement, and the account UI all read
  * from this file so the DB, Stripe, and the product never drift.
  *
- * NOTE (intentional scope): right now only LIMITS and the two Free-plan feature
- * restrictions (tags, beneficiary groups) are enforced. The other feature flags
- * are placeholders for things we'll gate later (widgets, auditing, donor
- * updates) — add them to `PlanFeatures` and the enforcement layer when ready.
+ * NOTE (intentional scope): LIMITS plus Free-plan feature restrictions
+ * (tags, beneficiary groups, content studio) are enforced. Add new flags
+ * here and to the enforcement layer together.
  */
 
 export type PlanTier = 'free' | 'growth' | 'pro';
@@ -21,6 +20,8 @@ export interface PlanFeatures {
     tags: boolean;
     /** Free plan cannot create/use beneficiary groups. */
     beneficiaryGroups: boolean;
+    /** Social/email posts from tracked evidence and stories. */
+    contentStudio: boolean;
 }
 
 export interface PlanDefinition {
@@ -44,7 +45,7 @@ export const PLAN_CATALOG: Record<PlanTier, PlanDefinition> = {
         locations_limit: 3,
         storage_limit_bytes: 25 * GB,
         ai_reports_per_day: 1,
-        features: { tags: false, beneficiaryGroups: false },
+        features: { tags: false, beneficiaryGroups: false, contentStudio: false },
     },
     growth: {
         tier: 'growth',
@@ -54,7 +55,7 @@ export const PLAN_CATALOG: Record<PlanTier, PlanDefinition> = {
         locations_limit: 15,
         storage_limit_bytes: 300 * GB,
         ai_reports_per_day: null,
-        features: { tags: true, beneficiaryGroups: true },
+        features: { tags: true, beneficiaryGroups: true, contentStudio: true },
     },
     pro: {
         tier: 'pro',
@@ -64,7 +65,7 @@ export const PLAN_CATALOG: Record<PlanTier, PlanDefinition> = {
         locations_limit: 30,
         storage_limit_bytes: 1 * TB,
         ai_reports_per_day: null,
-        features: { tags: true, beneficiaryGroups: true },
+        features: { tags: true, beneficiaryGroups: true, contentStudio: true },
     },
 };
 

@@ -149,6 +149,7 @@ export class SubscriptionService {
  tier: 'free' | 'growth' | 'pro'
  tags: boolean
  beneficiaryGroups: boolean
+ contentStudio: boolean
  }> {
  return apiService.requestCached('/subscription/features')
  }

@@ -207,6 +207,7 @@ export default function AdminOrgAccountPage() {
                         <div className="mt-4 flex flex-wrap gap-1.5 pt-3 border-t border-slate-100">
                             <FeatureFlag enabled={plan.features.tags} label="Metric tags" />
                             <FeatureFlag enabled={plan.features.beneficiaryGroups} label="Beneficiary groups" />
+                            <FeatureFlag enabled={plan.features.contentStudio} label="Content studio" />
                         </div>
                     </Section>
 

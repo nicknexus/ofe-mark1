@@ -389,6 +389,55 @@ export interface ConnectEvidenceResult {
     reconcile?: { created: number; pruned: number };
 }
 
+export type ContentPostKind = 'social' | 'email';
+export type ContentPostFormat = 'ig_square' | 'linkedin' | 'email';
+export type ContentSourceType = 'evidence' | 'story';
+export type GraphicLayout = 'clean' | 'title' | 'stats';
+
+export interface ContentOverlay {
+    label: string;
+    value: number;
+    unit: string;
+}
+
+export interface ContentSource {
+    source_type: ContentSourceType;
+    source_id: string;
+    title: string;
+    description?: string;
+    date_represented: string;
+    image_url: string;
+    thumb_url?: string;
+    initiative_id: string;
+    initiative_title: string;
+    overlay?: ContentOverlay | null;
+}
+
+export interface ContentPost {
+    id: string;
+    organization_id: string;
+    kind: ContentPostKind;
+    format: ContentPostFormat;
+    source_type: ContentSourceType;
+    source_id: string;
+    caption?: string | null;
+    email_subject?: string | null;
+    email_body?: string | null;
+    email_html?: string | null;
+    image_url?: string | null;
+    overlay?: ContentOverlay | null;
+    created_by?: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface ContentCopy {
+    caption_short: string;
+    caption_linkedin: string;
+    email_subject: string;
+    email_body: string;
+}
+
 export interface User {
     id: string;
     email: string;
