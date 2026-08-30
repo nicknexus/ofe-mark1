@@ -13,6 +13,7 @@ interface Props {
 
 export default function SubscriptionExpiredPage({ reason }: Props) {
     const [subscribing, setSubscribing] = useState(false)
+    const [upgrading, setUpgrading] = useState<string | null>(null)
     const [isSharedMember, setIsSharedMember] = useState(false)
     const [checkingPermissions, setCheckingPermissions] = useState(true)
     const [showAccessCode, setShowAccessCode] = useState(false)
@@ -36,6 +37,19 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
     const handleSignOut = async () => {
         await AuthService.signOut()
         window.location.reload()
+    }
+
+    const handleSubscribe = async (tier: 'growth' | 'pro') => {
+        setUpgrading(tier)
+        try {
+            const { url } = await SubscriptionService.createCheckoutSession({ tier, interval: 'monthly' })
+            if (url) window.location.href = url
+            else toast.error('Failed to start checkout')
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Failed to start checkout')
+        } finally {
+            setUpgrading(null)
+        }
     }
 
     const handleManageBilling = async () => {
@@ -92,7 +106,7 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
             default:
                 return {
                     title: 'Billing Needs Attention',
-                    subtitle: 'Update your billing to restore your paid plan, or continue on the free plan',
+                    subtitle: 'Subscribe to Growth or Pro to restore access',
                     icon: CreditCard
                 }
         }
@@ -170,15 +184,15 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
                                 <div className="bg-white/40 backdrop-blur rounded-xl border border-white/60 p-5 mb-6 text-left">
                                     <p className="text-sm text-muted-foreground">
                                         There's a problem with your subscription's billing. Update your payment
-                                        method to restore your paid plan. Your data is safe, and you can always
-                                        continue on the free plan.
+                                        method or subscribe again to restore access. Your data is safe.
                                     </p>
                                 </div>
 
                                 <div className="space-y-3">
+                                    {reason === 'payment_past_due' ? (
                                     <button
                                         onClick={handleManageBilling}
-                                        disabled={subscribing}
+                                        disabled={subscribing || !!upgrading}
                                         className="w-full bg-primary-500 text-gray-800 py-3.5 px-6 rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium flex items-center justify-center gap-2"
                                     >
                                         {subscribing ? (
@@ -194,6 +208,24 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
                                             </>
                                         )}
                                     </button>
+                                    ) : (
+                                    <>
+                                        <button
+                                            onClick={() => handleSubscribe('growth')}
+                                            disabled={!!upgrading || subscribing}
+                                            className="w-full bg-primary-500 text-gray-800 py-3.5 px-6 rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
+                                        >
+                                            {upgrading === 'growth' ? 'Opening checkout...' : 'Subscribe to Growth'}
+                                        </button>
+                                        <button
+                                            onClick={() => handleSubscribe('pro')}
+                                            disabled={!!upgrading || subscribing}
+                                            className="w-full bg-white/60 text-foreground py-3 px-6 rounded-xl border border-primary-500/30 hover:bg-primary-500/15 disabled:opacity-50 transition-all font-medium"
+                                        >
+                                            {upgrading === 'pro' ? 'Opening checkout...' : 'Subscribe to Pro'}
+                                        </button>
+                                    </>
+                                    )}
 
                                     <button
                                         onClick={handleSignOut}
@@ -245,7 +277,7 @@ export default function SubscriptionExpiredPage({ reason }: Props) {
                                 </div>
 
                                 <p className="mt-6 text-xs text-muted-foreground">
-                                    Your data is safely stored. Subscribe anytime to pick up where you left off.
+                                    Your data is safely stored. Subscribe again to pick up where you left off. Your public page stays unpublished until you turn it back on.
                                 </p>
                             </>
                         )}

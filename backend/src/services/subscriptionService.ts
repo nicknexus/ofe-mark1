@@ -1,9 +1,9 @@
 import { supabase } from '../utils/supabase';
 import { TeamService } from './teamService';
 import { PlatformAdminService } from './platformAdminService';
-import { stripe } from '../utils/stripe';
+import { stripe, mapStripeSubscriptionStatus, tierFromPriceId } from '../utils/stripe';
 import { EntitlementService } from './entitlementService';
-import { PLAN_CATALOG, PlanTier, getPlan, normaliseTier, planLimitColumns } from '../config/planCatalog';
+import { PlanTier, getPlan, normaliseTier, planLimitColumns } from '../config/planCatalog';
 
 export interface Subscription {
     id: string;
@@ -18,6 +18,8 @@ export interface Subscription {
     billing_interval?: 'monthly' | 'annual' | 'yearly' | 'lifetime' | null;
     trial_started_at?: string;
     trial_ends_at?: string;
+    /** Set once on the first Stripe Checkout (trial or paid). Never cleared. */
+    trial_used_at?: string | null;
     stripe_customer_id?: string;
     stripe_subscription_id?: string;
     stripe_price_id?: string;
@@ -41,8 +43,6 @@ export interface SubscriptionAccessResult {
     isInherited?: boolean;
     inheritedFromOrgId?: string;
 }
-
-const TRIAL_DURATION_DAYS = 30;
 
 export interface AccessCode {
     id: string;
@@ -162,25 +162,100 @@ export class SubscriptionService {
     }
 
     /**
-     * Downgrade a user to the free plan (e.g. paid subscription lapsed/cancelled).
-     * Applies Free limits and sets status 'free'. Nothing else is touched:
-     * over-limit initiatives, tags, and beneficiary groups are hidden/locked at
-     * read time by EntitlementService, so the user's data (and their is_public
-     * choices) are preserved exactly and reappear instantly on re-upgrade.
+     * Paid/trial access ended. Lock the account (no free fallback) and take
+     * every owned non-demo org off the public web. Data is untouched; they
+     * republish after they subscribe again.
      */
-    static async downgradeToFree(userId: string): Promise<Subscription> {
-        const sub = await supabase
+    static async deactivateAndUnpublish(userId: string): Promise<Subscription> {
+        const existing = await this.getByUserId(userId);
+        // Grandfathered always-free: never lock or unpublish from a stale
+        // canceled Stripe id left on the row after the old downgrade path.
+        if (existing?.status === 'free') return existing;
+
+        const { data, error } = await supabase
             .from('subscriptions')
-            .update({ status: 'free', ...planLimitColumns('free'), cancelled_at: new Date().toISOString() })
+            .update({
+                status: 'cancelled',
+                cancelled_at: new Date().toISOString(),
+                cancel_at_period_end: false,
+            })
             .eq('user_id', userId)
             .select()
             .single();
 
-        if (sub.error) {
-            throw new Error(`Failed to downgrade to free: ${sub.error.message}`);
+        if (error) {
+            throw new Error(`Failed to deactivate subscription: ${error.message}`);
         }
+
+        const { error: unpubError } = await supabase
+            .from('organizations')
+            .update({ is_public: false })
+            .eq('owner_id', userId)
+            .eq('is_demo', false);
+        if (unpubError) {
+            console.error(`[deactivateAndUnpublish] unpublish failed for ${userId}:`, unpubError.message);
+        }
+
         EntitlementService.bustAll();
-        return sub.data;
+        return data;
+    }
+
+    /** Owner's public page may be served (or stay listed). Grandfathered free stays live. */
+    static isLiveForPublic(sub: Subscription | null | undefined): boolean {
+        if (!sub) return false;
+        switch (sub.status) {
+            case 'free':
+            case 'active':
+            case 'past_due':
+                return true;
+            case 'trial':
+                return !sub.trial_ends_at || new Date(sub.trial_ends_at) > new Date();
+            case 'cancelled':
+                return !!(sub.current_period_end && new Date(sub.current_period_end) > new Date());
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Org ids whose owner currently has live access (trial/active/past_due/free,
+     * or cancelled-but-still-in-period). Demo orgs always pass. Used as a
+     * read-time belt so a missed webhook cannot leave a lapsed page up.
+     */
+    static async orgIdsWithLiveAccess(orgIds: string[]): Promise<Set<string>> {
+        const unique = [...new Set(orgIds.filter(Boolean))];
+        const live = new Set<string>();
+        if (unique.length === 0) return live;
+
+        const { data: orgs, error } = await supabase
+            .from('organizations')
+            .select('id, owner_id, is_demo')
+            .in('id', unique);
+        if (error || !orgs) return live;
+
+        const ownerIds = [...new Set(orgs.map(o => o.owner_id).filter(Boolean))] as string[];
+        const subByOwner = new Map<string, Subscription>();
+        if (ownerIds.length > 0) {
+            const { data: subs } = await supabase
+                .from('subscriptions')
+                .select('user_id, status, trial_ends_at, current_period_end')
+                .in('user_id', ownerIds);
+            for (const s of subs || []) subByOwner.set(s.user_id, s as Subscription);
+        }
+
+        for (const org of orgs) {
+            if (org.is_demo) {
+                live.add(org.id);
+                continue;
+            }
+            if (this.isLiveForPublic(subByOwner.get(org.owner_id))) live.add(org.id);
+        }
+        return live;
+    }
+
+    static async orgIsLiveForPublic(orgId: string): Promise<boolean> {
+        const live = await this.orgIdsWithLiveAccess([orgId]);
+        return live.has(orgId);
     }
 
     /**
@@ -252,7 +327,7 @@ export class SubscriptionService {
                 // Payment failed but Stripe is still retrying (dunning). Keep access
                 // during the grace window — Stripe will either recover the payment
                 // (→ active) or eventually cancel (→ subscription.deleted →
-                // downgradeToFree). We never hard-lock the user out.
+                // deactivateAndUnpublish). We never hard-lock the user out.
                 return { hasAccess: true, reason: 'payment_past_due_grace', subscription };
 
             case 'cancelled':
@@ -737,6 +812,95 @@ export class SubscriptionService {
     }
 
     /**
+     * Apply a Stripe subscription object onto our row. Shared by the webhook,
+     * /status self-heal, and confirm-checkout so mapping cannot drift.
+     */
+    static async applyStripeSubscription(
+        userId: string,
+        stripeSub: any,
+        opts?: { markTrialUsed?: boolean }
+    ): Promise<Subscription> {
+        const status = mapStripeSubscriptionStatus(stripeSub.status);
+        if (status === 'cancelled') {
+            return this.deactivateAndUnpublish(userId);
+        }
+
+        const item = stripeSub.items?.data?.[0];
+        const rawPeriodStart = stripeSub.current_period_start ?? item?.current_period_start;
+        const rawPeriodEnd = stripeSub.current_period_end ?? item?.current_period_end ?? stripeSub.cancel_at;
+        const cancelAtPeriodEnd =
+            stripeSub.cancel_at_period_end === true ||
+            (!!stripeSub.cancel_at && stripeSub.status === 'active');
+        const priceId = item?.price?.id as string | undefined;
+        const trialStart = stripeSub.trial_start
+            ? new Date(stripeSub.trial_start * 1000).toISOString()
+            : undefined;
+        const trialEnd = stripeSub.trial_end
+            ? new Date(stripeSub.trial_end * 1000).toISOString()
+            : undefined;
+
+        const existing = await this.getByUserId(userId);
+        const markTrialUsed = !!(opts?.markTrialUsed || status === 'trial') && !existing?.trial_used_at;
+
+        const updated = await this.updateFromStripe(userId, {
+            stripe_subscription_id: stripeSub.id,
+            ...(typeof stripeSub.customer === 'string' && { stripe_customer_id: stripeSub.customer }),
+            ...(priceId && { stripe_price_id: priceId }),
+            status,
+            cancel_at_period_end: cancelAtPeriodEnd,
+            ...(rawPeriodStart && { current_period_start: new Date(rawPeriodStart * 1000).toISOString() }),
+            ...(rawPeriodEnd && { current_period_end: new Date(rawPeriodEnd * 1000).toISOString() }),
+            ...(trialStart && { trial_started_at: trialStart }),
+            ...(trialEnd && { trial_ends_at: trialEnd }),
+            ...(status === 'active' && {
+                cancelled_at: null,
+                billing_interval: tierFromPriceId(priceId)?.interval || undefined,
+            }),
+            ...(status === 'trial' && {
+                cancelled_at: null,
+                billing_interval: tierFromPriceId(priceId)?.interval || undefined,
+            }),
+            ...(markTrialUsed && { trial_used_at: new Date().toISOString() }),
+        });
+
+        if (status === 'active' || status === 'trial') {
+            const fromPrice = tierFromPriceId(priceId);
+            const metaTier = stripeSub.metadata?.plan_tier;
+            const tier: PlanTier = fromPrice?.tier
+                || (metaTier === 'pro' || metaTier === 'growth' ? metaTier : null)
+                || (normaliseTier(metaTier) === 'free' ? 'growth' : normaliseTier(metaTier));
+            if (tier === 'growth' || tier === 'pro') {
+                await this.applyPlan(userId, tier);
+            }
+        }
+
+        return (await this.getByUserId(userId)) || updated;
+    }
+
+    /**
+     * If Checkout finished but the webhook never arrived (local `stripe listen`
+     * off), find a live Stripe sub on this customer and apply it.
+     */
+    static async syncFromStripeCustomer(userId: string, stripeCustomerId: string): Promise<Subscription> {
+        if (!stripe) return this.getOrCreate(userId);
+        try {
+            const list = await stripe.subscriptions.list({
+                customer: stripeCustomerId,
+                status: 'all',
+                limit: 5,
+            });
+            const live = list.data.find(s =>
+                s.status === 'trialing' || s.status === 'active' || s.status === 'past_due'
+            );
+            if (!live) return this.getOrCreate(userId);
+            return this.applyStripeSubscription(userId, live, { markTrialUsed: true });
+        } catch (e) {
+            console.error(`[syncFromStripeCustomer] Failed for user ${userId}:`, (e as Error).message);
+            return this.getOrCreate(userId);
+        }
+    }
+
+    /**
      * Sync subscription directly from Stripe API. Returns the updated local subscription.
      * Falls back to returning the existing subscription if Stripe call fails.
      */
@@ -746,21 +910,8 @@ export class SubscriptionService {
         }
         try {
             const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId) as any;
-            const status: Subscription['status'] = sub.status === 'active' ? 'active'
-                : sub.status === 'past_due' ? 'past_due'
-                    : sub.status === 'canceled' || sub.status === 'unpaid' ? 'cancelled'
-                        : 'active';
-            const item = sub.items?.data?.[0];
-            const rawPeriodStart = sub.current_period_start ?? item?.current_period_start;
-            const rawPeriodEnd = sub.current_period_end ?? item?.current_period_end ?? sub.cancel_at;
-            const updated = await this.updateFromStripe(userId, {
-                status,
-                ...(rawPeriodStart && { current_period_start: new Date(rawPeriodStart * 1000).toISOString() }),
-                ...(rawPeriodEnd && { current_period_end: new Date(rawPeriodEnd * 1000).toISOString() }),
-                ...(status === 'cancelled' && { cancelled_at: new Date().toISOString() }),
-                ...(status === 'active' && { cancelled_at: null }),
-            });
-            console.log(`[syncFromStripeDirectly] Synced subscription for user ${userId}: status=${status}`);
+            const updated = await this.applyStripeSubscription(userId, sub);
+            console.log(`[syncFromStripeDirectly] Synced subscription for user ${userId}: status=${updated.status}`);
             return updated;
         } catch (e) {
             console.error(`[syncFromStripeDirectly] Failed for user ${userId}:`, (e as Error).message);
@@ -784,6 +935,9 @@ export class SubscriptionService {
             current_period_end?: string;
             cancel_at_period_end?: boolean;
             cancelled_at?: string | null;
+            trial_started_at?: string;
+            trial_ends_at?: string;
+            trial_used_at?: string | null;
         }
     ): Promise<Subscription> {
         const { data, error } = await supabase

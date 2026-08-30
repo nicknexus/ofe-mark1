@@ -207,6 +207,17 @@ function App() {
  }
 
  try {
+ const params = new URLSearchParams(window.location.search)
+ const checkoutSession = params.get('session_id')
+ if (params.get('checkout') === 'success' && checkoutSession) {
+ try {
+ await SubscriptionService.confirmCheckout(checkoutSession)
+ } catch (e) {
+ console.warn('confirm-checkout failed, falling back to status poll:', e)
+ }
+ window.history.replaceState({}, '', window.location.pathname + window.location.hash)
+ }
+
  // Login / Safari session restore / backend wake often fail the first
  // hit. Keep the loader up and retry instead of flashing Connection Issue.
  const attempts = 3
@@ -217,6 +228,10 @@ function App() {
  const status = await SubscriptionService.getStatus()
  if (gen !== subCheckGenRef.current) return
  setSubscriptionStatus(status)
+ if (params.get('checkout') === 'success' && !status.hasAccess && i < attempts - 1) {
+ await new Promise(r => setTimeout(r, 600 * (i + 1)))
+ continue
+ }
  return
  } catch (error) {
  lastError = error
@@ -238,7 +253,8 @@ function App() {
  created_at: '',
  updated_at: ''
  },
- remainingTrialDays: null
+ remainingTrialDays: null,
+ trialDurationDays: 10,
  })
  } finally {
  if (showLoader && gen === subCheckGenRef.current) {
@@ -415,7 +431,10 @@ function App() {
 
  return (
  <>
- <TrialActivationPage onTrialStarted={handleTrialStarted} />
+ <TrialActivationPage
+ onTrialStarted={handleTrialStarted}
+ trialDurationDays={subscriptionStatus.trialDurationDays}
+ />
  <AppToaster />
  </>
  )
@@ -446,7 +465,11 @@ function App() {
  <StorageProvider>
  <TeamProvider key={user.id}>
  {showTrialBanner && (
- <TrialBanner remainingDays={subscriptionStatus.remainingTrialDays} />
+ <TrialBanner
+ remainingDays={subscriptionStatus.remainingTrialDays}
+ planName={subscriptionStatus.subscription.plan_tier || undefined}
+ trialEndsAt={subscriptionStatus.subscription.trial_ends_at}
+ />
  )}
  <Routes>
  <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -661,7 +684,10 @@ function App() {
 
  return (
  <>
- <TrialActivationPage onTrialStarted={handleTrialStarted} />
+ <TrialActivationPage
+ onTrialStarted={handleTrialStarted}
+ trialDurationDays={subscriptionStatus.trialDurationDays}
+ />
  <AppToaster />
  </>
  )
@@ -705,6 +731,8 @@ function App() {
  {showTrialBanner && (
  <TrialBanner
  remainingDays={subscriptionStatus.remainingTrialDays}
+ planName={subscriptionStatus.subscription.plan_tier || undefined}
+ trialEndsAt={subscriptionStatus.subscription.trial_ends_at}
  />
  )}
  <Routes>
@@ -753,6 +781,8 @@ function App() {
  {showTrialBanner && (
  <TrialBanner
  remainingDays={subscriptionStatus.remainingTrialDays}
+ planName={subscriptionStatus.subscription.plan_tier || undefined}
+ trialEndsAt={subscriptionStatus.subscription.trial_ends_at}
  />
  )}
 

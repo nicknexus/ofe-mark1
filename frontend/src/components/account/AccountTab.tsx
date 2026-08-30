@@ -56,7 +56,7 @@ export function AccountTab({
             </div>
             <div>
               <h2 className="text-base font-semibold text-gray-800">Start your own organization</h2>
-              <p className="text-sm text-secondary-500">Create one and start a 14-day trial.</p>
+              <p className="text-sm text-secondary-500">Create one and choose Growth or Pro.</p>
             </div>
           </div>
           {!showCreateOrg ? (
@@ -83,7 +83,7 @@ export function AccountTab({
                   {creatingOrg ? (
                     <><Spinner className="w-4 h-4 border-white border-t-white/30" />Creating...</>
                   ) : (
-                    <><Rocket className="w-4 h-4" />Create & start trial</>
+                    <><Rocket className="w-4 h-4" />Create organization</>
                   )}
                 </button>
                 <button

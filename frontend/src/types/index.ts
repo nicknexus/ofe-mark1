@@ -385,6 +385,7 @@ export interface Subscription {
  billing_interval?: 'monthly' | 'annual' | 'yearly' | 'lifetime' | null;
  trial_started_at?: string;
  trial_ends_at?: string;
+ trial_used_at?: string | null;
  stripe_customer_id?: string;
  stripe_subscription_id?: string;
  current_period_start?: string;
@@ -404,6 +405,7 @@ export interface SubscriptionStatus {
  reason: string;
  subscription: Subscription;
  remainingTrialDays: number | null;
+ trialDurationDays?: number;
  isInherited?: boolean;
  inheritedFromOrgId?: string;
 }

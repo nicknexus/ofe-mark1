@@ -3,6 +3,7 @@ import { Organization, Initiative, KPI, Evidence, Story, Location, BeneficiaryGr
 import { BeneficiaryService } from './beneficiaryService';
 import { MetricTagService } from './metricTagService';
 import { EntitlementService } from './entitlementService';
+import { SubscriptionService } from './subscriptionService';
 import { aggregateKpiUpdates } from '../utils/kpiAggregation';
 
 /**
@@ -70,6 +71,13 @@ export interface SearchResult {
 }
 
 export class PublicService {
+
+    /** Drop orgs whose owner no longer has live access. Demos always pass. */
+    private static async keepLivePublicOrgs<T extends { id: string }>(orgs: T[]): Promise<T[]> {
+        if (orgs.length === 0) return orgs;
+        const live = await SubscriptionService.orgIdsWithLiveAccess(orgs.map(o => o.id));
+        return orgs.filter(o => live.has(o.id));
+    }
 
     /**
      * Filter impact_claims on evidence by:
@@ -249,10 +257,15 @@ export class PublicService {
             return true;
         });
 
+        const live = await SubscriptionService.orgIdsWithLiveAccess([
+            ...organizations.map(o => o.id),
+            ...initiatives.map(i => i.organization_id),
+            ...uniqueLocationMatches.map((m: any) => m.organization.id),
+        ]);
         return {
-            organizations,
-            initiatives,
-            locationMatches: uniqueLocationMatches
+            organizations: organizations.filter(o => live.has(o.id)),
+            initiatives: initiatives.filter(i => live.has(i.organization_id)),
+            locationMatches: uniqueLocationMatches.filter((m: any) => live.has(m.organization.id)),
         };
     }
 
@@ -272,7 +285,7 @@ export class PublicService {
             .limit(100);
 
         if (error) throw new Error(`Failed to fetch organizations: ${error.message}`);
-        return data || [];
+        return this.keepLivePublicOrgs(data || []);
     }
 
     static async getOrganizationBySlug(slug: string, opts?: PublicReadOptions): Promise<{
@@ -288,6 +301,9 @@ export class PublicService {
         const { data: org, error } = await orgQuery.single();
 
         if (error || !org) return null;
+        if (!opts?.allowPrivate && !org.is_demo && !(await SubscriptionService.orgIsLiveForPublic(org.id))) {
+            return null;
+        }
 
         // Get stats — scoped to what the org's current plan allows, so numbers
         // from plan-hidden initiatives/locations never leak into public counts.
@@ -1905,7 +1921,7 @@ export class PublicService {
             .select('id, name, slug, logo_url, brand_color')
             .eq('is_public', true)
             .eq('is_demo', false);
-        const orgList = orgs || [];
+        const orgList = await this.keepLivePublicOrgs(orgs || []);
         if (orgList.length === 0) return { stats: emptyStats, stories: [], impact_claims: [] };
 
         const orgById = new Map(orgList.map((o: any) => [o.id, o]));

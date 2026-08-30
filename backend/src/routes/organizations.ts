@@ -30,7 +30,13 @@ router.get('/public', async (req, res) => {
             .limit(100);
 
         if (error) throw error;
-        res.json(data || []);
+        const rows = data || [];
+        if (rows.length === 0) {
+            res.json([]);
+            return;
+        }
+        const live = await SubscriptionService.orgIdsWithLiveAccess(rows.map((o: { id: string }) => o.id));
+        res.json(rows.filter((o: { id: string }) => live.has(o.id)));
     } catch (error) {
         res.status(500).json({ error: (error as Error).message });
     }

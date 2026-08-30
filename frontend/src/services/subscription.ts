@@ -29,30 +29,24 @@ export class SubscriptionService {
  }
  
  /**
- * Activate the always-free plan (no card, no expiry).
+ * After Stripe Checkout redirects back, persist the session so the app
+ * gate does not wait on a delayed webhook.
  */
- static async activateFree(): Promise<{
+ static async confirmCheckout(sessionId: string): Promise<{
  success: boolean
- subscription: Subscription
- remainingTrialDays: number
- message: string
+ pending?: boolean
  }> {
  const headers = await getAuthHeaders()
- 
- const response = await fetch(`${API_BASE_URL}/api/subscription/activate-free`, {
+ const response = await fetch(`${API_BASE_URL}/api/subscription/confirm-checkout`, {
  method: 'POST',
- headers
+ headers,
+ body: JSON.stringify({ sessionId }),
  })
- 
  if (!response.ok) {
- const error = await response.json()
- throw new Error(error.error || 'Failed to activate free plan')
+ const error = await response.json().catch(() => ({}))
+ throw new Error(error.error || 'Failed to confirm checkout')
  }
-
- // Bust the cached /subscription/status so the app re-reads the new access
- // state immediately (otherwise the gate sticks until a manual reload).
  apiService.clearCache('/subscription')
-
  return response.json()
  }
 

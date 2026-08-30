@@ -1,4 +1,5 @@
 import { supabase } from '../utils/supabase';
+import { SubscriptionService } from './subscriptionService';
 import { Organization } from '../types';
 
 export class OrganizationService {
@@ -119,6 +120,9 @@ export class OrganizationService {
             if (error.code === 'PGRST116') return null;
             throw new Error(`Failed to fetch organization: ${error.message}`);
         }
+        if (!data.is_demo && !(await SubscriptionService.orgIsLiveForPublic(data.id))) {
+            return null;
+        }
         return data;
     }
 
@@ -157,6 +161,22 @@ export class OrganizationService {
             const err = new Error('Permission denied — must be owner or admin');
             (err as any).status = 403;
             throw err;
+        }
+
+        if (updates.is_public === true) {
+            const { data: org } = await supabase
+                .from('organizations')
+                .select('owner_id, is_demo')
+                .eq('id', id)
+                .maybeSingle();
+            if (org && !org.is_demo && org.owner_id) {
+                const ownerSub = await SubscriptionService.getByUserId(org.owner_id);
+                if (!SubscriptionService.isLiveForPublic(ownerSub)) {
+                    const err = new Error('An active plan is required to publish your public page.');
+                    (err as any).status = 403;
+                    throw err;
+                }
+            }
         }
 
         // Generate slug if name is being updated, with collision detection
@@ -211,7 +231,10 @@ export class OrganizationService {
             .limit(50);
 
         if (error) throw new Error(`Failed to search organizations: ${error.message}`);
-        return data || [];
+        const rows = data || [];
+        if (rows.length === 0) return [];
+        const live = await SubscriptionService.orgIdsWithLiveAccess(rows.map(o => o.id));
+        return rows.filter(o => live.has(o.id));
     }
 }
 

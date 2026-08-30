@@ -52,6 +52,24 @@ export const STRIPE_CONFIG = {
 
 export type BillingInterval = 'monthly' | 'annual';
 
+/** Map a Stripe subscription.status onto our subscriptions.status. */
+export function mapStripeSubscriptionStatus(
+    stripeStatus: string | undefined
+): 'trial' | 'active' | 'past_due' | 'cancelled' {
+    switch (stripeStatus) {
+        case 'trialing':
+            return 'trial';
+        case 'past_due':
+            return 'past_due';
+        case 'canceled':
+        case 'unpaid':
+        case 'incomplete_expired':
+            return 'cancelled';
+        default:
+            return 'active';
+    }
+}
+
 /** Resolve the Stripe price id for a tier + interval (self-serve checkout). */
 export function priceIdForTier(
     tier: 'growth' | 'pro',

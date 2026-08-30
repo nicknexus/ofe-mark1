@@ -21,7 +21,7 @@ export function writePendingPlan(plan: PendingPlan): void {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(plan))
     } catch {
         // Storage blocked (private mode / cookie settings). Signup still works;
-        // the user just lands on the free plan and can upgrade from there.
+        // they pick Growth or Pro on the post-signup screen.
     }
 }
 

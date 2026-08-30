@@ -1,14 +1,15 @@
 import React, { useState } from 'react'
-import { Sparkles, CheckCircle2, ArrowRight, Ticket, CreditCard } from 'lucide-react'
+import { CheckCircle2, ArrowRight, Ticket, CreditCard } from 'lucide-react'
 import { SubscriptionService } from '../services/subscription'
 import { AuthService } from '../services/auth'
 import MarketingPageShell, { MarketingLogoHeader } from '../components/MarketingPageShell'
 import toast from 'react-hot-toast'
-import { readPendingPlan, clearPendingPlan, type PendingTier } from '../utils/pendingPlan'
+import { readPendingPlan, writePendingPlan, type PendingTier } from '../utils/pendingPlan'
+import { TRIAL_DURATION_DAYS } from '../config/trial'
 
 interface Props {
-    // Kept name for App.tsx compatibility — fires after the free plan is active.
     onTrialStarted: () => void
+    trialDurationDays?: number
 }
 
 const PLAN_INFO: Record<PendingTier, { name: string; monthly: string; annual: string; features: string[] }> = {
@@ -16,7 +17,7 @@ const PLAN_INFO: Record<PendingTier, { name: string; monthly: string; annual: st
         name: 'Growth',
         monthly: '$75 / month',
         annual: '$750 / year',
-        features: ['10 programs', '10 team members', '15 locations', '300 GB storage', 'Unlimited AI reports', 'Tags & beneficiary groups'],
+        features: ['10 programs', '10 team members', '15 locations', '300 GB storage', 'Unlimited AI reports', 'Tags and beneficiary groups'],
     },
     pro: {
         name: 'Pro',
@@ -26,41 +27,27 @@ const PLAN_INFO: Record<PendingTier, { name: string; monthly: string; annual: st
     },
 }
 
-export default function TrialActivationPage({ onTrialStarted }: Props) {
-    const [loading, setLoading] = useState(false)
+export default function TrialActivationPage({ onTrialStarted, trialDurationDays }: Props) {
+    const pending = readPendingPlan()
+    const days = trialDurationDays || TRIAL_DURATION_DAYS
+    const [interval, setInterval] = useState<'monthly' | 'annual'>(pending?.interval || 'monthly')
+    const [selected, setSelected] = useState<PendingTier>(pending?.tier || 'growth')
     const [subscribing, setSubscribing] = useState(false)
     const [showAccessCode, setShowAccessCode] = useState(false)
     const [accessCode, setAccessCode] = useState('')
     const [redeemingCode, setRedeemingCode] = useState(false)
-    const [pendingPlan] = useState(readPendingPlan)
 
-    const handlePayNow = async () => {
-        if (!pendingPlan) return
+    const handleStartTrial = async (tier: PendingTier) => {
+        setSelected(tier)
+        writePendingPlan({ tier, interval })
         setSubscribing(true)
         try {
-            const { url } = await SubscriptionService.createCheckoutSession({
-                tier: pendingPlan.tier,
-                interval: pendingPlan.interval,
-            })
+            const { url } = await SubscriptionService.createCheckoutSession({ tier, interval })
             if (url) window.location.href = url
             else toast.error('Failed to start checkout')
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'Failed to start checkout')
             setSubscribing(false)
-        }
-    }
-
-    const handleStartFree = async () => {
-        setLoading(true)
-        try {
-            const result = await SubscriptionService.activateFree()
-            clearPendingPlan()
-            toast.success(result.message || 'Your free plan is active. Welcome aboard!')
-            onTrialStarted()
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Failed to activate free plan')
-        } finally {
-            setLoading(false)
         }
     }
 
@@ -88,138 +75,85 @@ export default function TrialActivationPage({ onTrialStarted }: Props) {
         window.location.reload()
     }
 
-    const freeFeatures = [
-        '1 program',
-        '2 team members',
-        '3 locations',
-        '25 GB storage',
-        '1 AI summary report / day',
-        'Public impact page + Explore listing',
-    ]
-
-    // If the user picked a paid plan on the landing page, show that plan's
-    // "pay now" screen with a small "start free instead" opt-out.
-    if (pendingPlan) {
-        const info = PLAN_INFO[pendingPlan.tier]
-        const price = pendingPlan.interval === 'annual' ? info.annual : info.monthly
-        return (
-            <MarketingPageShell contentClassName="max-w-lg w-full">
-                <div className="text-center mb-8">
-                    <MarketingLogoHeader />
-                    <h2 className="text-lg font-medium text-muted-foreground">You're almost in</h2>
-                    <h1 className="text-2xl font-semibold text-foreground mt-1">Subscribe to {info.name}</h1>
-                    <p className="text-muted-foreground mt-2 text-sm">Complete your subscription to unlock {info.name}.</p>
-                </div>
-
-                <div className="glass-card p-6 text-center flex flex-col">
-                    <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 bg-primary-500/30 border border-primary-500/40">
-                        <CreditCard className="w-7 h-7 text-primary-500" />
-                    </div>
-
-                    <h2 className="text-xl font-semibold text-foreground mb-1">{info.name} plan</h2>
-                    <p className="text-muted-foreground text-sm mb-4">{price}</p>
-
-                    <div className="bg-white/40 backdrop-blur rounded-xl border border-white/60 p-4 mb-4 flex-1">
-                        <ul className="space-y-2 text-left">
-                            {info.features.map((feature) => (
-                                <li key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <CheckCircle2 className="w-4 h-4 text-primary-500 flex-shrink-0" />
-                                    <span>{feature}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-
-                    <button
-                        onClick={handlePayNow}
-                        disabled={subscribing || loading}
-                        className="w-full bg-primary-500 text-gray-800 py-3 px-6 rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium flex items-center justify-center gap-2"
-                    >
-                        {subscribing ? (
-                            <>
-                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                Redirecting to checkout...
-                            </>
-                        ) : (
-                            <>
-                                Pay now
-                                <ArrowRight className="w-5 h-5" />
-                            </>
-                        )}
-                    </button>
-
-                    {/* Small opt-out to the free plan */}
-                    <button
-                        onClick={handleStartFree}
-                        disabled={loading || subscribing}
-                        className="mt-3 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-                    >
-                        {loading ? 'Setting up...' : 'Not Ready? Start with the free plan instead'}
-                    </button>
-                </div>
-
-                <div className="text-center mt-6">
-                    <button onClick={handleSignOut} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                        Sign out and use a different account
-                    </button>
-                </div>
-            </MarketingPageShell>
-        )
-    }
-
     return (
-        <MarketingPageShell contentClassName="max-w-lg w-full">
-            {/* Logo - public style */}
+        <MarketingPageShell contentClassName="max-w-3xl w-full">
             <div className="text-center mb-8">
                 <MarketingLogoHeader />
                 <h2 className="text-lg font-medium text-muted-foreground">Welcome to</h2>
                 <h1 className="text-2xl font-semibold text-foreground mt-1">Nexus Impacts AI</h1>
-                <p className="text-muted-foreground mt-2 text-sm">Get your first impact page live — free, forever.</p>
+                <p className="text-muted-foreground mt-2 text-sm">
+                    Pick a plan to start your {days}-day free trial. You will not be charged until the trial ends.
+                </p>
             </div>
 
-            {/* Free Plan Card */}
-            <div className="glass-card p-6 text-center flex flex-col">
-                <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 bg-primary-500/30 border border-primary-500/40">
-                    <Sparkles className="w-7 h-7 text-primary-500" />
+            <div className="flex justify-center mb-6">
+                <div className="inline-flex items-center gap-1 p-1 rounded-full bg-white/50 border border-white/60">
+                    <button
+                        type="button"
+                        onClick={() => setInterval('monthly')}
+                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                            interval === 'monthly' ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground'
+                        }`}
+                    >
+                        Monthly
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setInterval('annual')}
+                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                            interval === 'annual' ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground'
+                        }`}
+                    >
+                        Annual <span className="text-xs text-primary-600">2 months free</span>
+                    </button>
                 </div>
+            </div>
 
-                <h2 className="text-xl font-semibold text-foreground mb-1">Free plan</h2>
-                <p className="text-muted-foreground text-sm mb-4">
-                    $0 forever. No credit card required.
-                </p>
-
-                <div className="bg-white/40 backdrop-blur rounded-xl border border-white/60 p-4 mb-4 flex-1">
-                    <ul className="space-y-2 text-left">
-                        {freeFeatures.map((feature) => (
-                            <li key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <CheckCircle2 className="w-4 h-4 text-primary-500 flex-shrink-0" />
-                                <span>{feature}</span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-
-                <button
-                    onClick={handleStartFree}
-                    disabled={loading || redeemingCode}
-                    className="w-full bg-primary-500 text-gray-800 py-3 px-6 rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium flex items-center justify-center gap-2"
-                >
-                    {loading ? (
-                        <>
-                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            Setting up...
-                        </>
-                    ) : (
-                        <>
-                            Get started free
-                            <ArrowRight className="w-5 h-5" />
-                        </>
-                    )}
-                </button>
-
-                <p className="text-xs text-muted-foreground mt-3">
-                    Need more? Upgrade to Growth or Pro anytime from Settings → Billing.
-                </p>
+            <div className="grid sm:grid-cols-2 gap-4">
+                {(['growth', 'pro'] as PendingTier[]).map((tier) => {
+                    const info = PLAN_INFO[tier]
+                    const price = interval === 'annual' ? info.annual : info.monthly
+                    const highlighted = selected === tier
+                    return (
+                        <div
+                            key={tier}
+                            className={`glass-card p-6 text-center flex flex-col ${highlighted ? 'ring-2 ring-primary-500' : ''}`}
+                        >
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 bg-primary-500/30 border border-primary-500/40">
+                                <CreditCard className="w-6 h-6 text-primary-500" />
+                            </div>
+                            <h2 className="text-xl font-semibold text-foreground mb-1">{info.name}</h2>
+                            <p className="text-muted-foreground text-sm mb-4">{price} after trial</p>
+                            <div className="bg-white/40 backdrop-blur rounded-xl border border-white/60 p-4 mb-4 flex-1">
+                                <ul className="space-y-2 text-left">
+                                    {info.features.map((feature) => (
+                                        <li key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
+                                            <CheckCircle2 className="w-4 h-4 text-primary-500 flex-shrink-0" />
+                                            <span>{feature}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                            <button
+                                onClick={() => handleStartTrial(tier)}
+                                disabled={subscribing || redeemingCode}
+                                className="w-full bg-primary-500 text-gray-800 py-3 px-6 rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium flex items-center justify-center gap-2"
+                            >
+                                {subscribing && selected === tier ? (
+                                    <>
+                                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        Redirecting to checkout...
+                                    </>
+                                ) : (
+                                    <>
+                                        Start my {days}-day free trial
+                                        <ArrowRight className="w-5 h-5" />
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    )
+                })}
             </div>
 
             <div className="mt-6 glass-card p-4 text-center">
@@ -245,7 +179,7 @@ export default function TrialActivationPage({ onTrialStarted }: Props) {
                             />
                             <button
                                 type="submit"
-                                disabled={redeemingCode || loading || !accessCode.trim()}
+                                disabled={redeemingCode || subscribing || !accessCode.trim()}
                                 className="px-4 py-2.5 bg-primary-500 text-gray-800 rounded-xl text-sm font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
                                 {redeemingCode ? 'Redeeming...' : 'Redeem'}

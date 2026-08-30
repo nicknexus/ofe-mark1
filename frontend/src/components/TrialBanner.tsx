@@ -6,30 +6,33 @@ const BANNER_DISMISSED_KEY = 'nexus-trial-banner-dismissed'
 
 interface Props {
  remainingDays: number | null
- onUpgradeClick?: () => void
+ planName?: string
+ trialEndsAt?: string | null
 }
 
-export default function TrialBanner({ remainingDays, onUpgradeClick }: Props) {
+function formatDate(iso?: string | null) {
+ if (!iso) return null
+ const d = new Date(iso)
+ if (Number.isNaN(d.getTime())) return null
+ return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+export default function TrialBanner({ remainingDays, planName, trialEndsAt }: Props) {
  const [dismissed, setDismissed] = useState(() => {
- // Check localStorage on initial render
  const stored = localStorage.getItem(BANNER_DISMISSED_KEY)
  return stored === 'true'
  })
  const navigate = useNavigate()
 
-
  if (remainingDays === null || dismissed) return null
 
  const isUrgent = remainingDays <= 7
  const isCritical = remainingDays <= 3
+ const endLabel = formatDate(trialEndsAt)
+ const plan = planName ? planName.charAt(0).toUpperCase() + planName.slice(1) : 'your plan'
 
- const handleUpgrade = () => {
- if (onUpgradeClick) {
- onUpgradeClick()
- } else {
- // Navigate to account page where subscription info is shown
- navigate('/account')
- }
+ const handleBilling = () => {
+ navigate('/account?tab=billing')
  }
 
  const getBannerStyle = () => {
@@ -44,12 +47,12 @@ export default function TrialBanner({ remainingDays, onUpgradeClick }: Props) {
 
  const getMessage = () => {
  if (remainingDays === 0) {
- return 'Your trial ends today!'
+ return `${plan} trial ends today. You will be billed unless you cancel.`
  }
  if (remainingDays === 1) {
- return '1 day left in your trial'
+ return `1 day left on ${plan}. You will be billed${endLabel ? ` on ${endLabel}` : ''} unless you cancel.`
  }
- return `${remainingDays} days left in your trial`
+ return `${remainingDays} days left on ${plan}. You will be billed${endLabel ? ` on ${endLabel}` : ''} unless you cancel.`
  }
 
  return (
@@ -58,23 +61,18 @@ export default function TrialBanner({ remainingDays, onUpgradeClick }: Props) {
  <div className="flex items-center gap-2 text-sm">
  <Clock className="w-4 h-4" />
  <span className="font-medium">{getMessage()}</span>
- {!isCritical && (
- <span className="hidden sm:inline text-white/80">
- — Upgrade to keep your impact tracking running
- </span>
- )}
  </div>
 
  <div className="flex items-center gap-3">
- <button 
- onClick={handleUpgrade}
+ <button
+ onClick={handleBilling}
  className="flex items-center gap-1 text-sm font-semibold bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg transition-colors cursor-pointer"
  >
- Upgrade Now
+ Manage billing
  <ArrowRight className="w-4 h-4" />
  </button>
- 
- <button 
+
+ <button
  onClick={() => {
  localStorage.setItem(BANNER_DISMISSED_KEY, 'true')
  setDismissed(true)
@@ -89,4 +87,3 @@ export default function TrialBanner({ remainingDays, onUpgradeClick }: Props) {
  </div>
  )
 }
-

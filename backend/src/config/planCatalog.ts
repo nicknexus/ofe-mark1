@@ -13,6 +13,16 @@
 
 export type PlanTier = 'free' | 'growth' | 'pro';
 
+/**
+ * Stripe Checkout trial length. Override with TRIAL_DURATION_DAYS in env.
+ * Changing this does not rewrite in-flight Stripe trial_end values.
+ * Free is grandfather-only (existing accounts). New signups are Growth/Pro.
+ */
+export const TRIAL_DURATION_DAYS = Math.max(
+    1,
+    parseInt(process.env.TRIAL_DURATION_DAYS || '10', 10) || 10
+);
+
 const GB = 1024 ** 3;
 const TB = 1024 ** 4;
 

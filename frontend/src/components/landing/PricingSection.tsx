@@ -6,7 +6,8 @@ import { Reveal, StaggerGroup, StaggerItem } from "./Reveal";
 import { AnimatedNumber } from "./AnimatedNumber";
 import { spring } from "./motion";
 import { DEMO_BOOKING_URL } from "./constants";
-import { writePendingPlan, clearPendingPlan, type PendingTier } from "../../utils/pendingPlan";
+import { writePendingPlan, type PendingTier } from "../../utils/pendingPlan";
+import { TRIAL_DURATION_DAYS } from "../../config/trial";
 
 interface PricingSectionProps {
   onGetStarted?: () => void;
@@ -16,8 +17,7 @@ type Billing = "monthly" | "annual";
 
 interface Tier {
   name: string;
-  /** Plan id carried through signup to Stripe; null for the free tier. */
-  tierKey: PendingTier | null;
+  tierKey: PendingTier;
   monthly: number;
   priceSuffix: string;
   cta: string;
@@ -25,29 +25,15 @@ interface Tier {
   features: string[];
 }
 
+const trialCta = `Start ${TRIAL_DURATION_DAYS}-day free trial`;
+
 const tiers: Tier[] = [
-  {
-    name: "Free",
-    tierKey: null,
-    monthly: 0,
-    priceSuffix: "forever",
-    cta: "Start free",
-    highlighted: false,
-    features: [
-      "1 program",
-      "2 team members",
-      "3 locations",
-      "25 GB storage",
-      "1 AI report / day",
-      "Public impact page + Explore listing",
-    ],
-  },
   {
     name: "Growth",
     tierKey: "growth",
     monthly: 75,
     priceSuffix: "per month",
-    cta: "Get started",
+    cta: trialCta,
     highlighted: true,
     features: [
       "10 programs",
@@ -65,7 +51,7 @@ const tiers: Tier[] = [
     tierKey: "pro",
     monthly: 240,
     priceSuffix: "per month",
-    cta: "Get started",
+    cta: trialCta,
     highlighted: false,
     features: [
       "25 programs",
@@ -87,15 +73,8 @@ const annualMonthly = (monthly: number) => Math.round((monthly * 10) / 12);
 const PricingSection = ({ onGetStarted }: PricingSectionProps) => {
   const [billing, setBilling] = useState<Billing>("monthly");
 
-  // Stash the picked plan before handing off to signup — TrialActivationPage
-  // reads it back afterwards and offers checkout for exactly this tier and
-  // billing interval. Picking Free clears any earlier choice.
   const handleTierClick = (tier: Tier) => {
-    if (tier.tierKey) {
-      writePendingPlan({ tier: tier.tierKey, interval: billing });
-    } else {
-      clearPendingPlan();
-    }
+    writePendingPlan({ tier: tier.tierKey, interval: billing });
     onGetStarted?.();
   };
 
@@ -150,14 +129,10 @@ const PricingSection = ({ onGetStarted }: PricingSectionProps) => {
         </Reveal>
 
         {/* Tiers */}
-        <StaggerGroup className="grid md:grid-cols-3 gap-6 items-stretch" gap={0.12}>
+        <StaggerGroup className="grid md:grid-cols-2 gap-6 items-stretch max-w-3xl mx-auto" gap={0.12}>
           {tiers.map((tier) => {
             const displayPrice =
-              tier.monthly === 0
-                ? 0
-                : billing === "annual"
-                ? annualMonthly(tier.monthly)
-                : tier.monthly;
+              billing === "annual" ? annualMonthly(tier.monthly) : tier.monthly;
             return (
               <StaggerItem key={tier.name} className="h-full">
                 <motion.div
@@ -195,7 +170,7 @@ const PricingSection = ({ onGetStarted }: PricingSectionProps) => {
                     <span className="text-sm text-muted-foreground">{tier.priceSuffix}</span>
                   </div>
                   <p className="text-xs text-muted-foreground h-4 mb-6">
-                    {tier.monthly !== 0 && billing === "annual" ? "billed annually" : " "}
+                    {billing === "annual" ? `then billed annually after ${TRIAL_DURATION_DAYS} days` : `then billed monthly after ${TRIAL_DURATION_DAYS} days`}
                   </p>
 
                   <ul className="space-y-3 mb-8 flex-1">

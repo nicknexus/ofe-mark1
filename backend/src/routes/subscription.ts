@@ -2,8 +2,7 @@ import { Router, Request, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { SubscriptionService, Subscription } from '../services/subscriptionService';
 import { stripe, STRIPE_CONFIG, priceIdForTier, tierFromPriceId, BillingInterval } from '../utils/stripe';
-import { normaliseTier, getPlan, PlanTier } from '../config/planCatalog';
-import { EntitlementService } from '../services/entitlementService';
+import { normaliseTier, getPlan, PlanTier, TRIAL_DURATION_DAYS } from '../config/planCatalog';
 import { supabase } from '../utils/supabase';
 import { blockInSupportMode } from '../middleware/supportMode';
 
@@ -40,6 +39,7 @@ function toClientSubscription(sub: Subscription | null | undefined) {
         billing_interval: sub.billing_interval,
         trial_started_at: sub.trial_started_at,
         trial_ends_at: sub.trial_ends_at,
+        trial_used_at: sub.trial_used_at,
         stripe_customer_id: sub.stripe_customer_id,
         stripe_subscription_id: sub.stripe_subscription_id,
         current_period_start: sub.current_period_start,
@@ -68,8 +68,14 @@ router.get('/status', authenticateUser, async (req: AuthenticatedRequest, res) =
         const sub = await SubscriptionService.getOrCreate(req.user!.id);
         // Only ever self-heal the caller's OWN Stripe record. An admin viewing a
         // customer must not trigger writes to that customer's billing row.
-        if (sub.stripe_subscription_id) {
+        //
+        // Local/dev often has no `stripe listen`. After Checkout we already
+        // stored stripe_customer_id, so pull the new sub from Stripe if the
+        // webhook never arrived.
+        if (sub.status !== 'free' && sub.stripe_subscription_id) {
             await syncSubscriptionFromStripe(req.user!.id, sub.stripe_subscription_id);
+        } else if (sub.stripe_customer_id && (sub.status === 'none' || sub.status === 'expired' || sub.status === 'cancelled')) {
+            await SubscriptionService.syncFromStripeCustomer(req.user!.id, sub.stripe_customer_id);
         }
         const { hasAccess, reason, subscription, isSupportMode } =
             await SubscriptionService.getAccessForContext(req.user!.id, requestedOrgId);
@@ -80,6 +86,7 @@ router.get('/status', authenticateUser, async (req: AuthenticatedRequest, res) =
             reason,
             subscription: toClientSubscription(subscription),
             remainingTrialDays,
+            trialDurationDays: TRIAL_DURATION_DAYS,
             isSupportMode,
         });
     } catch (error) {
@@ -87,43 +94,6 @@ router.get('/status', authenticateUser, async (req: AuthenticatedRequest, res) =
         res.status(500).json({ error: (error as Error).message });
     }
 });
-
-/**
- * POST /api/subscription/activate-free
- * (alias: POST /api/subscription/start-trial — kept for the existing frontend)
- * Activate the always-free plan. No card, no expiry. Only valid from status
- * 'none'; if already on any plan we just return the current subscription.
- */
-const activateFreeHandler = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        const existing = await SubscriptionService.getOrCreate(req.user!.id);
-
-        // Already on a plan (free/active/etc.) — idempotent no-op.
-        if (existing.status !== 'none') {
-            res.json({
-                success: true,
-                subscription: existing,
-                remainingTrialDays: null,
-                message: 'Your plan is already active.'
-            });
-            return;
-        }
-
-        const subscription = await SubscriptionService.activateFree(req.user!.id);
-        res.json({
-            success: true,
-            subscription,
-            remainingTrialDays: null,
-            message: 'Your free plan is active. Welcome aboard!'
-        });
-    } catch (error) {
-        console.error('Error activating free plan:', error);
-        res.status(500).json({ error: (error as Error).message });
-    }
-};
-
-router.post('/activate-free', authenticateUser, blockInSupportMode, activateFreeHandler);
-router.post('/start-trial', authenticateUser, blockInSupportMode, activateFreeHandler);
 
 /**
  * POST /api/subscription/redeem-code
@@ -173,24 +143,7 @@ async function syncSubscriptionFromStripe(userId: string, stripeSubscriptionId: 
     if (!stripe) return;
     try {
         const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId) as any;
-        const status = sub.status === 'active' ? 'active'
-            : sub.status === 'past_due' ? 'past_due'
-                : sub.status === 'canceled' || sub.status === 'unpaid' ? 'cancelled'
-                    : 'active';
-        const cancelAtPeriodEnd =
-            sub.cancel_at_period_end === true ||
-            (!!sub.cancel_at && sub.status === 'active');
-        const item = sub.items?.data?.[0];
-        const rawPeriodStart = sub.current_period_start ?? item?.current_period_start;
-        const rawPeriodEnd = sub.current_period_end ?? item?.current_period_end ?? sub.cancel_at;
-        await SubscriptionService.updateFromStripe(userId, {
-            status,
-            cancel_at_period_end: cancelAtPeriodEnd,
-            ...(rawPeriodStart && { current_period_start: new Date(rawPeriodStart * 1000).toISOString() }),
-            ...(rawPeriodEnd && { current_period_end: new Date(rawPeriodEnd * 1000).toISOString() }),
-            ...(status === 'cancelled' && { cancelled_at: new Date().toISOString() }),
-            ...(status === 'active' && { cancelled_at: null }),
-        });
+        await SubscriptionService.applyStripeSubscription(userId, sub);
     } catch (e) {
         console.error('Sync from Stripe failed:', (e as Error).message);
     }
@@ -288,6 +241,19 @@ router.post('/create-checkout-session', authenticateUser, blockInSupportMode, as
         // Get or create subscription to get/create stripe customer
         let subscription = await SubscriptionService.getOrCreate(userId);
 
+        const liveStripe =
+            !!subscription.stripe_subscription_id &&
+            (subscription.status === 'trial' || subscription.status === 'active' || subscription.status === 'past_due');
+        if (liveStripe) {
+            res.status(409).json({
+                error: 'You already have an active subscription. Manage it from Billing.',
+                usePortal: true,
+            });
+            return;
+        }
+
+        const grantTrial = !subscription.trial_used_at;
+
         let customerId = subscription.stripe_customer_id;
 
         // Create Stripe customer if doesn't exist
@@ -316,15 +282,22 @@ router.post('/create-checkout-session', authenticateUser, blockInSupportMode, as
                     { price: finalPriceId, quantity: 1 },
                 ],
                 mode: 'subscription',
+                payment_method_collection: 'always',
                 // Shows the "Add promotion code" field on the Stripe-hosted
                 // checkout page. Codes themselves are created in the Stripe
                 // dashboard (coupon → promotion code); nothing to configure here.
                 // Cannot be combined with a `discounts` param — we don't pass one.
                 allow_promotion_codes: true,
-                success_url: `${STRIPE_CONFIG.SUCCESS_URL}?checkout=success`,
+                success_url: `${STRIPE_CONFIG.SUCCESS_URL}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
                 cancel_url: `${STRIPE_CONFIG.CANCEL_URL}?checkout=cancelled`,
                 metadata: { user_id: userId, plan_tier: planTier },
-                subscription_data: { metadata: { user_id: userId, plan_tier: planTier } },
+                subscription_data: {
+                    metadata: { user_id: userId, plan_tier: planTier },
+                    ...(grantTrial ? {
+                        trial_period_days: TRIAL_DURATION_DAYS,
+                        trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
+                    } : {}),
+                },
             });
 
         let session;
@@ -352,6 +325,49 @@ router.post('/create-checkout-session', authenticateUser, blockInSupportMode, as
         res.json({ sessionId: session.id, url: session.url });
     } catch (error) {
         console.error('Error creating checkout session:', error);
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+/**
+ * POST /api/subscription/confirm-checkout
+ * After Stripe redirects back, write the session onto our row so the app
+ * gate does not wait on a delayed webhook.
+ */
+router.post('/confirm-checkout', authenticateUser, blockInSupportMode, async (req: AuthenticatedRequest, res) => {
+    try {
+        if (!stripe) {
+            res.status(503).json({ error: 'Payment system not configured' });
+            return;
+        }
+        const sessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId : '';
+        if (!sessionId.startsWith('cs_')) {
+            res.status(400).json({ error: 'A checkout session id is required' });
+            return;
+        }
+
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        if (session.metadata?.user_id && session.metadata.user_id !== req.user!.id) {
+            res.status(403).json({ error: 'This checkout session belongs to another account' });
+            return;
+        }
+        if (session.status !== 'complete' || !session.subscription) {
+            res.json({ success: false, pending: true });
+            return;
+        }
+
+        const stripeSub = await stripe.subscriptions.retrieve(session.subscription as string) as any;
+        const subscription = await SubscriptionService.applyStripeSubscription(req.user!.id, stripeSub, {
+            markTrialUsed: true,
+        });
+        res.json({
+            success: true,
+            subscription: toClientSubscription(subscription),
+            remainingTrialDays: SubscriptionService.getRemainingTrialDays(subscription),
+            hasAccess: SubscriptionService.isLiveForPublic(subscription) || subscription.status === 'trial',
+        });
+    } catch (error) {
+        console.error('Error confirming checkout:', error);
         res.status(500).json({ error: (error as Error).message });
     }
 });
@@ -395,34 +411,10 @@ router.post('/webhook', async (req: Request, res: Response) => {
                     const stripeSubscription = await stripe.subscriptions.retrieve(
                         session.subscription as string
                     ) as any;
-
-                    const item = stripeSubscription.items?.data?.[0];
-                    const rawPeriodStart = stripeSubscription.current_period_start ?? item?.current_period_start;
-                    const rawPeriodEnd = stripeSubscription.current_period_end ?? item?.current_period_end;
-                    const periodStart = rawPeriodStart
-                        ? new Date(rawPeriodStart * 1000).toISOString()
-                        : new Date().toISOString();
-                    const periodEnd = rawPeriodEnd
-                        ? new Date(rawPeriodEnd * 1000).toISOString()
-                        : new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString();
-
-                    const actualPriceId = stripeSubscription.items?.data?.[0]?.price?.id || STRIPE_CONFIG.STARTER_PRICE_ID;
-                    const planTier = resolvePaidTier(actualPriceId, session.metadata?.plan_tier);
-                    const billingInterval = tierFromPriceId(actualPriceId)?.interval || 'monthly';
-
-                    await SubscriptionService.updateFromStripe(userId, {
-                        stripe_subscription_id: stripeSubscription.id,
-                        stripe_price_id: actualPriceId,
-                        status: 'active',
-                        billing_interval: billingInterval,
-                        current_period_start: periodStart,
-                        current_period_end: periodEnd,
+                    const applied = await SubscriptionService.applyStripeSubscription(userId, stripeSubscription, {
+                        markTrialUsed: true,
                     });
-
-                    // Apply the full limit set + plan_tier from the catalog.
-                    await SubscriptionService.applyPlan(userId, planTier);
-
-                    console.log(`✅ Subscription activated for user ${userId} (${planTier}, ${billingInterval})`);
+                    console.log(`✅ Subscription activated for user ${userId} (status=${applied.status}, tier=${applied.plan_tier})`);
                 }
                 break;
             }
@@ -434,63 +426,16 @@ router.post('/webhook', async (req: Request, res: Response) => {
                     userId = await SubscriptionService.getUserIdByStripeSubscriptionId(subscription.id) ?? undefined;
                 }
 
-                // Period dates moved to subscription item level in newer Stripe API versions
-                const item = subscription.items?.data?.[0];
-                const rawPeriodStart = subscription.current_period_start ?? item?.current_period_start;
-                const rawPeriodEnd = subscription.current_period_end ?? item?.current_period_end ?? subscription.cancel_at;
-
                 console.log('[webhook] customer.subscription.updated', {
                     subscriptionId: subscription.id,
                     status: subscription.status,
                     cancel_at_period_end: subscription.cancel_at_period_end,
                     hasUserId: !!userId,
                     metadata: subscription.metadata,
-                    rawPeriodStart,
-                    rawPeriodEnd,
                 });
                 if (userId) {
-                    const status = subscription.status === 'active' ? 'active'
-                        : subscription.status === 'past_due' ? 'past_due'
-                            : subscription.status === 'canceled' ? 'cancelled'
-                                : 'active';
-
-                    const periodStart = rawPeriodStart
-                        ? new Date(rawPeriodStart * 1000).toISOString()
-                        : undefined;
-                    const periodEnd = rawPeriodEnd
-                        ? new Date(rawPeriodEnd * 1000).toISOString()
-                        : undefined;
-
-                    const cancelAtPeriodEnd =
-                        subscription.cancel_at_period_end === true ||
-                        (!!subscription.cancel_at && subscription.status === 'active');
-
-                    const updatedPriceId = item?.price?.id as string | undefined;
-
-                    await SubscriptionService.updateFromStripe(userId, {
-                        status,
-                        ...(updatedPriceId && { stripe_price_id: updatedPriceId }),
-                        ...(periodStart && { current_period_start: periodStart }),
-                        ...(periodEnd && { current_period_end: periodEnd }),
-                        ...(status === 'active' && { billing_interval: tierFromPriceId(updatedPriceId)?.interval || undefined }),
-                        cancel_at_period_end: cancelAtPeriodEnd,
-                        ...(status === 'cancelled' && { cancelled_at: new Date().toISOString() }),
-                        ...(status === 'active' && { cancelled_at: null }),
-                    });
-
-                    // Re-apply limits from the (possibly changed) price so plan
-                    // switches via the Stripe portal self-heal. On cancellation,
-                    // drop to Free and hide overflow public initiatives.
-                    if (status === 'active') {
-                        const tier = resolvePaidTier(updatedPriceId, subscription.metadata?.plan_tier);
-                        await SubscriptionService.applyPlan(userId, tier);
-                        console.log(`✅ Subscription updated for user ${userId}: active (${tier}), periodEnd=${periodEnd}`);
-                    } else if (status === 'cancelled') {
-                        await SubscriptionService.downgradeToFree(userId);
-                        console.log(`✅ Subscription cancelled for user ${userId} → downgraded to Free`);
-                    } else {
-                        console.log(`✅ Subscription updated for user ${userId}: ${status}, cancel_at_period_end=${cancelAtPeriodEnd}`);
-                    }
+                    const applied = await SubscriptionService.applyStripeSubscription(userId, subscription);
+                    console.log(`✅ Subscription updated for user ${userId}: ${applied.status}, cancel_at_period_end=${applied.cancel_at_period_end}`);
                 }
                 break;
             }
@@ -502,10 +447,8 @@ router.post('/webhook', async (req: Request, res: Response) => {
                     userId = await SubscriptionService.getUserIdByStripeSubscriptionId(subscription.id) ?? undefined;
                 }
                 if (userId) {
-                    // Paid subscription ended → downgrade to Free (keep access) and
-                    // hide overflow public initiatives instead of locking the user out.
-                    await SubscriptionService.downgradeToFree(userId);
-                    console.log(`✅ Subscription deleted for user ${userId} → downgraded to Free`);
+                    await SubscriptionService.deactivateAndUnpublish(userId);
+                    console.log(`✅ Subscription deleted for user ${userId} → unpublished and locked`);
                 } else {
                     console.warn('[webhook] customer.subscription.deleted: no user_id (metadata or stripe_subscription_id lookup)', subscription.id);
                 }

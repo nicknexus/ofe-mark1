@@ -3,7 +3,7 @@ import { ExternalLink } from 'lucide-react'
 import { notify } from '../../lib/notify'
 import { SubscriptionService } from '../../services/subscription'
 import type { BillingTabProps } from './accountTypes'
-import { Spinner } from '../ui'
+import { Badge, Spinner } from '../ui'
 
 // Self-serve upgrade tiers. Annual = 2 months free (10x monthly).
 const UPGRADE_TIERS = [
@@ -53,34 +53,41 @@ export function BillingTab({ subscriptionStatus }: BillingTabProps) {
  }
  }
 
- const plan = (subscriptionStatus?.subscription?.plan_tier as string) || 'free'
+ const plan = (subscriptionStatus?.subscription?.plan_tier as string) || 'none'
  const status = (subscriptionStatus?.subscription?.status as string) || 'none'
- // Paid users manage their plan via the portal; free users see upgrade options.
- const isPaid = status === 'active' || status === 'past_due'
+ const hasStripe = !!subscriptionStatus?.subscription?.stripe_subscription_id
+ // Live Stripe subs (including trial) manage via the portal so we never open
+ // a second Checkout and accidentally mint another trial.
+ const isPaid = status === 'active' || status === 'past_due' || (status === 'trial' && hasStripe)
+ const remainingDays = subscriptionStatus?.remainingTrialDays
+ const planLabel = plan === 'none' || plan === 'free' ? (status === 'free' ? 'Free' : 'None') : plan
+ const statusTone = status === 'active' ? 'impact' : status === 'trial' ? 'accent' : status === 'past_due' ? 'warning' : status === 'cancelled' || status === 'canceled' ? 'danger' : 'neutral'
+ const statusLabel = status === 'active' ? 'Active' : status === 'trial' ? 'Trial' : status === 'past_due' ? 'Past due' : status === 'cancelled' || status === 'canceled' ? 'Canceled' : 'Inactive'
+ const daysLeft = status === 'trial' && remainingDays != null
+  ? remainingDays === 0
+   ? 'Ends today'
+   : remainingDays === 1
+    ? '1 day left'
+    : `${remainingDays} days left`
+  : null
 
  return (
  <div className="app-card p-6">
  <div className="mb-6">
- <h2 className="text-base font-semibold text-gray-800">Plan</h2>
- <p className="text-sm text-secondary-500">Manage your subscription, payment methods, and invoices.</p>
+ <h2 className="app-card-title">Plan</h2>
+ <p className="app-muted mt-1">Manage your subscription, payment methods, and invoices.</p>
  </div>
 
- <div className="bg-gray-50 rounded-xl p-4 mb-6">
- <div className="flex items-center justify-between">
- <div>
- <p className="text-sm font-medium text-gray-500">Current Plan</p>
- <p className="text-lg font-bold text-gray-900 capitalize mt-0.5">{plan === 'none' ? 'Free' : plan}</p>
+ <div className="app-card-muted p-4 mb-6">
+ <div className="flex items-start justify-between gap-4">
+ <div className="min-w-0">
+ <p className="text-xs font-medium text-secondary-500">Current plan</p>
+ <p className="text-lg font-semibold text-secondary-900 capitalize mt-0.5">{planLabel}</p>
+ {daysLeft && (
+  <p className="text-sm text-secondary-500 mt-1">{daysLeft}</p>
+ )}
  </div>
- <span className={`px-3 py-1 rounded-full text-xs font-semibold ${status === 'active' ? 'bg-impact-100 text-impact-700' :
- status === 'trial' ? 'app-icon-tile app-icon-tile-accent' :
- status === 'canceled' ? 'bg-red-100 text-red-700' :
- 'bg-gray-100 text-gray-600'
- }`}>
- {status === 'active' ? 'Active' :
- status === 'trial' ? 'Trial' :
- status === 'canceled' ? 'Canceled' :
- 'Inactive'}
- </span>
+ <Badge tone={statusTone} className="shrink-0">{statusLabel}</Badge>
  </div>
  </div>
 
